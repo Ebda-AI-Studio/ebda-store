@@ -64,6 +64,7 @@ vi.mock('@api/middleware/security', () => ({
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: unknown, _res: unknown, next: () => void) => next(),
   rejectImpersonated: (_req: unknown, _res: unknown, next: () => void) => next(),
+  rejectAdminOnMerchantOrigin: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 vi.mock('@api/services/redis.service', () => ({
@@ -71,6 +72,15 @@ vi.mock('@api/services/redis.service', () => ({
 }));
 
 vi.mock('@api/lib/cors-cache', () => ({ isPlatformOrigin: vi.fn(() => true) }));
+
+// Ruling B1-13: the routes refuse the demo store first; not this suite's concern (it is pinned in
+// tests/integration/demo-store.test.ts), and the real guard needs the database this suite mocks.
+const demoGuard = vi.hoisted(() => ({ fail: null as null | Error }));
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertNotDemoStore: vi.fn(async () => {
+    if (demoGuard.fail) throw demoGuard.fail;
+  }),
+}));
 
 import authRoutes from '@api/routes/auth.routes';
 
@@ -222,5 +232,67 @@ describe('POST /auth/resend-verification — enumeration oracle closed', () => {
     await handler(req, res, next);
 
     expect(mockResendVerificationEmail).toHaveBeenCalledWith('real@example.test', null);
+  });
+});
+
+// T9 review minor (W2a): the demo guard's own failure (a store lookup that errors) must answer the
+// generic 200, byte-identical to an unknown address, never a 500 that differs by storeId; only the
+// DEMO_STORE refusal itself is passed on (403).
+describe('POST /auth/forgot-password — the demo guard never opens a second oracle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    demoGuard.fail = null;
+    mockRequestPasswordReset.mockResolvedValue(undefined);
+  });
+  it('a failing store lookup in the guard gives the generic 200, not next(error)', async () => {
+    const handler = getHandler('post', '/forgot-password');
+    const unknown = capture({ email: 'nobody@example.test', storeId: 's1' });
+    await handler(unknown.req, unknown.res, unknown.next);
+    demoGuard.fail = new Error('db down');
+    const failing = capture({ email: 'nobody@example.test', storeId: 's1' });
+    await handler(failing.req, failing.res, failing.next);
+    expect(failing.next).not.toHaveBeenCalled();
+    expect(failing.recorded).toEqual(unknown.recorded);
+    expect(mockRequestPasswordReset).toHaveBeenCalledTimes(1); // only the first call reached it
+  });
+  it('the DEMO_STORE refusal itself is still passed on (403 by the error handler)', async () => {
+    const { AppError } = await import('@api/middleware/error-handler');
+    const handler = getHandler('post', '/forgot-password');
+    demoGuard.fail = new AppError(403, 'DEMO_STORE', 'demo');
+    const c = capture({ email: 'nobody@example.test', storeId: 'demo' });
+    await handler(c.req, c.res, c.next);
+    expect(c.next).toHaveBeenCalledWith(demoGuard.fail);
+    expect(mockRequestPasswordReset).not.toHaveBeenCalled();
+  });
+});
+
+// Minor M-2 (B1 final review): resend-verification mirrors forgot-password above.
+describe('POST /auth/resend-verification — the demo guard never opens a second oracle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    demoGuard.fail = null;
+    mockResendVerificationEmail.mockResolvedValue({
+      success: true,
+      message: 'If an account exists with this email, a verification link has been sent.',
+    });
+  });
+  it('a failing store lookup in the guard gives the generic 200, not next(error)', async () => {
+    const handler = getHandler('post', '/resend-verification');
+    demoGuard.fail = new Error('db down');
+    const failing = capture({ email: 'nobody@example.test', storeId: 's1' });
+    await handler(failing.req, failing.res, failing.next);
+    expect(failing.next).not.toHaveBeenCalled();
+    expect(failing.recorded.status).toBe(200);
+    expect(failing.recorded.body).toMatchObject({ success: true });
+    expect(mockResendVerificationEmail).not.toHaveBeenCalled();
+  });
+  it('the DEMO_STORE refusal itself is still passed on (403 by the error handler)', async () => {
+    const { AppError } = await import('@api/middleware/error-handler');
+    const handler = getHandler('post', '/resend-verification');
+    demoGuard.fail = new AppError(403, 'DEMO_STORE', 'demo');
+    const c = capture({ email: 'nobody@example.test', storeId: 'demo' });
+    await handler(c.req, c.res, c.next);
+    expect(c.next).toHaveBeenCalledWith(demoGuard.fail);
+    expect(mockResendVerificationEmail).not.toHaveBeenCalled();
   });
 });

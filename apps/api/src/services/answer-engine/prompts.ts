@@ -22,6 +22,7 @@
 import { prisma } from '@ebda/database';
 
 import { REGION } from '@ebda/shared';
+import { visibleProductWhere } from '../../lib/visible-product';
 export interface GeneratedPrompt {
   text: string;
   locale: 'en' | 'ar';
@@ -52,8 +53,9 @@ export async function generatePrompts(storeId: string): Promise<GeneratedPrompt[
       select: { name: true, nameAr: true },
       take: MAX_CATEGORIES,
     }),
+    // A wholesale-only product's NAME must never reach a third-party answer engine (Ruling B2B-7; final review minor 1).
     prisma.product.findMany({
-      where: { storeId, deletedAt: null, status: 'active' },
+      where: { storeId, deletedAt: null, status: 'active', ...visibleProductWhere() },
       orderBy: [{ isBestSeller: 'desc' }, { viewCount: 'desc' }],
       select: { name: true, nameAr: true },
       take: MAX_PRODUCTS,

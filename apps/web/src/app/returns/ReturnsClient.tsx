@@ -16,26 +16,24 @@ const RETURN_REASONS = [
   {
     value: 'defective',
     label: 'Item is defective or damaged',
-    labelAr:
-      '\u0627\u0644\u0645\u0646\u062a\u062c \u0645\u0639\u064a\u0628 \u0623\u0648 \u062a\u0627\u0644\u0641',
+    labelAr: 'المنتج معيب أو تالف',
   },
   {
     value: 'wrong_item',
     label: 'Wrong item received',
-    labelAr:
-      '\u062a\u0645 \u0627\u0633\u062a\u0644\u0627\u0645 \u0645\u0646\u062a\u062c \u062e\u0627\u0637\u0626',
+    labelAr: 'وصلني منتج غلط',
   },
   {
     value: 'not_as_described',
     label: 'Not as described',
-    labelAr: '\u0644\u0627 \u064a\u0637\u0627\u0628\u0642 \u0627\u0644\u0648\u0635\u0641',
+    labelAr: 'لا يطابق الوصف',
   },
   {
     value: 'changed_mind',
     label: 'Changed my mind',
-    labelAr: '\u063a\u064a\u0631\u062a \u0631\u0623\u064a\u064a',
+    labelAr: 'غيرت رأيي',
   },
-  { value: 'other', label: 'Other', labelAr: '\u0623\u062e\u0631\u0649' },
+  { value: 'other', label: 'Other', labelAr: 'أخرى' },
 ] as const;
 
 type ReturnReason = (typeof RETURN_REASONS)[number]['value'];
@@ -146,10 +144,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
     if (!selectedOrderId) {
       setSubmitResult({
         type: 'error',
-        text: t(
-          'Please select an order.',
-          '\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0637\u0644\u0628.'
-        ),
+        text: t('Please select an order.', 'اختار طلب.'),
       });
       return;
     }
@@ -158,7 +153,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         type: 'error',
         text: t(
           'Please select at least one item to return.',
-          '\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0639\u0646\u0635\u0631 \u0648\u0627\u062d\u062f \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0625\u0631\u062c\u0627\u0639.'
+          'اختار حاجة واحدة على الأقل ترجّعها.'
         ),
       });
       return;
@@ -166,10 +161,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
     if (!reason) {
       setSubmitResult({
         type: 'error',
-        text: t(
-          'Please select a return reason.',
-          '\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0633\u0628\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639.'
-        ),
+        text: t('Please select a return reason.', 'اختار سبب الإرجاع.'),
       });
       return;
     }
@@ -200,7 +192,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         type: 'error',
         text: t(
           'Please select at least one item to return.',
-          'يرجى اختيار عنصر واحد على الأقل للإرجاع.'
+          'اختار حاجة واحدة على الأقل ترجّعها.'
         ),
       });
       return;
@@ -232,10 +224,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         const returnNumber = json.data?.return?.returnNumber;
         setSubmitResult({
           type: 'success',
-          text: t(
-            'Your return request has been submitted successfully.',
-            '\u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639 \u0628\u0646\u062c\u0627\u062d.'
-          ),
+          text: t('Your return request has been submitted successfully.', 'طلب الإرجاع اتبعت.'),
           returnNumber,
         });
         // Reset form
@@ -258,22 +247,22 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           text: windowClosed
             ? t(
                 'The return period for this order has ended, so a return can no longer be requested online. Please contact the store.',
-                'انتهت مدة الإرجاع لهذا الطلب ولم يعد ممكناً تقديم طلب الإرجاع إلكترونياً. يرجى التواصل مع المتجر.'
+                'مدة الإرجاع للطلب ده خلصت ومبقاش ينفع تقدّم طلب إرجاع أونلاين. كلّم المتجر.'
               )
             : orderBusy
               ? t(
                   'Another return on this order is being processed. Please try again in a moment.',
-                  'يتم الآن معالجة إرجاع آخر لهذا الطلب. يرجى المحاولة مرة أخرى بعد قليل.'
+                  'في إرجاع تاني للطلب ده بيتجهز دلوقتي. جرّب تاني بعد شوية.'
                 )
               : transportFailure
                 ? t(
                     'Failed to submit return request. Please check your connection.',
-                    '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+                    'طلب الإرجاع متبعتش. اتأكد من اتصالك.'
                   )
                 : json.error?.message ||
                   t(
                     'Failed to submit return request. Please try again.',
-                    '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
+                    'طلب الإرجاع متبعتش. جرّب تاني.'
                   ),
         });
       }
@@ -282,7 +271,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         type: 'error',
         text: t(
           'Failed to submit return request. Please check your connection.',
-          '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+          'طلب الإرجاع متبعتش. اتأكد من اتصالك.'
         ),
       });
     } finally {
@@ -294,18 +283,18 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
     return (
       <section className="rounded-xl border bg-card p-6 shadow-sm">
         <h2 className="text-xl font-semibold text-foreground">
-          {t('Request a Return', '\u0637\u0644\u0628 \u0625\u0631\u062c\u0627\u0639')}
+          {t('Request a Return', 'طلب إرجاع')}
         </h2>
         <p className="mt-3 text-muted-foreground">
           <Link
             href={`${storeUrl('/auth/login')}?redirect=${encodeURIComponent('/returns')}`}
             className="font-medium text-primary hover:underline"
           >
-            {t('Log in', '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644')}
+            {t('Log in', 'تسجيل الدخول')}
           </Link>{' '}
           {t(
             'to submit a return request for one of your orders.',
-            '\u0644\u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0625\u0631\u062c\u0627\u0639 \u0644\u0623\u062d\u062f \u0637\u0644\u0628\u0627\u062a\u0643.'
+            'عشان تقدّم طلب إرجاع لطلب من طلباتك.'
           )}
         </p>
       </section>
@@ -326,34 +315,25 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           </svg>
         </div>
         <h2 className="mt-4 text-xl font-semibold text-foreground">
-          {t(
-            'Return Request Submitted',
-            '\u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639'
-          )}
+          {t('Return Request Submitted', 'طلب الإرجاع اتبعت')}
         </h2>
         <p className="mt-2 text-muted-foreground">{submitResult.text}</p>
         {submitResult.returnNumber && (
           <p className="mt-2 text-sm text-muted-foreground">
-            {t('Return number:', '\u0631\u0642\u0645 \u0627\u0644\u0625\u0631\u062c\u0627\u0639:')}{' '}
+            {t('Return number:', 'رقم الإرجاع:')}{' '}
             <span className="font-mono font-semibold text-foreground">
               #{submitResult.returnNumber}
             </span>
           </p>
         )}
         <p className="mt-4 text-sm text-muted-foreground">
-          {t(
-            'We will review your request and contact you shortly.',
-            '\u0633\u0646\u0631\u0627\u062c\u0639 \u0637\u0644\u0628\u0643 \u0648\u0646\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0643 \u0642\u0631\u064a\u0628\u0627\u064b.'
-          )}
+          {t('We will review your request and contact you shortly.', 'هنراجع طلبك ونكلّمك قريب.')}
         </p>
         <button
           onClick={() => setSubmitResult(null)}
           className="mt-6 text-sm font-medium text-primary hover:underline"
         >
-          {t(
-            'Submit another return',
-            '\u062a\u0642\u062f\u064a\u0645 \u0625\u0631\u062c\u0627\u0639 \u0622\u062e\u0631'
-          )}
+          {t('Submit another return', 'تقديم إرجاع آخر')}
         </button>
       </section>
     );
@@ -362,12 +342,12 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
   return (
     <section className="rounded-xl border bg-card p-6 shadow-sm">
       <h2 className="text-xl font-semibold text-foreground">
-        {t('Request a Return', '\u0637\u0644\u0628 \u0625\u0631\u062c\u0627\u0639')}
+        {t('Request a Return', 'طلب إرجاع')}
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {t(
           'Fill out the form below to start a return for a delivered order.',
-          '\u0627\u0645\u0644\u0623 \u0627\u0644\u0646\u0645\u0648\u0630\u062c \u0623\u062f\u0646\u0627\u0647 \u0644\u0628\u062f\u0621 \u0625\u0631\u062c\u0627\u0639 \u0637\u0644\u0628 \u062a\u0645 \u062a\u0648\u0635\u064a\u0644\u0647.'
+          'املا الفورم اللي تحت عشان تبدأ ترجّع طلب وصلك.'
         )}
       </p>
 
@@ -380,16 +360,12 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       <form onSubmit={handleSubmit} className="mt-6 space-y-5">
         <div>
           <label htmlFor="return-order" className="block text-sm font-medium text-foreground mb-1">
-            {t('Select Order', '\u0627\u062e\u062a\u0631 \u0627\u0644\u0637\u0644\u0628')}{' '}
-            <span className="text-destructive-ink">*</span>
+            {t('Select Order', 'اختر الطلب')} <span className="text-destructive-ink">*</span>
           </label>
           {isLoadingOrders ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              {t(
-                'Loading your orders...',
-                '\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u0637\u0644\u0628\u0627\u062a\u0643...'
-              )}
+              {t('Loading your orders...', 'بنحمّل طلباتك...')}
             </div>
           ) : (
             <Select
@@ -404,13 +380,10 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               options={[
                 {
                   value: '',
-                  label: t(
-                    '-- Select an order --',
-                    '-- \u0627\u062e\u062a\u0631 \u0637\u0644\u0628\u0627\u064b --'
-                  ),
+                  label: t('-- Select an order --', '-- اختر طلباً --'),
                 },
                 ...orders.map(order => {
-                  // Collapse to display rows first \u2014 a box's own component
+                  // Collapse to display rows first — a box's own component
                   // count must not inflate "(+N more)" past what the
                   // customer actually bought (e.g. one 3-component bundle
                   // must read as one line, not "+2 more").
@@ -422,20 +395,20 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                     value: order.id,
                     label: `#${order.orderNumber}${
                       firstName
-                        ? ` \u2014 ${firstName}${rows.length > 1 ? ` (${t(`${signedText('+', rows.length - 1)} more`, `${signedText('+', rows.length - 1)} أخرى`)})` : ''}`
+                        ? ` — ${firstName}${rows.length > 1 ? ` (${t(`${signedText('+', rows.length - 1)} more`, `${signedText('+', rows.length - 1)} أخرى`)})` : ''}`
                         : ''
                     }`,
                   };
                 }),
               ]}
-              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full rounded-lg border border-input px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
           )}
           {!isLoadingOrders && orders.length === 0 && (
             <p className="mt-1 text-sm text-muted-foreground">
               {t(
                 'No eligible orders found. Only delivered orders can be returned.',
-                '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0637\u0644\u0628\u0627\u062a \u0645\u0624\u0647\u0644\u0629. \u064a\u0645\u0643\u0646 \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u0645\u0633\u0644\u0645\u0629 \u0641\u0642\u0637.'
+                'ملقيناش طلبات ينفع ترجّعها. ينفع ترجّع الطلبات اللي اتسلّمت بس.'
               )}
             </p>
           )}
@@ -444,55 +417,49 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         {selectedOrder && displayRows.length > 0 && (
           <div>
             <p className="block text-sm font-medium text-foreground mb-2">
-              {t(
-                'Select Items to Return',
-                '\u0627\u062e\u062a\u0631 \u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0644\u0644\u0625\u0631\u062c\u0627\u0639'
-              )}{' '}
+              {t('Select Items to Return', 'اختر العناصر للإرجاع')}{' '}
               <span className="text-destructive-ink">*</span>
             </p>
             <div className="space-y-2">
               {displayRows.map(row =>
                 row.kind === 'bundle' ? (
-                  // A bundle box is ONE selectable unit \u2014 ticking it submits
+                  // A bundle box is ONE selectable unit — ticking it submits
                   // its bundleGroupId, never the component orderItemIds
                   // inside it. Individual components of a box are never
                   // offered here (see `groupOrderLinesForDisplay`).
                   <label
                     key={row.key}
-                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
+                    className="flex items-center gap-3 rounded-lg border border-input px-4 py-3 cursor-pointer hover:bg-muted"
                   >
                     <input
                       type="checkbox"
                       checked={selectedBundleGroupIds.has(row.bundleGroupId)}
                       onChange={() => toggleBundleGroup(row.bundleGroupId)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.name}
                       <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        {t(
-                          'Whole box',
-                          '\u0627\u0644\u0635\u0646\u062f\u0648\u0642 \u0643\u0627\u0645\u0644\u0627\u064b'
-                        )}
+                        {t('Whole box', 'الصندوق كاملاً')}
                       </span>
                     </span>
                   </label>
                 ) : (
                   <label
                     key={row.key}
-                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
+                    className="flex items-center gap-3 rounded-lg border border-input px-4 py-3 cursor-pointer hover:bg-muted"
                   >
                     <input
                       type="checkbox"
                       checked={selectedItemIds.has(row.item.id)}
                       onChange={() => toggleItem(row.item.id)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.item.product?.name || `Item #${row.item.id.slice(0, 8)}`}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.item.quantity}
+                      {t('Qty', 'الكمية')}: {row.item.quantity}
                     </span>
                   </label>
                 )
@@ -501,8 +468,8 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
             {displayRows.some(row => row.kind === 'bundle') && (
               <p className="mt-2 text-xs text-muted-foreground">
                 {t(
-                  "A bundle box is returned as a whole \u2014 its components can't be selected individually.",
-                  '\u064a\u062a\u0645 \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0635\u0646\u062f\u0648\u0642 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u2014 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u062e\u062a\u064a\u0627\u0631 \u0645\u0643\u0648\u0646\u0627\u062a\u0647 \u0628\u0634\u0643\u0644 \u0645\u0646\u0641\u0635\u0644.'
+                  "A bundle box is returned as a whole — its components can't be selected individually.",
+                  'الصندوق بيرجع كله — مينفعش تختار مكوناته لوحدها.'
                 )}
               </p>
             )}
@@ -512,50 +479,38 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         <div>
           <Select
             id="return-reason"
-            label={`${t('Reason for Return', '\u0633\u0628\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639')} *`}
+            label={`${t('Reason for Return', 'سبب الإرجاع')} *`}
             value={reason}
             onChange={e => setReason(e.target.value as ReturnReason)}
             required
             options={[
               {
                 value: '',
-                label: t(
-                  '-- Select a reason --',
-                  '-- \u0627\u062e\u062a\u0631 \u0633\u0628\u0628\u0627\u064b --'
-                ),
+                label: t('-- Select a reason --', '-- اختر سبباً --'),
               },
               ...RETURN_REASONS.map(r => ({ value: r.value, label: t(r.label, r.labelAr) })),
             ]}
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full rounded-lg border border-input px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
         <div>
           <label htmlFor="return-notes" className="block text-sm font-medium text-foreground mb-1">
-            {t(
-              'Additional Notes (optional)',
-              '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0625\u0636\u0627\u0641\u064a\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-            )}
+            {t('Additional Notes (optional)', 'ملاحظات إضافية (اختياري)')}
           </label>
           <textarea
             id="return-notes"
             rows={4}
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder={t(
-              'Describe the issue in more detail...',
-              '\u0635\u0641 \u0627\u0644\u0645\u0634\u0643\u0644\u0629 \u0628\u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u062a\u0641\u0635\u064a\u0644...'
-            )}
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none sm:text-sm"
+            placeholder={t('Describe the issue in more detail...', 'اوصف المشكلة بتفاصيل أكتر...')}
+            className="w-full rounded-lg border border-input px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none sm:text-sm"
           />
         </div>
 
         <div className="pt-2">
           <Button type="submit" isLoading={isSubmitting}>
-            {t(
-              'Submit Return Request',
-              '\u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639'
-            )}
+            {t('Submit Return Request', 'تقديم طلب الإرجاع')}
           </Button>
         </div>
       </form>
@@ -571,27 +526,21 @@ export default function ReturnsClient() {
   // Days in the store's digits, the same as the PDP trust line (review M8).
   const { localize } = useNumerals();
   const policy = returnPolicyCopy(store.returnWindowDays, language, localize);
-  const returnsEmail =
-    email || t('our support team', '\u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645');
+  const returnsEmail = email || t('our support team', 'فريق الدعم');
   return (
     <ShopChrome>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
-            {t(
-              'Returns & Refunds',
-              '\u0627\u0644\u0645\u0631\u062a\u062c\u0639\u0627\u062a \u0648\u0627\u0644\u0627\u0633\u062a\u0628\u062f\u0627\u0644'
-            )}
+            {t('Returns & Refunds', 'المرتجعات واسترداد الفلوس')}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            {t(
-              'Our hassle-free return policy',
-              '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0633\u0647\u0644\u0629 \u0644\u062f\u064a\u0646\u0627'
-            )}
+            {t('Our hassle-free return policy', 'سياسة إرجاع سهلة')}
           </p>
         </div>
 
         <div className="mt-12 space-y-8">
+          {/* legal-register:start — the returns-policy body stays formal (Ruling FU46-Y02b) */}
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
@@ -616,15 +565,12 @@ export default function ReturnsClient() {
 
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              {t(
-                'Return Eligibility',
-                '\u0623\u0647\u0644\u064a\u0629 \u0627\u0644\u0625\u0631\u062c\u0627\u0639'
-              )}
+              {t('Return Eligibility', 'أهلية الإرجاع')}
             </h2>
             <p className="mt-2 text-muted-foreground">
               {t(
                 'To be eligible for a return, items must be:',
-                '\u0644\u062a\u0643\u0648\u0646 \u0645\u0624\u0647\u0644\u0627\u064b \u0644\u0644\u0625\u0631\u062c\u0627\u0639\u060c \u064a\u062c\u0628 \u0623\u0646 \u062a\u0643\u0648\u0646 \u0627\u0644\u0639\u0646\u0627\u0635\u0631:'
+                'لتكون مؤهلاً للإرجاع، يجب أن تكون العناصر:'
               )}
             </p>
             <ul className="mt-4 space-y-3">
@@ -643,10 +589,7 @@ export default function ReturnsClient() {
                   />
                 </svg>
                 <span className="text-muted-foreground">
-                  {t(
-                    'Unused and in original condition',
-                    '\u063a\u064a\u0631 \u0645\u0633\u062a\u062e\u062f\u0645\u0629 \u0648\u0628\u062d\u0627\u0644\u062a\u0647\u0627 \u0627\u0644\u0623\u0635\u0644\u064a\u0629'
-                  )}
+                  {t('Unused and in original condition', 'غير مستخدمة وبحالتها الأصلية')}
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -666,7 +609,7 @@ export default function ReturnsClient() {
                 <span className="text-muted-foreground">
                   {t(
                     'In original packaging with all tags attached',
-                    '\u0641\u064a \u0627\u0644\u0639\u0628\u0648\u0629 \u0627\u0644\u0623\u0635\u0644\u064a\u0629 \u0645\u0639 \u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062a'
+                    'في العبوة الأصلية مع جميع البطاقات'
                   )}
                 </span>
               </li>
@@ -687,7 +630,7 @@ export default function ReturnsClient() {
                 <span className="text-muted-foreground">
                   {t(
                     'Accompanied by the original receipt or proof of purchase',
-                    '\u0645\u0631\u0641\u0642\u0629 \u0628\u0627\u0644\u0625\u064a\u0635\u0627\u0644 \u0627\u0644\u0623\u0635\u0644\u064a \u0623\u0648 \u0625\u062b\u0628\u0627\u062a \u0627\u0644\u0634\u0631\u0627\u0621'
+                    'مرفقة بالإيصال الأصلي أو إثبات الشراء'
                   )}
                 </span>
               </li>
@@ -696,49 +639,37 @@ export default function ReturnsClient() {
 
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              {t(
-                'How to Return an Item',
-                '\u0643\u064a\u0641\u064a\u0629 \u0625\u0631\u062c\u0627\u0639 \u0645\u0646\u062a\u062c'
-              )}
+              {t('How to Return an Item', 'كيفية إرجاع منتج')}
             </h2>
             <div className="mt-4 space-y-4">
               {[
                 {
                   step: '1',
-                  title: t('Contact Us', '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627'),
+                  title: t('Contact Us', 'تواصل معنا'),
                   desc: t(
                     `Email us at ${returnsEmail} with your order number and reason for return.`,
-                    `\u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 ${returnsEmail} \u0645\u0639 \u0631\u0642\u0645 \u0637\u0644\u0628\u0643 \u0648\u0633\u0628\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639.`
+                    `راسلنا على ${returnsEmail} مع رقم طلبك وسبب الإرجاع.`
                   ),
                 },
                 {
                   step: '2',
-                  title: t(
-                    'Get Return Label',
-                    '\u0627\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0645\u0644\u0635\u0642 \u0627\u0644\u0625\u0631\u062c\u0627\u0639'
-                  ),
+                  title: t('Get Return Label', 'الحصول على ملصق الإرجاع'),
                   desc: t(
                     "We'll send you a prepaid return shipping label via email.",
-                    '\u0633\u0646\u0631\u0633\u0644 \u0644\u0643 \u0645\u0644\u0635\u0642 \u0634\u062d\u0646 \u0625\u0631\u062c\u0627\u0639 \u0645\u062f\u0641\u0648\u0639 \u0645\u0633\u0628\u0642\u0627\u064b \u0639\u0628\u0631 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a.'
+                    'سنرسل لك ملصق شحن إرجاع مدفوع مسبقاً عبر البريد الإلكتروني.'
                   ),
                 },
                 {
                   step: '3',
-                  title: t(
-                    'Ship the Item',
-                    '\u0634\u062d\u0646 \u0627\u0644\u0645\u0646\u062a\u062c'
-                  ),
+                  title: t('Ship the Item', 'شحن المنتج'),
                   desc: t(
                     'Pack the item securely and drop it off at any authorized shipping location.',
-                    '\u0642\u0645 \u0628\u062a\u063a\u0644\u064a\u0641 \u0627\u0644\u0645\u0646\u062a\u062c \u0628\u0634\u0643\u0644 \u0622\u0645\u0646 \u0648\u062a\u0633\u0644\u064a\u0645\u0647 \u0641\u064a \u0623\u064a \u0645\u0648\u0642\u0639 \u0634\u062d\u0646 \u0645\u0639\u062a\u0645\u062f.'
+                    'قم بتغليف المنتج بشكل آمن وتسليمه في أي موقع شحن معتمد.'
                   ),
                 },
                 {
                   step: '4',
-                  title: t(
-                    'Receive Refund',
-                    '\u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0633\u062a\u0631\u062f'
-                  ),
+                  title: t('Receive Refund', 'استلام المبلغ المسترد'),
                   desc: t(
                     "Once we receive and inspect the item, we'll process your refund.",
                     'بمجرد استلام المنتج وفحصه، سنقوم بمعالجة استرداد المبلغ.'
@@ -760,16 +691,13 @@ export default function ReturnsClient() {
 
           <section className="rounded-xl border bg-card p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              {t(
-                'Refund Information',
-                '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062f'
-              )}
+              {t('Refund Information', 'معلومات الاسترداد')}
             </h2>
             <ul className="mt-4 space-y-2 text-muted-foreground">
               <li>
                 {t(
                   'Refunds will be credited to your original payment method',
-                  '\u0633\u064a\u062a\u0645 \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0645\u0628\u0644\u063a \u0625\u0644\u0649 \u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639 \u0627\u0644\u0623\u0635\u0644\u064a\u0629'
+                  'سيتم إرجاع المبلغ إلى طريقة الدفع الأصلية'
                 )}
               </li>
               <li>
@@ -781,18 +709,19 @@ export default function ReturnsClient() {
               <li>
                 {t(
                   'Original shipping costs are non-refundable (unless the item was defective)',
-                  '\u062a\u0643\u0627\u0644\u064a\u0641 \u0627\u0644\u0634\u062d\u0646 \u0627\u0644\u0623\u0635\u0644\u064a\u0629 \u063a\u064a\u0631 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062f (\u0645\u0627 \u0644\u0645 \u064a\u0643\u0646 \u0627\u0644\u0645\u0646\u062a\u062c \u0645\u0639\u064a\u0628\u0627\u064b)'
+                  'تكاليف الشحن الأصلية غير قابلة للاسترداد (ما لم يكن المنتج معيباً)'
                 )}
               </li>
               <li>
                 {t(
                   'Sale items are final sale and cannot be returned',
-                  '\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062e\u0641\u0636\u0629 \u0646\u0647\u0627\u0626\u064a\u0629 \u0648\u0644\u0627 \u064a\u0645\u0643\u0646 \u0625\u0631\u062c\u0627\u0639\u0647\u0627'
+                  'العناصر المخفضة نهائية ولا يمكن إرجاعها'
                 )}
               </li>
             </ul>
           </section>
 
+          {/* legal-register:end */}
           {/* Return Request Form */}
           {store.id &&
             store.id !== 'demo' &&
@@ -803,15 +732,9 @@ export default function ReturnsClient() {
 
         <div className="mt-8 text-center">
           <p className="text-muted-foreground">
-            {t(
-              'Need help with a return?',
-              '\u0647\u0644 \u062a\u062d\u062a\u0627\u062c \u0645\u0633\u0627\u0639\u062f\u0629 \u0641\u064a \u0627\u0644\u0625\u0631\u062c\u0627\u0639\u061f'
-            )}{' '}
+            {t('Need help with a return?', 'محتاج مساعدة في الإرجاع؟')}{' '}
             <Link href={storeUrl('/contact')} className="text-primary hover:underline">
-              {t(
-                'Contact our support team',
-                '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645'
-              )}
+              {t('Contact our support team', 'تواصل مع فريق الدعم')}
             </Link>
           </p>
         </div>

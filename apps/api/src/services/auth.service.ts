@@ -1,3 +1,4 @@
+import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -12,6 +13,7 @@ import {
 } from '@ebda/database';
 import {
   deleteUserAddresses,
+  deleteUserPasskeys,
   deleteUserTokens,
   findUserIdByEmail,
   getUserState,
@@ -23,6 +25,8 @@ import {
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { loginGate } from './login-gate';
+import { announcePasskeyPurge } from './passkey-purge';
 import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
 import {
@@ -112,6 +116,18 @@ function authScope(email: string, storeId: string | null) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
   }
   return storeId === null ? { email, storeId: null as null } : { email, storeId };
+}
+
+/**
+ * Ruling B1-13: the demo showroom's seeded owner (`storedemo-owner@ebda.app`) has no mailbox and
+ * no login. Account mail for it is never sent (a bounce hurts the sender's reputation); callers
+ * answer exactly as for an unknown address, so nothing about the account is revealed.
+ */
+async function ownsDemoStore(userId: string): Promise<boolean> {
+  const row = await withUser(userId, tx =>
+    tx.store.findFirst({ where: { ownerId: userId, isDemo: true }, select: { id: true } })
+  );
+  return row !== null;
 }
 
 /**
@@ -696,8 +712,8 @@ export class AuthService {
       { includeDeleted: true }
     );
 
-    if (!user) {
-      // Don't reveal if user exists
+    if (!user || (await ownsDemoStore(user.id))) {
+      // Don't reveal if user exists (and never mail the demo owner, B1-13)
       return { ...GENERIC_RESEND_VERIFICATION_RESULT };
     }
 
@@ -744,17 +760,8 @@ export class AuthService {
     // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
     // exact-case key let an attacker reset the 5-per-15-min budget by
     // re-casing the address (Ebda SP5 review).
-    const lockoutEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
-    const lockoutKey = storeId ? `${storeId}:${lockoutEmail}` : lockoutEmail;
-    const lockStatus = await accountLockout.isLocked(lockoutKey);
-    if (lockStatus.locked) {
-      const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);
-      throw new AppError(
-        429,
-        'ACCOUNT_LOCKED',
-        `Account is temporarily locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
-      );
-    }
+    const lockoutKey = loginGate.lockoutKey(email, storeId);
+    await loginGate.assertNotLocked(lockoutKey);
 
     // Find user inside the requested scope (exclude soft-deleted).
     // passwordHash + mfaSecret are globally omitted (see packages/database);
@@ -771,14 +778,14 @@ export class AuthService {
       // previously a ~50ms timing oracle that let an attacker
       // enumerate registered emails by stopwatch.
       await bcrypt.compare(password, this.DUMMY_PASSWORD_HASH);
-      await accountLockout.recordFailedAttempt(lockoutKey, ip);
+      await loginGate.recordFailure(lockoutKey, ip);
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
-      const result = await accountLockout.recordFailedAttempt(lockoutKey, ip);
+      const result = await loginGate.recordFailure(lockoutKey, ip);
 
       if (result.locked) {
         const remainingMinutes = Math.ceil((result.lockoutDurationMs || 0) / 60000);
@@ -793,7 +800,7 @@ export class AuthService {
     }
 
     // Successful login - reset lockout
-    await accountLockout.recordSuccessfulLogin(lockoutKey, ip);
+    await loginGate.recordSuccess(lockoutKey, ip);
 
     // Reject non-active accounts. Checked AFTER the password is confirmed
     // correct (not before) — checking status before/instead of the password
@@ -803,9 +810,7 @@ export class AuthService {
     // close. S3-1, 2026-09-22 security audit: a super_admin who suspends a
     // compromised or departing account previously found the account could
     // still log in with its password — `status` was recorded but never read.
-    if (user.status !== 'active') {
-      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
-    }
+    loginGate.assertActive(user);
 
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
@@ -1469,12 +1474,16 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
-    await withUser(userId, tx =>
-      tx.user.update({
+    // Ruling PASSKEY-13: a password CHANGE removes every passkey, in the SAME transaction as the new
+    // hash (all or nothing). An attacker who held the old password and a session may have registered a
+    // passkey of their own; revoking their session alone would leave a key that satisfies MFA.
+    const purged = await withUser(userId, async tx => {
+      await tx.user.update({
         where: { id: userId },
         data: { passwordHash },
-      })
-    );
+      });
+      return tx.passkeyCredential.deleteMany({ where: { userId } });
+    });
 
     // ONE call, and it runs BEFORE anything else observes the change.
     //
@@ -1493,6 +1502,8 @@ export class AuthService {
     // 'reset:' } }` filter was already ineffective, since the unconditional
     // call on the next line revoked those rows anyway.
     await AuthService.revokeAllSessions(userId, 'password_changed');
+
+    await announcePasskeyPurge({ user, count: purged.count, reason: 'password_changed' });
   }
 
   /**
@@ -1647,8 +1658,8 @@ export class AuthService {
       { includeDeleted: true }
     );
 
-    if (!user) {
-      // Silently return to prevent email enumeration
+    if (!user || (await ownsDemoStore(user.id))) {
+      // Silently return to prevent email enumeration (and never mail the demo owner, B1-13)
       return null;
     }
 
@@ -1754,13 +1765,20 @@ export class AuthService {
     }
 
     // Update user password (as that user: `users` is RLS-scoped to app.current_user_id)
-    const updated = await withUser(storedToken.userId, tx =>
-      tx.user.update({
+    // Ruling PASSKEY-10 / review M5: the new hash and the removal of EVERY passkey commit together. If the
+    // delete fails the password does not change either, so the owner simply retries the reset; there is no
+    // state where the password moved on and an attacker's passkey survived.
+    const { updated, purged } = await withUser(storedToken.userId, async tx => {
+      const updated = await tx.user.update({
         where: { id: storedToken.userId },
         data: { passwordHash },
-        select: { email: true, storeId: true },
-      })
-    );
+        select: { id: true, email: true, storeId: true, firstName: true, language: true },
+      });
+      const purged = await tx.passkeyCredential.deleteMany({
+        where: { userId: storedToken.userId },
+      });
+      return { updated, purged };
+    });
 
     // Revoke all sessions — same call, and the same ordering, as
     // changePassword. The reset-token row was already deleted above.
@@ -1775,6 +1793,10 @@ export class AuthService {
     // performs precisely because they believe someone else is holding their
     // credentials.
     await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');
+
+    // Account recovery removed every passkey above (PASSKEY-10): record it and tell the owner, so a reset
+    // that silently drops their devices is never a surprise (review M5).
+    await announcePasskeyPurge({ user: updated, count: purged.count, reason: 'password_reset' });
 
     // A merchant who reset because they were locked out after too many wrong
     // passwords must be able to use the new one at once. The lockout exists to
@@ -1909,6 +1931,19 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
+      // Must run before the orders lose their customer link below. Already-delivered payloads on
+      // the merchant's own server cannot be recalled.
+      await redactWebhookCustomerData(tx, {
+        storeId: eraseStoreId,
+        orderIds: (
+          await tx.order.findMany({
+            where: { customerId: userId, storeId: eraseStoreId },
+            select: { id: true },
+          })
+        ).map(o => o.id),
+        email: user.email,
+      });
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -1955,10 +1990,20 @@ export class AuthService {
       // User-keyed rows: like `addresses` above, deleted by the shopper's id through a
       // guarded definer INSIDE this transaction (the GUC may be the merchant's id).
       await deleteUserTokens(userId);
+      // Passkeys (Ruling PASSKEY-1): same shape, same guarded-definer reason as the tokens above.
+      await deleteUserPasskeys(userId);
       await tx.loyaltyTransaction.deleteMany({
         where: { customerId: userId, storeId: eraseStoreId },
       });
       await tx.loyaltyPoints.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
+      // B2B wholesale (Task 5): the application holds PII (business name, phone, commercial registration no.) and the
+      // CRM row's user_id link is what grants a group price. Erase the applications and sever the link + membership, so an
+      // erased account can never price as a wholesaler again (the account is anonymised, not deleted, so no FK cascade fires).
+      await tx.wholesaleApplication.deleteMany({ where: { userId, storeId: eraseStoreId } });
+      await tx.customer.updateMany({
+        where: { userId, storeId: eraseStoreId },
+        data: { userId: null, groupId: null },
+      });
 
       // Customer wallet (D1, Ruling W-4). Unlike loyalty, the wallet ledger is
       // a FINANCIAL record of money the merchant owed and paid out, so it is
@@ -2339,7 +2384,9 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      passkeys,
       smsMarketingConsents,
+      wholesaleApplications,
     ] = await Promise.all([
       // Same user-scoped RLS policy as the erase path above: on the
       // merchant-initiated export `current_user_id()` is the MERCHANT, so a
@@ -2388,6 +2435,23 @@ export class AuthService {
           select: { id: true, playerId: true, createdAt: true },
         })
       ),
+      // Passkeys: metadata only. The public key is not personal data worth shipping and nothing in this
+      // bundle can be a secret (the private key never leaves the person's device).
+      withUser(userId, tx =>
+        tx.passkeyCredential.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            rpId: true,
+            deviceType: true,
+            backedUp: true,
+            createdAt: true,
+            lastUsedAt: true,
+          },
+        })
+      ),
       // SMS-marketing consent (issue 206): what was given, when, where, and
       // any withdrawal. Keyed by the user id (the shopper's own rows).
       prisma.smsMarketingConsent.findMany({
@@ -2402,6 +2466,24 @@ export class AuthService {
           revokedSource: true,
           createdAt: true,
           updatedAt: true,
+        },
+      }),
+      // B2B wholesale applications (business name, phone, commercial registration no., decision note): the applicant's own data.
+      prisma.wholesaleApplication.findMany({
+        where: { userId, storeId },
+        // Explicit select (review M2): the staff user id that decided it (`decidedBy`) is not the applicant's data. The
+        // decision note IS exported: the applicant is shown it already.
+        select: {
+          id: true,
+          businessName: true,
+          commercialRegNo: true,
+          phone: true,
+          notes: true,
+          status: true,
+          decisionNote: true,
+          decidedAt: true,
+          consentAt: true,
+          createdAt: true,
         },
       }),
     ]);
@@ -2421,7 +2503,9 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      passkeys,
       smsMarketingConsents,
+      wholesaleApplications,
     };
   }
 

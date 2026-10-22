@@ -4,6 +4,7 @@ import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
+import { visibleProductWhere } from '../lib/visible-product';
 import { enrichStockFlags, gateBackorder } from '../lib/effective-inventory';
 
 // ==========================================
@@ -113,7 +114,12 @@ class RecommendationService {
     let crossSell: unknown[] = [];
 
     const manualCrossSell = await prisma.productRelation.findMany({
-      where: { storeId, sourceProductId: productId, type: 'cross_sell' },
+      where: {
+        storeId,
+        sourceProductId: productId,
+        type: 'cross_sell',
+        targetProduct: visibleProductWhere(),
+      },
       orderBy: { position: 'asc' },
       take: 4,
       select: {
@@ -141,7 +147,7 @@ class RecommendationService {
       // returned [] and the storefront silently fell back to FBT.
       const aiRecRows = await readInStoreContext(storeId, () =>
         prisma.aiRecommendation.findMany({
-          where: { storeId, sourceProductId: productId },
+          where: { storeId, sourceProductId: productId, targetProduct: visibleProductWhere() },
           orderBy: { score: 'desc' },
           take: 4,
           select: {
@@ -164,6 +170,8 @@ class RecommendationService {
           where: {
             storeId,
             OR: [{ productId1: productId }, { productId2: productId }],
+            product1: visibleProductWhere(),
+            product2: visibleProductWhere(),
           },
           orderBy: { coOccurrenceCount: 'desc' },
           take: 4,
@@ -188,7 +196,12 @@ class RecommendationService {
 
     // 3. Upsell: manual relations
     const upsellRows = await prisma.productRelation.findMany({
-      where: { storeId, sourceProductId: productId, type: 'upsell' },
+      where: {
+        storeId,
+        sourceProductId: productId,
+        type: 'upsell',
+        targetProduct: visibleProductWhere(),
+      },
       orderBy: { position: 'asc' },
       take: 4,
       select: {
@@ -223,6 +236,7 @@ class RecommendationService {
           storeId,
           status: 'active',
           deletedAt: null,
+          ...visibleProductWhere(),
           id: { notIn: Array.from(alreadyReturnedIds) },
           categories: {
             some: { categoryId: { in: categoryIds } },
@@ -271,6 +285,7 @@ class RecommendationService {
           storeId,
           sourceProductId: { in: productIds },
           type: 'cross_sell',
+          targetProduct: visibleProductWhere(),
         },
         orderBy: { position: 'asc' },
         select: { sourceProductId: true, targetProductId: true },
@@ -279,6 +294,8 @@ class RecommendationService {
         where: {
           storeId,
           OR: [{ productId1: { in: productIds } }, { productId2: { in: productIds } }],
+          product1: visibleProductWhere(),
+          product2: visibleProductWhere(),
         },
         orderBy: { coOccurrenceCount: 'desc' },
         select: { productId1: true, productId2: true },
@@ -334,6 +351,7 @@ class RecommendationService {
         storeId,
         status: 'active',
         deletedAt: null,
+        ...visibleProductWhere(),
       },
       select: productSelect,
     });

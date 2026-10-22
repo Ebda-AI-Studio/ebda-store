@@ -11,7 +11,7 @@ updated: 2026-05-24
 
 - WBS (WhatsApp Bulk Sender) staging instance running at `backend.ebda.app` or a staging equivalent
 - A valid WBS API key for the test WBS account (generated in WBS dashboard)
-- At least 1 approved WhatsApp template in WBS (e.g. `force_order_shipped_v1` or equivalent)
+- At least 1 approved WhatsApp template in WBS (e.g. `ebda_order_shipped_v1` or equivalent)
 - Test store in Ebda Store has NO existing WBS connection (to test the connect flow)
 - A test phone number that can receive WhatsApp messages (real phone; test environment)
 - Preview/staging admin; **never connect WBS bridge against prod Ebda Store + prod WBS simultaneously**

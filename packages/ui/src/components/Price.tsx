@@ -68,12 +68,14 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
     },
     ref
   ) => {
+    // A price never splits from its currency at a line end: the one space is a no-break space
+    // (same rule as the storefront's useLocalePrice, STOP-2 re-audit).
     const fmtPrice = (amount: number) =>
       formatPrice(amount, {
         currency,
         locale: isRtl ? 'ar' : 'en',
         numerals,
-      });
+      }).replace(' ', '\u00A0');
 
     const discount =
       compareAtPrice && compareAtPrice > price

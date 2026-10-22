@@ -77,7 +77,7 @@ describe.each(Object.entries(themes))('%s CartTable — #1766 unavailable line',
   it('shows the Arabic notice on the Arabic storefront', () => {
     lang.current = 'ar';
     const html = render(Table, [line({ unavailable: true })]);
-    expect(html).toContain('لم يعد متوفراً');
+    expect(html).toContain('مبقاش متوفر');
     lang.current = 'en';
   });
 
@@ -90,3 +90,51 @@ describe.each(Object.entries(themes))('%s CartTable — #1766 unavailable line',
     expect(increase[0]).not.toMatch(/\sdisabled=""/);
   });
 });
+
+// Taste re-audit P2-2 (Y-05, one fact in one place): at quantity 1 the unit price under the
+// name repeated the line total beside it. The unit price shows only when quantity > 1.
+describe.each(Object.entries({ ...themes, dahab: (await import('../dahab/CartTable')).default }))(
+  '%s CartTable — unit price only when it differs from the line total',
+  (_name, Table) => {
+    it('quantity 1: the price appears once; quantity 3: unit and total both appear', () => {
+      lang.current = 'en';
+      const one = render(Table, [line({ quantity: 1, price: 14900 })]);
+      expect(one.split('149').length - 1).toBe(1);
+      const three = render(Table, [line({ quantity: 3, price: 14900 })]);
+      expect(three).toContain('149');
+      expect(three).toContain('447');
+    });
+  }
+);
+
+describe('the default cart (no theme table) follows the same rule (P2-2)', () => {
+  it('its "each" unit price is gated on quantity > 1', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, '../../app/cart/CartClient.tsx'), 'utf8');
+    expect(src).toMatch(/item\.quantity > 1 && \(\s*<p[\s\S]{0,400}?t\('each'/);
+  });
+});
+
+// a11y re-audit P1-N2 / P2-N4 class (rule (d)): the cart line's remove button measured 20x44 and
+// its product-name link 49x21 in the browser; the W4 class gate never rendered a cart table.
+describe.each(Object.entries({ ...themes, dahab: (await import('../dahab/CartTable')).default }))(
+  '%s CartTable — every control is a 44px target',
+  (_name, Table) => {
+    it('remove, steppers and the name link', async () => {
+      // @ts-expect-error jsdom ships no types in this workspace
+      const { JSDOM } = (await import('jsdom')) as {
+        JSDOM: new (html: string) => { window: { document: Document } };
+      };
+      const { smallTargets } = await import('../../../../../tests/helpers/target-size');
+      lang.current = 'ar';
+      const html = render(Table, [line({ quantity: 2 })]);
+      const doc = new JSDOM(`<body>${html}</body>`).window.document;
+      // A photo link is sized by its image, which a class read cannot see; the browser probe
+      // (scripts/taste/purchase-path-probe.mjs) measures it. Everything else is checked here.
+      for (const a of Array.from(doc.querySelectorAll<HTMLAnchorElement>('a')))
+        if (a.querySelector('img') || /\baspect-/.test(a.className)) a.remove();
+      expect(smallTargets(doc.body, 44, { requireWidth: true })).toEqual([]);
+    });
+  }
+);

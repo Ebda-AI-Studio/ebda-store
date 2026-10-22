@@ -51,7 +51,7 @@ export function AwardPointsModal({
             type="submit"
             form={FORM_ID}
             disabled={saving || !points}
-            className="px-4 py-2 min-h-11 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
           >
             {saving && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

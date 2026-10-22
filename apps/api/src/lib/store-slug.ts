@@ -1,4 +1,4 @@
-import { validateStoreSlug, validateStoreSlugFormat } from '@ebda/shared';
+import { validateStoreSlug, validateStoreSlugFormat, isDemoShowroomSlug } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -28,6 +28,9 @@ export function deriveStoreSlug(derived: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
     .replace(/-+$/g, '');
+  // A name that derives into the demo showroom family ("StoreDemo") is moved out of it, so the
+  // de-dup loop never has to suffix its way through an unclaimable prefix (Ruling B2-17).
+  if (isDemoShowroomSlug(slug)) slug = slug.replace(/^storedemo/, 'store-demo');
   while (slug.length < 3) slug += 'x';
   return validateStoreSlugFormat(slug).ok ? slug : `store-${Date.now().toString(36)}`;
 }

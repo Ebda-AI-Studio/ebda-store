@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { looksForTemplate } from '@ebda/shared';
+import { builtLooks } from '@ebda/shared';
 
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 
@@ -29,7 +29,7 @@ vi.mock('../../../../components/AdminSkeleton', () => ({ AdminSkeletonDetail: ()
 
 import StoreTemplatePage from './page';
 
-const looks = looksForTemplate('dahab');
+const looks = builtLooks();
 const target = looks[1]!;
 
 function storeWith(look: string | null, template = 'modern') {
@@ -37,6 +37,7 @@ function storeWith(look: string | null, template = 'modern') {
 }
 
 async function pickTarget() {
+  // The picker offers only built looks and opens on the first built template.
   const card = await screen.findByRole('radio', { name: new RegExp(target.name.en) });
   fireEvent.click(card);
 }
@@ -93,7 +94,7 @@ describe('template page (looks)', () => {
   it('keep sends design keep; a draft result shows the editor link', async () => {
     storeWith(null);
     apiPut.mockResolvedValue({
-      data: { look: target.id, template: 'dahab', builder: 'draft' },
+      data: { look: target.id, template: target.skin, builder: 'draft' },
     });
     render(<StoreTemplatePage />);
     await pickTarget();
@@ -114,7 +115,7 @@ describe('template page (looks)', () => {
   it('start fresh sends design reset; a published result shows the short success line', async () => {
     storeWith(target.id === looks[0]!.id ? looks[2]!.id : looks[0]!.id);
     apiPut.mockResolvedValue({
-      data: { look: target.id, template: 'dahab', builder: 'published' },
+      data: { look: target.id, template: target.skin, builder: 'published' },
     });
     render(<StoreTemplatePage />);
     await pickTarget();

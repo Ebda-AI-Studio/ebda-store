@@ -171,8 +171,9 @@ describe('WarehouseService.adjustStock — lost-update race', () => {
     const updatedVariant = await prisma.productVariant.findUnique({ where: { id: variant.id } });
     expect(updatedVariant?.inventory).toBe(70);
 
+    // Invariant (docs/architecture/inventory-model.md): the parent column of a variant product stays 0.
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    expect(product?.inventory).toBe(70);
+    expect(product?.inventory).toBe(0);
   });
 
   it('cross-warehouse: 2 warehouses concurrently adjusting the SAME product → aggregate == exact SUM', async () => {
@@ -236,7 +237,7 @@ describe('WarehouseService.adjustStock — lost-update race', () => {
     expect(product?.inventory).toBe(220);
   });
 
-  it('cross-variant rollup: 2 variants of the SAME product concurrently adjusted → product.inventory == exact SUM', async () => {
+  it('cross-variant rollup: 2 variants of the SAME product concurrently adjusted → each variant == exact SUM, parent stays 0', async () => {
     // Same hazard, one level up: two DIFFERENT variants of the SAME product
     // never collide on their own warehouse_stock/product_variants rows, but
     // both race to roll up into `products.inventory` via the variant→product
@@ -281,6 +282,6 @@ describe('WarehouseService.adjustStock — lost-update race', () => {
     expect(updatedB?.inventory).toBe(60);
 
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    expect(product?.inventory).toBe(120); // 60 + 60, exact rollup
+    expect(product?.inventory).toBe(0); // parent is never a rollup (inventory-model.md)
   });
 });

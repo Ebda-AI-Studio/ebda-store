@@ -18,7 +18,9 @@ export function useLocalePrice(): (amount: number) => string {
   const numerals = useStoreNumerals();
   const locale = language === 'ar' ? 'ar' : 'en';
   return useCallback(
-    (amount: number) => formatPriceBase(amount, { locale, numerals }),
+    // A price never splits from its currency at a line end ("32,000" over "ج.م" at 390): the one
+    // space is a no-break space on every storefront price path (STOP-2 re-audit).
+    (amount: number) => formatPriceBase(amount, { locale, numerals }).replace(' ', '\u00A0'),
     [locale, numerals]
   );
 }

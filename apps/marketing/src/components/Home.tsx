@@ -21,6 +21,9 @@ import { Reveal, StoryScroll } from './Motion';
 import { Product3D } from './Product3D';
 import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
+import { HomeCapabilities } from './Capabilities';
+import { AiNative } from './AiNative';
+import { FEATURES_PAGE, THEME_COPY } from '../lib/capabilities';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
@@ -88,7 +91,14 @@ export function Home({ locale }: { locale: Locale }) {
     looks: () => (
       <Section id="looks" title={c.looks.title} className="looks">
         <p className="lead">{c.looks.lead}</p>
-        <LooksShowcase copy={c.looks} rtl={rtl} initialHtml={initialLooksFragment()} />
+        <LooksShowcase
+          copy={c.looks}
+          rtl={rtl}
+          initialHtml={
+            // a live template renders real captures, so its built-in markup is not sent
+            c.looks.live.template === c.looks.templates[0].id ? '' : initialLooksFragment()
+          }
+        />
       </Section>
     ),
     features: () => (
@@ -102,6 +112,16 @@ export function Home({ locale }: { locale: Locale }) {
             </li>
           ))}
         </ul>
+      </Section>
+    ),
+    ainative: () => (
+      <Section id="ainative" title={THEME_COPY[locale].ai.title} className="ainative">
+        <AiNative locale={locale} />
+      </Section>
+    ),
+    capabilities: () => (
+      <Section id="capabilities" title={FEATURES_PAGE[locale].homeTitle} className="capabilities">
+        <HomeCapabilities locale={locale} />
       </Section>
     ),
     payments: () => (

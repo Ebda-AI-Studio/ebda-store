@@ -1,5 +1,7 @@
 // Communication Hub — Notification Types and Templates
 
+import { countText, ITEMS } from './utils/plural';
+
 // ─── Channels ────────────────────────────────────────────────────────────────
 
 export type NotificationChannel = 'whatsapp' | 'sms' | 'push';
@@ -45,6 +47,12 @@ export interface NotificationData {
    * phone (issue 206), never trusted from the caller.
    */
   dedupeKey?: string;
+  /**
+   * The shopper's stored locale ('en' | 'ar'): the order's `locale` (their choice at checkout).
+   * Senders with no stored locale (wishlist back-in-stock, web abandoned carts) omit it, and the
+   * dispatcher falls back to the store's default language, then the region default (ar).
+   */
+  locale?: string | null;
 }
 
 // ─── SMS Templates ────────────────────────────────────────────────────────────
@@ -57,48 +65,60 @@ export interface SmsTemplate {
 export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
   order_confirmed: {
     en: 'Hi {name}, your order #{number} has been confirmed. Total: {total}. Thank you for shopping with us!',
-    ar: 'مرحباً {name}، تم تأكيد طلبك رقم #{number}. الإجمالي: {total}. شكراً لتسوقك معنا!',
+    ar: 'أهلاً {name}، طلبك رقم #{number} اتأكد. الإجمالي: {total}. شكراً إنك اشتريت من عندنا!',
   },
   payment_success: {
     en: 'Hi {name}, payment of {amount} for order #{number} was successful. Thank you!',
-    ar: 'مرحباً {name}، تم استلام دفعة {amount} للطلب رقم #{number} بنجاح. شكراً!',
+    ar: 'أهلاً {name}، استلمنا دفعتك {amount} للطلب #{number}. شكراً!',
   },
   order_shipped: {
     en: 'Hi {name}, your order #{number} has been shipped. Track your package with: {tracking}',
-    ar: 'مرحباً {name}، تم شحن طلبك رقم #{number}. تتبع طردك برقم: {tracking}',
+    ar: 'أهلاً {name}، طلبك رقم #{number} اتشحن. تابع شحنتك برقم: {tracking}',
   },
   order_delivered: {
     en: 'Hi {name}, your order #{number} has been delivered. We hope you enjoy your purchase!',
-    ar: 'مرحباً {name}، تم تسليم طلبك رقم #{number}. نأمل أن تستمتع بمشترياتك!',
+    ar: 'أهلاً {name}، طلبك رقم #{number} اتسلّم. نتمنى يعجبك!',
   },
   order_cancelled: {
     en: 'Hi {name}, your order #{number} has been cancelled. Reason: {reason}. Contact us for support.',
-    ar: 'مرحباً {name}، تم إلغاء طلبك رقم #{number}. السبب: {reason}. تواصل معنا للدعم.',
+    ar: 'أهلاً {name}، طلبك رقم #{number} اتلغى. السبب: {reason}. كلّمنا لو محتاج مساعدة.',
   },
   refund_processed: {
-    en: 'Hi {name}, a refund of {amount} for order #{number} has been processed. It may take 3-5 business days.',
-    ar: 'مرحباً {name}، تمت معالجة استرداد {amount} للطلب رقم #{number}. قد يستغرق 3-5 أيام عمل.',
+    en: 'Hi {name}, a refund of {amount} for order #{number} has been processed. It may take 5–10 business days.',
+    ar: 'أهلاً {name}، رجعنالك {amount} من الطلب رقم #{number}. ممكن ياخد 5–10 أيام عمل.',
   },
   cart_abandoned_step1: {
-    en: 'Hi {name}, you left {cartItemCount} items ({cartTotal} EGP) in your cart at {storeName}. Complete your order: {cartUrl}',
-    ar: 'مرحباً {name}، تركت {cartItemCount} عناصر ({cartTotal} ج.م) في سلتك في {storeName}. أكمل طلبك: {cartUrl}',
+    en: 'Hi {name}, you left {cartItems} ({cartTotal} EGP) in your cart at {storeName}. Complete your order: {cartUrl}',
+    ar: 'أهلاً {name}، سيبت {cartItems} ({cartTotal} ج.م) في سلتك في {storeName}. كمّل طلبك: {cartUrl}',
   },
   cart_abandoned_step2: {
     en: 'Hi {name}, your items are still waiting! Complete your order now: {cartUrl}',
-    ar: 'مرحباً {name}، عناصرك لا تزال بانتظارك! أكمل طلبك الآن: {cartUrl}',
+    ar: 'أهلاً {name}، منتجاتك لسه مستنياك! كمّل طلبك دلوقتي: {cartUrl}',
   },
   cart_abandoned_step3: {
     en: '{name}, last chance! {couponCode} Complete your order: {cartUrl}',
-    ar: '{name}، فرصتك الأخيرة! {couponCode} أكمل طلبك: {cartUrl}',
+    ar: '{name}، آخر فرصة! {couponCode} كمّل طلبك: {cartUrl}',
   },
   back_in_stock: {
     en: 'Hi {name}, great news! "{productName}" is back in stock at {storeName}. Shop now: {productUrl}',
-    ar: 'مرحباً {name}، خبر رائع! "{productName}" عاد للمخزن في {storeName}. تسوق الآن: {productUrl}',
+    ar: 'أهلاً {name}، خبر حلو! رجّعنا "{productName}" في {storeName}. اطلب دلوقتي: {productUrl}',
   },
 };
 
-export function renderSmsTemplate(template: string, data: NotificationData): string {
+/**
+ * Fills a template. `{cartItems}` is the counted noun in the template's language (never
+ * "1 عناصر"); `locale` picks it (default ar, the Egyptian region default).
+ */
+export function renderSmsTemplate(
+  template: string,
+  data: NotificationData,
+  locale: 'en' | 'ar' = 'ar'
+): string {
   return template
+    .replace(
+      '{cartItems}',
+      data.cartItemCount !== undefined ? countText(locale, data.cartItemCount, ITEMS) : ''
+    )
     .replace('{name}', data.customerName)
     .replace('{number}', data.orderNumber)
     .replace('{total}', data.total !== undefined ? data.total.toFixed(2) : '')
@@ -125,101 +145,101 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
   order_confirmed: {
     title: {
       en: 'Order Confirmed',
-      ar: 'تم تأكيد الطلب',
+      ar: 'طلبك اتأكد',
     },
     body: {
       en: 'Hi {name}, your order #{number} has been confirmed. Total: {total}.',
-      ar: 'مرحباً {name}، تم تأكيد طلبك رقم #{number}. الإجمالي: {total}.',
+      ar: 'أهلاً {name}، طلبك رقم #{number} اتأكد. الإجمالي: {total}.',
     },
   },
   payment_success: {
     title: {
       en: 'Payment Successful',
-      ar: 'تمت عملية الدفع بنجاح',
+      ar: 'الدفع وصلنا',
     },
     body: {
       en: 'Payment of {amount} for order #{number} was received successfully.',
-      ar: 'تم استلام دفعة {amount} للطلب رقم #{number} بنجاح.',
+      ar: 'استلمنا دفعتك {amount} للطلب رقم #{number}.',
     },
   },
   order_shipped: {
     title: {
       en: 'Order Shipped',
-      ar: 'تم شحن الطلب',
+      ar: 'طلبك اتشحن',
     },
     body: {
       en: 'Your order #{number} is on its way. Tracking: {tracking}.',
-      ar: 'طلبك رقم #{number} في الطريق إليك. رقم التتبع: {tracking}.',
+      ar: 'طلبك رقم #{number} في الطريق ليك. رقم التتبع: {tracking}.',
     },
   },
   order_delivered: {
     title: {
       en: 'Order Delivered',
-      ar: 'تم تسليم الطلب',
+      ar: 'طلبك اتسلّم',
     },
     body: {
       en: 'Hi {name}, your order #{number} has been delivered. Enjoy!',
-      ar: 'مرحباً {name}، تم تسليم طلبك رقم #{number}. استمتع بمشترياتك!',
+      ar: 'أهلاً {name}، طلبك رقم #{number} اتسلّم. نتمنى يعجبك!',
     },
   },
   order_cancelled: {
     title: {
       en: 'Order Cancelled',
-      ar: 'تم إلغاء الطلب',
+      ar: 'طلبك اتلغى',
     },
     body: {
       en: 'Your order #{number} has been cancelled. Reason: {reason}.',
-      ar: 'تم إلغاء طلبك رقم #{number}. السبب: {reason}.',
+      ar: 'طلبك رقم #{number} اتلغى. السبب: {reason}.',
     },
   },
   refund_processed: {
     title: {
       en: 'Refund Processed',
-      ar: 'تمت معالجة الاسترداد',
+      ar: 'رجعنالك فلوسك',
     },
     body: {
       en: 'A refund of {amount} for order #{number} has been processed.',
-      ar: 'تمت معالجة استرداد {amount} للطلب رقم #{number}.',
+      ar: 'رجعنالك {amount} من الطلب رقم #{number}.',
     },
   },
   cart_abandoned_step1: {
     title: {
       en: 'You left something behind!',
-      ar: 'تركت شيئاً خلفك!',
+      ar: 'سيبت حاجة في السلة!',
     },
     body: {
-      en: 'Hi {name}, you have {cartItemCount} items worth {cartTotal} EGP waiting in your cart.',
-      ar: 'مرحباً {name}، لديك {cartItemCount} عناصر بقيمة {cartTotal} ج.م بانتظارك في سلتك.',
+      en: 'Hi {name}, you have {cartItems} worth {cartTotal} EGP waiting in your cart.',
+      ar: 'أهلاً {name}، في سلتك {cartItems} بقيمة {cartTotal} ج.م.',
     },
   },
   cart_abandoned_step2: {
     title: {
       en: 'Your cart is waiting for you',
-      ar: 'سلتك بانتظارك',
+      ar: 'سلتك مستنياك',
     },
     body: {
       en: 'Hi {name}, your items are still in your cart. Complete your order before they sell out!',
-      ar: 'مرحباً {name}، عناصرك لا تزال في سلتك. أكمل طلبك قبل نفاد الكمية!',
+      ar: 'أهلاً {name}، منتجاتك لسه في سلتك. كمّل طلبك قبل ما الكمية تخلص!',
     },
   },
   cart_abandoned_step3: {
     title: {
       en: 'Last chance — complete your order!',
-      ar: 'فرصتك الأخيرة — أكمل طلبك!',
+      ar: 'آخر فرصة — كمّل طلبك!',
     },
     body: {
       en: '{name}, your cart is about to expire. Use {couponCode} to save on your order.',
-      ar: '{name}، سلتك على وشك الانتهاء. استخدم {couponCode} لتوفير على طلبك.',
+      ar: '{name}، سلتك قربت تخلص. استخدم {couponCode} ووفّر في طلبك.',
     },
   },
   back_in_stock: {
     title: {
       en: 'Back in Stock!',
-      ar: 'عاد للمخزن!',
+      ar: 'رجّعنا المنتج تاني!',
     },
     body: {
       en: 'Hi {name}, "{productName}" is now available again at {storeName}.',
-      ar: 'مرحباً {name}، "{productName}" متوفر مجدداً في {storeName}.',
+      ar: 'أهلاً {name}، رجّعنا "{productName}" تاني في {storeName}.',
     },
   },
 };

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { withUser } from '@ebda/database';
 import { config } from '../config';
-import { authenticate, rejectImpersonated } from '../middleware/auth';
+import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
 import {
   AuthService,
   GENERIC_RESEND_VERIFICATION_RESULT,
@@ -25,6 +25,7 @@ import { redis } from '../services/redis.service';
 import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
+import { assertNotDemoStore } from '../services/plan-limit.service';
 
 import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 const router = Router();
@@ -210,6 +211,8 @@ const emailLookupSchema = z.object({
 router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
+    // Ruling B1-13: no customer accounts on the demo showroom.
+    if (data.storeId) await assertNotDemoStore(data.storeId);
     const result = await AuthService.register({
       ...data,
       storeId: data.storeId ?? null,
@@ -741,6 +744,7 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 router.post(
   '/logout-all',
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -757,18 +761,23 @@ router.post(
 );
 
 // GET /auth/me
-router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await AuthService.getProfile(req.user!.userId);
+router.get(
+  '/me',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await AuthService.getProfile(req.user!.userId);
 
-    res.json({
-      success: true,
-      data: { user },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { user },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // DELETE /auth/me - Soft-delete (deactivate) the authenticated user's account
 // `rejectImpersonated`: deactivating the account is irreversible from the
@@ -777,6 +786,7 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
 router.delete(
   '/me',
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -821,6 +831,7 @@ router.post(
   '/me/erase',
   authLimiter,
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -870,62 +881,78 @@ router.post(
 // that decision: `impersonatedBy` is written into the audit row whenever the
 // session is impersonated, so the download is at least ATTRIBUTABLE rather
 // than indistinguishable from the account owner's own export.
-router.get('/me/export', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.userId;
-    const bundle = await AuthService.exportAccount(userId);
+router.get(
+  '/me/export',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const bundle = await AuthService.exportAccount(userId);
 
-    await auditLog({
-      action: 'user.data.exported',
-      userId,
-      resourceType: 'user',
-      resourceId: userId,
-      details: req.user!.impersonatedBy ? { impersonatedBy: req.user!.impersonatedBy } : undefined,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+      await auditLog({
+        action: 'user.data.exported',
+        userId,
+        resourceType: 'user',
+        resourceId: userId,
+        details: req.user!.impersonatedBy
+          ? { impersonatedBy: req.user!.impersonatedBy }
+          : undefined,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
-    const today = new Date().toISOString().slice(0, 10);
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="my-data-${userId}-${today}.json"`);
-    res.send(JSON.stringify(bundle, null, 2));
-  } catch (error) {
-    next(error);
+      const today = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="my-data-${userId}-${today}.json"`
+      );
+      res.send(JSON.stringify(bundle, null, 2));
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /auth/me - Update profile
-router.put('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const updateSchema = z.object({
-      // ProfileClient.tsx always sends firstName from the form — even when
-      // the user clears the field it sends ''. Coerce '' → undefined so that
-      // a deliberate clear is treated as "don't update" rather than a 400.
-      firstName: z.preprocess(
-        v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
-        z.string().min(1, 'First name is required').optional()
-      ),
-      lastName: z.string().optional(),
-      phone: z.string().optional(),
-    });
+router.put(
+  '/me',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const updateSchema = z.object({
+        // ProfileClient.tsx always sends firstName from the form — even when
+        // the user clears the field it sends ''. Coerce '' → undefined so that
+        // a deliberate clear is treated as "don't update" rather than a 400.
+        firstName: z.preprocess(
+          v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+          z.string().min(1, 'First name is required').optional()
+        ),
+        lastName: z.string().optional(),
+        phone: z.string().optional(),
+      });
 
-    const data = updateSchema.parse(req.body);
-    const user = await AuthService.updateProfile(req.user!.userId, data);
+      const data = updateSchema.parse(req.body);
+      const user = await AuthService.updateProfile(req.user!.userId, data);
 
-    res.json({
-      success: true,
-      data: { user },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { user },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /auth/change-password
 router.post(
   '/change-password',
   authLimiter,
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -963,7 +990,26 @@ router.post(
   // multiply the mails one inbox receives.
   authEmailAddressLimiter,
   resetEmailLimiter,
-  async (req: Request, res: Response, _next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Ruling B1-13: no account mail from the demo showroom (its storeId is refused outright;
+    // the answer does not depend on the email, so it reveals nothing about any account).
+    try {
+      const demoScope = (req.body ?? {}).storeId;
+      if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
+    } catch (error) {
+      // Only the demo refusal itself is a 403. Any other failure of the guard (a store lookup
+      // that errors) answers like every other failure on this route: the generic 200 below
+      // (enumeration defence), never a 500 that differs by storeId (T9 review minor).
+      if (error instanceof AppError && error.code === 'DEMO_STORE') {
+        next(error);
+        return;
+      }
+      res.json({
+        success: true,
+        data: { message: 'If an account exists with this email, a reset link has been sent.' },
+      });
+      return;
+    }
     try {
       const { email, storeId } = req.body ?? {};
 
@@ -1140,6 +1186,21 @@ router.post(
   // also takes a caller-supplied storeId and sends one mail per account.
   authEmailAddressLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
+    // Ruling B1-13: no account mail from the demo showroom (its storeId is refused outright;
+    // the answer does not depend on the email, so it reveals nothing about any account).
+    try {
+      const demoScope = (req.body ?? {}).storeId;
+      if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
+    } catch (error) {
+      // Only the demo refusal itself is a 403. Any other guard failure answers the generic 200
+      // (enumeration defence), as on /forgot-password, never a 500 that differs by storeId.
+      if (error instanceof AppError && error.code === 'DEMO_STORE') {
+        next(error);
+        return;
+      }
+      res.json({ success: true, data: { ...GENERIC_RESEND_VERIFICATION_RESULT } });
+      return;
+    }
     try {
       const { email, storeId } = req.body ?? {};
 

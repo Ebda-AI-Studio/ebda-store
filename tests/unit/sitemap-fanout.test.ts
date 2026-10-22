@@ -37,7 +37,7 @@ import sitemap from '../../apps/web/src/app/sitemap';
 
 type MockWorld = {
   /** null → host is not a custom domain (master branch). */
-  tenant: { id: string; slug: string } | null;
+  tenant: { id: string; slug: string; isDemo?: boolean } | null;
   stores: Array<{ id: string; slug: string; createdAt: string }>;
   /** productCounts[storeId] = published product count for that store. */
   productCounts: Record<string, number>;
@@ -188,6 +188,18 @@ describe('sitemap — host routing', () => {
       productCounts: { s1: 3 },
     });
     await expect(sitemap()).rejects.toBe(NOT_FOUND);
+  });
+
+  it('B1-14: the demo showroom host lists nothing and asks for no products', async () => {
+    hostRef.host = 'storedemo.ebda.app';
+    const fetchMock = installFetchMock({
+      tenant: { id: 's1', slug: 'storedemo', isDemo: true },
+      stores: [],
+      productCounts: { s1: 40 },
+    });
+    await expect(sitemap()).resolves.toEqual([]);
+    const asked = fetchMock.mock.calls.map(c => new URL(String(c[0])).pathname);
+    expect(asked.some(p => p.endsWith('/public/products'))).toBe(false);
   });
 
   it('a <slug>.ebda.app host lists only its own store, rooted at that host', async () => {

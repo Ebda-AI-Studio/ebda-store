@@ -39,6 +39,7 @@ export const imageTextSchema = z
     buttonText: text(60),
     buttonTextAr: text(60),
     buttonLink: safeLink,
+    layout: z.enum(['split', 'full-bleed']).optional(),
     // Logical, never left/right: `start` mirrors to the right in Arabic.
     imagePosition: z.enum(['start', 'end']).optional(),
     imageAspect: z.enum(['square', 'portrait', 'landscape']).optional(),
@@ -65,7 +66,7 @@ export const newsletterSchema = z
  * stock never live in the document.
  */
 const productSource = z
-  .enum(['newest', 'best_seller', 'featured', 'category', 'manual'])
+  .enum(['newest', 'best_seller', 'featured', 'on_sale', 'category', 'manual'])
   .optional();
 const productRefs = {
   productSource,
@@ -105,6 +106,9 @@ export const productSpotlightSchema = z
     bodyAr: text(1000),
     ...productRefs,
     limit: z.number().int().min(1).max(4).optional(),
+    // `list` (default, absent) = the photograph beside a product list; `stage` = ONE product on a
+    // large object-contain tile (Souq Showroom, Phase B2).
+    layout: z.enum(['list', 'stage']).optional(),
     imagePosition: z.enum(['start', 'end']).optional(),
     buttonText: text(60),
     buttonTextAr: text(60),
@@ -118,7 +122,7 @@ export const collectionListSchema = z
     ...frame,
     heading: text(200),
     headingAr: text(200),
-    tileShape: z.enum(['arch', 'rectangle', 'circle']).optional(),
+    tileShape: z.enum(['arch', 'rectangle', 'circle', 'band']).optional(),
     columns: z.number().int().min(2).max(4).optional(),
   })
   .strict();
@@ -130,6 +134,8 @@ export const collectionBlockSchema = z
     imageAr: z.string().max(2048).optional(),
     label: text(80),
     labelAr: text(80),
+    /** Band colour when the list uses `tileShape: 'band'` (Ruling B1-2/B1-5). */
+    tone: z.enum(['primary', 'accent', 'line']).optional(),
   })
   .strict();
 
@@ -162,5 +168,28 @@ export const trustBadgeBlockSchema = z
     titleAr: text(80),
     text: text(200),
     textAr: text(200),
+  })
+  .strict();
+
+/**
+ * "Shop the look" (Phase B1, Qamar Lookbook; Ruling B1-2): a snap-scroll row of looks.
+ * Each look is a `look` block: one photo plus up to 4 products BY REFERENCE. The items
+ * are links to the PDP (thumbnail, name, price); there is no quick add and no "add the
+ * whole look" (Ruling B1-6). Unknown or cross-store ids are a REF_NOT_FOUND warning on
+ * save (C11) and never render (the storefront resolves them against the store's own pool).
+ */
+export const shopTheLookSchema = z
+  .object({ ...frame, heading: text(200), headingAr: text(200) })
+  .strict();
+
+export const shopTheLookBlockSchema = z
+  .object({
+    image: z.string().max(2048).optional(),
+    imageAr: z.string().max(2048).optional(),
+    alt: text(300),
+    altAr: text(300),
+    title: text(80),
+    titleAr: text(80),
+    productIds: z.array(z.string().max(80)).min(1).max(4).optional(),
   })
   .strict();

@@ -22,12 +22,34 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
 import { hasDb } from '../helpers/bundle-fixtures';
 
-const { invalidated, r2Cleanup, failValidation, notReady } = vi.hoisted(() => ({
-  invalidated: [] as string[],
-  r2Cleanup: vi.fn(),
-  failValidation: { on: false },
-  notReady: { on: false },
-}));
+const { invalidated, r2Cleanup, failValidation, notReady, lookMix, failAfterBuilder } = vi.hoisted(
+  () => ({
+    invalidated: [] as string[],
+    r2Cleanup: vi.fn(),
+    failValidation: { on: false },
+    notReady: { on: false },
+    // A section mix injected into a registered look. Lookbook and Vitrine have real mixes since
+    // Tasks 7-8 (pinned in tests/unit/looks-section-mix.test.ts); these cases inject controlled
+    // ones (Atelier's own design values equal the skin defaults, so they prove nothing).
+    lookMix: {} as Record<string, unknown[]>,
+    // Makes applyLook's store-row update fail AFTER the builder step (Ruling LOOKS-10 retry path).
+    failAfterBuilder: { on: false },
+  })
+);
+vi.mock('@api/services/page-builder.service', async importOriginal => {
+  const real = await importOriginal<typeof import('@api/services/page-builder.service')>();
+  return {
+    ...real,
+    applyFamilyForLook: async (...a: Parameters<typeof real.applyFamilyForLook>) => {
+      const out = await real.applyFamilyForLook(...a);
+      if (failAfterBuilder.on) {
+        failAfterBuilder.on = false;
+        throw new Error('simulated store update failure after the builder step');
+      }
+      return out;
+    },
+  };
+});
 vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
   const real = await importOriginal<typeof import('@api/services/r2-cleanup.service')>();
   return {
@@ -42,8 +64,13 @@ vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
 // section fail publish readiness (as if the whole family still held starter copy).
 vi.mock('@ebda/shared', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/shared')>();
+  const getLook = (id: string | null | undefined) => {
+    const look = real.getLook(id);
+    return look && id && lookMix[id] ? { ...look, sections: lookMix[id] as never } : look;
+  };
   return {
     ...real,
+    getLook,
     validateDefinition: (...a: Parameters<typeof real.validateDefinition>) =>
       failValidation.on
         ? Promise.resolve({ ok: false, errors: [] })
@@ -148,7 +175,9 @@ async function seedMerchant(
   });
 }
 
-const LOOK_ID = 'souq.catalogue';
+// A look with no mix and no skin of its own (still on minimal): keeps these cases about the
+// switch plumbing; the Souq mixes have their own cases below and in souq-look-mix.test.ts.
+const LOOK_ID = 'jasmine.clinic';
 
 describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => {
   let app: Express;
@@ -203,6 +232,20 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(s.look).toBe(LOOK_ID);
   });
 
+  it('reset: also drops the optional look UI tokens a merchant stored (W2a)', async () => {
+    const m = await seedMerchant('reset-ui', {
+      wordmarkSize: 'xl',
+      overPhotoChrome: 'soft',
+      receiptStyle: 'device',
+      cardCta: 'quiet',
+      cardHover: 'lift',
+      showQuickAdd: true,
+    });
+    const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'reset' });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toEqual({ showQuickAdd: true });
+  });
+
   it('theme PUT: density / imageRatio / motion accept only their known values (null deletes)', async () => {
     const m = await seedMerchant('look-keys', { density: 'airy', motion: 'subtle' });
     const putTheme = (body: Record<string, unknown>) =>
@@ -217,6 +260,12 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       { motion: 'wild' },
       { density: 3 },
       { motion: '' },
+      { wordmarkSize: 'huge' },
+      { overPhotoChrome: 'glass' },
+      { receiptStyle: 'thermal' },
+      { cardCta: 'slab' },
+      { cardHover: 'bounce' },
+      { cardBadge: 'red' },
     ]) {
       const res = await putTheme(bad);
       expect(res.status, JSON.stringify(bad)).toBe(400);
@@ -225,6 +274,22 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     const ok = await putTheme({ density: 'compact', imageRatio: '3/4', motion: null });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect((await row(m.storeId)).theme).toEqual({ density: 'compact', imageRatio: '3/4' });
+    const ui = await putTheme({ wordmarkSize: 'lg', overPhotoChrome: 'bare', receiptStyle: null });
+    expect(ui.status, JSON.stringify(ui.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toEqual({
+      density: 'compact',
+      imageRatio: '3/4',
+      wordmarkSize: 'lg',
+      overPhotoChrome: 'bare',
+    });
+    // W2b card tokens: known values only, merchant-storable like the W2a ones.
+    const card = await putTheme({ cardCta: 'quiet', cardHover: 'lift', cardBadge: 'accent' });
+    expect(card.status, JSON.stringify(card.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toMatchObject({
+      cardCta: 'quiet',
+      cardHover: 'lift',
+      cardBadge: 'accent',
+    });
   });
 
   it('unknown look: 400 INVALID_LOOK and the store is unchanged', async () => {
@@ -259,6 +324,28 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     for (const sec of doc.sections.filter(x => x.type === 'product-carousel'))
       expect((sec.settings as Record<string, unknown>).cardShape, sec.id).toBeUndefined();
   });
+
+  it.each(['souq.catalogue', 'souq.night', 'souq.showroom'])(
+    'Souq %s on an empty store: the souq skin + look are set and a home revision is written',
+    async id => {
+      const m = await seedMerchant(`mix-${id.split('.')[1]}`);
+      const res = await put(m.storeId, m.token, { lookId: id, design: 'keep' });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(await row(m.storeId)).toMatchObject({ look: id, template: 'souq' });
+      const revs = await revisions(m.storeId);
+      expect(revs.length).toBeGreaterThan(0);
+      const doc = (
+        await prisma.storePageRevision.findFirstOrThrow({
+          where: { storeId: m.storeId, pageKey: 'home' },
+          orderBy: { rev: 'desc' },
+          select: { document: true },
+        })
+      ).document as { sections: Array<{ type: string }> };
+      // only the mix's section types are written (an unpublishable one may be left out)
+      const mixTypes = new Set(getLook(id)!.sections!.map(x => x.type));
+      for (const sec of doc.sections) expect(mixTypes.has(sec.type), sec.type).toBe(true);
+    }
+  );
 
   it('empty store whose every family section is unpublishable: stays a DRAFT, never an empty live home', async () => {
     const m = await seedMerchant('all-unready');
@@ -297,6 +384,151 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(revs.filter(r => r.status === 'draft')).toHaveLength(1);
     expect(invalidated.filter(k => k === `public:store:${m.storeId}`)).toHaveLength(1);
     expect(invalidated).toContain(`public:store:${m.slug}`);
+  });
+
+  describe('look switch design keys (C6/C8, fix round 1)', () => {
+    type Doc = {
+      appliedLook?: string;
+      sections: { type: string; settings: Record<string, unknown>; blocks?: unknown }[];
+    };
+    const docOf = async (storeId: string, status: 'draft' | 'published') =>
+      (await prisma.storePageRevision.findFirstOrThrow({
+        where: { storeId, pageKey: 'home', status },
+        select: { id: true, document: true },
+      })) as { id: string; document: Doc };
+    const sec = (doc: Doc, type: string) => doc.sections.find(x => x.type === type)!.settings;
+    const ok = async (m: { storeId: string; token: string }, lookId: string) =>
+      expect((await put(m.storeId, m.token, { lookId, design: 'keep' })).status).toBe(200);
+    // Two columns + a framed hero on "Lookbook"; the same sections with NO design keys on
+    // "Vitrine" (C6 resets them). Vitrine's real mix drops the category grid, so it is injected.
+    const TWO = [
+      { type: 'hero', design: { presentation: 'framed' } },
+      { type: 'category-grid', design: { desktopColumns: 2 } },
+      { type: 'image-text' },
+    ];
+    const BARE = [{ type: 'hero' }, { type: 'category-grid' }, { type: 'image-text' }];
+
+    beforeAll(() => {
+      lookMix['qamar.lookbook'] = TWO;
+      lookMix['qamar.vitrine'] = BARE;
+    });
+    afterAll(() => {
+      delete lookMix['qamar.lookbook'];
+      delete lookMix['qamar.vitrine'];
+    });
+
+    it('keep from a layout-built page applies the look; a look-owned key returns to the skin default', async () => {
+      const a = await seedMerchant('mixa');
+      await ok(a, LOOK_ID);
+      await ok(a, 'qamar.lookbook');
+      const onLookbook = (await docOf(a.storeId, 'draft')).document;
+      expect(onLookbook.appliedLook).toBe('qamar.lookbook');
+      expect(sec(onLookbook, 'hero').presentation).toBe('framed');
+      expect(sec(onLookbook, 'category-grid').desktopColumns).toBe(2);
+      await ok(a, 'qamar.vitrine');
+      const onVitrine = (await docOf(a.storeId, 'draft')).document;
+      expect(onVitrine.appliedLook).toBe('qamar.vitrine');
+      // Back to the qamar skin's own defaults, not registry preset 0 (3 columns, unset hero).
+      expect(sec(onVitrine, 'category-grid').desktopColumns).toBe(4);
+      expect(sec(onVitrine, 'hero').presentation).toBe('full-bleed');
+      await awaitDeferredWork(5000);
+    });
+
+    it('Atelier -> the REAL Vitrine mix: bands, one quote and the frame line pass saveDraft under ebda_app', async () => {
+      const injected = lookMix['qamar.vitrine'];
+      delete lookMix['qamar.vitrine'];
+      try {
+        const v = await seedMerchant('vitrine-real');
+        await ok(v, LOOK_ID);
+        await ok(v, 'qamar.atelier');
+        await ok(v, 'qamar.vitrine');
+        const draft = (await docOf(v.storeId, 'draft')).document;
+        expect(draft.appliedLook).toBe('qamar.vitrine');
+        expect(sec(draft, 'hero')).toMatchObject({ presentation: 'framed', frame: 'line' });
+        expect(sec(draft, 'collection-list')).toMatchObject({
+          tileShape: 'band',
+          headingAr: 'تسوّق حسب المناسبة',
+        });
+        expect(sec(draft, 'testimonials').layout).toBe('single');
+        // content seeded by Atelier is kept (B1-3): only design keys follow Vitrine
+        expect(sec(draft, 'featured-collection')).toMatchObject({
+          headingAr: 'وصل حديثًا',
+          columns: 4,
+          mobileColumns: 2,
+        });
+        expect((await row(v.storeId)).look).toBe('qamar.vitrine');
+        await awaitDeferredWork(5000);
+      } finally {
+        lookMix['qamar.vitrine'] = injected;
+      }
+    });
+
+    it('keep: a hand-set hero presentation survives the switch', async () => {
+      const b = await seedMerchant('mixb');
+      await ok(b, LOOK_ID);
+      await ok(b, 'qamar.atelier');
+      const draft = await docOf(b.storeId, 'draft');
+      const edited = {
+        ...draft.document,
+        sections: draft.document.sections.map(x =>
+          x.type === 'hero' ? { ...x, settings: { ...x.settings, presentation: 'framed' } } : x
+        ),
+      };
+      await withRlsBypass(tx =>
+        tx.storePageRevision.update({
+          where: { id: draft.id },
+          data: { document: edited as object },
+        })
+      );
+      await ok(b, 'qamar.vitrine');
+      expect(sec((await docOf(b.storeId, 'draft')).document, 'hero').presentation).toBe('framed');
+      await awaitDeferredWork(5000);
+    });
+
+    it("A -> B with B's draft discarded, then B -> C: the published document's appliedLook is the baseline", async () => {
+      const c = await seedMerchant('mixc');
+      await ok(c, 'qamar.lookbook'); // fresh store: published, composed by Lookbook
+      const published = (await docOf(c.storeId, 'published')).document;
+      expect(published.appliedLook).toBe('qamar.lookbook');
+      expect(sec(published, 'category-grid').desktopColumns).toBe(2);
+      await ok(c, 'qamar.atelier'); // draft only; store row now says Atelier
+      const atelierDraft = await docOf(c.storeId, 'draft');
+      await withRlsBypass(tx => tx.storePageRevision.delete({ where: { id: atelierDraft.id } }));
+      await ok(c, 'qamar.vitrine');
+      const onVitrine = (await docOf(c.storeId, 'draft')).document;
+      // Lookbook's 2 columns are look-owned (untouched since Lookbook set them): reset, not kept
+      // as if the merchant had chosen them (the store row's Atelier never set the key).
+      expect(sec(onVitrine, 'category-grid').desktopColumns).toBe(4);
+      expect(onVitrine.appliedLook).toBe('qamar.vitrine');
+      await awaitDeferredWork(5000);
+    });
+
+    it('a retry after the store update failed converges on the same draft as one clean switch', async () => {
+      const once = await seedMerchant('retry1');
+      await ok(once, LOOK_ID);
+      await ok(once, 'qamar.lookbook');
+
+      const twice = await seedMerchant('retry2');
+      await ok(twice, LOOK_ID);
+      failAfterBuilder.on = true;
+      const failed = await put(twice.storeId, twice.token, {
+        lookId: 'qamar.lookbook',
+        design: 'keep',
+      });
+      expect(failed.status).toBe(500);
+      expect((await row(twice.storeId)).look).toBe(LOOK_ID); // the store row was not written
+      await ok(twice, 'qamar.lookbook');
+
+      const shape = (d: Doc) => ({
+        appliedLook: d.appliedLook,
+        sections: d.sections.map(x => ({ type: x.type, settings: x.settings, blocks: x.blocks })),
+      });
+      expect(shape((await docOf(twice.storeId, 'draft')).document)).toEqual(
+        shape((await docOf(once.storeId, 'draft')).document)
+      );
+      expect(await row(twice.storeId)).toMatchObject({ look: 'qamar.lookbook', template: 'qamar' });
+      await awaitDeferredWork(5000);
+    });
   });
 
   it('legacy store with customised layout_settings and no builder revision: DRAFT only, layout + R2 untouched', async () => {

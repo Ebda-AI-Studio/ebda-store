@@ -195,6 +195,12 @@ product.costPrice`. Order lines snapshot it at sale time
   backorder line that created the debt heals it back up to 0, never above
   (next section).
 
+- **Warehouse stock writes follow the same rule** (issue 27). `WarehouseService.syncAggregateInventory`
+  re-aggregates a VARIANT row from its `warehouse_stock` rows and stops there; it used to also write
+  `SUM(product_variants.inventory)` into `products.inventory`, which for a variant product must stay 0.
+  `setStock` / `adjustStock` with no `variantId` on a product that has variants now fail 400
+  `VARIANT_PRODUCT` (set it per variant), and both bust the product caches after the write.
+
 ## Cancelling one backorder line
 
 `cancelBackorder` (`POST …/backorders/:id/cancel`) takes back only that

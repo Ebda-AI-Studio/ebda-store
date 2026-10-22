@@ -19,6 +19,7 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { api } from '../../lib/api';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 export interface NewsletterSettings extends SectionPaddingMaxWidthVisibility {
@@ -47,7 +48,9 @@ export function NewsletterSection({
   const tr = (k: keyof typeof translations) => t(k, translations[k]);
   const pick = (en?: string, arv?: string) => (ar ? arv || en : en || arv) || '';
   const [email, setEmail] = useState('');
-  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'invalid' | 'error'>('idle');
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'invalid' | 'error' | 'demo'>(
+    'idle'
+  );
   const spacing = sectionSpacingClasses(settings, store.look);
   const edit = (key: string) =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
@@ -63,7 +66,7 @@ export function NewsletterSection({
         language: ar ? 'ar' : 'en',
         source: 'section',
       });
-      setState(res.success === false ? 'error' : 'done');
+      setState(res.success === false ? (demoRefusalText(res.error, t) ? 'demo' : 'error') : 'done');
     } catch {
       setState('error');
     }
@@ -116,7 +119,7 @@ export function NewsletterSection({
                 if (state !== 'idle') setState('idle');
               }}
               placeholder={tr('Your email')}
-              className="min-h-[44px] min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-background px-3 text-base text-foreground sm:text-sm"
+              className="min-h-[44px] min-w-0 flex-1 rounded-[var(--radius)] border border-input bg-background px-3 text-base text-foreground sm:text-sm"
             />
             <button
               type="submit"
@@ -138,9 +141,17 @@ export function NewsletterSection({
             {tr('Something went wrong. Please try again later.')}
           </p>
         )}
+        {state === 'demo' && (
+          <p role="status" className="mt-2 text-sm text-muted-foreground">
+            {tr('This is a demo store: this is turned off here')}
+          </p>
+        )}
         <p className="mt-3 text-xs text-muted-foreground">
           {tr('By subscribing you agree to receive marketing emails from this store.')}{' '}
-          <a href={storeUrl('/privacy')} className="underline">
+          <a
+            href={storeUrl('/privacy')}
+            className="inline-flex min-h-11 items-center underline underline-offset-4"
+          >
             {tr('Privacy policy')}
           </a>
         </p>

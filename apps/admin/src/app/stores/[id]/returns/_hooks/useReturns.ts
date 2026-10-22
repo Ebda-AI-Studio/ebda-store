@@ -19,7 +19,14 @@ interface UseReturnsArgs {
    * refund method, or null if the user cancelled. Receives the return so the
    * dialog can show what each method would refund for it.
    */
-  requestRefundMethod: (returnId: string) => Promise<string | null>;
+  requestRefundMethod: (returnId: string) => Promise<
+    | string
+    | {
+        refundMethod: string;
+        refundOverrides: Record<string, { amountMinor: number; reason: string }>;
+      }
+    | null
+  >;
 }
 
 /**
@@ -38,6 +45,10 @@ export const COMPLETE_ERROR_CODES = new Set([
   'EXCHANGE_CANNOT_REFUND_TO_GATEWAY',
   'PROVIDER_REFUND_FAILED',
   'INVALID_STATUS',
+  // B2B tier-adjustment overrides (Task 8b): refused before any money moves.
+  'OVERRIDE_NOT_APPLICABLE',
+  'OVERRIDE_OUT_OF_RANGE',
+  'OVERRIDE_UNKNOWN_ITEM',
   // Refused by PaymentService.refund before or at its claim (issue 2033).
   // Every 4xx the completion path can raise is pinned by
   // useReturns.codes.test.ts, which reads the producers.
@@ -200,12 +211,14 @@ export function useReturns({ storeId, requestRejectReason, requestRefundMethod }
 
   const complete = useCallback(
     async (returnId: string) => {
-      const refundMethod = await requestRefundMethod(returnId);
-      if (!refundMethod) return false;
+      const choice = await requestRefundMethod(returnId);
+      if (!choice) return false;
+      const refundMethod = typeof choice === 'string' ? choice : choice.refundMethod;
+      const refundOverrides = typeof choice === 'string' ? undefined : choice.refundOverrides;
       try {
         const { error } = await apiPost(
           `/api/v1/stores/${storeId}/returns/admin/${returnId}/complete`,
-          { refundMethod }
+          refundOverrides ? { refundMethod, refundOverrides } : { refundMethod }
         );
         if (error) {
           // Say WHY. One generic toast for every failure turned "the refund

@@ -2,9 +2,17 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
-import { SwatchDots } from './SwatchDots';
+import { vi } from 'vitest';
+const lang = { value: 'en' as 'en' | 'ar' };
+vi.mock('@/contexts/LanguageContext', () => ({
+  useLanguage: () => ({ language: lang.value }),
+}));
+const { SwatchDots } = await import('./SwatchDots');
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  lang.value = 'en';
+});
 
 describe('SwatchDots', () => {
   it('renders up to max dots then +N', () => {
@@ -80,7 +88,7 @@ describe('SwatchDots', () => {
     expect(screen.getByText('+7')).toBeTruthy();
   });
 
-  it('a black dot on an ink skin keeps a 35% foreground edge (F7, WCAG 1.4.11)', () => {
+  it('a black dot on an ink skin keeps a solid foreground edge (F7, LB-b, B1-107)', () => {
     const p = {
       options: [
         {
@@ -92,7 +100,37 @@ describe('SwatchDots', () => {
     };
     render(<SwatchDots product={p as never} max={5} />);
     const dot = screen.getByTestId('swatch-dot');
-    expect(dot.className).toContain('border-foreground/35');
-    expect(dot.className).not.toContain('border-foreground/15');
+    // solid foreground: a black dot on a dark look still has a >= 3:1 outline (B1-107)
+    expect(dot.className).toMatch(/\bborder-foreground(?!\/)/);
+    expect(dot.className).not.toMatch(/border-foreground\//);
+  });
+});
+
+// R-14 (W3): the dots are decorative, but the COUNT is information; screen readers get it.
+describe('SwatchDots colour count for assistive tech', () => {
+  const p = (n: number) => ({
+    options: [
+      {
+        name: 'Color',
+        values: Array.from({ length: n }, (_, i) => ({
+          id: `${i}`,
+          value: `c${i}`,
+          swatchHex: '#111111',
+        })),
+      },
+    ],
+  });
+  it('en: "7 colours" in an sr-only span, the dots stay aria-hidden', () => {
+    const { container } = render(<SwatchDots product={p(7)} max={5} />);
+    expect(container.querySelector('.sr-only')?.textContent).toBe('7 colours');
+    expect(container.querySelector('[aria-hidden="true"]')).toBeTruthy();
+  });
+  it('ar: the counted noun takes its Arabic plural form', () => {
+    lang.value = 'ar';
+    const two = render(<SwatchDots product={p(2)} max={5} />).container;
+    expect(two.querySelector('.sr-only')?.textContent).toBe('لونين');
+    cleanup();
+    const three = render(<SwatchDots product={p(3)} max={5} />).container;
+    expect(three.querySelector('.sr-only')?.textContent).toBe('3 ألوان');
   });
 });

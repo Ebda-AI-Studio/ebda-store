@@ -97,7 +97,10 @@ import { abandonedCartService } from '@api/services/abandoned-cart.service';
 beforeEach(() => {
   m.scope = '';
   m.seen = [];
-  m.feature.mockImplementation(async (id: string) => {
+  m.feature.mockImplementation(async (id: string, key?: string) => {
+    // Cart detection asks the effective entitlement per store (plan baseline OR row); featureService
+    // opens its own store scope, so it is called from outside one.
+    if (key === 'abandoned_cart') return true;
     expect(m.scope).toBe(id);
     m.seen.push(`birthday:${id}`);
     return false;

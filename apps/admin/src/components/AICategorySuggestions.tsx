@@ -124,7 +124,7 @@ export function AICategorySuggestions({
             key={s.id}
             type="button"
             onClick={() => onSelect(s.id)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1 text-xs font-medium text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10"
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-ink transition-colors hover:bg-primary/10"
             title={t('confidence', { level: s.confidence })}
           >
             <span>{s.name}</span>

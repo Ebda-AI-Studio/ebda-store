@@ -4,9 +4,15 @@ import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { couponValidateLimiter, writeLimiter, publicTenantLimiter } from '../middleware/security';
+import {
+  couponValidateLimiter,
+  couponValidateDistinctLimiter,
+  writeLimiter,
+  publicTenantLimiter,
+} from '../middleware/security';
 import { CouponService } from '../services/coupon.service';
 import { resolveCustomerContext } from '../services/promotion-resolver';
+import { buyerFromRequest } from '../lib/buyer-identity';
 import { tenantContext } from '../middleware/tenant-context';
 
 import { minorToDecimalString } from '@ebda/shared';
@@ -98,6 +104,13 @@ const validateTargetingSchema = z.object({
   cartItems: cartItemsSchema.optional(),
   phone: z.string().nullish(),
   email: z.string().nullish(),
+  /**
+   * The WHOLE loose cart (tier / group priced lines included), which a free-shipping code is judged on (Ruling B2B-M2,
+   * final review P2-3); `orderTotal` / `cartItems` stay the base-priced basis every other coupon type uses (B2B-5).
+   * Optional: a client that sends neither keeps the base-priced judgement.
+   */
+  looseOrderTotal: z.number().int().min(0).optional(),
+  looseCartItems: cartItemsSchema.optional(),
 });
 
 /**
@@ -284,6 +297,8 @@ router.patch(
 router.post(
   '/public/:storeId/coupons/validate',
   couponValidateLimiter,
+  // Distinct-code budget shared with /orders/quote + /orders (enumeration needs distinct codes).
+  couponValidateDistinctLimiter,
   // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
   // against one store's endpoint regardless of source-IP spread.
   publicTenantLimiter,
@@ -294,12 +309,13 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { code, orderTotal } = req.body;
+      const { code, orderTotal: basisOrderTotal } = req.body;
       // Validated separately from code/orderTotal (left untouched below) so
       // a malformed cartItems/phone/email (e.g. an object or array instead
       // of a string) fails with a clean 400 here rather than reaching
       // Prisma inside resolveCustomerContext as an uncontrolled 500.
-      const { cartItems, phone, email } = validateTargetingSchema.parse(req.body);
+      const parsed = validateTargetingSchema.parse(req.body);
+      const { phone, email } = parsed;
 
       if (!code) {
         res.status(400).json({
@@ -321,6 +337,13 @@ router.post(
         });
         return;
       }
+
+      // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2), exactly as OrderService.create does.
+      const looseBasis = coupon.type === 'free_shipping';
+      const orderTotal =
+        looseBasis && parsed.looseOrderTotal != null ? parsed.looseOrderTotal : basisOrderTotal;
+      const cartItems =
+        looseBasis && parsed.looseCartItems ? parsed.looseCartItems : parsed.cartItems;
 
       // Check minimum order amount. `orderTotal != null` rather than a
       // truthiness check: a bundle-only cart's basis is legitimately `0`
@@ -366,11 +389,12 @@ router.post(
         // The customer id comes ONLY from a verified token (customerUserId),
         // exactly the identity OrderService.create resolves the group from.
         const signedInCustomerId = customerUserId(req);
-        const custCtx = await resolveCustomerContext(storeId, {
-          phone,
-          email,
-          customerId: signedInCustomerId ?? null,
-        });
+        // Group membership comes from the SESSION only (Ruling B2B-2c/2e); the typed phone / email never confer a group.
+        const custCtx = await resolveCustomerContext(
+          storeId,
+          { phone, email, customerId: signedInCustomerId ?? null },
+          buyerFromRequest(req)
+        );
         const ctx = {
           ...custCtx,
           // Unknown is not ineligible. The cart page quotes before the shopper

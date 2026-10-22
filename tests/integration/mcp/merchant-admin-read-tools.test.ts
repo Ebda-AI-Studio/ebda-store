@@ -400,6 +400,27 @@ describe.skipIf(!hasDb)(
         for (const m of bMarkers()) expect(res.text).not.toContain(m);
       });
 
+      it('search is the SQL match: finds by email and by guest email, never another store', async () => {
+        // search P2: same match as the Customers page (names, any phone form, email), run in SQL
+        const reg = payload(
+          await call(A.slug, 'admin_list_customers', { search: A.registeredEmail }, A.readKey)
+        );
+        expect(reg.pagination.total).toBe(1);
+        expect(reg.customers[0].isGuest).toBe(false);
+        const guest = payload(
+          await call(A.slug, 'admin_list_customers', { search: A.guestEmail }, A.readKey)
+        );
+        expect(guest.pagination.total).toBe(1);
+        expect(guest.customers[0].isGuest).toBe(true);
+        // the other store's customer is not found through this store's key
+        const other = payload(
+          await call(A.slug, 'admin_list_customers', { search: B.registeredEmail }, A.readKey)
+        );
+        expect(other.pagination.total).toBe(0);
+        // the summary stays store-wide whatever the search
+        expect(other.summary.customers).toBe(2);
+      });
+
       it('paginates', async () => {
         const p1 = payload(await call(A.slug, 'admin_list_customers', { limit: 1 }, A.readKey));
         const p2 = payload(

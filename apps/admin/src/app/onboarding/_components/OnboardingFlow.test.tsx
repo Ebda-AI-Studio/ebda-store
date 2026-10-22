@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { getLook } from '@ebda/shared';
+import { builtLooks } from '@ebda/shared';
 
 const { apiGet, apiPost, apiPut, replace } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -56,6 +56,9 @@ const inactiveStore = {
   url: 'https://my-shop.ebda.app',
   planCode: 'free',
 };
+
+/** The picker offers only built looks and opens on the first built template: pick the first built look. */
+const BUILT = builtLooks()[0]!;
 
 function mockState(state: unknown) {
   apiGet.mockImplementation(async (url: string) => {
@@ -305,15 +308,13 @@ describe('onboarding stepper', () => {
     );
     render(<OnboardingFlow />);
 
-    // Look: pick a Dahab look -> PUT /look (design reset: a brand-new store), then next.
+    // Look: pick a built look -> PUT /look (design reset: a brand-new store), then next.
     await screen.findByText('onboarding.flow.template.title');
-    fireEvent.click(
-      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
-    );
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(BUILT.name.en) }));
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     await waitFor(() =>
       expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/look', {
-        lookId: 'dahab.worn',
+        lookId: BUILT.id,
         design: 'reset',
       })
     );
@@ -379,13 +380,11 @@ describe('onboarding stepper', () => {
     await screen.findByText('onboarding.flow.template.title');
     expect(screen.getByText('onboarding.flow.template.lookNotApplied')).toBeTruthy();
     // Picking a look again goes through the normal PUT /look.
-    fireEvent.click(
-      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
-    );
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(BUILT.name.en) }));
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     await waitFor(() =>
       expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/look', {
-        lookId: 'dahab.worn',
+        lookId: BUILT.id,
         design: 'reset',
       })
     );
@@ -404,9 +403,7 @@ describe('onboarding stepper', () => {
     apiPut.mockImplementationOnce(() => new Promise((_, rej) => (rejectPut = rej)));
     render(<OnboardingFlow />);
     await screen.findByText('onboarding.flow.template.title');
-    fireEvent.click(
-      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
-    );
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(BUILT.name.en) }));
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     const busy = await screen.findByRole('button', { name: 'onboarding.flow.template.saving' });
     expect(busy.getAttribute('aria-busy')).toBe('true');

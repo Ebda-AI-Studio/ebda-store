@@ -6,14 +6,32 @@
 import { deriveBrandRoles } from '../utils/brand-roles';
 import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
-import type { Density, ImageRatio, Motion } from '../looks/types';
+import type {
+  Density,
+  ImageRatio,
+  Motion,
+  OverPhotoChrome,
+  ReceiptStyle,
+  WordmarkSize,
+  CardCta,
+  CardHover,
+  CardBadge,
+} from '../looks/types';
 import { getLook } from '../looks/registry';
 import { resolveLookFonts } from '../looks/fonts';
 
 /**
  * Available store templates
  */
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
+export type TemplateId =
+  | 'modern'
+  | 'classic'
+  | 'minimal'
+  | 'bold'
+  | 'elegant'
+  | 'dahab'
+  | 'qamar'
+  | 'souq';
 
 /**
  * Font family options for store themes
@@ -96,7 +114,7 @@ export const DEFAULT_DIVIDER_SETTINGS: DividerSettings = {
  * Store theme configuration - colors stored as HSL values
  */
 export interface StoreTheme {
-  // Core colors (HSL format: "26 100% 50%")
+  // Core colors (HSL format: "36 36% 52%")
   primaryColor: string;
   primaryForeground: string;
   secondaryColor: string;
@@ -141,6 +159,14 @@ export interface StoreTheme {
   density?: Density;
   imageRatio?: ImageRatio;
   motion?: Motion;
+  // Optional look UI tokens (W2a): absent on legacy stores and on looks that do not set them, so
+  // every consumer keeps its current rendering unless the composed theme carries a value.
+  wordmarkSize?: WordmarkSize;
+  overPhotoChrome?: OverPhotoChrome;
+  receiptStyle?: ReceiptStyle;
+  cardCta?: CardCta;
+  cardHover?: CardHover;
+  cardBadge?: CardBadge;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
@@ -155,6 +181,12 @@ export interface StoreTheme {
   // pill adds visual noise that's only useful for brand-recall on
   // share/screenshot contexts.
   showBrandBadge?: boolean;
+
+  // Opt-in "New / جديد" badge on product cards (Ahmad 2026-10-16, Ruling
+  // D1016-NEW-1: the merchant's choice). When true, a product the merchant
+  // flagged `isNew` or created in the last 14 days shows the badge on every
+  // card path (`isProductNew`). Default false (new visual features default OFF).
+  showNewBadge?: boolean;
 
   // Opt-in quick-add (+) circle overlay on ProductCarousel cards (Bucket
   // E3, shipped 2026-05-17). When true, in-stock non-variant products
@@ -349,9 +381,10 @@ export interface StoreTheme {
    * when the merchant hasn't opted into the full `oosLabel*` badge
    * customization system (`productCardDefaults`). Accepts a `token:<name>`
    * reference (see `COLOR_TOKENS`) or a raw hex/hsl string, resolved via
-   * `resolveColor`. Default (undefined): renders the platform's original
-   * hardcoded terracotta `hsl(15 60% 33%)` — zero visual change for every
-   * EXISTING store (incl. demo-shop + Demo Store), no backfill. Seeded to a
+   * `resolveColor`. Default (undefined): the store's own ink and paper tokens
+   * (`hsl(var(--foreground))` on `hsl(var(--background))`); the old hardcoded
+   * terracotta default was retired on 2026-10-16 (Ebda has no orange, Ruling B1-88).
+   * On a store with a look the label is a flat chip on the look radius, not a sash. Seeded to a
    * neutral slate (`#6b7280`, matching `DEFAULT_THEME.mutedForeground`'s hue)
    * at store-creation time for NEW stores only (`StoreService.create`) and
    * for demo clones — same seeding path as
@@ -562,13 +595,15 @@ export interface TemplateInfo {
  */
 export const DEFAULT_THEME: StoreTheme = {
   // Core colors
-  primaryColor: '26 100% 50%', // Orange
-  // Black, not white: white on this orange is 2.79:1, black 7.5:1 (K-02, AA).
-  primaryForeground: '0 0% 0%',
+  // Ebda's palette (Ruling D1016-ORANGE-1, BRAND.colors): primary = night #0A0B0C with white
+  // ink (19.7:1, K-02), accent = a gold #B08D57 tint with dark-gold ink (8.3:1), ring = gold
+  // (3.08:1 on white, the ≥3:1 non-text bar). Never the inherited Force orange.
+  primaryColor: '210 9% 4%',
+  primaryForeground: '0 0% 100%',
   secondaryColor: '220 14% 96%',
   secondaryForeground: '220 9% 46%',
-  accentColor: '26 100% 95%',
-  accentForeground: '26 100% 25%',
+  accentColor: '36 36% 95%',
+  accentForeground: '36 40% 25%',
   backgroundColor: '0 0% 100%',
   foregroundColor: '224 71% 4%',
   mutedColor: '220 14% 96%',
@@ -585,7 +620,7 @@ export const DEFAULT_THEME: StoreTheme = {
 
   // Input colors
   inputColor: '220 13% 91%',
-  ringColor: '26 100% 50%',
+  ringColor: '36 36% 52%',
 
   // Status colors
   destructiveColor: '0 84% 60%',
@@ -600,6 +635,7 @@ export const DEFAULT_THEME: StoreTheme = {
   borderRadius: 'md',
   backgroundPreset: 'none',
   showBrandBadge: false,
+  showNewBadge: false,
   showQuickAdd: false,
   dividers: DEFAULT_DIVIDER_SETTINGS,
   showBrandStory: true,
@@ -613,7 +649,7 @@ export const DEFAULT_THEME: StoreTheme = {
  */
 export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
   modern: {
-    primaryColor: '26 100% 50%', // Vibrant orange
+    primaryColor: '36 36% 52%', // Ebda gold (was the inherited orange; D1016-ORANGE-1)
     fontFamily: 'modern',
     borderRadius: 'lg',
   },
@@ -642,6 +678,42 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
   // Egyptian goldsmith's own pairing — so it reads as night, not as a
   // generic near-black. Every pair below is checked for WCAG AA in
   // tests/unit/dahab-theme-contrast.test.ts.
+  // Qamar (fashion & boutiques, Phase B1): a neutral base. Every Qamar store has a
+  // look, and the look's tokens (packages/shared/src/looks/registry.ts) own colour,
+  // type, radius, density, image ratio and motion. Dividers off: the looks separate
+  // sections by space and bands, never hairline-flanked labels on every section.
+  qamar: {
+    primaryColor: '0 0% 8%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '0 0% 8%',
+    fontFamily: 'default',
+    borderRadius: 'none',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+  },
+  // Souq (general retail and electronics, Phase B2): a neutral cool base. Every Souq store has a
+  // look, and the look's tokens own colour, type, radius, density, image ratio and motion. No
+  // orange anywhere in the family (Ruling B2-2); dividers off like Qamar.
+  souq: {
+    primaryColor: '218 74% 48%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '216 24% 9%',
+    fontFamily: 'default',
+    borderRadius: 'md',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+    // The platform default warning is amber (45 deg), inside the forbidden band (Ruling B2-2),
+    // and it reaches the cart / checkout notices. Souq's warning is plum: distinct from
+    // destructive (red) and success (green), nothing orange.
+    warningColor: '320 62% 40%',
+    warningForeground: '0 0% 100%',
+  },
   dahab: {
     primaryColor: '39 49% 58%', // gold #C9A35E
     primaryForeground: '222 29% 8%', // night
@@ -742,6 +814,26 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/templates/dahab.png',
     tags: ['jewellery', 'handmade', 'gifts'],
     bestFor: 'Jewellery, handmade and premium gifts',
+  },
+  {
+    id: 'qamar',
+    name: 'Qamar',
+    nameAr: 'قمر',
+    description: 'Fashion and boutiques: Atelier, Lookbook and Vitrine looks',
+    descriptionAr: 'أزياء وبوتيكات: أتيليه ولوك بوك وفاترينة',
+    thumbnail: '/looks/qamar.atelier.webp',
+    tags: ['fashion', 'abayas', 'boutique'],
+    bestFor: 'Fashion, abayas and boutiques',
+  },
+  {
+    id: 'souq',
+    name: 'Souq',
+    nameAr: 'سوق',
+    description: 'General retail and electronics: Catalogue, Night souq and Showroom looks',
+    descriptionAr: 'متجر عام وإلكترونيات: كتالوج وسوق الليل وشو روم',
+    thumbnail: '/looks/souq.catalogue.webp',
+    tags: ['electronics', 'appliances', 'general'],
+    bestFor: 'General retail, electronics and appliances',
   },
 ];
 

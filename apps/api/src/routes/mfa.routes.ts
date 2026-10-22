@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { authenticate, rejectImpersonated } from '../middleware/auth';
+import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
 import { withUser } from '@ebda/database';
 import { encryption } from '../services/encryption.service';
@@ -53,49 +53,55 @@ const verifyBodySchema = z.object({
 // exactly why it was missed: the first rollout of this guard walked only
 // auth.routes.ts. The mount registry in tests/unit/reject-impersonated.test.ts
 // is now router-qualified so it can see routes outside that file.
-router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, next) => {
-  try {
-    // `code` is optional here (only required to re-enroll when MFA is already
-    // enabled). Validate its shape only when supplied so first-time enrollment
-    // (no code) still works.
-    const parsed = z.object({ code: codeSchema.shape.code.optional() }).safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
-    }
-    const { code } = parsed.data;
-    const existing = await withUser(req.user!.userId, tx =>
-      tx.user.findUnique({
-        where: { id: req.user!.userId },
-        select: { mfaEnabled: true, mfaSecret: true },
-      })
-    );
-
-    if (existing?.mfaEnabled) {
-      // Re-enrollment requires proof of the current second factor.
-      if (!code || !existing.mfaSecret) {
-        throw new AppError(400, 'MFA_REAUTH_REQUIRED', 'Provide current 2FA code to re-enroll');
+router.post(
+  '/enroll/begin',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  rejectImpersonated,
+  async (req, res, next) => {
+    try {
+      // `code` is optional here (only required to re-enroll when MFA is already
+      // enabled). Validate its shape only when supplied so first-time enrollment
+      // (no code) still works.
+      const parsed = z.object({ code: codeSchema.shape.code.optional() }).safeParse(req.body);
+      if (!parsed.success) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
       }
-      const currentSecretPlain = encryption.decrypt(existing.mfaSecret);
-      if (!MfaService.verifyCode(currentSecretPlain, code)) {
-        throw new AppError(400, 'MFA_REAUTH_REQUIRED', 'Provide current 2FA code to re-enroll');
-      }
-    }
+      const { code } = parsed.data;
+      const existing = await withUser(req.user!.userId, tx =>
+        tx.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { mfaEnabled: true, mfaSecret: true },
+        })
+      );
 
-    const { secret, otpauthUrl } = MfaService.generateEnrollment(req.user!.email);
-    await withUser(req.user!.userId, tx =>
-      tx.user.update({
-        where: { id: req.user!.userId },
-        data: { mfaSecret: encryption.encrypt(secret) },
-      })
-    );
-    res.json({
-      success: true,
-      data: { secret, qr: await MfaService.qrDataUrl(otpauthUrl) },
-    });
-  } catch (error) {
-    next(error);
+      if (existing?.mfaEnabled) {
+        // Re-enrollment requires proof of the current second factor.
+        if (!code || !existing.mfaSecret) {
+          throw new AppError(400, 'MFA_REAUTH_REQUIRED', 'Provide current 2FA code to re-enroll');
+        }
+        const currentSecretPlain = encryption.decrypt(existing.mfaSecret);
+        if (!MfaService.verifyCode(currentSecretPlain, code)) {
+          throw new AppError(400, 'MFA_REAUTH_REQUIRED', 'Provide current 2FA code to re-enroll');
+        }
+      }
+
+      const { secret, otpauthUrl } = MfaService.generateEnrollment(req.user!.email);
+      await withUser(req.user!.userId, tx =>
+        tx.user.update({
+          where: { id: req.user!.userId },
+          data: { mfaSecret: encryption.encrypt(secret) },
+        })
+      );
+      res.json({
+        success: true,
+        data: { secret, qr: await MfaService.qrDataUrl(otpauthUrl) },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * POST /auth/mfa/enroll/verify
@@ -106,6 +112,7 @@ router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, 
 router.post(
   '/enroll/verify',
   authenticate,
+  rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   authLimiter,
   async (req, res, next) => {
@@ -275,38 +282,45 @@ router.post('/verify', authLimiter, async (req, res, next) => {
 // which they do not have. Guarded anyway: the whole point of a registry is that
 // every account-level MFA change is in it, so a future refactor that relaxes the
 // code check does not silently reopen the class.
-router.post('/disable', authenticate, rejectImpersonated, authLimiter, async (req, res, next) => {
-  try {
-    const parsed = codeSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+router.post(
+  '/disable',
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  rejectImpersonated,
+  authLimiter,
+  async (req, res, next) => {
+    try {
+      const parsed = codeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+      }
+      const { code } = parsed.data;
+      const u = await withUser(req.user!.userId, tx =>
+        tx.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { mfaSecret: true },
+        })
+      );
+      if (!u?.mfaSecret || !MfaService.verifyCode(encryption.decrypt(u.mfaSecret), code)) {
+        throw new AppError(400, 'MFA_BAD_CODE', 'Invalid code — MFA disable rejected');
+      }
+      await withUser(req.user!.userId, tx =>
+        tx.user.update({
+          where: { id: req.user!.userId },
+          data: {
+            mfaEnabled: false,
+            mfaSecret: null,
+            mfaBackupCodes: [],
+            mfaEnrolledAt: null,
+          },
+        })
+      );
+      await AuthService.revokeAllSessions(req.user!.userId);
+      res.json({ success: true, data: { message: 'MFA disabled' } });
+    } catch (error) {
+      next(error);
     }
-    const { code } = parsed.data;
-    const u = await withUser(req.user!.userId, tx =>
-      tx.user.findUnique({
-        where: { id: req.user!.userId },
-        select: { mfaSecret: true },
-      })
-    );
-    if (!u?.mfaSecret || !MfaService.verifyCode(encryption.decrypt(u.mfaSecret), code)) {
-      throw new AppError(400, 'MFA_BAD_CODE', 'Invalid code — MFA disable rejected');
-    }
-    await withUser(req.user!.userId, tx =>
-      tx.user.update({
-        where: { id: req.user!.userId },
-        data: {
-          mfaEnabled: false,
-          mfaSecret: null,
-          mfaBackupCodes: [],
-          mfaEnrolledAt: null,
-        },
-      })
-    );
-    await AuthService.revokeAllSessions(req.user!.userId);
-    res.json({ success: true, data: { message: 'MFA disabled' } });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;

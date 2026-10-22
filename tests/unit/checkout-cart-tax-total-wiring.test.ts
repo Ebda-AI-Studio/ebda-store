@@ -113,18 +113,14 @@ describe('CartClient fallback summary — the 7th (previously untested) render p
 
   it('renders the exclusive row (gated on tax > 0 && !taxIncludedInPrice) BEFORE the Total row', () => {
     const exclusiveGateAt = cartClient.search(/\{tax > 0 && taxLabel && !taxIncludedInPrice && \(/);
-    const totalRowAt = cartClient.indexOf(
-      "{t('Total', '\\u0627\\u0644\\u0625\\u062c\\u0645\\u0627\\u0644\\u064a')}"
-    );
+    const totalRowAt = cartClient.indexOf("{t('Total', 'الإجمالي')}");
     expect(exclusiveGateAt).toBeGreaterThan(-1);
     expect(totalRowAt).toBeGreaterThan(-1);
     expect(exclusiveGateAt).toBeLessThan(totalRowAt);
   });
 
   it('renders the inclusive caption (gated on tax > 0 && taxIncludedInPrice) AFTER the Total row', () => {
-    const totalRowAt = cartClient.indexOf(
-      "{t('Total', '\\u0627\\u0644\\u0625\\u062c\\u0645\\u0627\\u0644\\u064a')}"
-    );
+    const totalRowAt = cartClient.indexOf("{t('Total', 'الإجمالي')}");
     const inclusiveGateAt = cartClient.search(/\{tax > 0 && taxLabel && taxIncludedInPrice && \(/);
     expect(inclusiveGateAt).toBeGreaterThan(-1);
     expect(inclusiveGateAt).toBeGreaterThan(totalRowAt);

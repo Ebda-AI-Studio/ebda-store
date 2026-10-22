@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps, ResolvedUtilityBar } from '../types';
+import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
@@ -22,6 +23,7 @@ export default function ClassicHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
+  const tabBarShown = useTabBarShown();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +94,7 @@ export default function ClassicHeader({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-500"
+            className={`md:hidden inline-flex h-11 w-11 items-center justify-center cursor-pointer text-foreground hover:text-primary transition-colors duration-500 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR_KEEP_SLOT : ''}`}
             aria-label={t('Menu', 'القائمة')}
             aria-expanded={isMenuOpen}
           >
@@ -122,12 +124,15 @@ export default function ClassicHeader({
           </button>
 
           {/* Desktop: left nav */}
-          <nav className="hidden md:flex items-center gap-8 flex-1 justify-start">
+          <nav
+            aria-label={t('Main', 'الرئيسية')}
+            className="hidden md:flex items-center gap-8 flex-1 justify-start"
+          >
             {leftNav.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
+                className="relative inline-flex min-h-11 items-center whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -149,6 +154,7 @@ export default function ClassicHeader({
               <span
                 className="text-2xl font-serif font-bold tracking-wider text-foreground"
                 data-zone="storeName"
+                translate="no"
               >
                 {displayName}
               </span>
@@ -156,12 +162,15 @@ export default function ClassicHeader({
           </Link>
 
           {/* Desktop: right nav */}
-          <nav className="hidden md:flex items-center gap-8 flex-1 justify-end">
+          <nav
+            aria-label={t('More', 'المزيد')}
+            className="hidden md:flex items-center gap-8 flex-1 justify-end"
+          >
             {rightNav.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
+                className="relative inline-flex min-h-11 items-center whitespace-nowrap text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:start-0 after:w-0 after:h-px after:bg-foreground after:transition-[width] after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -275,7 +284,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('Search', 'بحث')}
-            className="w-full ps-11 pe-4 py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
+            className="w-full ps-11 pe-4 py-2.5 border border-input bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={t('Search products', 'بحث عن المنتجات')}
           />
@@ -292,7 +301,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('Search our collection...', 'ابحث في مجموعتنا...')}
-            className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
+            className="w-full py-1.5 px-0 border-b border-input bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={t('Search products', 'بحث عن المنتجات')}
           />
@@ -316,7 +325,11 @@ export default function ClassicHeader({
           : {})}
       >
         <div className="min-h-0 overflow-hidden">
-          <nav className="container mx-auto px-4 py-5" dir={isRtl ? 'rtl' : 'ltr'}>
+          <nav
+            aria-label={t('Menu', 'القائمة')}
+            className="container mx-auto px-4 py-5"
+            dir={isRtl ? 'rtl' : 'ltr'}
+          >
             <ul className="space-y-1">
               {navigation.map(item => (
                 <li key={item.href}>
@@ -337,7 +350,7 @@ export default function ClassicHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('Search...', 'بحث...')}
-                className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
+                className="w-full py-2 px-0 border-b border-input bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={t('Search products', 'بحث عن المنتجات')}
               />

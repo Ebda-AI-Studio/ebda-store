@@ -131,8 +131,11 @@ describe.skipIf(!hasDb)('POST /onboarding/store with a look (ebda_app + tenant g
       const doc = revs[0]!.document as { sections?: { type: string }[] };
       const types = (doc.sections ?? []).map(s => s.type);
       const family = TEMPLATE_FAMILIES.find(f => f.id === template)!;
+      // A look with its own section mix composes that mix instead of the family's (Ruling B1-3).
+      const mix = getLook(lookId)!.sections?.map(s => s.type) ?? [];
+      const allowed = mix.length > 0 ? mix : family.sectionTypes;
       expect(types.length).toBeGreaterThan(0);
-      for (const t of types) expect(family.sectionTypes).toContain(t);
+      for (const t of types) expect(allowed).toContain(t);
       expect(validatePublishReadiness(doc as never)).toEqual([]);
     }
   );

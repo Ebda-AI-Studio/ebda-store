@@ -31,7 +31,7 @@ import {
   STORE_PLAN_TO_PLAN_CODE,
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
-  LOOK_TOKEN_KEYS,
+  LOOK_OWNED_THEME_KEYS,
 } from '@ebda/shared';
 import { applyFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -941,12 +941,14 @@ export class StoreService {
   static async updateTemplate(storeId: string, template: string) {
     const store = await this.getById(storeId);
 
-    const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
-    if (!validTemplates.includes(template)) {
+    // Existing stores keep their current skin (a re-save of it is allowed), but nobody can switch
+    // INTO a bare skin: the five legacy Force skins are closed to new choices and Qamar is only
+    // reachable through a look (Ruling B1-17). Switching is `applyLook`, gated on built looks.
+    if (template !== store.template) {
       throw new AppError(
         400,
         'INVALID_TEMPLATE',
-        `Template must be one of: ${validTemplates.join(', ')}`
+        'A store cannot switch to a bare template; choose a look instead'
       );
     }
 
@@ -979,6 +981,10 @@ export class StoreService {
     const look = getLook(lookId);
     if (!look) throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
     const store = await this.getById(storeId);
+    // Only built looks can be switched into (re-applying the store's own current look stays allowed).
+    if (look.status !== 'built' && store.look !== look.id) {
+      throw new AppError(400, 'LOOK_NOT_AVAILABLE', 'This look is not available yet');
+    }
     // Builder FIRST: it can refuse (409/422), and a refusal throws before any store write, so a
     // refused switch leaves the store row untouched. /stores/:id routes run under
     // storeScopeContext (no request transaction): each query below is its own transaction, so the
@@ -988,8 +994,9 @@ export class StoreService {
       storeId,
       look.template,
       userId,
-      opts.design === 'reset' ? LOOK_TOKEN_KEYS : [],
-      look.id
+      opts.design === 'reset' ? LOOK_OWNED_THEME_KEYS : [],
+      look.id,
+      opts.design
     );
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that
@@ -1000,7 +1007,7 @@ export class StoreService {
         select: { theme: true },
       });
       const theme = { ...((live?.theme as Record<string, unknown>) || {}) };
-      if (opts.design === 'reset') for (const k of LOOK_TOKEN_KEYS) delete theme[k];
+      if (opts.design === 'reset') for (const k of LOOK_OWNED_THEME_KEYS) delete theme[k];
       return tx.store.update({
         where: { id: storeId },
         data: {

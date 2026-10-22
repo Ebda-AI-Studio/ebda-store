@@ -1,3 +1,4 @@
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { prisma, Prisma, withMoneyTx, withStore } from '@ebda/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@ebda/shared';
 import { redis } from './redis.service';
@@ -134,6 +135,7 @@ class FeatureService {
       whatsappAutomation: boolean;
       brandingRemoval: boolean;
       apiAccess: boolean;
+      wholesalePricing: boolean;
       mcpAccess: boolean;
     } | null
   ): Record<FeatureKey, boolean> {
@@ -164,6 +166,8 @@ class FeatureService {
       // merchant-admin MCP (keys, read tools, write tools) -> Growth + Business
       // (2026-10-14, decoupled from `apiAccess`; see planIncludesMerchantMcp).
       map.remove_branding = flags.brandingRemoval;
+      // B2B wholesale pricing (Ruling B2B-1): Business + comped, decided by the plan limit.
+      map['b2b.wholesale'] = flags.wholesalePricing;
       map.merchant_mcp = flags.mcpAccess;
       // The merchant's own write switch is `store.settings.mcpWriteEnabled`
       // (mcp/merchant-write.ts); a StoreFeature override still wins both ways.
@@ -220,6 +224,9 @@ class FeatureService {
   async invalidateCache(storeId: string): Promise<void> {
     try {
       await redis.delete(this.cacheKey(storeId));
+      // B2B: the public product payload lists the public price tiers only while `b2b.wholesale` is on, so any change to the
+      // resolved feature map (plan change, plan-limit edit, override) must also drop the cached public product payloads.
+      await invalidateStoreProductCaches(storeId);
       logger.debug({ storeId }, '[FeatureService] Cache invalidated');
     } catch (err) {
       logger.warn({ err, storeId }, '[FeatureService] Cache invalidation failed (non-fatal)');

@@ -11,6 +11,7 @@ import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
+import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
 export const EXCERPT_MAX_LENGTH = 300;
 
@@ -41,8 +42,8 @@ Full description (AR): ${product.descriptionAr ?? '(none)'}
 
 Write a 1-2 sentence short excerpt summarising this product — punchy, no fluff,
 usable as a compact summary in search results and share cards. Provide it in
-BOTH English and Arabic (formal MSA, not dialect), even if only one full
-description was given (translate as needed).
+BOTH English and Arabic, even if only one full description was given (translate
+as needed). ${EGYPTIAN_ARABIC_REGISTER}
 
 Return ONLY valid JSON — no markdown, no explanation:
 { "excerpt": "English excerpt.", "excerptAr": "الملخص بالعربية." }`;

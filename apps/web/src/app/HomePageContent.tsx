@@ -24,7 +24,7 @@ interface HomepageTestimonial {
   rating: number;
   title: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity: string | null;
   createdAt: string;
 }
@@ -40,6 +40,8 @@ interface HomePageContentProps {
    *  (category-slug and manual-ids sources). Merged into the union the
    *  storefront filters against. */
   extraProducts?: Product[];
+  /** The API's ordered deals pool (see HomePageBody `onSalePool`). */
+  onSalePool?: Product[];
   storeName: string;
   layout: StoreLayoutSettings;
   /** Published page document from `GET /public/stores/:id/layout`, already
@@ -57,6 +59,7 @@ export function HomePageContent({
   categories,
   testimonials,
   extraProducts,
+  onSalePool,
   layout,
   definition,
   editorMode,
@@ -73,6 +76,7 @@ export function HomePageContent({
         categories={categories}
         testimonials={testimonials}
         extraProducts={extraProducts}
+        onSalePool={onSalePool}
         editorMode={editorMode}
       />
     </ShopChrome>

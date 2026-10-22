@@ -17,7 +17,7 @@ const PN = BRAND.product;
  * When any legal document last changed: the footer states this date only. No version: the five
  * documents version independently, so one number would be wrong for most pages (Ruling LEGAL-4).
  */
-const LEGAL_UPDATED = LEGAL_DOC_KEYS.map(
+export const LEGAL_UPDATED = LEGAL_DOC_KEYS.map(
   key => currentLegalVersion(LEGAL_POLICIES, key).publishedAt
 ).reduce((a, b) => (b > a ? b : a));
 
@@ -108,6 +108,8 @@ export interface LookCopy {
   who: string;
   /** The bold idea behind it. */
   idea: string;
+  /** Live templates only: alt text of the real screenshot of this look. */
+  alt?: string;
 }
 
 export interface LooksCopy {
@@ -124,6 +126,8 @@ export interface LooksCopy {
   retry: string;
   /** English page only: the phones stay Arabic. */
   bilingualNote: string;
+  /** Templates shown as real captures of the live demo store instead of the built-in mini-stores. */
+  live: { template: string; link: string };
   /** Tab labels, in tab order: id matches /looks/<id>.html. */
   templates: { id: string; name: string; kind: string }[];
   /** The three looks (A, B, C) of each template. */
@@ -377,6 +381,7 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'القالب ماحمّلش.',
       retry: 'جرّب تاني',
       bilingualNote: '',
+      live: { template: 'qamar', link: 'افتح المتجر الحي' },
       templates: [
         { id: 'qamar', name: 'قمر', kind: 'أزياء وبوتيكات' },
         { id: 'souq', name: 'سوق', kind: 'تجزئة وإلكترونيات' },
@@ -390,16 +395,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'أتيليه',
             who: 'لبوتيك عايز هدومه تتكلم لوحدها: هادي وأبيض وبشكل مجلات.',
             idea: 'صور منتجات كبيرة وتقريبًا من غير زحمة: الهدوم هي الواجهة.',
+            alt: 'الصفحة الرئيسية لمتجر قمر بشكل أتيليه: صورة كبيرة لعباية كتان قرميدية جنب شماعة هدوم، وتحتها عنوان وزر وأقسام المتجر',
           },
           {
             name: 'لوك بوك',
-            who: 'للستايليست ومحلات الفاست فاشن اللي بتبيع إطلالات مش قطع لوحدها.',
+            who: 'للستايليست ومحلات الموضة السريعة اللي بتبيع إطلالات مش قطع لوحدها.',
             idea: 'اشتري الإطلالة كلها: كل لوك فيه قطعه وأسعاره، وبضغطة واحدة تضيفهم كلهم.',
+            alt: 'الصفحة الرئيسية لمتجر قمر بشكل لوك بوك على خلفية كحلي: ثلاث صور لإطلالات وقت الغروب وعنوان «لبس السطوح» وزر تسوّق اللوكات',
           },
           {
             name: 'فيترين',
             who: 'لملابس المناسبات (فرح وخطوبة وسهرة) اللي المناسبة هي اللي بتحدد الشراء.',
             idea: 'التنقل بالمناسبة: فرح، خطوبة، سهرة، وكل واحدة بألوانها.',
+            alt: 'الصفحة الرئيسية لمتجر قمر بشكل فاترينة: فستان سهرة على مانيكان داخل إطار ذهبي رفيع، وتحته أقسام المناسبات',
           },
         ],
         souq: [
@@ -461,7 +469,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             name: 'الورشة',
-            who: 'لاستوديو فضة هاند ميد صنعته هي سبب إنك تدفع أكتر.',
+            who: 'لاستوديو فضة شغل إيد صنعته هي سبب إنك تدفع أكتر.',
             idea: 'الصنعة هي المنتج: رسم وصب وتلميع فعلي، ومدة التنفيذ على كل قطعة.',
           },
           {
@@ -499,7 +507,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         ai: {
           t: 'الذكاء الاصطناعي يكتب عنك',
-          d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي، وانت تراجعه وتنشره.',
+          d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي، وإنت تراجعه وتنشره.',
           formLabel: 'نموذج منتج بوصف مكتوب بالذكاء الاصطناعي',
           descLabel: 'الوصف',
           button: 'اكتب بالذكاء الاصطناعي',
@@ -579,7 +587,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'بياناتي بتاعة مين؟',
-          a: 'بتاعتك. منتجاتك وطلباتك وعملاءك ملكك إنت.',
+          a: 'بتاعتك. منتجاتك وطلباتك وعملاؤك ملكك إنت.',
         },
       ],
     },
@@ -589,7 +597,7 @@ export const COPY: Record<Locale, Copy> = {
       intro:
         'المتاجر اللي بتشوفها على الموقع أمثلة توضيحية. الموديلات ثلاثية الأبعاد اللي في صفحة المنتج مأخوذة من مصادر مفتوحة، وده نسبها كاملة.',
       modelsH: 'موديلات 3D',
-      modelsLead: 'كل موديل اتحسّن للويب بـ gltf-transform. التعديلات مكتوبة قدام كل واحد.',
+      modelsLead: 'كل موديل اتظبط عشان يشتغل خفيف على الموقع. التعديلات مكتوبة قدام كل واحد.',
       author: 'صاحب الموديل',
       source: 'المصدر',
       license: 'الرخصة',
@@ -598,7 +606,7 @@ export const COPY: Record<Locale, Copy> = {
       use: 'بيظهر في',
       photosH: 'صور القوالب',
       photosP:
-        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي (Cloudflare Workers AI، موديل FLUX.1 schnell) علشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
+        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي علشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
       modified: 'معدّل',
     },
     aboutPage: {
@@ -761,7 +769,8 @@ export const COPY: Record<Locale, Copy> = {
       failed: 'The template did not load.',
       retry: 'Try again',
       bilingualNote:
-        'Every template ships in Arabic and English. The previews here are shown in Arabic.',
+        'Every template ships in Arabic and English. Qamar is shown from the live demo store in English; the other previews are shown in Arabic.',
+      live: { template: 'qamar', link: 'Open the live store' },
       templates: [
         { id: 'qamar', name: 'Qamar', kind: 'Fashion and boutiques' },
         { id: 'souq', name: 'Souq', kind: 'General retail and electronics' },
@@ -775,16 +784,19 @@ export const COPY: Record<Locale, Copy> = {
             name: 'Atelier',
             who: 'For a boutique whose clothes should speak alone: calm, white, editorial.',
             idea: 'Oversized product photography with almost no chrome: the clothes are the interface.',
+            alt: 'The Qamar home page in the Atelier look: a large photo of a terracotta linen abaya beside a clothes rail, then a headline, a button and the shop categories',
           },
           {
             name: 'Lookbook',
             who: 'For stylists and fast-fashion shops that sell outfits, not single pieces.',
             idea: 'Shop the whole outfit: each look carries its items and prices, one tap adds the lot.',
+            alt: 'The Qamar home page in the Lookbook look on a navy ground: three sunset outfit photos, the headline "Dressed for the rooftop" and a Shop the looks button',
           },
           {
             name: 'Vitrine',
             who: 'For occasion wear (weddings, engagements, evenings) where the event decides the purchase.',
             idea: 'Occasion-first navigation: wedding, engagement, evening, each on its own palette band.',
+            alt: 'The Qamar home page in the Vitrine look: an evening gown on a mannequin inside a thin gold frame, and the shop-by-occasion bands below',
           },
         ],
         souq: [
@@ -978,7 +990,7 @@ export const COPY: Record<Locale, Copy> = {
         'The stores you see on this site are illustrations. The 3D models on the product page come from openly licensed sources; here is the full attribution.',
       modelsH: '3D models',
       modelsLead:
-        'Each model was optimised for the web with gltf-transform. The changes are listed beside each one.',
+        'Each model was optimised to load fast on the web. The changes are listed beside each one.',
       author: 'Author',
       source: 'Source',
       license: 'Licence',
@@ -987,7 +999,7 @@ export const COPY: Record<Locale, Copy> = {
       use: 'Shown in',
       photosH: 'Template photos',
       photosP:
-        'The photos in the five templates and their fifteen looks are AI-generated (Cloudflare Workers AI, FLUX.1 schnell) to illustrate the idea. They show no real shop, product or person and need no attribution.',
+        'The photos in the five templates and their fifteen looks are AI-generated to illustrate the idea. They show no real shop, product or person and need no attribution.',
       modified: 'modified',
     },
     aboutPage: {

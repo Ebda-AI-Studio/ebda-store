@@ -15,7 +15,7 @@ import type {
   FilterSidebarSettings,
   ProductsPageSettings,
 } from '@ebda/shared';
-import { resolveColor, colorToHslTriplet } from '@ebda/shared';
+import { resolveColor, colorToHslTriplet, getLook } from '@ebda/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useToast } from '@ebda/ui';
 import { useCart } from '../../contexts/CartContext';
@@ -34,12 +34,14 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
+import { getSortOptions } from './products-sort';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { darkLookListingBand } from '../../templates/shared/section-bg';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.
@@ -48,44 +50,8 @@ import { Breadcrumbs } from '../../components/Breadcrumbs';
 const PRICE_SLIDER_MAX = 5000;
 const PRICE_SLIDER_STEP = 10;
 
-const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
-
-/** Sort option labels are translated at render time via the t() helper */
-function getSortOptions(t: (en: string, ar: string) => string) {
-  return [
-    // Default = the merchant's curated per-category order. Sends NO sort/featured
-    // param so the API uses the ProductCategory.position path (all products in the
-    // store's chosen order). MUST stay first + be the default \u2014 a category browse
-    // should show the whole category, not a filtered collection.
-    {
-      value: 'default',
-      label: t('Recommended', '\u0627\u0644\u0645\u064f\u0648\u0635\u0649 \u0628\u0647'),
-    },
-    { value: 'featured', label: t('Featured', '\u0645\u0645\u064a\u0632') },
-    { value: 'newest', label: t('Newest', '\u0627\u0644\u0623\u062d\u062f\u062b') },
-    {
-      value: 'best_seller',
-      label: t(
-        'Best sellers',
-        '\u0627\u0644\u0623\u0643\u062b\u0631 \u0645\u0628\u064a\u0639\u0627\u064b'
-      ),
-    },
-    {
-      value: 'price-asc',
-      label: t(
-        'Price: Low to High',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0623\u0639\u0644\u0649'
-      ),
-    },
-    {
-      value: 'price-desc',
-      label: t(
-        'Price: High to Low',
-        '\u0627\u0644\u0633\u0639\u0631: \u0645\u0646 \u0627\u0644\u0623\u0639\u0644\u0649 \u0644\u0644\u0623\u0642\u0644'
-      ),
-    },
-  ];
-}
+const PLP_DEFAULT_PER_PAGE = 96;
+const PLP_LEGACY_PER_PAGE_KEY = 'plp-per-page';
 
 function ProductSkeleton() {
   return (
@@ -150,15 +116,16 @@ export default function ProductsClient({
   // Dahab skin: shopper-chosen grid density on wide screens (3 or 4 across).
   const [dahabCols, setDahabCols] = useState<3 | 4>(3);
   const [page, setPage] = useState(1);
-  // How many products to load per page. The user can pick from a small
-  // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
-  // so it survives reloads but never trust it blindly — anything outside the
-  // allow-list falls back to 96 (default: show all items).
-  const [perPage, setPerPage] = useState<number>(() => {
-    if (typeof window === 'undefined') return 96;
-    const stored = Number(window.localStorage.getItem('plp-per-page'));
-    return PER_PAGE_OPTIONS.includes(stored) ? stored : 96;
-  });
+  // Products per page. The selector was removed (W3), so the size is fixed at the default (show
+  // all). A choice an old build saved to localStorage is never read again; the key is cleared once.
+  const [perPage] = useState<number>(PLP_DEFAULT_PER_PAGE);
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem(PLP_LEGACY_PER_PAGE_KEY);
+    } catch {
+      /* storage blocked: nothing to clear */
+    }
+  }, []);
 
   // Price range in MAJOR units (EGP). 0–5000 EGP covers most catalogue SKUs;
   // see PRICE_SLIDER_MAX.
@@ -199,9 +166,12 @@ export default function ProductsClient({
   const { language, t } = useLanguage();
   const { warning } = useToast();
   const { store } = useStore();
+  // STOP-2 taste P1-1: a look may ask for an auto-fill listing grid (cards fill the column).
+  const plpAutoFill = getLook(store.look)?.chrome?.plp === 'autoFill';
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
-  const sortOptions = getSortOptions(t);
+  // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
+  const sortOptions = getSortOptions(t, meta?.ranked === true);
 
   // Resolve productCardDefaults typography zones for PLP cards. The global
   // zones are not accessible from this client component (they're emitted as
@@ -259,9 +229,13 @@ export default function ProductsClient({
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
       : (pickLocalizedName(activeCategory, true) ?? translations['All Products']);
-  // Arabic reads "تصفح الدراجية" (with the definite article ال), not "تصفح دراجية".
-  // Prepend ال for the subtitle phrase unless the name already carries it.
-  const ctxArDefinite = ctxAr.startsWith('ال') ? ctxAr : `ال${ctxAr}`;
+  // Subtitle = the category's own description in the shopper's language, or nothing. Never a
+  // generated "Browse X" line (quality bar Y-06: empty means absent; Ruling B1-44).
+  const subtitle = (
+    (language === 'ar'
+      ? activeCategory?.descriptionAr || activeCategory?.description
+      : activeCategory?.description || activeCategory?.descriptionAr) ?? ''
+  ).trim();
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's StorefrontProductCard handles its own optimistic add state.
@@ -500,7 +474,7 @@ export default function ProductsClient({
         'Compare Limit',
         t(
           'You can compare up to 4 products at a time. Remove one to add another.',
-          '\u064a\u0645\u0643\u0646\u0643 \u0645\u0642\u0627\u0631\u0646\u0629 \u0645\u0627 \u064a\u0635\u0644 \u0625\u0644\u0649 4 \u0645\u0646\u062a\u062c\u0627\u062a. \u0623\u0632\u0644 \u0648\u0627\u062d\u062f\u064b\u0627 \u0644\u0625\u0636\u0627\u0641\u0629 \u0622\u062e\u0631.'
+          'تقدر تقارن لحد 4 منتجات. شيل واحد عشان تضيف غيره.'
         )
       );
       return;
@@ -550,7 +524,11 @@ export default function ProductsClient({
     <ShopChrome>
       <div
         className="flex-1"
-        style={pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)}
+        style={
+          // A dark look lists its (white-ground) product photos on the inverse band (I-3).
+          darkLookListingBand(store.theme, store.look, !!productsPage?.bgColor) ??
+          pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)
+        }
       >
         {/* data-zone="products" wraps the entire listing — header h1 +
           breadcrumb + filter sidebar (sort, price range, search,
@@ -589,17 +567,14 @@ export default function ProductsClient({
             >
               {t(ctxEn, ctxAr)}
             </h1>
-            <p
-              className="mt-2 text-muted-foreground"
-              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
-            >
-              {categoryFilter
-                ? t(`Browse ${ctxEn}`, `\u062a\u0635\u0641\u062d ${ctxArDefinite}`)
-                : t(
-                    'Browse our collection of premium products',
-                    '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'
-                  )}
-            </p>
+            {subtitle && (
+              <p
+                className="mt-2 max-w-[60ch] text-muted-foreground"
+                style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
+              >
+                {subtitle}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-8 lg:flex-row">
@@ -622,16 +597,7 @@ export default function ProductsClient({
                   onSortChange={setSortBy}
                   resultCount={products.length}
                   isLoading={isLoading}
-                  perPage={perPage}
-                  perPageOptions={PER_PAGE_OPTIONS}
-                  onPerPageChange={next => {
-                    if (PER_PAGE_OPTIONS.includes(next)) {
-                      setPerPage(next);
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.setItem('plp-per-page', String(next));
-                      }
-                    }
-                  }}
+                  // L-07: a page size is not a filter; the PLP keeps its default page size.
                   priceMin={priceMin}
                   priceMax={priceMax}
                   priceFloor={0}
@@ -662,13 +628,13 @@ export default function ProductsClient({
                   }
                 />
                 {/* View Mode */}
-                <div className="hidden items-center gap-1 rounded-lg border border-border bg-background p-1 sm:flex">
+                <div className="hidden items-center gap-1 rounded-lg border border-input bg-background p-1 sm:flex">
                   <button
                     type="button"
                     aria-pressed={viewMode === 'grid'}
                     onClick={() => setViewMode('grid')}
                     aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                    className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <svg
                       className="h-4 w-4"
@@ -684,16 +650,14 @@ export default function ProductsClient({
                         d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
                       />
                     </svg>
-                    <span className="sr-only">
-                      {t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                    </span>
+                    <span className="sr-only">{t('Grid view', 'عرض شبكي')}</span>
                   </button>
                   <button
                     type="button"
                     aria-pressed={viewMode === 'list'}
                     onClick={() => setViewMode('list')}
                     aria-label={t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
-                    className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`rounded-md inline-flex h-11 w-11 items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <svg
                       className="h-4 w-4"
@@ -709,9 +673,7 @@ export default function ProductsClient({
                         d="M4 6h16M4 10h16M4 14h16M4 18h16"
                       />
                     </svg>
-                    <span className="sr-only">
-                      {t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
-                    </span>
+                    <span className="sr-only">{t('List view', 'عرض قائمة')}</span>
                   </button>
                 </div>
               </div>
@@ -741,18 +703,18 @@ export default function ProductsClient({
                     </svg>
                     <p className="text-destructive-ink flex-1">
                       {error === 'LOAD_FAILED'
-                        ? t('Failed to load products', 'فشل في تحميل المنتجات')
+                        ? t('Failed to load products', 'معرفناش نحمّل المنتجات')
                         : error === 'CONNECTION_ERROR'
                           ? t(
                               'Unable to load products. Please check your connection.',
-                              'تعذر تحميل المنتجات. يرجى التحقق من اتصالك.'
+                              'معرفناش نحمّل المنتجات. اتأكد من اتصالك.'
                             )
                           : error}
                     </p>
                     <button
                       type="button"
                       onClick={() => fetchProducts(page)}
-                      className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
+                      className="inline-flex min-h-11 items-center px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30"
                     >
                       {t('Retry', 'إعادة المحاولة')}
                     </button>
@@ -779,7 +741,7 @@ export default function ProductsClient({
                   <div
                     role="group"
                     aria-labelledby="plp-density-label"
-                    className="flex rounded-[var(--radius)] border border-border"
+                    className="flex rounded-[var(--radius)] border border-input"
                   >
                     {([3, 4] as const).map(n => (
                       <button
@@ -800,7 +762,9 @@ export default function ProductsClient({
                   className={
                     templateId === 'dahab'
                       ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
-                      : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
+                      : plpAutoFill
+                        ? `grid grid-cols-2 md:grid-cols-3 lg:[grid-template-columns:repeat(auto-fill,minmax(11.5rem,1fr))] ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
+                        : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
                   }
                   dir={language === 'ar' ? 'rtl' : 'ltr'}
                 >
@@ -901,15 +865,12 @@ export default function ProductsClient({
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-foreground">
-                    {t(
-                      'No products found',
-                      '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0645\u0646\u062a\u062c\u0627\u062a'
-                    )}
+                    {t('No products found', 'ملقيناش منتجات')}
                   </h3>
                   <p className="mt-1 text-muted-foreground">
                     {t(
                       'Try adjusting your search or filter criteria',
-                      '\u062d\u0627\u0648\u0644 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0628\u062d\u062b \u0623\u0648 \u0645\u0639\u0627\u064a\u064a\u0631 \u0627\u0644\u062a\u0635\u0641\u064a\u0629'
+                      'جرّب تغيّر البحث أو الفلاتر'
                     )}
                   </p>
                   <button
@@ -917,10 +878,7 @@ export default function ProductsClient({
                     onClick={handleClearAll}
                     className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
-                    {t(
-                      'Clear Filters',
-                      '\u0645\u0633\u062d \u0627\u0644\u0641\u0644\u0627\u062a\u0631'
-                    )}
+                    {t('Clear Filters', 'مسح الفلاتر')}
                   </button>
                 </div>
               )}

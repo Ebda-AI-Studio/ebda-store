@@ -29,6 +29,13 @@ export function Header({
   const home = HOME[locale];
   const anchor = (id: string) =>
     page === '' && !offHome ? `#${id}` : `${home === '/' ? '' : home}/#${id}`;
+  /** "Features" is the real /features/ page; every other item is a home section, absolute off the home. */
+  const navLink = (n: (typeof NAV_ANCHORS)[number]) =>
+    n.key === 'features' ? (
+      <Link href={pagePath(locale, 'features')}>{c.nav.features}</Link>
+    ) : (
+      <a href={anchor(n.target)}>{c.nav[n.key]}</a>
+    );
   return (
     <header className="site-header">
       <div className="wrap header-row">
@@ -45,9 +52,7 @@ export function Header({
         <nav aria-label={c.nav.label} className="nav">
           <ul className="nav-links">
             {NAV_ANCHORS.map(n => (
-              <li key={n.key}>
-                <a href={anchor(n.target)}>{c.nav[n.key]}</a>
-              </li>
+              <li key={n.key}>{navLink(n)}</li>
             ))}
           </ul>
           <details className="nav-menu">
@@ -65,9 +70,7 @@ export function Header({
             </summary>
             <ul>
               {NAV_ANCHORS.map(n => (
-                <li key={n.key}>
-                  <a href={anchor(n.target)}>{c.nav[n.key]}</a>
-                </li>
+                <li key={n.key}>{navLink(n)}</li>
               ))}
               <li className="menu-wa">
                 <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />

@@ -156,22 +156,22 @@ export default function LocationsClient({
               >
                 {t(
                   'Visit a store — tap a branch for directions, to call, or to message us.',
-                  'زر أحد فروعنا — اضغط على الفرع للاتجاهات أو الاتصال أو المراسلة.'
+                  'زور فرع من فروعنا — دوس على الفرع للاتجاهات أو الاتصال أو المراسلة.'
                 )}
               </p>
             </header>
 
             {isLoading ? (
               <p className="py-16 text-center text-sm text-foreground/70">
-                {isRtl ? 'جارٍ التحميل…' : 'Loading…'}
+                {isRtl ? 'بنحمّل…' : 'Loading…'}
               </p>
             ) : disabled ? (
               <p className="py-16 text-center text-sm text-foreground/70">
-                {isRtl ? 'الفروع غير متاحة حالياً.' : 'Locations are not available right now.'}
+                {isRtl ? 'الفروع مش متاحة دلوقتي.' : 'Locations are not available right now.'}
               </p>
             ) : locations.length === 0 ? (
               <p className="py-16 text-center text-sm text-foreground/70">
-                {isRtl ? 'لا توجد فروع بعد.' : 'No locations yet.'}
+                {isRtl ? 'مفيش فروع لسه.' : 'No locations yet.'}
               </p>
             ) : (
               <div className="space-y-10">
@@ -292,7 +292,7 @@ export default function LocationsClient({
                                 {loc.phone && (
                                   <a
                                     href={`tel:${loc.phone}`}
-                                    className="rounded-full border border-border px-3 py-1 text-sm font-medium text-foreground"
+                                    className="rounded-full border border-input px-3 py-1 text-sm font-medium text-foreground"
                                   >
                                     {t('Call', 'اتصال')}
                                   </a>
@@ -302,7 +302,7 @@ export default function LocationsClient({
                                     href={`https://wa.me/${waNumber}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="rounded-full border border-border px-3 py-1 text-sm font-medium text-foreground"
+                                    className="rounded-full border border-input px-3 py-1 text-sm font-medium text-foreground"
                                   >
                                     {t('WhatsApp', 'واتساب')}
                                   </a>

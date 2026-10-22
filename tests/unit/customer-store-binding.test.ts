@@ -231,6 +231,7 @@ describe('coverage: the binding cannot be forgotten by a customer route', () => 
       'middleware/security.ts', // csrfPrincipal (identity string only) + refresh limiter key
       'routes/auth.routes.ts', // refresh rotation, logout denylist, csrf mint role check
       'routes/mfa.routes.ts', // MFA challenge token (purpose token, not an access token)
+      'routes/passkey.routes.ts', // reads the jti of the access token it minted one line earlier (step-up window)
       'routes/wa-bridge.routes.ts', // signed checkout-cart token, not a session
       'services/socket.service.ts', // websocket: platform origins only, no customer rooms
     ]);

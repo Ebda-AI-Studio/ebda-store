@@ -43,7 +43,7 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
     titleEn: 'Fast Delivery',
     titleAr: 'شحن سريع',
     subEn: 'Delivered to your door across Egypt',
-    subAr: 'يصلك إلى باب البيت في جميع أنحاء مصر',
+    subAr: 'بيوصلك لحد باب البيت في كل مصر',
   },
   {
     // Shield-check — quality guarantee
@@ -52,7 +52,7 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
     titleEn: 'Quality Guarantee',
     titleAr: 'ضمان الجودة',
     subEn: 'Every product hand-selected for you',
-    subAr: 'كل منتج يتم اختياره بعناية لك',
+    subAr: 'كل منتج متختار بعناية عشانك',
   },
   {
     // Chat-alt — 24/7 support
@@ -61,7 +61,7 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
     titleEn: '24/7 Support',
     titleAr: 'دعم على مدار الساعة',
     subEn: 'We are here whenever you need us',
-    subAr: 'نحن هنا متى ما احتجت إلينا',
+    subAr: 'احنا هنا وقت ما تحتاجنا',
   },
 ];
 
@@ -206,7 +206,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
 
   return (
     <section
-      aria-label={t('Why shop with us', 'لماذا تتسوق معنا')}
+      aria-label={t('Why shop with us', 'ليه تتسوق معانا')}
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
       style={sectionBgStyle(settings?.bgColor, store.theme)}

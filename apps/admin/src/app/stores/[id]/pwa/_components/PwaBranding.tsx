@@ -20,7 +20,10 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">
+          <label
+            data-setting-id="pwa.app-name"
+            className="block text-sm font-medium text-muted-foreground mb-2"
+          >
             {t('appName')}
           </label>
           <input
@@ -48,7 +51,10 @@ export function PwaBranding({ settings, pwaEnabled, onChange }: PwaBrandingProps
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">
+          <label
+            data-setting-id="pwa.short-name"
+            className="block text-sm font-medium text-muted-foreground mb-2"
+          >
             {t('shortName')}
           </label>
           <input

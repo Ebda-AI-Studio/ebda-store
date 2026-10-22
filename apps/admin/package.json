@@ -9,6 +9,7 @@
     "start": "next start -p 3001",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "gen:settings-search": "tsx scripts/gen-settings-search-index.ts",
     "clean": "rm -rf .next node_modules"
   },
   "dependencies": {
@@ -18,6 +19,7 @@
     "@ebda/shared": "*",
     "@ebda/ui": "*",
     "@sentry/nextjs": "^10.53.1",
+    "@simplewebauthn/browser": "^14.0.0",
     "date-fns": "^4.1.0",
     "next": "^16.3.8",
     "next-intl": "^4.11.0",
@@ -28,8 +30,8 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "1.19.11",
     "@next/eslint-plugin-next": "^16.1.1",
+    "@opennextjs/cloudflare": "1.19.11",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.16",

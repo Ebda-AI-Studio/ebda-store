@@ -1,3 +1,4 @@
+import { BRAND } from '@ebda/shared';
 export interface PWASettings {
   appName: string;
   appNameAr?: string;
@@ -48,7 +49,7 @@ export const DEFAULT_SETTINGS: PWASettings = {
   appName: '',
   shortName: '',
   description: '',
-  themeColor: '#f97316',
+  themeColor: BRAND.colors.night, // Ruling D1016-ORANGE-1
   backgroundColor: '#ffffff',
   display: 'standalone',
   orientation: 'any',

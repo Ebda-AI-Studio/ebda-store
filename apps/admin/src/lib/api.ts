@@ -817,8 +817,12 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
 /**
  * GET request helper
  */
-export async function apiGet<T = unknown>(endpoint: string) {
-  return apiRequest<T>(endpoint, { method: 'GET' });
+/**
+ * `headers` carries extra request headers; a typed search term goes in `X-Search-Query`
+ * (`searchQueryHeaders` from @ebda/shared), never in the URL (Ruling SEARCH-P2-9).
+ */
+export async function apiGet<T = unknown>(endpoint: string, headers?: Record<string, string>) {
+  return apiRequest<T>(endpoint, headers ? { method: 'GET', headers } : { method: 'GET' });
 }
 
 /** The `meta` block list routes return beside `data` (see expenses.routes.ts). */

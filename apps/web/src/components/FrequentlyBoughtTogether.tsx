@@ -69,7 +69,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         <SectionRetryNotice
           onRetry={refetch}
           message="Couldn't load Frequently Bought Together."
-          messageAr="تعذّر تحميل قسم يُشترى معاً في الغالب."
+          messageAr="معرفناش نحمّل قسم «بيتشروا مع بعض»."
         />
       </div>
     );
@@ -84,10 +84,10 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
     if (!p) return;
     if (hasVariants(p)) {
       toastInfo(
-        t('Choose a variant first', 'اختر نوع المنتج أولاً'),
+        t('Choose a variant first', 'اختار نوع المنتج الأول'),
         t(
           `"${p.name}" has options — open the product to pick one.`,
-          `"${pickLocalizedName(p, true) ?? p.name}" يحتوي على خيارات — افتح المنتج لاختيار النوع.`
+          `"${pickLocalizedName(p, true) ?? p.name}" ليه اختيارات — افتح المنتج واختار النوع.`
         )
       );
       window.location.href = storeUrl(`/products/${p.slug}`);
@@ -125,7 +125,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
 
     if (simple.length > 0) {
       toastSuccess(
-        t('Added to cart', 'تمت الإضافة إلى السلة'),
+        t('Added to cart', 'اتضاف للسلة'),
         t(countText('en', simple.length, ITEMS_ADDED), countText('ar', simple.length, ITEMS_ADDED))
       );
     }
@@ -141,15 +141,15 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         ),
         t(
           `${names} — open each to pick a variant before adding.`,
-          `${names} — افتح كل منتج لاختيار النوع قبل الإضافة.`
+          `${names} — افتح كل منتج واختار نوعه قبل ما تضيفه.`
         )
       );
     }
 
     if (simple.length === 0 && needVariant.length === 0) {
       toastError(
-        t('Nothing to add', 'لا يوجد ما يضاف'),
-        t('No items were available to add.', 'لا توجد منتجات متاحة للإضافة.')
+        t('Nothing to add', 'مفيش حاجة تتضاف'),
+        t('No items were available to add.', 'مفيش منتجات متاحة تتضاف.')
       );
     }
   };
@@ -161,13 +161,13 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
           shrink-0 on the button keeps it from squishing. LTR unaffected. */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-foreground">
-          {t('Frequently Bought Together', 'يُشترى معاً في الغالب')}
+          {t('Frequently bought together', 'يُشترى معاً في الغالب')}
         </h2>
         <button
           onClick={handleAddAllToCart}
           className="shrink-0 rounded-xl border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
         >
-          {t('Add All to Cart', 'أضف الكل إلى السلة')}
+          {t('Add all to cart', 'أضف الكل إلى السلة')}
         </button>
       </div>
       {/* Issue 2 fix (2026-05-28): StorefrontProductCard honours per-store

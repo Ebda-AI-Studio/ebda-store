@@ -62,13 +62,23 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    order: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    passkeyCredential: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    order: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    // webhook delivery-log redaction (Ruling WH-7)
+    $executeRaw: vi.fn().mockResolvedValue(0),
     review: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     address: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     smsMarketingConsent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     abandonedCart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     cart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     wishlist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    wholesaleApplication: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     pushSubscription: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -83,7 +93,11 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     customerWallet: { findMany: vi.fn().mockResolvedValue([]) },
-    customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
+    customer: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     newsletterSubscriber: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     campaignRecipient: {
@@ -139,6 +153,10 @@ vi.mock('@api/lib/definer', () => ({
     await mockPrisma.verificationToken.deleteMany({ where: { userId } });
     return 0;
   },
+  deleteUserPasskeys: async (userId: string) => {
+    await mockPrisma.passkeyCredential.deleteMany({ where: { userId } });
+    return 0;
+  },
   insertAuditLog: (e: { action: string; storeId?: string | null; details?: unknown }) =>
     mockPrisma.auditLog.create({
       data: { action: e.action, storeId: e.storeId ?? null, details: e.details },
@@ -192,6 +210,13 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
       data: { userId: CUSTOMER.id, oneSignalPlayerIds: ['player-a', 'player-b'] },
+    });
+  });
+
+  it('erases the shopper\u2019s passkeys in the same transaction (Ruling PASSKEY-1)', async () => {
+    await AuthService.eraseAccount(CUSTOMER.id);
+    expect(mockPrisma.passkeyCredential.deleteMany).toHaveBeenCalledWith({
+      where: { userId: CUSTOMER.id },
     });
   });
 

@@ -8,6 +8,9 @@ import { CartService, resolveLineNote } from '@api/services/cart.service';
 import { prisma } from '@ebda/database';
 
 // Mock Prisma
+vi.mock('@api/services/price-resolver.service', async () =>
+  (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
+);
 vi.mock('@ebda/database', () => ({
   prisma: {
     cart: {

@@ -6,6 +6,10 @@ export const LOCALES: readonly Locale[] = ['ar', 'en'] as const;
 export const SITE_URL = BRAND_MARKETING_URL;
 export const LOGIN_URL = `${BRAND_STORE_APP_URL}/login`;
 export const SIGNUP_URL = `${BRAND_STORE_APP_URL}/signup`;
+/** The live showroom (a real Ebda store, seeded with the Qamar looks). `?look=` previews a look. */
+export const DEMO_STORE_URL = `https://storedemo${BRAND.domains.storeSuffix}`;
+export const demoLookUrl = (look: 'atelier' | 'lookbook' | 'vitrine') =>
+  `${DEMO_STORE_URL}/?look=qamar.${look}`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
 /** Home path per locale. Arabic is the default and lives at the root. */
@@ -19,10 +23,25 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export type PageSlug = '' | 'about' | 'credits' | LegalSlug;
+export const COMPARE_SLUGS = ['salla', 'zid', 'shopify'] as const;
+export type CompareSlug = (typeof COMPARE_SLUGS)[number];
+export type ComparePage = `compare/${CompareSlug}`;
+export type PageSlug = '' | 'about' | 'credits' | 'features' | ComparePage | LegalSlug;
+
+/** The comparison pages (/compare/salla, /compare/zid, /compare/shopify), as page slugs. */
+export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
+  s => `compare/${s}` as const
+);
 
 /** Every public marketing page (same set in both locales). The sitemap is generated from this. */
-export const SITE_PAGES = ['', 'about', 'credits', ...LEGAL_SLUGS] as const;
+export const SITE_PAGES = [
+  '',
+  'features',
+  ...COMPARE_PAGES,
+  'about',
+  'credits',
+  ...LEGAL_SLUGS,
+] as const satisfies readonly PageSlug[];
 
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */
 export function pagePath(locale: Locale, page: PageSlug): string {
@@ -44,6 +63,8 @@ export const SECTION_ORDER = [
   'model3d',
   'payments',
   'features',
+  'ainative',
+  'capabilities',
   'pricing',
   'faq',
   'start',

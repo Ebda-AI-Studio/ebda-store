@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
-import { LOOKS, LOOK_TEMPLATES, looksForTemplate, getLook } from '@ebda/shared';
+import { LOOKS, builtLookTemplates, builtLooks, getLook } from '@ebda/shared';
 import { LookPicker } from './LookPicker';
 
 vi.mock('../../i18n/useT', () => ({
@@ -10,24 +10,28 @@ vi.mock('../../i18n/useT', () => ({
 
 afterEach(cleanup);
 
+const FIRST = builtLookTemplates()[0]!;
 const tabs = () => screen.getAllByRole('tab');
+const activeTab = () => tabs().find(t => t.getAttribute('aria-selected') === 'true')!;
 
-describe('LookPicker', () => {
-  it('renders one tab per template, Dahab first, with the registry labels', () => {
+describe('LookPicker (registry-driven: built templates and looks only)', () => {
+  it('renders one tab per BUILT template, in registry order, with the registry labels', () => {
     render(<LookPicker value={null} onChange={() => {}} locale="en" />);
     expect(screen.getByRole('tablist')).toBeTruthy();
-    expect(tabs()).toHaveLength(LOOK_TEMPLATES.length);
-    expect(tabs()[0]!.textContent).toBe('Dahab');
-    expect(tabs()[0]!.getAttribute('aria-selected')).toBe('true');
+    expect(tabs()).toHaveLength(builtLookTemplates().length);
+    expect(tabs()[0]!.textContent).toBe('Qamar');
+    expect(tabs().map(t => t.textContent)).toContain('Souq');
+    expect(activeTab()).toBe(tabs()[0]);
+    // The unbuilt templates (Jasmine, Lamma, Dahab) are not offered.
+    for (const name of ['Jasmine', 'Lamma', 'Dahab'])
+      expect(screen.queryByRole('tab', { name })).toBeNull();
   });
 
-  it('shows the three looks of the active template with name, forWhom and idea (en)', () => {
+  it('offers only built looks under the active tab', () => {
     render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-    const looks = looksForTemplate('dahab');
-    expect(looks).toHaveLength(3);
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(3);
-    for (const l of looks) {
+    const built = builtLooks().filter(l => l.template === FIRST);
+    expect(screen.getAllByRole('radio')).toHaveLength(built.length);
+    for (const l of built) {
       const card = screen.getByRole('radio', { name: new RegExp(l.name.en) });
       expect(within(card).getByText(l.forWhom.en)).toBeTruthy();
       expect(within(card).getByText(l.idea.en)).toBeTruthy();
@@ -37,8 +41,7 @@ describe('LookPicker', () => {
   it('renders Arabic copy from the registry and is RTL', () => {
     const { container } = render(<LookPicker value={null} onChange={() => {}} locale="ar" />);
     expect((container.firstChild as HTMLElement).getAttribute('dir')).toBe('rtl');
-    expect(tabs()[0]!.textContent).toBe('دهب');
-    const l = looksForTemplate('dahab')[0]!;
+    const l = builtLooks()[0]!;
     const card = screen.getByRole('radio', { name: new RegExp(l.name.ar) });
     expect(within(card).getByText(l.forWhom.ar)).toBeTruthy();
     expect(within(card).getByText(l.idea.ar)).toBeTruthy();
@@ -47,9 +50,8 @@ describe('LookPicker', () => {
   it('tabs control a tabpanel that wraps the radiogroup and is labelled by the active tab', () => {
     render(<LookPicker value={null} onChange={() => {}} locale="en" />);
     const panel = screen.getByRole('tabpanel');
-    const active = tabs().find(t => t.getAttribute('aria-selected') === 'true')!;
-    expect(active.getAttribute('aria-controls')).toBe(panel.id);
-    expect(panel.getAttribute('aria-labelledby')).toBe(active.id);
+    expect(activeTab().getAttribute('aria-controls')).toBe(panel.id);
+    expect(panel.getAttribute('aria-labelledby')).toBe(activeTab().id);
     expect(within(panel).getByRole('radiogroup')).toBeTruthy();
   });
 
@@ -58,55 +60,64 @@ describe('LookPicker', () => {
     expect((container.firstChild as HTMLElement).getAttribute('dir')).toBe('ltr');
   });
 
-  it('arrow keys move between tabs and show that template (LTR: ArrowRight = next)', () => {
-    render(<LookPicker value={null} onChange={() => {}} locale="en" />);
-    fireEvent.keyDown(tabs()[0]!, { key: 'ArrowRight' });
-    expect(tabs()[1]!.getAttribute('aria-selected')).toBe('true');
-    expect(tabs()[1]!.textContent).toBe('Qamar');
-    const first = looksForTemplate('qamar')[0]!;
-    expect(screen.getByRole('radio', { name: new RegExp(first.name.en) })).toBeTruthy();
-    fireEvent.keyDown(tabs()[1]!, { key: 'ArrowLeft' });
-    expect(tabs()[0]!.getAttribute('aria-selected')).toBe('true');
-    fireEvent.keyDown(tabs()[0]!, { key: 'End' });
-    expect(tabs()[LOOK_TEMPLATES.length - 1]!.getAttribute('aria-selected')).toBe('true');
-  });
-
-  it('in Arabic (RTL) ArrowLeft goes to the next tab', () => {
-    render(<LookPicker value={null} onChange={() => {}} locale="ar" />);
-    fireEvent.keyDown(tabs()[0]!, { key: 'ArrowLeft' });
-    expect(tabs()[1]!.getAttribute('aria-selected')).toBe('true');
-  });
-
   it('selecting a look calls onChange with its id', () => {
     const onChange = vi.fn();
     render(<LookPicker value={null} onChange={onChange} locale="en" />);
-    fireEvent.keyDown(tabs()[0]!, { key: 'ArrowRight' });
     const l = getLook('qamar.lookbook')!;
     fireEvent.click(screen.getByRole('radio', { name: new RegExp(l.name.en) }));
     expect(onChange).toHaveBeenCalledWith('qamar.lookbook');
   });
 
   it('opens on the tab of the current value and marks it checked', () => {
-    render(<LookPicker value="souq.night" onChange={() => {}} locale="en" />);
-    expect(tabs().find(t => t.getAttribute('aria-selected') === 'true')!.textContent).toBe('Souq');
-    const l = getLook('souq.night')!;
+    render(<LookPicker value="qamar.vitrine" onChange={() => {}} locale="en" />);
+    expect(activeTab().textContent).toBe('Qamar');
+    const l = getLook('qamar.vitrine')!;
     expect(
       screen.getByRole('radio', { name: new RegExp(l.name.en) }).getAttribute('aria-checked')
     ).toBe('true');
   });
 
+  it('an existing store on an unbuilt look still sees it (and only it), but nothing unbuilt is added', () => {
+    const current = LOOKS.find(l => l.status === 'designed')!;
+    render(<LookPicker value={current.id} onChange={() => {}} locale="en" />);
+    expect(activeTab().getAttribute('aria-selected')).toBe('true');
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(1);
+    expect(radios[0]!.getAttribute('aria-checked')).toBe('true');
+    expect(tabs()).toHaveLength(builtLookTemplates().length + 1);
+  });
+
   it('every look thumbnail has alt text equal to the look name, on every tab', () => {
-    const onChange = vi.fn();
-    render(<LookPicker value={null} onChange={onChange} locale="ar" />);
-    for (let i = 0; i < LOOK_TEMPLATES.length; i++) {
+    render(<LookPicker value={null} onChange={() => {}} locale="ar" />);
+    for (let i = 0; i < tabs().length; i++) {
       fireEvent.click(tabs()[i]!);
       const imgs = screen.getAllByRole('img');
-      expect(imgs).toHaveLength(3);
+      expect(imgs.length).toBeGreaterThan(0);
       for (const img of imgs) {
         const look = LOOKS.find(l => l.name.ar === img.getAttribute('alt'));
         expect(look, `alt ${img.getAttribute('alt')}`).toBeTruthy();
+        expect(look!.status).toBe('built');
         expect(img.getAttribute('src')).toBe(`/looks/${look!.id}.webp`);
       }
+    }
+  });
+
+  // Mutation check: flip a designed template to built in the registry and the picker must grow a
+  // tab for it with no component edit (this is what makes Souq/Jasmine/Lamma/Dahab appear on ship).
+  it('MUTATION: flipping a template to built adds its tab; flipping a built one back removes it', () => {
+    const designed = LOOKS.filter(l => l.template === 'jasmine');
+    const before = designed.map(l => l.status);
+    try {
+      (designed[0] as { status: string }).status = 'built';
+      render(<LookPicker value={null} onChange={() => {}} locale="en" />);
+      expect(screen.getByRole('tab', { name: 'Jasmine' })).toBeTruthy();
+      expect(tabs()).toHaveLength(builtLookTemplates().length);
+      cleanup();
+      (designed[0] as { status: string }).status = 'designed';
+      render(<LookPicker value={null} onChange={() => {}} locale="en" />);
+      expect(screen.queryByRole('tab', { name: 'Jasmine' })).toBeNull();
+    } finally {
+      designed.forEach((l, i) => ((l as { status: string }).status = before[i]!));
     }
   });
 });

@@ -6,9 +6,11 @@ import { useStore } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import { API_URL } from '../../lib/api';
 
 import { REGION } from '@ebda/shared';
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 // ==========================================
 // Referral Tracking (run once per session)
 // ==========================================
@@ -110,8 +112,9 @@ function AffiliatePageContent() {
 
       if (!res.ok || !json.success) {
         const msg =
+          demoRefusalText(json?.error, t) ||
           json?.error?.message ||
-          t('Something went wrong. Please try again.', 'حدث خطأ ما. يرجى المحاولة مرة أخرى.');
+          t('Something went wrong. Please try again.', 'حصل خطأ. جرّب تاني.');
         setError(msg);
       } else {
         setSuccess(true);
@@ -121,7 +124,7 @@ function AffiliatePageContent() {
       setError(
         t(
           'Network error. Please check your connection and try again.',
-          'خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى.'
+          'مشكلة في الشبكة. اتأكد من اتصالك وجرّب تاني.'
         )
       );
     } finally {
@@ -156,7 +159,7 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 'The affiliate program is not currently available for this store.',
-                'برنامج الشراكة غير متاح حالياً لهذا المتجر.'
+                'برنامج الشراكة مش متاح للمتجر ده دلوقتي.'
               )}
             </p>
           </div>
@@ -192,7 +195,9 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 `Partner with ${store?.name || 'us'} and earn commissions for every sale you refer.`,
-                `كن شريكاً مع ${store?.name || 'نا'} واكسب عمولات على كل عملية بيع تحيلها.`
+                pickLocalizedName(store, true)
+                  ? `خليك شريك مع ${pickLocalizedName(store, true)} واكسب عمولة على كل بيعة تجيبها.`
+                  : 'اشترك معانا في برنامج الشراكة واكسب عمولة على كل بيعة تجيبها.'
               )}
             </p>
           </div>
@@ -216,12 +221,12 @@ function AffiliatePageContent() {
                 </svg>
               </div>
               <h2 className="text-lg font-semibold text-success-ink mb-2">
-                {t('Application Submitted!', 'تم إرسال الطلب!')}
+                {t('Application Submitted!', 'الطلب اتبعت!')}
               </h2>
               <p className="text-success-ink">
                 {t(
                   "We'll review it shortly and get back to you via email.",
-                  'سنقوم بمراجعته قريباً والرد عليك عبر البريد الإلكتروني.'
+                  'هنراجعه قريب ونرد عليك على البريد الإلكتروني.'
                 )}
               </p>
             </div>
@@ -247,7 +252,7 @@ function AffiliatePageContent() {
                     onChange={handleChange}
                     placeholder={t('Your full name', 'اسمك الكامل')}
                     required
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -264,13 +269,13 @@ function AffiliatePageContent() {
                     onChange={handleChange}
                     placeholder="you@example.com"
                     required
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">
-                    {t('Phone Number', 'رقم الهاتف')}
+                    {t('Phone Number', 'رقم الموبايل')}
                   </label>
                   <input
                     id="phone"
@@ -279,7 +284,7 @@ function AffiliatePageContent() {
                     value={form.phone}
                     onChange={handleChange}
                     placeholder={REGION.phone.placeholderIntl}
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -301,7 +306,7 @@ function AffiliatePageContent() {
                       value={form.instagram}
                       onChange={handleChange}
                       placeholder={t('yourhandle', 'حسابك')}
-                      className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-8 pr-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>
@@ -324,7 +329,7 @@ function AffiliatePageContent() {
                       value={form.tiktok}
                       onChange={handleChange}
                       placeholder={t('yourhandle', 'حسابك')}
-                      className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-8 pr-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>
@@ -337,7 +342,7 @@ function AffiliatePageContent() {
                   {submitting && (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
                   )}
-                  {submitting ? t('Submitting...', 'جاري الإرسال...') : t('Apply Now', 'قدّم الآن')}
+                  {submitting ? t('Submitting...', 'بنبعت...') : t('Apply Now', 'قدّم الآن')}
                 </button>
               </form>
             </div>

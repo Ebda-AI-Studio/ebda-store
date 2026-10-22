@@ -205,16 +205,16 @@ const sized = {
 describe('default PDP sticky bar mirrors the main add button', () => {
   it('enabled product: same label, both enabled', async () => {
     const { stickyBtn, main } = await renderPdp(product());
-    expectMirror(main, stickyBtn, 'Add to Cart', false);
+    expectMirror(main, stickyBtn, 'Add to cart', false);
   });
 
   it('required personalisation empty: both stay enabled-looking (the note is not a disabled reason)', async () => {
     const { stickyBtn, main } = await renderPdp(product(requiredNote));
-    expectMirror(main, stickyBtn, 'Add to Cart', false);
+    expectMirror(main, stickyBtn, 'Add to cart', false);
     fireEvent.change(document.querySelector('input[maxlength]') as HTMLInputElement, {
       target: { value: 'Sara' },
     });
-    expectMirror(main, stickyBtn, 'Add to Cart', false);
+    expectMirror(main, stickyBtn, 'Add to cart', false);
   });
 
   it.each(['main', 'sticky'] as const)(
@@ -243,7 +243,7 @@ describe('default PDP sticky bar mirrors the main add button', () => {
 
   it('out of stock: same label and both disabled', async () => {
     const { stickyBtn, main } = await renderPdp(product({ inStock: false, inventory: 0 }));
-    expectMirror(main, stickyBtn, 'Out of Stock', true);
+    expectMirror(main, stickyBtn, 'Out of stock', true);
   });
 
   it('pre-order (out of stock, accepts backorder): same label, both enabled', async () => {
@@ -257,7 +257,7 @@ describe('default PDP sticky bar mirrors the main add button', () => {
     // A choice the shopper can still make is not a reason to paint the buy
     // button disabled: `disabled` means the item cannot be bought.
     const { stickyBtn, main } = await renderPdp(product(sized));
-    expectMirror(main, stickyBtn, 'Add to Cart', false);
+    expectMirror(main, stickyBtn, 'Add to cart', false);
   });
 
   it.each(['main', 'sticky'] as const)(
@@ -344,7 +344,7 @@ describe('variants but NO option groups (W1a fix round, minor 1)', () => {
           ],
         })
       );
-      expectMirror(main, stickyBtn, 'Add to Cart', false);
+      expectMirror(main, stickyBtn, 'Add to cart', false);
       await act(async () => {
         fireEvent.click(which === 'main' ? main : stickyBtn);
       });
@@ -542,8 +542,8 @@ describe('X-02: a sold-out size that accepts backorder stays pickable (pre-order
     ) as HTMLButtonElement;
     expect(main.textContent?.trim()).toBe('Pre-order');
     expect(main.disabled).toBe(false);
-    // No "Out of Stock" panel under the selector for a buyable pre-order.
-    expect(screen.queryByText('Out of Stock')).toBeNull();
+    // No "Out of stock" panel under the selector for a buyable pre-order.
+    expect(screen.queryByText('Out of stock')).toBeNull();
     expect(screen.queryAllByTestId('delivery-chip').length).toBeGreaterThan(0);
   });
 

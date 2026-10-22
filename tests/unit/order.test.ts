@@ -12,6 +12,9 @@ import { socketService } from '@api/services/socket.service';
 // Mock dependencies
 // Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
 // by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+vi.mock('@api/services/price-resolver.service', async () =>
+  (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
+);
 vi.mock('@api/services/fiscal-document.service', () => ({
   FiscalDocumentService: {
     issueSaleDocument: vi.fn().mockResolvedValue(null),
@@ -115,7 +118,7 @@ vi.mock('@ebda/database', () => ({
       // findFirst backs createAdminOrder's customerId ownership check — an
       // attached customer must belong to THIS store (2026-09-02 audit).
       // Default: resolves, so tests that don't exercise it are unaffected.
-      findFirst: vi.fn().mockResolvedValue({ id: 'customer-1' }),
+      findFirst: vi.fn().mockResolvedValue({ id: 'customer-1', status: 'active', deletedAt: null }),
     },
     promotion: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -530,10 +533,13 @@ describe('OrderService', () => {
       );
 
       expect(result.orderNumber).toBeDefined();
+      // priced below with the real buyer, so the cart service's own pricing pass is skipped (money review M-7)
       expect(CartService.getOrCreate).toHaveBeenCalledWith(
         mockStoreId,
         mockSessionId,
-        mockCustomerId
+        mockCustomerId,
+        expect.objectContaining({ kind: 'anonymous' }),
+        { skipPricing: true }
       );
     });
 

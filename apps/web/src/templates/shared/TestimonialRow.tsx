@@ -2,7 +2,60 @@
 
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
-import type { TestimonialRowProps } from '../types';
+import type { TestimonialItem, TestimonialRowProps } from '../types';
+import { translations } from '../../contexts/LanguageContext';
+
+/** The review's author, or the localized "Customer" when the API has no name (null). */
+export function authorLabel(name: string | null | undefined, isRtl?: boolean): string {
+  const n = (name ?? '').trim();
+  return n || (isRtl ? translations.Customer : 'Customer');
+}
+
+/** The quote shown by `layout: 'single'`: the first one short enough to set large, else the first. */
+export function pickSingleTestimonial(list: TestimonialItem[]): TestimonialItem | undefined {
+  return list.find(t => t.comment.trim().length > 0 && t.comment.length <= 220) ?? list[0];
+}
+
+/**
+ * One customer line set large in the display face (Ruling B1-2, Vitrine). No stars, no card: the
+ * words are the proof. The heading stays for screen readers so the section keeps a name.
+ */
+export function SingleTestimonial({
+  testimonials,
+  heading,
+  isRtl,
+}: {
+  testimonials: TestimonialItem[];
+  heading: string;
+  isRtl?: boolean;
+}) {
+  const quote = pickSingleTestimonial(testimonials);
+  if (!quote) return null;
+  // Quote marks follow the quote's own script, not the page: an Arabic review on the English
+  // page still reads «…», an English one on the Arabic page “…”.
+  const arabicText = /[\u0600-\u06FF]/.test(quote.comment);
+  return (
+    <figure
+      data-layout="single"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      className="mx-auto max-w-3xl px-4 py-4 text-center sm:px-6"
+    >
+      <h2 className="sr-only">{heading}</h2>
+      <blockquote
+        dir="auto"
+        className="font-display text-pretty text-2xl leading-relaxed text-foreground sm:text-3xl rtl:leading-[1.7]"
+      >
+        {arabicText ? '«' : '“'}
+        {quote.comment.trim()}
+        {arabicText ? '»' : '”'}
+      </blockquote>
+      <figcaption dir="auto" className="mt-5 text-sm text-muted-foreground">
+        {authorLabel(quote.authorName, isRtl)}
+        {quote.authorCity ? `${isRtl ? '، ' : ', '}${quote.authorCity}` : ''}
+      </figcaption>
+    </figure>
+  );
+}
 
 /**
  * 3-up testimonial row. Card chrome + author typography vary per pack:
@@ -23,10 +76,13 @@ export function TestimonialRow({
   subtitleZone,
   dividers,
   sectionBgColor,
+  layout,
 }: TestimonialRowProps) {
   if (testimonials.length === 0) return null;
   const styles = getPackStyles(pack);
   const heading = isRtl ? (titleAr ?? title ?? 'آراء العملاء') : (title ?? 'Customer Reviews');
+  if (layout === 'single')
+    return <SingleTestimonial testimonials={testimonials} heading={heading} isRtl={isRtl} />;
 
   return (
     <section className="px-4 sm:px-6 lg:px-8" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -54,7 +110,7 @@ export function TestimonialRow({
                 {t.comment}
               </p>
               <footer className="mt-7 border-t border-foreground/10 pt-5">
-                <p className={styles.testimonialAuthor}>{t.authorName}</p>
+                <p className={styles.testimonialAuthor}>{authorLabel(t.authorName, isRtl)}</p>
                 {t.authorCity && (
                   <p className="text-sm text-muted-foreground mt-1.5">{t.authorCity}</p>
                 )}

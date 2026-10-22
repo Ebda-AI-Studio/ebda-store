@@ -12,6 +12,10 @@
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
   getLook,
+  builtLooks,
+  defaultNewStoreLook,
+  isBuiltSkin,
+  type LookDefinition,
   storeCreatedEventId,
   storeHost,
   storefrontOrigin,
@@ -38,9 +42,11 @@ import { emitEbdaConversion } from './ebda-ads-emit';
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
 
-/** Legacy bare-skin choice, kept for callers that predate looks (new clients send `lookId`). */
-export const SELF_SERVE_TEMPLATES = ['modern', 'classic', 'minimal', 'bold', 'elegant'] as const;
-export type SelfServeTemplate = (typeof SELF_SERVE_TEMPLATES)[number];
+/**
+ * Bare-skin choice, kept for callers that predate looks (new clients send `lookId`). Only skins
+ * a BUILT look renders with are accepted (looks registry); the five legacy Force skins are not.
+ */
+export type SelfServeTemplate = LookDefinition['skin'];
 
 export type SlugAvailability =
   | { slug: string; host: string; available: true }
@@ -194,9 +200,24 @@ export class OnboardingService {
       throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
     }
 
-    const look = input.lookId === undefined ? undefined : getLook(input.lookId);
+    // No look asked for = the registry default (Qamar's first built look), never the DB default.
+    // A bare `template` picks that template's first built look. Unbuilt looks are refused.
+    const look =
+      input.lookId !== undefined
+        ? getLook(input.lookId)
+        : (builtLooks().find(l => l.skin === input.template) ?? defaultNewStoreLook());
     if (input.lookId !== undefined && !look) {
       throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
+    }
+    if (!look || look.status !== 'built' || !isBuiltSkin(look.skin)) {
+      throw new AppError(400, 'LOOK_NOT_AVAILABLE', 'This look is not available for new stores');
+    }
+    if (input.template !== undefined && !isBuiltSkin(input.template)) {
+      throw new AppError(
+        400,
+        'TEMPLATE_NOT_AVAILABLE',
+        'This template is not available for new stores'
+      );
     }
 
     const availability = await this.checkSlug(input.slug, {
@@ -234,7 +255,7 @@ export class OnboardingService {
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',
-          template: look ? (look.skin as SelfServeTemplate) : input.template,
+          template: look.skin as SelfServeTemplate,
           ownerEmail: user.email,
           ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
           settings: { defaultLanguage: input.language ?? 'ar' },
@@ -248,10 +269,8 @@ export class OnboardingService {
             storeId: result.store.id,
           });
         }
-        // No look asked for counts as applied: only a requested-and-failed look is reported.
-        const lookApplied = look
-          ? await this.applyChosenLook(result.store.id, look.id, owner.userId)
-          : true;
+        // Only a failed look application is reported (the default look is applied like a chosen one).
+        const lookApplied = await this.applyChosenLook(result.store.id, look.id, owner.userId);
         return { store: result.store, lookApplied };
       } catch (err) {
         // Lost the slug race between the check above and the insert.

@@ -12,6 +12,7 @@ import { resolveColor, DEFAULT_THEME } from '@ebda/shared';
 import { CartIcon } from '@ebda/ui';
 import type { NavItem } from '../types';
 import { Sheet } from '../../components/ui/Sheet';
+import { tabBarShownOn } from './tab-bar-visibility';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
@@ -85,8 +86,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
   // desktop-only). The pathname includes the store slug prefix on path-based
   // multi-tenant URLs, so match the trailing segment(s).
   const lowered = pathname.toLowerCase();
-  const hideOn = ['/checkout', '/auth/', '/account/order'];
-  if (hideOn.some(p => lowered.includes(p))) return null;
+  if (!tabBarShownOn(pathname)) return null;
 
   const tabs: Array<{
     key: string;
@@ -250,12 +250,12 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
                 >
                   {tab.icon}
                   {tab.key === 'cart' && itemCount > 0 && (
-                    <span className="absolute -top-1 -end-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-xs tabular-nums font-bold text-white">
+                    <span className="absolute -top-1 -end-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-foreground px-1 text-xs tabular-nums font-bold text-background">
                       {itemCount > 99 ? '99+' : itemCount}
                     </span>
                   )}
                 </span>
-                <span className="text-xs font-medium leading-none">{label}</span>
+                <span className="text-xs font-medium leading-snug">{label}</span>
               </Link>
             </li>
           );
@@ -289,7 +289,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
             >
               {menuIcon}
             </span>
-            <span className="text-xs font-medium leading-none">{menuLabel}</span>
+            <span className="text-xs font-medium leading-snug">{menuLabel}</span>
           </button>
         </li>
       </ul>

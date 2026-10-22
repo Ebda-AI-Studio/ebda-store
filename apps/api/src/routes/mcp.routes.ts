@@ -7,6 +7,7 @@ import { classifyToolCall, resolveAgentAuth } from '../mcp/agent-auth';
 import { AppError } from '../middleware/error-handler';
 import { rejectBatches } from '../mcp/reject-batches';
 import logger from '../lib/logger';
+import { searcherFromIp } from '../lib/search/embed-budget';
 
 /**
  * Store-scoped MCP endpoint — stateless Streamable HTTP.
@@ -105,7 +106,8 @@ async function handleMcpPost(req: Request, res: Response): Promise<void> {
     import('@modelcontextprotocol/sdk/server/streamableHttp.js'),
     import('../mcp/store-mcp-server.js'),
   ]);
-  const server = buildStoreMcpServer(store);
+  // The caller's identity for the query-embed limit (search_products, Ruling SEARCH-T12-6).
+  const server = buildStoreMcpServer(store, { searcher: searcherFromIp(req.ip) });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {
     void transport.close();

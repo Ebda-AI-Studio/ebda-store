@@ -29,9 +29,13 @@ describe('composeStoreTheme', () => {
     const t = composeStoreTheme({ template: 'minimal', look: 'qamar.deleted', theme: {} });
     expect(t.primaryColor).toBe(getTemplateTheme('minimal').primaryColor);
   });
-  it('null look = legacy store, unchanged behaviour', () => {
+  it('null look = legacy store, unchanged except the input floor (Ruling B1-90)', async () => {
+    const { boundaryColorFloor } = await import('@ebda/shared');
+    const skin = getTemplateTheme('modern');
     expect(composeStoreTheme({ template: 'modern', look: null, theme: { x: 1 } as any })).toEqual({
-      ...getTemplateTheme('modern'),
+      ...skin,
+      // taste re-audit no-look regression: --input reads >= 3:1 against the page
+      inputColor: boundaryColorFloor(skin.inputColor, skin.backgroundColor),
       x: 1,
     });
   });
@@ -47,10 +51,78 @@ describe('composeStoreTheme', () => {
 });
 
 describe('lookTheme key guard', () => {
-  it('every look sets exactly LOOK_TOKEN_KEYS (no more, no fewer)', async () => {
-    const { LOOKS, LOOK_TOKEN_KEYS } = await import('@ebda/shared');
+  it('every look sets exactly LOOK_TOKEN_KEYS plus the UI tokens it declares (no more, no fewer)', async () => {
+    const { LOOKS, LOOK_TOKEN_KEYS, LOOK_UI_TOKEN_KEYS } = await import('@ebda/shared');
     for (const l of LOOKS) {
-      expect(Object.keys(lookTheme(l)).sort(), l.id).toEqual([...LOOK_TOKEN_KEYS].sort());
+      const declared = LOOK_UI_TOKEN_KEYS.filter(k => l.tokens[k] !== undefined);
+      expect(Object.keys(lookTheme(l)).sort(), l.id).toEqual(
+        [...LOOK_TOKEN_KEYS, ...declared].sort()
+      );
     }
   });
 });
+
+describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
+  it('Atelier declares its values; the composed theme carries them', () => {
+    const t = composeStoreTheme({ template: 'qamar', look: 'qamar.atelier', theme: {} });
+    expect(t).toMatchObject({
+      wordmarkSize: 'lg',
+      overPhotoChrome: 'bare',
+      receiptStyle: 'framed',
+    });
+  });
+  it('a stored merchant value beats the look', () => {
+    const t = composeStoreTheme({
+      template: 'qamar',
+      look: 'qamar.atelier',
+      theme: { wordmarkSize: 'xl', overPhotoChrome: 'soft' },
+    });
+    expect(t.wordmarkSize).toBe('xl');
+    expect(t.overPhotoChrome).toBe('soft');
+    expect(t.receiptStyle).toBe('framed');
+  });
+  it('a look that does not declare a token leaves the skin behaviour (undefined)', () => {
+    const t = composeStoreTheme({ template: 'minimal', look: 'jasmine.clinic', theme: {} });
+    expect(t.wordmarkSize).toBeUndefined();
+    expect(t.overPhotoChrome).toBeUndefined();
+    expect(t.receiptStyle).toBeUndefined();
+  });
+  it('no look: the composed theme is the skin theme byte-for-byte but the input floor (no UI token appears)', async () => {
+    const { LOOK_UI_TOKEN_KEYS, boundaryColorFloor } = await import('@ebda/shared');
+    const skins = [
+      'modern',
+      'classic',
+      'minimal',
+      'bold',
+      'elegant',
+      'dahab',
+      'qamar',
+      'souq',
+    ] as const;
+    for (const template of skins) {
+      const t = composeStoreTheme({ template, look: null, theme: {} });
+      const skin = getTemplateTheme(template);
+      // Ruling B1-90: --input is held to >= 3:1 against the page; every other key is the skin's.
+      const want = {
+        ...skin,
+        inputColor: boundaryColorFloor(skin.inputColor, skin.backgroundColor),
+      };
+      expect(JSON.stringify(t), template).toBe(JSON.stringify(want));
+      for (const k of LOOK_UI_TOKEN_KEYS) expect(k in t, `${template}.${k}`).toBe(false);
+    }
+  });
+  it('only the Qamar and Souq looks declare UI tokens today (Dahab and the designed looks are unchanged)', async () => {
+    const { LOOKS, LOOK_UI_TOKEN_KEYS } = await import('@ebda/shared');
+    for (const l of LOOKS.filter(x => x.template !== 'qamar' && x.template !== 'souq'))
+      for (const k of LOOK_UI_TOKEN_KEYS) expect(l.tokens[k], `${l.id}.${k}`).toBeUndefined();
+  });
+  it('overriddenLookKeys reports a merchant UI-token override', () => {
+    expect(
+      overriddenLookKeys({ wordmarkSize: 'xl', receiptStyle: 'framed' }, atelierLook())
+    ).toEqual(['wordmarkSize']);
+  });
+});
+
+function atelierLook() {
+  return getLook('qamar.atelier')!;
+}

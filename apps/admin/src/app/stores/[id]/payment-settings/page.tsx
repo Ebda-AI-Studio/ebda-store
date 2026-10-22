@@ -16,6 +16,7 @@ import {
   type StorePaymentConfig,
 } from './_components/ProviderCard';
 import { GatewayConnectCard, type GatewayConfig } from './_components/GatewayConnectCard';
+import { InstalmentsCard } from './_components/InstalmentsCard';
 
 // Gateways (Paymob, Kashier, Fawry...) are schema-driven from the catalog; only the manual
 // methods (COD, InstaPay) keep the hand-built card.
@@ -272,6 +273,10 @@ export default function StorePaymentSettingsPage() {
             />
           );
         })}
+      </div>
+
+      <div className="mt-6">
+        <InstalmentsCard storeId={storeId} />
       </div>
 
       <p className="mt-6 text-sm text-muted-foreground">

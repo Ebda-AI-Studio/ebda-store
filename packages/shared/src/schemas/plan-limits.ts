@@ -39,6 +39,13 @@ export const planLimitsSchema = z
      * stays reserved for future outbound API/webhook access.
      */
     apiAccess: z.boolean(),
+    /**
+     * B2B wholesale pricing (feature key `b2b.wholesale`): quantity tiers, group prices, MOQ,
+     * wholesale-only products and the wholesale application flow. Business + comped (Ruling B2B-1).
+     * `.default(false)`: a stored `plans.limits` blob written before this key existed still parses
+     * (to OFF) - the corrupt-blob fallback in `parseLimits` must never flip a gate open.
+     */
+    wholesalePricing: z.boolean().default(false),
     analyticsTier: z.enum(ANALYTICS_TIERS),
     supportTier: z.enum(SUPPORT_TIERS),
   })
@@ -78,6 +85,7 @@ export const BOOLEAN_LIMIT_KEYS = [
   'whatsappAutomation',
   'brandingRemoval',
   'apiAccess',
+  'wholesalePricing',
 ] as const satisfies readonly PlanLimitKey[];
 export type BooleanLimitKey = (typeof BOOLEAN_LIMIT_KEYS)[number];
 
@@ -183,6 +191,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: false,
       brandingRemoval: false,
       apiAccess: false,
+      wholesalePricing: false,
       analyticsTier: 'advanced',
       supportTier: 'email',
     },
@@ -209,6 +218,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: false,
       brandingRemoval: false,
       apiAccess: false,
+      wholesalePricing: false,
       analyticsTier: 'basic',
       supportTier: 'email',
     },
@@ -235,6 +245,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: false,
       brandingRemoval: true,
       apiAccess: false,
+      wholesalePricing: false,
       analyticsTier: 'standard',
       supportTier: 'chat',
     },
@@ -261,6 +272,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: false,
       brandingRemoval: true,
       apiAccess: true,
+      wholesalePricing: true,
       analyticsTier: 'advanced',
       supportTier: 'priority',
     },
@@ -287,6 +299,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: true,
       brandingRemoval: false,
       apiAccess: false,
+      wholesalePricing: false,
       analyticsTier: 'advanced',
       supportTier: 'chat',
     },
@@ -313,6 +326,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: true,
       brandingRemoval: false,
       apiAccess: false,
+      wholesalePricing: true,
       analyticsTier: 'advanced',
       supportTier: 'priority',
     },
@@ -341,6 +355,7 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       whatsappAutomation: false,
       brandingRemoval: true,
       apiAccess: true,
+      wholesalePricing: false,
       analyticsTier: 'advanced',
       supportTier: 'priority',
     },
@@ -419,6 +434,8 @@ export function planLimitMessage(
     abandonedCartAutomation:
       'Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.',
     whatsappAutomation: 'WhatsApp automation is not included in your plan. Upgrade to turn it on.',
+    wholesalePricing:
+      'Wholesale pricing (quantity tiers, group prices, wholesale accounts) is not included in your plan. Upgrade to Business to use it.',
   };
   const ar: Record<GatedLimitKey, string> = {
     maxProducts: `باقتك تسمح بحد أقصى ${n} منتج. قم بالترقية لإضافة المزيد.`,
@@ -432,6 +449,8 @@ export function planLimitMessage(
     customDomain: 'النطاق المخصص غير متاح في باقتك. قم بالترقية لربط نطاقك الخاص.',
     abandonedCartAutomation: 'استرداد السلات المتروكة غير متاح في باقتك. قم بالترقية لتفعيله.',
     whatsappAutomation: 'أتمتة واتساب غير متاحة في باقتك. قم بالترقية لتفعيلها.',
+    wholesalePricing:
+      'أسعار الجملة (شرائح الكمية وأسعار المجموعات وحسابات الجملة) غير متاحة في باقتك. قم بالترقية إلى باقة الأعمال لاستخدامها.',
   };
   return (lang === 'ar' ? ar : en)[key];
 }

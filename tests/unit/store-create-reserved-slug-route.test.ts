@@ -226,3 +226,19 @@ describe('PUT /stores/:id/domain — a custom domain can never be an Ebda host',
     expect(res.body.error.code).toBe('DOMAIN_FEATURE_UNAVAILABLE');
   });
 });
+
+// Ruling B2-17: the demo showroom slugs are unclaimable on create AND update.
+describe.each(['storedemo', 'storedemo-souq', 'storedemo-anything'])('demo slug %s', slug => {
+  it('POST /stores refuses it with SLUG_RESERVED and never calls the service', async () => {
+    const res = await request(app).post('/stores').send({ name: 'Shop', slug });
+    expect(res.status).toBe(400);
+    expect(res.body.error?.code ?? res.body.code).toBe('SLUG_RESERVED');
+    expect(create).not.toHaveBeenCalled();
+  });
+  it('PUT /stores/:id refuses it with SLUG_RESERVED and never calls the service', async () => {
+    const res = await request(app).put(`/stores/${STORE_ID}`).send({ slug });
+    expect(res.status).toBe(400);
+    expect(res.body.error?.code ?? res.body.code).toBe('SLUG_RESERVED');
+    expect(update).not.toHaveBeenCalled();
+  });
+});

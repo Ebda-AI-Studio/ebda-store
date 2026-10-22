@@ -90,6 +90,8 @@ export const config = {
   // order page without re-authenticating. Shortening the access token does
   // NOT shorten the session — it only forces a transparent token swap.
   jwtSecret: getRequiredSecret('JWT_SECRET', 'JWT Secret'),
+  /** Optional HMAC key for the email-barcode R2 object names; unset = derived from ENCRYPTION_KEY. */
+  barcodeKeySecret: process.env.BARCODE_KEY_SECRET || '',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30m',
   refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '365d',
 

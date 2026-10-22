@@ -130,3 +130,17 @@ describe('self-serve Growth trial (locked pricing: 14 days on Growth)', () => {
     expect(subUpdate).not.toHaveBeenCalled();
   });
 });
+
+describe('provisioning template (new stores start on a built Ebda skin)', () => {
+  it('defaults to qamar, never the DB default', async () => {
+    await ProvisioningService.provisionStore({ ...base });
+    expect(createdData().template).toBe('qamar');
+  });
+
+  it('refuses a legacy Force skin', async () => {
+    await expect(
+      ProvisioningService.provisionStore({ ...base, template: 'modern' })
+    ).rejects.toMatchObject({ code: 'TEMPLATE_NOT_AVAILABLE' });
+    expect(storeCreate).not.toHaveBeenCalled();
+  });
+});

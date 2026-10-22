@@ -35,6 +35,11 @@ export interface PackStyles {
   productCardCta: string;
   /** Class for the section heading H2. */
   sectionHeading: string;
+  /**
+   * Default alignment of a `SectionHeading` title/kicker/subtitle when the merchant set none
+   * (per-zone `textAlign` still wins). Unset = 'center' (every legacy skin, unchanged).
+   */
+  sectionHeadingAlign?: 'start' | 'center';
   /** Class for the "see all" link in section heading. */
   sectionSeeAll: string;
   /** Hero overlay tint + treatment. */
@@ -230,7 +235,95 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'border-t border-primary/40 bg-transparent pt-6',
     testimonialAuthor: 'text-sm text-muted-foreground',
   },
+  qamar: {
+    // Phase B1 (Ruling B1-1): the clothes are the interface. No card surface, no
+    // border, no lift: the 3:4 photo carries the card. Type voice comes from the
+    // look's --font-display/--font-body (looks.md), so these classes carry weight
+    // and colour only.
+    card: 'bg-transparent',
+    categoryFrame: 'bg-transparent',
+    categoryCaption: 'text-sm font-medium text-foreground',
+    productCardName: 'font-normal text-foreground leading-snug',
+    productCardPrice: 'font-medium text-foreground',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    // AT-1: one section-title style per Qamar page; the builder SectionHeader renders this too.
+    sectionHeading:
+      'font-display text-2xl sm:text-3xl md:text-4xl font-normal text-foreground leading-[1.25] text-balance',
+    sectionSeeAll:
+      'text-sm font-medium text-foreground/70 hover:text-foreground underline-offset-4 hover:underline',
+    // Quality bar T-03: one heading alignment per page. The builder sections (SectionHeader:
+    // shop-the-look, new in) start-align, so the layout sections' headings do too.
+    sectionHeadingAlign: 'start',
+    // White headline over ANY photo (light Atelier walls included): a dark ink scrim, densest
+    // where the centred text sits. Not a token: the text is white on every look, so the scrim
+    // is dark on every look (a `foreground` scrim is LIGHT on Lookbook). Pinned by
+    // tests/unit/qamar-looks-contrast.test.ts through QAMAR_HERO_SCRIM.
+    heroOverlay:
+      'bg-[radial-gradient(ellipse_at_center,rgb(20_20_20/0.65)_0%,rgb(20_20_20/0.65)_60%,rgb(20_20_20/0.3)_100%)]',
+    heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
+    heroCta:
+      'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-medium text-foreground hover:bg-background/90 min-h-[44px]',
+    testimonialCard: 'bg-transparent p-0',
+    testimonialAuthor: 'text-sm font-medium text-muted-foreground',
+  },
+  souq: {
+    // Phase B2 (Ruling B2-1): a catalogue of many SKUs. A framed tile (surface + hairline,
+    // radius from the look), a name that reads at a glance in two lines, a firm price (600; the
+    // struck compare-at price is already muted in the shared card), and ONE always-visible quick
+    // add (a >= 44px target; the card keeps its single action, never a second control).
+    // Everything is a look token, so the orange gate stays true; compact spacing comes from the
+    // look's density, the square photo from its image ratio.
+    // h-full: cards in a row share one height and the CTA (mt-auto) sits on the same baseline.
+    card: 'h-full rounded-[var(--radius)] border border-border bg-card',
+    categoryFrame: 'rounded-[var(--radius)] bg-muted',
+    categoryCaption: 'text-sm font-medium text-foreground',
+    // hyphens-none: a title never breaks inside a word unless one word is wider than the card.
+    productCardName: 'line-clamp-2 font-medium text-foreground leading-snug [hyphens:none]',
+    productCardPrice: 'font-semibold text-foreground',
+    productCardBody: 'text-start',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    sectionHeading:
+      'font-display text-xl sm:text-2xl md:text-3xl font-semibold text-foreground leading-[1.25] text-balance',
+    // Ink text with a primary underline: the literal primary is only ~5:1 on a light page.
+    sectionSeeAll:
+      'text-sm font-medium text-foreground underline decoration-primary underline-offset-4 hover:decoration-2',
+    sectionHeadingAlign: 'start',
+    heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/0 to-foreground/35',
+    heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
+    heroCta:
+      'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-medium text-foreground hover:bg-background/90 min-h-[44px]',
+    testimonialCard: 'rounded-[var(--radius)] border border-border bg-card p-5',
+    testimonialAuthor: 'text-sm font-medium text-muted-foreground',
+  },
 };
+
+/** The qamar hero scrim, as painted by `PACK_STYLES.qamar.heroOverlay` (centre = under the text). */
+export const QAMAR_HERO_SCRIM = {
+  color: '#141414',
+  /** held flat from the centre to `plateau` (the headline + subheadline block), then fades */
+  centre: 0.65,
+  plateau: 60,
+  edge: 0.3,
+} as const;
+
+/**
+ * The anchored hero copy scrim (W2a, quality bar L-04): a band behind the bottom-start text block
+ * only, solid at `alpha` behind the text and fading to clear over `fade` above it, on every skin
+ * (the copy on the photo is white whatever the look). Pinned by tests/unit/hero-text-anchor.test.tsx
+ * BY IMPORT: white text over this scrim over a white photo is >= 4.5:1.
+ */
+export const HERO_TEXT_SCRIM = {
+  /** #141414 as an rgb() channel list */
+  rgb: '20 20 20',
+  hex: '#141414',
+  alpha: 0.72,
+  fade: '2rem',
+  /** Inline mask: solid under the copy column (max-w-xl + padding), clear past `reach`. */
+  solidTo: 'min(100%, 40rem)',
+  reach: 'min(100%, 60rem)',
+} as const;
 
 export function getPackStyles(pack: TemplateId | undefined): PackStyles {
   return PACK_STYLES[pack ?? 'modern'] ?? PACK_STYLES.modern;

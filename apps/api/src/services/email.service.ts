@@ -1,3 +1,8 @@
+import {
+  wholesaleNotice,
+  wholesaleMerchantNotice,
+  type WholesaleNoticeKind,
+} from './email-templates/wholesale';
 import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -10,10 +15,13 @@ import { ResendService } from './resend.service';
 import { emailQueue } from './email-queue.service';
 import { welcomeTemplate } from './email-templates/welcome';
 import { passwordResetTemplate } from './email-templates/password-reset';
+import { passkeyNoticeTemplate, type PasskeyNoticeData } from './email-templates/passkey-notice';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
+import type { EmailBarcode } from './email-templates/_barcode';
+import { ensureEmailBarcode } from './barcode-image.service';
 import { buildOrderEmailWaMe } from './email-templates/_wa-me';
 import { emailMoney } from './email-templates/_util';
 import {
@@ -50,6 +58,10 @@ import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
 } from './email-templates/subscription-billing';
+import {
+  webhookDisabledTemplate,
+  type WebhookDisabledData,
+} from './email-templates/webhook-disabled';
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
@@ -181,7 +193,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   // sentence so every branded email has a canonical reachable contact.
   const contactBlock = store.email
     ? `<p class="contact-cta" style="margin:0 auto 14px;padding:12px 16px;max-width:460px;background-color:${c.bg};border:1px solid ${c.lineSoft};border-radius:10px;color:${c.inkSoft};font-size:13px;line-height:1.5;">${
-        isArabic ? 'لديك سؤال؟ راسلنا على' : 'Questions? Email us at'
+        isArabic ? 'عندك سؤال؟ ابعتلنا على' : 'Questions? Email us at'
       } <a href="mailto:${escapeHtml(store.email)}" style="color:${brand};text-decoration:none;font-weight:600;">${escapeHtml(
         store.email
       )}</a></p>`
@@ -233,6 +245,8 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
 
 export interface OrderEmailData {
   orderNumber: string;
+  /** The order barcode PNG (merchant's shape or plain); absent/null = the number stays text-only. */
+  barcode?: EmailBarcode | null;
   customerName: string;
   customerEmail: string;
   items: Array<{
@@ -518,7 +532,24 @@ export class EmailService {
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     // Free-tier wa.me link (no API): only when the store has a valid number.
-    const withWaMe: OrderEmailData = { ...data, waMe: buildOrderEmailWaMe(data, store, lang) };
+    // The barcode PNG (the merchant's shape; plain by default; `off` = none). The fanout that
+    // calls this runs after commit on Inngest; a missing/failed image NEVER blocks the email.
+    const shape =
+      (store.settings as { receiptBarcodeShape?: string } | null)?.receiptBarcodeShape ?? 'plain';
+    let barcode = data.barcode;
+    if (barcode === undefined && shape !== 'off') {
+      barcode = await ensureEmailBarcode({
+        storeId,
+        kind: 'order',
+        number: data.orderNumber,
+        shape,
+      }).catch(() => null);
+    }
+    const withWaMe: OrderEmailData = {
+      ...data,
+      barcode,
+      waMe: buildOrderEmailWaMe(data, store, lang),
+    };
     const subject = orderConfirmationTemplate.subject[lang](withWaMe, store.name);
     const content = orderConfirmationTemplate[lang](withWaMe, store.name);
     await this.sendForStore(
@@ -561,6 +592,76 @@ export class EmailService {
     await this.sendForStore(
       storeId,
       { to: data.customerEmail, subject, content, language: lang },
+      { queue: true }
+    );
+  }
+
+  /**
+   * B2B wholesale application notices to the APPLICANT's account email only (received / approved / rejected). Queued with
+   * the order-lifecycle emails so a transient provider failure retries instead of vanishing.
+   */
+  /** Merchant-facing wholesale notice (new application / 48h nudge) to the store owner. Throws on failure; callers log it. */
+  static async sendWholesaleMerchantNotice(
+    storeId: string,
+    args: {
+      kind: 'received' | 'nudge';
+      businessName?: string;
+      pendingCount: number;
+      adminUrl: string;
+      to?: string | null;
+    }
+  ): Promise<void> {
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true, owner: { select: { email: true } } },
+      })
+    );
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const to = args.to ?? store.owner?.email;
+    if (!to) return;
+    const lang: 'en' | 'ar' = resolveDefaultLanguage(
+      (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+    );
+    const { subject, content } = wholesaleMerchantNotice(args.kind, lang, {
+      storeName: store.name,
+      businessName: args.businessName,
+      pendingCount: args.pendingCount,
+      adminUrl: args.adminUrl,
+    });
+    await this.sendForStore(storeId, { to, subject, content, language: lang }, { queue: true });
+  }
+
+  static async sendWholesaleNotice(
+    storeId: string,
+    args: {
+      to: string;
+      kind: WholesaleNoticeKind;
+      customerName: string;
+      businessName: string;
+      note?: string | null;
+      language?: 'en' | 'ar';
+    }
+  ): Promise<void> {
+    if (!args.to) return;
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+    );
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const lang: 'en' | 'ar' =
+      args.language ??
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
+    const { subject, content } = wholesaleNotice(args.kind, lang, {
+      customerName: args.customerName,
+      storeName: store.name,
+      businessName: args.businessName,
+      note: args.note,
+    });
+    await this.sendForStore(
+      storeId,
+      { to: args.to, subject, content, language: lang },
       { queue: true }
     );
   }
@@ -723,6 +824,23 @@ export class EmailService {
     const subject = passwordResetTemplate.subject[lang](data, store.name);
     const content = passwordResetTemplate[lang](data, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
+  }
+
+  /**
+   * Passkey security notice to a SHOPPER, sent from the store's own sender identity (Ruling PASSKEY-16).
+   * Never queued or skipped: it is an account-security message.
+   */
+  static async sendPasskeyNotice(
+    storeId: string,
+    data: PasskeyNoticeData,
+    language: 'en' | 'ar'
+  ): Promise<void> {
+    await this.sendForStore(storeId, {
+      to: data.email,
+      subject: passkeyNoticeTemplate.subject[language](data),
+      content: passkeyNoticeTemplate[language](data),
+      language,
+    });
   }
 
   /**
@@ -1023,6 +1141,25 @@ export class EmailService {
       content: planLimitReachedTemplate[lang](data),
       language: lang,
     });
+  }
+
+  /** Merchant notice: a webhook endpoint was switched off after repeated failures. */
+  static async sendWebhookDisabledNotice(
+    storeId: string,
+    data: WebhookDisabledData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'ar';
+    await this.sendForStore(
+      storeId,
+      {
+        to: data.to,
+        subject: webhookDisabledTemplate.subject[lang](data),
+        content: webhookDisabledTemplate[lang](data),
+        language: lang,
+      },
+      { queue: true }
+    );
   }
 
   /**

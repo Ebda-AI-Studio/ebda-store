@@ -22,8 +22,19 @@ vi.mock('@ebda/database', async importOriginal => {
         const sql = sqlOf(q, values);
         queries.push(sql);
         if (sql.includes('embedded_at >=')) return [{ n: 0n }];
-        if (sql.includes('EXISTS')) return [{ stale: true }];
-        return [{ id: 'p1', doc: 'Shoes', hash: 'h' }];
+        if (sql.includes('AS stale')) return [{ stale: true }]; // hasStaleProducts (the finder has EXISTS too)
+        return [
+          {
+            id: 'p1',
+            doc: 'Shoes',
+            hash: 'h',
+            words: null,
+            wordsHash: null,
+            key: 'k',
+            needDoc: true,
+            needWords: false,
+          },
+        ];
       }),
       $executeRaw: vi.fn(async () => 0),
     },

@@ -231,7 +231,7 @@ export default function LoyaltySettingsPage() {
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'settings'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -242,7 +242,7 @@ export default function LoyaltySettingsPage() {
               onClick={() => setActiveTab('members')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'members'
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
               disabled={!loyaltyEnabled}
@@ -296,7 +296,7 @@ export default function LoyaltySettingsPage() {
                     type="button"
                     onClick={handleSaveSettings}
                     disabled={saving}
-                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {saving && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

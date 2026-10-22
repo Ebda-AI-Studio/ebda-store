@@ -24,7 +24,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   BRAND_MARKETING_URL,
   JWT_ISSUER,
@@ -45,6 +45,8 @@ import {
   lineAllowsBackorder,
 } from '../lib/effective-inventory';
 import logger from '../lib/logger';
+import { PriceResolver } from '../services/price-resolver.service';
+import { ANONYMOUS_BUYER } from '../lib/buyer-identity';
 import { maskPhone } from '../lib/pii-mask';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { AppError } from '../middleware/error-handler';
@@ -117,6 +119,7 @@ router.use(bridgeRateLimit);
 // per request for latency diagnosis. Phase 0 instrumentation.
 router.use(waBridgeTiming(logger));
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PAGE_SIZE = 10; // Meta interactive list cap
 const CHECKOUT_TOKEN_TTL_SECONDS = 30 * 60; // 30 minutes
 
@@ -232,7 +235,8 @@ export async function bridgeProductSearchPage(
   const matchIds = await searchProductIds(storeId, q, { scope: 'storefront', withSku: true });
   // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
   const products = await prisma.product.findMany({
-    where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
+    // B2B-7b: WhatsApp is an anonymous surface, wholesale-only products never appear
+    where: { storeId, status: 'active', deletedAt: null, audience: 'public', id: { in: matchIds } },
     select: {
       id: true,
       name: true,
@@ -293,6 +297,7 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         storeId,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
         categories: { some: { categoryId } },
       },
       select: {
@@ -659,6 +664,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
         storeId: store.id,
         status: 'active',
         deletedAt: null,
+        audience: 'public',
       },
       select: {
         id: true,
@@ -902,12 +908,19 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     // Verify every product belongs to bridge store + still in stock.
     const productIds = items.map(i => i.productId);
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, storeId: store.id, status: 'active', deletedAt: null },
+      where: {
+        id: { in: productIds },
+        storeId: store.id,
+        status: 'active',
+        deletedAt: null,
+        audience: 'public',
+      },
       select: {
         id: true,
         name: true,
         nameAr: true,
         price: true,
+        moq: true,
         // EFFECTIVE_STOCK_SELECT supplies inventory/trackInventory/
         // allowBackorder plus the variants the stock check needs — spread it
         // rather than listing the columns, so a future edit cannot drop
@@ -1020,13 +1033,28 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       return;
     }
 
-    // Build the cart payload that the checkout JWT carries.
-    const cartItems = productItems.map(i => {
+    // Build the cart payload that the checkout JWT carries. Priced through the ONE resolver as an ANONYMOUS buyer (Ruling
+    // B2B-2: a WhatsApp conversation has no verified shopper session, so retail + PUBLIC tiers only, never a group price),
+    // so the total quoted here is what the order will charge. The order itself is created by OrderService.create, which
+    // re-resolves and enforces MOQ (422 BELOW_MOQ).
+    const waResolver = await PriceResolver.forBuyer(store.id, ANONYMOUS_BUYER);
+    const waPriced = await waResolver.priceCart(
+      productItems.map((i, idx) => ({
+        key: String(idx),
+        product: {
+          id: i.productId,
+          price: byId.get(i.productId)!.price,
+          moq: byId.get(i.productId)!.moq ?? null,
+        },
+        qty: i.quantity,
+      }))
+    );
+    const cartItems = productItems.map((i, idx) => {
       const p = byId.get(i.productId)!;
       return {
         productId: i.productId,
         quantity: i.quantity,
-        priceFils: p.price,
+        priceFils: waPriced.get(String(idx))!.unitMinor,
         name: p.name,
         nameAr: p.nameAr,
       };
@@ -1158,11 +1186,24 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
     // Cross-check the store still has the integration enabled. If a
     // merchant disconnected WBS between token issuance and redemption,
     // refuse — they don't want WA-originated traffic anymore.
-    const store = await prisma.store.findUnique({
-      where: { id: payload.storeId as string },
-      select: { id: true, slug: true, wbsEnabled: true },
-    });
-    if (!store?.wbsEnabled) {
+    // This route has no waBridgeAuth, so it opens its own store scope for the id the signed token
+    // names: a malformed id is a bad token, an unknown id is a 404 — never a default store.
+    const tokenStoreId = payload.storeId;
+    if (typeof tokenStoreId !== 'string' || !UUID_RE.test(tokenStoreId)) {
+      res.status(400).json({ success: false, error: 'TOKEN_INVALID' });
+      return;
+    }
+    const store = await withStore(tokenStoreId, tx =>
+      tx.store.findUnique({
+        where: { id: tokenStoreId },
+        select: { id: true, slug: true, wbsEnabled: true },
+      })
+    );
+    if (!store) {
+      res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+      return;
+    }
+    if (!store.wbsEnabled) {
       res.status(403).json({ success: false, error: 'STORE_WBS_DISABLED' });
       return;
     }

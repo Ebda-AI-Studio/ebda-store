@@ -10,13 +10,16 @@ import {
 import { prisma, type RfmSegment } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { customerKeyOf } from '../lib/customer-key';
+import { searchTermOf } from '../lib/search-term';
 import { SmsConsentService } from '../services/sms-consent.service';
 import {
   aggregateCustomers,
+  aggregateCustomersMatching,
   MAX_ZERO_ORDER_CUSTOMERS,
   getCustomerProfile,
   filterCustomersBySegment,
@@ -26,6 +29,7 @@ import {
   type ShippingAddressShape,
 } from '../services/customer-aggregate.service';
 import { AuthService, eraseNeedsCrmReview } from '../services/auth.service';
+import { searchOrderCustomers } from '../services/customer-search.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 import { BRAND } from '@ebda/shared';
@@ -59,7 +63,16 @@ const adminMiddleware = [
 ];
 
 /**
- * The list's search + segment filters, applied the SAME way by the list and
+ * The search term: the `X-Search-Query` header (clients send it there so a typed phone/email stays
+ * out of the URL, Ruling SEARCH-P2-9), else the deprecated `?search=`. Trimmed, bounded (it reaches
+ * a SECURITY DEFINER lookup), '' when absent.
+ */
+function searchTerm(req: Request, res: Response): string {
+  return searchTermOf(req, res, 'search') ?? '';
+}
+
+/**
+ * The list's segment filter (the text search is resolved in SQL by `aggregateCustomersMatching`), applied the SAME way by the list and
  * by the export (owner report 2026-09-30: the export button ignored the
  * filters on screen and always downloaded every customer). Segment filtering
  * is admin-only — staff get a 403, matching `rfm-batch`.
@@ -69,7 +82,6 @@ async function applyCustomerListFilters(
   storeId: string,
   customers: Awaited<ReturnType<typeof aggregateCustomers>>['customers']
 ) {
-  const search = (req.query.search as string | undefined)?.trim().toLowerCase() ?? '';
   const segment = parseSegmentFilter(req.query.segment);
 
   // RFM segments are analytics that `rfm-batch` serves to store_admin /
@@ -89,17 +101,10 @@ async function applyCustomerListFilters(
         ? await filterCustomersBySegment(storeId, customers, segment)
         : customers;
 
-  // Server-side so search is consistent across pages (the old client-only
-  // search only matched the fetched page).
-  return search
-    ? bySegment.filter(
-        c =>
-          c.firstName.toLowerCase().includes(search) ||
-          c.lastName.toLowerCase().includes(search) ||
-          c.email.toLowerCase().includes(search) ||
-          c.phone.toLowerCase().includes(search)
-      )
-    : bySegment;
+  // The text search is NOT applied here: it is resolved in SQL (`aggregateCustomersMatching`,
+  // Arabic-normalised names, any phone form, email), so it also finds customers beyond the
+  // aggregate's order-scan cap. This only narrows by segment.
+  return bySegment;
 }
 
 /**
@@ -122,7 +127,9 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const aggregated = await aggregateCustomers(storeId);
+      const aggregated = searchTerm(req, res)
+        ? await aggregateCustomersMatching(storeId, searchTerm(req, res))
+        : await aggregateCustomers(storeId);
       const { ordersTruncated, zeroOrderTruncated, ordersScanned } = aggregated;
       const customers = await applyCustomerListFilters(req, storeId, aggregated.customers);
       // The Purchases / Summary sheets follow the same filter: only the orders
@@ -471,7 +478,7 @@ router.get(
         noticeRow.getCell(1).font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
 
-      const appliedSearch = (req.query.search as string | undefined)?.trim() || undefined;
+      const appliedSearch = searchTerm(req, res) || undefined;
       const appliedSegment = parseSegmentFilter(req.query.segment) ?? undefined;
       addFiltersSheet(
         workbook,
@@ -523,7 +530,7 @@ router.get(
  * value is ignored (the unfiltered list), never a 400, so an old bookmark
  * with a retired segment still loads.
  *
- * Response: { data, meta: { page, perPage, total, totalPages, truncated,
+ * Response: { data, meta: { page, perPage, total, totalPages, truncated, searchTruncated,
  * summary, segments } } — `summary` is the store-wide KPI strip
  * (`CustomersSummary`); `segments` lists the RFM segments present in the
  * store, and each row carries `segment` (null = no snapshot). Both are
@@ -538,7 +545,15 @@ router.get(
       const page = Math.max(1, Number(req.query.page ?? 1) || 1);
       // Hard-cap perPage so a caller can't request an unbounded page.
       const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
-      const { customers, truncated, summary } = await aggregateCustomers(storeId);
+      // The KPI strip and the truncation notice describe the whole store (cached aggregate); a
+      // search replaces only the rows (SQL match, see `aggregateCustomersMatching`).
+      const { customers: allCustomers, truncated, summary } = await aggregateCustomers(storeId);
+      const term = searchTerm(req, res);
+      const matched = term ? await aggregateCustomersMatching(storeId, term) : null;
+      const customers = matched ? matched.customers : allCustomers;
+      // The match itself hit its cap (1,000 registered / 20,000 guest orders): the rows are the
+      // first of more, and the page says so (Task 16 review M5).
+      const searchTruncated = matched?.searchTruncated ?? false;
 
       // A guest's snapshot is keyed by the HASH of the same key this list
       // groups by (`lib/customer-key.ts`), so guests resolve too — before,
@@ -580,7 +595,16 @@ router.get(
         data: {
           data: pageItems,
           // `summary` is store-wide (unaffected by page/search/segment).
-          meta: { page, perPage, total, totalPages, truncated, summary, segments },
+          meta: {
+            page,
+            perPage,
+            total,
+            totalPages,
+            truncated,
+            searchTruncated,
+            summary,
+            segments,
+          },
         },
       });
     } catch (error) {
@@ -605,110 +629,19 @@ router.get(
 router.get(
   '/customers/search',
   ...adminMiddleware,
+  requirePermission('orders:read'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const q = (req.query.q as string | undefined)?.trim();
+      // Bounded like the storefront suggest route: an unbounded ILIKE pattern would reach the
+      // SECURITY DEFINER lookup (review M-4).
+      const q = searchTermOf(req, res, 'q');
       if (!q || q.length < 2) {
         res.json({ success: true, data: { customers: [] } });
         return;
       }
 
-      // --- Registered customers (User table, joined via orders) ---
-      const registeredOrders = await prisma.order.findMany({
-        where: {
-          storeId,
-          customerId: { not: null },
-          customer: {
-            OR: [
-              { firstName: { contains: q, mode: 'insensitive' } },
-              { lastName: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-              { phone: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-        },
-        select: {
-          customer: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-            },
-          },
-        },
-        distinct: ['customerId'],
-        take: 10,
-      });
-
-      // Shape: { id (UUID), isGuest: false, firstName, lastName, email, phone }
-      const registered = registeredOrders
-        .map(o => o.customer)
-        .filter((c): c is NonNullable<(typeof registeredOrders)[number]['customer']> => c !== null)
-        .map(c => ({
-          id: c.id,
-          isGuest: false as const,
-          firstName: c.firstName ?? '',
-          lastName: c.lastName ?? '',
-          email: c.email ?? '',
-          phone: c.phone ?? '',
-        }));
-
-      // --- Guest customers (raw SQL: JSON ILIKE) ---
-      // Prisma's JSON filter doesn't support partial-match (`contains`),
-      // only exact `equals`. For guest typeahead we need ILIKE on
-      // JSONB-extracted scalar fields, which is a `$queryRaw` job. The
-      // result is deduped by lowercased email when present, falling
-      // back to phone, then to order.id (each guest-order without
-      // either becomes its own row — same as the customers list page).
-      const like = `%${q}%`;
-      const guestRows = await prisma.$queryRaw<
-        Array<{
-          first_name: string | null;
-          last_name: string | null;
-          email: string | null;
-          phone: string | null;
-          order_id: string;
-        }>
-      >`
-        SELECT DISTINCT ON (
-          COALESCE(LOWER(shipping_address->>'email'), shipping_address->>'phone', id::text)
-        )
-          shipping_address->>'firstName' AS first_name,
-          shipping_address->>'lastName'  AS last_name,
-          shipping_address->>'email'     AS email,
-          shipping_address->>'phone'     AS phone,
-          id::text AS order_id
-        FROM public.orders
-        WHERE store_id = ${storeId}
-          AND customer_id IS NULL
-          AND deleted_at IS NULL
-          AND (
-                shipping_address->>'firstName' ILIKE ${like}
-             OR shipping_address->>'lastName'  ILIKE ${like}
-             OR shipping_address->>'email'     ILIKE ${like}
-             OR shipping_address->>'phone'     ILIKE ${like}
-          )
-        LIMIT 10
-      `;
-
-      const guests = guestRows.map(g => ({
-        // Synthetic id — frontend treats this as guest (no customerId
-        // sent on order create), pre-fills form fields from these
-        // values. Matches the customer-detail polymorphic key pattern.
-        id: g.email ? `guest:${g.email.toLowerCase()}` : `guest:${g.order_id}`,
-        isGuest: true as const,
-        firstName: g.first_name ?? '',
-        lastName: g.last_name ?? '',
-        email: g.email ?? '',
-        phone: g.phone ?? '',
-      }));
-
-      // Merge + cap at 10. Registered customers ranked first because
-      // they're more useful for repeat-order attribution.
-      const customers = [...registered, ...guests].slice(0, 10);
+      const customers = await searchOrderCustomers(storeId, q);
 
       res.json({ success: true, data: { customers } });
     } catch (error) {

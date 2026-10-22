@@ -94,10 +94,10 @@ afterEach(cleanup);
 const CODS = { name: 'Cash on Delivery', nameAr: 'الدفع عند الاستلام' };
 
 describe('S-02: PDP trust line', () => {
-  it('COD on and a 14-day window: "الدفع عند الاستلام · إرجاع خلال 14 يومًا", on the FIRST render', () => {
+  it('COD on and a 14-day window: "الدفع عند الاستلام · إرجاع خلال 14 يوم", on the FIRST render', () => {
     render(<TrustLine cod={CODS} />);
     const line = screen.getByTestId('pdp-trust-line');
-    expect(line.textContent).toBe('الدفع عند الاستلام · إرجاع خلال 14 يومًا');
+    expect(line.textContent).toBe('الدفع عند الاستلام · إرجاع خلال 14 يوم');
     expect(line.querySelector('a[data-trust="returns"]')!.getAttribute('href')).toBe('/returns');
   });
 
@@ -117,7 +117,7 @@ describe('S-02: PDP trust line', () => {
 
   it('COD off: only the return window', () => {
     render(<TrustLine cod={null} />);
-    expect(screen.getByTestId('pdp-trust-line').textContent).toBe('إرجاع خلال 14 يومًا');
+    expect(screen.getByTestId('pdp-trust-line').textContent).toBe('إرجاع خلال 14 يوم');
   });
 
   it('no window declared, or returns not accepted: no returns part', () => {

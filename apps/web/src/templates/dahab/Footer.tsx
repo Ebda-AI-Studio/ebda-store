@@ -26,7 +26,7 @@ import { getSocialLinks, SocialGlyph } from '../shared/icons';
 import { DAHAB_CONTAINER, cx } from './ui';
 
 const LINK =
-  'inline-flex min-h-[40px] items-center text-sm text-foreground/70 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
+  'inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-foreground/70 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
 const HEAD = 'font-display mb-4 text-lg text-foreground rtl:text-xl';
 
 export function DahabPaymentMarks({ className }: { className?: string }) {

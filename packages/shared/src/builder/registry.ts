@@ -28,6 +28,8 @@ import {
   collectionBlockSchema,
   trustBadgesSchema,
   trustBadgeBlockSchema,
+  shopTheLookSchema,
+  shopTheLookBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -157,6 +159,11 @@ export const HERO_SLIDE_BLOCK: BlockDefinition = {
       localized: false,
     }),
     s.video('videoMobile', 'Mobile video', 'فيديو الجوال'),
+    s.select('focus', 'Image focus', 'تركيز الصورة', [
+      opt('center', 'Centre', 'الوسط'),
+      opt('top', 'Top (keeps heads in frame)', 'أعلى (يحافظ على الرأس)'),
+      opt('bottom', 'Bottom', 'أسفل'),
+    ]),
     s.text('alt', 'Image description', 'وصف الصورة'),
     s.text('headline', 'Headline', 'العنوان', { localized: true }),
     s.text('ctaText', 'Button text', 'نص الزر', { localized: true }),
@@ -241,7 +248,28 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.select('presentation', 'Presentation', 'طريقة العرض', [
         opt('full-bleed', 'Full bleed', 'بعرض الشاشة'),
         opt('framed', 'Framed', 'داخل إطار'),
+        opt('collage', 'Collage (3 photos)', 'كولاج (3 صور)'),
       ]),
+      s.select('frame', 'Frame line (framed only)', 'خط الإطار (داخل إطار فقط)', [
+        opt('none', 'None', 'بدون'),
+        opt('line', 'Hairline', 'خط رفيع'),
+      ]),
+      s.select(
+        'textAnchor',
+        'Text position',
+        'موضع النص',
+        [
+          opt('center', 'Centre', 'في المنتصف'),
+          opt('bottom-start', 'Bottom corner', 'في الركن السفلي'),
+        ],
+        {
+          // M-6 (B1-48): below xl the anchored copy leaves the photo, so its colour is the page's.
+          hintEn:
+            'On phones and tablets the text sits under the photo in the page colours, so the headline colour applies only on large screens.',
+          hintAr:
+            'على الجوال والتابلت يظهر النص أسفل الصورة بألوان الصفحة، لذا يُطبَّق لون العنوان على الشاشات الكبيرة فقط.',
+        }
+      ),
       ...styleSettings(),
     ],
   }),
@@ -260,7 +288,13 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         'layout',
         'Layout',
         'التخطيط',
-        [opt('grid', 'Grid', 'شبكة'), opt('horizontal', 'Scrolling row', 'صف متحرك')],
+        [
+          opt('grid', 'Grid', 'شبكة'),
+          opt('horizontal', 'Scrolling row', 'صف متحرك'),
+          opt('chips', 'Text chips', 'أزرار نصية'),
+          opt('rail', 'Image rail', 'شريط'),
+          opt('tiles', 'Square tiles', 'مربعات'),
+        ],
         {
           responsive: ['mobile'],
         }
@@ -375,6 +409,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     group: 'template',
     settings: [
       ...headingSettings(false),
+      s.select('layout', 'Layout', 'طريقة العرض', [
+        opt('row', 'Row of reviews', 'صف آراء'),
+        opt('single', 'One quote', 'رأي واحد'),
+      ]),
       s.range('minRating', 'Minimum rating', 'أقل تقييم', 1, 5),
       s.check('verifiedOnly', 'Verified purchases only', 'مشتريات موثقة فقط', 'content'),
       ...styleSettings(),
@@ -417,6 +455,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
+          opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -488,6 +527,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.textarea('body', 'Text', 'النص', { localized: true }),
       s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
       s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.select('layout', 'Layout', 'التخطيط', [
+        opt('split', 'Side by side', 'جنب بعض'),
+        opt('full-bleed', 'Full-width image', 'صورة بعرض الشاشة'),
+      ]),
       s.select('imagePosition', 'Image side', 'جهة الصورة', [
         opt('start', 'Start (right in Arabic)', 'البداية (يمين في العربية)'),
         opt('end', 'End (left in Arabic)', 'النهاية (يسار في العربية)'),
@@ -579,6 +622,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
+          opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -640,6 +684,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           },
           s.image('image', 'Image', 'الصورة', { localized: true }),
           s.text('label', 'Label', 'الاسم', { localized: true }),
+          s.select('tone', 'Band colour', 'لون الشريط', [
+            opt('primary', 'Main colour', 'اللون الأساسي'),
+            opt('accent', 'Accent', 'لون مميز'),
+            opt('line', 'Hairline colour', 'لون الخطوط'),
+          ]),
         ],
       },
     ],
@@ -662,6 +711,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('arch', 'Arch', 'قوس'),
         opt('rectangle', 'Rectangle', 'مستطيل'),
         opt('circle', 'Circle', 'دائري'),
+        opt('band', 'Full-width bands', 'شرائط بعرض الشاشة'),
       ]),
       s.select('columns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
         opt(2, '2', '2'),
@@ -707,6 +757,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
+          opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -727,12 +778,65 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         max: 4,
       },
       s.range('limit', 'Products to show', 'عدد المنتجات', 1, 4),
+      s.select('layout', 'Layout', 'التخطيط', [
+        opt('list', 'Photo and list', 'صورة وقائمة'),
+        opt('stage', 'One product', 'عرض منتج واحد'),
+      ]),
       s.select('imagePosition', 'Image side', 'جهة الصورة', [
         opt('start', 'Start (right in Arabic)', 'البداية (يمين في العربية)'),
         opt('end', 'End (left in Arabic)', 'النهاية (يسار في العربية)'),
       ]),
       s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
       s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'shop-the-look',
+    labelEn: 'Shop the look',
+    // Neutral noun form (the verbal noun, "shopping the look"), never a gendered imperative.
+    labelAr: 'تسوّق اللوك',
+    legacyKey: null,
+    rendererKey: 'section.shopTheLook',
+    group: 'template',
+    propsSchema: shopTheLookSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'look',
+        labelEn: 'Look',
+        labelAr: 'لوك',
+        maxCount: 6,
+        propsSchema: shopTheLookBlockSchema,
+        settings: [
+          // LB-04: the photo is the promise; it shows every piece listed below.
+          s.image('image', 'Photo (shows every piece)', 'الصورة (تظهر فيها كل القطع)', {
+            localized: true,
+          }),
+          s.text('alt', 'Photo description', 'وصف الصورة', { localized: true }),
+          s.text('title', 'Look name', 'اسم اللوك', { localized: true }),
+          {
+            id: 'productIds',
+            type: 'product_list',
+            labelEn: 'Pieces',
+            labelAr: 'القطع',
+            group: 'content',
+            max: 4,
+          },
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Shop the look',
+        nameAr: 'تسوّق اللوك',
+        settings: { heading: 'Shop the look', headingAr: 'تسوّق اللوك' },
+        blocks: [],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],

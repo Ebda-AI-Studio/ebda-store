@@ -1,3 +1,10 @@
+import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
+import { matchingCustomers, type CustomerMatches } from './admin-search.service';
+export {
+  ORDER_SEARCH_CUSTOMER_ID_CAP,
+  orderSearchIds,
+  orderSearchIdsSql,
+} from '../lib/order-search-ids';
 import { randomUUID } from 'node:crypto';
 import {
   prisma,
@@ -15,8 +22,10 @@ import {
   fromMinor,
   minorToDecimalString,
   normalizePhoneForStorage,
+  normalizeArabicSearch,
   activePersonalisation,
   REGION,
+  orderNumberFromScanCode,
 } from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
 import { recordPaymentEvent } from './payment-event.service';
@@ -29,7 +38,15 @@ function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown>
 }
 import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
-import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
+import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
+import { canSeeWholesaleOnly } from '../lib/audience';
+import {
+  assertMoqSatisfied,
+  priceSnapshot,
+  eligibleForCoupon,
+  loyaltyRedeemableSubtotal,
+} from '../lib/order-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
@@ -129,7 +146,30 @@ const ORDER_PAYMENT_SELECT = {
   createdAt: true,
 } as const satisfies Prisma.PaymentSelect;
 
+export interface OrderQuote {
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  codFee: number;
+  tax: number;
+  /** The amount the server will put on the order (piastres). `expectedTotal` is compared with this. */
+  total: number;
+  taxIncludedInPrice: boolean;
+  lines: Array<{
+    itemId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    listPrice: number;
+    priceSource: 'base' | 'tier' | 'group';
+    priceTierMinQty: number | null;
+  }>;
+}
+
 interface CreateOrderData {
+  /** The total (piastres) the shopper last saw. Compared, never charged: a mismatch is 409 PRICE_CHANGED (Ruling B2B-9). */
+  expectedTotal?: number;
   shippingAddress: {
     firstName: string;
     lastName: string;
@@ -209,14 +249,6 @@ export interface OrderListWhere {
   confirmedOnly?: boolean;
 }
 
-/**
- * Most customer ids the order search resolves up front. Above this the term
- * is too broad for an id list to be worth binding, and the search falls back
- * to the relation filter (same rows, unindexed plan). 1000 bind parameters is
- * nowhere near Postgres' 65535 ceiling.
- */
-export const ORDER_SEARCH_CUSTOMER_ID_CAP = 1000;
-
 /** The `shipping_address` keys a guest's contact lives under (see `contactOf`, lib/customer-key.ts). */
 const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as const;
 
@@ -224,39 +256,60 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  * The OR arms of the order-list search: order number, or the registered
  * customer's first name / last name / email / phone (issue 2405).
  *
- * WHY two steps. The obvious shape — `customer: { is: { firstName: contains } }`
- * per field — is compiled by Prisma into four LEFT JOINs onto `users` with an
- * OR spanning both tables. No index can serve an OR whose arms live on
- * different sides of a join, so every keystroke walked the store's whole
- * order history (measured: 150-270 ms per query at 50k orders, twice per
- * search because the list also counts). Resolving the matching customers
- * first turns every arm into a predicate on `orders` itself —
- * `order_number ILIKE` (trigram GIN) OR `customer_id IN (...)` (btree) —
- * which Postgres answers with a BitmapOr (measured: under 1 ms). The customer
- * lookup is itself a BitmapOr over the four `users` trigram indexes. Both
- * sets of indexes: migration 20261002090000_order_search_trgm_and_fk_indexes.
+ * WHY lookups first. The obvious shape — `customer: { is: { firstName: contains } }` per
+ * field — is compiled by Prisma into four LEFT JOINs onto `users` with an OR spanning both
+ * tables, which no index can serve (measured: 150-270 ms per query at 50k orders). Resolving the
+ * matching ids first turns every arm into a predicate on `orders` itself: `id IN (...)` for the
+ * order number and the guests, `customer_id IN (...)` (btree) for registered customers.
  *
- * Same rows as the relation filter, by construction: an order matches iff its
- * number matches or its customer matches on one of the four fields. The
- * customer lookup is restricted to users with an order in THIS store (a
- * semi-join, bounded by the store's own customers), not by `users.store_id` —
- * a registered customer's `store_id` is not necessarily the order's store.
+ * The lookups run in the store-scoped SECURITY DEFINER `ebda_order_search_ids` (Ruling
+ * SEARCH-T14-5/-7), because as `ebda_app` the RLS barrier forbids every ILIKE trigram index when
+ * the predicate is written inline. It takes the store only from the session scope and returns ids
+ * only; this function then re-reads orders through RLS.
  *
- * GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address`
- * JSON) are matched by the same term on first name, last name, email and phone
- * through `guestOrderIdsMatching`, served by the partial expression trigram
- * indexes of migration 20261003100000_order_search_guest_contact_trgm_idx.
+ * Which customers match: users WITH AN ORDER in this store (soft-deleted orders do not count)
+ * whom the `users` RLS policy would show a store scope — registered on THIS store (`users.store_id`),
+ * the caller, the store's owner/staff, or a super admin. A customer with `users.store_id` NULL or
+ * registered on another store is NOT matched, exactly as the relation join already behaved under
+ * `ebda_app` (the old comment here claimed the opposite; that was true only for an owner role).
+ *
+ * Customers and GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address` JSON)
+ * both come from `matchingCustomers` (Search P2): Arabic-normalised names ("احمد" finds "أحمد"), the
+ * phone in any form ("0101 234 5678", "+20…", "٠١٠…"), and the email, served by the normalised
+ * expression trigram indexes of migration 20261027000100 (and the older email indexes). The order
+ * number also matches by its digits alone ("#١٢٣٤" finds "EB-1234").
  *
  * Falls back to the relation filter when the term is shorter than a trigram
  * (3 chars — the indexes cannot serve it, so the lookup would only add a
- * scan). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
+ * scan), and for a customer searching their own orders (`indexed: false`). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
  * or guest orders degrades ONLY that half to its relation/JSON arm; the other
  * half keeps its indexed `IN (...)` arm (issue 2444).
  */
+/**
+ * What a barcode scanner types: the 18 digits of `scanCodeFor('ORD-xxxxxx-xxxxx')`
+ * (Ruling BARCODE-4). Returns the real order number, or null for anything that is
+ * not a scan code (typed searches, phones, `EBD-` payment numbers).
+ */
+export function orderNumberFromScan(input: string): string | null {
+  const n = orderNumberFromScanCode(input.trim());
+  return n.startsWith('ORD-') ? n : null;
+}
+
 export async function orderSearchWhere(
   storeId: string,
-  search: string
+  search: string,
+  opts: {
+    indexed?: boolean;
+    /** The customer lookup, when the caller already ran it (the ⌘K route does): not repeated. */
+    matches?: CustomerMatches;
+    /** Cap for the order-number id lookups (default `ORDER_SEARCH_CUSTOMER_ID_CAP + 1`). */
+    numberIdLimit?: number;
+  } = {}
 ): Promise<Prisma.OrderWhereInput[]> {
+  // A scanned receipt/slip/email barcode opens that order: one exact arm, no customer fan-out.
+  // Still store-scoped: callers AND this with their own `storeId`.
+  const scanned = orderNumberFromScan(search);
+  if (scanned) return [{ orderNumber: scanned }];
   const contains = { contains: search, mode: 'insensitive' as const };
   const customerMatch: Prisma.UserWhereInput[] = [
     { firstName: contains },
@@ -267,7 +320,7 @@ export async function orderSearchWhere(
   // GUEST orders (no `customer_id`) carry the buyer's contact only in the
   // `shipping_address` JSON snapshot — the same place `customerKeyOf` reads
   // email/phone from. 174 of 188 production orders are guest orders. The JSON
-  // path filter is the unindexed twin of `guestOrderIdsMatching` below.
+  // path filter is the unindexed guest lookup (the indexed `guest` definer kind was dropped, SEARCH-P2-5).
   const guestJsonMatch: Prisma.OrderWhereInput = {
     customerId: null,
     OR: GUEST_CONTACT_FIELDS.map(field => ({
@@ -279,84 +332,52 @@ export async function orderSearchWhere(
     { customer: { is: { OR: customerMatch } } },
     guestJsonMatch,
   ];
-  if (search.length < 3) return relationFallback;
+  // A customer searching THEIR OWN orders (`indexed: false`) never calls the store-wide id lookup:
+  // the lookup answers for the whole store, and only a store viewer may ask the store a question.
+  // The relation fallback is ANDed with their customerId by the caller.
+  // Prisma's `contains` does not escape LIKE metacharacters, so the relation fallback would turn a
+  // typed "%" into "match every order": a term holding one always takes the escaped lookups.
+  if ((search.length < 3 && !/[%_\\]/.test(search)) || opts.indexed === false) {
+    return relationFallback;
+  }
 
-  // The matching customers are read THROUGH this store's orders (keyed by `storeId`, which is
-  // what the tenant guard requires), not from `users` directly. That is also the exact
-  // relation-join semantics: a customer with users.store_id NULL, or registered on another
-  // store, matches when they ordered here. Filtering `users.store_id = storeId` would drop them.
-  const [customerRows, guestOrderIds] = await Promise.all([
-    prisma.order.groupBy({
-      by: ['customerId'],
-      where: { storeId, customerId: { not: null }, customer: { is: { OR: customerMatch } } },
-      orderBy: { customerId: 'asc' },
-      take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
-    }),
-    guestOrderIdsMatching(storeId, search),
+  // Store-scoped id lookups (see the docblock): the order number (the typed text, plus its digits
+  // alone when it has 4+, so "#١٢٣٤" finds "EB-1234"), and the customers + guest orders through
+  // `matchingCustomers` (Arabic-normalised names, any phone form, email; Search P2 Task 17).
+  // Only a term made of digits (with #, spaces, dashes) is also tried as the number's digits alone:
+  // a mixed term like "Gwendolyn58123" must not turn its digits into an order-number filter.
+  const folded = normalizeArabicSearch(search);
+  const digits = /^[#\s-]*[0-9][0-9\s-]*$/.test(folded) ? folded.replace(/\D/g, '') : '';
+  const [numberIdsRaw, digitIds, matches] = await Promise.all([
+    orderSearchIds(storeId, 'order_number', search, opts.numberIdLimit),
+    digits.length >= 4 && digits !== search
+      ? orderSearchIds(storeId, 'order_number', digits, opts.numberIdLimit)
+      : Promise.resolve([] as string[]),
+    opts.matches ?? matchingCustomers(storeId, search),
   ]);
-  const customers = customerRows.map(r => ({ id: r.customerId as string }));
+  const numberIds = [...new Set([...numberIdsRaw, ...digitIds])];
+  const customerIds = matches.usersTruncated ? [] : matches.userIds;
+  const guestOrderIds = matches.guestsTruncated ? [] : matches.guestOrderIds;
+  const customers = customerIds.map(id => ({ id }));
   // Each half degrades on its OWN: a broad guest term (every Egyptian guest phone starts `+20`)
   // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
   // (issue 2444). Both over the cap is exactly `relationFallback`.
-  const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
-  if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
+  const arms: Prisma.OrderWhereInput[] = [];
+  if (numberIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) arms.push({ orderNumber: contains });
+  else if (numberIds.length > 0) arms.push({ id: { in: numberIds } });
+  if (matches.usersTruncated || customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
     arms.push({ customer: { is: { OR: customerMatch } } });
   } else if (customers.length > 0) {
     arms.push({ customerId: { in: customers.map(c => c.id) } });
   }
-  if (guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
+  if (matches.guestsTruncated || guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
     arms.push(guestJsonMatch);
   } else if (guestOrderIds.length > 0) {
     arms.push({ id: { in: guestOrderIds } });
   }
+  // Nothing matched anywhere: an explicit match-nothing arm (an empty OR is easy to misread).
+  if (arms.length === 0) arms.push({ id: { in: [] } });
   return arms;
-}
-
-/** `%term%` with LIKE metacharacters escaped, so the term is matched literally. */
-function likeContains(term: string): string {
-  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
-}
-
-/**
- * Ids of this store's live GUEST orders whose shipping contact (first name,
- * last name, email or phone) contains `search`, capped at
- * `ORDER_SEARCH_CUSTOMER_ID_CAP + 1` so the caller can tell "too many".
- *
- * The WHERE is shaped to match the partial expression GIN indexes of
- * migration 20261003100000_order_search_guest_contact_trgm_idx exactly:
- * `customer_id IS NULL` is the index predicate and each ILIKE reads the same
- * `shipping_address ->> '<key>'` expression the index was built on, so
- * Postgres answers the four-way OR with a BitmapOr of the four trigram
- * indexes (then `store_id` filters the few hits) instead of walking every
- * order. Do not rewrite these to `#>>`, `jsonb_extract_path_text` or
- * `LOWER(...) LIKE` — a different expression cannot use the index.
- *
- * Registered customers' orders are excluded on purpose (`customer_id IS NULL`):
- * they keep matching through the customer's own account fields, exactly as
- * before, so a registered customer's results do not change. The search term is
- * PII (a phone or an email): it is only ever a bound parameter, never logged.
- */
-export async function guestOrderIdsMatching(storeId: string, search: string): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>(guestOrderIdsSql(storeId, search));
-  return rows.map(r => r.id);
-}
-
-/** The statement behind `guestOrderIdsMatching`; exported so the plan test EXPLAINs the real SQL. */
-export function guestOrderIdsSql(storeId: string, search: string): Prisma.Sql {
-  const like = likeContains(search);
-  return Prisma.sql`
-    SELECT id FROM public.orders
-    WHERE store_id = ${storeId}
-      AND customer_id IS NULL
-      AND deleted_at IS NULL
-      AND (
-            shipping_address ->> 'firstName' ILIKE ${like}
-         OR shipping_address ->> 'lastName'  ILIKE ${like}
-         OR shipping_address ->> 'email'     ILIKE ${like}
-         OR shipping_address ->> 'phone'     ILIKE ${like}
-      )
-    LIMIT ${ORDER_SEARCH_CUSTOMER_ID_CAP + 1}
-  `;
 }
 
 export class OrderService {
@@ -399,7 +420,7 @@ export class OrderService {
       if (to) (where.createdAt as any).lte = to;
     }
     const search = filters.search?.trim();
-    if (search) where.OR = await orderSearchWhere(storeId, search);
+    if (search) where.OR = await orderSearchWhere(storeId, search, { indexed: !customerId });
     return where;
   }
 
@@ -554,7 +575,9 @@ export class OrderService {
     return result;
   }
 
-  static async getByOrderNumber(storeId: string, orderNumber: string) {
+  static async getByOrderNumber(storeId: string, orderNumberOrScan: string) {
+    // Accepts the typed number or the scanned barcode digits (Ruling BARCODE-4).
+    const orderNumber = orderNumberFromScan(orderNumberOrScan) ?? orderNumberOrScan;
     const order = await prisma.order.findFirst({
       where: { orderNumber, storeId, deletedAt: null },
       include: {
@@ -583,6 +606,23 @@ export class OrderService {
     return order;
   }
 
+  /**
+   * The exact amounts `create` would charge for this cart, buyer and inputs, computed by `create` itself in dry-run mode so
+   * the two can never drift (design review I-1). The checkout shows `total` and sends it back as `expectedTotal`.
+   */
+  static async quote(
+    storeId: string,
+    customerId: string | undefined,
+    sessionId: string,
+    data: CreateOrderData,
+    buyer: BuyerIdentity
+  ): Promise<OrderQuote> {
+    return (await OrderService.create(storeId, customerId, sessionId, data, undefined, {
+      buyer,
+      dryRun: true,
+    })) as unknown as OrderQuote;
+  }
+
   static async create(
     storeId: string,
     customerId: string | undefined,
@@ -597,7 +637,20 @@ export class OrderService {
      * method; a future script) simply get no IP signal in the stock-hold cap
      * below.
      */
-    requestContext?: { checkoutIp?: string | null }
+    requestContext?: {
+      checkoutIp?: string | null;
+      /**
+       * Who this order is priced for (lib/buyer-identity.ts): the signed-in customer session, minted by the route via
+       * `buyerFromRequest(req)`. Absent = anonymous (retail + public tiers), e.g. WhatsApp / MCP callers.
+       */
+      buyer?: BuyerIdentity;
+      /**
+       * Compute everything up to the final total with the REAL create logic (pricing, MOQ, coupon / promotion, loyalty,
+       * shipping, COD fee, VAT) and return it as an `OrderQuote` WITHOUT touching stock, wallet or the database. This is
+       * how the checkout learns the exact total the server will charge (`OrderService.quote`).
+       */
+      dryRun?: boolean;
+    }
   ) {
     await assertOrderAllowed(storeId);
     // One stored phone form (ruling MONEYB-7): E.164 for an Egyptian mobile,
@@ -638,7 +691,11 @@ export class OrderService {
     };
 
     // Get cart
-    const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
+    // The lines are priced below with the REAL buyer; skip the cart service's own (anonymous) pricing pass, whose result was
+    // thrown away (design review M-7).
+    const cart = await CartService.getOrCreate(storeId, sessionId, customerId, ANONYMOUS_BUYER, {
+      skipPricing: true,
+    });
     // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
     // the cart). A cart holding ONLY bundles (no loose items) is valid, so
     // the empty-cart guard below must check both, not just `cart.items`.
@@ -685,6 +742,9 @@ export class OrderService {
         id: true,
         trackInventory: true,
         costPrice: true,
+        // B2B minimum order quantity (Review Focus 7): judged below on the product total.
+        moq: true,
+        audience: true,
         name: true,
         nameAr: true,
         // Every variant row (disabled included): the sizeless-line gate below.
@@ -728,6 +788,23 @@ export class OrderService {
       );
     }
 
+    // B2B-7b: a wholesale-only line in the cart (added before a revoke, or before the merchant changed the audience) cannot
+    // be ordered by a buyer who is not an approved wholesale member. Same 409 as a deleted product: the cart page removes it.
+    const wholesaleOnlyIds = cart.items
+      .filter(i => productInternalsById.get(i.productId)?.audience === 'wholesale_only')
+      .map(i => i.productId);
+    if (
+      wholesaleOnlyIds.length > 0 &&
+      !(await canSeeWholesaleOnly(storeId, requestContext?.buyer ?? ANONYMOUS_BUYER))
+    ) {
+      throw new AppError(
+        409,
+        'PRODUCT_NO_LONGER_AVAILABLE',
+        'A product in your cart is no longer available. Remove it and try again.',
+        { productIds: [...new Set(wholesaleOnlyIds)] }
+      );
+    }
+
     // A variant product is sold as one of its variants (C-01). Cart writes enforce it, but a
     // line written before C-01 (or merged in from an old guest cart) can still be sizeless, and
     // with backorder on it would be sold with no size the warehouse can pick. Refuse it here,
@@ -742,7 +819,7 @@ export class OrderService {
     if (sizelessLines.length > 0) {
       const first = sizelessLines[0];
       const messageEn = `Please choose a size for “${first.name}” before checking out`;
-      const messageAr = `يرجى اختيار المقاس لـ «${first.nameAr || first.name}» قبل إتمام الطلب`;
+      const messageAr = `اختار المقاس لـ «${first.nameAr || first.name}» قبل ما تكمل الطلب`;
       throw new AppError(400, 'VARIANT_REQUIRED', messageEn, {
         messageEn,
         messageAr,
@@ -890,31 +967,83 @@ export class OrderService {
       (sum, b) => sum + (b.resolved.componentSum - b.resolved.price) * b.cartBundle.quantity,
       0
     );
+    // Resolve every loose line's unit price through the ONE resolver (Ruling B2B-9: the price becomes binding here, in the
+    // request that creates the order). Fresh group read, UNCACHED entitlement (a just-made downgrade binds the next order).
+    // The pricing happens moments before the money transaction opens, the same window the totals above always had.
+    // `expectedTotal` (below) catches a price that moved since the shopper last saw the cart.
+    const resolver = await PriceResolver.forBuyer(
+      storeId,
+      requestContext?.buyer ?? ANONYMOUS_BUYER,
+      {
+        uncachedEntitlement: wholesaleEntitledUncached,
+      }
+    );
+    const linePrices = await resolver.priceCart(
+      cart.items.map(item => ({
+        key: item.id,
+        product: {
+          id: item.productId,
+          price: item.product.price,
+          moq: productInternalsById.get(item.productId)?.moq ?? null,
+        },
+        variant: item.variant
+          ? { id: (item as { variantId: string }).variantId, price: item.variant.price }
+          : null,
+        qty: item.quantity,
+      }))
+    );
+    const lineUnit = (item: { id: string }) => linePrices.get(item.id)!;
+    const productQtyTotals = new Map<string, number>();
+    for (const item of cart.items) {
+      productQtyTotals.set(
+        item.productId,
+        (productQtyTotals.get(item.productId) ?? 0) + item.quantity
+      );
+    }
+    // Review Focus 7: below MOQ an order is refused (inside the request, before any stock moves), all offenders listed.
+    assertMoqSatisfied(
+      cart.items.map(item => ({
+        productId: item.productId,
+        name: item.product.name,
+        nameAr: item.product.nameAr ?? null,
+        current: productQtyTotals.get(item.productId) ?? item.quantity,
+        resolved: lineUnit(item),
+      }))
+    );
+    const groupPriceApplied = cart.items.some(item => lineUnit(item).groupApplied);
+
     // The LOOSE-items-only subtotal — every cart line that is not part of a
-    // bundle. It is the basis a coupon is evaluated against, because a
-    // coupon never discounts a bundle (Ruling B1: no stacking on an
-    // already-discounted box; `cartItems` below, which drives
-    // `matchesTargeting`/`matchingSubtotal`, is likewise built from
-    // `cart.items` only). Identical to `subtotal` for every cart with no
-    // bundle, so a store without the `bundles` feature is unaffected.
+    // bundle. Coupons and promotions are evaluated against the BASE-PRICED loose lines only: a line priced by a tier or a
+    // group price is excluded (Ruling B2B-5) and a coupon never discounts a bundle (Ruling B1). Both bases equal the plain
+    // loose subtotal for every store without tiers/groups/bundles, so those stores are unaffected.
     const looseSubtotal = cart.items.reduce(
-      (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
+      (sum, item) => sum + lineUnit(item).unitMinor * item.quantity,
+      0
+    );
+    const couponBasisSubtotal = cart.items.reduce(
+      (sum, item) =>
+        eligibleForCoupon(lineUnit(item)) ? sum + lineUnit(item).unitMinor * item.quantity : sum,
       0
     );
     const subtotal = looseSubtotal + bundlesSubtotal;
 
     // Build the targeting cart snapshot (product + category ids, per-line
     // totals) shared by coupon targeting and automatic promotion resolution.
-    // Prices each line the same way as `subtotal` so scoped discounts compute
-    // against the exact piastres the customer is charged.
-    const cartItems = cart.items.map(item => ({
+    // Only coupon-eligible (base-priced) lines are in it, priced exactly as charged.
+    // `looseCartItems` keeps EVERY loose line: a free-shipping coupon judges its minimum, quantity and scope on the whole
+    // loose cart, because shipping is not a price discount (Ruling B2B-M2, final review P2-3).
+    const looseCartItems = cart.items.map(item => ({
       productId: item.productId,
       categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
         c => c.categoryId
       ),
       quantity: item.quantity,
-      lineTotal: cartLineUnitPrice(item) * item.quantity,
+      lineTotal: lineUnit(item).unitMinor * item.quantity,
+      eligible: eligibleForCoupon(lineUnit(item)),
     }));
+    const cartItems = looseCartItems
+      .filter(item => item.eligible)
+      .map(({ eligible: _eligible, ...item }) => item);
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
     // piastres; 0/unset = no minimum). Platform-level — any store can configure
@@ -1018,17 +1147,29 @@ export class OrderService {
       typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null;
     const idEmail =
       typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null;
-    const custCtx = await resolveCustomerContext(storeId, {
-      phone: idPhone,
-      email: idEmail,
-      customerId: customerId ?? null,
-    });
+    // Group membership for promotions and coupons comes from the SAME identity as the price (the session), never from the
+    // typed phone / email (Ruling B2B-2c/2e): a guest gets no group benefits.
+    const custCtx = await resolveCustomerContext(
+      storeId,
+      { phone: idPhone, email: idEmail, customerId: customerId ?? null },
+      requestContext?.buyer ?? ANONYMOUS_BUYER
+    );
     const targetingCtx = { ...custCtx, cartItems };
 
     let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
     let couponDiscount = 0;
     if (data.couponCode) {
-      appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
+      try {
+        appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
+      } catch (err) {
+        // Public path (quote + checkout): collapse not-found / inactive / not-started / expired / exhausted into
+        // ONE generic answer, exactly as POST /coupons/validate does, so these endpoints are not a
+        // coupon-existence oracle. Anything that is not an AppError (DB outage) still propagates.
+        if (err instanceof AppError) {
+          throw new AppError(400, 'INVALID_COUPON', 'Coupon code is not valid');
+        }
+        throw err;
+      }
       // Gate on the LOOSE subtotal, not the bundle-inclusive one. A coupon
       // discounts only loose lines (Ruling B1), so measuring its minimum
       // against a total that INCLUDES bundles let a bundle-only cart pass
@@ -1036,7 +1177,12 @@ export class OrderService {
       // had just "qualified" for. `looseSubtotal === subtotal` whenever the
       // cart holds no bundle, so this is the identity for every store
       // without the `bundles` feature.
-      if (appliedCoupon.minOrderAmount && looseSubtotal < appliedCoupon.minOrderAmount) {
+      // Ruling B2B-M2 (final review P2-3): a free-shipping code acts on the shipping line, not the discount basis, so its
+      // minimum, quantity and scope are judged on the whole loose cart, tier / group lines included. Every other coupon
+      // type keeps the base-priced basis (B2B-5).
+      const freeShipping = appliedCoupon.type === 'free_shipping';
+      const couponMinBasis = freeShipping ? looseSubtotal : couponBasisSubtotal;
+      if (appliedCoupon.minOrderAmount && couponMinBasis < appliedCoupon.minOrderAmount) {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
@@ -1053,7 +1199,12 @@ export class OrderService {
       // to a minimum quantity, or to specific products or categories applied to
       // anyone who typed it. `evaluateForCart` already accepts the type — the
       // branch simply never asked it.
-      const evalResult = CouponService.evaluateForCart(appliedCoupon, targetingCtx);
+      const evalResult = CouponService.evaluateForCart(
+        appliedCoupon,
+        freeShipping
+          ? { ...targetingCtx, cartItems: looseCartItems.map(({ eligible: _e, ...item }) => item) }
+          : targetingCtx
+      );
       if (!evalResult.eligible) {
         throw new AppError(400, 'COUPON_NOT_ELIGIBLE', 'This coupon does not apply to your cart.');
       }
@@ -1119,7 +1270,12 @@ export class OrderService {
       if (ctx) {
         // Cap against the goods value still payable after the primary discount
         // (the winning coupon-or-promotion). Loyalty stacks on the remainder.
-        const redeemableSubtotal = Math.max(0, subtotal - primaryDiscount);
+        // Ruling B2B-M3: points are not redeemable against tier / group priced lines (same exclusion as coupons).
+        const redeemableSubtotal = loyaltyRedeemableSubtotal({
+          subtotal,
+          nonBaseSubtotal: looseSubtotal - couponBasisSubtotal,
+          primaryDiscount,
+        });
         const quote = computeRedemption(
           ctx.settings,
           data.pointsToRedeem,
@@ -1152,6 +1308,52 @@ export class OrderService {
       ratePercent: activeTax.ratePercent,
       includedInPrice: activeTax.includedInPrice,
     });
+
+    if (requestContext?.dryRun) {
+      const quote: OrderQuote = {
+        subtotal,
+        discount,
+        shipping,
+        codFee,
+        tax,
+        total,
+        taxIncludedInPrice: activeTax.includedInPrice,
+        lines: cart.items.map(item => ({
+          itemId: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: lineUnit(item).unitMinor,
+          lineTotal: lineUnit(item).unitMinor * item.quantity,
+          listPrice: lineUnit(item).listMinor,
+          priceSource: lineUnit(item).source,
+          priceTierMinQty: lineUnit(item).tierMinQty,
+        })),
+      };
+      return quote as never;
+    }
+
+    // Ruling B2B-9: the shopper's `expectedTotal` is a QUOTE they saw, used ONLY to compare, never to charge. If the
+    // server-resolved total differs (a tier edit, a revoked approval, a downgrade, a changed price since the cart was read),
+    // refuse with the new lines so the checkout can re-render and the buyer can confirm. Absent = no comparison (older clients).
+    if (typeof data.expectedTotal === 'number' && data.expectedTotal !== total) {
+      throw new AppError(
+        409,
+        'PRICE_CHANGED',
+        'Prices changed since you last saw your cart. Review the new total and confirm.',
+        {
+          expectedTotal: data.expectedTotal,
+          total,
+          lines: cart.items.map(item => ({
+            itemId: item.id,
+            productId: item.productId,
+            unitPrice: lineUnit(item).unitMinor,
+            lineTotal: lineUnit(item).unitMinor * item.quantity,
+            priceSource: lineUnit(item).source,
+            tierMinQty: lineUnit(item).tierMinQty,
+          })),
+        }
+      );
+    }
 
     // Customer wallet (D1). Resolved on the SERVER from the real balance; the
     // debit itself happens inside the order transaction below and re-checks the
@@ -1585,6 +1787,8 @@ export class OrderService {
             // priced at `bundlePrice`, not `componentSum`), so this is never
             // added again into `discount`/`total`.
             bundleDiscount,
+            // Name of the group whose price applied, snapshotted so a renamed / deleted group never rewrites history.
+            priceGroupName: groupPriceApplied ? resolver.groupName : null,
             loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
             loyaltyDiscount,
             total,
@@ -1626,7 +1830,10 @@ export class OrderService {
                   // Charge the chosen variant's price (fall back to the parent
                   // product for variant-less products). Persisting product.price
                   // here undercharged every variant at the parent (lowest) price.
-                  price: cartLineUnitPrice(item),
+                  price: lineUnit(item).unitMinor,
+                  // Price provenance snapshot (Ruling B2B-3b): invoices, returns and analytics read these and never
+                  // re-resolve a price. A pre-B2B order has NULLs, which read as 'base'.
+                  ...priceSnapshot(lineUnit(item)),
                   // Snapshot cost-of-goods at sale time so profit reports
                   // stay correct even if the product's cost changes later.
                   // A variant line takes the variant's own cost, falling back
@@ -1636,7 +1843,7 @@ export class OrderService {
                     productInternalsById.get(item.productId),
                     (item as { variantId?: string | null }).variantId
                   ),
-                  total: cartLineUnitPrice(item) * item.quantity,
+                  total: lineUnit(item).unitMinor * item.quantity,
                 })),
                 // Every bundle box's components, appended to the SAME array the
                 // loose cart items build above — ordinary product lines from
@@ -2742,8 +2949,17 @@ export class OrderService {
        */
       overrideCouponRules?: boolean;
       couponOverrideReason?: string;
+      /**
+       * Create the order below a product's minimum order quantity (B2B). Refused by default (422 BELOW_MOQ); honoured only
+       * for COUPON_OVERRIDE_ROLES (store_admin / super_admin) and only with a reason; the actor and reason are written to
+       * the order's event and audit log.
+       */
+      overrideMoq?: boolean;
+      moqOverrideReason?: string;
     },
-    actor: { role?: string } = {}
+    actor: { role?: string } = {},
+    /** Who the order is priced for (Ruling B2B-2d): the Customer the merchant selected; absent = retail. */
+    pricingOpts: { buyer?: BuyerIdentity } = {}
   ) {
     await assertOrderAllowed(storeId);
     if (data.items.length === 0) {
@@ -2758,10 +2974,19 @@ export class OrderService {
     if (data.customerId) {
       const customer = await prisma.user.findFirst({
         where: { id: data.customerId, storeId, role: 'customer' },
-        select: { id: true },
+        select: { id: true, status: true, deletedAt: true },
       });
       if (!customer) {
         throw new AppError(404, 'NOT_FOUND', 'Customer not found for this store');
+      }
+      // Design review M-5: the selected shopper also drives their group price, so a suspended or deleted account is refused
+      // here (the price loader applies the same test) instead of silently pricing wholesale for a dead account.
+      if (customer.deletedAt || customer.status !== 'active') {
+        throw new AppError(
+          409,
+          'CUSTOMER_INACTIVE',
+          'This customer account is suspended or deleted. Choose another customer or create the order as a guest.'
+        );
       }
     }
 
@@ -2783,12 +3008,12 @@ export class OrderService {
     });
     const productMap = new Map(products.map(p => [p.id, p]));
 
-    const resolved = data.items.map(it => {
+    const unpricedLines = data.items.map(it => {
       const product = productMap.get(it.productId);
       if (!product) {
         throw new AppError(404, 'PRODUCT_NOT_FOUND', `Product ${it.productId} not found`);
       }
-      let unitPrice = product.price;
+      let variantPrice: number | null = null;
       let variantSku: string | undefined;
       let variantTitle: string | undefined;
       let variantTitleAr: string | null = null;
@@ -2818,30 +3043,95 @@ export class OrderService {
             { productId: product.id, variantId: it.variantId, productName: product.name }
           );
         }
-        if (typeof variant.price === 'number') unitPrice = variant.price;
+        variantPrice = typeof variant.price === 'number' ? variant.price : null;
         variantSku = variant.sku ?? undefined;
         variantTitle = variant.title ?? undefined;
         variantTitleAr = variant.titleAr || null;
       }
       const quantity = Math.max(1, Math.floor(it.quantity));
-      const lineTotal = unitPrice * quantity;
       return {
         productId: product.id,
         productName: product.name,
+        productNameAr: product.nameAr ?? null,
+        productPrice: product.price,
+        productMoq: product.moq ?? null,
+        variantPrice,
         sku: variantSku ?? product.sku ?? undefined,
         variantId: it.variantId,
         variantTitle,
         variantTitleAr,
-        unitPrice,
         // Admin manual orders never snapshotted cost at all, so every line
         // they created had no COGS and no profit. Same rule as checkout.
         costPrice: lineUnitCost(product, it.variantId),
         quantity,
-        lineTotal,
       };
     });
 
+    // Price every line through the ONE resolver (Ruling B2B-2d): as the Customer the merchant selected, else retail + public
+    // tiers. UNCACHED entitlement (review I2). The admin form submits no price, and the route's zod object strips any.
+    const adminResolver = await PriceResolver.forBuyer(
+      storeId,
+      pricingOpts.buyer ?? ANONYMOUS_BUYER,
+      { uncachedEntitlement: wholesaleEntitledUncached }
+    );
+    const adminProductQty = new Map<string, number>();
+    for (const r of unpricedLines) {
+      adminProductQty.set(r.productId, (adminProductQty.get(r.productId) ?? 0) + r.quantity);
+    }
+    const adminPrices = await adminResolver.priceCart(
+      unpricedLines.map((r, i) => ({
+        key: String(i),
+        product: { id: r.productId, price: r.productPrice, moq: r.productMoq },
+        variant: r.variantId ? { id: r.variantId, price: r.variantPrice } : null,
+        qty: r.quantity,
+      }))
+    );
+    const resolved = unpricedLines.map((r, i) => {
+      const pricing = adminPrices.get(String(i))!;
+      return {
+        ...r,
+        unitPrice: pricing.unitMinor,
+        lineTotal: pricing.unitMinor * r.quantity,
+        pricing,
+      };
+    });
+
+    // Review Focus 7: MOQ refuses an admin order too, unless store_admin / super_admin overrides it with a reason.
+    const moqOverride = data.overrideMoq === true;
+    const moqLines = resolved.map(r => ({
+      productId: r.productId,
+      name: r.productName,
+      nameAr: r.productNameAr,
+      current: adminProductQty.get(r.productId) ?? r.quantity,
+      resolved: r.pricing,
+    }));
+    const belowMoqProducts = moqLines.filter(l => l.resolved.belowMoq).map(l => l.productId);
+    if (moqOverride) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role)) {
+        throw new AppError(
+          403,
+          'MOQ_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override the minimum order quantity'
+        );
+      }
+      if (!data.moqOverrideReason?.trim()) {
+        throw new AppError(
+          400,
+          'MOQ_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override the minimum order quantity'
+        );
+      }
+    } else {
+      assertMoqSatisfied(moqLines);
+    }
+    const adminGroupPriceApplied = resolved.some(r => r.pricing.groupApplied);
+
     const subtotal = resolved.reduce((sum, r) => sum + r.lineTotal, 0);
+    // Coupons never discount a tier / group priced line (Ruling B2B-5).
+    const couponBasisSubtotal = resolved.reduce(
+      (sum, r) => (eligibleForCoupon(r.pricing) ? sum + r.lineTotal : sum),
+      0
+    );
 
     // Tax: same store-level resolution as the public checkout path, levied
     // after the coupon discount below (#193).
@@ -2940,22 +3230,32 @@ export class OrderService {
         typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null;
       const idEmail =
         typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null;
-      const custCtx = await resolveCustomerContext(storeId, {
-        phone: idPhone,
-        email: idEmail,
-        customerId: data.customerId ?? null,
-      });
+      // Group membership: the Customer the merchant selected (or none), never the typed shipping phone / email.
+      const custCtx = await resolveCustomerContext(
+        storeId,
+        { phone: idPhone, email: idEmail, customerId: data.customerId ?? null },
+        pricingOpts.buyer ?? ANONYMOUS_BUYER
+      );
+      // Ruling B2B-M2 (final review P2-3): a free-shipping code is judged on every line (it acts on the shipping line,
+      // not the discount basis); every other type on the base-priced lines only (B2B-5). Same split as checkout.
+      const freeShipping = appliedCoupon.type === 'free_shipping';
       const targetingCtx = {
         ...custCtx,
-        cartItems: resolved.map(r => ({
-          productId: r.productId,
-          categoryIds: (productMap.get(r.productId)?.categories ?? []).map(c => c.categoryId),
-          quantity: r.quantity,
-          lineTotal: r.lineTotal,
-        })),
+        cartItems: resolved
+          .filter(r => freeShipping || eligibleForCoupon(r.pricing))
+          .map(r => ({
+            productId: r.productId,
+            categoryIds: (productMap.get(r.productId)?.categories ?? []).map(c => c.categoryId),
+            quantity: r.quantity,
+            lineTotal: r.lineTotal,
+          })),
       };
       couponViolations.push(
-        ...CouponService.adminOrderCouponViolations(appliedCoupon, targetingCtx, subtotal)
+        ...CouponService.adminOrderCouponViolations(
+          appliedCoupon,
+          targetingCtx,
+          freeShipping ? subtotal : couponBasisSubtotal
+        )
       );
       if (couponViolations.length > 0 && !overrideCoupon) {
         const first = couponViolations[0];
@@ -2967,7 +3267,7 @@ export class OrderService {
         couponDiscount = CouponService.adminOrderCouponDiscount(
           appliedCoupon,
           targetingCtx,
-          subtotal,
+          couponBasisSubtotal,
           overrideCoupon
         );
       }
@@ -3095,6 +3395,7 @@ export class OrderService {
           taxableAmount,
           discount: couponDiscount,
           total,
+          priceGroupName: adminGroupPriceApplied ? adminResolver.groupName : null,
           currency: data.currency ?? REGION.currency,
           couponCode: couponCode ?? null,
           shippingAddress: withStoredPhone(data.shippingAddress) as Prisma.InputJsonValue,
@@ -3115,6 +3416,7 @@ export class OrderService {
               variantName: r.variantTitle,
               variantNameAr: r.variantTitleAr,
               price: r.unitPrice,
+              ...priceSnapshot(r.pricing),
               costPrice: r.costPrice,
               quantity: r.quantity,
               total: r.lineTotal,
@@ -3151,10 +3453,42 @@ export class OrderService {
           },
         });
       }
+      // The durable record of a MOQ override, in the order transaction (the audit row below is best-effort).
+      if (moqOverride && belowMoqProducts.length > 0) {
+        await tx.orderEvent.create({
+          data: {
+            storeId,
+            orderId: created.id,
+            fromStatus: null,
+            toStatus: 'moq_override',
+            actorId: adminUserId,
+            metadata: {
+              reason: data.moqOverrideReason?.trim() ?? '',
+              actorRole: actor.role ?? null,
+              productIds: [...new Set(belowMoqProducts)],
+            },
+          },
+        });
+      }
       // Fiscal document + gap-free serial in the same transaction (MONEYB-1).
       await FiscalDocumentService.issueSaleDocument(tx, storeId, created.id);
       return created;
     });
+
+    if (moqOverride && belowMoqProducts.length > 0) {
+      await auditLog({
+        action: 'order.moq_override',
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: order.id,
+        details: {
+          orderNumber: order.orderNumber,
+          description: data.moqOverrideReason?.trim() ?? '',
+          productIds: [...new Set(belowMoqProducts)],
+        },
+      });
+    }
 
     await auditLog({
       action: 'order.admin_created',

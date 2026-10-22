@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -11,6 +11,18 @@ import { safeInternalPath } from '@ebda/shared';
 import { useCart } from '../../../contexts/CartContext';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import {
+  isPasskeyCancel,
+  passkeyAutofillSupported,
+  passkeysSupported,
+} from '../../../lib/passkeys';
+
+const PASSKEY_FAILED = (t: (en: string, ar: string) => string) =>
+  t(
+    'Passkey sign-in did not work. Try again, or use your email and password.',
+    '\u0645\u0642\u062f\u0631\u0646\u0627\u0634 \u0646\u062f\u062e\u0644\u0643 \u0628\u0645\u0641\u062a\u0627\u062d \u0627\u0644\u0645\u0631\u0648\u0631. \u062c\u0631\u0651\u0628 \u062a\u0627\u0646\u064a \u0623\u0648 \u0627\u062f\u062e\u0644 \u0628\u0627\u0644\u0625\u064a\u0645\u064a\u0644 \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0633\u0631.'
+  );
 
 export default function LoginClient() {
   const { isLoading, error, submit } = useAuthFormSubmit();
@@ -20,10 +32,60 @@ export default function LoginClient() {
   const { store } = useStore();
   const { syncCartToBackend } = useCart();
   const { t } = useLanguage();
+  const { loginWithPasskey } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+
+  // Passkeys (Face ID / Touch ID / Windows Hello). Optional: the password form stays the default.
+  const [canUsePasskey, setCanUsePasskey] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyError, setPasskeyError] = useState('');
+
+  const finishPasskeyLogin = async () => {
+    await syncCartToBackend();
+    router.push(storeUrl(safeInternalPath(searchParams.get('redirect'), '/')));
+  };
+
+  // Capability check only on load; the ceremony - and its /begin request - starts ON DEMAND (review M3),
+  // so merely opening this page costs the passkey limiter nothing.
+  useEffect(() => {
+    setCanUsePasskey(passkeysSupported());
+  }, []);
+
+  // Conditional UI: on the first focus of the email field the saved passkey is offered in the browser's
+  // autofill list; this settles only if the shopper picks it. The button below starts a normal prompt.
+  const conditionalStarted = useRef(false);
+  const startConditionalPasskey = () => {
+    if (conditionalStarted.current || !canUsePasskey) return;
+    conditionalStarted.current = true;
+    void passkeyAutofillSupported().then(ok => {
+      if (!ok) return;
+      loginWithPasskey(true)
+        .then(r => (r.success ? finishPasskeyLogin() : undefined))
+        .catch(() => {
+          /* cancelled or replaced: the password form is right there */
+        });
+    });
+  };
+
+  const handlePasskey = async () => {
+    setPasskeyError('');
+    setPasskeyBusy(true);
+    try {
+      const r = await loginWithPasskey(false);
+      if (r.success) {
+        await finishPasskeyLogin();
+        return;
+      }
+      setPasskeyError(PASSKEY_FAILED(t));
+    } catch (err) {
+      if (!isPasskeyCancel(err)) setPasskeyError(PASSKEY_FAILED(t));
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +100,7 @@ export default function LoginClient() {
       await syncCartToBackend();
 
       // Redirect to the original page or home. safeInternalPath rejects
-      // offsite targets — absolute, protocol-relative (//host), AND backslash
+      // offsite targets \u2014 absolute, protocol-relative (//host), AND backslash
       // tricks (/\host) that the old startsWith('//') check let through.
       const redirectTo = safeInternalPath(searchParams.get('redirect'), '/');
       router.push(storeUrl(redirectTo));
@@ -49,24 +111,18 @@ export default function LoginClient() {
     <MinimalChrome>
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-8">
-          {/* Header — logo lives in MinimalChrome; keep only the page heading. */}
+          {/* Header \u2014 logo lives in MinimalChrome; keep only the page heading. */}
           <div className="text-center">
             <h2 className="text-3xl font-bold tracking-tight text-foreground">
-              {t(
-                'Welcome back',
-                '\u0645\u0631\u062d\u0628\u0627\u064b \u0628\u0639\u0648\u062f\u062a\u0643'
-              )}
+              {t('Welcome back', 'مرحباً بعودتك')}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {t(
-                "Don't have an account?",
-                '\u0644\u064a\u0633 \u0644\u062f\u064a\u0643 \u062d\u0633\u0627\u0628\u061f'
-              )}{' '}
+              {t("Don't have an account?", 'معندكش حساب؟')}{' '}
               <Link
                 href={storeUrl('/auth/register')}
-                className="font-medium text-primary hover:underline"
+                className="font-medium text-primary underline underline-offset-2"
               >
-                {t('Sign up', '\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628')}
+                {t('Sign up', 'إنشاء حساب')}
               </Link>
             </p>
           </div>
@@ -84,12 +140,10 @@ export default function LoginClient() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <Input
-                label={t(
-                  'Email address',
-                  '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a'
-                )}
+                label={t('Email address', 'البريد الإلكتروني')}
                 type="email"
-                autoComplete="email"
+                autoComplete="username webauthn"
+                onFocus={startConditionalPasskey}
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 required
@@ -97,10 +151,7 @@ export default function LoginClient() {
 
               <div>
                 <Input
-                  label={t(
-                    'Password',
-                    '\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631'
-                  )}
+                  label={t('Password', 'كلمة المرور')}
                   type="password"
                   autoComplete="current-password"
                   value={formData.password}
@@ -112,40 +163,55 @@ export default function LoginClient() {
                     href={storeUrl('/auth/forgot-password')}
                     className="text-sm text-primary hover:underline"
                   >
-                    {t(
-                      'Forgot password?',
-                      '\u0646\u0633\u064a\u062a \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631\u061f'
-                    )}
+                    {t('Forgot password?', 'نسيت كلمة المرور؟')}
                   </Link>
                 </div>
               </div>
 
               <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-                {t(
-                  'Sign in',
-                  '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
-                )}
+                {t('Sign in', 'تسجيل الدخول')}
               </Button>
             </form>
+
+            {canUsePasskey && (
+              <div className="mt-6 space-y-3">
+                <div className="relative text-center text-xs text-muted-foreground">
+                  <span className="relative bg-card px-3">{t('or', '\u0623\u0648')}</span>
+                  <div className="absolute inset-x-0 top-1/2 -z-0 border-t" aria-hidden="true" />
+                </div>
+                {passkeyError && (
+                  <div
+                    role="alert"
+                    className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink"
+                  >
+                    {passkeyError}
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="min-h-11 w-full"
+                  onClick={handlePasskey}
+                  isLoading={passkeyBusy}
+                >
+                  {t(
+                    'Sign in with Face ID or a passkey',
+                    '\u0627\u062f\u062e\u0644 \u0628\u0628\u0635\u0645\u0629 \u0627\u0644\u0648\u062c\u0647 \u0623\u0648 \u0645\u0641\u062a\u0627\u062d \u0627\u0644\u0645\u0631\u0648\u0631'
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
-            {t(
-              'By signing in, you agree to our',
-              '\u0628\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644\u060c \u0623\u0646\u062a \u062a\u0648\u0627\u0641\u0642 \u0639\u0644\u0649'
-            )}{' '}
-            <Link href={storeUrl('/terms')} className="text-primary hover:underline">
-              {t(
-                'Terms of Service',
-                '\u0627\u0644\u0634\u0631\u0648\u0637 \u0648\u0627\u0644\u0623\u062d\u0643\u0627\u0645'
-              )}
+            {t('By signing in, you agree to our', 'لما تسجّل دخول، إنت موافق على')}{' '}
+            <Link href={storeUrl('/terms')} className="text-primary underline underline-offset-2">
+              {t('Terms of Service', 'الشروط والأحكام')}
             </Link>{' '}
-            {t('and', '\u0648')}{' '}
-            <Link href={storeUrl('/privacy')} className="text-primary hover:underline">
-              {t(
-                'Privacy Policy',
-                '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629'
-              )}
+            {t('and', 'و')}{' '}
+            <Link href={storeUrl('/privacy')} className="text-primary underline underline-offset-2">
+              {t('Privacy Policy', 'سياسة الخصوصية')}
             </Link>
           </p>
         </div>

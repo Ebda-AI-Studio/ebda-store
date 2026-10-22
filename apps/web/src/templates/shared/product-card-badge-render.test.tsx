@@ -16,7 +16,7 @@
  * an additive-rendering claim, comparing the whole output string is stricter
  * than querying for the element anyway.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { StoreLayoutSettings } from '@ebda/shared';
@@ -159,7 +159,14 @@ function stripBadgeChip(html: string): { stripped: string; chips: string[] } {
     'g'
   );
   const chips = html.match(chipRe) ?? [];
-  return { stripped: html.replace(chipRe, ''), chips };
+  // a11y P2-14: the chip is aria-hidden and its words follow the product name in
+  // the link's name (aria-label suffix or an sr-only span). That announcement is
+  // part of adding a label, so it is stripped along with the chip.
+  const stripped = html
+    .replace(chipRe, '')
+    .replace(/(aria-label="[^"]*), Offer"/g, '$1"')
+    .replace(/<span class="sr-only">, Offer<\/span>/g, '');
+  return { stripped, chips };
 }
 
 // ── 1. The additive contract ────────────────────────────────────────────────
@@ -584,6 +591,13 @@ function renderWithWishlistHandler(
 }
 
 describe('heart collision — modern/elegant (heart at top-end)', () => {
+  // The NEW chip is the merchant's choice (Ruling D1016-NEW-1): these cases turn it on.
+  beforeEach(() => {
+    storeState.store.theme = { showNewBadge: true };
+  });
+  afterEach(() => {
+    storeState.store.theme = {};
+  });
   it.each([
     ['modern/ProductCard', ModernProductCard],
     ['elegant/ProductCard', ElegantProductCard],
@@ -679,6 +693,13 @@ describe('heart collision — modern/elegant (heart at top-end)', () => {
 // straight onto the NEW chip (demo-boutique runs minimal). No wishlist heart on
 // minimal, so the avoidance target is the other top corner.
 describe('NEW-badge corner — minimal (#2092)', () => {
+  // The NEW chip is the merchant's choice (Ruling D1016-NEW-1): these cases turn it on.
+  beforeEach(() => {
+    storeState.store.theme = { showNewBadge: true };
+  });
+  afterEach(() => {
+    storeState.store.theme = {};
+  });
   it('LTR: a top-left badge on a NEW product moves off the NEW chip to top-right', () => {
     const html = render(
       MinimalProductCard,

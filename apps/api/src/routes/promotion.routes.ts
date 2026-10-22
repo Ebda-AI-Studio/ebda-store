@@ -6,12 +6,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@ebda/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { promotionPreviewLimiter, publicTenantLimiter } from '../middleware/security';
 import { PromotionService } from '../services/promotion.service';
 import { resolveBestPromotion, resolveCustomerContext } from '../services/promotion-resolver';
 import { tenantContext } from '../middleware/tenant-context';
+import { buyerFromRequest } from '../lib/buyer-identity';
+import { PriceResolver } from '../services/price-resolver.service';
 
 const router = Router();
 
@@ -221,46 +223,54 @@ router.post(
   // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
   // against one store's endpoint regardless of source-IP spread.
   publicTenantLimiter,
+  // The signed-in customer (never a body-supplied identity) decides group membership and group prices.
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
       const { items, phone, email } = previewSchema.parse(req.body);
 
-      // Server-resolve the targeting cart snapshot: the storefront cart only
-      // knows productId + quantity, never category ids, so fetch each
-      // product's price + categories here (same select shape as
-      // OrderService.create's productInternals fetch). Items whose product
-      // isn't found (deleted/wrong store) are skipped rather than 400ing —
-      // a stale cart line shouldn't block the whole preview.
-      //
-      // Variants aren't priced in preview — this uses the product base
-      // price for a display-only best-effort estimate; the authoritative
-      // discount is always (re)computed at order creation.
+      // Lines are priced by the ONE resolver for the signed-in buyer (product level: the preview carries no variant, so a
+      // variant with its own price is previewed at the product price, display only). A line priced by a tier or a group
+      // price is excluded from the discount basis (Ruling B2B-5); the authoritative discount is recomputed at order creation.
+      const buyer = buyerFromRequest(req);
       const products = await prisma.product.findMany({
         where: { id: { in: items.map(i => i.productId) }, storeId },
         select: { id: true, price: true, categories: { select: { categoryId: true } } },
       });
       const productsById = new Map(products.map(p => [p.id, p]));
-      const cartItems = items.flatMap(item => {
+      const resolver = await PriceResolver.forBuyer(storeId, buyer);
+      const priced = await resolver.priceCart(
+        items.flatMap((item, i) => {
+          const product = productsById.get(item.productId);
+          return product
+            ? [
+                {
+                  key: String(i),
+                  product: { id: product.id, price: product.price },
+                  qty: item.quantity,
+                },
+              ]
+            : [];
+        })
+      );
+      const cartItems = items.flatMap((item, i) => {
         const product = productsById.get(item.productId);
-        if (!product) return [];
+        const line = priced.get(String(i));
+        if (!product || !line || line.source !== 'base') return [];
         return [
           {
             productId: item.productId,
             categoryIds: product.categories.map(c => c.categoryId),
             quantity: item.quantity,
-            lineTotal: product.price * item.quantity,
+            lineTotal: line.unitMinor * item.quantity,
           },
         ];
       });
 
-      // This route is unauthenticated (public storefront), so identity is
-      // resolved from phone/email only — NOT a client-supplied customerId.
-      // Accepting a body customerId here would let an attacker probe any
-      // other customer's segment/first-order status without proving they
-      // are that customer.
+      // Group membership comes from the SESSION only (Ruling B2B-2c/2e): a typed phone / email never confers a group.
       const ctx = {
-        ...(await resolveCustomerContext(storeId, { phone, email })),
+        ...(await resolveCustomerContext(storeId, { phone, email }, buyer)),
         cartItems,
       };
       const best = await resolveBestPromotion(storeId, ctx);

@@ -16,9 +16,13 @@ import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
-import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import {
+  couponQuoteBasis,
+  couponQuoteCartItems,
+  couponQuoteLooseFields,
+} from '@/lib/coupon-quote-basis';
+import { moqShortfalls, moqCartMessage, cartMaxQty, moqFix } from '@/lib/b2b-moq';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
 import {
   resolveSectionZone,
@@ -29,12 +33,14 @@ import {
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
-import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@ebda/shared';
+import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
+import { cartRemovalToast } from './cart-removal';
 import { countText, ITEMS } from '../../lib/plural';
 import { CART_CHECKOUT_CTA } from '../../lib/checkout-cta';
+import { couponErrorCopy } from '../../lib/coupon-errors';
 import { ArrowIcon } from '../../templates/shared/icons';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 
@@ -44,6 +50,7 @@ export default function CartClient() {
     bundles: cartBundles,
     updateQuantity: updateCartQuantity,
     removeItem: removeCartItem,
+    addItem,
     removeBundle: removeCartBundle,
     itemCount,
     total: cartTotal,
@@ -115,7 +122,7 @@ export default function CartClient() {
   };
   const { language, t } = useLanguage();
   const lang = language === 'ar' ? 'ar' : 'en';
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
   const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
 
@@ -155,7 +162,7 @@ export default function CartClient() {
   const [shippingFee, setShippingFee] = useState(0);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
   const [shippingLoaded, setShippingLoaded] = useState(false);
-  const { info, success, error: errorToast } = useToast();
+  const { info, success, error: errorToast, addToast } = useToast();
 
   // Cart mutations optimistically update, reconcile via refetch, then re-throw
   // on API failure. Without this catch the user saw a "removed"/"updated"
@@ -163,8 +170,8 @@ export default function CartClient() {
   // silent/misleading-failure trap. Surface a specific error instead.
   const cartErrorToast = () =>
     errorToast(
-      t('Unable to update cart', 'تعذّر تحديث السلة'),
-      t('Please check your connection and try again.', 'يرجى التحقق من اتصالك والمحاولة مرة أخرى.')
+      t('Unable to update cart', 'معرفناش نحدّث السلة'),
+      t('Please check your connection and try again.', 'اتأكد من اتصالك وجرّب تاني.')
     );
 
   const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
@@ -172,19 +179,14 @@ export default function CartClient() {
     if (newQuantity < 1) {
       try {
         await removeCartItem(itemId);
-        if (item) {
-          info(
-            t('Item removed', 'تمت الإزالة'),
-            t(`${item.name} removed from cart`, `تمت إزالة ${item.name} من السلة`)
-          );
-        }
+        if (item) addToast(cartRemovalToast(item, { isRtl: language === 'ar', t, addItem }));
       } catch {
         cartErrorToast();
       }
-    } else if (newQuantity > 10) {
+    } else if (newQuantity > (item ? cartMaxQty(item) : 10)) {
       info(
-        t('Limit reached', 'تم الوصول للحد'),
-        t('Maximum 10 items per product', 'الحد الأقصى 10 قطع لكل منتج')
+        t('Limit reached', 'وصلت للحد'),
+        t('Maximum 10 items per product', 'تقدر تطلب لحد 10 قطع من كل منتج')
       );
     } else {
       try {
@@ -199,12 +201,7 @@ export default function CartClient() {
     const item = cartItems.find(i => i.id === itemId);
     try {
       await removeCartItem(itemId);
-      if (item) {
-        success(
-          t('Item removed', 'تمت الإزالة'),
-          t(`${item.name} has been removed from your cart`, `تمت إزالة ${item.name} من سلة التسوق`)
-        );
-      }
+      if (item) addToast(cartRemovalToast(item, { isRtl: language === 'ar', t, addItem }));
     } catch {
       cartErrorToast();
     }
@@ -214,8 +211,8 @@ export default function CartClient() {
     try {
       await removeCartBundle(cartBundleId);
       success(
-        t('Item removed', 'تمت الإزالة'),
-        t(`${name} has been removed from your cart`, `تمت إزالة ${name} من سلة التسوق`)
+        t('Item removed', 'اتشال'),
+        t(`${name} has been removed from your cart`, `شيلنا ${name} من السلة`)
       );
     } catch {
       cartErrorToast();
@@ -223,7 +220,15 @@ export default function CartClient() {
   };
 
   const applyPromoCode = useCallback(async () => {
-    if (!promoCode.trim() || isValidating) return;
+    if (isValidating) return;
+    if (!promoCode.trim()) {
+      // Y-08: Apply is never dead; an empty tap puts the cursor in the (visible) code field.
+      const field = [
+        ...document.querySelectorAll<HTMLInputElement>('#cart-promo-code, #cart-promo-code-t'),
+      ].find(el => el.offsetParent !== null);
+      field?.focus();
+      return;
+    }
     setIsValidating(true);
     try {
       const result = await api.post<{
@@ -237,6 +242,8 @@ export default function CartClient() {
         // The loose lines themselves, so the route evaluates the coupon's
         // targeting now rather than accepting a code checkout will refuse.
         cartItems: couponQuoteCartItems(cartItems),
+        // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+        ...couponQuoteLooseFields(cartItems),
       });
       if (result.success && result.data) {
         setPromoApplied(true);
@@ -255,20 +262,15 @@ export default function CartClient() {
           }
         }
         success(
-          t('Promo applied', 'تم تطبيق الخصم'),
+          t('Promo applied', 'الخصم اتطبّق'),
           t(
             `${result.data.coupon.name} discount has been applied`,
-            `تم تطبيق خصم ${result.data.coupon.name}`
+            `اتطبّق خصم ${result.data.coupon.name}`
           )
         );
       } else {
-        const message =
-          result.error?.code === 'COUPON_NOT_ELIGIBLE'
-            ? t(
-                'This coupon does not apply to the items in your cart.',
-                'هذا الكوبون لا ينطبق على المنتجات في سلتك.'
-              )
-            : result.error?.message || t('The promo code is not valid', 'كود الخصم غير صالح');
+        // a11y re-audit P1-N1: copy from the error code, in the page language.
+        const message = couponErrorCopy(result.error?.code, t);
         info(t('Invalid code', 'كود غير صالح'), message);
       }
     } catch {
@@ -276,7 +278,7 @@ export default function CartClient() {
         t('Error', 'خطأ'),
         t(
           'Failed to validate promo code. Please try again.',
-          'فشل التحقق من كود الخصم. يرجى المحاولة مرة أخرى.'
+          'معرفناش نتأكد من كود الخصم. جرّب تاني.'
         )
       );
     } finally {
@@ -288,6 +290,8 @@ export default function CartClient() {
   // The server is still the source of truth for the discount amount; if the
   // stored code is no longer valid we silently drop it.
   const autoAppliedRef = useRef(false);
+  // Taste re-audit P2-3: the sticky total waits until the summary checkout button leaves view.
+  const summaryRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (autoAppliedRef.current) return;
     if (!cartIsReady || !store.id || cartTotal === 0) return;
@@ -305,6 +309,8 @@ export default function CartClient() {
           // Same loose-items-only basis as the manual apply above.
           orderTotal: couponBasis,
           cartItems: couponQuoteCartItems(cartItems),
+          // A free-shipping code is judged on the whole loose cart (Ruling B2B-M2).
+          ...couponQuoteLooseFields(cartItems),
         });
         if (result.success && result.data) {
           setPromoCode(result.data.coupon.code);
@@ -413,7 +419,7 @@ export default function CartClient() {
   const minimumOrderMessage = belowMinimumOrder
     ? t(
         `Minimum order is ${formatPrice(minimumOrderFils as number)} — add ${formatPrice(minimumOrderCheck.shortfallFils)} more`,
-        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — أضف ${formatPrice(minimumOrderCheck.shortfallFils)} أخرى`
+        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — ضيف ${formatPrice(minimumOrderCheck.shortfallFils)} كمان`
       )
     : undefined;
   // #2117: a line whose product was deleted blocks the order server-side
@@ -421,16 +427,34 @@ export default function CartClient() {
   // "remove it to check out" is enforced here rather than left advisory —
   // otherwise the shopper fills the whole checkout form only to be refused.
   const hasUnavailableLines = unavailableItems.length > 0;
-  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines;
+  // B2B minimum order quantity: the server flags each line (`belowMoq`); the order would be refused 422 BELOW_MOQ, so the cart
+  // says so inline and disables checkout instead of letting the buyer fill the form first.
+  const moqShort = moqShortfalls(
+    cartItems.map(i => ({
+      productId: i.productId,
+      name: i.name,
+      nameAr: i.nameAr,
+      quantity: i.quantity,
+      belowMoq: i.belowMoq,
+      moqRequired: i.moqRequired,
+      unavailable: i.unavailable,
+    }))
+  );
+  const moqMessage = moqCartMessage(moqShort, language === 'ar' ? 'ar' : 'en');
+  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines || !!moqMessage;
   const checkoutBlockedMessage =
     minimumOrderMessage ??
     (hasUnavailableLines
-      ? t('Remove the unavailable items to check out.', 'أزل المنتجات غير المتوفرة لإتمام الطلب.')
-      : undefined);
+      ? t(
+          'Remove the unavailable items to check out.',
+          'شيل المنتجات اللي مش متوفرة عشان تكمّل الطلب.'
+        )
+      : moqMessage);
 
   return (
     <ShopChrome>
-      <div className="flex-1" style={cartBgStyle}>
+      {/* rule (g): sub-headings and item names here read in the body face, not the display face. */}
+      <div className="flex-1" style={cartBgStyle} data-transactional>
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={cartDensity}>
           {/* Breadcrumb */}
           <Breadcrumbs
@@ -438,23 +462,27 @@ export default function CartClient() {
               { label: t('Home', translations['Home']), href: storeUrl('/') },
               {
                 label: t(
-                  'Shopping Cart',
+                  'Shopping cart',
                   '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
                 ),
               },
             ]}
           />
 
+          {/* STOP-2 P2-2: an empty cart says "your cart is empty" once. The page still has its h1
+              (for screen readers); the visible heading is the empty state's own. */}
           <h1
-            className="text-3xl font-bold tracking-tight text-foreground"
+            className={`text-3xl font-bold tracking-tight text-foreground${
+              cartItems.length === 0 && cartBundles.length === 0 ? ' sr-only' : ''
+            }`}
             style={cartZoneStyle(cartHeadingZone)}
           >
-            {t('Shopping Cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
+            {t('Shopping cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
           </h1>
           {(cartItems.length > 0 || cartBundles.length > 0) && (
             <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
               {countText(lang, cartCount, ITEMS, localize(cartCount))}{' '}
-              {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
+              {t('in your cart', 'في سلتك')}
             </p>
           )}
           {unavailableItems.length > 0 && (
@@ -471,15 +499,43 @@ export default function CartClient() {
             </p>
           )}
 
+          {moqShort.length > 0 && (
+            <div
+              data-cart-moq-fix=""
+              className="mt-4 space-y-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink"
+            >
+              {moqShort.map(sf => {
+                const fix = moqFix(sf, cartItems);
+                return (
+                  <div key={sf.productId} className="flex flex-wrap items-center gap-3">
+                    <span className="font-medium">
+                      <bdi>{language === 'ar' && sf.nameAr ? sf.nameAr : sf.name}</bdi>:{' '}
+                      {t(`minimum order is ${sf.required}`, `الحد الأدنى للطلب ${sf.required}`)}
+                    </span>
+                    {fix ? (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-warning/50 px-4 font-medium hover:bg-warning/20"
+                        onClick={() => void handleUpdateQuantity(fix.lineId, fix.quantity)}
+                      >
+                        {t(`Set to ${fix.quantity}`, `اجعلها ${fix.quantity}`)}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {cartItems.length === 0 && cartBundles.length === 0 ? (
             T?.EmptyState ? (
               <div className="mt-16">
                 <T.EmptyState
                   title="Your cart is empty"
-                  titleAr="سلة التسوق فارغة"
+                  titleAr="سلتك فاضية"
                   description="Looks like you haven't added any items yet."
-                  descriptionAr="يبدو أنك لم تضف أي منتجات بعد."
-                  ctaLabel="Start Shopping"
+                  descriptionAr="لسه مضفتش أي منتج."
+                  ctaLabel="Start shopping"
                   ctaLabelAr="ابدأ التسوق"
                   ctaHref={storeUrl('/products')}
                   isRtl={language === 'ar'}
@@ -491,22 +547,16 @@ export default function CartClient() {
                   <CartIcon className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {t(
-                    'Your cart is empty',
-                    '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642 \u0641\u0627\u0631\u063a\u0629'
-                  )}
+                  {t('Your cart is empty', 'سلة التسوق فاضية')}
                 </h2>
                 <p className="mt-2 text-muted-foreground">
-                  {t(
-                    "Looks like you haven't added any items yet.",
-                    '\u064a\u0628\u062f\u0648 \u0623\u0646\u0643 \u0644\u0645 \u062a\u0636\u0641 \u0623\u064a \u0645\u0646\u062a\u062c\u0627\u062a \u0628\u0639\u062f.'
-                  )}
+                  {t("Looks like you haven't added any items yet.", 'شكلك لسه مضفتش أي منتجات.')}
                 </p>
-                <Link href={storeUrl('/products')}>
-                  <Button className="mt-8 gap-2 rounded-xl" size="lg">
+                <Link href={storeUrl('/products')} className="inline-block">
+                  <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
                     <CartIcon className="h-5 w-5" />
                     {t(
-                      'Start Shopping',
+                      'Start shopping',
                       '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'
                     )}
                   </Button>
@@ -516,9 +566,14 @@ export default function CartClient() {
                 <div className="mt-12">
                   <Link
                     href={storeUrl('/products')}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                    className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                      className="h-4 w-4 rtl:-scale-x-100"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -598,7 +653,10 @@ export default function CartClient() {
                           style={{ animationDelay: `${index * 100}ms` }}
                         >
                           {/* Product Image */}
-                          <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32">
+                          <div
+                            data-part="cart-thumb"
+                            className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32"
+                          >
                             {item.image ? (
                               <Image
                                 src={item.image}
@@ -661,14 +719,17 @@ export default function CartClient() {
                                   className="mt-0.5 text-sm text-muted-foreground"
                                 />
                                 {item.unavailable && <CartLineUnavailableNotice />}
-                                <p
-                                  className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
-                                  data-zone="productPrice"
-                                  style={cartZoneStyle(cartPriceZone)}
-                                >
-                                  {formatPrice(item.price)}{' '}
-                                  {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
-                                </p>
+                                {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                                {item.quantity > 1 && (
+                                  <p
+                                    className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
+                                    data-zone="productPrice"
+                                    style={cartZoneStyle(cartPriceZone)}
+                                  >
+                                    {formatPrice(item.price)}{' '}
+                                    {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
+                                  </p>
+                                )}
                               </div>
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
@@ -693,7 +754,7 @@ export default function CartClient() {
 
                             <div className="mt-auto flex items-center justify-between pt-2">
                               {/* Quantity Selector */}
-                              <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
+                              <div className="inline-flex items-center overflow-hidden rounded-md border border-input">
                                 <button
                                   onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                                   disabled={item.unavailable || item.quantity <= 1}
@@ -770,10 +831,10 @@ export default function CartClient() {
                   <div className="mt-8">
                     <Link
                       href={continuShoppingHref}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                      className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       <svg
-                        className="h-4 w-4"
+                        className="h-4 w-4 rtl:-scale-x-100"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -786,7 +847,7 @@ export default function CartClient() {
                         />
                       </svg>
                       {t(
-                        'Continue Shopping',
+                        'Continue shopping',
                         '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
                       )}
                     </Link>
@@ -795,7 +856,7 @@ export default function CartClient() {
 
                 {/* Order Summary */}
                 <div className="mt-8 lg:col-span-4 lg:mt-0">
-                  <div className="sticky top-24 space-y-6">
+                  <div ref={summaryRef} className="sticky top-24 space-y-6">
                     {T?.OrderSummary ? (
                       <T.OrderSummary
                         subtotal={subtotal}
@@ -837,30 +898,35 @@ export default function CartClient() {
                               htmlFor="cart-promo-code-t"
                               className="text-sm font-medium text-foreground"
                             >
-                              {t('Promo Code', 'كود الخصم')}
+                              {t('Coupon code', 'كود الخصم')}
                             </label>
                             <div className="mt-2 flex gap-2">
                               <input
                                 id="cart-promo-code-t"
+                                spellCheck={false}
+                                autoCapitalize="characters"
+                                autoCorrect="off"
+                                enterKeyHint="done"
                                 type="text"
                                 autoComplete="off"
                                 value={promoCode}
                                 onChange={e => setPromoCode(e.target.value)}
                                 placeholder={t('Enter code', 'أدخل الكود')}
                                 disabled={promoApplied}
-                                className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                                className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                               />
-                              <button
+                              <Button
+                                type="button"
+                                variant="outline"
                                 onClick={applyPromoCode}
-                                disabled={promoApplied || !promoCode || isValidating}
-                                className="h-11 rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                                disabled={promoApplied || isValidating}
                               >
                                 {promoApplied
-                                  ? t('Applied', 'تم')
+                                  ? t('Applied', 'اتطبّق')
                                   : isValidating
                                     ? '…'
                                     : t('Apply', 'تطبيق')}
-                              </button>
+                              </Button>
                             </div>
                             {promoApplied && (
                               <p
@@ -901,7 +967,7 @@ export default function CartClient() {
                     ) : (
                       <>
                         {/* Summary Card */}
-                        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                        <div className="rounded-[var(--radius)] border border-border bg-card p-6 shadow-sm">
                           <h2
                             className="text-lg font-bold text-foreground"
                             style={{
@@ -910,7 +976,7 @@ export default function CartClient() {
                             }}
                           >
                             {t(
-                              'Order Summary',
+                              'Order summary',
                               '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
                             )}
                           </h2>
@@ -923,13 +989,17 @@ export default function CartClient() {
                                 className="text-sm font-medium text-foreground"
                               >
                                 {t(
-                                  'Promo Code',
+                                  'Coupon code',
                                   '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645'
                                 )}
                               </label>
                               <div className="mt-2 flex gap-2">
                                 <input
                                   id="cart-promo-code"
+                                  spellCheck={false}
+                                  autoCapitalize="characters"
+                                  autoCorrect="off"
+                                  enterKeyHint="done"
                                   type="text"
                                   autoComplete="off"
                                   value={promoCode}
@@ -939,26 +1009,20 @@ export default function CartClient() {
                                     '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
                                   )}
                                   disabled={promoApplied}
-                                  className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
+                                  className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
                                 />
-                                <button
+                                <Button
                                   type="button"
+                                  variant="outline"
                                   onClick={applyPromoCode}
-                                  disabled={promoApplied || !promoCode || isValidating}
-                                  className="h-10 min-w-[88px] rounded-lg bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+                                  disabled={promoApplied || isValidating}
                                 >
                                   {promoApplied
-                                    ? t(
-                                        'Applied',
-                                        '\u062a\u0645 \u0627\u0644\u062a\u0637\u0628\u064a\u0642'
-                                      )
+                                    ? t('Applied', 'اتطبّق')
                                     : isValidating
-                                      ? t(
-                                          'Validating...',
-                                          '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0642\u0642...'
-                                        )
+                                      ? t('Validating...', 'بنتأكد...')
                                       : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
-                                </button>
+                                </Button>
                               </div>
                               {promoApplied && (
                                 <p
@@ -1021,7 +1085,7 @@ export default function CartClient() {
                             {promoApplied && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-success-ink">
-                                  {t('Discount', '\u0627\u0644\u062e\u0635\u0645')} (
+                                  {t('Discount', 'الخصم')} (
                                   {promoType === 'percentage' ? `${promoValue}%` : promoName})
                                 </span>
                                 <span className="font-medium text-success-ink">
@@ -1037,10 +1101,10 @@ export default function CartClient() {
                                   ...summaryLabelStyle,
                                 }}
                               >
-                                {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
+                                {t('Shipping', 'الشحن')}
                               </span>
                               {/* Shipping is resolved at checkout (per delivery
-                                  area), not on the cart \u2014 show a neutral
+                                  area), not on the cart — show a neutral
                                   "Calculated at checkout" label rather than a
                                   premature "Free". */}
                               <span
@@ -1076,7 +1140,7 @@ export default function CartClient() {
                               </div>
                             )}
                             <div className="border-t border-border pt-3">
-                              <div className="flex justify-between">
+                              <div className="flex justify-between" data-cart-total="">
                                 <span
                                   className={`text-lg ${summaryFontWeight} text-foreground`}
                                   style={{
@@ -1084,7 +1148,7 @@ export default function CartClient() {
                                     ...summaryTotalStyle,
                                   }}
                                 >
-                                  {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
+                                  {t('Total', 'الإجمالي')}
                                 </span>
                                 <span
                                   className={`text-xl ${summaryFontWeight} text-primary`}
@@ -1098,7 +1162,7 @@ export default function CartClient() {
                               </div>
                             </div>
                             {/* Tax already inside the listed price is
-                                informational only \u2014 a muted caption below
+                                informational only — a muted caption below
                                 Total, never a row in the summed amount
                                 column (scoped-audit follow-up: an inclusive
                                 amount printed there implied it was added
@@ -1122,14 +1186,18 @@ export default function CartClient() {
                             <Button
                               type="button"
                               disabled
-                              className="mt-6 w-full gap-2 rounded-xl"
+                              className="mt-6 w-full gap-2 rounded-[var(--radius)]"
                               size="lg"
                             >
                               {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                             </Button>
                           ) : (
-                            <Link href={storeUrl('/checkout')} className="mt-6 block">
-                              <Button className="w-full gap-2 rounded-xl" size="lg">
+                            <Link
+                              href={storeUrl('/checkout')}
+                              data-cta="button"
+                              className="mt-6 block"
+                            >
+                              <Button className="w-full gap-2 rounded-[var(--radius)]" size="lg">
                                 {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
                                 <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
                               </Button>
@@ -1162,42 +1230,17 @@ export default function CartClient() {
 
                     <AcceptedPaymentBadges />
 
-                    {/* Help */}
-                    <div className="rounded-2xl border border-border bg-card p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                          <svg
-                            className="h-5 w-5 text-primary"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {t(
-                              'Need Help?',
-                              '\u062a\u062d\u062a\u0627\u062c \u0645\u0633\u0627\u0639\u062f\u0629\u061f'
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {store.phone
-                              ? `${t('Contact us at', '\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0639\u0644\u0649')} ${store.phone}`
-                              : t(
-                                  'Visit our contact page for help',
-                                  '\u0642\u0645 \u0628\u0632\u064a\u0627\u0631\u0629 \u0635\u0641\u062d\u0629 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0644\u0644\u0645\u0633\u0627\u0639\u062f\u0629'
-                                )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    {/* IA-04 (W4): one quiet help line, not a card with an icon tile. */}
+                    <p data-testid="cart-help-line" className="text-sm text-muted-foreground">
+                      <Link
+                        href={storeUrl('/contact')}
+                        className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
+                      >
+                        {store.phone
+                          ? `${t('Questions? Call', 'عندك سؤال؟ كلّمنا على')} ${store.phone}`
+                          : t('Questions? Contact the store', 'عندك سؤال؟ كلّم المتجر')}
+                      </Link>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1221,24 +1264,20 @@ export default function CartClient() {
         </div>
       </div>
       {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA, and the
-          summary's own Total row (label, value AND money format: a themed OrderSummary prints
-          "2,980 EGP", the fallback summary formatPrice). That total is net of the promo discount
+          summary's own Total row (label, value AND money format: every summary prints the ONE
+          storefront format, "2,980 ج.م" / "EGP 2,980", B1-28). That total is net of the promo discount
           and carries no zone fee while shipping reads "calculated at checkout", so the bar never
           quotes the pre-discount subtotal. */}
       <StickyCartTotal
         totalLabel={t('Total', 'الإجمالي')}
-        total={summaryMoneyFormatter(
-          T?.OrderSummary,
-          money,
-          store.currency ?? REGION.currency,
-          formatPrice
-        )(total)}
+        total={formatPrice(total)}
         itemCount={cartCount}
         itemCountLabel={countText(lang, cartCount, ITEMS, localize(cartCount))}
         href={storeUrl('/checkout')}
         label={t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
         disabled={checkoutBlocked}
         blockedMessage={checkoutBlockedMessage}
+        anchorRef={summaryRef}
       />
     </ShopChrome>
   );

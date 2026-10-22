@@ -1,5 +1,6 @@
 'use client';
 
+import { AutoplayToggle } from './AutoplayToggle';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { IMAGE_STANDARDS } from '@ebda/shared';
 import { HeroBanner } from './HeroBanner';
@@ -26,11 +27,25 @@ export function HeroSlider({
   isRtl,
   pack,
   presentation = 'full-bleed',
+  frameLine,
+  textAnchor,
   headingZone,
   urlPrefix,
 }: HeroSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const pausedRef = useRef(false);
+  // Rule (e) (W4): a visible pause toggle, beside the hover / focus / hidden-tab holds.
+  const [userPaused, setUserPaused] = useState(false);
+  const userPausedRef = useRef(false);
+  userPausedRef.current = userPaused;
+  const [canAutoplay, setCanAutoplay] = useState(false);
+  useEffect(() => {
+    setCanAutoplay(
+      autoplayMs > 0 &&
+        slides.length > 1 &&
+        !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    );
+  }, [autoplayMs, slides.length]);
   const touchStartXRef = useRef<number | null>(null);
 
   const goTo = useCallback(
@@ -54,7 +69,7 @@ export function HeroSlider({
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const tick = () => {
-      if (pausedRef.current || document.hidden) return;
+      if (pausedRef.current || userPausedRef.current || document.hidden) return;
       setActiveIndex(i => (i + 1) % slides.length);
     };
 
@@ -80,6 +95,8 @@ export function HeroSlider({
         pack={pack}
         priority
         presentation={presentation}
+        frameLine={frameLine}
+        textAnchor={textAnchor}
         headingZone={headingZone}
         urlPrefix={urlPrefix}
       />
@@ -107,6 +124,37 @@ export function HeroSlider({
     const dir = dx > 0 ? -1 : 1;
     goTo(activeIndex + (isRtl ? -dir : dir));
   };
+
+  const anchoredBelow = textAnchor === 'bottom-start';
+  // Pagination dots. With the copy anchored bottom-start they sit in the track's inline-end corner.
+  const dots = (
+    <div
+      // Copy anchored bottom-start: the dots move to the inline-end corner, off the button.
+      className={
+        textAnchor === 'bottom-start'
+          ? 'absolute bottom-4 end-4 z-20 flex items-center gap-2'
+          : 'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2'
+      }
+      role="tablist"
+      aria-label={isRtl ? 'شرائح البانر الرئيسي' : 'Hero slides'}
+    >
+      {slides.map((_, i) => (
+        <button
+          key={i}
+          type="button"
+          role="tab"
+          aria-selected={i === activeIndex}
+          aria-label={
+            isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
+          }
+          onClick={() => goTo(i)}
+          className={`h-2 rounded-full transition-[width,background-color,box-shadow] ${
+            i === activeIndex ? 'w-6 bg-white shadow-md' : 'w-2 bg-white/60 hover:bg-white/80'
+          }`}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <section
@@ -152,35 +200,43 @@ export function HeroSlider({
               priority={i === 0}
               active={i === activeIndex}
               presentation={presentation}
+              frameLine={frameLine}
+              textAnchor={textAnchor}
+              inSlider
               headingZone={headingZone}
               urlPrefix={urlPrefix}
             />
           </div>
         ))}
-      </div>
-
-      {/* Pagination dots */}
-      <div
-        className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2"
-        role="tablist"
-        aria-label={isRtl ? 'شرائح البانر الرئيسي' : 'Hero slides'}
-      >
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === activeIndex}
-            aria-label={
-              isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
+        {anchoredBelow && dots}
+        {canAutoplay && (
+          <AutoplayToggle
+            paused={userPaused}
+            onToggle={() => setUserPaused(p => !p)}
+            labels={
+              isRtl
+                ? { pause: 'إيقاف العرض التلقائي', play: 'تشغيل العرض التلقائي' }
+                : { pause: 'Pause the slideshow', play: 'Play the slideshow' }
             }
-            onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-[width,background-color,box-shadow] ${
-              i === activeIndex ? 'w-6 bg-white shadow-md' : 'w-2 bg-white/60 hover:bg-white/80'
-            }`}
+            className="absolute top-3 end-3"
           />
-        ))}
+        )}
       </div>
+      {!anchoredBelow && dots}
+      {/* W2a fix round 1 (I-1): below xl the active slide's copy sits under the track as page
+          text, so the slides keep >= 60% of the photo clear on phones and tablets too. */}
+      {anchoredBelow && slides[activeIndex] && (
+        <HeroBanner
+          {...slides[activeIndex]}
+          isRtl={isRtl}
+          pack={pack}
+          textAnchor={textAnchor}
+          inSlider
+          copyOnly
+          headingZone={headingZone}
+          urlPrefix={urlPrefix}
+        />
+      )}
     </section>
   );
 }

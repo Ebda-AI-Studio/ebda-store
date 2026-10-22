@@ -3,12 +3,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { api, getProfileWithMountRetries, isTransientSessionAnswer, type User } from '../lib/api';
 import { useStore } from './StoreContext';
+import { runPasskeyAuthentication } from '../lib/passkeys';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  /** Sign in with a passkey (Face ID, Touch ID, ...). `conditional` = the browser's autofill list. */
+  loginWithPasskey: (conditional: boolean) => Promise<{ success: boolean; error?: string }>;
   register: (data: {
     email: string;
     password: string;
@@ -82,6 +85,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [store.id]
   );
 
+  const loginWithPasskey = useCallback(async (conditional: boolean) => {
+    const begin = await api.passkeyBegin();
+    if (!begin.success || !begin.data) {
+      return { success: false, error: begin.error?.code || 'PASSKEY_BEGIN_FAILED' };
+    }
+    // Throws NotAllowedError/AbortError when the person dismisses the prompt: the caller treats that as quiet.
+    const assertion = await runPasskeyAuthentication(
+      begin.data as Parameters<typeof runPasskeyAuthentication>[0],
+      conditional
+    );
+    const result = await api.passkeyFinish(assertion);
+    if (result.success && result.data && result.data.user.role === 'customer') {
+      setUser(result.data.user);
+      return { success: true };
+    }
+    return { success: false, error: result.error?.code || 'PASSKEY_AUTH_FAILED' };
+  }, []);
+
   const register = useCallback(
     async (data: { email: string; password: string; firstName: string; lastName: string }) => {
       const result = await api.register({ ...data, storeId: store.id });
@@ -110,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        loginWithPasskey,
         register,
         logout,
         refreshUser,
@@ -126,4 +148,9 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+/** Like useAuth, but null outside an AuthProvider (shared PDP pieces that must also render without one). */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
 }

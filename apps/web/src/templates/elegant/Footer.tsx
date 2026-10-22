@@ -8,6 +8,7 @@ import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { footerRootPaint } from '../shared/footer-ink';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import { api } from '../../lib/api';
 import {
   footerBranchesHeading,
@@ -70,10 +71,13 @@ export default function ElegantFooter({
         setSubscribed(true);
         setEmail('');
       } else {
-        setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+        setErrorMsg(
+          demoRefusalText(result.error, (en, ar) => (isRtl ? ar : en)) ||
+            (isRtl ? 'الاشتراك منفعش، جرّب بعدين' : 'Could not subscribe, please try again')
+        );
       }
     } catch {
-      setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+      setErrorMsg(isRtl ? 'الاشتراك منفعش، جرّب بعدين' : 'Could not subscribe, please try again');
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +118,7 @@ export default function ElegantFooter({
       {/* Newsletter — hidden when the store explicitly opts out. */}
       {showNewsletter && (
         <div className="border-b border-border/50">
-          <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16 md:py-20">
             <div className="max-w-xl mx-auto text-center">
               <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground mb-4 font-serif">
                 {isRtl ? 'النشرة البريدية' : 'Newsletter'}
@@ -145,7 +149,7 @@ export default function ElegantFooter({
                       onChange={e => setEmail(e.target.value)}
                       placeholder={t('Enter your email', 'البريد الإلكتروني')}
                       aria-label={t('Email address', 'البريد الإلكتروني')}
-                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground transition-colors duration-500"
+                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-input focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground transition-colors duration-500"
                       dir={isRtl ? 'rtl' : 'ltr'}
                       required
                       disabled={submitting}
@@ -157,7 +161,7 @@ export default function ElegantFooter({
                     >
                       {submitting
                         ? isRtl
-                          ? 'جاري...'
+                          ? 'لحظة...'
                           : 'Sending...'
                         : isRtl
                           ? 'اشتراك'
@@ -177,7 +181,7 @@ export default function ElegantFooter({
       )}
 
       {/* Main footer */}
-      <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20 lg:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16 md:py-20 lg:py-24">
         {/* Brand + (sections|explore) + Contact + Follow. Grow the grid so
             extra sections don't crowd the contact / follow columns. */}
         <div className={`grid grid-cols-2 gap-8 sm:gap-10 ${gridColsClass} md:gap-12`}>
@@ -260,7 +264,7 @@ export default function ElegantFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
@@ -282,7 +286,7 @@ export default function ElegantFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                     >
                       {contact.email}
                     </a>
@@ -292,7 +296,7 @@ export default function ElegantFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       dir="ltr"
                     >
                       {displayPhone}
@@ -314,7 +318,7 @@ export default function ElegantFooter({
                         href={addressMapHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {displayAddress}
                       </a>
@@ -342,7 +346,7 @@ export default function ElegantFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-foreground/70 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -372,7 +376,7 @@ export default function ElegantFooter({
                         href={loc.mapsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {loc.address}
                       </a>
@@ -383,7 +387,7 @@ export default function ElegantFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="block text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
                       >
                         {loc.phone}
                       </a>

@@ -53,7 +53,7 @@ export function LandingHeader() {
           {/* Get started CTA */}
           <a
             href={`mailto:${BRAND.supportEmail}`}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-[#160b03] shadow-[0_6px_20px_rgba(255,106,26,0.3)] transition-transform hover:-translate-y-0.5"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-[#160b03] shadow-[0_6px_20px_rgba(176,141,87,0.3)] transition-transform hover:-translate-y-0.5"
           >
             {t('Get started', 'ابدأ الآن')}
           </a>

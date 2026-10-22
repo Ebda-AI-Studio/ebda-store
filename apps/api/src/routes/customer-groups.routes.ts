@@ -12,6 +12,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { tenantContext } from '../middleware/tenant-context';
 import { CustomerGroupService } from '../services/customer-group.service';
+import { assertWholesaleEntitled } from '../lib/b2b-invalidate';
 
 const router = Router();
 
@@ -25,9 +26,24 @@ const createSchema = z.object({
   nameAr: z.string().max(100).nullable().optional(),
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
+  // B2B pricing (Task 4). Turning any of it ON needs the b2b.wholesale entitlement; turning it off never does.
+  pricingMode: z.enum(['none', 'percent_off']).optional(),
+  discountBps: z.number().int().min(0).max(9000).optional(),
+  requiresApproval: z.boolean().optional(),
+  isWholesale: z.boolean().optional(),
 });
 
 const updateSchema = createSchema.partial();
+
+/** True when the body switches a wholesale benefit ON (so the plan gate applies). */
+function enablesWholesale(b: z.infer<typeof createSchema> | z.infer<typeof updateSchema>): boolean {
+  return (
+    (b.pricingMode !== undefined && b.pricingMode !== 'none') ||
+    (b.discountBps !== undefined && b.discountBps > 0) ||
+    b.requiresApproval === true ||
+    b.isWholesale === true
+  );
+}
 
 const assignSchema = z.object({
   groupId: z.string().uuid().nullable(),
@@ -37,6 +53,7 @@ const assignSchema = z.object({
 // which never hold a Customer id. At least one of phone/email is required
 // (enforced in the service, not the schema, so the error is a clean 400).
 const assignByIdentitySchema = z.object({
+  userId: z.string().uuid().nullish(),
   phone: z.string().trim().max(40).nullish(),
   email: z.string().trim().max(255).nullish(),
   firstName: z.string().trim().max(100).nullish(),
@@ -85,6 +102,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createSchema.parse(req.body);
+      if (enablesWholesale(data)) await assertWholesaleEntitled(req.params.storeId);
       const group = await CustomerGroupService.create(req.params.storeId, data);
       res.status(201).json({ success: true, data: { group } });
     } catch (error) {
@@ -102,6 +120,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = updateSchema.parse(req.body);
+      if (enablesWholesale(data)) await assertWholesaleEntitled(req.params.storeId);
       const group = await CustomerGroupService.update(req.params.storeId, req.params.id, data);
       res.json({ success: true, data: { group } });
     } catch (error) {

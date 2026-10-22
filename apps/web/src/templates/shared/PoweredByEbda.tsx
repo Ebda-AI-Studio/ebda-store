@@ -13,7 +13,7 @@ import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
  * noreferrer"` because external + visited by anonymous customers; `target=
  * "_blank"` so it doesn't unload the merchant's storefront when clicked.
  *
- * Styling: low-contrast (text-muted-foreground) so it reads as platform
+ * Styling: muted (text-muted-foreground, AA on the footer surface) so it reads as platform
  * attribution not store branding. Size bumped from 11px to text-sm sm:text-base
  * (14-16px) 2026-05-17 evening — Ahmad reported the previous 11px was
  * unreadable. `data-zone="afterFooter"` lets the Typography admin override
@@ -41,16 +41,15 @@ export function PoweredByEbda({ hidden = false }: { hidden?: boolean }) {
           `Powered by ${t(BRAND.product.nameEn, BRAND.product.nameAr)}`,
           `مدعوم من ${BRAND.product.nameAr}`
         )}
-        className="inline-flex items-center gap-1 align-middle hover:opacity-80 transition-opacity"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 align-middle hover:opacity-80 transition-opacity"
       >
-        {/* "Powered by Ebda" as a text wordmark — the raw /logo.svg mark read
-            as a stray orange box in the footer. "Ebda" is set in the brand
-            gold + semibold so it reads as an intentional wordmark, while
-            "Powered by" stays muted (inherited) so it reads as attribution. */}
+        {/* "Powered by Ebda" as a text wordmark. The wordmark is the footer's own ink + semibold:
+            the brand gold (#B08D57) measured 3.09:1 on a white footer (STOP 1, Ruling B1-27), and
+            the line is the full muted tone (the old /70 alpha also fell under 4.5:1). On a
+            merchant-coloured footer both take the shared footer ink ([data-footer-ink], footer-ink.ts). */}
         <span>{t('Powered by', 'مدعوم من')}</span>
-        <span className="font-semibold" style={{ color: BRAND.colors.gold }}>
-          {t(BRAND.product.nameEn, BRAND.product.nameAr)}
-        </span>
+        {/* IA-09 (W4): attribution never outweighs the store's own name: one muted weight. */}
+        <span className="font-medium">{t(BRAND.product.nameEn, BRAND.product.nameAr)}</span>
       </a>
     </div>
   );

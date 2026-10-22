@@ -44,7 +44,6 @@ vi.mock('@/hooks/useNumerals', numeralsMock);
 vi.mock('../../hooks/useNumerals', numeralsMock);
 
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
-import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { formatPrice as formatPriceBase } from '@/lib/format';
 import Minimal from '../../templates/minimal/OrderSummary';
 import Modern from '../../templates/modern/OrderSummary';
@@ -62,7 +61,6 @@ afterEach(() => {
 const SUBTOTAL = 298000;
 const DISCOUNT = 30000;
 const TOTAL = SUBTOTAL - DISCOUNT;
-const money = (m: number) => formatMoney(m, 'ar', { hideSymbol: true, numerals });
 
 describe.each([
   ['minimal', Minimal],
@@ -80,7 +78,10 @@ describe.each([
     it(`${l}/${n}`, () => {
       lang = l;
       numerals = n;
-      const fp = (a: number) => formatPriceBase(a, { locale: l, numerals: n });
+      // the storefront's formatter joins number and currency with a no-break space (B2-25 (1)); the
+      // sticky bar and the summary both read it, so the fixture builds the bar the same way
+      const fp = (a: number) =>
+        formatPriceBase(a, { locale: l, numerals: n }).replace(' ', '\u00A0');
       const { container } = render(
         <Summary
           subtotal={SUBTOTAL}
@@ -95,7 +96,7 @@ describe.each([
       render(
         <StickyCartTotal
           totalLabel={l === 'ar' ? 'الإجمالي' : 'Total'}
-          total={summaryMoneyFormatter(Summary, money, 'EGP', fp)(TOTAL)}
+          total={fp(TOTAL)}
           itemCount={2}
           itemCountLabel="2"
           href="/checkout"
@@ -103,7 +104,7 @@ describe.each([
         />
       );
       const bar = screen.getByTestId('sticky-cart-total-value').textContent!;
-      const fmt = summaryMoneyFormatter(Summary, money, 'EGP', fp);
+      const fmt = fp;
       // The summary prints this exact string as its Total value.
       expect(container.textContent).toContain(bar);
       expect(bar).toBe(fmt(TOTAL));
@@ -127,8 +128,7 @@ describe('CartClient wiring', () => {
   it('the sticky bar repeats the summary Total row (after discounts) in the summary money format', () => {
     const bar = src.slice(src.indexOf('<StickyCartTotal'));
     expect(bar).toMatch(/totalLabel=\{t\('Total', 'الإجمالي'\)\}/);
-    expect(bar).toMatch(
-      /summaryMoneyFormatter\(\s*T\?\.OrderSummary,\s*money,\s*store\.currency \?\? REGION\.currency,\s*formatPrice\s*\)\(total\)/
-    );
+    // every themed summary and the bar print the ONE storefront format (B1-28)
+    expect(bar).toMatch(/total=\{formatPrice\(total\)\}/);
   });
 });

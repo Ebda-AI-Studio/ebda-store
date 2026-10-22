@@ -82,9 +82,9 @@ export function getDiscountBadgeText(
     if (isRtl) {
       // Arabic "وفّر" prefix + the single money formatter (Western digits
       // unless the store opted into Arabic-Indic — Ruling NUMERALS-1).
-      return `وفّر ${formatMoney(savingMinor, 'ar', { numerals })}`;
+      return `وفّر ${formatMoney(savingMinor, 'ar', { numerals }).replace(' ', '\u00A0')}`;
     }
-    return `Save ${formatMoney(savingMinor, 'en')}`;
+    return `Save ${formatMoney(savingMinor, 'en').replace(' ', '\u00A0')}`;
   }
 
   // Percentage / legacy path. The sign is U+2212 and travels with its number in a

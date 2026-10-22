@@ -6,7 +6,7 @@ import rateLimit, {
   type Store,
 } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
@@ -478,6 +478,10 @@ const CSRF_EXEMPT_AUTH_PATHS: ReadonlySet<string> = new Set([
   '/api/v1/auth/verify-email',
   '/api/v1/auth/resend-verification',
   '/api/v1/auth/mfa/verify',
+  // Passkey sign-in (Ruling PASSKEY-6): credential-less, runs before a session exists. Registration and
+  // management are authenticated writes and stay CSRF-checked.
+  '/api/v1/auth/passkeys/authenticate/begin',
+  '/api/v1/auth/passkeys/authenticate/finish',
   // Self-serve merchant signup (SP5): credential-less entry points reached
   // before any session exists, like register / resend-verification above.
   '/api/v1/auth/merchant/signup',
@@ -913,6 +917,83 @@ export function createAuthLimiter(opts?: { skip?: (req: Request) => boolean; pre
 }
 
 export const authLimiter = createAuthLimiter();
+
+/**
+ * Passkey sign-in (Ruling PASSKEY-6) takes NO email, so `authLimiter`'s IP+email key would collapse every
+ * attempt from an IP into one `<ip>-unknown` bucket shared with login — and conditional-UI autofill calls
+ * /begin on every login page load. Two IP-only buckets instead: /begin is cheap (one Redis write) and
+ * generous; /finish is the guessable surface (a signature has to verify) and counts FAILURES only.
+ * Exported with their key function for the same reason as `authLimiterKey`: every limiter is skipped
+ * under vitest, so a test can only see a 429 by building one with the skip turned off.
+ */
+export function passkeyLimiterKey(req: Request): string {
+  return `${ipKeyGenerator(req.ip ?? '')}-passkey`;
+}
+
+/**
+ * Sign-in start is cheap (one Redis write) and the real brute-force guard is the account lockout, so its
+ * bucket is generous and is split by store host (review M3): a mobile-carrier NAT full of shoppers of one
+ * store cannot lock out another store's shoppers, nor the admin.
+ */
+export function passkeyBeginLimiterKey(req: Request): string {
+  let host = 'none';
+  try {
+    host = new URL(String(req.headers?.origin ?? '')).host.toLowerCase().slice(0, 100) || 'none';
+  } catch {
+    host = 'none';
+  }
+  return `${ipKeyGenerator(req.ip ?? '')}-${host}-passkey-begin`;
+}
+
+export function createPasskeyLimiter(
+  kind: 'begin' | 'finish',
+  opts?: { skip?: (req: Request) => boolean }
+) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, `passkey-${kind}`),
+    windowMs: 15 * 60 * 1000,
+    max: kind === 'begin' ? 300 : 20,
+    skipSuccessfulRequests: kind === 'finish',
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many attempts, please try again later.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Same availability-over-strictness posture as authLimiter.
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: kind === 'begin' ? passkeyBeginLimiterKey : passkeyLimiterKey,
+  });
+}
+/**
+ * Step-up (PASSKEY-7) is an AUTHENTICATED call, so its bucket is the authenticated user (review M2):
+ * `authLimiter` keys on `req.body.email`, which an attacker rotates for a fresh bucket per request. The
+ * shared lockout counter stays the real guard against password guessing; this bounds the request rate.
+ */
+export function passkeyStepUpLimiterKey(req: Request): string {
+  return `stepup-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`;
+}
+
+export function createPasskeyStepUpLimiter(opts?: { skip?: (req: Request) => boolean }) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'passkey-stepup'),
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many attempts, please try again later.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: passkeyStepUpLimiterKey,
+  });
+}
+export const passkeyBeginLimiter = createPasskeyLimiter('begin');
+export const passkeyFinishLimiter = createPasskeyLimiter('finish');
+export const passkeyStepUpLimiter = createPasskeyStepUpLimiter();
 
 /**
  * Exported so it can be unit-tested directly (same reasoning as
@@ -1413,6 +1494,26 @@ export const writeLimiter = rateLimit({
   skip: skipForLoadTest,
 });
 
+// Admin ⌘K record lookup (GET /stores/:storeId/search). GETs skip the global limiter, and each
+// request runs three store-scoped lookups, so it needs its own: per USER (a store's staff share one
+// office IP), generous for typing (the palette debounces to ~5/s at most) and a hard stop for a
+// held key or a script. A merchant who hits it sees a distinct "slow down" state in the palette.
+export const ADMIN_SEARCH_LIMIT_PER_MINUTE = 120;
+export const adminSearchLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'admin-search'),
+  windowMs: 60 * 1000,
+  max: ADMIN_SEARCH_LIMIT_PER_MINUTE,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many searches, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTest,
+  keyGenerator: req => `admin-search-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
+});
+
 // Stricter limiter for payment operations
 export const paymentLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'payment'),
@@ -1607,6 +1708,67 @@ export const couponValidateLimiter = rateLimit({
   skip: skipForLoadTest,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
+
+// Coupon DISTINCT-code budget — closes the enumeration oracle on every public
+// endpoint that evaluates a caller-supplied coupon code (POST /orders/quote,
+// POST /orders, and POST /coupons/validate itself). Enumeration needs DISTINCT
+// codes, so this counts distinct codes per IP per 60s, not requests: a shopper
+// who re-quotes the same applied coupon on every cart change is never limited,
+// while probing 21 different codes in a window is. One budget across all three
+// endpoints, keyed per IP (ipKeyGenerator collapses IPv6 /128 -> /64).
+//
+// Built from two counters on the same RedisOrMemoryStore the other limiters use
+// (Redis, the Workers AuthState DO, or process memory), because the Workers shim
+// has no set commands: an "admitted" marker per (ip, code-hash) written only AFTER
+// the code was let through, and a per-IP counter of codes that were not yet admitted.
+// Over budget NOTHING is written (no marker to reset), so two concurrent requests for
+// the same new code are both refused; under budget such a pair may count twice, which
+// only over-counts (conservative). Markers hold the hash only, never the raw code.
+const COUPON_DISTINCT_MAX = 20;
+const COUPON_DISTINCT_WINDOW_MS = 60 * 1000;
+const couponAdmittedStore = makeRateLimitStore(
+  rateLimitRedisClient,
+  'coupon-validate-distinct-admitted'
+);
+const couponDistinctStore = makeRateLimitStore(rateLimitRedisClient, 'coupon-validate-distinct');
+couponAdmittedStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
+couponDistinctStore.init?.({ windowMs: COUPON_DISTINCT_WINDOW_MS } as Options);
+
+function couponDistinctGate(field: 'couponCode' | 'code') {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const raw = (req.body as Record<string, unknown> | undefined)?.[field];
+    if (typeof raw !== 'string' || raw.trim().length === 0 || skipForLoadTest(req)) {
+      next();
+      return;
+    }
+    try {
+      const ip = ipKeyGenerator(req.ip ?? '') || 'noip';
+      const hash = createHash('sha256').update(raw.trim().toUpperCase()).digest('hex');
+      const markerKey = `${ip}:${hash}`;
+      if (!(await couponAdmittedStore.get?.(markerKey))) {
+        const distinct = await couponDistinctStore.increment(ip);
+        if (distinct.totalHits > COUPON_DISTINCT_MAX) {
+          res.setHeader('Retry-After', String(COUPON_DISTINCT_WINDOW_MS / 1000));
+          res.status(429).json({
+            success: false,
+            error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+          });
+          return;
+        }
+        await couponAdmittedStore.increment(markerKey);
+      }
+    } catch (err) {
+      // Fail-OPEN on a store error, same posture as passOnStoreError on the other limiters.
+      logger.warn({ err }, 'coupon distinct limiter store error; failing open');
+    }
+    next();
+  };
+}
+
+/** POST /orders/quote + POST /orders: `couponCode` in the body. */
+export const couponAttemptLimiter = couponDistinctGate('couponCode');
+/** POST /coupons/validate: `code` in the body. Runs after couponValidateLimiter. */
+export const couponValidateDistinctLimiter = couponDistinctGate('code');
 
 // Promotion preview limiter — public storefront targeting-preview endpoint.
 // Same posture as couponValidateLimiter (20/min per IP): generous for a

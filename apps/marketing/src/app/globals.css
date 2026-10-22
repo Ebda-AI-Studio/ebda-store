@@ -380,7 +380,7 @@ html[lang='en'] .wm-name {
 }
 html[lang='ar'] .hero h1 {
   letter-spacing: 0;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 .hero-sub {
   font-size: clamp(1.1rem, 2.4vw, 1.35rem);
@@ -443,8 +443,22 @@ html[lang='ar'] .section h2 {
   font-size: 1.2rem;
   color: var(--muted);
   max-width: 50ch;
-  margin-top: -24px;
+  line-height: 1.7;
+  margin-top: 0;
   margin-bottom: 40px;
+}
+/* A heading that is directly followed by a lead owns the gap between them (no negative
+   margin on the lead: that pulled the lead up into Arabic descenders). */
+:is(.section, .page-head, .page-sec, main) :is(h1, h2, h3):has(+ .lead) {
+  margin-bottom: clamp(14px, 2vw, 22px);
+}
+/* Arabic display headings need room for dots/tails below the baseline. */
+html[lang='ar'] :is(h1, h2, h3) {
+  line-height: 1.45;
+}
+html[lang='ar'] .lead,
+html[lang='ar'] .hero-sub {
+  line-height: 1.8;
 }
 
 /* ---------- devices: bezel, glass and reflections drawn in CSS ---------- */
@@ -852,6 +866,29 @@ html[lang='ar'] .story h2 {
   border-radius: 24px;
   overflow: hidden;
   background: #fff;
+}
+.look-shot {
+  display: block;
+  color: inherit;
+}
+.look-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.look-shot:focus-visible {
+  outline: 3px solid #7aa2ff;
+  outline-offset: -3px;
+}
+.looks-item figcaption .look-live {
+  margin-top: 10px;
+}
+.look-live a {
+  color: var(--fg);
+  font-weight: 700;
+  text-underline-offset: 3px;
 }
 .look-screen .scr:focus-visible {
   outline: 3px solid #7aa2ff;
@@ -2297,4 +2334,225 @@ html[dir='rtl'] .not-found .lead {
 }
 .credit-list dd {
   margin: 0;
+}
+
+/* ---------- capabilities (home section + /features) ---------- */
+.cap-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 760px) {
+  .cap-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1040px) {
+  .cap-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.cap-card {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.cap-card h2,
+.cap-card h3 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+.cap-card p {
+  margin: 0;
+  color: var(--muted);
+}
+.cap-card .cap-plan {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--accent-text);
+}
+.cap-plan span {
+  font-weight: 700;
+}
+.cap-more {
+  margin: 0;
+}
+
+/* ---------- /features and /compare pages ---------- */
+.page {
+  padding-block: clamp(40px, 6vw, 80px);
+}
+.page-head {
+  margin-bottom: clamp(32px, 5vw, 56px);
+}
+.page-head h1 {
+  font-size: clamp(2rem, 5.5vw, 3.4rem);
+  line-height: 1.25;
+  max-width: 20ch;
+  margin-bottom: 16px;
+  text-wrap: balance;
+}
+.page-sec {
+  margin-top: clamp(40px, 6vw, 72px);
+}
+.page-sec h2 {
+  font-size: clamp(1.5rem, 3.6vw, 2.2rem);
+  line-height: 1.35;
+  margin-bottom: 20px;
+}
+.more-list {
+  margin: 0;
+  padding-inline-start: 1.2em;
+  color: var(--muted);
+}
+.more-list li {
+  padding-block: 4px;
+}
+.cmp-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.cmp-links a {
+  font-weight: 600;
+}
+.choose {
+  display: grid;
+  gap: 28px;
+}
+@media (min-width: 760px) {
+  .choose {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.choose h2 {
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+}
+.cmp-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+}
+.cmp {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.98rem;
+}
+.cmp caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.cmp th,
+.cmp td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+.cmp thead th {
+  background: var(--raise);
+}
+.cmp tbody th {
+  font-weight: 600;
+  width: 22%;
+}
+.cmp tr:last-child th,
+.cmp tr:last-child td {
+  border-bottom: 0;
+}
+.cmp-verdict {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.cmp tr[data-verdict='ebda'] td:nth-child(2) {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+@media (max-width: 639px) {
+  .cmp thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .cmp tr {
+    display: block;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .cmp th,
+  .cmp td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+  .cmp tbody th {
+    width: auto;
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+  }
+  .cmp td {
+    margin-top: 6px;
+  }
+  .cmp td::before {
+    content: attr(data-label) ': ';
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .cmp-verdict {
+    display: inline;
+    margin: 0;
+  }
+}
+
+/* ---------- coming-soon badge and AI-native blocks ---------- */
+.cap-badge {
+  display: inline-block;
+  margin-inline-end: 8px;
+  padding: 2px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--raise);
+  vertical-align: middle;
+}
+.cap-card[data-status='coming'] {
+  border-style: dashed;
+}
+.cap-card .cap-badge {
+  display: table;
+  margin: 0 0 10px;
+}
+.cap-card .cap-soon {
+  padding-inline-start: 14px;
+  border-inline-start: 2px solid var(--gold);
+  color: var(--muted);
+}
+.cap-card .cap-soon .cap-badge {
+  display: inline-block;
+  margin: 0 0 0 0;
+  margin-inline-end: 8px;
+}
+.page-sec > .lead {
+  margin-bottom: clamp(20px, 3vw, 32px);
+}
+.cmp td .cap-badge {
+  display: inline-block;
 }

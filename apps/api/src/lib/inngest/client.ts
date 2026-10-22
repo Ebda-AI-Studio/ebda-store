@@ -313,6 +313,16 @@ type CampaignSendRequestedEvent = EventPayload & {
   };
 };
 
+// Abandoned-cart recovery email: emitted ONLY by sweepCartRecoveryEmails for a cart it just
+// claimed; the event id is `cart-recovery-email/<abandonedCartId>`.
+type CartRecoveryEmailRequestedEvent = EventPayload & {
+  name: 'cart-recovery/email-requested';
+  data: {
+    abandonedCartId: string;
+    storeId: string;
+  };
+};
+
 // Ebda's own acquisition conversions (Meta Conversions API). Emitted after the business
 // transaction committed; see functions/ebda-ads-conversion.ts and services/ebda-ads-emit.ts.
 type EbdaAdsConversionRequestedEvent = EventPayload & {
@@ -343,6 +353,23 @@ type LegalNoticeSendRequestedEvent = EventPayload & {
 type SearchStoreReindexRequestedEvent = EventPayload & {
   name: 'search/store.reindex-requested';
   data: { storeId: string; reason: string };
+};
+
+// Merchant outgoing webhooks. `delivery.requested` is sent by the fan-out (after the delivery rows
+// exist) and by the admin test/resend routes; `inventory.low` by the low-stock scan.
+type WebhookDeliveryRequestedEvent = EventPayload & {
+  name: 'webhook/delivery.requested';
+  data: { storeId: string; deliveryId: string };
+};
+
+type WebhookInventoryLowEvent = EventPayload & {
+  name: 'webhook/inventory.low';
+  data: {
+    storeId: string;
+    /** UTC day (YYYY-MM-DD): at most one inventory.low per product per day. */
+    day: string;
+    items: Array<{ productId: string; name: string; inventory: number; lowStockThreshold: number }>;
+  };
 };
 
 export type AppEvent =
@@ -378,9 +405,12 @@ export type AppEvent =
   | GscIngestRequestedEvent
   | ContactFormSubmittedEvent
   | CampaignSendRequestedEvent
+  | CartRecoveryEmailRequestedEvent
   | EbdaAdsConversionRequestedEvent
   | LegalNoticeSendRequestedEvent
-  | SearchStoreReindexRequestedEvent;
+  | SearchStoreReindexRequestedEvent
+  | WebhookDeliveryRequestedEvent
+  | WebhookInventoryLowEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

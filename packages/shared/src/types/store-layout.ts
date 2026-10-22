@@ -74,6 +74,18 @@ export interface SectionDividers {
   belowHeading?: import('./store-theme').DividerSettings;
 }
 
+/** Where a cropped hero image keeps its subject (Ruling B1-32). */
+export type HeroFocus = 'top' | 'center' | 'bottom';
+/** CSS object-position for a hero focus; `center` (or unset) is the browser default. */
+export const HERO_FOCUS_POSITION: Record<HeroFocus, string> = {
+  top: '50% 0%',
+  center: '50% 50%',
+  bottom: '50% 100%',
+};
+export function heroObjectPosition(focus: HeroFocus | undefined | null): string | undefined {
+  return focus && focus !== 'center' ? HERO_FOCUS_POSITION[focus] : undefined;
+}
+
 export interface HeroSlide {
   /**
    * Desktop image — R2 URL. Recommended 1920×800 (aspect 2.4:1) so the
@@ -99,6 +111,8 @@ export interface HeroSlide {
   video?: string;
   /** Mobile video; falls back to `video`. */
   videoMobile?: string;
+  /** Image focus for the cropped hero (object-position): `top` keeps a head in frame (B1-32). */
+  focus?: HeroFocus;
   alt?: string;
   /** Optional headline rendered as overlay — pack styles vary */
   headline?: string;
@@ -203,17 +217,38 @@ export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthV
    *     + rounded corners + neutral bg; image renders with object-contain
    *     so the WHOLE image shows (may letterbox). Pick this when merchant
    *     uploaded an image they want to display in full without crop.
+   *   - `'collage'` (Phase B1, Ruling B1-2) — three slide photos overlap in a
+   *     collage with one headline + CTA below them on the page colour
+   *     (`HeroCollage`, every skin). Needs >= 3 slides with images; with fewer
+   *     the hero renders as the full-bleed banner/slider.
    * Merchants pick via Admin → Layout → Hero. Optional — undefined
    * preserves the existing full-bleed default for back-compat.
    */
-  presentation?: 'full-bleed' | 'framed';
+  presentation?: 'full-bleed' | 'framed' | 'collage';
+  /**
+   * Ruling B1-41: `'line'` draws a hairline in the line colour inside a FRAMED hero, drawn in once,
+   * and the photo fills the frame (cover + focus). Absent / `'none'` = framed as before
+   * (whole image, letterboxed). Ignored unless `presentation === 'framed'`.
+   */
+  frame?: 'none' | 'line';
+  /**
+   * W2a (L-04): where the copy sits on a cropped hero. `'bottom-start'` puts the headline, line
+   * and button at the bottom inline-start corner on a gradient scrim that covers only the text
+   * block (>= 60% of the photo stays clear); absent / `'center'` = the centred overlay as before.
+   * Atelier's and Vitrine's mixes set `'bottom-start'`; a merchant can pick either.
+   */
+  textAnchor?: 'center' | 'bottom-start';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
   /** Per-section divider overrides — see SectionDividers. Default undefined (off). */
   dividers?: SectionDividers;
 }
 
-export type CategoriesLayout = 'grid' | 'horizontal';
+/**
+ * `rail` = a snap row of image tiles, `tiles` = square tiles (Souq, Phase B2); every skin renders
+ * them (look data, never forked commerce code).
+ */
+export type CategoriesLayout = 'grid' | 'horizontal' | 'chips' | 'rail' | 'tiles';
 export type CategoriesCaption = 'below' | 'overlay';
 
 /**
@@ -607,6 +642,8 @@ export interface TestimonialsSettings
   enabled: boolean;
   minRating: number;
   verifiedOnly: boolean;
+  /** `'single'` = one large customer quote (Ruling B1-2, Vitrine); absent = the row. */
+  layout?: 'row' | 'single';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
   /** Per-section divider overrides — see SectionDividers. Default undefined (off). */
@@ -723,7 +760,17 @@ export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingM
  * v2 will add `'category:<id>'` (carousel filtered to a single category)
  * and `'manual:<id[]>'` (curated list of product ids).
  */
-export type ExtraCarouselSource = 'newest' | 'best_seller' | 'featured' | 'category' | 'manual';
+/**
+ * `on_sale` (Phase B2): products whose compare-at price exceeds their price (a variant product:
+ * any variant on sale), biggest drop first. BOUNDED-stale (rides the tagged public product caches).
+ */
+export type ExtraCarouselSource =
+  | 'newest'
+  | 'best_seller'
+  | 'featured'
+  | 'on_sale'
+  | 'category'
+  | 'manual';
 
 export interface ExtraCarouselSettings extends ProductCarouselSettings {
   /** Unique id (uuid). Required for stable ordering + admin keying. */

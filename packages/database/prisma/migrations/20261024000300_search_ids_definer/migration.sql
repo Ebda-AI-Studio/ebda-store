@@ -1,0 +1,111 @@
+-- Lexical product search that can use its trigram indexes under RLS (search program P1, Task 14
+-- load-test finding; Ruling SEARCH-T14-1).
+--
+-- Problem (measured, `ebda_app`, 20 000 products in one store): the storefront / typeahead / admin
+-- statement `WHERE ebda_product_search_doc(...) LIKE '%x%'` never touched
+-- products_search_doc_trgm_idx / products_name_doc_trgm_idx / products_sku_norm_trgm_idx. The
+-- tenant policy is a security barrier, and Postgres lets a user qual run before it (so be an index
+-- condition) only if every function in it is LEAKPROOF. btrim, regexp_replace, translate and
+-- texticlike are not (pg_proc.proleakproof = f) and a non-superuser cannot mark anything
+-- leakproof, so the statement became a store_id scan that normalised every row of the store:
+-- 80 ms at 2 000 products, 740 ms at 20 000 (one query, idle machine), and it saturates the
+-- database long before the application. The planner tests ran as the owner (BYPASSRLS), so they
+-- never saw it.
+--
+-- Fix: ebda_product_search_ids(store, field, with_sku, only_active, include_deleted, word_start, patterns)
+-- returns the candidate product ids of ONE store. It is SECURITY DEFINER (owner-run, like every
+-- other ebda_* function, and for the same reason: the owner bypasses RLS, so the indexes are
+-- usable) and therefore checks its caller exactly as the policy does: the store id must equal the
+-- transaction-local app.current_store_id (no scope: refused; another store: nothing). The patterns are BOUND values
+-- ($1[i] inside the dynamic statement); the only text built by format() is a fixed column
+-- expression chosen from two literals and the loop index. The application keeps joining the ids
+-- back to `products` as ebda_app, so RLS, soft-delete, status, ordering and the tenant guard all
+-- still apply to the final rows.
+--
+-- Additive (CREATE FUNCTION only): safe to deploy before the code that calls it.
+-- Rollback: rollback.sql (roll the CODE back first).
+
+CREATE OR REPLACE FUNCTION public.ebda_product_search_ids(
+  p_store_id text,
+  p_field text,
+  p_with_sku boolean,
+  p_only_active boolean,
+  p_include_deleted boolean,
+  p_word_start boolean,
+  p_patterns text[]
+)
+RETURNS SETOF text
+LANGUAGE plpgsql STABLE SECURITY DEFINER ROWS 500
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+DECLARE
+  doc text;
+  v_scope text;
+  arm text;
+  b text;
+  v_bounds text[] := ARRAY['', '% ', '%/', '%(', '%-', '%,', '%.', 'ا', '% ا', 'ال', '% ال'];
+  arms text := '';
+  n int := coalesce(array_length(p_patterns, 1), 0);
+  i int;
+BEGIN
+  -- The store comes ONLY from the scoped session (app.current_store_id, set transaction-locally by
+  -- the app), never from the argument. No scope at all is a programming error or a probe: refuse
+  -- (42501). An argument naming any other store gets an empty answer, indistinguishable from "no
+  -- match", so the function is not an existence oracle. There is no exemption for owner or
+  -- BYPASSRLS sessions: the scope is the single source of the store.
+  v_scope := nullif(current_setting('app.current_store_id', true), '');
+  IF v_scope IS NULL THEN
+    RAISE EXCEPTION 'ebda_product_search_ids: no store scope' USING ERRCODE = '42501';
+  END IF;
+  IF p_store_id IS DISTINCT FROM v_scope THEN
+    RETURN;
+  END IF;
+  -- searchTokens() caps a query at 8 words; refuse anything else rather than build a huge AND.
+  IF n < 1 OR n > 8 THEN
+    RETURN;
+  END IF;
+  IF p_field = 'name' THEN
+    doc := 'public.ebda_product_name_doc(p.name, p.name_ar, p.search_terms)';
+  ELSIF p_field = 'all' THEN
+    doc := 'public.ebda_product_search_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)';
+  ELSE
+    RETURN;
+  END IF;
+  -- p_word_start (Ruling SEARCH-T14-3): a query made only of words under 3 characters cannot use a
+  -- trigram index as a substring, so the caller sends PREFIX patterns ('ab%') and the word must
+  -- START a word of the document. "Starts a word" means, in the normalised document: at the start,
+  -- after a space, after one of the punctuation marks that join sizes and lists (S/XL, (XL), a-b,
+  -- a,b, a.b), or after the Arabic definite article / a one-letter prefix (a short word such as the
+  -- two letters of "rice" must find the article form and the alef-hamza form, which folds to a
+  -- plain alef). Each boundary is one LIKE arm; pg_trgm treats punctuation and spaces alike, so
+  -- every arm extracts the same word-start trigrams and the same GIN index serves all of them
+  -- (BitmapOr). Review I-1. Other prefixes and other punctuation are a residual, see the ruling.
+  FOR i IN 1..n LOOP
+    IF coalesce(p_word_start, false) THEN
+      arm := '';
+      FOREACH b IN ARRAY v_bounds LOOP
+        arm := arm || CASE WHEN arm = '' THEN '' ELSE ' OR ' END
+                   || format('%s LIKE (%L || $1[%s])', doc, b, i);
+      END LOOP;
+      IF coalesce(p_with_sku, false) THEN
+        arm := arm || format(' OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s]', i);
+      END IF;
+      arms := arms || ' AND (' || arm || ')';
+    ELSIF coalesce(p_with_sku, false) THEN
+      arms := arms || format(
+        ' AND (%s LIKE $1[%s] OR public.ebda_ar_norm(coalesce(p.sku, '''')) LIKE $1[%s])', doc, i, i);
+    ELSE
+      arms := arms || format(' AND %s LIKE $1[%s]', doc, i);
+    END IF;
+  END LOOP;
+  RETURN QUERY EXECUTE
+    'SELECT p.id FROM public.products p WHERE p.store_id = $2'
+    || CASE WHEN coalesce(p_only_active, false) THEN ' AND p.status = ''active''' ELSE '' END
+    || CASE WHEN coalesce(p_include_deleted, false) THEN '' ELSE ' AND p.deleted_at IS NULL' END
+    || arms
+    USING p_patterns, v_scope;
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public.ebda_product_search_ids(text, text, boolean, boolean, boolean, boolean, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ebda_product_search_ids(text, text, boolean, boolean, boolean, boolean, text[]) TO ebda_app;

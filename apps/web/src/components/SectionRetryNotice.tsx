@@ -46,12 +46,12 @@ export function SectionRetryNotice({
         />
       </svg>
       <span className="flex-1 text-destructive-ink">
-        {t(message ?? "Couldn't load this section.", messageAr ?? 'تعذّر تحميل هذا القسم.')}
+        {t(message ?? "Couldn't load this section.", messageAr ?? 'معرفناش نحمّل القسم ده.')}
       </span>
       <button
         type="button"
         onClick={onRetry}
-        className="rounded bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/30"
+        className="inline-flex min-h-11 items-center rounded bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/30"
       >
         {t('Retry', 'إعادة المحاولة')}
       </button>

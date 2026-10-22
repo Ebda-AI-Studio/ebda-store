@@ -134,6 +134,11 @@ export interface StoreSettings {
    */
   deliveryOffDays?: number[] | null;
   /**
+   * Optional merchant-configured instalment display on the PDP (Ruling B2-9): arithmetic over
+   * these settings, shown as an estimate, never a payment method. `null` clears (shallow merge).
+   */
+  instalments?: import('../commerce/instalments').Instalments | null;
+  /**
    * Optional, opt-in per-store minimum order value in PIASTRES (1 EGP = 1000
    * piastres). When set to a positive number, a customer cannot place an order
    * whose items subtotal (before shipping/tax) falls below it. `0` or

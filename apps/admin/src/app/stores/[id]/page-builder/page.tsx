@@ -1,5 +1,7 @@
 'use client';
 
+import { ModeButton } from './ModeButton';
+import { CategoryLayoutButtons } from './CategoryLayoutButtons';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
@@ -600,7 +602,7 @@ export default function StoreLayoutPage() {
                 <div className="mb-2 text-xs font-medium text-muted-foreground">
                   {t('sections.hero.fitLabel')}
                 </div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="grid grid-cols-3 gap-2 mb-2">
                   <ModeButton
                     active={(layout.hero.presentation ?? 'full-bleed') === 'full-bleed'}
                     onClick={() =>
@@ -613,12 +615,66 @@ export default function StoreLayoutPage() {
                     onClick={() => updateSection('hero', s => ({ ...s, presentation: 'framed' }))}
                     label={t('sections.hero.fitFit')}
                   />
+                  <ModeButton
+                    active={layout.hero.presentation === 'collage'}
+                    onClick={() => updateSection('hero', s => ({ ...s, presentation: 'collage' }))}
+                    label={t('sections.hero.fitCollage')}
+                  />
                 </div>
                 <p className="mb-4 text-xs text-muted-foreground">
-                  {(layout.hero.presentation ?? 'full-bleed') === 'full-bleed'
-                    ? t('sections.hero.fitFillHint')
-                    : t('sections.hero.fitFitHint')}
+                  {layout.hero.presentation === 'collage'
+                    ? t('sections.hero.fitCollageHint')
+                    : (layout.hero.presentation ?? 'full-bleed') === 'full-bleed'
+                      ? t('sections.hero.fitFillHint')
+                      : t('sections.hero.fitFitHint')}
                 </p>
+                {/* Ruling B1-41: the opt-in hairline frame, offered only for a framed hero. */}
+                {layout.hero.presentation === 'framed' && (
+                  <>
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                      {t('sections.hero.frameLabel')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <ModeButton
+                        active={(layout.hero.frame ?? 'none') === 'none'}
+                        onClick={() => updateSection('hero', s => ({ ...s, frame: 'none' }))}
+                        label={t('sections.hero.frameNone')}
+                      />
+                      <ModeButton
+                        active={layout.hero.frame === 'line'}
+                        onClick={() => updateSection('hero', s => ({ ...s, frame: 'line' }))}
+                        label={t('sections.hero.frameLine')}
+                      />
+                    </div>
+                  </>
+                )}
+                {/* W2a (L-04): where the copy sits. Bottom corner keeps the photo clear. */}
+                {layout.hero.presentation !== 'collage' && (
+                  <>
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                      {t('sections.hero.textAnchorLabel')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <ModeButton
+                        active={(layout.hero.textAnchor ?? 'center') === 'center'}
+                        onClick={() => updateSection('hero', s => ({ ...s, textAnchor: 'center' }))}
+                        label={t('sections.hero.textAnchorCenter')}
+                      />
+                      <ModeButton
+                        active={layout.hero.textAnchor === 'bottom-start'}
+                        onClick={() =>
+                          updateSection('hero', s => ({ ...s, textAnchor: 'bottom-start' }))
+                        }
+                        label={t('sections.hero.textAnchorBottomStart')}
+                      />
+                    </div>
+                    {layout.hero.textAnchor === 'bottom-start' && (
+                      <p className="-mt-2 mb-4 text-xs text-muted-foreground">
+                        {t('sections.hero.textAnchorHint')}
+                      </p>
+                    )}
+                  </>
+                )}
                 {/* Autoplay only matters in slider mode — hide it entirely
                     when the merchant has picked the static single banner so
                     the form doesn't expose an irrelevant control. */}
@@ -706,20 +762,11 @@ export default function StoreLayoutPage() {
                 <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('sections.categories.desktopLabel')}
                 </p>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <ModeButton
-                    active={layout.categories.layout === 'grid'}
-                    onClick={() => updateSection('categories', s => ({ ...s, layout: 'grid' }))}
-                    label={t('sections.categories.layoutGrid')}
-                  />
-                  <ModeButton
-                    active={layout.categories.layout === 'horizontal'}
-                    onClick={() =>
-                      updateSection('categories', s => ({ ...s, layout: 'horizontal' }))
-                    }
-                    label={t('sections.categories.layoutHorizontal')}
-                  />
-                </div>
+                <CategoryLayoutButtons
+                  value={layout.categories.layout}
+                  onChange={v => updateSection('categories', s => ({ ...s, layout: v }))}
+                  t={t}
+                />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={layout.categories.captionPosition === 'below'}
@@ -754,24 +801,11 @@ export default function StoreLayoutPage() {
                 <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('sections.categories.mobileLabel')}
                 </p>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <ModeButton
-                    active={(layout.categories.layoutMobile ?? layout.categories.layout) === 'grid'}
-                    onClick={() =>
-                      updateSection('categories', s => ({ ...s, layoutMobile: 'grid' }))
-                    }
-                    label={t('sections.categories.layoutGrid')}
-                  />
-                  <ModeButton
-                    active={
-                      (layout.categories.layoutMobile ?? layout.categories.layout) === 'horizontal'
-                    }
-                    onClick={() =>
-                      updateSection('categories', s => ({ ...s, layoutMobile: 'horizontal' }))
-                    }
-                    label={t('sections.categories.layoutHorizontal')}
-                  />
-                </div>
+                <CategoryLayoutButtons
+                  value={layout.categories.layoutMobile ?? layout.categories.layout}
+                  onChange={v => updateSection('categories', s => ({ ...s, layoutMobile: v }))}
+                  t={t}
+                />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <ModeButton
                     active={
@@ -2305,6 +2339,30 @@ export default function StoreLayoutPage() {
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-foreground">
+                        {t('productCard.newBadgeTitle')}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {t('productCard.newBadgeHint')}
+                      </span>
+                    </span>
+                    {/* Ruling D1016-NEW-1: the "New" badge is the merchant's choice, default OFF. */}
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.showNewBadge ?? storeInfo?.theme?.showNewBadge === true
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          showNewBadge: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
                         {t('productCard.quickAddTitle')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -3249,6 +3307,7 @@ export default function StoreLayoutPage() {
             k =>
               ![
                 'showBrandBadge',
+                'showNewBadge',
                 'showQuickAdd',
                 'showPriceOnCards',
                 'normalizeProductImages',
@@ -3701,30 +3760,6 @@ function SectionTypographyBlock({
         ))}
       </div>
     </div>
-  );
-}
-
-function ModeButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors cursor-pointer ${
-        active
-          ? 'border-primary bg-primary/10 text-primary-ink'
-          : 'border-border bg-card text-foreground hover:bg-muted'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -4796,6 +4831,7 @@ function ExtraCarouselCard({
               <option value="newest">{t('extraCarousel.sourceNewest')}</option>
               <option value="best_seller">{t('extraCarousel.sourceBestSellers')}</option>
               <option value="featured">{t('extraCarousel.sourceFeatured')}</option>
+              <option value="on_sale">{t('extraCarousel.sourceOnSale')}</option>
               <option value="category">{t('extraCarousel.sourceCategory')}</option>
               <option value="manual">{t('extraCarousel.sourceManual')}</option>
             </select>
@@ -5811,6 +5847,23 @@ function SlidesEditor({ slides, storeId, storeTemplate, onChange }: SlidesEditor
                   value={slide.link ?? ''}
                   onChange={v => updateSlide(index, { link: v })}
                 />
+                {/* Image focus for the cropped hero (Ruling B1-32): keeps a head in frame. */}
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-muted-foreground">{t('focus')}</span>
+                  <select
+                    value={slide.focus ?? 'center'}
+                    onChange={e =>
+                      updateSlide(index, {
+                        focus: e.target.value as 'top' | 'center' | 'bottom',
+                      })
+                    }
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="center">{t('focusCenter')}</option>
+                    <option value="top">{t('focusTop')}</option>
+                    <option value="bottom">{t('focusBottom')}</option>
+                  </select>
+                </label>
               </div>
             </div>
           </li>

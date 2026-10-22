@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
-import { authenticate, optionalAuthenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import {
@@ -279,6 +279,8 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
 router.post(
   '/create',
   optionalAuthenticate,
+  // Design review I5 / I-4: no payment may be initiated from an impersonation session.
+  rejectImpersonated,
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     let rollbackContext: { orderId: string; storeId: string; sessionId: string } | null = null;

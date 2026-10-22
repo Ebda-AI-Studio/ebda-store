@@ -215,6 +215,9 @@ vi.mock('../../apps/api/src/lib/definer', () => ({
   ]),
 }));
 
+// Store ids the bridge opened a store scope for, and the store ids the route read inside one.
+const scopeCalls = vi.hoisted(() => ({ scoped: [] as string[], inScope: [] as (string | null)[] }));
+
 // Mock @ebda/database before importing the route
 vi.mock('@ebda/database', () => {
   const prisma = {
@@ -248,6 +251,17 @@ vi.mock('@ebda/database', () => {
   return {
     prisma,
     withStore: (_storeId: string, fn: (tx: typeof prisma) => unknown) => fn(prisma),
+    // waBridgeAuth runs the whole request inside runInStoreScope(store.id); the mock tracks the
+    // ambient id so a test can prove a handler ran INSIDE the scope.
+    runInStoreScope: async (storeId: string, fn: () => Promise<unknown>) => {
+      scopeCalls.scoped.push(storeId);
+      scopeCalls.inScope.push(storeId);
+      try {
+        return await fn();
+      } finally {
+        scopeCalls.inScope.pop();
+      }
+    },
   };
 });
 
@@ -419,6 +433,62 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     const res = await request(app).get('/api/v1/wa-bridge/store-catalog');
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
+  });
+
+  describe('store context (RLS scope + tenant guard)', () => {
+    it('runs the handler inside runInStoreScope for exactly the key-resolved store', async () => {
+      scopeCalls.scoped.length = 0;
+      const { prisma } = await import('@ebda/database');
+      (prisma.category.findMany as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+        // The ambient scope must be the authenticated store while the handler queries.
+        expect(scopeCalls.inScope).toEqual([MOCK_STORE.id]);
+        return [];
+      });
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/categories')
+        .set('x-wbs-api-key', TEST_WBS_API_KEY);
+      expect(res.status).toBe(200);
+      expect(scopeCalls.scoped).toEqual([MOCK_STORE.id]);
+    });
+
+    it('opens NO store scope and never falls back to a store for an unknown key', async () => {
+      scopeCalls.scoped.length = 0;
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/categories')
+        .set('x-wbs-api-key', 'completely-wrong-key');
+      expect(res.status).toBe(401);
+      expect(scopeCalls.scoped).toEqual([]);
+    });
+
+    it('cart/redeem: a token naming an unknown store is a 404, not a default store', async () => {
+      const jwt = (await import('jsonwebtoken')).default;
+      const token = jwt.sign(
+        { sub: 'wa-cart', storeId: '00000000-0000-4000-8000-00000000dead' },
+        'test-jwt-secret-for-contract-tests',
+        { algorithm: 'HS256', issuer: 'force-api', audience: 'force-wa-cart', expiresIn: 600 }
+      );
+      const { prisma } = await import('@ebda/database');
+      (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+      const res = await request(app).post('/api/v1/wa-bridge/cart/redeem').send({ token });
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('STORE_NOT_FOUND');
+    });
+
+    it('cart/redeem: a token whose storeId is not a uuid is rejected before any query', async () => {
+      const jwt = (await import('jsonwebtoken')).default;
+      const token = jwt.sign(
+        { sub: 'wa-cart', storeId: 'not-a-uuid' },
+        'test-jwt-secret-for-contract-tests',
+        { algorithm: 'HS256', issuer: 'force-api', audience: 'force-wa-cart', expiresIn: 600 }
+      );
+      const { prisma } = await import('@ebda/database');
+      const findUnique = prisma.store.findUnique as ReturnType<typeof vi.fn>;
+      findUnique.mockClear();
+      const res = await request(app).post('/api/v1/wa-bridge/cart/redeem').send({ token });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('TOKEN_INVALID');
+      expect(findUnique).not.toHaveBeenCalled();
+    });
   });
 
   it('401 — wrong api key', async () => {

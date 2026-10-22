@@ -349,7 +349,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium"
+              className="inline-flex items-center gap-1 text-xs text-primary-ink hover:text-primary-ink/80 font-medium"
             >
               <PlusIcon className="h-3.5 w-3.5" />
               {t('addItem')}
@@ -378,7 +378,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                             updateLine(idx, { productId: '', variantId: undefined });
                             setLineQueries(prev => ({ ...prev, [idx]: '' }));
                           }}
-                          className="ms-2 text-xs text-orange-600 hover:text-orange-700 font-medium"
+                          className="ms-2 text-xs text-primary-ink hover:text-primary-ink/80 font-medium"
                         >
                           {t('change')}
                         </button>
@@ -437,7 +437,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                                 setLineQueries(prev => ({ ...prev, [idx]: '' }));
                                 if (isVariantProduct(p)) void loadVariants(p.id);
                               }}
-                              className="block w-full px-3 py-2 text-start text-sm hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                              className="block w-full px-3 py-2 text-start text-sm hover:bg-primary/5"
                             >
                               <div className="truncate font-medium text-foreground">{p.name}</div>
                               <div className="text-[11px] text-muted-foreground font-mono tabular-nums">
@@ -552,7 +552,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         <Button
           onClick={send}
           disabled={!canSend}
-          className="w-full bg-orange-500 hover:bg-orange-600"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <SendIcon className="me-2 h-4 w-4" />
           {sending ? t('sending') : t('sendLink')}

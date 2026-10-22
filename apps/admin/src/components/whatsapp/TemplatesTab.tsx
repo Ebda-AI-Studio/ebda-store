@@ -354,7 +354,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         <Button
           onClick={generate}
           disabled={generating || loading}
-          className="bg-orange-500 hover:bg-orange-600"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <Icon.Sparkles className="me-2 h-4 w-4" />
           {generating ? t('generating') : hasAnyRows ? t('addMissing') : t('generateDefaults')}
@@ -401,7 +401,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
               onChange={e => toggleLogoHeader(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed mt-0.5 shrink-0" />
+            <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary peer-disabled:opacity-40 peer-disabled:cursor-not-allowed mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-sm text-foreground">{t('logoLabel')}</div>
               <p className="text-xs text-muted-foreground mt-0.5">{t('logoHint')}</p>
@@ -427,7 +427,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         </div>
       ) : !hasAnyRows ? (
         <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-          <Icon.Sparkles className="mx-auto mb-2 h-8 w-8 text-orange-500" />
+          <Icon.Sparkles className="mx-auto mb-2 h-8 w-8 text-primary-ink" />
           <p className="font-medium text-foreground">{t('noTemplates')}</p>
           <p className="mt-1">{t('noTemplatesHint')}</p>
         </div>

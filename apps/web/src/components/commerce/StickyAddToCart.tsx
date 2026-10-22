@@ -59,7 +59,7 @@ export function StickyAddToCart(p: {
             href={p.cartHref}
             aria-label={p.cartLabel}
             data-testid="sticky-atc-cart"
-            className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border text-foreground"
+            className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-input text-foreground"
           >
             <CartIcon className="h-5 w-5" aria-hidden="true" />
             {(p.cartCount ?? 0) > 0 && (

@@ -4,6 +4,7 @@ import { PoweredByEbda } from '../shared/PoweredByEbda';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
 import type { FooterProps } from '../types';
+import { FOOTER_WORDMARK_CLASS } from '../shared/wordmark';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { footerRootPaint } from '../shared/footer-ink';
 import {
@@ -71,7 +72,7 @@ export default function MinimalFooter({
       className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} mt-auto py-12 md:py-16`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="container mx-auto px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Single-row layout: logo · links · copyright */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           {displayLogo && !hideFooterLogoMobile && (
@@ -89,7 +90,12 @@ export default function MinimalFooter({
           {!displayLogo && !hideFooterLogoMobile && (
             <p
               data-footer-brand="mobile"
-              className="md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground"
+              className={
+                theme?.wordmarkSize
+                  ? `md:hidden self-center ${FOOTER_WORDMARK_CLASS}`
+                  : 'md:hidden self-center text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground'
+              }
+              translate="no"
             >
               {displayName}
             </p>
@@ -111,7 +117,15 @@ export default function MinimalFooter({
                 }
               />
             ) : (
-              <span className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
+              <span
+                data-footer-brand="desktop"
+                translate="no"
+                className={
+                  theme?.wordmarkSize
+                    ? FOOTER_WORDMARK_CLASS
+                    : 'text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground'
+                }
+              >
                 {displayName}
               </span>
             )}
@@ -124,7 +138,7 @@ export default function MinimalFooter({
                 <a
                   key={href}
                   href={href}
-                  className="text-sm tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   {label}
                 </a>
@@ -150,7 +164,7 @@ export default function MinimalFooter({
                   href={s.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                   aria-label={s.key}
                 >
                   <SocialGlyph
@@ -179,7 +193,7 @@ export default function MinimalFooter({
                         href={loc.mapsHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                       >
                         {loc.address}
                       </a>
@@ -190,7 +204,7 @@ export default function MinimalFooter({
                       <a
                         href={`tel:${loc.phone}`}
                         dir="ltr"
-                        className="block hover:text-foreground transition-colors duration-200"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-foreground transition-colors duration-200"
                       >
                         {loc.phone}
                       </a>

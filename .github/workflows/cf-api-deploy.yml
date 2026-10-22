@@ -32,13 +32,15 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       EBDA_HYPERDRIVE_ID: ${{ vars.EBDA_HYPERDRIVE_ID }}
+      # Cloudflare Images binding for PWA icon resizing (Ruling D1016-ICONS-1); unset = no binding.
+      EBDA_IMAGES_BINDING: ${{ vars.EBDA_IMAGES_BINDING }}
       EBDA_KV_CACHE_ID: ${{ vars.EBDA_KV_CACHE_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
-          cache: npm
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
       - name: Require deployment credentials
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"

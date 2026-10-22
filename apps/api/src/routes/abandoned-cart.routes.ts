@@ -4,6 +4,10 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { abandonedCartService } from '../services/abandoned-cart.service';
+import {
+  CART_EMAIL_MIN_DELAY_MINUTES,
+  CART_EMAIL_MAX_DELAY_MINUTES,
+} from '../services/cart-recovery-email.service';
 import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { tenantContext } from '../middleware/tenant-context';
@@ -37,6 +41,13 @@ const upsertConfigSchema = z.object({
   couponDiscountPercent: z.number().min(0).max(100).optional(),
   couponMaxDiscount: z.number().int().min(0).nullable().optional(),
   couponExpiryHours: z.number().int().min(1).optional(),
+  emailEnabled: z.boolean().optional(),
+  emailDelayMinutes: z
+    .number()
+    .int()
+    .min(CART_EMAIL_MIN_DELAY_MINUTES)
+    .max(CART_EMAIL_MAX_DELAY_MINUTES)
+    .optional(),
 });
 
 // ==========================================

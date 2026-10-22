@@ -51,6 +51,8 @@ vi.mock('@ebda/database', () => ({
     },
     order: { findFirst: (...a: unknown[]) => orderFindFirst(...a) },
     orderItem: { findMany: (...a: unknown[]) => orderItemFindMany(...a) },
+    // B2B Task 8b: what earlier completed returns retained per line, and the per-item adjustment write.
+    returnItem: { findMany: async () => [], update: async () => ({}) },
     // Backorder single-line cancel markers — none in this file.
     orderEvent: { findMany: async () => [] },
     payment: { findFirst: (...a: unknown[]) => paymentFindFirst(...a) },

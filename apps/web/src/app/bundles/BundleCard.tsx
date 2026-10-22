@@ -62,7 +62,7 @@ export function BundleCard({ bundle }: BundleCardProps) {
   // opens the bundle, and the button sits above that overlay as a sibling —
   // the same shape as StorefrontProductCard. Visually unchanged.
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-lg">
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/30 hover:shadow-lg">
       <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
         {bundle.image ? (
           <Image

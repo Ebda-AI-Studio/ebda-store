@@ -89,14 +89,17 @@ describe('ci.yml triggers', () => {
     expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
   });
 
-  it('uses Node 22 (wrangler >= 4.110) and caches npm in every setup-node that installs', () => {
+  it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
     expect(ci.env.NODE_VERSION).toBe('22');
     const steps = raw.split('uses: actions/setup-node@').slice(1);
     expect(steps.length).toBeGreaterThan(8);
     // Exactly one setup-node skips the cache: the `changes` job, which only
     // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
     const uncached = steps.filter(
-      b => !/^[^\n]*\n\s+with:[\s\S]*?cache: npm/.test(b.split('\n\n')[0] + '\n')
+      b =>
+        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ vars\.EBDA_RUNS_ON == '' && 'npm' \|\| '' \}\}/.test(
+          b.split('\n\n')[0] + '\n'
+        )
     );
     expect(uncached).toHaveLength(1);
   });
@@ -251,6 +254,17 @@ describe('scripts/ci-affected.mjs', () => {
       expect(r.unit, f).toContain('tests/unit');
       expect(r.unit, f).toContain('packages/shared/src');
     }
+  });
+
+  it('the search eval (tests/search-eval) is typechecked when it or the API it imports changes', () => {
+    const EVAL = 'tests/search-eval/tsconfig.json';
+    expect(run('apps/api/src/services/product-search.service.ts').typecheck).toContain(EVAL);
+    expect(run('tests/search-eval/run.ts').typecheck).toEqual([EVAL]);
+    expect(run('packages/database/prisma/schema.prisma').typecheck).toContain(EVAL);
+    expect(run('apps/admin/src/app/page.tsx').typecheck).not.toContain(EVAL);
+    // and the full lane's `npm run typecheck`
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    expect(pkg.scripts.typecheck).toContain(`tsc --noEmit -p ${EVAL}`);
   });
 
   it('only lists Worker apps that have a wrangler config', () => {

@@ -93,6 +93,36 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       EmptyState: m.EmptyState,
       FormCard: m.FormCard,
     })),
+  qamar: () =>
+    import('./qamar').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
+    })),
+  souq: () =>
+    import('./souq').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
+    })),
 };
 
 /**
@@ -117,6 +147,8 @@ export const TEMPLATE_IDS: TemplateId[] = [
   'bold',
   'elegant',
   'dahab',
+  'qamar',
+  'souq',
 ];
 
 // Re-export types

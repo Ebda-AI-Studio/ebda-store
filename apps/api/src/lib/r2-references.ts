@@ -732,3 +732,29 @@ export async function isR2UrlReferenced(
   );
   return Boolean(rows[0]?.referenced);
 }
+
+// ── Derived objects: in R2, referenced by NO database column ─────────────────
+
+/**
+ * Objects the API renders itself and addresses by a deterministic keyed name,
+ * so no column holds their URL (`stores/<id>/barcodes/<hmac>.png`, the email
+ * barcode PNGs). They are not orphans (the diff against `R2_REFERENCE_COLUMNS`
+ * would call every one an orphan and `--apply` would delete live email images),
+ * and they are re-renderable, so they expire by AGE instead.
+ */
+export const DERIVED_R2_KEY_PATTERNS: readonly RegExp[] = [
+  /^stores\/[0-9a-f-]{36}\/barcodes\/[0-9a-f]{32}\.png$/,
+];
+export const DERIVED_R2_RETENTION_DAYS = 400;
+
+export const isDerivedR2Key = (key: string): boolean =>
+  DERIVED_R2_KEY_PATTERNS.some(p => p.test(key));
+
+export function isExpiredDerivedKey(
+  key: string,
+  lastModified: Date | undefined,
+  now: number
+): boolean {
+  if (!isDerivedR2Key(key) || !lastModified) return false;
+  return now - lastModified.getTime() > DERIVED_R2_RETENTION_DAYS * 86400_000;
+}

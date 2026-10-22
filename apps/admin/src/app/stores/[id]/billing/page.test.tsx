@@ -63,6 +63,7 @@ const limits = {
   maxStores: 1,
   brandingRemoval: false,
   apiAccess: false,
+  wholesalePricing: false,
   analyticsTier: 'basic',
   supportTier: 'email',
 };

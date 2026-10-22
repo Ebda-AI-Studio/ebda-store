@@ -8,6 +8,7 @@ import {
   resolveColor,
   pickReadableForeground,
   contrastRatio,
+  resolveBackgroundPreset,
 } from '@ebda/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
@@ -117,7 +118,7 @@ export function SectionHeading({
   // Anchor B (PDP-4 / YML-1): GUARANTEE a readable heading color — invert at
   // render time, never via a CSS --section-fg cascade (audit 2026-06-05).
   //
-  // The background is the section bg when provided, else the page (#ffffff).
+  // The background is the section bg when provided, else the painted page colour (below).
   // A saved/explicit color is honoured ONLY when it actually reads against that
   // bg (contrast >= 2:1, see floor note below). If it doesn't — e.g. a
   // stale white/light heading color on a white page (the demo-merchant "قد يعجبك
@@ -125,7 +126,18 @@ export function SectionHeading({
   // heading is never invisible. This keeps a deliberate light-on-dark pick
   // (white on a brand-colored section reads fine) while self-correcting the
   // unreadable ones. The mechanical rule: the heading is ALWAYS legible.
-  const resolvedBg: string = resolveColor(sectionBgColor, store.theme) ?? '#ffffff';
+  // No section bg: the section paints `--bg-page`, which is EXACTLY
+  // `resolveBackgroundPreset(theme).bgPage` (StoreContext `themeToCssVars`): the theme's
+  // bgPage/bgSectionAlt pair when both are set (every look sets them), else the backgroundPreset
+  // (white by default, whatever `backgroundColor` says). Measure against what is painted, so a
+  // dark look page (Qamar Lookbook, #1E2340) gets a light heading and a legacy store with a dark
+  // `backgroundColor` but a white painted page keeps its dark heading.
+  const paintedPage = store.theme
+    ? `hsl(${resolveBackgroundPreset(store.theme).bgPage})`
+    : undefined;
+  const resolvedBg: string =
+    resolveColor(sectionBgColor, store.theme) ??
+    (paintedPage && pickReadableForeground(paintedPage) ? paintedPage : '#ffffff');
   const ensureReadable = (zoneColor: string | undefined): string | undefined => {
     const auto = pickReadableForeground(resolvedBg) ?? '#000000';
     if (!zoneColor) return sectionBgColor ? auto : undefined; // no explicit pick → auto-contrast
@@ -137,7 +149,13 @@ export function SectionHeading({
     // essentially the same color as the background (contrast < 1.06 ≈
     // white-on-white) — to keep the stale-color safety without blocking a real tint.
     const concrete = resolveColor(zoneColor, store.theme) ?? zoneColor;
-    return contrastRatio(resolvedBg, concrete) >= 1.06 ? zoneColor : auto;
+    // On a LIGHT bg, invisible against the painted bg OR against white (the reference this floor
+    // was tuned on): a stale near-white pick on an off-white page (#FAF7F2 ≈ 1.07:1) is still
+    // corrected, exactly as when this measured against white alone. On a dark bg (a dark look),
+    // only the painted bg counts, so a merchant's light tint there is honoured.
+    const vsBg = contrastRatio(resolvedBg, concrete);
+    const seen = auto === '#000000' ? Math.min(vsBg, contrastRatio('#ffffff', concrete)) : vsBg;
+    return seen >= 1.06 ? zoneColor : auto;
   };
   // When there is no explicit color AND no section bg, fall back to a guaranteed
   // dark default rather than inheriting (which on a white page can resolve to an
@@ -213,9 +231,10 @@ export function SectionHeading({
   // the flanking editorial-divider hairlines auto-suppress because they only
   // read well on a centered line. Wrapper uses items-stretch so each child
   // takes the full row width and self-aligns via its own textAlign.
-  const kickerAlign = kickerZone?.textAlign ?? 'center';
-  const titleAlign = headingZone?.textAlign ?? 'center';
-  const subtitleAlign = subtitleZone?.textAlign ?? 'center';
+  const packAlign = getPackStyles(pack).sectionHeadingAlign ?? 'center';
+  const kickerAlign = kickerZone?.textAlign ?? packAlign;
+  const titleAlign = headingZone?.textAlign ?? packAlign;
+  const subtitleAlign = subtitleZone?.textAlign ?? packAlign;
   // 2026-05-20: removed the `&& align === 'center'` gate that previously
   // auto-suppressed flanking hairlines for non-centered text. That was
   // me second-guessing the merchant — if they explicitly enable the
@@ -225,6 +244,44 @@ export function SectionHeading({
   const kickerShowLines = kickerLinesEnabled;
   const titleShowLines = titleLinesEnabled;
   const subtitleShowLines = subtitleLinesEnabled;
+  // IA-16: a start-aligned title shares one baseline row with See all; a centred or
+  // hairline-flanked title has no end edge to share, so the link keeps its own row below.
+  const seeAllInline = Boolean(seeAllHref && text) && titleAlign === 'start' && !titleShowLines;
+  const seeAllLink = (inline: boolean) => (
+    <Link
+      href={seeAllHref ?? ''}
+      // Item 2 (2026-07-12) persona-completion: elegant's whisper CTA
+      // idiom (top hairline, matching productCardCta's `border-t
+      // border-foreground/15`) extended to the see-all link when
+      // personaChromeV2 is on. Existing theme token only, no new color.
+      className={
+        inline
+          ? `inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center ${styles.sectionSeeAll}`
+          : `mt-2 block w-full text-end ${
+              elegantPersonaChrome ? 'border-t border-foreground/15 pt-2' : ''
+            } ${styles.sectionSeeAll}`
+      }
+      data-zone="sectionSeeAll"
+      // The data-cta="link" hover effect is a from-center underline (a
+      // background-gradient line, NOT text-decoration). A merchant who set
+      // the See-all zone's text decoration to "none" means "no underline" —
+      // honour that by dropping data-cta so the hover line doesn't fire.
+      data-cta={seeAllZone?.textDecoration === 'none' ? undefined : 'link'}
+      style={{
+        fontFamily: seeAllZone?.fontFamily,
+        fontSize: responsiveFontSize(seeAllZone?.fontSize),
+        fontWeight: seeAllZone?.fontWeight,
+        color: seeAllZone?.color,
+        letterSpacing: seeAllZone?.letterSpacing,
+        lineHeight: seeAllZone?.lineHeight,
+        textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
+        textDecoration: seeAllZone?.textDecoration,
+        textAlign: seeAllZone?.textAlign as React.CSSProperties['textAlign'],
+      }}
+    >
+      {isRtl ? 'عرض الكل' : 'See all'}
+    </Link>
+  );
   return (
     <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
       {/* relative row: title-block is full-width-centered, seeAll absolute-anchored
@@ -336,6 +393,35 @@ export function SectionHeading({
                   style={titleLineStyle}
                 />
               </div>
+            ) : seeAllInline ? (
+              <div data-heading-row className="flex items-baseline justify-between gap-x-6">
+                <h2
+                  className={`min-w-0 ${styles.sectionHeading} ${
+                    titleAlign === 'start'
+                      ? 'text-start'
+                      : titleAlign === 'end'
+                        ? 'text-end'
+                        : 'text-center'
+                  }`}
+                  data-zone="sectionTitle"
+                  style={{
+                    fontFamily: headingZone?.fontFamily,
+                    fontSize: responsiveFontSize(headingZone?.fontSize),
+                    fontWeight: headingZone?.fontWeight,
+                    // resolvedHeadingColor: explicit merchant pick wins; falls back
+                    // to auto-invert against sectionBgColor when no explicit color.
+                    color: resolvedHeadingColor,
+                    letterSpacing: headingZone?.letterSpacing,
+                    lineHeight: headingZone?.lineHeight,
+                    textTransform:
+                      headingZone?.textTransform as React.CSSProperties['textTransform'],
+                    textDecoration: headingZone?.textDecoration,
+                  }}
+                >
+                  {text}
+                </h2>
+                {seeAllLink(true)}
+              </div>
             ) : (
               <h2
                 className={`${styles.sectionHeading} ${
@@ -429,37 +515,7 @@ export function SectionHeading({
             </div>
           )}
         </div>
-        {seeAllHref && (
-          <Link
-            href={seeAllHref}
-            // Item 2 (2026-07-12) persona-completion: elegant's whisper CTA
-            // idiom (top hairline, matching productCardCta's `border-t
-            // border-foreground/15`) extended to the see-all link when
-            // personaChromeV2 is on. Existing theme token only, no new color.
-            className={`mt-2 block w-full text-end ${
-              elegantPersonaChrome ? 'border-t border-foreground/15 pt-2' : ''
-            } ${styles.sectionSeeAll}`}
-            data-zone="sectionSeeAll"
-            // The data-cta="link" hover effect is a from-center underline (a
-            // background-gradient line, NOT text-decoration). A merchant who set
-            // the See-all zone's text decoration to "none" means "no underline" —
-            // honour that by dropping data-cta so the hover line doesn't fire.
-            data-cta={seeAllZone?.textDecoration === 'none' ? undefined : 'link'}
-            style={{
-              fontFamily: seeAllZone?.fontFamily,
-              fontSize: responsiveFontSize(seeAllZone?.fontSize),
-              fontWeight: seeAllZone?.fontWeight,
-              color: seeAllZone?.color,
-              letterSpacing: seeAllZone?.letterSpacing,
-              lineHeight: seeAllZone?.lineHeight,
-              textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
-              textDecoration: seeAllZone?.textDecoration,
-              textAlign: seeAllZone?.textAlign as React.CSSProperties['textAlign'],
-            }}
-          >
-            {isRtl ? 'عرض الكل' : 'See all'}
-          </Link>
-        )}
+        {seeAllHref && !seeAllInline && seeAllLink(false)}
       </div>
       {/* belowHeading divider — between this heading block and the section
           content (products / categories grid). Full DividerSettings shape;

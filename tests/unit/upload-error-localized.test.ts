@@ -14,7 +14,7 @@ const body = {
     message: 'The file is not a JPEG, PNG, GIF or WebP image',
     details: {
       messageEn: 'The file is not a JPEG, PNG, GIF or WebP image',
-      messageAr: 'الملف ليس صورة JPEG أو PNG أو GIF أو WebP',
+      messageAr: 'الملف ده مش صورة JPEG أو PNG أو GIF أو WebP',
     },
   },
 };
@@ -26,7 +26,7 @@ afterEach(() => {
 describe('upload error text follows the admin language', () => {
   it('Arabic admin (rtl) shows the Arabic text', () => {
     document.documentElement.dir = 'rtl';
-    expect(uploadErrorText(body, 'fallback')).toBe('الملف ليس صورة JPEG أو PNG أو GIF أو WebP');
+    expect(uploadErrorText(body, 'fallback')).toBe('الملف ده مش صورة JPEG أو PNG أو GIF أو WebP');
   });
   it('English admin shows the English text', () => {
     document.documentElement.dir = 'ltr';

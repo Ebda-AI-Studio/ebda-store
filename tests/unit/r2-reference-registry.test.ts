@@ -76,6 +76,8 @@ const URL_SHAPED =
  * column, or that is also registered, fails the suite.
  */
 const NOT_R2_REFERENCES: Record<string, string> = {
+  'OrderItem.tierLadder':
+    'JSON entitlement snapshot { rungs: [{ minQty, priceMinor, variant, group }], groupPercentMinor } taken at sale time (B2B Task 8b, B2B-17/18), never a URL',
   'InstapayReceipt.extracted':
     'what the AI read off a transfer receipt (amounts, names, references), never a URL; the image is a private-bucket key, not a public R2 URL',
   'StoreTaxDocument.profileId': 'foreign key to store_tax_profiles, never a URL',
@@ -149,6 +151,10 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'AnswerEngineCheck.competitorUrls': 'third-party competitor URLs',
   'ProductModel.materials': 'material names + indexes extracted from the GLB, no URLs',
   'ProductModel.gltfVariants': 'KHR_materials_variants names, no URLs',
+  'WebhookEndpoint.url':
+    "the merchant's own https webhook receiver address (a third-party server), never an R2 upload",
+  'WebhookDelivery.payload':
+    'the signed webhook event JSON (ids, totals, status), no media URLs of ours',
   'ProductModel.stats': 'vertex/mesh/texture counts and extension names, no URLs',
 };
 

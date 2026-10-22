@@ -16,6 +16,8 @@ import type { TemplateId, PageDefinition } from '@ebda/shared';
 import {
   sanitizeUrl,
   definitionToLayout,
+  documentForLook,
+  getLook,
   getSectionDefinition,
   renderableSections,
   sectionToLegacy,
@@ -36,8 +38,14 @@ import {
   type ProductSpotlightSettings,
 } from '../sections/ProductSpotlightSection';
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
-import { resolveSectionProducts } from '../sections/section-products';
+import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
+import { HeroCollage } from '../../templates/shared/HeroCollage';
+import { resolveSectionProducts, onSaleProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
+import { CategoryChips } from '../../templates/shared/CategoryChips';
+import { CategoryRail } from '../../templates/shared/CategoryRail';
+import { CategoryTiles } from '../../templates/shared/CategoryTiles';
+import { CompactHeroBand } from '../../templates/shared/CompactHeroBand';
 import {
   sectionSpacingClasses,
   sectionVisibilityClass,
@@ -69,7 +77,7 @@ interface HomepageTestimonial {
   rating: number;
   title: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity: string | null;
   createdAt: string;
 }
@@ -86,6 +94,9 @@ export interface PageRendererProps {
    *  (category-slug and manual-ids sources). Merged into the union the
    *  storefront filters against. */
   extraProducts?: Product[];
+  /** The API's `sort=on_sale` result in its own order; the deals row reads it as-is. Absent (the
+   *  editor canvas, a page that fetched none) = the client derivation over the loaded pools. */
+  onSalePool?: Product[];
   /**
    * Editor canvas only (token-gated preview): wrap each section in a
    * `display: contents` marker carrying its id so the overlay can select it,
@@ -109,7 +120,7 @@ function heroSlidesWithImage<T extends { image?: string }>(
 }
 
 export function PageRenderer({
-  definition,
+  definition: storedDefinition,
   editorMode = false,
   templateId,
   featuredProducts,
@@ -118,11 +129,14 @@ export function PageRenderer({
   categories,
   testimonials,
   extraProducts,
+  onSalePool,
 }: PageRendererProps) {
   // The legacy-shaped view of the document: section props plus the
   // cross-section lookups the dividers and the featured fallback need.
-  const layout = definitionToLayout(definition);
   const { store } = useStore();
+  // Under a look with a section mix, sections tagged for another look are left out (C10).
+  const definition = documentForLook(storedDefinition, getLook(store.look));
+  const layout = definitionToLayout(definition);
   const { language } = useLanguage();
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
@@ -137,6 +151,7 @@ export function PageRenderer({
       n.hidden !== true &&
       (n.type === 'featured-collection' ||
         n.type === 'product-spotlight' ||
+        n.type === 'shop-the-look' ||
         n.type === 'product-carousel')
   );
 
@@ -339,10 +354,27 @@ export function PageRenderer({
   // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the
   // store has supplied slides via layout.hero. When no slides exist we fall
   // back to the legacy T.Hero (which uses the per-store hero text fields).
+  // Collage (Ruling B1-2): needs three slides with a photo (`image`; HeroCollage shows `imageAr` in Arabic when set); with fewer, the
+  // hero renders as the banner / slider below in full-bleed.
+  const collageEligible =
+    layout.hero.enabled &&
+    layout.hero.presentation === 'collage' &&
+    heroSlidesWithImage(layout.hero.slides).length >= 3;
+  // Opt-in hero design key (Ruling B1-41): only a hero set to `frame: 'line'` (Vitrine's mix, or a
+  // merchant's pick) draws the hairline and fills its frame; every other framed hero is unchanged.
+  const heroFrameLine = layout.hero.frame === 'line';
+  const bannerPresentation =
+    layout.hero.presentation === 'collage' ? 'full-bleed' : layout.hero.presentation;
   const sliderEligible =
-    layout.hero.mode === 'slider' && layout.hero.slides.length > 0 && !!T.HeroSlider;
+    !collageEligible &&
+    layout.hero.mode === 'slider' &&
+    layout.hero.slides.length > 0 &&
+    !!T.HeroSlider;
   const bannerEligible =
-    layout.hero.mode === 'single' && layout.hero.slides.length > 0 && !!T.HeroBanner;
+    !collageEligible &&
+    layout.hero.mode === 'single' &&
+    layout.hero.slides.length > 0 &&
+    !!T.HeroBanner;
   // The legacy T.Hero is only useful when the merchant has supplied at
   // least one piece of content for it (title, subtitle, or image). With
   // all three empty we'd render a hero with nothing in it, which is
@@ -354,6 +386,16 @@ export function PageRenderer({
     heroSubtitleArVal ||
     heroImage
   );
+
+  // a11y P2-2: a home with no hero section (Catalogue, Showroom) still opens with an h1, the
+  // store's name. A document hero (any presentation) emits its own.
+  const homeHasHero =
+    definition.sections.some(n => n.type === 'hero' && n.hidden !== true) &&
+    layout.hero.enabled &&
+    (collageEligible ||
+      sliderEligible ||
+      (bannerEligible && !!heroSlidesWithImage(layout.hero.slides)[0]) ||
+      legacyHeroHasContent);
 
   // Data-driven sections render nothing publicly when they have nothing to
   // show (never an empty shell, never a stray divider). In the editor canvas
@@ -378,7 +420,7 @@ export function PageRenderer({
   // A divider only separates two rendered sections.
   const dividerOk = (visible: boolean) => visible || editorMode;
 
-  return (
+  const body = (
     <>
       {/* Section titles. Each section settings type extends
           SectionTitleOverride, so the merchant can change the heading
@@ -409,6 +451,14 @@ export function PageRenderer({
             style={sectionBgStyle(layout.hero.bgColor, store.theme)}
             className={heroVisClass}
           >
+            {collageEligible && (
+              <HeroCollage
+                slides={heroSlidesWithImage(layout.hero.slides)}
+                isRtl={isRtl}
+                urlPrefix={storeUrl('')}
+                headingZone={heroHeadingZone}
+              />
+            )}
             {layout.hero.enabled && sliderEligible && T.HeroSlider && (
               <T.HeroSlider
                 // `image` is optional on HeroSlide only so a DRAFT can hold a
@@ -420,7 +470,9 @@ export function PageRenderer({
                 autoplayMs={layout.hero.autoplayMs}
                 isRtl={isRtl}
                 pack={templateId}
-                presentation={layout.hero.presentation}
+                presentation={bannerPresentation}
+                frameLine={heroFrameLine}
+                textAnchor={layout.hero.textAnchor}
                 headingZone={heroHeadingZone}
                 urlPrefix={storeUrl('')}
               />
@@ -433,25 +485,40 @@ export function PageRenderer({
                   {...heroSlidesWithImage(layout.hero.slides)[0]}
                   isRtl={isRtl}
                   pack={templateId}
-                  presentation={layout.hero.presentation}
+                  presentation={bannerPresentation}
+                  frameLine={heroFrameLine}
+                  textAnchor={layout.hero.textAnchor}
                   headingZone={heroHeadingZone}
                   urlPrefix={storeUrl('')}
                 />
               )}
-            {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
-              <T.Hero
-                title={heroTitleEn}
-                titleAr={heroTitleArVal}
-                subtitle={heroSubtitleEn}
-                subtitleAr={heroSubtitleArVal}
-                image={heroImage}
-                ctaText={heroCtaEn}
-                ctaTextAr={heroCtaArVal}
-                ctaLink={heroCtaLink}
-                isRtl={isRtl}
-                urlPrefix={storeUrl('')}
-              />
-            )}
+            {layout.hero.enabled &&
+              !collageEligible &&
+              !sliderEligible &&
+              !bannerEligible &&
+              legacyHeroHasContent &&
+              (!heroImage && getLook(store.look) ? (
+                // A look store with no hero photo gets a compact title band, never an empty block.
+                <CompactHeroBand
+                  title={(isRtl ? heroTitleArVal : heroTitleEn) || heroTitleEn || heroTitleArVal}
+                  subtitle={isRtl ? heroSubtitleArVal || heroSubtitleEn : heroSubtitleEn}
+                  ctaText={isRtl ? heroCtaArVal : heroCtaEn}
+                  ctaLink={heroCtaLink}
+                />
+              ) : (
+                <T.Hero
+                  title={heroTitleEn}
+                  titleAr={heroTitleArVal}
+                  subtitle={heroSubtitleEn}
+                  subtitleAr={heroSubtitleArVal}
+                  image={heroImage}
+                  ctaText={heroCtaEn}
+                  ctaTextAr={heroCtaArVal}
+                  ctaLink={heroCtaLink}
+                  isRtl={isRtl}
+                  urlPrefix={storeUrl('')}
+                />
+              ))}
           </div>
         );
 
@@ -546,7 +613,11 @@ export function PageRenderer({
                       renderGrid(caption, vis)
                     );
                   const kindFor = (lay: typeof layout.categories.layout) =>
-                    lay === 'horizontal' && T.CategoryStrip ? 'strip' : 'grid';
+                    lay === 'chips' || lay === 'rail' || lay === 'tiles'
+                      ? lay
+                      : lay === 'horizontal' && T.CategoryStrip
+                        ? 'strip'
+                        : 'grid';
                   const desktopKind = kindFor(layout.categories.layout);
                   const mobileKind = kindFor(
                     layout.categories.layoutMobile ?? layout.categories.layout
@@ -554,8 +625,38 @@ export function PageRenderer({
                   const desktopCaption = layout.categories.captionPosition;
                   const mobileCaption =
                     layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
-                  const renderKind = (kind: 'strip' | 'grid', caption: Caption, vis?: string) =>
-                    kind === 'strip' ? renderStrip(caption, vis) : renderGrid(caption, vis);
+                  const renderKind = (
+                    kind: 'strip' | 'grid' | 'chips' | 'rail' | 'tiles',
+                    caption: Caption,
+                    vis?: string
+                  ) =>
+                    kind === 'rail' ? (
+                      <div className={vis}>
+                        <CategoryRail {...common} captionPosition={caption} pack={templateId} />
+                      </div>
+                    ) : kind === 'tiles' ? (
+                      <div className={vis}>
+                        <CategoryTiles
+                          {...common}
+                          captionPosition={caption}
+                          pack={templateId}
+                          mobileColumns={layout.categories.mobileColumns}
+                          desktopColumns={layout.categories.desktopColumns}
+                        />
+                      </div>
+                    ) : kind === 'chips' ? (
+                      <div className={vis}>
+                        <CategoryChips
+                          categories={common.categories}
+                          urlPrefix={common.urlPrefix}
+                          isRtl={isRtl}
+                        />
+                      </div>
+                    ) : kind === 'strip' ? (
+                      renderStrip(caption, vis)
+                    ) : (
+                      renderGrid(caption, vis)
+                    );
                   // Render once when desktop + mobile resolve to the SAME layout AND
                   // caption; otherwise render both trees + toggle with md: so each
                   // breakpoint gets its own layout + caption independently.
@@ -902,6 +1003,7 @@ export function PageRenderer({
                   subtitleZone={testimonialsSubtitleZone}
                   dividers={layout.testimonials.dividers}
                   sectionBgColor={layout.testimonials.bgColor}
+                  layout={layout.testimonials.layout}
                 />
               </section>
             )}
@@ -952,6 +1054,10 @@ export function PageRenderer({
             sourceProducts = templateBestSellers;
           } else if (extra.productSource === 'featured') {
             sourceProducts = templateProducts;
+          } else if (extra.productSource === 'on_sale') {
+            // Deals row: biggest drop first; an empty match renders nothing (below), never a
+            // fallback to unrelated products.
+            sourceProducts = (onSalePool ?? onSaleProducts(allRawProducts)).map(toTemplateProduct);
           } else if (extra.productSource === 'category' && extra.categorySlug) {
             const slug = extra.categorySlug.toLowerCase();
             const matched = allRawProducts.filter(p =>
@@ -1053,6 +1159,7 @@ export function PageRenderer({
           ) : (
             node
           );
+        let stagesSeen = 0;
         for (const section of renderableSections(definition).sections) {
           const def = getSectionDefinition(section.type);
           if (!def || def.group !== 'template') continue;
@@ -1065,7 +1172,12 @@ export function PageRenderer({
               bestSellers,
               featured: featuredProducts,
               extra: extraProducts ?? [],
+              onSale: onSalePool,
             };
+            const stagePriority =
+              def.type === 'product-spotlight' &&
+              (settings as ProductSpotlightSettings).layout === 'stage' &&
+              stagesSeen++ === 0;
             const node =
               def.type === 'featured-collection' ? (
                 <FeaturedCollectionSection
@@ -1092,9 +1204,29 @@ export function PageRenderer({
                   products={resolveSectionProducts(
                     settings as ProductSpotlightSettings,
                     pools,
-                    3
+                    // A stage shows exactly one product; the list shows up to three.
+                    (settings as ProductSpotlightSettings).layout === 'stage' ? 1 : 3
                   ).map(toTemplateProduct)}
                   editorMode={editorMode}
+                  onAddToCart={handleAddToCart}
+                  priority={stagePriority}
+                  showPrice={showCardPriceEff !== false}
+                />
+              ) : def.type === 'shop-the-look' ? (
+                <ShopTheLookSection
+                  sectionId={section.id}
+                  settings={settings as ShopTheLookSettings}
+                  blocks={section.blocks ?? []}
+                  // Store-scoped pools only: an unknown or foreign id is absent, never rendered (C11).
+                  products={[
+                    ...pools.newArrivals,
+                    ...pools.bestSellers,
+                    ...pools.featured,
+                    ...pools.extra,
+                  ]}
+                  editorMode={editorMode}
+                  showPrice={showCardPriceEff !== false}
+                  cardLayout={layout}
                 />
               ) : def.type === 'trust-badges' ? (
                 <TrustBadgesSection
@@ -1164,5 +1296,15 @@ export function PageRenderer({
           merchant content. Stores that want a closing CTA can use the
           AnnouncementBar or surface it through their hero / categories. */}
     </>
+  );
+  // a11y P2-2: a look home with no hero opens with an h1, the store's name. The wrapper exists only
+  // then, so every other tree (legacy stores, pinned fixtures) keeps its exact shape and ids.
+  return !editorMode && !homeHasHero && getLook(store.look) ? (
+    <>
+      <h1 className="sr-only">{(isRtl ? store.nameAr || store.name : store.name) || ''}</h1>
+      {body}
+    </>
+  ) : (
+    body
   );
 }

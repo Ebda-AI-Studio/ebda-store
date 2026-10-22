@@ -231,13 +231,14 @@ describe('adapter round trip', () => {
 
 describe('registry', () => {
   it('owns every legacy section key: the 8 body keys + announcement/header/footer + extraCarousels', () => {
-    // document-only types (Phase 2; Phase 3 Dahab pilot) have no legacy key
+    // document-only types (Phase 2; Phase 3 Dahab pilot; B1 shop-the-look) have no legacy key
     expect(SECTION_REGISTRY.filter(d => d.legacyKey === null).map(d => d.type)).toEqual([
       'image-text',
       'newsletter',
       'featured-collection',
       'collection-list',
       'product-spotlight',
+      'shop-the-look',
       'trust-badges',
     ]);
     const keys = SECTION_REGISTRY.flatMap(d => (d.legacyKey === null ? [] : [d.legacyKey])).sort();

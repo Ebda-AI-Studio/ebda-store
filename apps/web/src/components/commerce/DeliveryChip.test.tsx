@@ -73,17 +73,17 @@ describe('DeliveryChip', () => {
     zones = [zone()];
     render(<DeliveryChip leadTimeDays={5} />);
     const chip = await screen.findByTestId('delivery-chip');
-    expect(chip.textContent).toContain('يصلك بين');
-    expect(chip.textContent).toContain('يُجهَّز خصيصًا لك خلال 5 أيام');
+    expect(chip.textContent).toContain('يوصلك بين');
+    expect(chip.textContent).toContain('بيتجهزلك مخصوص في 5 أيام');
     // The "و" attaches to the second date.
     expect(chip.textContent).toMatch(/بين \S+ \d+ \S+ و\S+ \d+ \S+/);
   });
 
   it.each([
-    [1, 'ar', 'يُجهَّز خصيصًا لك خلال يوم واحد'],
-    [2, 'ar', 'يُجهَّز خصيصًا لك خلال يومين'],
-    [5, 'ar', 'يُجهَّز خصيصًا لك خلال 5 أيام'],
-    [11, 'ar', 'يُجهَّز خصيصًا لك خلال 11 يومًا'],
+    [1, 'ar', 'بيتجهزلك مخصوص في يوم واحد'],
+    [2, 'ar', 'بيتجهزلك مخصوص في يومين'],
+    [5, 'ar', 'بيتجهزلك مخصوص في 5 أيام'],
+    [11, 'ar', 'بيتجهزلك مخصوص في 11 يوم'],
     [1, 'en', 'Made for you in 1 day'],
     [2, 'en', 'Made for you in 2 days'],
     [5, 'en', 'Made for you in 5 days'],
@@ -105,11 +105,11 @@ describe('DeliveryChip', () => {
     expect(chip.textContent).toContain('Arrives Thu 15 Oct');
   });
 
-  it('single day reads "يصلك X" and omits the lead line when ready to ship', async () => {
+  it('single day reads "يوصلك X" and omits the lead line when ready to ship', async () => {
     zones = [zone({ estimatedDaysMin: 1, estimatedDaysMax: 1 })];
     render(<DeliveryChip leadTimeDays={null} />);
     const chip = await screen.findByTestId('delivery-chip');
-    expect(chip.textContent).toContain('يصلك');
+    expect(chip.textContent).toContain('يوصلك');
     expect(chip.textContent).not.toContain('بين');
     expect(chip.textContent).not.toContain('يُجهَّز');
   });
@@ -138,14 +138,14 @@ describe('DeliveryChip', () => {
     const first = render(<DeliveryChip leadTimeDays={null} />);
     // Wed 14 +3 business days, Friday off: Thu 15 - Sun 18.
     expect((await screen.findByTestId('delivery-chip')).textContent).toBe(
-      'Arrives Thu 15 Oct – Sun 18 Oct'
+      'Arrives between Thu 15 Oct and Sun 18 Oct'
     );
     first.unmount();
     storeId = `store-${++n}`;
     settings = { deliveryOffDays: [] };
     render(<DeliveryChip leadTimeDays={null} />);
     expect((await screen.findByTestId('delivery-chip')).textContent).toBe(
-      'Arrives Thu 15 Oct – Sat 17 Oct'
+      'Arrives between Thu 15 Oct and Sat 17 Oct'
     );
   });
 

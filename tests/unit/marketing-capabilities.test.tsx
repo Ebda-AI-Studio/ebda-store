@@ -1,0 +1,146 @@
+/**
+ * apps/marketing capability surface: /features and /compare/{salla,zid,shopify} exist in ar + en,
+ * are in the sitemap with alternates, are named in robots' sitemap + llms.txt, carry the brand
+ * line, stay honest (every compare page lists what Ebda does not have), and never leak the
+ * inherited brands or the orange the Ebda palette forbids.
+ */
+import { describe, it, expect } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import sitemap from '../../apps/marketing/src/app/sitemap';
+import robots from '../../apps/marketing/src/app/robots';
+import { jsonLd, brandLine } from '../../apps/marketing/src/lib/seo';
+import { ComparePage } from '../../apps/marketing/src/components/ComparePage';
+import { FeaturesPage } from '../../apps/marketing/src/components/FeaturesPage';
+import { Home } from '../../apps/marketing/src/components/Home';
+import {
+  CAPABILITIES,
+  CAPABILITY_IDS,
+  featuresFaq,
+} from '../../apps/marketing/src/lib/capabilities';
+import { ALL_ROW_IDS, COMPARE, compareRows } from '../../apps/marketing/src/lib/compare';
+import { COMPARE_SLUGS, LOCALES, pagePath } from '../../apps/marketing/src/lib/site';
+
+const APP = path.resolve(__dirname, '../../apps/marketing');
+const pub = (f: string) => readFileSync(path.join(APP, 'public', f), 'utf8');
+const BAD =
+  /Force AI|ForceAI|force-ai|\bFWB\b|\bForce\b|Kuwait|الكويت|\bKWD\b|#ff6e01|#ff6f00|orange/i;
+
+const routeFile = (locale: 'ar' | 'en', page: string) =>
+  path.join(APP, 'src/app', locale === 'ar' ? '(ar)' : '(en)/en', page, 'page.tsx');
+
+describe('every /features and /compare page exists in ar + en', () => {
+  for (const locale of LOCALES) {
+    for (const page of ['features', ...COMPARE_SLUGS.map(s => `compare/${s}`)]) {
+      it(`${locale} ${page}: route file, sitemap entry, hreflang`, () => {
+        expect(existsSync(routeFile(locale, page))).toBe(true);
+        const url = `https://ebda.app${pagePath(locale, page as never)}/`.replace('//', '//');
+        const e = sitemap().find(x => x.url === url);
+        expect(e, `${url} in sitemap`).toBeTruthy();
+        expect(Object.keys(e!.alternates!.languages!).sort()).toEqual(['ar', 'en', 'x-default']);
+      });
+    }
+  }
+  it('robots points at the sitemap that lists them', () => {
+    expect(robots().sitemap).toBe('https://ebda.app/sitemap.xml');
+  });
+});
+
+describe('/features', () => {
+  for (const locale of LOCALES) {
+    const html = renderToStaticMarkup(<FeaturesPage locale={locale} />);
+    it(`${locale}: one block per capability, FAQ, compare links, no forbidden strings`, () => {
+      for (const id of CAPABILITY_IDS) expect(html).toContain(`data-capability="${id}"`);
+      expect(html.match(/<h1/g)).toHaveLength(1);
+      for (const f of featuresFaq(locale)) expect(html).toContain(f.q);
+      for (const s of COMPARE_SLUGS)
+        expect(html).toContain(`href="${pagePath(locale, `compare/${s}` as never)}"`);
+      expect(html).not.toMatch(BAD);
+    });
+    it(`${locale}: JSON-LD has a FAQPage with the features FAQ`, () => {
+      const m = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)!;
+      const g = JSON.parse(m[1].replace(/\\u003c/g, '<'))['@graph'];
+      const faq = g.find((n: { '@type': string }) => n['@type'] === 'FAQPage');
+      expect(faq.mainEntity).toHaveLength(featuresFaq(locale).length);
+    });
+  }
+  it('home shows the capabilities section in both locales and links to /features', () => {
+    for (const locale of LOCALES) {
+      const html = renderToStaticMarkup(<Home locale={locale} />);
+      expect(html).toMatch(/<section id="capabilities"/);
+      expect(html).toContain(`href="${pagePath(locale, 'features')}"`);
+    }
+  });
+});
+
+describe('/compare is balanced', () => {
+  for (const slug of COMPARE_SLUGS) {
+    for (const locale of LOCALES) {
+      it(`${locale} ${slug}: says where Ebda is stronger AND not yet, dated, no forbidden strings`, () => {
+        const html = renderToStaticMarkup(<ComparePage locale={locale} slug={slug} />);
+        // verdicts of "stronger" either way only where the fact is firmly public: Shopify
+        expect(html.includes('data-verdict="ebda"')).toBe(slug === 'shopify');
+        expect(html.includes('data-verdict="them"')).toBe(slug === 'shopify');
+        for (const r of [...compareRows().gap, ...compareRows().strength])
+          expect(html).toContain(r.label[locale]);
+        expect(html).toContain(locale === 'en' ? 'October 2026' : 'أكتوبر 2026');
+        expect(html).not.toMatch(BAD);
+        // JSON-LD on a compare page carries no FAQPage
+        expect(html).not.toContain('FAQPage');
+      });
+    }
+  }
+  it('every row has a cell for every vendor, and the permanent gaps stay in the not-yet table', () => {
+    const gap = compareRows().gap.map(r => r.id);
+    for (const id of ['apps', 'code', 'pos', 'multicur']) expect(gap).toContain(id);
+    for (const slug of COMPARE_SLUGS)
+      for (const id of ALL_ROW_IDS) expect(COMPARE[slug].cells[id]).toBeTruthy();
+  });
+  it('uses no invented numbers about competitors (digits only in the Ebda column)', () => {
+    for (const slug of COMPARE_SLUGS)
+      for (const id of ALL_ROW_IDS)
+        for (const l of LOCALES)
+          expect(COMPARE[slug].cells[id].text[l].replace(/B2B/g, '')).not.toMatch(/\d/);
+  });
+});
+
+describe('llms.txt and llms-full.txt', () => {
+  const llms = pub('llms.txt');
+  const full = pub('llms-full.txt');
+  it('llms.txt links every features and compare page in both locales and llms-full.txt', () => {
+    for (const locale of LOCALES) {
+      expect(llms).toContain(`https://ebda.app${pagePath(locale, 'features')}/`);
+      for (const s of COMPARE_SLUGS)
+        expect(llms).toContain(`https://ebda.app${pagePath(locale, `compare/${s}` as never)}/`);
+    }
+    expect(llms).toContain('https://ebda.app/llms-full.txt');
+    expect(llms).toMatch(/^# Ebda Store/);
+    expect(llms).toContain('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
+    expect(llms).toMatch(/## Not there yet/);
+    expect(llms).not.toMatch(BAD);
+  });
+  it('llms-full.txt carries every capability title (English), the FAQ and the comparisons', () => {
+    for (const id of CAPABILITY_IDS) expect(full).toContain(CAPABILITIES.en[id].t);
+    for (const f of featuresFaq('en')) expect(full).toContain(f.q);
+    for (const s of COMPARE_SLUGS) expect(full).toContain(`/en/compare/${s}/`);
+    expect(full).not.toMatch(BAD);
+  });
+});
+
+describe('brand disambiguation', () => {
+  it('brandLine is the one agreed string', () => {
+    expect(brandLine()).toBe('Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)');
+  });
+  it('JSON-LD names Ebda Store with Ebda AI Studio as parent, url ebda.app', () => {
+    for (const locale of LOCALES) {
+      const g = jsonLd(locale)['@graph'] as {
+        '@type': string;
+        name?: string;
+        parentOrganization?: unknown;
+      }[];
+      const brand = g.find(n => n.name === 'Ebda Store' && n['@type'] === 'Organization');
+      expect(brand?.parentOrganization).toBeTruthy();
+    }
+  });
+});

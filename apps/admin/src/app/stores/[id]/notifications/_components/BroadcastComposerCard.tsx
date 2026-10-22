@@ -160,7 +160,12 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             </svg>
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
+            <h2
+              data-setting-id="notifications.broadcast"
+              className="text-lg font-semibold text-foreground"
+            >
+              {t('title')}
+            </h2>
             <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>

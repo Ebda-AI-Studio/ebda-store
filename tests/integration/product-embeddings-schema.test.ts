@@ -7,6 +7,9 @@
  * StoreService.delete remove the rows; nothing references the table, so no NO ACTION child is
  * added), the tenant guard covers the model, and `ebda_product_embed_doc` builds the embedding
  * input. Owner-role `prisma` is used only for fixtures and read-backs. Fixtures are per CALL.
+ *
+ * planner-owner-ok: the EXPLAIN here only checks that an IMMUTABLE helper is inlined (SQL shape),
+ * not that any index is used.
  */
 import crypto from 'node:crypto';
 import { describe, it, expect, afterAll, vi } from 'vitest';
@@ -131,34 +134,62 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
   it('embed doc strips html, keeps arabic as written, caps description', async () => {
     const long = 'x'.repeat(4000);
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc('Shoes', 'أحذية', '3abaya', ${'<p>جلد <b>طبيعي</b></p>'}, ${long}) AS d`;
+      SELECT public.ebda_product_embed_doc('Shoes', 'أحذية', ${'<p>جلد <b>طبيعي</b></p>'}, ${long}) AS d`;
     expect(r.d).toContain('أحذية');
     expect(r.d).toContain('جلد طبيعي');
     expect(r.d).not.toContain('<b>');
     expect(r.d.length).toBeLessThan(1500 + 200);
   });
 
+  it('SEARCH-T13-7: a nullable words vector + hash, set together or not at all', async () => {
+    const cols = await prisma.$queryRaw<Array<{ c: string; t: string; n: string }>>`
+      SELECT a.attname::text AS c, format_type(a.atttypid, a.atttypmod) AS t,
+             CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS n
+        FROM pg_attribute a WHERE a.attrelid = 'product_embeddings'::regclass
+         AND a.attname IN ('terms_embedding', 'terms_hash') ORDER BY 1`;
+    expect(cols).toEqual([
+      { c: 'terms_embedding', t: 'halfvec(1024)', n: 'YES' },
+      { c: 'terms_hash', t: 'text', n: 'YES' },
+    ]);
+    const [c] = await prisma.$queryRaw<Array<{ def: string }>>`
+      SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+       WHERE conrelid = 'product_embeddings'::regclass AND conname = 'product_embeddings_terms_pair_chk'`;
+    expect(c?.def).toMatch(/terms_embedding IS NULL.*=.*terms_hash IS NULL/);
+  });
+
+  it('SEARCH-T13-5/8: contracted — only the 4-argument doc (no words) exists; the 5-argument one is dropped', async () => {
+    const sigs = await prisma.$queryRaw<Array<{ args: string }>>`
+      SELECT pg_get_function_identity_arguments(p.oid) AS args FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc' ORDER BY 1`;
+    expect(sigs).toEqual([{ args: 'p_name text, p_name_ar text, p_desc text, p_desc_ar text' }]);
+    const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
+      SELECT public.ebda_product_embed_doc('Mug', 'مج', 'سيراميك', NULL) AS d`;
+    expect(r.d).toBe('مج\nMug\nسيراميك');
+  });
+
   it('embed doc tolerates NULL fields and is IMMUTABLE invoker-rights sql', async () => {
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc('Bag', NULL, NULL, NULL, NULL) AS d`;
+      SELECT public.ebda_product_embed_doc('Bag', NULL, NULL, NULL) AS d`;
     expect(r.d).toBe('Bag');
     const [f] = await prisma.$queryRaw<Array<{ vol: string; secdef: boolean }>>`
       SELECT p.provolatile::text AS vol, p.prosecdef AS secdef FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc'`;
+      WHERE n.nspname = 'public' AND p.proname = 'ebda_product_embed_doc'
+        AND p.pronargs = 4`;
     expect(f).toEqual({ vol: 'i', secdef: false });
   });
 
   it('embed doc trims every kind of whitespace and drops whitespace-only parts', async () => {
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-      SELECT public.ebda_product_embed_doc(${'\t Bag \r\n'}, ${'\n'}, ${'\t\n'}, ${' \t '}, NULL) AS d`;
+      SELECT public.ebda_product_embed_doc(${'\t Bag \r\n'}, ${'\n'}, ${' \t '}, NULL) AS d`;
     expect(r.d).toBe('Bag');
   });
 
   it('embed doc turns tags into a space, collapses whitespace, and keeps a bare < or >', async () => {
     const doc = async (desc: string) => {
       const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
-        SELECT public.ebda_product_embed_doc('X', NULL, NULL, ${desc}, NULL) AS d`;
+        SELECT public.ebda_product_embed_doc('X', NULL, ${desc}, NULL) AS d`;
       return r.d;
     };
     expect(await doc('<p>قطن</p><p>مصري</p>')).toBe('X\nقطن مصري');
@@ -170,8 +201,8 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
   it('embed doc is NULL (not an empty string) when every part is empty', async () => {
     // Task 11 must skip a NULL doc instead of embedding md5('').
     const [r] = await prisma.$queryRaw<Array<{ a: string | null; b: string | null }>>`
-      SELECT public.ebda_product_embed_doc(NULL, NULL, NULL, NULL, NULL) AS a,
-             public.ebda_product_embed_doc(' ', ${'\t'}, '', '<p> </p>', NULL) AS b`;
+      SELECT public.ebda_product_embed_doc(NULL, NULL, NULL, NULL) AS a,
+             public.ebda_product_embed_doc(' ', ${'\t'}, '<p> </p>', NULL) AS b`;
     expect(r).toEqual({ a: null, b: null });
   });
 
@@ -179,7 +210,7 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
     // Postgres inlines an IMMUTABLE sql function only when its body contains no mutable call, so a
     // label that hides a STABLE function (concat_ws, array_to_string) leaves the call in the plan.
     const plan = await prisma.$queryRaw<Array<{ 'QUERY PLAN': string }>>`
-      EXPLAIN (VERBOSE) SELECT public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)
+      EXPLAIN (VERBOSE) SELECT public.ebda_product_embed_doc(p.name, p.name_ar, p.description, p.description_ar)
       FROM products p LIMIT 1`;
     const text = plan.map(r => r['QUERY PLAN']).join('\n');
     expect(text).not.toMatch(/ebda_product_embed_doc/);
@@ -201,6 +232,55 @@ describe.skipIf(!hasDb)('product_embeddings', () => {
       WHERE contype = 'f' AND confrelid = 'public.product_embeddings'::regclass`;
     expect(Number(children.n)).toBe(0);
   });
+
+  it('Task 14: both vectors are stored inline (toast_tuple_target 8160), not in TOAST', async () => {
+    const [rel] = await prisma.$queryRaw<Array<{ opts: string[] | null }>>`
+      SELECT reloptions AS opts FROM pg_class WHERE oid = 'public.product_embeddings'::regclass`;
+    expect(rel.opts).toContain('toast_tuple_target=8160');
+    // Behaviour, not just the option: 150 rows of two incompressible 1024-dim vectors (~4 KB each
+    // row) grow the heap and leave the TOAST relation untouched. (Measured at 20 000 products
+    // with the default EXTENDED: the exact KNN scan read the vectors back through the TOAST index
+    // (~5 buffer hits per value, 120 k hits per query) and took 74 ms alone and ~1.2 s mean
+    // under 30 searches/s, against 30 ms and 26 ms inline.)
+    const ROLLBACK = Symbol('rollback');
+    let grew = { heap: 0n, toast: 0n };
+    const storeId = await seedStore('inline');
+    await prisma
+      .$transaction(
+        async tx => {
+          const size = async () => {
+            const [r] = await tx.$queryRaw<Array<{ heap: bigint; toast: bigint }>>`
+              SELECT pg_relation_size('public.product_embeddings'::regclass) AS heap,
+                     pg_relation_size((SELECT reltoastrelid FROM pg_class
+                                       WHERE oid = 'public.product_embeddings'::regclass)) AS toast`;
+            return r;
+          };
+          const before = await size();
+          await tx.$executeRaw`
+            INSERT INTO public.products (id, store_id, name, slug, price, status, updated_at)
+            SELECT 'inl-' || ${uid()} || '-' || g, ${storeId}, 'n' || g, 'inl-' || ${uid()} || '-' || g,
+                   1000, 'active', now()
+            FROM generate_series(1, 150) g`;
+          await tx.$executeRaw`
+            INSERT INTO public.product_embeddings
+              (product_id, store_id, model, content_hash, embedding, terms_embedding, terms_hash)
+            SELECT p.id, p.store_id, '@cf/baai/bge-m3', md5(p.id),
+                   (SELECT array_agg(random()::real) FROM generate_series(1, 1024))::real[]::halfvec(1024),
+                   (SELECT array_agg(random()::real) FROM generate_series(1, 1024))::real[]::halfvec(1024),
+                   'h'
+            FROM public.products p WHERE p.store_id = ${storeId}`;
+          const after = await size();
+          grew = { heap: after.heap - before.heap, toast: after.toast - before.toast };
+          throw ROLLBACK;
+        },
+        { timeout: 60_000 }
+      )
+      .catch(e => {
+        if (e !== ROLLBACK) throw e;
+      });
+    expect(grew.heap).toBeGreaterThan(0n);
+    expect(grew.toast).toBe(0n);
+  }, 90_000);
 
   it('has the store_id and (store_id, embedded_at) btree indexes', async () => {
     const idx = await prisma.$queryRaw<Array<{ indexname: string }>>`

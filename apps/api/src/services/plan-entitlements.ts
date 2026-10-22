@@ -136,7 +136,11 @@ export async function getAutomationFlags(
 ): Promise<
   | (Pick<
       PlanLimits,
-      'abandonedCartAutomation' | 'whatsappAutomation' | 'brandingRemoval' | 'apiAccess'
+      | 'abandonedCartAutomation'
+      | 'whatsappAutomation'
+      | 'brandingRemoval'
+      | 'apiAccess'
+      | 'wholesalePricing'
     > & { mcpAccess: boolean })
   | null
 > {
@@ -147,6 +151,7 @@ export async function getAutomationFlags(
     whatsappAutomation: e.limits.whatsappAutomation,
     brandingRemoval: e.limits.brandingRemoval,
     apiAccess: e.limits.apiAccess,
+    wholesalePricing: e.limits.wholesalePricing,
     // Merchant MCP (keys + read + write tools): Growth + Business (Ahmad 2026-10-14),
     // decided on the EFFECTIVE plan (a canceled Growth store falls back to free => off).
     mcpAccess: planIncludesMerchantMcp(e.planCode, e.limits),

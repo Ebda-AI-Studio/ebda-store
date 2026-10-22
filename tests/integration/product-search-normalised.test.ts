@@ -132,8 +132,9 @@ describe.skipIf(!hasDb)('normalised product search', () => {
   });
   it('escapes LIKE wildcards: % and _ are literal characters', async () => {
     expect(await q('50%')).toEqual([ids.pct]);
-    // The only name with a literal % in it; a wildcard % would return every product.
-    expect(await q('%')).toEqual([ids.pct]);
+    // A one-character query matches at the START of a word (SEARCH-T14-3): the only literal % sits
+    // mid-word in "50%", so nothing starts with it, and a wildcard % would return every product.
+    expect(await q('%')).toEqual([]);
     // No product text contains an underscore; a wildcard _ would match every product.
     expect(await q('_')).toEqual([]);
   });

@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
+import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { Suspense } from 'react';
 import LoginClient from './LoginClient';
 
 // Track-B — see app/cart/page.tsx sibling comment; same rationale.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Login',
-  description: 'Sign in to your account.',
-  robots: { index: false, follow: false },
-};
+export function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Login', 'تسجيل الدخول'],
+    description: ['Sign in to your account.', 'سجّل الدخول إلى حسابك.'],
+    robots: { index: false, follow: false },
+  });
+}
 
 export default function LoginPage() {
   return (

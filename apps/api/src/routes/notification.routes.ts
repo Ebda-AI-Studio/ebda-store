@@ -5,6 +5,7 @@ import { FeatureKey } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { refuseDemoStore } from '../middleware/demo-store';
 import { featureService } from '../services/feature.service';
 import { notificationConfigService } from '../services/notification-config.service';
 import { pushService } from '../services/push.service';
@@ -433,6 +434,7 @@ router.get(
 // the storefront sends.
 publicRouter.post(
   '/:storeId/push/subscribe',
+  refuseDemoStore,
   requireFeature('push_notifications'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

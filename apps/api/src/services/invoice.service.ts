@@ -6,6 +6,8 @@ import {
   orderTaxPlacement,
   REGION,
   taxInvoiceInfo,
+  renderBarcodeSvg,
+  BARCODE_DISPLAY_PX,
 } from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
 import {
@@ -18,6 +20,7 @@ import {
   type EmailDir,
 } from './email-templates/_layout';
 import { AppError } from '../middleware/error-handler';
+import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
@@ -36,10 +39,10 @@ function escapeHtml(value: string | null | undefined): string {
 
 /**
  * Read a brand color from the store's theme JSON. Theme stores HSL components
- * (e.g. "26 100% 50%") matching the Tailwind theme-token format. Returns a
- * complete `hsl(...)` string; falls back to Force Orange when no color set.
+ * (e.g. "36 36% 52%") matching the Tailwind theme-token format. Returns a
+ * complete `hsl(...)` string; falls back to Ebda night when no color set (Ruling D1016-ORANGE-1).
  */
-function readBrandColor(theme: unknown, fallback = 'hsl(26 100% 50%)'): string {
+function readBrandColor(theme: unknown, fallback = 'hsl(210 9% 4%)'): string {
   if (theme && typeof theme === 'object' && 'primaryColor' in theme) {
     const v = (theme as { primaryColor?: unknown }).primaryColor;
     if (typeof v === 'string' && v.trim()) return `hsl(${v})`;
@@ -149,6 +152,29 @@ function isArabic(locale: string): locale is 'ar' {
  * The one order read both invoice renderers share (the printable page and the
  * email body), so the two can never disagree about what an invoice contains.
  */
+/**
+ * The order barcode: a real, scannable Code 128 of the order number in the
+ * store's chosen shape (`settings.receiptBarcodeShape`, default plain, `off`
+ * hides it). Shape drawings: BARKOD studio (barkod.studio), used with permission.
+ * An un-encodable number or an unknown shape degrades to plain / nothing, never
+ * a broken invoice.
+ */
+function orderBarcodeBlock(orderNumber: string, rawShape: unknown): string {
+  const shape = typeof rawShape === 'string' ? rawShape : 'plain';
+  if (shape === 'off') return '';
+  try {
+    const svg = renderBarcodeSvg({
+      value: orderNumber,
+      shape,
+      label: false,
+      displayPx: BARCODE_DISPLAY_PX.invoice,
+    });
+    return `<div class="doc-barcode"><bdi dir="ltr">${svg}</bdi><div class="doc-barcode-num" dir="ltr">${escapeHtml(orderNumber)}</div></div>`;
+  } catch {
+    return '';
+  }
+}
+
 function loadInvoiceOrder(storeId: string, orderId: string) {
   return prisma.order.findFirst({
     where: { id: orderId, storeId },
@@ -165,6 +191,7 @@ function loadInvoiceOrder(storeId: string, orderId: string) {
           template: true,
           currency: true,
           timezone: true,
+          settings: true,
         },
       },
       customer: { select: { email: true, firstName: true, lastName: true } },
@@ -418,12 +445,24 @@ export class InvoiceService {
                 <div class="item-meta">
                   <div class="item-name">${escapeHtml(displayName)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}</div>
                   ${item.personalisation ? `<div class="item-note">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></div>` : ''}
+                  ${(() => {
+                    // B2B: the tier / wholesale label from the line's persisted snapshot (never re-resolved).
+                    const label = priceLineLabel(item, ar ? 'ar' : 'en');
+                    return label
+                      ? `<div class="item-note" data-price-label="1">${escapeHtml(label)}</div>`
+                      : '';
+                  })()}
                   ${item.sku ? `<div class="item-sku">${escapeHtml(item.sku)}</div>` : ''}
                 </div>
               </div>
             </td>
             <td class="col-qty">${item.quantity}</td>
-            <td class="col-price">${formatPrice(item.price)}</td>
+            <td class="col-price">${(() => {
+              const list = struckListPrice(item);
+              return list != null
+                ? `<s class="list-price" style="opacity:.6">${formatPrice(list)}</s> ${formatPrice(item.price)}`
+                : formatPrice(item.price);
+            })()}</td>
             <td class="col-total">${formatPrice(item.total)}</td>
           </tr>`;
       })
@@ -613,6 +652,11 @@ export class InvoiceService {
     .notes { margin-top: 28px; padding: 18px 20px; background: var(--bg-soft); border-radius: 12px; }
     .notes .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-mute); margin-bottom: 6px; }
     .notes .body { font-size: 13px; color: var(--ink); line-height: 1.55; white-space: pre-wrap; }
+
+    /* Order barcode: ink on paper, always LTR, kept together when printing */
+    .doc-barcode { margin-top: 28px; text-align: center; color: var(--ink); break-inside: avoid; }
+    .doc-barcode svg { width: 100%; max-width: 360px; height: auto; }
+    .doc-barcode-num { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0.2em; color: var(--ink-soft); margin-top: 4px; }
 
     /* Footer */
     .footer { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
@@ -810,6 +854,8 @@ export class InvoiceService {
       </section>`
           : ''
       }
+
+      ${orderBarcodeBlock(order.orderNumber, (order.store.settings as Record<string, unknown> | null)?.receiptBarcodeShape)}
 
       <footer class="footer">
         <div class="footer-text">

@@ -1,0 +1,220 @@
+# Ebda Store (ابدأ ستور) — full capability list
+
+> Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). A self-serve online store builder for sellers in Egypt, Arabic-first with English. Not to be confused with any other site named Ebda. Generated from the same source as https://ebda.app/en/features/ and /en/compare/*; short version: https://ebda.app/llms.txt
+
+Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on every plan. Sign up: https://store.ebda.app/signup
+
+## AI inside everything, not a button on the side.
+Ebda Store works alongside you in your store, search, accounts, stock and numbers. You decide, and the AI prepares the work.
+
+### AI that writes, translates and optimises
+It writes product descriptions and translates them between Arabic and English, and drafts search-engine titles and descriptions, FAQs, categories, tags and image alt text, for one product or your whole store. You review and publish. Included in every paid plan, within fair-use limits.
+Arabic: كتابة وترجمة وتحسين بالذكاء الاصطناعي
+
+### Search that understands Egyptian Arabic and Franco
+Your shoppers type the way they talk: in Egyptian Arabic, in Franco like "gazma" or "kotshy", or in English. Search understands letter variants such as أ/ا and ه/ة, and still finds the product when the spelling is not exact. Every product gets its own search words in Egyptian Arabic, Franco and English plus the common misspellings, and you can edit them. You also see what shoppers searched for and found nothing, so you can add the missing product.
+Search by meaning: shoppers type what they have in mind and search understands what they mean. We are rolling it out gradually, and it only switches on for your store once its results pass our quality check on a real catalogue. (coming soon)
+Arabic: بحث بيفهم المصري والفرانكو
+
+### Run your store from an AI assistant
+Connect your favourite assistant to your store and ask it to add products, change prices and review orders instead of opening the dashboard. Available on: Growth and Business plans.
+Arabic: شغّل متجرك من مساعد ذكاء اصطناعي
+
+### Your books close faster
+Snap a photo of a supplier receipt and upload it, and it becomes a draft expense for you to review. When your margin drops, costs jump, revenue falls or refunds rise, you get an alert explained in Arabic and English. Receipt reading is on the Growth and Business plans.
+Arabic: حساباتك بتخلص أسرع
+
+### Your stock tells you what to do
+Reorder suggestions: it works out how fast each product sells and tells you when to reorder and how much, with the reason. Slow-moving products are flagged on their own, with ready-made clearance copy. The low-stock warning email is on the Growth and Business plans.
+Arabic: مخزونك بيقولك تعمل إيه
+
+### Your numbers explain themselves
+See what sells and your revenue, with two lines in Arabic and English above your numbers explaining what changed. Products that sell together show up for shoppers on the product page and in the cart. The level of detail grows with the plan.
+Arabic: أرقام متجرك بتتشرح
+
+### InstaPay receipts read themselves
+The receipt a customer uploads is read automatically, so nobody types the transfer details.
+Arabic: إيصال إنستا باي بيتقري لوحده
+
+### SEO and visibility in AI answers
+Search-engine titles and descriptions, redirects for old links and structured FAQs. Your store also shows up for AI assistants: we prepare an always-current store profile (llms.txt) and product feed they can read. You can also track whether AI assistants mention your store.
+Arabic: SEO وظهور في إجابات الذكاء الاصطناعي
+
+## Your store and its design
+Pick how your store looks, tune it yourself, and sell from a free link or your own domain.
+
+### Templates, ready-made looks and a page builder
+Pick from five templates with three ready-made looks each, then change colours, photos and the order of sections in a page builder where you see every change as you make it. No developer needed.
+Arabic: قوالب وأشكال جاهزة ومحرر صفحات
+
+### A free address and your own domain
+Every store gets a free yourname.ebda.app address, and you can connect your own domain from the dashboard. A custom domain is available on every plan.
+Arabic: لينك مجاني ودومين خاص بيك
+
+## Sell and market
+Win back shoppers who left, talk to them after they buy, and reward them for coming back.
+
+### Abandoned-cart recovery
+When a shopper leaves items in the cart, the store reminds them in steps and sends them back to the cart with a direct link, by notification, by email or by SMS. Email and SMS only go out when the shopper agreed at checkout, guests included. Available on: Growth and Business plans.
+Arabic: استرجاع السلات المتروكة
+
+### Order emails that send themselves
+Order confirmation, shipping, refunds, payment success or failure and a review request after delivery all go to your customer in Arabic or English, styled to match your store.
+Arabic: إيميلات الطلبات بتتبعت لوحدها
+
+### Email campaigns to your subscribers
+Write a marketing email in Arabic and English and send it to newsletter subscribers who agreed to receive it. Available on: Growth and Business plans.
+Arabic: حملات إيميل لمشتركيك
+
+### Loyalty points, referral rewards and affiliates
+Customers earn points on every pound they spend and for signing up, reviewing, birthdays and referrals, and move up through four tiers. Larger stores can also run an affiliate programme with a commission you set. Points are on Growth and Business, the affiliate programme on Business.
+Arabic: نقاط ولاء ومكافآت إحالة وعمولة مسوّقين
+
+### Customer reviews
+Customers review a product after it arrives, and you moderate reviews before they appear on your store.
+Arabic: تقييمات العملاء
+
+## Run the store
+Payments and shipping for Egypt, warehouses and barcodes, and the other tools you connect.
+
+### Payments and shipping the Egyptian market expects
+Cash on delivery, InstaPay, and card and wallet payments through Paymob, Kashier and FawryPay. Shipping with Bosta, ShipBlu, Mylerz and Aramex, or deliver yourself.
+Arabic: دفع وشحن زي ما السوق المصري متعود
+
+### Multiple warehouses and purchase orders
+If you keep stock in more than one place, track inventory per warehouse, raise purchase orders to suppliers and scan product barcodes. Available on: Business plan.
+Arabic: أكتر من مخزن وأوامر شراء
+
+### Order barcodes and a packing slip
+Every order has a barcode you scan to open it straight away, in 23 fun shapes. A packing slip carries the barcode, and you can print slips in bulk.
+Arabic: باركود للطلبات وبوليصة تغليف
+
+### Wholesale selling (B2B)
+Prices that drop as quantity grows, customer groups, minimum orders, and your approval of a wholesale buyer before they can order. Available on: Business plan.
+Arabic: بيع بالجملة (B2B)
+
+### Connect your store to your other tools
+When something happens in your store, such as a new order, it notifies the tool you choose, so you can connect it to your accounting, shipping or any other tool you work with. Available on: Growth and Business plans.
+Arabic: اربط متجرك بأدواتك التانية
+
+## Pricing with no surprises
+A clear subscription, and nothing taken from your orders.
+
+### 0% commission on your orders
+You pay the subscription only, with no commission on any order on any plan. Payment gateway fees are separate when a customer pays online.
+Arabic: صفر عمولة على طلباتك
+
+## And also
+- Coupons and promotions, which can target customer groups
+- Returns handled from the dashboard
+- Team accounts with roles
+- Bulk product import from CSV or Excel
+- Server-side Meta and TikTok ad conversion tracking
+- 3D product models and AR on every plan
+- A dashboard you install on your phone that notifies you of every order
+
+## FAQ
+Q: Does Ebda Store have templates and ready-made designs?
+A: Yes. There are five templates with three ready-made looks each, and you can change colours, photos and sections in the page builder.
+
+Q: Can I connect my own domain?
+A: Yes, on every plan. If you would rather wait, your store runs on a free yourname.ebda.app address.
+
+Q: Does search understand Egyptian Arabic and Franco?
+A: Yes. A shopper can type "gazma", "كوتشي" or English, search understands letter variants, and every product gets AI search words that you can edit.
+
+Q: Is there search by meaning?
+A: It is rolling out gradually and coming soon. We will not switch it on for your store until its results pass our quality check on a real catalogue.
+
+Q: Does it recover abandoned carts?
+A: Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification, and by SMS when they agreed to it.
+
+Q: Is there loyalty and a referral programme?
+A: Yes. Loyalty points, tiers and referral rewards are on Growth and Business, and the affiliate programme with commission is on Business.
+
+Q: Can I send email campaigns to newsletter subscribers?
+A: Yes, on Growth and Business. Automatic order emails (confirmation, shipping, refunds, review request) work on every plan.
+
+Q: Can I connect my store to other tools?
+A: Yes, on Growth and Business. The store notifies the tool you choose when something happens, such as a new order.
+
+Q: Are there order barcodes?
+A: Yes. Every order has a barcode in 23 fun shapes, and a packing slip carries it, with bulk printing.
+
+Q: Can I sell wholesale to businesses?
+A: Yes, on the Business plan: prices that drop with quantity, customer groups, minimum orders, and your approval of a wholesale buyer.
+
+Q: Is AI included in the price?
+A: Yes. The AI tools are included in the paid plans, within fair-use limits, with no separate subscription.
+
+Q: Is there a commission on orders?
+A: No. It is 0% on every plan. You pay the subscription, and the payment gateway charges its own fee when a customer pays online.
+
+Q: What is not there yet?
+A: There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Salla, Zid and Shopify go through the details, and what is coming soon.
+
+## Comparisons (as of October 2026)
+Competitor facts are general and publicly known; check their sites before deciding.
+
+### Ebda Store vs Salla — https://ebda.app/en/compare/salla/
+Both Ebda Store and Salla let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while Salla started in Saudi Arabia. This page says where each is stronger, including what Ebda Store does not have yet.
+- Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. Salla — Salla started in Saudi Arabia.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. Salla — Check Salla's site for current pricing and billing currency.
+- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. Salla — Check Salla's current plan terms. Payment gateway fees apply on any platform.
+- Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. Salla — Salla is Arabic-first.
+- Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. Salla — Check Salla's site for its current search features.
+- AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Salla — Check Salla's site for its AI features and which plan includes them.
+- Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Salla — Check which Egyptian gateways and carriers Salla supports for your account.
+- Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Salla — Check Salla's site for its themes and editor.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Salla — Check Salla's site for cart recovery and loyalty options.
+- Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Salla — Check Salla's site for webhooks and integrations.
+- Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Salla — Check Salla's site for wholesale pricing.
+- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Salla — Check Salla's site for email marketing options.
+- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Salla — Check Salla's site for how its search handles meaning.
+- App marketplace: Ebda Store — There is no app marketplace. Salla — Check Salla's site for its app store.
+- Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Salla — Check Salla's site for developer and theme customisation tools.
+- Point of sale (POS): Ebda Store — There is no in-store point of sale. Salla — Check Salla's site for in-store selling options.
+- Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Salla — Check Salla's site for multi-currency support.
+- Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Salla — Check Salla's site for its merchant base and partners.
+
+### Ebda Store vs Zid — https://ebda.app/en/compare/zid/
+Both Ebda Store and Zid let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while Zid started in Saudi Arabia. This page says where each is stronger, including what Ebda Store does not have yet.
+- Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. Zid — Zid started in Saudi Arabia.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. Zid — Check Zid's site for current pricing and billing currency.
+- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. Zid — Check Zid's current plan terms. Payment gateway fees apply on any platform.
+- Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. Zid — Zid is Arabic-first.
+- Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. Zid — Check Zid's site for its current search features.
+- AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Zid — Check Zid's site for its AI features and which plan includes them.
+- Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Zid — Check which Egyptian gateways and carriers Zid supports for your account.
+- Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Zid — Check Zid's site for its themes and editor.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Zid — Check Zid's site for cart recovery and loyalty options.
+- Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Zid — Check Zid's site for webhooks and integrations.
+- Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Zid — Check Zid's site for wholesale pricing.
+- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Zid — Check Zid's site for email marketing options.
+- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Zid — Check Zid's site for how its search handles meaning.
+- App marketplace: Ebda Store — There is no app marketplace. Zid — Check Zid's site for its app store.
+- Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Zid — Check Zid's site for developer and theme customisation tools.
+- Point of sale (POS): Ebda Store — There is no in-store point of sale. Zid — Check Zid's site for in-store selling options.
+- Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Zid — Check Zid's site for multi-currency support.
+- Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Zid — Check Zid's site for its merchant base and partners.
+
+### Ebda Store vs Shopify — https://ebda.app/en/compare/shopify/
+Shopify is a large global platform serving merchants in many countries, while Ebda Store is built for Egypt only. This page says where each is stronger, including what Ebda Store does not have yet.
+- Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. Shopify — Global, with merchants in many countries.
+- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. Shopify — Check Shopify's site for the billing currency in Egypt.
+- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. Shopify — A transaction fee applies on orders paid through third-party gateways unless you use Shopify Payments. Check whether it is available for Egypt.
+- Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. Shopify — Arabic and right-to-left are supported, mainly through themes and apps.
+- Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. Shopify — Compare the current search features and apps.
+- AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Shopify — Has AI features. Compare the current scope and which plan includes them.
+- Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Shopify — Egyptian gateways and carriers depend on apps and integrations. Check what is available.
+- Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Shopify — A very large theme store and a theme editor.
+- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Shopify — Available, built in or through apps.
+- Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Shopify — Webhooks and a developer API are available, alongside the app store.
+- Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Shopify — Check Shopify's site for B2B features and which plans include them.
+- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Shopify — Email marketing through built-in tools or apps.
+- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Shopify — Check Shopify's site for how its search handles meaning.
+- App marketplace: Ebda Store — There is no app marketplace. Shopify — A very large app store.
+- Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Shopify — A theme code editor and developer tools.
+- Point of sale (POS): Ebda Store — There is no in-store point of sale. Shopify — Shopify POS for physical shops.
+- Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Shopify — Selling in multiple currencies and countries.
+- Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Shopify — An established platform with a very large merchant base and partner ecosystem.

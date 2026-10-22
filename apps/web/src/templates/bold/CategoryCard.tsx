@@ -44,7 +44,7 @@ export default function BoldCategoryCard({
         {category.image ? (
           <img
             src={category.image}
-            alt={displayName}
+            alt=""
             className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-700 ease-out"
             loading="lazy"
           />

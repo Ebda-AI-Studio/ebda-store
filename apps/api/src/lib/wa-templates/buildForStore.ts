@@ -66,9 +66,9 @@ export function buildTemplatesForStore(store: StoreBrandingForTemplates): Templa
   const arName = store.nameAr || store.name;
 
   return TEMPLATES.map(tmpl => {
-    // Replace 'force_' prefix with `<store-slug>_` for the Meta-side name.
+    // Replace 'ebda_' prefix with `<store-slug>_` for the Meta-side name.
     // Keep the rest of the canonical name (purpose + version) untouched.
-    const newName = tmpl.name.replace(/^force_/, `${prefix}_`);
+    const newName = tmpl.name.replace(/^ebda_/, `${prefix}_`);
 
     // Rewrite each example body_text array to substitute the store name.
     // Position depends on the template: every template's variableLabels

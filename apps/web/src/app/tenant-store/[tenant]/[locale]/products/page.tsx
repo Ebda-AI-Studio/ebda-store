@@ -1,12 +1,8 @@
-import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { ProductsPageBody } from '@/app/products/ProductsPageBody';
 
-export const metadata: Metadata = {
-  title: 'Products',
-  description:
-    'Browse our full catalog of products. Find the best deals with fast delivery in Egypt.',
-};
+// Rule (f): the same page-language title as the legacy twin (metadata parity, issue 2418).
+export { generateMetadata } from '@/app/products/page';
 
 export default async function StoreProductsPage({
   params,

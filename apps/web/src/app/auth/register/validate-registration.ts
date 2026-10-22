@@ -15,13 +15,10 @@ export function validateRegistration(
   t: (en: string, ar: string) => string
 ): string | null {
   if (formData.password !== formData.confirmPassword) {
-    return t('Passwords do not match', 'كلمتا المرور غير متطابقتين');
+    return t('Passwords do not match', 'كلمة المرور وتأكيدها مش زي بعض');
   }
   if (formData.password.length < 8) {
-    return t(
-      'Password must be at least 8 characters',
-      'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل'
-    );
+    return t('Password must be at least 8 characters', 'كلمة المرور لازم تكون 8 حروف على الأقل');
   }
   return null;
 }
