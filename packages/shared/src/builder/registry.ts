@@ -33,6 +33,9 @@ import {
   stepsSchema,
   stepsBlockSchema,
   makerProfileSchema,
+  giftFinderSchema,
+  giftOccasionBlockSchema,
+  giftBudgetBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -977,6 +980,75 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.text('hygiene', 'Kitchen and hygiene line', 'سطر المطبخ والنظافة', { localized: true }),
       s.range('years', 'Years cooking', 'سنين الطبخ', 0, 80),
       s.url('storyLink', 'Story page link', 'رابط صفحة الحكاية'),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'gift-finder',
+    labelEn: 'Gift finder',
+    // Neutral noun phrase, never a gendered imperative.
+    labelAr: 'مساعد الهدايا',
+    legacyKey: null,
+    rendererKey: 'section.giftFinder',
+    group: 'template',
+    propsSchema: giftFinderSchema,
+    maxCount: 1,
+    blocks: [
+      {
+        type: 'occasion',
+        labelEn: 'Occasion',
+        labelAr: 'مناسبة',
+        maxCount: 8,
+        propsSchema: giftOccasionBlockSchema,
+        settings: [
+          {
+            id: 'categorySlug',
+            type: 'category',
+            labelEn: 'Category for this occasion',
+            labelAr: 'فئة المناسبة',
+            group: 'content',
+          },
+          s.text('label', 'Label', 'الاسم', { localized: true }),
+        ],
+      },
+      {
+        type: 'budget',
+        labelEn: 'Budget',
+        labelAr: 'ميزانية',
+        maxCount: 6,
+        propsSchema: giftBudgetBlockSchema,
+        settings: [
+          s.range('maxPrice', 'Up to (pounds)', 'لحد (بالجنيه)', 50, 100000, 50),
+          s.text('label', 'Label', 'الاسم', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Gift finder',
+        nameAr: 'مساعد الهدايا',
+        settings: { heading: 'Find the right gift', headingAr: 'اختار الهدية المناسبة' },
+        blocks: [
+          { type: 'occasion', settings: { label: 'Engagement', labelAr: 'خطوبة' } },
+          { type: 'occasion', settings: { label: 'Birthday', labelAr: 'عيد ميلاد' } },
+          { type: 'occasion', settings: { label: "Mother's day", labelAr: 'عيد الأم' } },
+          {
+            type: 'budget',
+            settings: { maxPrice: 2000, label: 'Up to 2,000', labelAr: 'لحد 2,000' },
+          },
+          {
+            type: 'budget',
+            settings: { maxPrice: 5000, label: 'Up to 5,000', labelAr: 'لحد 5,000' },
+          },
+        ],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.text('occasionsLabel', 'Occasions line', 'سطر المناسبات', { localized: true }),
+      s.text('budgetsLabel', 'Budgets line', 'سطر الميزانية', { localized: true }),
+      s.text('buttonText', 'Show-gifts link text', 'نص رابط عرض الهدايا', { localized: true }),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],

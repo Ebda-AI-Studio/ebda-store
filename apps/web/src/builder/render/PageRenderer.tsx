@@ -43,6 +43,7 @@ import { StepsSection, type StepsSettings } from '../sections/StepsSection';
 import { MenuSection } from '../sections/MenuSection';
 import { ReorderRow } from '../sections/ReorderRow';
 import { MakerProfileSection, type MakerProfileSettings } from '../sections/MakerProfileSection';
+import { GiftFinderSection, type GiftFinderSettings } from '../sections/GiftFinderSection';
 import { SectionHeader } from '../sections/SectionHeader';
 import { TagChips } from '../../templates/shared/TagChips';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
@@ -1287,6 +1288,13 @@ export function PageRenderer({
                   categories={categories}
                   pack={templateId}
                   onAddToCart={handleAddToCart}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'gift-finder' ? (
+                <GiftFinderSection
+                  settings={settings as GiftFinderSettings}
+                  blocks={section.blocks ?? []}
+                  categories={categories}
                   editorMode={editorMode}
                 />
               ) : def.type === 'maker-profile' ? (

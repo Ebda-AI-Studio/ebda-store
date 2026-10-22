@@ -112,7 +112,8 @@ describe('page renderer: lookTag sections render only under their look (C10)', (
   });
 
   it('under a look with no mix, or no look: every section renders as before', () => {
-    for (const look of ['dahab.worn', null]) {
+    // every real look has a mix since Dahab (B5); an unknown id resolves to no look at all
+    for (const look of ['qamar.gone', null]) {
       const html = render(look);
       expect(html, String(look)).toContain('Atelier story');
       expect(html, String(look)).toContain('Lookbook story');

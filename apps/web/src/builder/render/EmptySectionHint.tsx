@@ -20,7 +20,8 @@ export type EmptySectionKind =
   | 'testimonials'
   | 'shopTheLook'
   | 'steps'
-  | 'makerProfile';
+  | 'makerProfile'
+  | 'giftFinder';
 
 const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   categories: 'Add categories and they will appear here.',
@@ -33,6 +34,7 @@ const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   shopTheLook: 'Add a look with a photo and its pieces and it will appear here.',
   steps: 'Add at least two steps and your routine will appear here.',
   makerProfile: 'Add a name or a photo and your kitchen profile will appear here.',
+  giftFinder: 'Add an occasion or a budget and your gift finder will appear here.',
 };
 
 export function EmptySectionHint({ kind }: { kind: EmptySectionKind }) {

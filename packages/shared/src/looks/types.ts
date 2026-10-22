@@ -88,6 +88,13 @@ export interface LookSectionSpec {
   design?: Record<string, unknown>;
   /** Starting settings for a section the store does not have yet (never applied to an existing one). */
   preset?: Record<string, unknown>;
+  /**
+   * Starting blocks for a section the store does not have yet (never applied to an existing one).
+   * Absent = the registry preset's blocks. Phase B5 (Ruling B5-8): Workshop's journey strip reuses
+   * Jasmine's `steps` section, whose registry preset is a skincare routine; the mix names its own
+   * three jewellery steps here instead of forking the section.
+   */
+  blocks?: ReadonlyArray<{ type: string; settings: Record<string, unknown> }>;
 }
 
 /** Chrome choices a skin reads from the look (Ruling B1-4). */
