@@ -86,6 +86,8 @@ vi.mock('@ebda/database', () => ({
       },
     }),
   prisma: {
+    // The faqs + howtos + disabled-pages triple is one raw round trip (fetchStoreExtras).
+    $queryRaw: vi.fn().mockResolvedValue([{ faqs: [], howtos: [], disabled: [] }]),
     storePage: { findMany: vi.fn().mockResolvedValue([]) },
     storeFaq: { findMany: vi.fn().mockResolvedValue([]) },
     storeHowto: { findMany: vi.fn().mockResolvedValue([]) },
