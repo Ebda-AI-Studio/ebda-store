@@ -22,6 +22,16 @@
         "pdp-add-missing-option": "/products/matte-lipstick",
         "pdp-added": "/products/matte-lipstick"
       }
+    },
+    "lamma": {
+      "$comment": "Phase B4 (Ruling B4-10): the Lamma demo catalogue. Category = the tagines menu page; PDP = the portion-variant stuffed cabbage box (the checkout-data-flow case: the portion name must reach the cart summary and the receipt); the second cart line is an option-less, in-stock dish (the 150 EGP minimum order is met by the two lines); the checkout picks a delivery date and window before placing the order (Ruling B4-7). `--template lamma` on the shoot script applies this set.",
+      "secondProductPath": "/products/okra-tagine",
+      "paths": {
+        "category": "/products?category=tagines",
+        "pdp": "/products/mahshi-koronb",
+        "pdp-add-missing-option": "/products/mahshi-koronb",
+        "pdp-added": "/products/mahshi-koronb"
+      }
     }
   },
   "screens": [
@@ -136,6 +146,15 @@
     "builder/sections/StepsSection.tsx",
     "components/commerce/RatingSummary.tsx",
     "components/commerce/BundleSaving.tsx",
-    "templates/jasmine/Header.tsx"
+    "templates/jasmine/Header.tsx",
+    "builder/sections/MenuSection.tsx",
+    "builder/sections/MakerProfileSection.tsx",
+    "builder/sections/ReorderRow.tsx",
+    "components/commerce/StickyBrowseCartBar.tsx",
+    "components/commerce/MinOrderProgress.tsx",
+    "components/commerce/ReorderOrderButton.tsx",
+    "app/checkout/_components/DeliveryDateChips.tsx",
+    "templates/shared/CardStepper.tsx",
+    "templates/lamma/Header.tsx"
   ]
 }

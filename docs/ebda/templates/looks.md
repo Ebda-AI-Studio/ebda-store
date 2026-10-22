@@ -13,7 +13,7 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 
 ## The 15 looks
 
-9 of the 15 are `status: 'built'` (the three Qamar looks, flipped in Phase B1 Task 10, the three Souq looks, flipped in Phase B2 Task 7, and the three Jasmine looks, flipped in Phase B3 Task 5, each after the independent audits; Ahmad's STOP rounds were withdrawn 2026-10-21); the other 6 are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks on the `souq` skin (Ruling B2-1); the Jasmine looks on the `jasmine` skin (Ruling B3-1); the six others still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers the three Qamar, the three Souq and the three Jasmine looks (each template on its own demo host, Rulings B2-7, B3-8). The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
+12 of the 15 are `status: 'built'` (the three Qamar looks, flipped in Phase B1 Task 10, the three Souq looks, flipped in Phase B2 Task 7, the three Jasmine looks, flipped in Phase B3 Task 5, and the three Lamma looks, flipped in Phase B4 Task 7, each after the independent audits; Ahmad's STOP rounds were withdrawn 2026-10-21); the other 3 (Dahab) are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks on the `souq` skin (Ruling B2-1); the Jasmine looks on the `jasmine` skin (Ruling B3-1); the Lamma looks on the `lamma` skin (Ruling B4-1); the three Dahab looks still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers the three Qamar, the three Souq, the three Jasmine and the three Lamma looks (each template on its own demo host, Rulings B2-7, B3-8, B4-10). The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
 
 | Id                   | Template | Name (ar)    | Name (en)        | Status   |
 | -------------------- | -------- | ------------ | ---------------- | -------- |
@@ -26,9 +26,9 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 | `jasmine.apothecary` | jasmine  | عطارة        | Apothecary       | built    |
 | `jasmine.bloom`      | jasmine  | بلوم         | Bloom            | built    |
 | `jasmine.clinic`     | jasmine  | عيادة        | Clinic           | built    |
-| `lamma.table`        | lamma    | سفرة العيلة  | Family table     | designed |
-| `lamma.notebook`     | lamma    | كشكول المطبخ | Kitchen notebook | designed |
-| `lamma.market`       | lamma    | سوق طازة     | Fresh market     | designed |
+| `lamma.table`        | lamma    | سفرة العيلة  | Family table     | built    |
+| `lamma.notebook`     | lamma    | كشكول المطبخ | Kitchen notebook | built    |
+| `lamma.market`       | lamma    | سوق طازة     | Fresh market     | built    |
 | `dahab.worn`         | dahab    | على الإيد    | Worn             | designed |
 | `dahab.workshop`     | dahab    | الورشة       | Workshop         | designed |
 | `dahab.giftbox`      | dahab    | علبة هدية    | Gift box         | designed |

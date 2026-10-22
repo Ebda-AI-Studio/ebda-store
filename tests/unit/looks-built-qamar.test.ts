@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { LOOKS } from '@ebda/shared';
 
-describe('B1, B2 and B3 flip exactly the Qamar, Souq and Jasmine looks to built', () => {
-  it('qamar, souq and jasmine built, everything else designed', () => {
+describe('B1 to B4 flip exactly the Qamar, Souq, Jasmine and Lamma looks to built', () => {
+  it('qamar, souq, jasmine and lamma built, everything else designed', () => {
     for (const l of LOOKS)
       expect(l.status, l.id).toBe(
-        ['qamar', 'souq', 'jasmine'].includes(l.template) ? 'built' : 'designed'
+        ['qamar', 'souq', 'jasmine', 'lamma'].includes(l.template) ? 'built' : 'designed'
       );
   });
   it('every built look has a skin of its own template and a section mix', () => {

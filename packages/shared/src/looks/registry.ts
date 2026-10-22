@@ -700,7 +700,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'lamma',
     letter: 'A',
     skin: 'lamma',
-    status: 'designed',
+    status: 'built',
     chrome: {
       header: { logoPlacement: 'start' },
       cartBar: 'total',
@@ -763,7 +763,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'lamma',
     letter: 'B',
     skin: 'lamma',
-    status: 'designed',
+    status: 'built',
     chrome: {
       header: { logoPlacement: 'centre' },
       cartBar: 'total',
@@ -825,7 +825,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'lamma',
     letter: 'C',
     skin: 'lamma',
-    status: 'designed',
+    status: 'built',
     chrome: {
       header: { logoPlacement: 'start' },
       cartBar: 'total',

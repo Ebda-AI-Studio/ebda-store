@@ -182,6 +182,16 @@ export const ACTIONS = {
     // Continues from the payment step the previous screen left open.
     const cod = page.locator('input[type="radio"][value="cod"]');
     if (await cod.count()) await cod.check();
+    // A store with delivery date chips (Phase B4, Ruling B4-7) needs a date and, with windows, a
+    // bookable window: take the first date and the first enabled window, as a shopper would.
+    const dates = page.getByRole('radiogroup', { name: /Delivery date|يوم التوصيل/ });
+    if (await dates.count()) {
+      await dates.getByRole('radio').first().click();
+      const wins = page.getByRole('radiogroup', { name: /Delivery window|موعد التوصيل/ });
+      if (await wins.count())
+        await wins.getByRole('radio').and(page.locator(':enabled')).first().click();
+      await page.waitForTimeout(300);
+    }
     await page
       .getByRole('button', { name: /Place order|تأكيد الطلب/ })
       .first()
