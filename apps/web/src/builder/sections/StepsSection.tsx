@@ -206,6 +206,7 @@ export function StepsSection({
             return (
               <li
                 key={s.id}
+                {...(editorMode ? { 'data-builder-block': s.id } : undefined)}
                 data-part="step"
                 data-done={done ? 'true' : 'false'}
                 className="flex gap-3 rounded-[var(--radius)] border border-border bg-card p-4"

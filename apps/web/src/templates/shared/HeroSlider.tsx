@@ -186,6 +186,7 @@ export function HeroSlider({
               i === activeIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
             aria-hidden={i !== activeIndex}
+            data-builder-block={slide.builderBlockId}
             aria-roledescription="slide"
             aria-label={
               isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`

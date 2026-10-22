@@ -188,6 +188,28 @@ test('click in the canvas selects the section in the tree and panel', async ({ p
   );
 });
 
+test('click on a hero slide selects the slide; header and footer select their sections', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  // dispatchEvent: at 390 a pane drawer can sit over the canvas, which Playwright cannot see from the frame
+  await canvas(page).locator('[data-builder-block="slide-2"]').dispatchEvent('click');
+  await settings(page);
+  // the slide's own settings are open (its headline field carries slide 2's value)
+  await expect(page.getByTestId('field-headline')).toHaveValue('Gift boxes');
+  await structure(page);
+  await expect(page.getByTestId('tree-block-hero-slide-2').getByRole('button').first()).toHaveClass(
+    /ring-primary/
+  );
+
+  await canvas(page).locator('[data-zone="header"]').dispatchEvent('click');
+  await settings(page);
+  await expect(page.getByTestId('header-chrome-content')).toBeVisible();
+  await canvas(page).locator('[data-zone="footer"]').dispatchEvent('click');
+  await settings(page);
+  await expect(page.getByTestId('footer-chrome-content')).toBeVisible();
+});
+
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {
   await openBuilder(page);
   for (const [v, w] of [

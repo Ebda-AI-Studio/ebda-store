@@ -7,7 +7,7 @@
  *   parent -> child  `locale`     { locale }              (reload-free locale is not supported; informational)
  *   child  -> parent `ready`      {}                      overlay mounted, send `render`
  *   child  -> parent `select`     { sectionId, blockId? } a section was clicked
- *   child  -> parent `hover`      { sectionId | null }
+ *   child  -> parent `hover`      { sectionId | null, blockId? }
  *   child  -> parent `patch-text` { sectionId, blockId?, key, value } inline text edit committed
  *
  * Both sides accept a message ONLY when it parses here AND it comes from the
@@ -40,7 +40,9 @@ export const parentToChildSchema = z.discriminatedUnion('type', [
 export const childToParentSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('ready') }).strict(),
   z.object({ ...base, type: z.literal('select'), sectionId: id, blockId: id.optional() }).strict(),
-  z.object({ ...base, type: z.literal('hover'), sectionId: id.nullable() }).strict(),
+  z
+    .object({ ...base, type: z.literal('hover'), sectionId: id.nullable(), blockId: id.optional() })
+    .strict(),
   z
     .object({
       ...base,

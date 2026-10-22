@@ -8,8 +8,9 @@
  * - talks `ebda-builder:v1` to the admin editor; every inbound message must
  *   come from an allowed admin origin (the storefront's frame-ancestors) AND
  *   from `window.parent`, and parse against the protocol schema;
- * - click selects a section (links do not navigate inside the canvas);
- * - hover outlines; the selected section keeps a gold outline;
+ * - click selects the block, section, header, announcement bar or footer
+ *   under the pointer (links do not navigate inside the canvas);
+ * - hover outlines carry a name chip; the selection keeps a solid gold outline;
  * - double-click on a merchant text setting edits it in place; Enter or
  *   blur commits a `patch-text`, Escape cancels.
  */
@@ -22,7 +23,14 @@ import {
   type PageDefinition,
 } from '@ebda/shared';
 import { BRAND } from '@ebda/shared';
-import { inlineSettingFor, sectionIdOf, unionRect, type Rect } from './overlay-logic';
+import {
+  inlineSettingFor,
+  labelFor,
+  targetOf,
+  unionRect,
+  type CanvasTarget,
+  type Rect,
+} from './overlay-logic';
 
 interface Props {
   allowedOrigins: string[];
@@ -31,27 +39,52 @@ interface Props {
   onRender: (definition: PageDefinition) => void;
 }
 
-function boxOf(id: string): Rect | null {
-  const el = document.querySelector(`[data-builder-id="${CSS.escape(id)}"]`);
-  if (!el) return null;
-  const rects = Array.from(el.children).map(c => {
-    const r = c.getBoundingClientRect();
-    return {
-      top: r.top + window.scrollY,
-      left: r.left + window.scrollX,
-      width: r.width,
-      height: r.height,
-    };
-  });
-  return unionRect(rects);
+const rectOf = (el: Element): Rect => {
+  const r = el.getBoundingClientRect();
+  return {
+    top: r.top + window.scrollY,
+    left: r.left + window.scrollX,
+    width: r.width,
+    height: r.height,
+  };
+};
+
+/** The page box of a target: a `display: contents` marker is boxed by its children. */
+function boxOf(target: CanvasTarget, doc: PageDefinition): Rect | null {
+  const sel = (id: string) => `[data-builder-id="${CSS.escape(id)}"]`;
+  if (target.blockId) {
+    const els = document.querySelectorAll(
+      `${sel(target.sectionId)} [data-builder-block="${CSS.escape(target.blockId)}"]`
+    );
+    return unionRect(Array.from(els).map(rectOf));
+  }
+  const marked = document.querySelector(sel(target.sectionId));
+  if (marked) return unionRect(Array.from(marked.children).map(rectOf));
+  // Header, announcement bar and footer are found by their storefront zone.
+  const node = [...doc.sectionGroups.header, ...doc.sectionGroups.footer].find(
+    n => n.id === target.sectionId
+  );
+  const zone =
+    node?.type === 'header'
+      ? 'header'
+      : node?.type === 'announcement'
+        ? 'beforeHeader'
+        : node?.type === 'footer'
+          ? 'footer'
+          : null;
+  const el = zone ? document.querySelector(`[data-zone="${zone}"]`) : null;
+  return el ? unionRect([rectOf(el)]) : null;
 }
+
+const same = (a: CanvasTarget | null, b: CanvasTarget | null) =>
+  a?.sectionId === b?.sectionId && a?.blockId === b?.blockId;
 
 export default function EditorOverlay({ allowedOrigins, locale, definition, onRender }: Props) {
   const parentOrigin = useRef<string | null>(null);
   const docRef = useRef(definition);
   docRef.current = definition;
-  const [selected, setSelected] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CanvasTarget | null>(null);
+  const [hovered, setHovered] = useState<CanvasTarget | null>(null);
   const [, setTick] = useState(0);
 
   const post = useCallback(
@@ -75,10 +108,16 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       parentOrigin.current = event.origin;
       if (msg.type === 'render') onRender(msg.definition);
       if (msg.type === 'select') {
-        setSelected(msg.sectionId);
-        if (msg.sectionId) {
-          const box = boxOf(msg.sectionId);
-          if (box) window.scrollTo({ top: Math.max(0, box.top - 80), behavior: 'smooth' });
+        const next = msg.sectionId
+          ? { sectionId: msg.sectionId, ...(msg.blockId ? { blockId: msg.blockId } : {}) }
+          : null;
+        setSelected(prev => (same(prev, next) ? prev : next));
+        if (next) {
+          const box = boxOf(next, docRef.current);
+          const view = { top: window.scrollY, bottom: window.scrollY + window.innerHeight };
+          // Only scroll when the target is off screen (a click on it already is on screen).
+          if (box && (box.top + 40 < view.top || box.top > view.bottom - 40))
+            window.scrollTo({ top: Math.max(0, box.top - 80), behavior: 'smooth' });
         }
       }
     };
@@ -91,24 +130,29 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     const onClick = (e: MouseEvent) => {
       const target = e.target as Element | null;
       if (target?.closest('[contenteditable="true"]')) return;
-      const id = sectionIdOf(target);
+      const hit = targetOf(target, docRef.current);
       // Inside the canvas a click selects; it never navigates or submits.
       if (target?.closest('a, button, form')) e.preventDefault();
-      if (!id) return;
-      setSelected(id);
-      post({ type: 'select', sectionId: id } as Omit<ChildToParent, 'protocol'>);
+      if (!hit) return;
+      setSelected(hit);
+      post({ type: 'select', ...hit } as Omit<ChildToParent, 'protocol'>);
     };
     const onOver = (e: MouseEvent) => {
-      const id = sectionIdOf(e.target as Element | null);
+      const hit = targetOf(e.target as Element | null, docRef.current);
       setHovered(prev => {
-        if (prev !== id) post({ type: 'hover', sectionId: id } as Omit<ChildToParent, 'protocol'>);
-        return id;
+        if (same(prev, hit)) return prev;
+        post({
+          type: 'hover',
+          sectionId: hit?.sectionId ?? null,
+          ...(hit?.blockId ? { blockId: hit.blockId } : {}),
+        } as Omit<ChildToParent, 'protocol'>);
+        return hit;
       });
     };
     const onDblClick = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
       if (!el) return;
-      const id = sectionIdOf(el);
+      const id = targetOf(el, docRef.current)?.sectionId;
       if (!id) return;
       const key = inlineSettingFor(el, docRef.current, id, locale);
       if (!key) return;
@@ -159,32 +203,67 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     };
   }, [locale, post]);
 
-  const outline = (id: string | null, kind: 'hover' | 'selected') => {
-    if (!id) return null;
-    const box = boxOf(id);
+  const isRtl = locale === 'ar';
+  const outline = (target: CanvasTarget | null, kind: 'hover' | 'selected') => {
+    if (!target) return null;
+    const box = boxOf(target, docRef.current);
     if (!box) return null;
+    const label = labelFor(docRef.current, target, locale);
+    const pageWidth = document.documentElement.clientWidth;
+    // The chip sits on the box's inline-start edge, above it (inside it at the page top).
+    const chipTop = box.top >= 24 ? box.top - 24 : box.top;
+    const chipStart = isRtl ? Math.max(0, pageWidth - (box.left + box.width)) : box.left;
     return (
-      <div
-        data-builder-outline={kind}
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          top: box.top,
-          left: box.left,
-          width: box.width,
-          height: box.height,
-          pointerEvents: 'none',
-          zIndex: 2147483000,
-          outline: `2px ${kind === 'selected' ? 'solid' : 'dashed'} ${BRAND.colors.gold}`,
-          outlineOffset: -2,
-        }}
-      />
+      <>
+        <div
+          data-builder-outline={kind}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: box.top,
+            insetInlineStart: chipStart,
+            width: box.width,
+            height: box.height,
+            pointerEvents: 'none',
+            zIndex: 2147483000,
+            outline: `2px ${kind === 'selected' ? 'solid' : 'dashed'} ${BRAND.colors.gold}`,
+            outlineOffset: -2,
+          }}
+        />
+        {label && (
+          <div
+            data-builder-chip={kind}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: chipTop,
+              insetInlineStart: chipStart,
+              maxWidth: Math.max(120, box.width),
+              pointerEvents: 'none',
+              zIndex: 2147483001,
+              padding: '2px 8px',
+              borderRadius: 6,
+              fontSize: 12,
+              lineHeight: '20px',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              background: kind === 'selected' ? BRAND.colors.gold : '#1c1917',
+              color: kind === 'selected' ? '#1c1917' : '#ffffff',
+              direction: isRtl ? 'rtl' : 'ltr',
+            }}
+          >
+            {label}
+          </div>
+        )}
+      </>
     );
   };
 
   return (
     <>
-      {hovered !== selected && outline(hovered, 'hover')}
+      {!same(hovered, selected) && outline(hovered, 'hover')}
       {outline(selected, 'selected')}
     </>
   );

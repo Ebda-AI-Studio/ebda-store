@@ -415,6 +415,8 @@ export interface HeroProps {
  * any slides at all fall back to the per-store hero text in T.Hero.
  */
 export interface HeroBannerProps {
+  /** Builder canvas only: the document block id of this slide (selects it on click). */
+  builderBlockId?: string;
   image: string;
   /** Image focus for the cropped hero (Ruling B1-32): `top` keeps a model's head in frame. */
   focus?: import('@ebda/shared').HeroFocus;

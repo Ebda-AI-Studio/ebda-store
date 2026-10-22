@@ -509,6 +509,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
             doc={b.doc}
             viewport={viewport}
             selectedId={selection?.sectionId ?? null}
+            selectedBlockId={selection?.blockId ?? null}
             reloadKey={reloadKey}
             onMessage={onCanvasMessage}
           />

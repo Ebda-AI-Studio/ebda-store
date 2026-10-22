@@ -55,6 +55,7 @@ export function HeroBanner({
   copyOnly = false,
   headingZone,
   urlPrefix,
+  builderBlockId,
 }: HeroBannerProps) {
   const isFramed = presentation === 'framed';
   const drawFrame = isFramed && frameLine;
@@ -269,6 +270,7 @@ export function HeroBanner({
       style={mobileAspectStyle}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-frame-draw={drawFrame ? '' : undefined}
+      data-builder-block={!inSlider ? builderBlockId : undefined}
     >
       <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
         {desktopSrc &&

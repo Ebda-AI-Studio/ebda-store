@@ -138,7 +138,12 @@ export function ShopTheLookSection({
               const total = buyable.reduce((sum, p) => sum + p.pricing.displayPrice, 0);
               const totalFrom = buyable.some(p => p.pricing.mode === 'fromMin');
               return (
-                <li key={l.id} data-part="look" className={PANEL}>
+                <li
+                  key={l.id}
+                  data-part="look"
+                  {...(editorMode ? { 'data-builder-block': l.id } : undefined)}
+                  className={PANEL}
+                >
                   <article className="flex h-full flex-col">
                     {l.image && (
                       <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-muted">
