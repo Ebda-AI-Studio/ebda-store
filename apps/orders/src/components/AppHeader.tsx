@@ -21,16 +21,16 @@ export function AppHeader() {
           <img
             src="/logo-on-light.svg"
             alt={BRAND.product.nameEn}
-            className="h-8 w-8 dark:hidden"
-            width={32}
+            className="h-8 w-auto dark:hidden"
+            width={17}
             height={32}
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.svg"
             alt={BRAND.product.nameEn}
-            className="hidden h-8 w-8 dark:block"
-            width={32}
+            className="hidden h-8 w-auto dark:block"
+            width={17}
             height={32}
           />
           <h1 className="text-base font-bold text-foreground">{t.orders.title}</h1>

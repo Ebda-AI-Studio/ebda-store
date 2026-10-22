@@ -54,6 +54,16 @@ export function PoweredByEbda({ hidden = false }: { hidden?: boolean }) {
             the brand gold (#B08D57) measured 3.09:1 on a white footer (STOP 1, Ruling B1-27), and
             the line is the full muted tone (the old /70 alpha also fell under 4.5:1). On a
             merchant-coloured footer both take the shared footer ink ([data-footer-ink], footer-ink.ts). */}
+        {/* The approved Ebda mark (2026-10-22 pack), decorative: the link's aria-label carries the name. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.svg"
+          alt=""
+          width={9}
+          height={17}
+          className="h-4 w-auto"
+          aria-hidden="true"
+        />
         <span>{t('Powered by', 'مدعوم من')}</span>
         {/* IA-09 (W4): attribution never outweighs the store's own name: one muted weight. */}
         <span className="font-medium">{t(BRAND.product.nameEn, BRAND.product.nameAr)}</span>

@@ -281,7 +281,7 @@ function FooterColumn({ title, links }: FooterColumnProps) {
 export function FlickeringFooter() {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const isTablet = useMediaQuery('(min-width: 640px)');
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   // The server's clock, handed down once per request: new Date() here differed across New Year.
   const year = new Date(useRenderNow()).getFullYear();
 
@@ -326,11 +326,11 @@ export function FlickeringFooter() {
           <div className="flex flex-col gap-4 max-w-xs">
             <div className="flex items-center gap-2.5">
               <img
-                src="/lockup-dark.svg"
-                alt={BRAND.product.nameEn}
-                className="h-10 w-auto"
-                width={120}
-                height={40}
+                src={language === 'ar' ? '/lockup-ar-dark.svg' : '/lockup-dark.svg'}
+                alt={language === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
+                className="h-12 w-auto"
+                width={85}
+                height={48}
               />
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">

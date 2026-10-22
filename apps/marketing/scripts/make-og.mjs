@@ -1,7 +1,7 @@
 // Generates public/og.svg + public/og.png (1200x630): the light canvas of the site (#fafafa) with the
-// approved lockup, the tagline and four template looks in phones (the looks' own photos from
+// approved bilingual lockup, the tagline and four template looks in phones (the looks' own photos from
 // public/looks/img: Qamar, Souq, Jasmine, Dahab). No night, no gold field. All text is pre-outlined
-// (brand/logo/ebda-lockup-light.svg + ebda-og-text.svg), so the output is identical on any machine.
+// (brand/logo/svg/02c-lockup-bilingual.svg + og-text.svg), so the output is identical on any machine.
 // Re-run with `npm run og -w apps/marketing`.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,12 +17,17 @@ const GOLD = '#B08D57';
 const W = 1200;
 const H = 630;
 
-const lockupSvg = readFileSync(path.join(brand, 'ebda-lockup-light.svg'), 'utf8');
+const lockupSvg = readFileSync(path.join(brand, 'svg', '02c-lockup-bilingual.svg'), 'utf8');
 const lockupInner = lockupSvg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
-const ogText = readFileSync(path.join(brand, 'ebda-og-text.svg'), 'utf8');
+const [, , lockupW, lockupH] = lockupSvg
+  .match(/viewBox="([^"]+)"/)[1]
+  .split(/\s+/)
+  .map(Number);
+const ogText = readFileSync(path.join(brand, 'og-text.svg'), 'utf8');
 const pathOf = role => ogText.match(new RegExp(`data-role="${role}" d="([^"]+)"`))[1];
-// viewBox is "18 16 288.496 96": scale 1.75 -> ~505x168 box, left-aligned at x=76.
-const lockup = `<g transform="translate(76 80) scale(1.75) translate(-18 -16)">${lockupInner}</g>`;
+// Nested <svg> keeps the lockup's own viewBox (164x92): scaled to 190px tall, left-aligned at x=76.
+const LOCKUP_H = 190;
+const lockup = `<svg x="76" y="70" width="${(LOCKUP_H * lockupW) / lockupH}" height="${LOCKUP_H}" viewBox="0 0 ${lockupW} ${lockupH}">${lockupInner}</svg>`;
 
 // Four phones, staggered, each showing one look's hero photo inside a dark bezel.
 const PHONES = [

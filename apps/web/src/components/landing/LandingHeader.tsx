@@ -18,11 +18,11 @@ export function LandingHeader() {
         {/* Logo + wordmark */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <img
-            src="/lockup-dark.svg"
-            alt={BRAND.product.nameEn}
-            className="h-9 w-auto"
-            width={108}
-            height={36}
+            src={language === 'ar' ? '/lockup-ar-dark.svg' : '/lockup-dark.svg'}
+            alt={language === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
+            className="h-10 w-auto"
+            width={71}
+            height={40}
           />
         </Link>
 
