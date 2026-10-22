@@ -223,8 +223,8 @@ test('inline Arabic edit of a slide headline reaches the draft, undo restores it
   await canvas(page)
     .locator('body')
     .evaluate(() => (window as any).__patch('hero', 'headlineAr', 'علب جديدة', 'slide-2'));
-  await waitSaved(page);
-  expect(await slideHeadline()).toBe('علب جديدة');
+  // poll the draft: `saved` is also the idle state before the debounced autosave fires
+  await expect.poll(slideHeadline, { timeout: 15_000 }).toBe('علب جديدة');
 
   // a key that is not a text setting of the block never reaches the document
   const saves = (await state(page)).saves;
@@ -235,8 +235,7 @@ test('inline Arabic edit of a slide headline reaches the draft, undo restores it
   expect((await state(page)).saves).toBe(saves);
 
   await page.getByTestId('undo').click();
-  await waitSaved(page);
-  expect(await slideHeadline()).toBe('علب هدايا');
+  await expect.poll(slideHeadline, { timeout: 15_000 }).toBe('علب هدايا');
 });
 
 test('change image from the canvas: pick, describe, one undo step; a non-image key opens nothing', async ({
@@ -269,16 +268,16 @@ test('change image from the canvas: pick, describe, one undo step; a non-image k
   await page.getByTestId('swap-alt-en').fill('Gift boxes of dates');
   await page.getByTestId('swap-apply').click();
   await expect(page.getByTestId('image-swap-alt')).toHaveCount(0);
-  await waitSaved(page);
-  expect(await slide()).toMatchObject({
+  await expect.poll(slide, { timeout: 15_000 }).toMatchObject({
     image: 'https://media.ebda.app/stores/e2e/builder/a.jpg',
     alt: 'Gift boxes of dates',
   });
 
   // the picture and its description are ONE undo step
   await page.getByTestId('undo').click();
-  await waitSaved(page);
-  expect(await slide()).toMatchObject({ image: 'https://media.ebda.app/hero-2.jpg' });
+  await expect
+    .poll(slide, { timeout: 15_000 })
+    .toMatchObject({ image: 'https://media.ebda.app/hero-2.jpg' });
   expect((await slide())?.alt).toBeUndefined();
 });
 
@@ -299,11 +298,11 @@ test('canvas drop reorders the sections, the tree follows, one undo restores it'
   await sendFromCanvas(page, { type: 'move', sectionId: last, toIndex: 0 });
   await expect.poll(async () => (await templateIds(page))[0]).toBe(last);
   expect(await templateIds(page)).toEqual([last, ...before.slice(0, -1)]);
-  await waitSaved(page);
-  expect((await state(page)).draft!.definition.sections.map(x => x.id)).toEqual([
-    last,
-    ...before.slice(0, -1),
-  ]);
+  await expect
+    .poll(async () => (await state(page)).draft?.definition.sections.map(x => x.id), {
+      timeout: 15_000,
+    })
+    .toEqual([last, ...before.slice(0, -1)]);
   // ONE undo restores the original order
   await page.getByTestId('undo').click();
   expect(await templateIds(page)).toEqual(before);
