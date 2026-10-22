@@ -28,7 +28,11 @@ export default function MinimalEmptyState({
   });
 
   return (
-    <div dir={isRtl ? 'rtl' : 'ltr'} className="flex flex-col items-start py-20" role="status">
+    <div
+      dir={isRtl ? 'rtl' : 'ltr'}
+      className="flex flex-col items-start py-10 sm:py-20"
+      role="status"
+    >
       {icon}
       <h2 className="text-2xl text-foreground">{displayTitle}</h2>
       {displayDescription && (

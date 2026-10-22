@@ -371,9 +371,9 @@ export const HERO_TEXT_SCRIM = {
   hex: '#141414',
   alpha: 0.72,
   fade: '2rem',
-  /** Inline mask: solid under the copy column (max-w-xl + padding), clear past `reach`. */
-  solidTo: 'min(100%, 40rem)',
-  reach: 'min(100%, 60rem)',
+  /** Inline mask: solid under the copy column (max-w-xl + padding), clear past `reach`. Tightened 2026-10-23 (polish): the old 40/60rem band ran across the subject's hem on a 1280 hero; the copy column is max-w-xl (36rem) + px-10, so 39rem keeps the text on solid scrim. */
+  solidTo: 'min(100%, 39rem)',
+  reach: 'min(100%, 46rem)',
 } as const;
 
 export function getPackStyles(pack: TemplateId | undefined): PackStyles {
