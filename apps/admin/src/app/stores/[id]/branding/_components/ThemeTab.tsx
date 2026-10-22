@@ -89,8 +89,8 @@ function BrandColorField({
  * Secondary, optional Accent) and clicks "Generate palette". From those seeds we
  * derive the full token set (accent if unset, text, surfaces, borders, and the
  * two alternating page backgrounds) and save them onto the theme — where they
- * become the color options the Page Builder reads. Fine-grained, per-section
- * color editing lives in the Page Builder; this tab is NOT a second editor.
+ * become the color options the visual editor reads. Fine-grained, per-section
+ * color editing lives in the visual editor; this tab is NOT a second editor.
  */
 export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
   const t = useT('branding.theme');

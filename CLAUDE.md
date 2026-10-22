@@ -85,7 +85,7 @@ Refuse: "ship on one tenant first, roll out later", "setting for store X only", 
 
 ## Per-store visual configuration
 
-Canonical editors, all StoreTheme flags, the product-card CTA/OOS system, PLP facets, AI balancer, and layout invariants: **`docs/architecture/store-theme-flags.md`**. Binding headlines: Page Builder + Smart Palette are the canonical design system (the Branding tab's color/font/preset pickers are retired inputs); theme PUT is a server-side shallow-merge PATCH — send only the keys your surface owns; new visual toggles default OFF (rule 2 below); Store columns instead of StoreTheme JSON only when API-gated.
+Canonical editors, all StoreTheme flags, the product-card CTA/OOS system, PLP facets, AI balancer, and layout invariants: **`docs/architecture/store-theme-flags.md`**. Binding headlines: the visual editor (`/stores/:id/builder`; the form Page Builder was retired 2026-10-22, its routes redirect) + Smart Palette are the canonical design system (the Branding tab's color/font/preset pickers are retired inputs); theme PUT is a server-side shallow-merge PATCH — send only the keys your surface owns; new visual toggles default OFF (rule 2 below); Store columns instead of StoreTheme JSON only when API-gated.
 
 ## UI/UX standing rules (lessons — apply on every UI change)
 

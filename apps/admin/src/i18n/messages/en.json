@@ -2273,7 +2273,7 @@
       },
       "uppercaseStyle": {
         "title": "Uppercase text styling (nav, headings, labels)",
-        "hint": "When enabled, nav links, footer column headings, section headings, category captions, hero text, and testimonial author names render in uppercase. Off by default (natural case). Product names have their own control on Page Builder.",
+        "hint": "When enabled, nav links, footer column headings, section headings, category captions, hero text, and testimonial author names render in uppercase. Off by default (natural case). Product names have their own control in the visual editor.",
         "enableLabel": "Enable uppercase chrome styling"
       },
       "footerLogo": {
@@ -2310,7 +2310,7 @@
       },
       "brandColors": {
         "title": "Brand colors",
-        "hint": "Set your 2–3 core brand colors. We generate the rest of the palette from them — then fine-tune any individual color in the Page Builder.",
+        "hint": "Set your 2–3 core brand colors. We generate the rest of the palette from them — then fine-tune any individual color in the visual editor.",
         "primary": "Primary",
         "secondary": "Secondary",
         "accent": "Accent",
@@ -2408,7 +2408,7 @@
       "enableDescription": "Show the Locations page on your storefront. Customers can find your branches.",
       "disabledTitle": "Locations are currently disabled",
       "disabledDescription": "Locations you add here are saved but won't be visible on the storefront until you enable the toggle above.",
-      "navHint": "Add the Locations link to your storefront via Page Builder → header navigation, footer links, or top utility bar.",
+      "navHint": "Add the Locations link to your storefront via the visual editor → header navigation, footer links, or top utility bar.",
       "showInFooterTitle": "Show branches in footer",
       "showInFooterHint": "Adds a \"Branches\" column to your storefront footer listing your published locations (name, address, phone). Off by default — existing footers are unaffected until you turn this on.",
       "showInFooterToggle": "Show a Branches column in the storefront footer",

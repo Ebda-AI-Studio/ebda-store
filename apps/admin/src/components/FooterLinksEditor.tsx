@@ -111,7 +111,7 @@ interface FooterLinksEditorProps {
   variant?: 'standalone' | 'embedded';
   /**
    * When provided, the editor registers a silent save here and HIDES its own
-   * Save button — so the Page Builder's main Save button persists footer +
+   * Save button — so the visual editor's main Save button persists footer +
    * utility links alongside everything else. Returns true on success.
    */
   saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
@@ -126,7 +126,7 @@ interface FooterLinksEditorProps {
   section?: 'all' | 'utility' | 'links';
   /**
    * When provided, the editor keeps this ref up-to-date with the current
-   * (unsaved) state so the Page Builder can include it in the preview-draft
+   * (unsaved) state so the visual editor can include it in the preview-draft
    * bundle without requiring a save first.
    */
   stateRef?: React.MutableRefObject<FooterLinksEditorState | null>;
@@ -521,7 +521,7 @@ export function FooterLinksEditor({
     }
   }
 
-  // Register a silent save for the Page Builder's main Save button.
+  // Register a silent save for the visual editor's main Save button.
   if (saveRef) saveRef.current = () => handleSave({ silent: true });
 
   function getSetter(section: 'shop' | 'support' | 'company') {
@@ -781,7 +781,7 @@ export function FooterLinksEditor({
           sticky chrome when embedded. Pinned position inside the
           standalone /pages variant comes from the page-level sticky
           footer there, not from this component. */}
-      {/* Hidden when the Page Builder owns saving (saveRef provided) — the
+      {/* Hidden when the visual editor owns saving (saveRef provided) — the
           main Save button persists footer + utility links via the registered
           saver. Otherwise the standalone editor keeps its own sticky save. */}
       {!saveRef && (

@@ -4,8 +4,8 @@
  * NavMenuEditor — reusable navigation menu editor.
  *
  * Renders the same nav-item form in two contexts:
- *   variant="standalone"  → used by /stores/[id]/navigation page (full-page chrome)
- *   variant="embedded"    → used by Page Builder, rendered inside a SectionCard
+ *   variant="standalone"  → kept for a full-page host; /stores/[id]/navigation now redirects to the editor
+ *   variant="embedded"    → used by visual editor, rendered inside a SectionCard
  *
  * Data is saved directly to settings.navMenu via PUT /api/v1/stores/:id.
  * The editor is self-contained (owns its own state + save button).
@@ -56,14 +56,14 @@ interface NavMenuEditorProps {
   variant: 'standalone' | 'embedded';
   /**
    * When provided, the editor registers a silent save here and HIDES its own
-   * Save button — so the Page Builder's main Save button persists the nav menu
+   * Save button — so the visual editor's main Save button persists the nav menu
    * alongside everything else. Returns true on success (or when there's nothing
    * valid to save, so it never blocks the unified save).
    */
   saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   /**
    * When provided, the editor keeps this ref up-to-date with the current
-   * (unsaved) nav menu state so the Page Builder can include it in the
+   * (unsaved) nav menu state so the visual editor can include it in the
    * preview-draft bundle without requiring a save first.
    */
   stateRef?: React.MutableRefObject<NavItem[] | null>;
@@ -164,7 +164,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
     return true;
   }
 
-  // Register a silent save for the Page Builder's main Save button.
+  // Register a silent save for the visual editor's main Save button.
   if (saveRef) saveRef.current = () => handleSave({ silent: true });
 
   const isEmbedded = variant === 'embedded';
@@ -281,7 +281,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
           {t('resetDefault')}
         </Button>
         <div className="flex-1" />
-        {/* Hidden when the Page Builder owns saving (saveRef provided) — the
+        {/* Hidden when the visual editor owns saving (saveRef provided) — the
             main Save button persists the nav menu via the registered saver. */}
         {!saveRef && (
           <Button

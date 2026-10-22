@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 // NOTE (2026-06-09 overlap audit #4/#5): announcement-bar VISIBILITY (`enabled`)
-// and BACKGROUND color (`bgColor`) are now owned by the Page Builder
+// and BACKGROUND color (`bgColor`) are now owned by the visual editor
 // (layout.announcement.*), which wins at render (ShopChrome resolves
 // `layout.announcement.enabled ?? announcementBar.enabled` and the same for
 // bgColor). This page is now content-only: it edits text/link/textColor and
@@ -94,7 +94,7 @@ export default function AnnouncementPage() {
     setIsSaving(true);
     setMessage(null);
     try {
-      // Send content only. `enabled` + `bgColor` are owned by the Page Builder
+      // Send content only. `enabled` + `bgColor` are owned by the visual editor
       // (layout.announcement.*) and intentionally omitted — the API merges, so
       // omitting them preserves any legacy values without this page clobbering
       // the editor-managed chrome.
@@ -158,7 +158,7 @@ export default function AnnouncementPage() {
             {t('preview')}
           </p>
           {/* Preview uses a neutral surface — the live background color is set
-              in the Page Builder (announcement section). */}
+              in the visual editor (announcement section). */}
           <div
             className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-foreground"
             style={{
@@ -249,7 +249,7 @@ export default function AnnouncementPage() {
           </div>
         </div>
 
-        {/* Text color. The background color is set in the Page Builder
+        {/* Text color. The background color is set in the visual editor
             (announcement section) — see the pointer above. */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('colors')}</h2>
