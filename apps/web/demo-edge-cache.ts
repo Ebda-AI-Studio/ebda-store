@@ -61,7 +61,6 @@ export function demoEdgeKey(request: Request): string | null {
   const h = request.headers;
   // Spoof / per-visitor inputs: any of these makes the request ineligible.
   for (const name of [
-    'cookie',
     'authorization',
     'x-forwarded-host',
     'forwarded',
@@ -74,6 +73,17 @@ export function demoEdgeKey(request: Request): string | null {
   ])
     if (h.has(name)) return null;
   if (!(h.get('accept') ?? '').includes('text/html')) return null;
+  // The ONLY cookie a cacheable request may carry is the storefront's own language cookie, exactly
+  // `force-language=ar|en` and nothing else in the header: the app writes it on every first load, so
+  // refusing it would exclude every visitor after their first page. It selects one of two HTML
+  // variants and is part of the key; consent, draft, auth, analytics or any second cookie bypass.
+  let lang = '';
+  const cookie = h.get('cookie');
+  if (cookie !== null) {
+    const m = /^force-language=(ar|en)$/.exec(cookie.trim());
+    if (!m) return null;
+    lang = m[1];
+  }
   const path = url.pathname;
   if (
     !SAFE_PATH.test(path) ||
@@ -91,7 +101,8 @@ export function demoEdgeKey(request: Request): string | null {
     if (all.length !== 1 || getLook(all[0])?.status !== 'built') return null;
     look = all[0];
   }
-  return `https://${host}${path}${look ? `?look=${look}` : ''}`;
+  const q = [look && `look=${look}`, lang && `__lang=${lang}`].filter(Boolean).join('&');
+  return `https://${host}${path}${q ? `?${q}` : ''}`;
 }
 
 const demoVerdict = new Map<string, { demo: boolean; until: number }>();
