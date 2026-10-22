@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Local scenario stores for the Qamar and Souq matrices (tests/qamar, tests/souq). LOOPBACK
+// Local scenario stores for the Qamar, Souq and Jasmine matrices (tests/qamar, tests/souq, tests/jasmine). LOOPBACK
 // DATABASES ONLY: there is no --yes-production path. Each store is a NON-demo merchant store switched to a look through
 // StoreService.applyLook(..., { design: 'reset' }), then shaped:
 //   qamar-empty   0 products            qamar-one   1 product
@@ -13,8 +13,14 @@
 // souq-cod (the plain COD catalogue; card visuals are covered by the PaymentStep unit render,
 // Ruling B1-20, so there is no card-provider store: it would need provider credentials).
 //
+// Jasmine (--template jasmine, Phase B3): jasmine-empty, jasmine-one, jasmine-500 (cursor pagination),
+// jasmine-noimg, jasmine-longnames, jasmine-edge-light / -dark, jasmine-logo-wide / -tall / -none,
+// jasmine-white-photos (Apothecary with white-background merchant photos: the dark look on real
+// merchant content, quality bar section 9 rule 1) and jasmine-cod. There is no card-provider store:
+// the card method is the PaymentStep unit render (B1-20).
+//
 //   DATABASE_URL=<owner-role local postgres url> QAMAR_DEMO_ASSET_BASE=/__qamar-demo \
-//     npx tsx scripts/storedemo/scenario-stores.mjs [--template qamar|souq]
+//     npx tsx scripts/storedemo/scenario-stores.mjs [--template qamar|souq|jasmine]
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -54,7 +60,55 @@ export const SOUQ_SCENARIOS = [
   ['souq-white-photos', 'souq.night', { whitePhotos: true }],
   ['souq-cod', 'souq.catalogue', {}],
 ];
+export const JASMINE_SCENARIOS = [
+  ['jasmine-empty', 'jasmine.clinic', { products: 0 }],
+  ['jasmine-one', 'jasmine.bloom', { products: 1 }],
+  ['jasmine-500', 'jasmine.clinic', { products: 500 }],
+  ['jasmine-noimg', 'jasmine.apothecary', { noImages: true }],
+  ['jasmine-longnames', 'jasmine.bloom', { longNames: true }],
+  ['jasmine-edge-light', 'jasmine.clinic', { edge: 'wide', primary: '0 0% 98%' }],
+  ['jasmine-edge-dark', 'jasmine.apothecary', { edge: 'tall', primary: '0 0% 4%' }],
+  ['jasmine-logo-wide', 'jasmine.bloom', { edge: 'wide' }],
+  ['jasmine-logo-tall', 'jasmine.clinic', { edge: 'tall' }],
+  ['jasmine-logo-none', 'jasmine.apothecary', { edge: 'nologo' }],
+  ['jasmine-white-photos', 'jasmine.apothecary', { whitePhotos: true }],
+  ['jasmine-cod', 'jasmine.clinic', {}],
+];
 export const SCENARIOS = QAMAR_SCENARIOS;
+
+/** What differs per template: the lists, display names, asset dir, the one-product slug and the 500-store category/photo. */
+const PER_TEMPLATE = {
+  qamar: {
+    list: QAMAR_SCENARIOS,
+    assetDir: '__qamar-demo',
+    word: 'QAMAR',
+    name: 'Heliopolis Boutique',
+    nameAr: 'بوتيك مصر الجديدة',
+    one: 'linen-abaya',
+    category: 'abayas',
+    photo: 'linen-abaya-1.webp',
+  },
+  souq: {
+    list: SOUQ_SCENARIOS,
+    assetDir: '__souq-demo',
+    word: 'SOUQ',
+    name: 'Cairo Electronics',
+    nameAr: 'القاهرة للإلكترونيات',
+    one: 'smartphone-6-7',
+    category: 'phones',
+    photo: 'smartphone.webp',
+  },
+  jasmine: {
+    list: JASMINE_SCENARIOS,
+    assetDir: '__jasmine-demo',
+    word: 'JASMINE',
+    name: 'Cairo Beauty',
+    nameAr: 'القاهرة للجمال',
+    one: 'niacinamide-serum',
+    category: 'cleansers',
+    photo: 'gentle-cleanser.webp',
+  },
+};
 
 const svg = (w, h, word = 'QAMAR') =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#222"/><text x="50%" y="50%" fill="#fff" font-size="${Math.min(w, h) / 3}" text-anchor="middle" dominant-baseline="middle">${word}</text></svg>`;
@@ -69,14 +123,14 @@ async function run() {
   }
   const spec = templateFromArgv(process.argv.slice(2));
   if (!spec) {
-    console.error('Unknown --template; expected qamar or souq.');
+    console.error('Unknown --template; expected qamar, souq or jasmine.');
     process.exit(2);
   }
-  const isSouq = spec.template === 'souq';
-  const SCENARIO_LIST = isSouq ? SOUQ_SCENARIOS : QAMAR_SCENARIOS;
-  const assetDir = isSouq ? '__souq-demo' : '__qamar-demo';
+  const T = PER_TEMPLATE[spec.template];
+  const SCENARIO_LIST = T.list;
+  const assetDir = T.assetDir;
   const LOGO_DIR = resolve(root, `apps/web/public/${assetDir}`);
-  const word = isSouq ? 'SOUQ' : 'QAMAR';
+  const word = T.word;
   const a = assetBase([], process.env, spec);
   process.env.DIRECT_URL ??= url;
   const { createPrismaClient, Prisma, runInStoreScope } = await import('@ebda/database');
@@ -97,8 +151,8 @@ async function run() {
       const edge = shape.edge;
       const data = {
         // A store's display name is never its slug (STOP-2: "souq-noimg" leaked into a hero).
-        name: isSouq ? 'Cairo Electronics' : 'Heliopolis Boutique',
-        nameAr: isSouq ? 'القاهرة للإلكترونيات' : 'بوتيك مصر الجديدة',
+        name: T.name,
+        nameAr: T.nameAr,
         isDemo: false,
         status: 'active',
         plan: 'professional',
@@ -137,12 +191,12 @@ async function run() {
           });
         } else if (shape.products === 1) {
           await prisma.product.updateMany({
-            where: { storeId: s.id, slug: { not: isSouq ? 'smartphone-6-7' : 'linen-abaya' } },
+            where: { storeId: s.id, slug: { not: T.one } },
             data: { status: 'archived' },
           });
         } else if (shape.products === 500) {
           const cat = await prisma.category.findFirst({
-            where: { storeId: s.id, slug: isSouq ? 'phones' : 'abayas' },
+            where: { storeId: s.id, slug: T.category },
           });
           for (let b = 0; b < 5; b++) {
             const rows = Array.from({ length: 100 }, (_, i) => {
@@ -170,7 +224,7 @@ async function run() {
           await prisma.productImage.createMany({
             data: withImage.map(p => ({
               productId: p.id,
-              url: isSouq ? `${a.base}/smartphone.webp` : `${a.base}/linen-abaya-1.webp`,
+              url: `${a.base}/${T.photo}`,
               alt: p.nameAr,
               position: 0,
             })),

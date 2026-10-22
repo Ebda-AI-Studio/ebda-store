@@ -232,9 +232,15 @@ async function main() {
   const { chromium } = createRequire(join(ROOT, 'package.json'))('playwright');
   const consent = encodeURIComponent(JSON.stringify({ v: 1, marketing: false, analytics: false }));
   // SHOOT_CHANNEL=chrome drives an installed Chrome when no Playwright chromium is cached.
-  const browser = await chromium.launch(
-    process.env.SHOOT_CHANNEL ? { channel: process.env.SHOOT_CHANNEL } : {}
-  );
+  // SHOOT_HOST_RULES (e.g. `MAP *.b3.test 127.0.0.1`) maps store hosts to the local stack when the
+  // stack is a PRODUCTION build: it refuses the `<slug>.localhost` dev hosts, so the stores carry a
+  // custom domain and the browser resolves it.
+  const browser = await chromium.launch({
+    ...(process.env.SHOOT_CHANNEL ? { channel: process.env.SHOOT_CHANNEL } : {}),
+    ...(process.env.SHOOT_HOST_RULES
+      ? { args: [`--host-resolver-rules=${process.env.SHOOT_HOST_RULES}`] }
+      : {}),
+  });
   const run = [];
   const probes = [];
   // Warm-up: compile each manifest route once before shooting, so a dev server's first-compile

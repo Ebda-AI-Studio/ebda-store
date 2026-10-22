@@ -12,39 +12,102 @@
         "pdp-add-missing-option": "/products/smartphone-6-7",
         "pdp-added": "/products/smartphone-6-7"
       }
+    },
+    "jasmine": {
+      "$comment": "Phase B3 (Ruling B3-8): the Jasmine demo catalogue. Category = a skin-type tag PLP (the chip target); PDP = the Shade x Size lipstick (the checkout-data-flow case: the variant names must reach the cart summary and the receipt); the second cart line is an option-less, in-stock product. `--template jasmine` on the shoot script applies this set.",
+      "secondProductPath": "/products/sunscreen-spf50",
+      "paths": {
+        "category": "/products?tag=%D8%A8%D8%B4%D8%B1%D8%A9%20%D8%AF%D9%87%D9%86%D9%8A%D8%A9",
+        "pdp": "/products/matte-lipstick",
+        "pdp-add-missing-option": "/products/matte-lipstick",
+        "pdp-added": "/products/matte-lipstick"
+      }
     }
   },
   "screens": [
-    { "id": "home", "path": "/" },
-    { "id": "category", "path": "/products?category=abayas" },
-    { "id": "pdp", "path": "/products/linen-abaya" },
+    {
+      "id": "home",
+      "path": "/"
+    },
+    {
+      "id": "category",
+      "path": "/products?category=abayas"
+    },
+    {
+      "id": "pdp",
+      "path": "/products/linen-abaya"
+    },
     {
       "id": "pdp-add-missing-option",
       "path": "/products/linen-abaya",
       "action": "tap-add-without-options"
     },
-    { "id": "pdp-added", "path": "/products/linen-abaya", "action": "pick-options-and-add" },
-    { "id": "cart", "path": "/cart", "action": "two-lines" },
-    { "id": "cart-edit", "path": "/cart", "action": "increase-quantity" },
-    { "id": "cart-remove", "path": "/cart", "action": "remove-line-with-undo" },
-    { "id": "checkout-shipping", "path": "/checkout", "action": "empty" },
-    { "id": "checkout-shipping-errors", "path": "/checkout", "action": "submit-empty" },
-    { "id": "checkout-shipping-filled", "path": "/checkout", "action": "fill-shipping" },
+    {
+      "id": "pdp-added",
+      "path": "/products/linen-abaya",
+      "action": "pick-options-and-add"
+    },
+    {
+      "id": "cart",
+      "path": "/cart",
+      "action": "two-lines"
+    },
+    {
+      "id": "cart-edit",
+      "path": "/cart",
+      "action": "increase-quantity"
+    },
+    {
+      "id": "cart-remove",
+      "path": "/cart",
+      "action": "remove-line-with-undo"
+    },
+    {
+      "id": "checkout-shipping",
+      "path": "/checkout",
+      "action": "empty"
+    },
+    {
+      "id": "checkout-shipping-errors",
+      "path": "/checkout",
+      "action": "submit-empty"
+    },
+    {
+      "id": "checkout-shipping-filled",
+      "path": "/checkout",
+      "action": "fill-shipping"
+    },
     {
       "id": "checkout-shipping-error",
       "path": "/checkout",
       "action": "fill-shipping-calc-fails"
     },
-    { "id": "checkout-payment", "path": "/checkout", "action": "fill-and-continue" },
+    {
+      "id": "checkout-payment",
+      "path": "/checkout",
+      "action": "fill-and-continue"
+    },
     {
       "id": "checkout-coupon-failed",
       "path": "/checkout",
       "action": "apply-bad-coupon",
       "probe": ["contrast"]
     },
-    { "id": "receipt", "path": "/checkout/success", "action": "place-cod-order" },
-    { "id": "cart-empty", "path": "/cart", "probe": ["contrast"] },
-    { "id": "footer", "path": "/", "action": "scroll-to-footer" }
+    {
+      "id": "receipt",
+      "path": "/checkout/success",
+      "action": "place-cod-order"
+    },
+    {
+      "id": "cart-empty",
+      "path": "/cart",
+      "probe": ["contrast"]
+    },
+    {
+      "id": "footer",
+      "path": "/",
+      "action": "scroll-to-footer"
+    }
   ],
   "files": [
     "app/cart/CartClient.tsx",
@@ -68,6 +131,11 @@
     "templates/shared/CategoryTiles.tsx",
     "builder/sections/ProductSpotlightSection.tsx",
     "components/commerce/InstalmentLine.tsx",
-    "templates/souq/Header.tsx"
+    "templates/souq/Header.tsx",
+    "templates/shared/TagChips.tsx",
+    "builder/sections/StepsSection.tsx",
+    "components/commerce/RatingSummary.tsx",
+    "components/commerce/BundleSaving.tsx",
+    "templates/jasmine/Header.tsx"
   ]
 }
