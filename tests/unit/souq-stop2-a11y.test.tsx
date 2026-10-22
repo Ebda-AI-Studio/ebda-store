@@ -71,6 +71,8 @@ describe('P1-1: the sticky header offset', () => {
     const root = path.resolve(__dirname, '../..');
     const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8');
     expect(css).toMatch(/html\s*\{\s*scroll-padding-top:\s*calc\(var\(--header-h,\s*0px\)/);
+    // a sticky sub-bar (the Lamma menu tabs) adds its own height to the same offset (B4 a11y P1-1)
+    expect(css).toContain('var(--sticky-extra, 0px)');
     const chrome = readFileSync(path.join(root, 'apps/web/src/components/ShopChrome.tsx'), 'utf8');
     expect(chrome).toContain('<StickyHeaderOffset />');
   });

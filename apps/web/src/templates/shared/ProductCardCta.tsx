@@ -13,6 +13,7 @@ import type { CardCta } from '@ebda/shared';
 import { lookCtaVisible, QUIET_CARD_CTA_CLS } from './look-card';
 import { CardStepper } from './CardStepper';
 import { useCardStepperLine } from './card-stepper-context';
+import { requestStepperFocus, takeStepperFocus } from './card-stepper-focus';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -141,6 +142,11 @@ export function AdaptiveAddButton({
 }: AdaptiveAddButtonProps) {
   const { ref, compact } = useCompactCta();
   const stepper = useCardStepperLine(stepperProductId ?? '');
+  // `-` at 1 removed the line: this add button is back and takes the focus the stepper held (2.4.3)
+  useEffect(() => {
+    if (stepperProductId && !stepper && takeStepperFocus(stepperProductId, 'add'))
+      ref.current?.focus();
+  }, [stepper, stepperProductId, ref]);
   if (stepperProductId && stepper) return <CardStepper line={stepper} />;
   const icon = loading ? (
     <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -152,7 +158,10 @@ export function AdaptiveAddButton({
       ref={ref}
       type="button"
       disabled={disabled}
-      onClick={onClick}
+      onClick={e => {
+        if (stepperProductId) requestStepperFocus(stepperProductId, 'step');
+        onClick?.(e);
+      }}
       className={compact ? cn(className, COMPACT_CTA_CLS) : className}
       style={style}
       aria-label={compact ? label : undefined}
@@ -239,6 +248,9 @@ export function ProductCardCta({
   const stepper = useCardStepperLine(productId, { hasVariants: hasVariants || viewOnly });
   // An out-of-stock label must stay words: a disabled cart icon reads as "broken".
   const compact = compactRaw && inStock !== false;
+  useEffect(() => {
+    if (!stepper && takeStepperFocus(productId, 'add')) ctaRef.current?.focus();
+  }, [stepper, productId, ctaRef]);
 
   // Build additive shape + size classes — '' when unset so theme classes win.
   const shapeClass = ctaShapeClass(ctaShape);
@@ -320,7 +332,14 @@ export function ProductCardCta({
       inStock={inStock}
       quantityInCart={quantityInCart}
       isRtl={isRtl}
-      onAddToCart={onAddToCart}
+      onAddToCart={
+        onAddToCart
+          ? (id: string) => {
+              requestStepperFocus(productId, 'step');
+              return onAddToCart(id);
+            }
+          : onAddToCart
+      }
       showQuantityBadge={showQuantityBadge}
       variant={variant}
       labels={mergedLabels}

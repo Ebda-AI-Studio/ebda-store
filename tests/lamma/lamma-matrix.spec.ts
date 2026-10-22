@@ -213,7 +213,9 @@ test('the card stepper: the add control becomes - qty + once the dish is in the 
   await expect(page.getByTestId('min-order-progress').first()).toBeVisible();
   // - at 1 removes the line
   await card.getByRole('button', { name: 'إنقاص الكمية' }).click();
-  await card.getByRole('button', { name: 'إنقاص الكمية' }).click();
+  await expect(card.getByRole('status')).toHaveText('1');
+  // at 1 the same button removes the line and is NAMED for it (a11y P2-2)
+  await card.getByRole('button', { name: 'شيل من السلة' }).click();
   await expect(card.locator('[data-cta="stepper"]')).toHaveCount(0);
 });
 
@@ -348,7 +350,7 @@ test('an empty store is a finished page: no products renders no tabs, no broken 
 });
 
 test('a missing photo does not break a dish row', async ({ page }) => {
-  await open(page, 'lamma-table', 'ar', NOIMG_PDP);
+  await open(page, 'lamma-noimg', 'ar', NOIMG_PDP);
   await expect(page.locator('h1')).toBeVisible();
   await open(page, 'lamma-noimg', 'ar', '/products');
   expect(await page.locator('article').count()).toBeGreaterThan(0);

@@ -180,12 +180,12 @@ describe('lamma demo catalogue: every feature, by count', () => {
     for (const t of sold[0].soldOut!) expect(all).toContain(t.join('|'));
     expect(all.length).toBeGreaterThan(sold[0].soldOut!.length);
   });
-  it('one product with no photo', () => {
-    expect(PRODUCTS.filter(p => p.images.length === 0).map(p => p.slug)).toEqual(['cooking-oil']);
+  it('every product has a photo (the showroom never shows a placeholder; lamma-noimg covers the empty case)', () => {
+    expect(PRODUCTS.filter(p => p.images.length === 0).map(p => p.slug)).toEqual([]);
   });
-  it('two very long names: one Arabic, one English (>= 90 characters)', () => {
+  it('one very long Arabic name (>= 90 characters); no English name runs past 60 (the long case is lamma-longnames)', () => {
     expect(PRODUCTS.filter(p => p.nameAr.length >= 90)).toHaveLength(1);
-    expect(PRODUCTS.filter(p => p.name.length >= 90)).toHaveLength(1);
+    expect(PRODUCTS.filter(p => p.name.length > 60)).toEqual([]);
   });
   it('Arabic first: every product has Arabic name and description', () => {
     for (const p of PRODUCTS) {

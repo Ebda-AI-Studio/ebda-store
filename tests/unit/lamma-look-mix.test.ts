@@ -127,7 +127,7 @@ describe('the mixes, exactly as designed', () => {
       captionPosition: 'below',
     });
     expect(deals.preset).toMatchObject({ productSource: 'on_sale', titleAr: 'عروض النهاردة' });
-    expect(grid.design).toMatchObject({ columns: 5, mobileColumns: 2 });
+    expect(grid.design).toMatchObject({ columns: 4, mobileColumns: 2 });
     expect(market.chrome?.aisles).toHaveLength(4);
   });
   it('every look reaches the products in the first three sections', () => {

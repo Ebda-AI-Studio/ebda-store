@@ -32,7 +32,7 @@ def add(name, prompt, crop):
 
 
 # ---- stuffed and home cooking
-add('mahshi-koronb', dish("a plain round white plate of rolled stuffed cabbage leaves, pale green cylinders arranged in a circle, served dry with fresh green dill, white plate and pale green only"), 'dish')
+add('mahshi-koronb', dish("a round white plate of Egyptian stuffed cabbage rolls, many small tight cylinders of cooked dark green cabbage leaf, each rolled around rice, one cut open showing white rice inside, glossy olive green rolls in a shallow pale brown broth, a few sprigs of fresh parsley, white plate and olive green only"), 'dish')
 add('waraq-enab', dish("a white plate of thin tightly rolled stuffed vine leaves in dark green, neatly stacked in a pile, nothing else on the plate, dark green and white only"), 'dish')
 add('lentil-soup', dish("a white bowl of smooth creamy pale beige lentil soup with a drizzle of green olive oil, a plain spoon beside the bowl, beige and white only"), 'dish')
 # ---- tagines
@@ -66,7 +66,7 @@ add('minced-beef', cut("a mound of fresh raw minced beef on a plain white plate,
 add('egyptian-rice', cut("a plain unmarked white paper bag of rice standing next to a small bowl of white rice grains, white and cream tones"), 'square')
 add('brown-lentils', cut("a white bowl heaped with whole dark olive brown lentils beside a plain kraft paper bag, olive brown and cream tones"), 'square')
 add('black-tea', cut("a plain unmarked small dark green tin with a lid beside a white cup of dark brewed black tea and loose dry tea leaves, deep green and dark brown tones"), 'square')
-# cooking-oil has NO photo on purpose (the no-image product)
+add('cooking-oil', cut("a single clear glass bottle of pale golden vegetable oil with a plain white cap, only the bottle, clear glass and pale yellow only"), 'square')  # the no-photo edge case lives in the lamma-noimg scenario store
 # ---- hero (16:9) and the maker
 add('hero-table', ("a Friday table spread seen from above on white linen: round clay and white ceramic dishes of stuffed vine leaves, "
                    "a pot of dark green molokhia, white rice, a bowl of fresh green salad and a basket of flat bread, with sprigs of dill, "

@@ -380,7 +380,7 @@ function StorefrontProductCardImpl({
         ])}
         className={cn(
           'group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-          row && 'w-28 shrink-0 self-start sm:w-36'
+          row && 'w-32 shrink-0 self-start sm:w-44'
         )}
         data-card-thumb={row ? '' : undefined}
       >

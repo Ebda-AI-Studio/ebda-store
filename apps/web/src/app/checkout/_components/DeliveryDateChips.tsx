@@ -20,7 +20,11 @@ function ChipRadioGroup<T extends { key: string; disabled?: boolean }>({
   selectedKey,
   onSelect,
   render,
+  invalid,
+  describedBy,
 }: {
+  invalid?: boolean;
+  describedBy?: string;
   label: string;
   items: T[];
   selectedKey: string | null;
@@ -49,7 +53,13 @@ function ChipRadioGroup<T extends { key: string; disabled?: boolean }>({
     else if (e.key === 'End') (e.preventDefault(), move(enabled[0]?.key ?? key, -1));
   };
   return (
-    <div role="radiogroup" aria-label={label} className="mt-2 flex flex-wrap gap-2">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      aria-invalid={invalid || undefined}
+      aria-describedby={invalid ? describedBy : undefined}
+      className="mt-2 flex flex-wrap gap-2"
+    >
       {items.map(item => {
         const selected = selectedKey === item.key;
         return (
@@ -135,14 +145,19 @@ export function DeliveryDateChips({
         items={choices.map(c => ({ key: c.date, choice: c }))}
         selectedKey={selectedDate}
         onSelect={onSelectDate}
-        render={item => {
+        invalid={Boolean(error) && !selectedDate}
+        describedBy="delivery-chips-error"
+        render={(item, selected) => {
           const c = item.choice;
           const w = word(c);
           return (
             <span className="flex flex-col leading-tight">
               <span className="font-medium">{w ?? formatDeliveryDate(c.date, language)}</span>
               {w && (
-                <span className="text-xs opacity-80">{formatDeliveryDate(c.date, language)}</span>
+                // the selected chip is filled: dimming the caption would drop it under 4.5:1 (a11y P1-2)
+                <span className={`text-xs ${selected ? '' : 'opacity-80'}`}>
+                  {formatDeliveryDate(c.date, language)}
+                </span>
               )}
             </span>
           );
@@ -162,22 +177,25 @@ export function DeliveryDateChips({
             }))}
             selectedKey={selectedWindowId}
             onSelect={onSelectWindow}
-            render={item => (
+            invalid={Boolean(error) && !selectedWindowId}
+            describedBy="delivery-chips-error"
+            render={(item, selected) => (
               <span className="flex flex-col leading-tight">
                 <span className="font-medium">
                   {language === 'ar' ? item.win.labelAr || item.win.label : item.win.label}
                 </span>
-                <span className="text-xs opacity-80">
+                <span className={`text-xs ${selected ? '' : 'opacity-80'}`}>
                   {formatWindowTime12(item.win.start, language)}–
                   {formatWindowTime12(item.win.end, language)}
                 </span>
+                {item.disabled && <span className="text-xs">{t('Full', 'مكتمل')}</span>}
               </span>
             )}
           />
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-sm text-destructive-ink">
+        <p id="delivery-chips-error" role="alert" className="mt-2 text-sm text-destructive-ink">
           {error}
         </p>
       )}

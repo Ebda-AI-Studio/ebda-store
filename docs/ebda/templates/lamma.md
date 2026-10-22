@@ -10,7 +10,7 @@ Lamma is the Egyptian home-kitchen and grocery template: stuffed vegetables, tag
 | ------------ | ------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------- |
 | Scene        | A home kitchen taking same-day orders like a restaurant      | One named cook who is the brand                          | Grocery and produce with repeat baskets               |
 | Colour       | White, pomegranate clay `#A5303F`, herb `#2F6B34`, rose tint | Deep green `#1F3D2B`, paper ink, antique brass `#D3B87C` | White, herb green `#23744A`, crimson tomato `#CC2F3F` |
-| Type         | El Messiri / Cairo / Fraunces                                | Aref Ruqaa / Noto Naskh Arabic / Lora                    | Baloo Bhaijaan 2 / Almarai / Nunito                   |
+| Type         | El Messiri / Cairo / Fraunces                                | Aref Ruqaa / Noto Sans Arabic / Lora                    | Baloo Bhaijaan 2 / Almarai / Nunito                   |
 | Radius, etc. | md (8px), regular, 4/3, subtle                               | sm (4px), airy, 4/3, subtle                              | lg (16px), compact, 1/1, expressive                   |
 | Card action  | the skin's add control, becomes a stepper in the cart        | quiet outline add, becomes a stepper                     | the skin's add control, becomes a stepper             |
 
@@ -51,7 +51,7 @@ The `menu` layout of `featured-collection` and the `maker-profile` section and `
 
 **Family table.** Scene: a Friday table with the dishes still steaming. Colour strategy: restrained white with ONE pomegranate action and a rose tint for bands. Type: El Messiri headings (a warm display), Cairo body, Fraunces Latin. Bold idea: order like a menu, not like a shop: category tabs, dishes as rows with portion and prep-time chips, a stepper in place of the add button once it is in the basket, a cart bar with the total and the minimum-order progress. Playful detail: the stepper's quantity is a live region; the delivery chips say "النهاردة" and "بكرة".
 
-**Kitchen notebook.** Scene: a handwritten kitchen notebook. Colour strategy: committed deep green with paper ink and ONE antique-brass accent (the only metal). Type: Aref Ruqaa (handwritten Arabic), Noto Naskh Arabic body, Lora Latin. Bold idea: the cook is the brand; her photo and story lead and the dishes follow on a light band so a white-background photo never reads as a white box on green.
+**Kitchen notebook.** Scene: a handwritten kitchen notebook. Colour strategy: committed deep green with paper ink and ONE antique-brass accent (the only metal). Type: Aref Ruqaa (handwritten Arabic), Noto Sans Arabic body (Ruling B4-16; Naskh read 8-9px), Lora Latin. Bold idea: the cook is the brand; her photo and story lead and the dishes follow on a light band so a white-background photo never reads as a white box on green.
 
 **Fresh market.** Scene: a grocery aisle sign. Colour strategy: committed white with herb green and a crimson accent; the aisles are four soft tints (herb, crimson, aubergine, aqua) behind ink names. Type: Baloo Bhaijaan 2 (a friendly rounded display), Almarai, Nunito. Bold idea: everything in two taps: tiles, deals, a dense grid whose cards carry the stepper, an "order again" row, a cart bar. Playful detail: the aisle tint cycles; the add control grows into the stepper in place.
 

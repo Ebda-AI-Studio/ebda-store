@@ -744,7 +744,7 @@ export const LOOKS: readonly LookDefinition[] = [
       page: '#FFFFFF',
       // Ruling B4-2: the direction's terracotta (#B5482E, hue 12) is re-derived to pomegranate
       // clay, surface/line/ink follow it (hue 342-353), the herb green is darkened for text.
-      surface: '#F8E8EA',
+      surface: '#FBF1F2',
       ink: '#2B1A1F',
       muted: '#62505A',
       primary: '#A5303F',
@@ -769,6 +769,8 @@ export const LOOKS: readonly LookDefinition[] = [
       header: { logoPlacement: 'centre' },
       cartBar: 'total',
       cardStepper: 'inline',
+      // Ruling B4-15: the listing pages stay on the green (no cream sheet); photos sit on a paper matte.
+      listing: 'ground',
     },
     // Ruling B4-1 (Kitchen notebook). The cook is the brand: her photo and story lead, no hero. The
     // dish grid sits on the LIGHT band (`token:inverse`, quality bar section 9 rule 1) because the
@@ -811,7 +813,8 @@ export const LOOKS: readonly LookDefinition[] = [
       onPrimary: '#1F3D2B',
       accent: '#D3B87C',
       line: '#345E46',
-      fonts: { display: 'Aref Ruqaa', body: 'Noto Naskh Arabic', latin: 'Lora' },
+      // Ruling B4-16: UI text is a Sans Arabic face (Naskh reads 8-9px at 12px); Aref Ruqaa stays the display.
+      fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Lora' },
       radius: 'sm',
       density: 'airy',
       imageRatio: '4/3',
@@ -869,7 +872,7 @@ export const LOOKS: readonly LookDefinition[] = [
       },
       {
         type: 'featured-collection',
-        design: { columns: 5, mobileColumns: 2, paddingTop: 'tight' },
+        design: { columns: 4, mobileColumns: 2, paddingTop: 'tight' },
         preset: {
           productSource: 'newest',
           limit: 24,

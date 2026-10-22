@@ -190,10 +190,12 @@ export default function ProductsClient({
   const { language, t } = useLanguage();
   const { warning } = useToast();
   const { store } = useStore();
-  // STOP-2 taste P1-1: a look may ask for an auto-fill listing grid (cards fill the column).
-  const plpAutoFill = getLook(store.look)?.chrome?.plp === 'autoFill';
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
+  // Ruling B4-PLP-1: every template lists on an auto-fill grid (cards >= 11.5rem, photos at full card
+  // width) so 3 products never become five 160px cells. Dahab keeps its own 3/4-up density control
+  // (always wide cards); a look's `chrome.plp: 'autoFill'` (Souq) is now the default, not an opt-in.
+  const plpAutoFill = templateId !== 'dahab' || getLook(store.look)?.chrome?.plp === 'autoFill';
   // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
   const sortOptions = getSortOptions(t, meta?.ranked === true);
 

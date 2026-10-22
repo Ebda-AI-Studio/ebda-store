@@ -69,8 +69,9 @@ export function ReorderOrderButton({
     <Button
       type="button"
       variant="outline"
-      onClick={run}
-      disabled={busy}
+      onClick={() => (busy ? undefined : run())}
+      aria-disabled={busy || undefined}
+      aria-busy={busy || undefined}
       className={className ?? 'min-h-11 self-start'}
     >
       {t('Reorder', 'إعادة الطلب')}

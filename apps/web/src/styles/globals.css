@@ -1236,8 +1236,21 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 
 /* 2.4.11 Focus Not Obscured: the sticky header's measured height (StickyHeaderOffset) keeps the
  * browser's focus / scrollIntoView scroll clear of it, on every template. */
+/* --sticky-extra: a sticky sub-bar under the header (the Lamma menu tab strip publishes its
+ * height) is opaque too, so a focus scroll must clear header + sub-bar (B4 a11y P1-1). */
 html {
-  scroll-padding-top: calc(var(--header-h, 0px) + 0.75rem);
+  scroll-padding-top: calc(var(--header-h, 0px) + var(--sticky-extra, 0px) + 0.75rem);
+}
+
+/* A page with a sticky sub-bar (the Lamma menu tab strip): `overflow-x: hidden` on html AND body
+ * (layout.tsx) makes <body> a scroll container that never scrolls, so a `position: sticky` descendant
+ * never sticks (measured: the strip scrolled away at 1400px). `clip` keeps the horizontal clipping
+ * without creating a scroll container. Scoped to pages that mount the strip: the same defect inerts
+ * every other sticky element on the storefront (headers, PDP gallery, cart summary, filter rail), which
+ * is reported as a platform finding, not changed here. */
+html:has([data-part='menu-tabs']),
+body:has([data-part='menu-tabs']) {
+  overflow-x: clip;
 }
 
 /* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
@@ -1620,6 +1633,30 @@ html[lang] [data-pack='lamma'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   font-family: var(--font-display, inherit);
   line-height: 1.3;
   font-weight: 700;
+}
+
+/* Kitchen notebook (Ruling B4-16): `font-size-adjust: 0.5` (the RTL rule above) scales a face by its
+   own x-height, and it shrank the notebook's Arabic UI text to ~9px. The look sets its sizes in rem,
+   so it opts out; the floor for small-text zones is asserted in tests/lamma/lamma-matrix.spec.ts. */
+html[dir='rtl'] [data-look='lamma.notebook'],
+[data-look='lamma.notebook'] {
+  font-size-adjust: none;
+}
+/* Ruling B4-15: the listing keeps the green; a card photo shot on white sits on a paper matte and
+   multiplies into it (quality bar section 9 rule 1), except inside an inverse band (see Apothecary). */
+[data-look='lamma.notebook']
+  [data-part='card-image']:not([style*='background-color'][style*='--bg-page'] *),
+[data-look='lamma.notebook']
+  [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *) {
+  background-color: hsl(var(--foreground));
+}
+[data-look='lamma.notebook']
+  [data-part='card-image']:not([style*='background-color'][style*='--bg-page'] *)
+  img,
+[data-look='lamma.notebook']
+  [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *)
+  img {
+  mix-blend-mode: multiply;
 }
 
 /* Ruling B3-2: Apothecary's brass is a CTA FILL. As TEXT inside a card it is 5.0:1 (passes), but

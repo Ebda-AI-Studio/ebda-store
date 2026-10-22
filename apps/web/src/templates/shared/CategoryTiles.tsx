@@ -7,11 +7,12 @@ import { pickLocalizedName } from './display-helpers';
 import type { CategoryStripProps } from '../types';
 
 /**
- * Aisle tint (Phase B4, Ruling B4-2): a soft 13% wash of one aisle colour over the page. The name
+ * Aisle tint (Phase B4, Ruling B4-2): a 20% wash of one aisle colour over the page (taste P2: 13% read as an empty pale frame); the still
+ * is cropped to the tile and multiplied into the wash, so a photo shot on white takes the aisle colour. The name
  * is ALWAYS present and ink-coloured, so colour never carries the meaning alone; the washes stay
- * above 13:1 for ink (checked in tests/unit/lamma-variants-render.test.tsx for the Market aisles).
+ * above 10:1 for ink (checked in tests/unit/lamma-variants-render.test.tsx for the Market aisles).
  */
-export const AISLE_TINT_PERCENT = 13;
+export const AISLE_TINT_PERCENT = 20;
 export const aisleTint = (hex: string) =>
   `color-mix(in srgb, ${hex} ${AISLE_TINT_PERCENT}%, hsl(var(--background)))`;
 
@@ -126,7 +127,9 @@ export function CategoryTiles({
                           alt=""
                           fill
                           sizes="(min-width: 768px) 25vw, 50vw"
-                          className="object-contain p-3"
+                          className={
+                            wash ? 'object-cover mix-blend-multiply' : 'object-contain p-3'
+                          }
                         />
                       ) : (
                         <span

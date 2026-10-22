@@ -147,7 +147,9 @@ describe('card stepper (Ruling B4-4)', () => {
   it('- at 1 removes the line and offers Undo that puts it back', async () => {
     state.items = [line({ quantity: 1, note: 'بدون بصل' })];
     const { getByLabelText } = render(adaptive());
-    fireEvent.click(getByLabelText('إنقاص الكمية'));
+    // at 1 the button is named for what it does (a11y P2-2)
+    expect(() => getByLabelText('إنقاص الكمية')).toThrow();
+    fireEvent.click(getByLabelText('شيل من السلة'));
     await waitFor(() => expect(state.removeItem).toHaveBeenCalledWith('line-1'));
     await waitFor(() => expect(state.addToast).toHaveBeenCalled());
     const toast = state.addToast.mock.calls[0][0];
@@ -162,7 +164,8 @@ describe('card stepper (Ruling B4-4)', () => {
     await waitFor(() =>
       expect(getByRole('status').textContent).toContain('وصلت للحد الأقصى للكمية')
     );
-    expect((getByLabelText('زيادة الكمية') as HTMLButtonElement).disabled).toBe(true);
+    // aria-disabled, not disabled: a disabled button that holds focus drops it (a11y P2-1)
+    expect(getByLabelText('زيادة الكمية').getAttribute('aria-disabled')).toBe('true');
   });
   it('the click never reaches the card link around it', () => {
     const outer = vi.fn();

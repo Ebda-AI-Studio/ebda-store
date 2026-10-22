@@ -275,14 +275,16 @@ describe('MenuSection', () => {
     expect(container.querySelector('[role="tablist"]')).toBeNull();
     expect(nav.className).toContain('sticky');
     expect(nav.className).toContain('--header-h');
-    expect(container.querySelector('[data-menu-group]')!.className).toContain('scroll-mt-');
+    // one offset source: the strip publishes its height for html{scroll-padding-top} (2.4.11)
+    expect(document.documentElement.style.getPropertyValue('--sticky-extra')).toMatch(/^\d+px$/);
+    expect(container.querySelector('[data-menu-group]')!.className).not.toContain('scroll-mt-');
   });
   it('each dish is the shared card in row orientation: photo at the start, the same data and links', () => {
     const { container } = render(menu());
     const first = container.querySelector('article')!;
     expect(first.className).toContain('flex-row');
     const thumb = first.querySelector('[data-card-thumb]')!;
-    expect(thumb.getAttribute('class')).toContain('w-28');
+    expect(thumb.getAttribute('class')).toContain('w-32');
     expect(thumb.getAttribute('href')).toBe('/products/dish-a');
     expect(first.textContent).toContain('طبق a');
     // a menu is not a browsing grid: no wishlist heart on a row
@@ -467,16 +469,16 @@ describe('aisle tiles (Ruling B4-2)', () => {
     expect(smallTargets(container, 44)).toEqual([]);
     expect(container.querySelectorAll('[data-part="typographic"]').length).toBe(3);
   });
-  it('the aisles are not orange, and ink on every 13% wash clears 4.5:1 (and 13:1 on white)', () => {
+  it('the aisles are not orange, and ink on every 20% wash clears 4.5:1 (and 10:1)', () => {
     expect(AISLES).toEqual(['#23744A', '#CC2F3F', '#5B2A6E', '#0F7F8C']);
     for (const hex of AISLES) {
       expect(isOrangeFamily(hex), hex).toBe(false);
       const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-      const mix = (c: number) => Math.round(c * 0.13 + 255 * 0.87);
+      const mix = (c: number) => Math.round(c * 0.2 + 255 * 0.8);
       const wash = `#${[r, g, b].map(c => mix(c).toString(16).padStart(2, '0')).join('')}`;
       expect(isOrangeFamily(wash), wash).toBe(false);
-      expect(contrastRatio(wash, '#1B1B1B'), wash).toBeGreaterThanOrEqual(13);
+      expect(contrastRatio(wash, '#1B1B1B'), wash).toBeGreaterThanOrEqual(10);
     }
-    expect(aisleTint('#23744A')).toBe('color-mix(in srgb, #23744A 13%, hsl(var(--background)))');
+    expect(aisleTint('#23744A')).toBe('color-mix(in srgb, #23744A 20%, hsl(var(--background)))');
   });
 });

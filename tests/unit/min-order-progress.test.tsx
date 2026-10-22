@@ -33,7 +33,9 @@ describe('MinOrderProgress', () => {
     expect(bar.getAttribute('aria-valuemin')).toBe('0');
     expect(bar.getAttribute('aria-valuemax')).toBe('15000');
     expect(bar.getAttribute('aria-valuenow')).toBe('7000');
-    expect(bar.getAttribute('aria-label')).toContain('80');
+    // named by the visible sentence (labelledby), so it is read once (a11y M1)
+    const labelId = bar.getAttribute('aria-labelledby')!;
+    expect(document.getElementById(labelId)!.textContent).toContain('80');
   });
   it('speaks English sentence case', () => {
     ctx.language = 'en';

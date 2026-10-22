@@ -104,6 +104,12 @@
       "probe": ["contrast"]
     },
     {
+      "id": "checkout-chips-selected",
+      "path": "/checkout",
+      "action": "select-delivery-chips",
+      "probe": ["contrast"]
+    },
+    {
       "id": "receipt",
       "path": "/checkout/success",
       "action": "place-cod-order"

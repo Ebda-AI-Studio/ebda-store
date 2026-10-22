@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { checkMinimumOrder } from '@ebda/shared';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -21,6 +22,7 @@ export function MinOrderProgress({
   className?: string;
 }) {
   const { t } = useLanguage();
+  const msgId = useId();
   const formatPrice = useLocalePrice();
   const check = checkMinimumOrder(subtotalFils, minimumOrderFils);
   if (check.met || !minimumOrderFils) return null;
@@ -31,10 +33,12 @@ export function MinOrderProgress({
   );
   return (
     <div data-testid="min-order-progress" className={className}>
-      <p className="text-xs font-medium text-foreground">{message}</p>
+      <p id={msgId} className="text-xs font-medium text-foreground">
+        {message}
+      </p>
       <div
         role="progressbar"
-        aria-label={message}
+        aria-labelledby={msgId}
         aria-valuemin={0}
         aria-valuemax={minimumOrderFils}
         aria-valuenow={Math.max(0, Math.min(subtotalFils, minimumOrderFils))}

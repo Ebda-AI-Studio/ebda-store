@@ -11,8 +11,8 @@
 // as a fact ("30 ج.م/كجم"), two `onCard` facts at most per product (serves-N, prep time or the unit
 // price), a made-to-order lead time on 5+ dishes (1, 2 and 3 days) and none on grocery, a cake with
 // a REQUIRED message and a kunafa with an OPTIONAL order note, 7 sale prices (one at 40 % off or
-// more), a backorder (the béchamel tray), a sold-out variant (tea 250 g), a product with no photo
-// (the cooking oil), a very long Arabic name and a very long English name, and one empty-looking
+// more), a backorder (the béchamel tray), a sold-out variant (tea 250 g), every product with a photo
+// (the no-photo and long-name cases are the lamma-noimg and lamma-longnames scenario stores), and one empty-looking
 // product description path (every product has copy; the empty-category case is the test's).
 // Store level (the seed): cash on delivery, a 14-day return window, a minimum order of 150 EGP,
 // delivery dates 5 days ahead with two windows, a Greater Cairo zone.
@@ -148,12 +148,12 @@ export const LAMMA_PRODUCTS = [
   // ---------------------------------------------------------------- tagines and trays
   {
     slug: 'okra-tagine',
-    name: 'Slow-cooked okra and beef tagine in a rich garlic and coriander sauce, family clay pot serving four to six',
+    name: 'Okra and beef tagine, family pot',
     nameAr: 'طاجن بامية باللحمة',
     category: 'tagines',
     price: 24_000,
     images: ['okra-tagine.webp'],
-    description: 'Small okra and beef cubes slow-cooked with garlic and coriander in a clay pot.',
+    description: 'Small okra and beef cubes slow-cooked in a rich garlic and coriander sauce, in a clay pot that serves four to six.',
     descriptionAr: 'بامية زيرو ولحمة مكعبات على نار هادية بالتوم والكزبرة في طاجن فخار.',
     leadTimeDays: 1,
     facts: [SERVES('4-6 people', '4-6 أفراد'), READY('24 hours', '24 ساعة'), MADE],
@@ -452,7 +452,7 @@ export const LAMMA_PRODUCTS = [
     category: 'pantry',
     price: 5_200,
     compareAtPrice: 6_500,
-    images: [], // the product with no photo (taste bar: the card must hold up without one)
+    images: ['cooking-oil.webp'], // the no-photo case lives in the lamma-noimg scenario store (a showroom never shows a placeholder)
     description: 'Refined vegetable oil for everyday cooking.',
     descriptionAr: 'زيت نباتي مكرر للطبخ اليومي.',
     facts: [WEIGHT('1 litre', 'لتر'), ROW('Keep', 'الحفظ', 'Cool and dry', 'مكان بارد وجاف')],

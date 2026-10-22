@@ -52,6 +52,8 @@ export function MakerProfileSection({
   const edit = (key: string): Record<string, string> =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
   const name = pick(settings.name, settings.nameAr);
+  const [open, setOpen] = React.useState(false);
+  const storyId = React.useId();
   const image = pick(settings.image, settings.imageAr);
   if (!name && !image) return editorMode ? <EmptySectionHint kind="makerProfile" /> : null;
   const role = pick(settings.role, settings.roleAr);
@@ -80,7 +82,7 @@ export function MakerProfileSection({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={image}
-                alt={alt}
+                alt="" /* the name sits beside the photo: an alt equal to it reads twice */
                 loading="lazy"
                 className="h-16 w-16 shrink-0 rounded-full object-cover"
               />
@@ -142,25 +144,47 @@ export function MakerProfileSection({
             )}
             {story && (
               <p
-                className="mt-4 line-clamp-5 text-base leading-relaxed text-foreground"
+                id={storyId}
+                className={`mt-4 text-base leading-relaxed text-foreground ${open ? '' : 'line-clamp-5'}`}
                 {...edit('story')}
               >
                 {story}
               </p>
+            )}
+            {story && story.length > 180 && (
+              // the clamp must never hide content with no way to read it (a11y M6, 200% zoom)
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={storyId}
+                onClick={() => setOpen(o => !o)}
+                className="mt-2 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
+              >
+                {open ? t('Show less', 'أقل') : t('Read more', 'اقرأ أكتر')}
+              </button>
             )}
             {hygiene && (
               <p className="mt-3 text-sm font-medium text-foreground" {...edit('hygiene')}>
                 {hygiene}
               </p>
             )}
-            {link && story && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+              {link && story && (
+                <a
+                  href={link}
+                  className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
+                >
+                  {t('Read the story', 'اقرأ الحكاية')}
+                </a>
+              )}
+              {/* the cook leads, but the dishes are one tap away (taste P2: no product above the fold) */}
               <a
-                href={link}
-                className="mt-4 inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
+                href={storeUrl('/products')}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius)] bg-primary px-5 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                {t('Read the story', 'اقرأ الحكاية')}
+                {t('See the menu', 'شوف المنيو')}
               </a>
-            )}
+            </div>
           </div>
         </div>
       </div>

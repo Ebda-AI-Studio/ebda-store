@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn, useToast } from '@ebda/ui';
 import { useCart, type CartItem } from '../../contexts/CartContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { cartRemovalToast } from '../../app/cart/cart-removal';
 import { MinusIcon, PlusIcon } from './icons';
+import { requestStepperFocus, takeStepperFocus } from './card-stepper-focus';
 
 /**
  * - qty + in place of the add control (state of the one CTA, not a second CTA). Targets 44px.
@@ -19,6 +20,11 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
   const { t, isRtl } = useLanguage();
   const [capped, setCapped] = useState<number | null>(null);
   const busy = useRef(false);
+  const plusRef = useRef<HTMLButtonElement | null>(null);
+  // the add button that became this stepper handed its focus over (2.4.3)
+  useEffect(() => {
+    if (takeStepperFocus(line.productId, 'step')) plusRef.current?.focus();
+  }, [line.productId]);
   const atCap = capped !== null && capped === line.quantity;
 
   const change = async (next: number) => {
@@ -26,6 +32,7 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
     busy.current = true;
     try {
       if (next <= 0) {
+        requestStepperFocus(line.productId, 'add'); // the stepper unmounts: the add button takes focus
         await cart.removeItem(line.id);
         addToast(cartRemovalToast(line, { isRtl, t, addItem: cart.addItem }));
       } else {
@@ -58,7 +65,11 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
           void change(line.quantity - 1);
         }}
         className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-primary"
-        aria-label={t('Decrease quantity', 'إنقاص الكمية')}
+        aria-label={
+          line.quantity === 1
+            ? t('Remove from cart', 'شيل من السلة') // at 1 this button removes the line (Undo follows)
+            : t('Decrease quantity', 'إنقاص الكمية')
+        }
       >
         <MinusIcon className="h-4 w-4" />
       </button>
@@ -76,13 +87,16 @@ export function CardStepper({ line, className }: { line: CartItem; className?: s
       </span>
       <button
         type="button"
-        disabled={atCap}
+        ref={plusRef}
+        // aria-disabled, not disabled: a disabled button that holds focus drops it (2.4.3)
+        aria-disabled={atCap || undefined}
         onClick={e => {
           e.preventDefault();
           e.stopPropagation();
+          if (atCap) return;
           void change(line.quantity + 1);
         }}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-primary disabled:opacity-40"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-primary aria-disabled:opacity-40"
         aria-label={t('Increase quantity', 'زيادة الكمية')}
       >
         <PlusIcon className="h-4 w-4" />
