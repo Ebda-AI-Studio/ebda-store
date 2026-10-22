@@ -21,7 +21,7 @@ Brass and antique gold are metal, not orange (Ruling METAL-1), but no Dahab look
 | Ink / on page                  | `#121212`, 18.73:1                             | `#FFFFFF`, 9.75:1                          | `#16201C`, 16.70:1         |
 | Muted on page                  | 6.90:1                                         | 7.25:1                                     | 7.21:1                     |
 | Primary (button)               | `#121212`, 18.73:1                             | `#E4E7EB` silver, 7.86:1                   | `#0E5C46` emerald, 7.96:1  |
-| Accent                         | `#8F4F59` rose gold, 6.12:1                    | `#9FD8CB` enamel, 6.11:1                   | `#8F4F59`, 6.12:1          |
+| Accent                         | `#8F4F59` rose gold, 6.12:1                    | `#9FD8CB` enamel, 6.11:1                   | `#7A4049`, 7.90:1          |
 | Fonts (display / body / latin) | Reem Kufi / IBM Plex Sans Arabic / Bodoni Moda | Markazi Text / Almarai / Libre Caslon Text | Kufam / Tajawal / Italiana |
 | Radius, density, ratio, motion | none, airy, 4/5, subtle                        | sm, regular, 1/1, subtle                   | md, regular, 1/1, subtle   |
 

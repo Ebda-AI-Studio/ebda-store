@@ -60,7 +60,11 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
-import { GoldRateLine, useGoldRateStale } from '../../../components/commerce/GoldRateLine';
+import {
+  GOLD_STALE_NOTE_ID,
+  GoldRateLine,
+  useGoldRateStale,
+} from '../../../components/commerce/GoldRateLine';
 import { RatingSummary } from '../../../components/commerce/RatingSummary';
 import { BundleSaving } from '../../../components/commerce/BundleSaving';
 import { TrustLine } from '../../../components/commerce/TrustLine';
@@ -871,7 +875,13 @@ export default function ProductDetailClient({
                 ) : undefined
               }
               bundleLine={<BundleSaving productId={product.id} />}
-              priceNote={<GoldRateLine gold={goldForSelection} className="mt-1" />}
+              priceNote={
+                <GoldRateLine
+                  gold={goldForSelection}
+                  className="mt-1"
+                  staleId={GOLD_STALE_NOTE_ID}
+                />
+              }
               b2bPanel={
                 <B2bPdpPanel
                   productId={product.id}
@@ -920,6 +930,7 @@ export default function ProductDetailClient({
               onAddToCart={handleAddToCart}
               isAdding={isAdding}
               addDisabled={addDisabled}
+              addDescribedBy={goldStale ? GOLD_STALE_NOTE_ID : undefined}
               personalisation={product.personalisation}
               note={note}
               onNoteChange={setNote}
@@ -1383,7 +1394,11 @@ export default function ProductDetailClient({
                   <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
                 </div>
                 <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
-                <GoldRateLine gold={goldForSelection} className="mt-1" />
+                <GoldRateLine
+                  gold={goldForSelection}
+                  className="mt-1"
+                  staleId={GOLD_STALE_NOTE_ID}
+                />
                 {/* Phase B3 (Ruling B3-6): one live bundle-saving line; renders nothing without a saving. */}
                 <BundleSaving productId={product.id} />
                 <B2bPdpPanel
@@ -1493,6 +1508,7 @@ export default function ProductDetailClient({
                       onClick={handleAddToCart}
                       isLoading={isAdding}
                       disabled={addDisabled}
+                      aria-describedby={goldStale ? GOLD_STALE_NOTE_ID : undefined}
                     >
                       {addLabel}
                     </Button>

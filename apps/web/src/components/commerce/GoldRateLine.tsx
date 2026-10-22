@@ -6,6 +6,9 @@ import { useLocalePrice } from '@/hooks/useLocalePrice';
 import { useNumerals, useStoreNumerals } from '@/hooks/useNumerals';
 import { goldLineParts, goldRateIsStale, goldRateTime } from '@/lib/gold-display';
 
+/** DOM id of the stale sentence on a product page; the add buttons point `aria-describedby` at it. */
+export const GOLD_STALE_NOTE_ID = 'gold-stale-note';
+
 /**
  * True once the browser clock says the rate is past the store's limit. Computed after mount so the server
  * render and the first client render agree (the page is cached; time moves on without a rebuild).
@@ -33,9 +36,12 @@ export function useGoldRateStale(gold: PublicGoldPricing | null | undefined): bo
 export function GoldRateLine({
   gold,
   className,
+  staleId,
 }: {
   gold: PublicGoldPricing | null | undefined;
   className?: string;
+  /** Set on the product page only (one stale sentence per page); cart/checkout lines repeat it. */
+  staleId?: string;
 }) {
   const { language, t } = useLanguage();
   const money = useLocalePrice();
@@ -64,6 +70,7 @@ export function GoldRateLine({
       )}
       {stale && (
         <p
+          id={staleId}
           role="status"
           className="mt-1 text-xs font-medium text-foreground"
           data-testid="gold-stale"

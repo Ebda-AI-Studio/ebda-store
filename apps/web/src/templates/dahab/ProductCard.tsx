@@ -178,7 +178,7 @@ export default function DahabProductCard({
                 href={href}
                 prefetch={false}
                 tabIndex={-1}
-                className="pointer-events-auto hidden w-full items-center justify-center rounded-[var(--radius)] bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:bg-primary hover:text-primary-foreground [@media(hover:hover)]:flex"
+                className="pointer-events-auto hidden w-full items-center justify-center rounded-[var(--radius)] bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:bg-primary hover:text-primary-foreground [@media(hover:hover)]:flex [@media(hover:hover)]:min-h-[44px]"
               >
                 {ctaLabel}
               </Link>

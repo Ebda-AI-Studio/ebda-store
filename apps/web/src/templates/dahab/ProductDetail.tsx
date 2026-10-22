@@ -80,6 +80,8 @@ export interface DahabProductDetailProps {
   onAddToCart: () => void;
   isAdding: boolean;
   addDisabled: boolean;
+  /** DOM id of the note that explains why add is disabled (the gold-rate stale sentence). */
+  addDescribedBy?: string;
   addLabel: string;
   isWishlisted: boolean;
   onToggleWishlist: () => void;
@@ -469,6 +471,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 data-testid="pdp-add"
                 onClick={p.onAddToCart}
                 disabled={p.addDisabled || p.isAdding}
+                aria-describedby={p.addDescribedBy}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
               >
                 {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
@@ -579,6 +582,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             data-testid="dahab-pinned-add"
             onClick={p.onAddToCart}
             disabled={p.addDisabled || p.isAdding}
+            aria-describedby={p.addDescribedBy}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}
           >
             {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}

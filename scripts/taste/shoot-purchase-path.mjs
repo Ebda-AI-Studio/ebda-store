@@ -279,8 +279,26 @@ export const ACTIONS = {
       timeout: 180000,
     });
     await settle(page);
+    // Wait for the cart to be written (the add response, then the persisted line), not a fixed delay:
+    // on a slow 390-ar run the rate moved before the line existed, so there was nothing to re-price.
+    const added = page
+      .waitForResponse(r => /\/cart/.test(r.url()) && r.request().method() !== 'GET', {
+        timeout: 15000,
+      })
+      .catch(() => null);
     await page.getByTestId('pdp-add').first().click();
-    await page.waitForTimeout(1500);
+    await added;
+    await page.waitForFunction(
+      () =>
+        Object.keys(localStorage).some(
+          k =>
+            /cart/i.test(k) &&
+            !/bundles/i.test(k) &&
+            /"price|"unitPrice|"productId/.test(localStorage.getItem(k) ?? '')
+        ),
+      undefined,
+      { timeout: 15000 }
+    );
     await GOLD.move();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
     await page.getByTestId('price-changed-notice').waitFor({ timeout: 20000 });

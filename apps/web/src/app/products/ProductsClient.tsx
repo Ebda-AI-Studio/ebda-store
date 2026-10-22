@@ -864,7 +864,7 @@ export default function ProductsClient({
                           type="button"
                           aria-pressed={dahabCols === n}
                           onClick={() => setDahabCols(n)}
-                          className={`h-9 w-10 tabular-nums transition-colors ${dahabCols === n ? 'text-primary' : 'hover:text-foreground'}`}
+                          className={`h-11 w-11 tabular-nums transition-colors ${dahabCols === n ? 'font-semibold text-primary underline underline-offset-4' : 'hover:text-foreground'}`}
                         >
                           {n}
                         </button>

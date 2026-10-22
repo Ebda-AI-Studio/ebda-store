@@ -1133,8 +1133,8 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#4E5A54',
       primary: '#0E5C46',
       onPrimary: '#FFFFFF',
-      // Ruling B5-2: the ribbon is rose gold; the first design's brass #7E5E27 is retired.
-      accent: '#8F4F59',
+      // Ruling B5-2: the ribbon is rose gold; the first design's brass #7E5E27 is retired. Ruling B5-33: darkened from #8F4F59 (4.06:1 on the #F2C9C4 surface) to clear 4.5:1.
+      accent: '#7A4049',
       onAccent: '#FFFFFF',
       line: '#E6E6E6',
       fonts: { display: 'Kufam', body: 'Tajawal', latin: 'Italiana' },

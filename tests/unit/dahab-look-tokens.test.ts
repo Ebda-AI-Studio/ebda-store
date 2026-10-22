@@ -2,6 +2,8 @@
 // metal rule (Ruling METAL-1). The designed palettes failed the gate (Worn/Gift box brass accents,
 // Workshop coral CTA 2.91:1 on its own page); they are re-derived to rose gold, silver, enamel and
 // champagne. The gate has negative controls: it must flag the old coral and the old brass accents.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   LOOKS,
@@ -45,7 +47,7 @@ describe('dahab looks: shape', () => {
       expect(['designed', 'built']).toContain(l.status);
     }
   });
-  it('the tokens are exactly the re-derived ones of Ruling B5-2', () => {
+  it('the tokens are exactly the re-derived ones of Ruling B5-2 (Gift box accent darkened by B5-33)', () => {
     const w = by('dahab.worn');
     expect([w.page, w.surface, w.ink, w.primary, w.accent]).toEqual([
       '#FFFFFF',
@@ -70,7 +72,7 @@ describe('dahab looks: shape', () => {
       '#F2C9C4',
       '#16201C',
       '#0E5C46',
-      '#8F4F59',
+      '#7A4049',
     ]);
   });
 });
@@ -190,4 +192,18 @@ describe('merchant-extreme colours on dahab looks (merchants may pick any colour
         expect(ratio(c, roles['--primary-foreground'])).toBeGreaterThanOrEqual(4.5);
         expect(ratio(c, roles['--accent-foreground'])).toBeGreaterThanOrEqual(2);
       });
+});
+
+describe('Workshop card matte (Ruling B5-29)', () => {
+  const css = readFileSync(join(__dirname, '../../apps/web/src/styles/globals.css'), 'utf8');
+  it('is captured at the look root, never read from --foreground at the tile', () => {
+    expect(css).toMatch(
+      /\[data-look='dahab\.workshop'\]\s*\{\s*--workshop-matte:\s*var\(--foreground\);/
+    );
+    const tile = /\[data-look='dahab\.workshop'\] \[data-part='card-image'\]\s*\{([^}]*)\}/.exec(
+      css
+    );
+    expect(tile?.[1]).toContain('hsl(var(--workshop-matte))');
+    expect(tile?.[1]).not.toContain('var(--foreground)');
+  });
 });
