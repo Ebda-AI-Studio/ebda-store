@@ -185,7 +185,7 @@ export function StepsSection({
             editorMode ? { 'data-builder-setting': ar ? 'headingAr' : 'heading' } : undefined
           }
         />
-        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ol role="list" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {steps.map((s, i) => {
             const done = bundleInCart || (!!s.product && inCart.has(s.product.id));
             const price = priced[i]?.pricing;
@@ -267,9 +267,10 @@ export function StepsSection({
             <span className="text-sm text-foreground" data-part="steps-total">
               {formatPrice(bundle ? bundle.price : sum)}
               {bundle && (
-                <span className="ms-2 text-muted-foreground line-through">
+                <s className="ms-2 text-muted-foreground">
+                  <span className="sr-only">{t('Instead of', translations['Instead of'])} </span>
                   {formatPrice(bundle.componentSum)}
-                </span>
+                </s>
               )}
             </span>
             {bundle && <span className="text-sm font-medium text-foreground">{savingLine}</span>}

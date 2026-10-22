@@ -314,10 +314,10 @@ export const translations = {
   // Jasmine routine, rating and bundle lines (Phase B3): sentences are Egyptian, buttons neutral.
   'Add all to cart': 'إضافة الكل للسلة',
   'In your cart': 'في سلتك',
+  'Instead of': 'بدل',
   'Save {n}% when you buy them together': 'وفّر {n}% لما تشتريهم مع بعض',
   'Save {n}% when you buy it with the routine': 'وفّر {n}% لما تشتريه مع الروتين',
-  'Rated {avg} out of 5 from {count}. Read the reviews':
-    'تقييم {avg} من 5 من {count}. اقرا التقييمات',
+  'Out of 5, read the reviews': 'من 5، اقرا التقييمات',
   'Clear filter': 'مسح الفلتر',
   'Only you see this in the editor. Visitors do not see an empty section.':
     'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',

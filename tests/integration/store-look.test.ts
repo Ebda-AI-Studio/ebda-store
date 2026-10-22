@@ -688,8 +688,8 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       doc = await draftOf(m.storeId);
       expect(doc.sections.map(x => x.type).slice(0, 3)).toEqual([
         'category-grid',
-        'steps',
         'product-spotlight',
+        'steps',
       ]);
       expect(sec(doc, 'category-grid')).toMatchObject({ source: 'tags', layout: 'chips' });
       expect((doc.sections.find(x => x.type === 'steps')?.blocks ?? []).length).toBe(3);
@@ -699,8 +699,12 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       await ok(m, 'jasmine.apothecary');
       doc = await draftOf(m.storeId);
       expect(sec(doc, 'featured-collection')?.bgColor).toBe('token:inverse');
-      // An UNTOUCHED section the outgoing look seeded leaves the DRAFT (B1-45); the PUBLISHED page
-      // is never touched by a switch. (An edited section survives: tests/unit/jasmine-look-mix.test.ts.)
+      // Apothecary's mix uses the routine steps too, so they stay on its draft ...
+      expect((doc.sections.find(x => x.type === 'steps')?.blocks ?? []).length).toBe(3);
+      // ... and an UNTOUCHED section the outgoing look seeded leaves the DRAFT when the incoming
+      // look does not use it (B1-45); the PUBLISHED page is never touched by a switch.
+      await ok(m, 'jasmine.bloom');
+      doc = await draftOf(m.storeId);
       expect(doc.sections.some(x => x.type === 'steps')).toBe(false);
       const published = (
         (await prisma.storePageRevision.findFirstOrThrow({
@@ -709,7 +713,7 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
         })) as { document: Doc }
       ).document;
       expect(published.appliedLook).toBe('jasmine.apothecary'); // the first switch of a fresh store
-      expect(published.sections.some(x => x.type === 'steps')).toBe(false);
+      expect(published.sections.some(x => x.type === 'steps')).toBe(true);
       await awaitDeferredWork(5000);
     });
 

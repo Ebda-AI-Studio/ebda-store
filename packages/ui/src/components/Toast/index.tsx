@@ -250,7 +250,12 @@ function ToastItem({
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm text-foreground">{toast.title}</p>
         {toast.message && (
-          <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{toast.message}</p>
+          <p
+            className="text-sm text-muted-foreground mt-0.5 leading-relaxed line-clamp-2 [overflow-wrap:anywhere]"
+            title={toast.message}
+          >
+            {toast.message}
+          </p>
         )}
       </div>
 

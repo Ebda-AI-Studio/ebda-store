@@ -67,6 +67,8 @@ What it writes beyond the Souq shape: **catalogue** `scripts/jasmine-demo/catalo
 
 Local review: copy `scripts/jasmine-demo/assets/*` into an untracked `apps/web/public/__jasmine-demo/` and seed with `JASMINE_DEMO_ASSET_BASE=/__jasmine-demo`; delete the folder afterwards.
 
+The seed's tags are bilingual (`JASMINE_TAGS`: English `name` for the filter key, Arabic `nameAr`; products carry the English names), and the seed upserts `nameAr` (Ruling B3-13).
+
 ## Souq scenario stores and suite (Phase B2 Task 7)
 
 `scripts/storedemo/scenario-stores.mjs --template souq` (local only) seeds `souq-empty`, `souq-one`, `souq-500` (500 generated products, every 5th without a photo), `souq-noimg`, `souq-longnames`, `souq-edge-light` / `-dark` (merchant primary at the extremes, Arabic-Indic numerals ON, B1-111), `souq-logo-wide` / `-tall` / `-none`, `souq-white-photos` (Night with white-background photos) and `souq-cod`. There is no card-provider store: the card method is covered by the `PaymentStep` unit render (B1-20) and needs provider credentials. These stores are layout-built (no hand-made document) and then `applyLook(reset)`, the real merchant path; the seeded look stores (`souq-catalogue|night|showroom`) start from the superset home document. Both paths are shot. Browser suite: `tests/souq/` with `playwright.souq.config.ts` (`SOUQ_PORT`, optional `SOUQ_CHANNEL=chrome`), the matrix plus `souq-demo.spec.ts` (bar, look switch, template switch to the Qamar host, closed checkout, catalogue isolation, noindex). The demo spec needs both demo stores seeded.

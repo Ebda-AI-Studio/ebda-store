@@ -58,14 +58,16 @@ function merchantBase(): PageDefinition {
 }
 
 describe('the mixes, exactly as designed', () => {
-  it('Apothecary: hero, skin-type chips under it, product rows on the LIGHT band, ritual band, trust', () => {
+  it('Apothecary: hero, skin-type chips under it, product rows on the LIGHT band, the routine steps, trust', () => {
     expect(apothecary.sections!.map(s => s.type)).toEqual([
       'hero',
       'category-grid',
       'featured-collection',
-      'image-text',
+      'steps',
       'trust-strip',
     ]);
+    // the listing pages keep the olive ground; photos sit on a paper matte (fix wave 1)
+    expect(apothecary.chrome?.listing).toBe('ground');
     const [h, chips, rows, ritual] = apothecary.sections!;
     expect(h.design).toMatchObject({ presentation: 'full-bleed' });
     expect(chips.design).toMatchObject({ source: 'tags', layout: 'chips', layoutMobile: 'chips' });
@@ -85,24 +87,29 @@ describe('the mixes, exactly as designed', () => {
       'trust-strip',
     ]);
     const [h, rail, week, grid, , deals] = bloom.sections!;
-    expect(h.design).toMatchObject({ presentation: 'framed' });
+    // the photo FILLS the frame (cover) and the headline sits on the scrim, never on pale pink
+    expect(h.design).toMatchObject({
+      presentation: 'framed',
+      frame: 'line',
+      textAnchor: 'bottom-start',
+    });
     expect(rail.design).toMatchObject({ layout: 'rail', layoutMobile: 'rail' });
     expect(rail.design).not.toHaveProperty('source');
     expect(rail.preset).toMatchObject({ titleAr: 'ابدأ من هنا' });
     expect(week.preset).toMatchObject({ productSource: 'manual', titleAr: 'روتين الأسبوع' });
-    expect(grid.design).toMatchObject({ mobileColumns: 2 });
+    expect(grid.design).toMatchObject({ columns: 4, mobileColumns: 2 });
     expect(deals.preset).toMatchObject({ productSource: 'on_sale', titleAr: 'عروض' });
   });
-  it('Clinic: concern chips FIRST (directly under the header), the routine, a stage, actives on the surface', () => {
+  it('Clinic: concern chips FIRST (directly under the header), the featured active (a photo in the first screen), the routine, actives on the surface', () => {
     expect(clinic.sections!.map(s => s.type)).toEqual([
       'category-grid',
-      'steps',
       'product-spotlight',
+      'steps',
       'featured-collection',
       'trust-strip',
       'newsletter',
     ]);
-    const [chips, steps, stage, grid] = clinic.sections!;
+    const [chips, stage, steps, grid] = clinic.sections!;
     expect(chips.design).toMatchObject({ source: 'tags', layout: 'chips' });
     expect(chips.preset).toMatchObject({ titleAr: 'اختار مشكلتك' });
     expect(steps.preset).toMatchObject({ headingAr: 'روتينك في 3 خطوات' });
@@ -180,23 +187,28 @@ describe('re-applying a mix is idempotent (Bloom names product-carousel twice)',
 describe('look switch keeps content and does not leak design (TPL-1)', () => {
   /** Apothecary with the merchant's own content layered on: refs, a category photo, steps. */
   function merchantApothecary(): PageDefinition {
-    let doc = applyTemplateFamily(merchantBase(), 'jasmine', apothecary);
-    // Steps belong to Clinic's mix; the merchant added them by hand (an edited section survives).
-    const steps = sectionFromPreset('steps', 0, 'steps');
-    steps.blocks = steps.blocks!.map((b, i) => ({
-      ...b,
-      settings: { ...b.settings, productIds: [`prod-${i}`], bodyAr: `خطوة ${i + 1}` },
-    }));
+    // (re-applied with `keep`: the merchant's own about block is an edited section, so it stays even
+    // though no Jasmine mix names an image-text any more)
+    let doc = applyTemplateFamily(merchantBase(), 'jasmine', apothecary, {
+      from: apothecary,
+      design: 'keep',
+    });
+    // The routine steps the Apothecary mix created: the merchant filled in their products.
     doc = {
       ...doc,
-      sections: [
-        ...doc.sections.map(n =>
-          n.type === 'featured-collection'
-            ? { ...n, settings: { ...n.settings, manualProductIds: ['p1', 'p2'] } }
+      sections: doc.sections.map(n =>
+        n.type === 'featured-collection'
+          ? { ...n, settings: { ...n.settings, manualProductIds: ['p1', 'p2'] } }
+          : n.type === 'steps'
+            ? {
+                ...n,
+                blocks: n.blocks!.map((blk, i) => ({
+                  ...blk,
+                  settings: { ...blk.settings, productIds: [`prod-${i}`], bodyAr: `خطوة ${i + 1}` },
+                })),
+              }
             : n
-        ),
-        steps,
-      ],
+      ),
     };
     return doc;
   }

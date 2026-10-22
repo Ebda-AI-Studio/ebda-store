@@ -67,7 +67,9 @@ describe('Jasmine CSS block: token-only, motion-safe', () => {
   const block = jasmineCss();
   it('there are jasmine rules for the pack and for each look', () => {
     expect(block).toMatch(/data-pack='jasmine'/);
-    for (const l of jasmine) expect(block, l.id).toContain(`data-look='${l.id}'`);
+    // Clinic's detail (the step tick) is platform-level now (`[data-part='step']`, every skin)
+    for (const l of jasmine.filter(x => x.id !== 'jasmine.clinic'))
+      expect(block, l.id).toContain(`data-look='${l.id}'`);
   });
   it('no colour literal (hex, rgb(), hsl() with numbers, named colour) anywhere in it', () => {
     expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
@@ -112,7 +114,8 @@ describe('Jasmine CSS block: token-only, motion-safe', () => {
 describe('Apothecary: merchant white-background photos sit on a paper matte (quality bar 9.1)', () => {
   it('the card photo and tile get the page ink as a matte and multiply into it, but never inside an inverse band', () => {
     const flat = css.replace(/\s+/g, ' ');
-    const band = "\\:not\\(\\[style\\*='--bg-page'\\] \\*\\)";
+    // the ROOT also carries --bg-page (StoreContext), so a band is "background-color AND --bg-page"
+    const band = "\\:not\\(\\[style\\*='background-color'\\]\\[style\\*='--bg-page'\\] \\*\\)";
     expect(flat).toMatch(
       new RegExp(
         `\\[data-look='jasmine\\.apothecary'\\] \\[data-part='card-image'\\]${band}, \\[data-look='jasmine\\.apothecary'\\] \\[data-part='tile'\\]${band} \\{ background-color: hsl\\(var\\(--foreground\\)\\)`

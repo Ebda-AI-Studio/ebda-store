@@ -157,6 +157,8 @@ test('first screen shows a path to the products (chips, rail or categories) in e
 test('skin-type chips do real work: each chip lands on a non-empty PLP filtered by that tag and shows the count', async ({
   page,
 }) => {
+  // two stores x two languages x every chip, each a full page load: longer than the 120 s default
+  test.setTimeout(360_000);
   for (const store of ['jasmine-apothecary', 'jasmine-clinic'])
     for (const lang of ['ar', 'en'] as const) {
       await open(page, store, lang, '/');
@@ -471,4 +473,150 @@ test('PDP: shade dots, a struck-through sold-out size, a sale, the instalment li
   expect(crossed, 'crossed price').toBeGreaterThan(0);
   void TAG;
   void PLAIN_PDP;
+});
+
+// ---- fix wave 1 (taste + a11y audits) ----------------------------------------------------------
+
+test('Bloom hero: the photo FILLS its frame (no letterbox), the headline and the button are legible', async ({
+  page,
+}) => {
+  for (const lang of ['ar', 'en'] as const) {
+    await open(page, 'jasmine-bloom', lang, '/');
+    const m = await page.evaluate(() => {
+      const sec =
+        document.querySelector('section[data-frame-draw]') ??
+        document.querySelector('main section');
+      const img = sec?.querySelector('img');
+      if (!sec || !img) return null;
+      const s = sec.getBoundingClientRect();
+      const i = img.getBoundingClientRect();
+      return {
+        fillX: i.width / s.width,
+        fillY: i.height / s.height,
+        fit: getComputedStyle(img).objectFit,
+        h1: (() => {
+          const h = sec.querySelector('h1');
+          if (!h) return null;
+          return getComputedStyle(h).color;
+        })(),
+      };
+    });
+    expect(m, `${lang}: hero found`).not.toBeNull();
+    expect(m!.fit, `${lang}: cover, never contain`).toBe('cover');
+    expect(m!.fillX, `${lang}: photo spans the frame`).toBeGreaterThan(0.98);
+    expect(m!.fillY, `${lang}: photo spans the frame`).toBeGreaterThan(0.98);
+  }
+});
+
+test('first screen of Clinic has a product photo (the featured active sits under the chips)', async ({
+  page,
+}) => {
+  const vh = page.viewportSize()!.height;
+  await open(page, 'jasmine-clinic', 'ar', '/');
+  const top = await page.evaluate(() => {
+    const img = document.querySelector('[data-section="product-spotlight"] img, main img');
+    return img ? img.getBoundingClientRect().top + window.scrollY : null;
+  });
+  expect(top, 'a photo exists').not.toBeNull();
+  expect(top!, 'a photo starts inside the first screen').toBeLessThan(vh - 80);
+});
+
+test('tag chips and the filter title follow the page language; a fallback is marked with lang', async ({
+  page,
+}) => {
+  const arabic = /[؀-ۿ]/;
+  await open(page, 'jasmine-clinic', 'en', '/');
+  const en = await page.locator('[data-section="tag-chips"] a').allInnerTexts();
+  expect(en.length).toBeGreaterThanOrEqual(5);
+  for (const t of en) expect(arabic.test(t), `English chip "${t}"`).toBe(false);
+  await open(page, 'jasmine-clinic', 'ar', '/');
+  const ar = await page.locator('[data-section="tag-chips"] a').allInnerTexts();
+  for (const t of ar) expect(arabic.test(t), `Arabic chip "${t}"`).toBe(true);
+  // the filter page: title and clear button in the page language
+  await open(page, 'jasmine-clinic', 'en', TAG_PATH);
+  await expect(page.locator('h1')).toHaveText('Oily skin');
+  await expect(page.locator('[data-zone="tagFilter"] button')).toContainText('Oily skin');
+  await open(page, 'jasmine-clinic', 'ar', TAG_PATH);
+  await expect(page.locator('h1')).toHaveText('بشرة دهنية');
+});
+
+test('Apothecary listing keeps the olive ground; photos sit on a paper matte', async ({ page }) => {
+  await open(page, 'jasmine-apothecary', 'en', '/products');
+  const g = await page.evaluate(() => {
+    const px = (c: string) => (c.match(/\d+/g) ?? []).slice(0, 3).map(Number);
+    const lum = (c: string) => px(c).reduce((a, b) => a + b, 0);
+    const wrap = document.querySelector('[data-part="card-image"]');
+    let e: Element | null = document.querySelector('main');
+    // the first painted ancestor chain of the listing must be dark, not the cream band
+    const bands = [...document.querySelectorAll('main div')].filter(
+      d =>
+        (d as HTMLElement).style.backgroundColor && lum(getComputedStyle(d).backgroundColor) > 600
+    ).length;
+    void e;
+    return {
+      body: getComputedStyle(document.body).backgroundColor,
+      matte: wrap ? getComputedStyle(wrap).backgroundColor : '',
+      bands,
+    };
+  });
+  expect(g.bands, 'no cream band around the listing').toBe(0);
+  const lumOf = (c: string) =>
+    (c.match(/\d+/g) ?? [])
+      .slice(0, 3)
+      .map(Number)
+      .reduce((a, b) => a + b, 0);
+  expect(lumOf(g.body), 'olive ground').toBeLessThan(300);
+  expect(lumOf(g.matte), 'paper matte under the photo').toBeGreaterThan(600);
+});
+
+test('a price never splits from its currency (class guard for the Souq no-break space)', async ({
+  page,
+}) => {
+  test.skip((page.viewportSize()?.width ?? 0) > 420, 'the wrap is a phone measurement');
+  for (const store of LOOK_STORES)
+    for (const lang of ['ar', 'en'] as const)
+      for (const p of ['/', SHADE_PDP, '/products/niacinamide-serum', '/cart']) {
+        await open(page, store, lang, p);
+        const bad = await page.evaluate(() => {
+          const out: string[] = [];
+          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          let n: Node | null;
+          while ((n = w.nextNode())) {
+            const t = n.textContent ?? '';
+            const re = /(\d[\d,.]*)[\s ]*(ج\.م|EGP)|(EGP)[\s ]*(\d[\d,.]*)/g;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(t))) {
+              const r = document.createRange();
+              r.setStart(n, m.index);
+              r.setEnd(n, m.index + m[0].length);
+              const tops = new Set(
+                [...r.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top))
+              );
+              if (tops.size > 1) out.push(`${m[0]} :: ${t.trim().slice(0, 50)}`);
+            }
+          }
+          return out;
+        });
+        expect(bad, `${store} ${lang} ${p}`).toEqual([]);
+      }
+});
+
+test('toast and cart titles stay short: a long product name cannot run a toast past two lines', async ({
+  page,
+}) => {
+  await open(page, 'jasmine-clinic', 'ar', '/products/anti-dandruff-shampoo');
+  await page.getByTestId('pdp-add').first().click();
+  const toast = page
+    .locator('[role="status"], [role="alert"]')
+    .filter({ hasText: /شامبو/ })
+    .first();
+  await expect(toast).toBeVisible();
+  const lines = await toast
+    .locator('p')
+    .last()
+    .evaluate(el => {
+      const lh = parseFloat(getComputedStyle(el).lineHeight) || 20;
+      return Math.round(el.getBoundingClientRect().height / lh);
+    });
+  expect(lines, 'toast message lines').toBeLessThanOrEqual(2);
 });

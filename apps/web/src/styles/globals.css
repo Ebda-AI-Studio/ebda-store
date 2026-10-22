@@ -1600,12 +1600,18 @@ html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
    pages of a dark look and a `token:inverse` home row, `--bg-page` in the inline style) the ink
    variables are swapped and the card is already the light paper, so the matte is left out there:
    on the band `--foreground` is the OLIVE page colour and a matte would paint the photo dark. */
-[data-look='jasmine.apothecary'] [data-part='card-image']:not([style*='--bg-page'] *),
-[data-look='jasmine.apothecary'] [data-part='tile']:not([style*='--bg-page'] *) {
+[data-look='jasmine.apothecary']
+  [data-part='card-image']:not([style*='background-color'][style*='--bg-page'] *),
+[data-look='jasmine.apothecary']
+  [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *) {
   background-color: hsl(var(--foreground));
 }
-[data-look='jasmine.apothecary'] [data-part='card-image']:not([style*='--bg-page'] *) img,
-[data-look='jasmine.apothecary'] [data-part='tile']:not([style*='--bg-page'] *) img {
+[data-look='jasmine.apothecary']
+  [data-part='card-image']:not([style*='background-color'][style*='--bg-page'] *)
+  img,
+[data-look='jasmine.apothecary']
+  [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *)
+  img {
   mix-blend-mode: multiply;
 }
 /* Brass never dims on hover (it read as disabled next to the other CTA). */
@@ -1668,23 +1674,27 @@ html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   }
 }
 
-/* Playful detail, Clinic: a routine step ticks when its product is in the cart. The step sets
+/* Routine step tick (Clinic's playful detail, platform-level: the `steps` section renders on every skin): a step ticks when its product is in the cart. The step sets
    data-done="true" (StepsSection); the tick mark is shown statically, and only its entrance is
    motion-gated. */
-[data-look='jasmine.clinic'] [data-part='step'] [data-part='step-tick'] {
+[data-part='step'] [data-part='step-tick'] {
   opacity: 0;
 }
-[data-look='jasmine.clinic'] [data-part='step'][data-done='true'] [data-part='step-tick'] {
+[data-part='step'][data-done='true'] [data-part='step-tick'] {
   opacity: 1;
 }
+/* the tick replaces the numeral (they overlapped inside the 32px disc) */
+[data-part='step'][data-done='true'] [data-part='step-num'] {
+  opacity: 0;
+}
 @media (prefers-reduced-motion: no-preference) {
-  [data-look='jasmine.clinic'] [data-part='step'] [data-part='step-tick'] {
+  [data-part='step'] [data-part='step-tick'] {
     transition:
       opacity 0.25s ease,
       transform 0.25s ease;
     transform: scale(0.6);
   }
-  [data-look='jasmine.clinic'] [data-part='step'][data-done='true'] [data-part='step-tick'] {
+  [data-part='step'][data-done='true'] [data-part='step-tick'] {
     transform: scale(1);
   }
 }

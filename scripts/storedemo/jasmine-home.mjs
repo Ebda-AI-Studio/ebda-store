@@ -46,7 +46,6 @@ const USED = [
   'steps',
   'product-spotlight',
   'featured-collection',
-  'image-text',
   'product-carousel',
   'testimonials',
   'trust-strip',
@@ -92,6 +91,9 @@ export function buildJasmineHome(base, ctx) {
       alt: 'Jade, clear and cobalt glass bottles on olive linen with leaves and oats',
       headline: 'Ingredients you know',
       headlineAr: 'مكوّنات بتعرفها',
+      // ingredients first: the hero names what is in the bottle
+      subtitle: 'Jojoba, oats and green leaf. Nothing you cannot pronounce.',
+      subtitleAr: 'جوجوبا وشوفان وورق أخضر. مفيش حاجة صعب تنطقها.',
       ctaText: 'Shop',
       ctaTextAr: 'تسوّق',
     }),
@@ -146,15 +148,6 @@ export function buildJasmineHome(base, ctx) {
     buttonTextAr: 'عرض الكل',
     buttonLink: '/products?sort=newest',
   });
-  const ritual = node('image-text', 'ritual', {
-    image: img('ceramide-moisturiser.webp'),
-    alt: 'A white cream jar on a clean ground',
-    heading: 'The ritual',
-    headingAr: 'الطقس',
-    body: 'Cleanse, treat, then protect. Three calm steps, the same order every day.',
-    bodyAr: 'نضّف، وبعدين علّاج، وبعدين حماية. تلات خطوات هادية بنفس الترتيب كل يوم.',
-    imagePosition: 'end',
-  });
   const curated = node(
     'product-carousel',
     'curated',
@@ -195,7 +188,6 @@ export function buildJasmineHome(base, ctx) {
       stage,
       curated,
       newIn,
-      ritual,
       deals,
       testimonials,
       trust,

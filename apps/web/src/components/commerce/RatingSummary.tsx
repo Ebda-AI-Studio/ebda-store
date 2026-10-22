@@ -26,12 +26,8 @@ export function RatingSummary({
   const lang = language === 'ar' ? 'ar' : 'en';
   const avg = average.toFixed(1);
   const counted = countText(lang, count, RATINGS);
-  const label = t(
-    'Rated {avg} out of 5 from {count}. Read the reviews',
-    translations['Rated {avg} out of 5 from {count}. Read the reviews']
-  )
-    .replace('{avg}', avg)
-    .replace('{count}', counted);
+  // Label in name (2.5.3): the accessible name STARTS with the visible text "4.7 · 212 ratings".
+  const label = `${avg} · ${counted}. ${t('Out of 5, read the reviews', translations['Out of 5, read the reviews'])}`;
   return (
     <a
       href={`#${REVIEWS_ANCHOR_ID}`}

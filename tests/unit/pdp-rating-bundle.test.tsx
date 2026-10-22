@@ -78,7 +78,9 @@ describe('RatingSummary', () => {
     const a = container.querySelector('a')!;
     expect(a.getAttribute('href')).toBe('#reviews');
     expect(a.textContent).toBe('★4.7· 212 تقييم');
-    expect(a.getAttribute('aria-label')).toBe('تقييم 4.7 من 5 من 212 تقييم. اقرا التقييمات');
+    // label in name (2.5.3): it STARTS with the visible text
+    expect(a.getAttribute('aria-label')).toBe('4.7 · 212 تقييم. من 5، اقرا التقييمات');
+    expect(a.getAttribute('aria-label')!.startsWith('4.7 · 212')).toBe(true);
     expect(smallTargets(container, 44)).toEqual([]);
   });
   it('counted nouns follow the Arabic plural (one / two / few) and English', () => {

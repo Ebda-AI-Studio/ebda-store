@@ -406,10 +406,11 @@ describe('framed hero hairline (Rulings B1-5, B1-7, B1-41)', () => {
       const hero = m.layout?.sections?.hero ?? findKey(m, 'frameLabel');
       expect(hero.frameLabel && hero.frameNone && hero.frameLine, lang).toBeTruthy();
     }
-    // only Vitrine's mix sets it
+    // only Vitrine's and Bloom's (Ruling B3-13: a cover-filled hero) mixes set it
     for (const l of LOOKS)
       for (const sec of l.sections ?? [])
-        if ((sec.design ?? {}).frame !== undefined) expect(l.id).toBe('qamar.vitrine');
+        if ((sec.design ?? {}).frame !== undefined)
+          expect(['qamar.vitrine', 'jasmine.bloom']).toContain(l.id);
   });
 
   it('the draw is 600ms ease-out-quint, from the centre, motion-safe only', () => {

@@ -306,7 +306,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame: 'rounded-[var(--radius)] bg-muted',
     categoryCaption: 'text-sm font-medium text-foreground',
     // hyphens-none: a title never breaks inside a word unless one word is wider than the card.
-    productCardName: 'line-clamp-2 font-medium text-foreground leading-snug [hyphens:none]',
+    productCardName: 'line-clamp-3 font-medium text-foreground leading-snug [hyphens:none]',
     productCardPrice: 'font-semibold text-foreground',
     productCardBody: 'text-start',
     productCardCta:
