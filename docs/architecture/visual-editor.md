@@ -137,7 +137,7 @@ under `apps/admin/src` names the classic builder (item 5, `parity-baseline.json`
 
 ## Retiring the form page builder (Task 12)
 
-The 5,951-line `/stores/:id/page-builder` page, `CategoryLayoutButtons`, `ModeButton`,
+The 4,793-line `/stores/:id/page-builder` page (5,951 lines with its two components), `CategoryLayoutButtons`, `ModeButton`,
 `lib/page-builder-save.ts` and `POST /admin/stores/:id/layout/preview` are deleted.
 `/page-builder`, `/hero`, `/navigation` and `/pages` are server redirects to `/builder`
 (`lib/builder-redirect.ts`) that keep the Ruling VE-16 deep link (`select`, `block`, `field`,
