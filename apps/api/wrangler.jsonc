@@ -18,6 +18,12 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // Smart Placement (cold-start fix, measured 2026-10-22 with `wrangler tail`): a public request
+  // is ~10-25 SERIAL hops to Frankfurt-side backends (AuthState Durable Object, Hyperdrive/Neon,
+  // KV) for ~10-40 ms of CPU, and the default placement ran the Worker at the visitor's colo
+  // (KWI), so every hop paid a long-haul round trip: 1-6 s per API call, 10-15 s for a cold
+  // storefront render that makes several. Smart Placement runs the Worker near those backends.
+  "placement": { "mode": "smart" },
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
 
   // Hyperdrive in front of Neon. QUERY CACHING MUST STAY OFF: a cached read is keyed on SQL text
