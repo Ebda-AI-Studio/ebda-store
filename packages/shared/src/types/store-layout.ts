@@ -771,6 +771,9 @@ export interface BlogCarouselSettings extends SectionBgOverride, SectionPaddingM
 /**
  * `on_sale` (Phase B2): products whose compare-at price exceeds their price (a variant product:
  * any variant on sale), biggest drop first. BOUNDED-stale (rides the tagged public product caches).
+ * `reorder` (Phase B4, Ruling B4-8): the signed-in customer's own last products, "order again".
+ * Resolved in the browser from `GET /public/customers/me/reorder`; anonymous or first-time
+ * shoppers see nothing (an unfilled feature renders nothing).
  */
 export type ExtraCarouselSource =
   | 'newest'
@@ -778,7 +781,8 @@ export type ExtraCarouselSource =
   | 'featured'
   | 'on_sale'
   | 'category'
-  | 'manual';
+  | 'manual'
+  | 'reorder';
 
 export interface ExtraCarouselSettings extends ProductCarouselSettings {
   /** Unique id (uuid). Required for stable ordering + admin keying. */

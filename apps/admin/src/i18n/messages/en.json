@@ -1976,6 +1976,7 @@
         "sourceNewest": "Newest (same as New Arrivals)",
         "sourceBestSellers": "Best sellers",
         "sourceOnSale": "On sale",
+        "sourceReorder": "Order again (the customer's last products)",
         "sourceFeatured": "Featured",
         "sourceCategory": "Category",
         "sourceManual": "Manual product list",

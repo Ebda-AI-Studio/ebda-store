@@ -83,6 +83,11 @@ export const featuredCollectionSchema = z
     subheading: text(400),
     subheadingAr: text(400),
     ...productRefs,
+    // `reorder` (Phase B4, Ruling B4-8): the signed-in customer's last products; only the grid
+    // sections that render a row for it accept it (not the spotlight).
+    productSource: z
+      .enum(['newest', 'best_seller', 'featured', 'on_sale', 'category', 'manual', 'reorder'])
+      .optional(),
     // 24 = the most the home page fetches for one section (HomePageBody). A `menu` lists up to that many.
     limit: z.number().int().min(2).max(24).optional(),
     columns: z.number().int().min(2).max(5).optional(),

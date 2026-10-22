@@ -482,6 +482,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
           opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
+          opt(
+            'reorder',
+            'Order again (the customer’s last products)',
+            'اطلب تاني (آخر منتجات الزبون)'
+          ),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -649,6 +654,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
           opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
+          opt(
+            'reorder',
+            'Order again (the customer’s last products)',
+            'اطلب تاني (آخر منتجات الزبون)'
+          ),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }

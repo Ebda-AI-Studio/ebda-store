@@ -515,6 +515,7 @@ const layoutSchemaInternal = z
               'on_sale',
               'category',
               'manual',
+              'reorder',
             ]),
             categorySlug: z.string().max(120).optional(),
             categoryFetchLimit: z.number().int().min(1).max(200).optional(),

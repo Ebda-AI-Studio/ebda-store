@@ -707,10 +707,19 @@ export const LOOKS: readonly LookDefinition[] = [
       cardStepper: 'inline',
     },
     // Ruling B4-1 (Family table). Order like a menu: a full-bleed food photo (the delivery line is
-    // merchant content, B4-12), the dishes as rows grouped by category under sticky tabs, the cook
-    // as a strip and the trust line. The "order again" row joins in Task 4.
+    // merchant content, B4-12), "order again" for a returning customer (nothing for anyone else), the
+    // dishes as rows grouped by category under sticky tabs, the cook as a strip and the trust line.
     sections: [
       { type: 'hero', design: { presentation: 'full-bleed' } },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'reorder',
+          limit: 8,
+          title: 'Order again',
+          titleAr: 'اطلب تاني',
+        },
+      },
       {
         type: 'featured-collection',
         design: { layout: 'menu', tabs: 'categories', paddingTop: 'tight' },
@@ -765,6 +774,15 @@ export const LOOKS: readonly LookDefinition[] = [
     // merchant's dish photos are shot on white and would read as white rectangles on the green.
     sections: [
       { type: 'maker-profile', design: { variant: 'lead' } },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'reorder',
+          limit: 8,
+          title: 'Order again',
+          titleAr: 'اطلب تاني',
+        },
+      },
       {
         type: 'featured-collection',
         design: { columns: 2, mobileColumns: 2, bgColor: 'token:inverse' },
@@ -827,6 +845,15 @@ export const LOOKS: readonly LookDefinition[] = [
           captionPosition: 'below',
           paddingTop: 'tight',
           paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'reorder',
+          limit: 8,
+          title: 'Order again',
+          titleAr: 'اطلب تاني',
         },
       },
       {

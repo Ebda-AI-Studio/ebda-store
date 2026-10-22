@@ -69,14 +69,16 @@ function merchantBase(): PageDefinition {
 }
 
 describe('the mixes, exactly as designed', () => {
-  it('Family table: full-bleed hero, the menu with category tabs, the cook as a strip, trust', () => {
+  it('Family table: full-bleed hero, order again, the menu with category tabs, the cook as a strip, trust', () => {
     expect(table.sections!.map(s => s.type)).toEqual([
       'hero',
+      'product-carousel',
       'featured-collection',
       'maker-profile',
       'trust-strip',
     ]);
-    const [h, menu, maker] = table.sections!;
+    const [h, again, menu, maker] = table.sections!;
+    expect(again.preset).toMatchObject({ productSource: 'reorder', titleAr: 'اطلب تاني' });
     expect(h.design).toMatchObject({ presentation: 'full-bleed' });
     expect(menu.design).toMatchObject({ layout: 'menu', tabs: 'categories' });
     expect(menu.preset).toMatchObject({
@@ -91,28 +93,32 @@ describe('the mixes, exactly as designed', () => {
       cardStepper: 'inline',
     });
   });
-  it('Kitchen notebook: the cook leads (no hero), dishes on the LIGHT band, story, trust', () => {
+  it('Kitchen notebook: the cook leads (no hero), order again, dishes on the LIGHT band, story, trust', () => {
     expect(notebook.sections!.map(s => s.type)).toEqual([
       'maker-profile',
+      'product-carousel',
       'featured-collection',
       'brand-story',
       'trust-strip',
     ]);
-    const [maker, grid] = notebook.sections!;
+    const [maker, again, grid] = notebook.sections!;
+    expect(again.preset).toMatchObject({ productSource: 'reorder' });
     expect(maker.design).toMatchObject({ variant: 'lead' });
     // quality bar section 9 rule 1: merchant dish photos are shot on white, so the grid sits on the inverse band
     expect(grid.design).toMatchObject({ columns: 2, mobileColumns: 2, bgColor: 'token:inverse' });
     expect(notebook.chrome?.header.logoPlacement).toBe('centre');
     expect(notebook.sections!.map(s => s.type)).not.toContain('hero');
   });
-  it('Fresh market: aisle tiles FIRST (three across on a phone), deals, a dense grid, trust', () => {
+  it('Fresh market: aisle tiles FIRST (three across on a phone), order again, deals, a dense grid, trust', () => {
     expect(market.sections!.map(s => s.type)).toEqual([
       'category-grid',
+      'product-carousel',
       'product-carousel',
       'featured-collection',
       'trust-strip',
     ]);
-    const [tiles, deals, grid] = market.sections!;
+    const [tiles, again, deals, grid] = market.sections!;
+    expect(again.preset).toMatchObject({ productSource: 'reorder' });
     expect(tiles.design).toMatchObject({
       layout: 'tiles',
       layoutMobile: 'tiles',
@@ -124,9 +130,9 @@ describe('the mixes, exactly as designed', () => {
     expect(grid.design).toMatchObject({ columns: 5, mobileColumns: 2 });
     expect(market.chrome?.aisles).toHaveLength(4);
   });
-  it('every look reaches the products in the first two sections', () => {
+  it('every look reaches the products in the first three sections', () => {
     for (const l of LAMMA) {
-      const early = l.sections!.slice(0, 2).map(s => s.type);
+      const early = l.sections!.slice(0, 3).map(s => s.type);
       expect(
         early.some(t => t === 'featured-collection' || t === 'category-grid'),
         l.id
@@ -252,7 +258,7 @@ describe('look switch keeps content and does not leak design (TPL-1)', () => {
     const m = applyTemplateFamily(t1, 'lamma', market, { from: table, design: 'reset' });
     expect(types(m)).toContain('category-grid');
     const back = applyTemplateFamily(m, 'lamma', table, { from: market, design: 'reset' });
-    expect(types(back).slice(0, 4)).toEqual(table.sections!.map(s => s.type));
+    expect(types(back).slice(0, table.sections!.length)).toEqual(table.sections!.map(s => s.type));
   });
 
   it('Lamma -> Qamar -> Lamma and Lamma -> Souq -> Lamma keep the merchant content', () => {

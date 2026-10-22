@@ -5,6 +5,7 @@ import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
+import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
@@ -1219,6 +1220,33 @@ router.post(
       );
       setBuyerPrivate(res);
       res.json({ success: true, data: { quote } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /customers/me/reorder - "Order again" (Phase B4, Ruling B4-8): the signed-in customer's
+// last distinct products (ids only, newest first, <= 12). Per customer, so NEVER cached
+// (`private, no-store`); the storefront resolves current price and stock through the cached
+// public product read. Anonymous: 401 (the storefront row then renders nothing).
+router.get(
+  '/customers/me/reorder',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      const customerId = customerUserId(req);
+      setBuyerPrivate(res);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
+      const productIds = await CustomerReorderService.productIds(storeId, customerId);
+      res.json({ success: true, data: { productIds } });
     } catch (error) {
       next(error);
     }
