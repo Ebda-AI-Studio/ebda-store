@@ -53,11 +53,19 @@ const hasDiscount = (v: {
  * A product's pricing slice. Gold mode needs a complete spec (Ruling B5-13) and forbids
  * compare-at / discount fields (Ruling B5-19: sales run through coupons and promotions).
  */
+/**
+ * A weight a merchant EDITS: whole 10 mg steps (two decimals of a gram, what the editor types and shows). The
+ * engine and the stored snapshot accept any milligram; the edge refuses 995 so no weight shows as a rounded one.
+ */
+const editableWeightMg = int(GOLD_WEIGHT_MG_MIN, GOLD_WEIGHT_MG_MAX).refine(n => n % 10 === 0, {
+  message: 'weight must be in steps of 0.01 g',
+});
+
 export const productGoldPricingInputSchema = z
   .object({
     pricingMode: mode,
     karat: karat.nullable().optional(),
-    weightMg: int(GOLD_WEIGHT_MG_MIN, GOLD_WEIGHT_MG_MAX).nullable().optional(),
+    weightMg: editableWeightMg.nullable().optional(),
     makingChargeType: makingType.nullable().optional(),
     makingChargeValue: int(0, GOLD_MAKING_VALUE_MAX).nullable().optional(),
     marginBps: int(GOLD_MARGIN_BPS_MIN, GOLD_MARGIN_BPS_MAX).optional(),
@@ -87,7 +95,7 @@ export const variantGoldPricingInputSchema = z
   .object({
     pricingMode: mode.nullable(),
     karat: karat.nullable().optional(),
-    weightMg: int(GOLD_WEIGHT_MG_MIN, GOLD_WEIGHT_MG_MAX).nullable().optional(),
+    weightMg: editableWeightMg.nullable().optional(),
     makingChargeType: makingType.nullable().optional(),
     makingChargeValue: int(0, GOLD_MAKING_VALUE_MAX).nullable().optional(),
     marginBps: int(GOLD_MARGIN_BPS_MIN, GOLD_MARGIN_BPS_MAX).nullable().optional(),

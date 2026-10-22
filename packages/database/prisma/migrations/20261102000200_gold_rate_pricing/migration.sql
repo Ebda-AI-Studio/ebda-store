@@ -252,17 +252,19 @@ AS $fn$
 $fn$;
 
 -- (store, karat) pairs that sell gold-rate products and whose applied rate is inside the warning window
--- (max age - 240 min) or past the max age. Empty on almost every tick.
+-- (max age - 240 min) or past the max age. Empty on almost every tick. Watches EVERY store that sells gold
+-- products: nothing in the API reads gold_rate_settings.enabled, and a store that never saved settings is
+-- gated at the 1560-minute default (Ruling B5-36), so it must be warned too.
 CREATE OR REPLACE FUNCTION public.ebda_gold_rate_watch()
 RETURNS TABLE (store_id text, karat smallint, rate_id text, applied_at timestamptz, max_age_minutes integer)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
-  SELECT c.store_id, c.karat, c.rate_id, c.applied_at, g.max_age_minutes
+  SELECT c.store_id, c.karat, c.rate_id, c.applied_at, COALESCE(g.max_age_minutes, 1560)::integer AS max_age_minutes
   FROM public.gold_rates_current c
-  JOIN public.gold_rate_settings g ON g.store_id = c.store_id AND g.enabled
+  LEFT JOIN public.gold_rate_settings g ON g.store_id = c.store_id
   JOIN public.stores s ON s.id = c.store_id AND s.deleted_at IS NULL AND s.status::text = 'active'
-  WHERE c.applied_at <= now() - make_interval(mins => GREATEST(g.max_age_minutes - 240, 0))
+  WHERE c.applied_at <= now() - make_interval(mins => GREATEST(COALESCE(g.max_age_minutes, 1560) - 240, 0))
     AND EXISTS (
       SELECT 1 FROM public.products p
       WHERE p.store_id = c.store_id AND p.pricing_mode = 'gold_rate' AND p.deleted_at IS NULL AND p.status::text = 'active'

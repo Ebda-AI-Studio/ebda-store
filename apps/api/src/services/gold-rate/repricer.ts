@@ -164,19 +164,22 @@ function planProduct(
       }
     );
     if (!spec) {
-      // a fixed variant keeps its own price; null falls back to the product's CURRENT price
-      effective.push({ price: v.price ?? p.price, active: v.isActive });
+      // A fixed variant keeps its own price. One with none (legacy data; setProductPricing refuses it now)
+      // is left out of the minimum: the product's own price IS that minimum, so counting it would only ratchet.
+      if (v.price != null) effective.push({ price: v.price, active: v.isActive });
       continue;
     }
     const r = priceOf(spec);
     if (!r) {
-      effective.push({ price: v.price ?? p.price, active: v.isActive });
+      // untouched by this rate write: its stored price still counts (a gold variant is always priced)
+      if (v.price != null) effective.push({ price: v.price, active: v.isActive });
       continue;
     }
     effective.push({ price: r.price, active: v.isActive });
     if (r.price !== v.price || r.rateId !== v.goldRateId)
       out.variants.push({ id: v.id, price: r.price, rateId: r.rateId });
   }
+  if (effective.length === 0) return; // nothing priced to take a minimum of: the product keeps its price
   const pool = effective.some(e => e.active) ? effective.filter(e => e.active) : effective;
   const min = Math.min(...pool.map(e => e.price));
   if (min !== p.price) out.products.push({ id: p.id, price: min, rateId: null });

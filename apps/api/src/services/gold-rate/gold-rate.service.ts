@@ -27,6 +27,7 @@ import { auditLog } from '../../middleware/security';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import {
+  GOLD_CATALOGUE_CAP,
   KARAT_COHERENCE_GATE_BPS,
   loadCurrentRates,
   loadSettings,
@@ -449,12 +450,35 @@ export class GoldRateService {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const existing = await tx.product.findFirst({
         where: { id: productId, storeId, deletedAt: null },
-        select: { id: true, pricingMode: true, price: true, variants: { select: { id: true } } },
+        select: {
+          id: true,
+          pricingMode: true,
+          price: true,
+          variants: { select: { id: true, price: true } },
+        },
       });
       if (!existing) throw new AppError(404, 'NOT_FOUND', 'Product not found');
       const variantIds = new Set(existing.variants.map(v => v.id));
       for (const v of variantInputs)
         if (!variantIds.has(v.id)) throw new AppError(404, 'NOT_FOUND', 'Variant not found');
+      // Ruling B5-36: a fixed variant under a gold product keeps ITS OWN price. One without a price would
+      // fall back to the product's price, which is the minimum over the variants, so it could only ratchet down.
+      if (product.pricingMode !== 'fixed') {
+        const priceById = new Map(existing.variants.map(v => [v.id, v.price]));
+        const unpriced = variantInputs.filter(
+          v => v.pricingMode === 'fixed' && priceById.get(v.id) == null
+        );
+        if (unpriced.length > 0)
+          throw new AppError(
+            409,
+            'GOLD_VARIANT_NEEDS_PRICE',
+            'A fixed-price variant under a gold product needs its own price first',
+            {
+              variantIds: unpriced.map(v => v.id),
+              messageAr: 'المتغيّر ده بسعر ثابت ومحتاج سعر خاص بيه الأول.',
+            }
+          );
+      }
 
       const settings = await loadSettings(tx, storeId);
       const before = existing.pricingMode;
@@ -472,6 +496,18 @@ export class GoldRateService {
           });
         });
       } else {
+        if (before !== 'gold_rate') {
+          // Ruling B5-13: the catalogue cap is enforced where a product BECOMES gold, not only by the repricer.
+          const goldCount = await tx.product.count({
+            where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
+          });
+          if (goldCount >= GOLD_CATALOGUE_CAP)
+            throw new AppError(
+              409,
+              'GOLD_CATALOGUE_TOO_LARGE',
+              `A store can hold at most ${GOLD_CATALOGUE_CAP} gold-priced products`
+            );
+        }
         const bundled = await tx.bundleItem.count({ where: { productId } });
         if (bundled > 0)
           throw new AppError(

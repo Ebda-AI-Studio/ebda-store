@@ -432,11 +432,7 @@ router.post(
       // the SAME connection as the order write (the request's tenant transaction when there is one: the
       // customer row above and the fiscal document below live on it, so a second transaction could not see
       // them), `FOR SHARE`, which waits for a rate write in flight.
-      await assertSameRates(
-        prisma as unknown as Prisma.TransactionClient,
-        storeId,
-        linkGold.rateIds
-      );
+      await assertSameRates(prisma as unknown as Prisma.TransactionClient, storeId, linkGold);
       const draftOrder = await prisma.order.create({
         data: {
           storeId,

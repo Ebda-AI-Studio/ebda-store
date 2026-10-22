@@ -227,9 +227,9 @@ export function parseGramsToMg(input: string): number | null {
 
 /** Milligrams to the grams string an input shows ("12.50"). */
 export function mgToGramsString(mg: number): string {
-  const whole = Math.floor(mg / 1000);
-  const hundredths = Math.round((mg % 1000) / 10);
-  return `${String(whole)}.${String(hundredths).padStart(2, '0')}`;
+  // round to hundredths FIRST, then split: 995 mg is 100 hundredths = "1.00", never "0.100"
+  const total = Math.round(mg / 10);
+  return `${String(Math.floor(total / 100))}.${String(total % 100).padStart(2, '0')}`;
 }
 
 /** A margin typed as a percent ("7.5", "-2") to basis points; at most 2 decimals; null otherwise. */

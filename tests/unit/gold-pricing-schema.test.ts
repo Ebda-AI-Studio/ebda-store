@@ -58,6 +58,17 @@ describe('productGoldPricingInputSchema', () => {
     expect(ok(productGoldPricingInputSchema, { pricingMode: 'fixed' })).toBe(true);
     expect(ok(productGoldPricingInputSchema, gold)).toBe(true);
   });
+  it('an edited weight is in whole 10 mg steps: 995 mg is refused, 990 and 1000 are not (Ruling B5-36)', () => {
+    expect(ok(productGoldPricingInputSchema, { ...gold, weightMg: 995 })).toBe(false);
+    expect(ok(productGoldPricingInputSchema, { ...gold, weightMg: 990 })).toBe(true);
+    expect(ok(productGoldPricingInputSchema, { ...gold, weightMg: 1000 })).toBe(true);
+    expect(ok(variantGoldPricingInputSchema, { pricingMode: 'gold_rate', weightMg: 995 })).toBe(
+      false
+    );
+    expect(ok(variantGoldPricingInputSchema, { pricingMode: 'gold_rate', weightMg: 4350 })).toBe(
+      true
+    );
+  });
   it('gold needs every spec field', () => {
     for (const k of ['karat', 'weightMg', 'makingChargeType', 'makingChargeValue'] as const) {
       const { [k]: _omit, ...rest } = gold;

@@ -1238,7 +1238,8 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { order },
+        // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-36).
+        data: { order: redactOrderForCustomer(order) },
       });
     } catch (error) {
       next(error);

@@ -43,7 +43,14 @@ export interface GoldFeedQuote {
   source: 'primary' | 'fallback';
   /** Exact rational per24k = num / den (piastres), as strings: candidates are made from this, not from the rounded figure. */
   exact: { num: string; den: string };
-  reference: { xauUsdMicro?: number; usdEgpMicro?: number; egpMicro?: number; xauFrac?: number };
+  reference: {
+    xauUsdMicro?: number;
+    usdEgpMicro?: number;
+    egpMicro?: number;
+    xauFrac?: number;
+    /** When the source data was current: the OLDEST leg's own time (Ruling B5-36). */
+    quotedAt: string;
+  };
 }
 
 export type GoldFeedResult =
@@ -90,9 +97,9 @@ export function goldFeed(deps: FeedDeps = {}): GoldFeedAdapter {
     async fetch(signal: AbortSignal): Promise<GoldFeedResult> {
       const now = nowFn();
       const [xau, usdEgp, fb] = await Promise.all([
-        fetchXauUsdMicro(fetchImpl, signal),
+        fetchXauUsdMicro(fetchImpl, signal, now.getTime()),
         fetchUsdEgpMicro(fetchImpl, signal, now.getTime()),
-        fetchEgpPerXau(fetchImpl, signal),
+        fetchEgpPerXau(fetchImpl, signal, now.getTime()),
       ]);
       const spike = (q: GoldFeedQuote | null) =>
         q &&
@@ -108,9 +115,13 @@ export function goldFeed(deps: FeedDeps = {}): GoldFeedAdapter {
         xau && usdEgp
           ? quoteFrom(
               'primary',
-              B(xau) * B(usdEgp),
+              B(xau.micro) * B(usdEgp.micro),
               OZ_GRAMS_E7 * B(1000),
-              { xauUsdMicro: xau, usdEgpMicro: usdEgp },
+              {
+                xauUsdMicro: xau.micro,
+                usdEgpMicro: usdEgp.micro,
+                quotedAt: new Date(Math.min(xau.atMs, usdEgp.atMs)).toISOString(),
+              },
               now
             )
           : null
@@ -122,7 +133,11 @@ export function goldFeed(deps: FeedDeps = {}): GoldFeedAdapter {
               'fallback',
               B(fb.egpMicro) * B(1_000_000) * B(100) * B(10_000_000),
               B(fb.xauFrac) * OZ_GRAMS_E7,
-              { egpMicro: fb.egpMicro, xauFrac: fb.xauFrac },
+              {
+                egpMicro: fb.egpMicro,
+                xauFrac: fb.xauFrac,
+                quotedAt: new Date(fb.atMs).toISOString(),
+              },
               now
             )
           : null

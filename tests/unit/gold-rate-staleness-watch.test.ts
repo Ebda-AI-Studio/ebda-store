@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
   emails: [] as Array<{ kind: string; to: string; hours?: number }>,
   alerts: [] as Array<{ level: string; scope?: string; source?: string }>,
   redisDown: false,
+  noRedis: false,
+  failEmail: 0,
 }));
 vi.mock('../../apps/api/src/lib/definer', () => ({
   goldRateWatch: async () => h.watch,
@@ -26,9 +28,10 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: {
     getClient: () => {
       if (h.redisDown) throw new Error('redis down');
+      if (h.noRedis) return null;
       return {
-        set: async (key: string, _v: string, _ex: string, _ttl: number, nx: string) => {
-          if (nx === 'NX' && h.sentinels.has(key)) return null;
+        get: async (key: string) => (h.sentinels.has(key) ? '1' : null),
+        set: async (key: string) => {
           h.sentinels.add(key);
           return 'OK';
         },
@@ -39,6 +42,10 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
 vi.mock('../../apps/api/src/services/email.service', () => ({
   EmailService: {
     sendGoldRateNotice: async (_s: string, kind: string, d: { to: string; hours?: number }) => {
+      if (h.failEmail > 0) {
+        h.failEmail--;
+        throw new Error('smtp down');
+      }
       h.emails.push({ kind, to: d.to, hours: d.hours });
     },
   },
@@ -93,6 +100,8 @@ beforeEach(() => {
   h.emails.length = 0;
   h.alerts.length = 0;
   h.redisDown = false;
+  h.noRedis = false;
+  h.failEmail = 0;
   steps = 0;
 });
 
@@ -168,9 +177,35 @@ describe('frozen clock, 26 h max age (warn at 22 h, block at 26 h)', () => {
     expect(h.emails).toHaveLength(1);
     expect(h.emails[0].kind).toBe('blocked');
   });
-  it('no sentinel store: it sends nothing rather than email the owner every hour', async () => {
+  it('no sentinel store (client throws): it sends nothing rather than email every hour, AND says so with a P1', async () => {
     h.redisDown = true;
     await tick(at(26 * 60));
     expect(h.emails).toEqual([]);
+    expect(h.alerts.map(a => a.source)).toEqual(['cron.gold-rate-staleness-no-sentinel-store']);
+  });
+  it('no sentinel store (no client at all): the same, loudly', async () => {
+    h.noRedis = true;
+    const out = await tick(at(26 * 60));
+    expect(h.emails).toEqual([]);
+    expect(out).toMatchObject({ outcome: 'no-sentinel-store' });
+    expect(h.alerts.map(a => a.level)).toEqual(['p1']);
+  });
+  // Ruling B5-36: the once-only marker is claimed AFTER the send, so a failed send is retried next run.
+  it('a send that throws leaves the marker unset: the NEXT run sends it, and a P1 names the failure', async () => {
+    h.failEmail = 1;
+    await tick(at(22 * 60));
+    expect(h.emails).toEqual([]);
+    expect(h.sentinels.size).toBe(0);
+    expect(h.alerts.map(a => a.source)).toEqual(['cron.gold-rate-staleness-failed']);
+    h.alerts.length = 0;
+    await tick(at(23 * 60));
+    expect(h.emails).toEqual([{ kind: 'warning', to: 'owner@example.com', hours: 23 }]);
+    expect(h.sentinels.size).toBe(1);
+  });
+  it('one store failing does not stop the stores after it', async () => {
+    h.failEmail = 1;
+    h.watch = [row('rA'), { ...row('rB'), storeId: 's2' }];
+    await tick(at(22 * 60));
+    expect(h.emails).toHaveLength(1); // s1 failed, s2 went out
   });
 });

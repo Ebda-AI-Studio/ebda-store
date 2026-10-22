@@ -1452,7 +1452,7 @@ export class OrderService {
         // Ruling B5-17: the gold rates this order was priced from must still be the current ones. Read
         // FOR SHARE, so a rate write in flight is waited for and a committed one is seen: PRICE_CHANGED,
         // never an order at the old rate.
-        await assertSameRates(tx, storeId, goldGate.rateIds);
+        await assertSameRates(tx, storeId, goldGate);
         // Admission and stock reservation share one transaction. Full-wallet
         // orders are already paid; a failed wallet debit below rolls back all work.
         const manualHoldAdmitted =
@@ -3362,7 +3362,7 @@ export class OrderService {
     // path elsewhere decrements as needed when payment lands.
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Ruling B5-17: the gold rates the lines were priced from must still be the current ones.
-      await assertSameRates(tx, storeId, adminGoldGate.rateIds);
+      await assertSameRates(tx, storeId, adminGoldGate);
       // Per-customer coupon usage limit (same money-integrity gap as
       // OrderService.create, 2026-07-02 audit: createAdminOrder resolved
       // coupons via CouponService.getByCode, which only enforces the

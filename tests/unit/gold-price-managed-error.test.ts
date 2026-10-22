@@ -1,6 +1,7 @@
 // Ruling B5-13: GOLD_PRICE_MANAGED (raised by the database guard) is a 409 with a business message,
 // never an opaque 500, and nothing about the SQL leaks.
 import { describe, it, expect } from 'vitest';
+import { GoldPriceError } from '../../packages/shared/src/commerce/gold-price';
 import { isGoldPriceManaged } from '../../apps/api/src/lib/prisma-errors';
 import { clientErrorStatus, errorHandler } from '../../apps/api/src/middleware/error-handler';
 
@@ -62,5 +63,22 @@ describe('GOLD_PRICE_MANAGED', () => {
       expect(r.body?.error.messageAr).toMatch(/سعر الدهب/);
       expect(JSON.stringify(r.body)).not.toMatch(/P0001|prisma|repricer|originalMessage/i);
     }
+  });
+});
+
+describe('GoldPriceError (Ruling B5-36)', () => {
+  const err = new GoldPriceError(
+    'GOLD_PRICE_OUT_OF_RANGE',
+    'computed price is outside 1..2147483647'
+  );
+  it('is a 409 client error, not a 500', () => {
+    expect(clientErrorStatus(err)).toBe(409);
+  });
+  it('answers 409 with its code, a bilingual message and no engine text', () => {
+    const r = respond(err);
+    expect(r.status).toBe(409);
+    expect(r.body?.error.code).toBe('GOLD_PRICE_OUT_OF_RANGE');
+    expect(r.body?.error.messageAr).toMatch(/الدهب/);
+    expect(JSON.stringify(r.body)).not.toMatch(/2147483647/);
   });
 });

@@ -675,7 +675,7 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { order },
+        data: { order: redactOrderForCustomer(order) },
       });
     } catch (error) {
       next(error);

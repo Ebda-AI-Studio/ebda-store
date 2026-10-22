@@ -5,6 +5,18 @@ import { isGoldPriceManaged, uniqueViolationTarget } from '../lib/prisma-errors'
 import logger from '../lib/logger';
 import { redactSensitiveQuery } from '@ebda/shared';
 
+/**
+ * A `GoldPriceError` from the shared pricing engine. By name + code, not `instanceof`: the engine is bundled
+ * into more than one entry point, and a copy's class is not this module's class (same reason as isZodError).
+ */
+function isGoldPriceError(err: unknown): err is Error & { code: string } {
+  return (
+    err instanceof Error &&
+    err.name === 'GoldPriceError' &&
+    typeof (err as { code?: unknown }).code === 'string'
+  );
+}
+
 export class AppError extends Error {
   constructor(
     public statusCode: number,
@@ -75,7 +87,7 @@ function multerClientError(err: unknown): { status: number; code: string; messag
 export function clientErrorStatus(err: unknown): number | undefined {
   if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;
   // Ruling B5-13: a writer touched a gold-priced row's price outside the repricer.
-  if (isGoldPriceManaged(err)) return 409;
+  if (isGoldPriceManaged(err) || isGoldPriceError(err)) return 409;
   if (err instanceof SyntaxError && 'body' in err) return 400;
   if (isZodError(err)) return 400;
   const multerErr = multerClientError(err);
@@ -245,6 +257,21 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
         message:
           "The price of a gold-rate product is calculated from the day's gold rate and cannot be edited by hand.",
         messageAr: 'سعر القطعة بسعر الدهب بيتحسب لوحده من سعر الجرام ومينفعش يتعدّل يدوي.',
+        requestId,
+      },
+    });
+    return;
+  }
+
+  // Ruling B5-36: a gold price the engine refuses (a rate or spec out of range) is a business 409, not a 500.
+  if (isGoldPriceError(err)) {
+    logger.warn({ requestId, code: err.code }, 'Gold price refused by the engine');
+    res.status(409).json({
+      success: false,
+      error: {
+        code: err.code,
+        message: 'This gold price cannot be calculated. Check the rate and the piece details.',
+        messageAr: 'مش قادرين نحسب سعر الدهب ده. راجع السعر وتفاصيل القطعة.',
         requestId,
       },
     });

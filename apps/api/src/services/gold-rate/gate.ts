@@ -168,10 +168,18 @@ export interface GoldGateResult {
   snapshots: Map<string, GoldLineSnapshot>;
   /** The rate row each karat was priced from: re-checked inside the money transaction. */
   rateIds: Map<GoldKarat, string>;
+  /**
+   * What each gold line was priced from (the price column and the resolved spec): re-selected inside the
+   * money transaction, so a weight / making / margin edit or a rounding change that commits between the
+   * pre-check and the order write is `PRICE_CHANGED`, never an order at the old price (Ruling B5-36).
+   */
+  lines: Array<{ productId: string; variantId: string | null; price: number; spec: GoldPriceSpec }>;
+  roundingStep: GoldRoundingStep | null;
 }
 
 const productGoldSelect = {
   id: true,
+  price: true,
   pricingMode: true,
   goldKarat: true,
   goldWeightMg: true,
@@ -183,6 +191,7 @@ const productGoldSelect = {
 const variantGoldSelect = {
   id: true,
   productId: true,
+  price: true,
   pricingMode: true,
   goldKarat: true,
   goldWeightMg: true,
@@ -253,8 +262,120 @@ export async function assertGoldLinesPriceable(
   lines: readonly GoldGateLine[],
   opts: { requireQuote: boolean; lock?: 'share'; now?: Date }
 ): Promise<GoldGateResult> {
-  const out: GoldGateResult = { snapshots: new Map(), rateIds: new Map() };
+  const out: GoldGateResult = {
+    snapshots: new Map(),
+    rateIds: new Map(),
+    lines: [],
+    roundingStep: null,
+  };
   if (lines.length === 0) return out;
+  const now = opts.now ?? new Date();
+
+  type State = Awaited<ReturnType<typeof readGoldState>>;
+  type Priced = { g: State['goldLines'][number]; expected: number };
+  const priceAll = (st: State): Priced[] =>
+    st.goldLines.map(g => ({
+      g,
+      expected: computeGoldUnitPrice(
+        g.spec,
+        st.rates.get(g.spec.karat)!.ratePerGram,
+        st.settings.roundingStep
+      ).unitPrice,
+    }));
+  const isDrift = (p: Priced) => p.g.dbPrice !== p.expected;
+
+  let st = await readGoldState(db, storeId, lines, opts.lock);
+  if (st.goldLines.length === 0) return out;
+  assertRatesFresh(st.rates, st.karats, st.settings, now);
+  let priced = priceAll(st);
+  if (priced.some(isDrift)) {
+    // The price and the rate are separate reads: a rate write (which reprices in its own transaction) that
+    // committed between them looks like drift. Read both again; only a mismatch that survives is real.
+    st = await readGoldState(db, storeId, lines, opts.lock);
+    assertRatesFresh(st.rates, st.karats, st.settings, now);
+    priced = priceAll(st);
+  }
+
+  const drift = priced.filter(isDrift).map(p => ({
+    productId: p.g.line.productId,
+    variantId: p.g.line.variantId,
+    materialised: p.g.dbPrice,
+    expected: p.expected,
+  }));
+  if (drift.length > 0) {
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'order.gold-price-drift',
+      title: 'Gold price drift: the stored price differs from the recomputed one',
+      body: 'The repricer and the order gate disagree. The order was refused; nothing was charged.',
+      context: { storeId, lines: drift.slice(0, 10) },
+    }).catch(() => undefined);
+    throw new AppError(
+      409,
+      'GOLD_PRICE_DRIFT',
+      'This piece cannot be ordered right now. Please try again in a moment.',
+      { messageAr: 'القطعة دي مش هتتطلب دلوقتي. جرّب تاني بعد شوية.', lines: drift.length }
+    );
+  }
+
+  // The stored price now equals the recomputed one. A caller that read an OLDER price (the cart, a rate
+  // write in between) or a shopper quote that differs is a moved price: PRICE_CHANGED, not drift.
+  const changed: Array<{
+    productId: string;
+    variantId: string | null;
+    previous: number;
+    current: number;
+  }> = [];
+  for (const { g, expected } of priced) {
+    const { line } = g;
+    const previous =
+      line.materialisedUnitPrice !== expected
+        ? line.materialisedUnitPrice
+        : opts.requireQuote && line.quotedUnitPrice !== null && line.quotedUnitPrice !== expected
+          ? line.quotedUnitPrice
+          : null;
+    if (previous !== null)
+      changed.push({
+        productId: line.productId,
+        variantId: line.variantId,
+        previous,
+        current: expected,
+      });
+    else
+      out.snapshots.set(
+        line.key,
+        buildGoldSnapshot(g.spec, st.rates.get(g.spec.karat)!, st.settings.roundingStep, expected)
+      );
+    out.lines.push({
+      productId: line.productId,
+      variantId: line.variantId,
+      price: expected,
+      spec: g.spec,
+    });
+  }
+  for (const k of st.karats) out.rateIds.set(k, st.rates.get(k)!.rateId);
+  out.roundingStep = st.settings.roundingStep;
+  if (changed.length > 0)
+    throw new AppError(
+      409,
+      'PRICE_CHANGED',
+      'The gold rate changed since you added this piece. The new price is shown.',
+      {
+        messageAr: 'سعر الدهب اتغيّر من ساعة ما ضفت القطعة للسلة، والسعر الجديد ظاهر قدامك.',
+        lines: changed,
+      }
+    );
+  return out;
+}
+
+/** One fresh read of everything a gold price depends on: the rows, the spec they resolve to, the rates, the settings. */
+async function readGoldState(
+  db: Prisma.TransactionClient,
+  storeId: string,
+  lines: readonly GoldGateLine[],
+  lock?: 'share'
+) {
   const productIds = [...new Set(lines.map(l => l.productId))];
   const variantIds = [...new Set(lines.map(l => l.variantId).filter((v): v is string => !!v))];
   const [products, variants] = await Promise.all([
@@ -271,85 +392,20 @@ export async function assertGoldLinesPriceable(
   const productById = new Map(products.map(p => [p.id, p]));
   const variantById = new Map(variants.map(v => [v.id, v]));
 
-  const goldLines: Array<{ line: GoldGateLine; spec: GoldPriceSpec }> = [];
+  const goldLines: Array<{ line: GoldGateLine; spec: GoldPriceSpec; dbPrice: number }> = [];
   for (const line of lines) {
     const p = productById.get(line.productId);
     if (!p) continue;
     const v = line.variantId ? (variantById.get(line.variantId) ?? null) : null;
     if (p.pricingMode !== 'gold_rate' && v?.pricingMode !== 'gold_rate') continue;
     const spec = lineGoldSpec(p, v);
-    if (spec) goldLines.push({ line, spec });
+    if (spec) goldLines.push({ line, spec, dbPrice: v?.price ?? p.price });
   }
-  if (goldLines.length === 0) return out;
-
-  const now = opts.now ?? new Date();
   const settings = await loadSettings(db, storeId);
   const karats = [...new Set(goldLines.map(g => g.spec.karat))];
-  const rates = await loadCurrentRates(db, storeId, karats, { lock: opts.lock });
-  assertRatesFresh(rates, karats, settings, now);
-
-  const drift: Array<{
-    productId: string;
-    variantId: string | null;
-    materialised: number;
-    expected: number;
-  }> = [];
-  const changed: Array<{
-    productId: string;
-    variantId: string | null;
-    previous: number;
-    current: number;
-  }> = [];
-  for (const { line, spec } of goldLines) {
-    const rate = rates.get(spec.karat)!;
-    const expected = computeGoldUnitPrice(spec, rate.ratePerGram, settings.roundingStep).unitPrice;
-    if (expected !== line.materialisedUnitPrice) {
-      drift.push({
-        productId: line.productId,
-        variantId: line.variantId,
-        materialised: line.materialisedUnitPrice,
-        expected,
-      });
-      continue;
-    }
-    if (opts.requireQuote && line.quotedUnitPrice !== null && line.quotedUnitPrice !== expected)
-      changed.push({
-        productId: line.productId,
-        variantId: line.variantId,
-        previous: line.quotedUnitPrice,
-        current: expected,
-      });
-    out.snapshots.set(line.key, buildGoldSnapshot(spec, rate, settings.roundingStep, expected));
-  }
-  for (const k of karats) out.rateIds.set(k, rates.get(k)!.rateId);
-
-  if (drift.length > 0) {
-    void sendAlert({
-      level: 'p1',
-      scope: 'platform',
-      source: 'order.gold-price-drift',
-      title: 'Gold price drift: a materialised price differs from the recomputed one',
-      body: 'The repricer and the order gate disagree. The order was refused; nothing was charged.',
-      context: { storeId, lines: drift.slice(0, 10) },
-    }).catch(() => undefined);
-    throw new AppError(
-      409,
-      'GOLD_PRICE_DRIFT',
-      'This piece cannot be ordered right now. Please try again in a moment.',
-      { messageAr: 'القطعة دي مش هتتطلب دلوقتي. جرّب تاني بعد شوية.', lines: drift.length }
-    );
-  }
-  if (changed.length > 0)
-    throw new AppError(
-      409,
-      'PRICE_CHANGED',
-      'The gold rate changed since you added this piece. The new price is shown.',
-      {
-        messageAr: 'سعر الدهب اتغيّر من ساعة ما ضفت القطعة للسلة، والسعر الجديد ظاهر قدامك.',
-        lines: changed,
-      }
-    );
-  return out;
+  const rates =
+    goldLines.length > 0 ? await loadCurrentRates(db, storeId, karats, { lock }) : new Map();
+  return { goldLines, settings, karats, rates: rates as Map<GoldKarat, CurrentRate> };
 }
 
 /**
@@ -360,18 +416,45 @@ export async function assertGoldLinesPriceable(
 export async function assertSameRates(
   db: Prisma.TransactionClient,
   storeId: string,
-  priced: ReadonlyMap<GoldKarat, string>
+  gate: GoldGateResult
 ): Promise<void> {
+  const priced = gate.rateIds;
   if (priced.size === 0) return;
+  const changed = (karat?: GoldKarat) =>
+    new AppError(
+      409,
+      'PRICE_CHANGED',
+      'The gold rate changed while your order was being placed. The new price is shown.',
+      { messageAr: 'سعر الدهب اتغيّر وإنت بتكمّل الطلب. السعر الجديد ظاهر قدامك.', karat }
+    );
   const now = await loadCurrentRates(db, storeId, [...priced.keys()], { lock: 'share' });
-  for (const [karat, rateId] of priced)
-    if (now.get(karat)?.rateId !== rateId)
-      throw new AppError(
-        409,
-        'PRICE_CHANGED',
-        'The gold rate changed while your order was being placed. The new price is shown.',
-        { messageAr: 'سعر الدهب اتغيّر وإنت بتكمّل الطلب. السعر الجديد ظاهر قدامك.', karat }
-      );
+  for (const [karat, rateId] of priced) if (now.get(karat)?.rateId !== rateId) throw changed(karat);
+
+  // The rate is the same; the price may still have moved through the piece itself (weight, making charge,
+  // margin, or the store's rounding step). Re-select the rows and compare (Ruling B5-36). Not row-locked:
+  // FOR SHARE on products/variants would queue every checkout behind a hot SKU's stock decrement.
+  const keyed = gate.lines.map(l => ({
+    key: l.productId,
+    productId: l.productId,
+    variantId: l.variantId,
+    materialisedUnitPrice: l.price,
+    quotedUnitPrice: null,
+  }));
+  const fresh = await readGoldState(db, storeId, keyed);
+  if (gate.roundingStep !== null && fresh.settings.roundingStep !== gate.roundingStep)
+    throw changed();
+  const sig = (productId: string, variantId: string | null, price: number, spec: GoldPriceSpec) =>
+    `${productId}|${variantId ?? ''}|${price}|${spec.karat}|${spec.weightMg}|${spec.makingChargeType}|${spec.makingChargeValue}|${spec.marginBps}`;
+  const have = new Map<string, number>();
+  for (const g of fresh.goldLines) {
+    const k = sig(g.line.productId, g.line.variantId, g.dbPrice, g.spec);
+    have.set(k, (have.get(k) ?? 0) + 1);
+  }
+  for (const l of gate.lines) {
+    const k = sig(l.productId, l.variantId, l.price, l.spec);
+    const n = have.get(k) ?? 0;
+    if (n === 0) throw changed();
+  }
 }
 
 /** The `order_items.gold_snapshot` for one line (Zod-valid by construction). */

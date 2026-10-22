@@ -15,6 +15,7 @@ import {
   type GoldFeedQuote,
   type GoldFeedResult,
 } from '../../../services/gold-rate/feed/adapter';
+import { markSent, wasSent } from '../../../services/gold-rate/sentinel';
 import { config } from '../../../config';
 
 /**
@@ -88,29 +89,71 @@ export async function handleGoldRateFeedFetch(
 
     let applied = 0;
     let pending = 0;
+    let failed = 0;
     for (const s of stores) {
+      // Apply: one store's failure (a catalogue over the cap, a price out of range) is a P1 for THAT store and the
+      // loop goes on, so one bad store never stops the feed for the stores after it (Ruling B5-36).
       const out = await step.run(`apply-${s.storeId}`, async () => {
-        const candidates = storeCandidateRates(quote, s.premiumBps);
-        const reference = {
-          source: quote.source,
-          fetchedAt: quote.fetchedAt,
-          premiumBps: s.premiumBps,
-          ...quote.reference,
-          ...(disagree
-            ? {
-                disagreeDiffBps: result.diffBps,
-                otherSource24k: result.fallback.per24kGramPiastres,
-              }
-            : {}),
-        };
-        const res = await runInStoreScope(s.storeId, () =>
-          GoldRateService.applyRates(
-            s.storeId,
-            { rates: GOLD_KARATS.map(k => ({ karat: k, ratePerGram: candidates.get(k)! })) },
-            { feed: reference, forcePending: disagree }
-          )
-        );
-        for (const p of res.pending) {
+        try {
+          const candidates = storeCandidateRates(quote, s.premiumBps);
+          const reference = {
+            source: quote.source,
+            fetchedAt: quote.fetchedAt,
+            premiumBps: s.premiumBps,
+            ...quote.reference,
+            ...(disagree
+              ? {
+                  disagreeDiffBps: result.diffBps,
+                  otherSource24k: result.fallback.per24kGramPiastres,
+                }
+              : {}),
+          };
+          const res = await runInStoreScope(s.storeId, () =>
+            GoldRateService.applyRates(
+              s.storeId,
+              { rates: GOLD_KARATS.map(k => ({ karat: k, ratePerGram: candidates.get(k)! })) },
+              { feed: reference, forcePending: disagree }
+            )
+          );
+          return {
+            failed: false as const,
+            applied: res.applied.length,
+            pending: res.pending.map(p => ({
+              id: p.id,
+              karat: p.karat,
+              ratePerGram: p.ratePerGram,
+              jumpBps: p.jumpBps,
+            })),
+          };
+        } catch (err) {
+          logger.error({ err, storeId: s.storeId }, 'gold-rate-feed: apply failed for one store');
+          await sendAlert({
+            level: 'p1',
+            scope: 'platform',
+            source: 'cron.gold-rate-feed-store-failed',
+            title: 'Gold rate feed: applying the rate failed for one store',
+            body: `Store ${s.storeId} was skipped this run; the other stores were not affected.`,
+            context: {
+              storeId: s.storeId,
+              code: (err as { code?: string }).code,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          }).catch(() => undefined);
+          return { failed: true as const, applied: 0, pending: [] };
+        }
+      });
+      if (out.failed) {
+        failed++;
+        continue;
+      }
+      applied += out.applied;
+      pending += out.pending.length;
+      if (out.pending.length === 0) continue;
+
+      // Notify: its OWN step, so an email error cannot re-run `apply-` (which would write history again and
+      // supersede the pending rows it just made). One email per pending rate id, marked after the send.
+      await step.run(`notify-${s.storeId}`, async () => {
+        try {
           const info = await withStore(s.storeId, tx =>
             tx.store.findUnique({
               where: { id: s.storeId },
@@ -118,30 +161,51 @@ export async function handleGoldRateFeedFetch(
             })
           );
           const to = info?.owner?.email;
-          if (!to) continue;
-          await EmailService.sendGoldRateNotice(s.storeId, 'pending', {
-            to,
-            storeName: info?.name ?? s.storeId,
-            adminUrl: config.adminUrl,
-            karat: p.karat,
-            rateText: `${(p.ratePerGram / 100).toLocaleString('en-US')} EGP`,
-            jumpText: p.jumpBps != null ? `${(p.jumpBps / 100).toFixed(1)}%` : '',
-          });
-          logger.info(
-            { storeId: s.storeId, to: maskEmail(to), karat: p.karat },
-            'gold-rate-feed: pending rate email sent'
-          );
+          if (!to) return;
+          for (const p of out.pending) {
+            const key = `gold:pending-mail:${s.storeId}:${p.id}`;
+            if (await wasSent(key)) continue;
+            await EmailService.sendGoldRateNotice(s.storeId, 'pending', {
+              to,
+              storeName: info?.name ?? s.storeId,
+              adminUrl: config.adminUrl,
+              karat: p.karat,
+              rateText: `${(p.ratePerGram / 100).toLocaleString('en-US')} EGP`,
+              jumpText: p.jumpBps != null ? `${(p.jumpBps / 100).toFixed(1)}%` : '',
+            });
+            await markSent(key);
+            logger.info(
+              { storeId: s.storeId, to: maskEmail(to), karat: p.karat },
+              'gold-rate-feed: pending rate email sent'
+            );
+          }
+        } catch (err) {
+          logger.error({ err, storeId: s.storeId }, 'gold-rate-feed: pending-rate email failed');
+          await sendAlert({
+            level: 'p1',
+            scope: 'platform',
+            source: 'cron.gold-rate-feed-notice-failed',
+            title: 'Gold rate feed: a pending-rate email failed to send',
+            body: `The rate for store ${s.storeId} was stored; only the owner email failed.`,
+            context: {
+              storeId: s.storeId,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          }).catch(() => undefined);
         }
-        return { applied: res.applied.length, pending: res.pending.length };
       });
-      applied += out.applied;
-      pending += out.pending;
     }
     logger.info(
-      { stores: stores.length, applied, pending, source: quote.source, disagree },
+      { stores: stores.length, applied, pending, failed, source: quote.source, disagree },
       'gold-rate-feed-fetch completed'
     );
-    return { stores: stores.length, applied, pending, outcome: disagree ? 'disagree' : 'ok' };
+    return {
+      stores: stores.length,
+      applied,
+      pending,
+      failed,
+      outcome: disagree ? 'disagree' : 'ok',
+    };
   }
 }
 

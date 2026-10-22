@@ -197,3 +197,51 @@ describe('cross-check: the threshold is 200 bps and is pinned both sides', () =>
     expect(ok(await run({ [GOLD_SPOT_URL]: XAU, [USD_RATES_URL]: USD })).source).toBe('primary');
   });
 });
+
+// Ruling B5-36: a frozen feed must not count as fresh.
+describe('quote freshness', () => {
+  const H = 3600_000;
+  const xauAt = (ms: number) => ({ ...XAU, updatedAt: new Date(NOW.getTime() - ms).toISOString() });
+  const usdAt = (ms: number) => ({
+    ...USD,
+    time_last_update_unix: Math.floor((NOW.getTime() - ms) / 1000),
+  });
+  const fbDay = (date: string) => ({ ...FB_PG, date });
+
+  it('the spot quote: 11 h old is used, 13 h old is a frozen feed and falls through to the fallback', async () => {
+    expect(ok(await run({ ...ALL_OK, [GOLD_SPOT_URL]: xauAt(11 * H) })).source).toBe('primary');
+    expect(ok(await run({ ...ALL_OK, [GOLD_SPOT_URL]: xauAt(13 * H) })).source).toBe('fallback');
+  });
+  it('a spot quote with no timestamp, an unparseable one, or one from the future is not trusted', async () => {
+    const { updatedAt: _u, ...none } = XAU;
+    for (const bad of [none, { ...XAU, updatedAt: 'yesterday' }, xauAt(-5 * H)])
+      expect(ok(await run({ ...ALL_OK, [GOLD_SPOT_URL]: bad })).source, JSON.stringify(bad)).toBe(
+        'fallback'
+      );
+  });
+  it('the USD/EGP file publishes daily: 30 h old is used, 40 h old is stale', async () => {
+    expect(ok(await run({ ...ALL_OK, [USD_RATES_URL]: usdAt(30 * H) })).source).toBe('primary');
+    resetUsdEgpMemo();
+    expect(ok(await run({ ...ALL_OK, [USD_RATES_URL]: usdAt(40 * H) })).source).toBe('fallback');
+  });
+  it('the fallback file is dated: today and yesterday (inside 12 h of its end) pass, two days old does not', async () => {
+    const only = (body: unknown) => ({ [FALLBACK_URLS[0]]: body, [FALLBACK_URLS[1]]: 'throw' });
+    expect((await run(only(fbDay('2026-10-22')))).kind).toBe('ok');
+    expect((await run(only(fbDay('2026-10-21')))).kind).toBe('ok'); // ended 9 h 15 min ago
+    expect((await run(only(fbDay('2026-10-20')))).kind).toBe('down');
+    expect((await run(only({ ...FB_PG, date: undefined }))).kind).toBe('down');
+  });
+  it('a stale first mirror falls through to a current second one', async () => {
+    const r = await run({
+      [FALLBACK_URLS[0]]: fbDay('2026-10-10'),
+      [FALLBACK_URLS[1]]: fbDay('2026-10-22'),
+    });
+    expect(r.kind).toBe('ok');
+  });
+  it('the quote carries WHEN its data was current (the oldest leg), for the feedReference', async () => {
+    const q = ok(await run(ALL_OK));
+    expect(q.reference.quotedAt).toBe(new Date(1792627351 * 1000).toISOString()); // the USD/EGP file is the older leg
+    const f = ok(await run({ [FALLBACK_URLS[1]]: FB_PG }));
+    expect(f.reference.quotedAt).toBe(NOW.toISOString()); // today's file counts as now
+  });
+});

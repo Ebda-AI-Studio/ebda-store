@@ -58,7 +58,7 @@ describe.skipIf(!hasDb)('ebda_gold_feed_stores / ebda_gold_rate_watch', () => {
       await app.query(
         `select store_id, karat, rate_id, max_age_minutes from ebda_gold_rate_watch()`
       )
-    ).rows as Array<{ store_id: string; karat: number; rate_id: string }>;
+    ).rows as Array<{ store_id: string; karat: number; rate_id: string; max_age_minutes: number }>;
   const mine = <T extends { store_id: string }>(rows: T[]) =>
     rows.filter(r => Object.values(mk).some(s => s.storeId === r.store_id));
 
@@ -74,6 +74,7 @@ describe.skipIf(!hasDb)('ebda_gold_feed_stores / ebda_gold_rate_watch', () => {
       'blocked',
       'noGold',
       'notEnabled',
+      'noSettings',
       'variantKarat',
     ])
       mk[k] = await createStore(owner, `cron-${k}-${t}`);
@@ -96,6 +97,9 @@ describe.skipIf(!hasDb)('ebda_gold_feed_stores / ebda_gold_rate_watch', () => {
       await seedRate(mk[k].storeId, 21, age);
       if (k !== 'noGold') await createProduct(owner, mk[k].storeId, { ...GOLD });
     }
+    // a store that NEVER saved settings: the API gates it at the 1560-minute default, so the watch must see it
+    await seedRate(mk.noSettings.storeId, 21, 1600);
+    await createProduct(owner, mk.noSettings.storeId, { ...GOLD });
     // a store whose only gold use is a VARIANT override at 18k
     await settings(mk.variantKarat.storeId, {});
     await seedRate(mk.variantKarat.storeId, 18, 1600);
@@ -135,10 +139,18 @@ describe.skipIf(!hasDb)('ebda_gold_feed_stores / ebda_gold_rate_watch', () => {
     expect(ids.has(mk.blocked.storeId)).toBe(true);
   });
 
-  it('watch: a store with the feature on but ZERO gold products is skipped; so is a store that did not opt in', async () => {
+  it('watch: a store with ZERO gold products is skipped', async () => {
     const ids = new Set(mine(await watch()).map(r => r.store_id));
     expect(ids.has(mk.noGold.storeId)).toBe(false);
-    expect(ids.has(mk.notEnabled.storeId)).toBe(false);
+  });
+
+  // Ruling B5-36: nothing in the API reads gold_rate_settings.enabled, so the watch must not either.
+  it('watch: every store that sells gold is watched - enabled=false, and no settings row at all (default 1560 min)', async () => {
+    const rows = mine(await watch());
+    expect(rows.some(r => r.store_id === mk.notEnabled.storeId)).toBe(true);
+    const noSettings = rows.filter(r => r.store_id === mk.noSettings.storeId);
+    expect(noSettings).toHaveLength(1);
+    expect(noSettings[0]).toMatchObject({ max_age_minutes: 1560 });
   });
 
   it('watch: a karat used only by a VARIANT override counts', async () => {

@@ -351,6 +351,11 @@ describe('typed units: grams, percent', () => {
       expect(parseGramsToMg(mgToGramsString(mg))).toBe(mg);
     expect(mgToGramsString(4350)).toBe('4.35');
     expect(mgToGramsString(12000)).toBe('12.00');
+    // Ruling B5-36: the hundredths carry into the whole part, never "0.100"
+    expect(mgToGramsString(995)).toBe('1.00');
+    expect(mgToGramsString(1995)).toBe('2.00');
+    expect(mgToGramsString(5)).toBe('0.01');
+    expect(mgToGramsString(4)).toBe('0.00');
   });
 
   it('parses a margin percent into basis points inside the allowed range', () => {

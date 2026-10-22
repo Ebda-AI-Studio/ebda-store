@@ -42,8 +42,15 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/gold-rate/gate.ts': {
     category: 'catalog-read',
     reason:
-      "Ruling B5-17: the order gate recomputes a gold line's BASE price from its spec (computeGoldUnitPrice) and compares it with the materialised base the caller hands to PriceResolver; goldQuotesForLines reads the base price the cart stores as the shopper's quote. The gate never decides a charged price",
-    reads: { assertGoldLinesPriceable: 1, buildGoldSnapshot: 1, goldQuotesForLines: 4 },
+      "Ruling B5-17: the order gate recomputes a gold line's BASE price from its spec (computeGoldUnitPrice) and compares it with the stored base (re-read in the gate, and again inside the money transaction, B5-36) and the base the caller hands to PriceResolver; goldQuotesForLines reads the base price the cart stores as the shopper's quote. The gate never decides a charged price",
+    reads: {
+      '<module>': 2,
+      priceAll: 1,
+      readGoldState: 2,
+      assertSameRates: 2,
+      buildGoldSnapshot: 1,
+      goldQuotesForLines: 4,
+    },
   },
   'services/gold-rate/feed/gold-api.ts': {
     category: 'unrelated',
@@ -60,8 +67,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/gold-rate/gold-rate.service.ts': {
     category: 'writer',
     reason:
-      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price",
-    reads: { setProductPricing: 4 },
+      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price; it also reads each variant's own price to refuse a fixed variant that has none (B5-36)",
+    reads: { setProductPricing: 6 },
   },
   'services/cart.service.ts': {
     category: 'resolver-input',

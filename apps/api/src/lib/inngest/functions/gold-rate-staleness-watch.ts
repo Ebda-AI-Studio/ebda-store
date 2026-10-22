@@ -4,7 +4,11 @@ import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 import { goldRateWatch } from '../../definer';
-import { redis } from '../../../services/redis.service';
+import {
+  SentinelStoreUnavailableError,
+  markSent,
+  wasSent,
+} from '../../../services/gold-rate/sentinel';
 import { sendAlert } from '../../../services/alerts.service';
 import { EmailService } from '../../../services/email.service';
 import { rateAgeMinutes } from '../../../services/gold-rate/gate';
@@ -12,21 +16,6 @@ import { config } from '../../../config';
 
 /** Minutes before the max age at which the owner is warned (Ruling B5-16: 22 h of 26). */
 export const WARN_BEFORE_MINUTES = 240;
-const SENTINEL_TTL_SECONDS = 3 * 24 * 60 * 60;
-
-/** Claim a once-only sentinel (a Durable Object key on Workers: it is not a `cache:` key). */
-async function claimOnce(key: string): Promise<boolean> {
-  try {
-    const client = redis.getClient();
-    if (!client) return false;
-    const res = await client.set(key, '1', 'EX', SENTINEL_TTL_SECONDS, 'NX');
-    return res === 'OK';
-  } catch (err) {
-    // No dedupe store: skip rather than email the owner every hour. The next healthy run sends it.
-    logger.warn({ err, key }, 'gold-rate-staleness-watch: sentinel store unavailable, skipping');
-    return false;
-  }
-}
 
 /**
  * Stale-rate alerts (Phase B5 Task 11; Ruling B5-16). Hourly (`7 * * * *`, 720 runs a month).
@@ -36,8 +25,8 @@ async function claimOnce(key: string): Promise<boolean> {
  *                            (sentinel gold:stale-block:<store>:<rateId>)
  *
  * A new rate has a new id, so its sentinels are fresh and the cycle resets. The admin banner reads the
- * same age from GET /gold-rates, so no extra state exists. Only stores that opted in AND sell at least
- * one gold-priced product are returned by the definer; with none inside the window the tick returns
+ * same age from GET /gold-rates, so no extra state exists. Every store that sells at least one gold-priced
+ * product is returned by the definer (nothing in the API reads `enabled`, so the watch does not either); with none inside the window the tick returns
  * before opening any step, so an empty tick costs ONE execution (INNGEST-BUDGET-1).
  *
  * Deviation from the plan: hourly, not every 30 minutes. At 30 minutes the cron alone would be 1 440
@@ -58,51 +47,93 @@ export async function handleGoldRateStalenessWatch(
 
     let warned = 0;
     let blocked = 0;
+    try {
+      await wasSent('gold:stale-probe'); // is the dedupe store there at all?
+    } catch (err) {
+      // Fail LOUD (Ruling B5-36): without a dedupe store the notice can neither go out once nor be skipped quietly.
+      logger.error(
+        { err },
+        'gold-rate-staleness-watch: sentinel store unavailable, no notice sent'
+      );
+      await sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'cron.gold-rate-staleness-no-sentinel-store',
+        title: 'Gold rate stale notices cannot be sent: no dedupe store',
+        body: `${byStore.size} store(s) have a rate near or past its max age and no owner was told: the sentinel store (Redis) is unavailable.`,
+        context: { stores: byStore.size },
+      }).catch(() => undefined);
+      return { stores: byStore.size, warned, blocked, outcome: 'no-sentinel-store' };
+    }
     for (const [storeId, rows] of byStore) {
-      const out = await step.run(`notify-${storeId}`, async () => {
-        const oldest = rows.reduce((a, b) => (a.appliedAt <= b.appliedAt ? a : b));
-        const age = rateAgeMinutes(oldest.appliedAt, now);
-        // defensive: the definer only returns rows inside the warning window, but the handler never trusts a row alone
-        if (age < oldest.maxAgeMinutes - WARN_BEFORE_MINUTES)
-          return { sent: false, kind: 'warning' as const };
-        const isBlocked = age >= oldest.maxAgeMinutes;
-        const kind = isBlocked ? 'blocked' : 'warning';
-        const sentinel = `gold:stale-${isBlocked ? 'block' : 'warn'}:${storeId}:${oldest.rateId}`;
-        if (!(await claimOnce(sentinel))) return { sent: false, kind };
+      const out = await step
+        .run(`notify-${storeId}`, async () => {
+          const oldest = rows.reduce((a, b) => (a.appliedAt <= b.appliedAt ? a : b));
+          const age = rateAgeMinutes(oldest.appliedAt, now);
+          // defensive: the definer only returns rows inside the warning window, but the handler never trusts a row alone
+          if (age < oldest.maxAgeMinutes - WARN_BEFORE_MINUTES)
+            return { sent: false, kind: 'warning' as const };
+          const isBlocked = age >= oldest.maxAgeMinutes;
+          const kind = isBlocked ? 'blocked' : 'warning';
+          const sentinel = `gold:stale-${isBlocked ? 'block' : 'warn'}:${storeId}:${oldest.rateId}`;
+          // Marked AFTER the send (below): a send that throws leaves it unset and the next run retries.
+          if (await wasSent(sentinel)) return { sent: false, kind };
 
-        const info = await withStore(storeId, tx =>
-          tx.store.findUnique({
-            where: { id: storeId },
-            select: { name: true, slug: true, owner: { select: { email: true } } },
-          })
-        );
-        const to = info?.owner?.email;
-        if (to) {
-          await EmailService.sendGoldRateNotice(storeId, kind, {
-            to,
-            storeName: info?.name ?? storeId,
-            adminUrl: config.adminUrl,
-            hours: Math.floor(age / 60),
-            maxHours: Math.round(oldest.maxAgeMinutes / 60),
-          });
-          logger.info(
-            { storeId, to: maskEmail(to), kind },
-            'gold-rate-staleness-watch: notice sent'
+          const info = await withStore(storeId, tx =>
+            tx.store.findUnique({
+              where: { id: storeId },
+              select: { name: true, slug: true, owner: { select: { email: true } } },
+            })
           );
-        }
-        if (isBlocked) {
+          const to = info?.owner?.email;
+          if (to) {
+            await EmailService.sendGoldRateNotice(storeId, kind, {
+              to,
+              storeName: info?.name ?? storeId,
+              adminUrl: config.adminUrl,
+              hours: Math.floor(age / 60),
+              maxHours: Math.round(oldest.maxAgeMinutes / 60),
+            });
+            logger.info(
+              { storeId, to: maskEmail(to), kind },
+              'gold-rate-staleness-watch: notice sent'
+            );
+          }
+          if (isBlocked) {
+            await sendAlert({
+              level: 'p1',
+              scope: 'store',
+              store: { id: storeId, name: info?.name ?? storeId, slug: info?.slug ?? undefined },
+              source: 'cron.gold-rate-staleness',
+              title: 'Gold rate is stale: selling gold-priced pieces is paused',
+              body: `The ${oldest.karat}k rate is ${Math.floor(age / 60)} h old (max ${Math.round(oldest.maxAgeMinutes / 60)} h).`,
+              context: {
+                karat: oldest.karat,
+                ageMinutes: age,
+                maxAgeMinutes: oldest.maxAgeMinutes,
+              },
+            });
+          }
+          await markSent(sentinel);
+          return { sent: true, kind };
+        })
+        .catch(async (err: unknown) => {
+          // One store's failure must not stop the stores after it, and must not be silent.
+          if (err instanceof SentinelStoreUnavailableError) throw err;
+          logger.error(
+            { err, storeId },
+            'gold-rate-staleness-watch: notice failed, will retry next run'
+          );
           await sendAlert({
             level: 'p1',
-            scope: 'store',
-            store: { id: storeId, name: info?.name ?? storeId, slug: info?.slug ?? undefined },
-            source: 'cron.gold-rate-staleness',
-            title: 'Gold rate is stale: selling gold-priced pieces is paused',
-            body: `The ${oldest.karat}k rate is ${Math.floor(age / 60)} h old (max ${Math.round(oldest.maxAgeMinutes / 60)} h).`,
-            context: { karat: oldest.karat, ageMinutes: age, maxAgeMinutes: oldest.maxAgeMinutes },
-          });
-        }
-        return { sent: true, kind };
-      });
+            scope: 'platform',
+            source: 'cron.gold-rate-staleness-failed',
+            title: 'Gold rate stale notice failed to send',
+            body: `The stale-rate notice for store ${storeId} threw; it is retried on the next hourly run.`,
+            context: { storeId, error: err instanceof Error ? err.message : String(err) },
+          }).catch(() => undefined);
+          return { sent: false, kind: 'warning' as const };
+        });
       if (out.sent) {
         if (out.kind === 'blocked') blocked++;
         else warned++;

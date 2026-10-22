@@ -16,6 +16,20 @@ const h = vi.hoisted(() => ({
   pendingFor: new Set<string>(),
   alerts: [] as Array<{ level: string; source?: string; title: string }>,
   emails: [] as Array<{ kind: string; to: string }>,
+  failApplyFor: new Set<string>(),
+  failEmail: 0,
+  sentinels: new Set<string>(),
+}));
+vi.mock('../../apps/api/src/services/redis.service', () => ({
+  redis: {
+    getClient: () => ({
+      get: async (k: string) => (h.sentinels.has(k) ? '1' : null),
+      set: async (k: string) => {
+        h.sentinels.add(k);
+        return 'OK';
+      },
+    }),
+  },
 }));
 vi.mock('../../apps/api/src/lib/definer', () => ({
   goldFeedStores: async () => h.stores,
@@ -29,6 +43,11 @@ vi.mock('../../apps/api/src/services/gold-rate/gold-rate.service', () => ({
       actor: Record<string, unknown>
     ) => {
       h.applied.push({ storeId, rates: input.rates, actor });
+      if (h.failApplyFor.has(storeId)) {
+        const e = new Error('catalogue too large') as Error & { code: string };
+        e.code = 'GOLD_CATALOGUE_TOO_LARGE';
+        throw e;
+      }
       const pending = h.pendingFor.has(storeId) || actor.forcePending === true;
       return pending
         ? {
@@ -55,6 +74,10 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
 vi.mock('../../apps/api/src/services/email.service', () => ({
   EmailService: {
     sendGoldRateNotice: async (_s: string, kind: string, d: { to: string }) => {
+      if (h.failEmail > 0) {
+        h.failEmail--;
+        throw new Error('smtp down');
+      }
       h.emails.push({ kind, to: d.to });
     },
   },
@@ -90,7 +113,11 @@ const quote = (per24: number, source: 'primary' | 'fallback' = 'primary'): GoldF
   fetchedAt: '2026-10-22T09:00:00.000Z',
   source,
   exact: { num: String(per24), den: '1' },
-  reference: { xauUsdMicro: 4082300049, usdEgpMicro: 54385184 },
+  reference: {
+    xauUsdMicro: 4082300049,
+    usdEgpMicro: 54385184,
+    quotedAt: '2026-10-22T09:00:00.000Z',
+  },
 });
 const adapter = (r: GoldFeedResult) => ({ fetch: async () => r });
 
@@ -100,6 +127,9 @@ beforeEach(() => {
   h.pendingFor.clear();
   h.alerts.length = 0;
   h.emails.length = 0;
+  h.failApplyFor.clear();
+  h.failEmail = 0;
+  h.sentinels.clear();
   steps = 0;
 });
 
@@ -184,5 +214,46 @@ describe('gold-rate feed cron', () => {
     );
     expect(r).toMatchObject({ applied: 3, pending: 1 });
     expect(h.emails).toEqual([{ kind: 'pending', to: 'o@example.com' }]);
+  });
+
+  // Ruling B5-36
+  it("one store's apply error is a P1 for that store and the stores after it still get the rate", async () => {
+    h.stores = [
+      { storeId: 'a', premiumBps: 0 },
+      { storeId: 'b', premiumBps: 0 },
+      { storeId: 'c', premiumBps: 0 },
+    ];
+    h.failApplyFor.add('a');
+    const r = await handleGoldRateFeedFetch(
+      { step },
+      adapter({ kind: 'ok', quote: quote(713_800) })
+    );
+    expect(r).toMatchObject({ applied: 6, failed: 1 });
+    expect(h.applied.map(x => x.storeId)).toEqual(['a', 'b', 'c']);
+    expect(h.alerts).toHaveLength(1);
+    expect(h.alerts[0]).toMatchObject({ level: 'p1', source: 'cron.gold-rate-feed-store-failed' });
+  });
+
+  it('an email error after applyRates committed does not re-run applyRates, and is a P1', async () => {
+    h.stores = [{ storeId: 'a', premiumBps: 0 }];
+    h.pendingFor.add('a');
+    h.failEmail = 1;
+    const r = await handleGoldRateFeedFetch(
+      { step },
+      adapter({ kind: 'ok', quote: quote(713_800) })
+    );
+    expect(h.applied).toHaveLength(1); // applied exactly once
+    expect(r).toMatchObject({ pending: 1, failed: 0 });
+    expect(h.emails).toEqual([]);
+    expect(h.alerts.map(a => a.source)).toEqual(['cron.gold-rate-feed-notice-failed']);
+  });
+
+  it('the pending email goes once per rate: a repeat for the same rate id is not sent again', async () => {
+    h.stores = [{ storeId: 'a', premiumBps: 0 }];
+    h.pendingFor.add('a');
+    const q = adapter({ kind: 'ok', quote: quote(713_800) });
+    await handleGoldRateFeedFetch({ step }, q);
+    await handleGoldRateFeedFetch({ step }, q); // the mock returns the same pending rate id 'p1'
+    expect(h.emails).toHaveLength(1);
   });
 });
