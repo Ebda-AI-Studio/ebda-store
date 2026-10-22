@@ -184,6 +184,7 @@ export function CollectionListSection({
           {tiles.map((tile, i) => (
             <li
               key={tile.id}
+              {...(editorMode ? { 'data-builder-block': tile.id } : undefined)}
               data-tone={tones[i]}
               className={`${BAND_TONES[tones[i]]} md:overflow-hidden md:rounded-[var(--radius)]`}
               style={(() => {
@@ -256,7 +257,7 @@ export function CollectionListSection({
         <SectionHeader title={title} center editTitle={editTitle} />
         <ul className={`grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 ${COLS[cols] ?? COLS[4]}`}>
           {tiles.map(tile => (
-            <li key={tile.id}>
+            <li key={tile.id} {...(editorMode ? { 'data-builder-block': tile.id } : undefined)}>
               <DahabTile
                 href={tile.href}
                 image={tile.image}

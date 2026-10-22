@@ -366,12 +366,25 @@ export function PageRenderer({
   // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the
   // store has supplied slides via layout.hero. When no slides exist we fall
   // back to the legacy T.Hero (which uses the per-store hero text fields).
+  // Canvas only: each slide carries its document block id so a click on it selects
+  // the slide. The legacy layout drops hidden slides in order, so the ids line up
+  // one to one; when they do not (a stale legacy fallback) no slide is marked.
+  const heroBlockIds = editorMode
+    ? (definition.sections
+        .find(n => n.type === 'hero')
+        ?.blocks?.filter(b => b.type === 'slide' && b.hidden !== true)
+        .map(b => b.id) ?? [])
+    : [];
+  const heroSlides: Array<(typeof layout.hero.slides)[number] & { builderBlockId?: string }> =
+    heroBlockIds.length === layout.hero.slides.length
+      ? layout.hero.slides.map((sl, i) => ({ ...sl, builderBlockId: heroBlockIds[i] }))
+      : layout.hero.slides;
   // Collage (Ruling B1-2): needs three slides with a photo (`image`; HeroCollage shows `imageAr` in Arabic when set); with fewer, the
   // hero renders as the banner / slider below in full-bleed.
   const collageEligible =
     layout.hero.enabled &&
     layout.hero.presentation === 'collage' &&
-    heroSlidesWithImage(layout.hero.slides).length >= 3;
+    heroSlidesWithImage(heroSlides).length >= 3;
   // Opt-in hero design key (Ruling B1-41): only a hero set to `frame: 'line'` (Vitrine's mix, or a
   // merchant's pick) draws the hairline and fills its frame; every other framed hero is unchanged.
   const heroFrameLine = layout.hero.frame === 'line';
@@ -406,7 +419,7 @@ export function PageRenderer({
     layout.hero.enabled &&
     (collageEligible ||
       sliderEligible ||
-      (bannerEligible && !!heroSlidesWithImage(layout.hero.slides)[0]) ||
+      (bannerEligible && !!heroSlidesWithImage(heroSlides)[0]) ||
       legacyHeroHasContent);
 
   // Data-driven sections render nothing publicly when they have nothing to
@@ -469,7 +482,7 @@ export function PageRenderer({
           >
             {collageEligible && (
               <HeroCollage
-                slides={heroSlidesWithImage(layout.hero.slides)}
+                slides={heroSlidesWithImage(heroSlides)}
                 isRtl={isRtl}
                 urlPrefix={storeUrl('')}
                 headingZone={heroHeadingZone}
@@ -482,7 +495,7 @@ export function PageRenderer({
                 // refuses to publish one without it, so every slide reaching a
                 // live render is guaranteed to have one — filter is defense in
                 // depth against a document from before that gate existed.
-                slides={heroSlidesWithImage(layout.hero.slides)}
+                slides={heroSlidesWithImage(heroSlides)}
                 autoplayMs={layout.hero.autoplayMs}
                 isRtl={isRtl}
                 pack={templateId}
@@ -496,9 +509,9 @@ export function PageRenderer({
             {layout.hero.enabled &&
               bannerEligible &&
               T.HeroBanner &&
-              heroSlidesWithImage(layout.hero.slides)[0] && (
+              heroSlidesWithImage(heroSlides)[0] && (
                 <T.HeroBanner
-                  {...heroSlidesWithImage(layout.hero.slides)[0]}
+                  {...heroSlidesWithImage(heroSlides)[0]}
                   isRtl={isRtl}
                   pack={templateId}
                   presentation={bannerPresentation}
@@ -1349,6 +1362,7 @@ export function PageRenderer({
                 <TrustBadgesSection
                   settings={settings as TrustBadgesSettings}
                   blocks={section.blocks ?? []}
+                  editorMode={editorMode}
                 />
               ) : def.type === 'image-text' ? (
                 <ImageTextSection

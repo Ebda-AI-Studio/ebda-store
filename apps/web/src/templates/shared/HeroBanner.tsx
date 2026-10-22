@@ -55,6 +55,7 @@ export function HeroBanner({
   copyOnly = false,
   headingZone,
   urlPrefix,
+  builderBlockId,
 }: HeroBannerProps) {
   const isFramed = presentation === 'framed';
   const drawFrame = isFramed && frameLine;
@@ -219,6 +220,7 @@ export function HeroBanner({
               'drop-shadow-none'
             )}
             data-zone="heroHeadline"
+            data-builder-setting={builderBlockId ? (isRtl ? 'headlineAr' : 'headline') : undefined}
             style={{
               fontFamily: headingZone?.fontFamily,
               fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -251,6 +253,7 @@ export function HeroBanner({
                 : 'bg-white text-[#141414] hover:bg-white/90'
             )}
             data-cta="button"
+            data-builder-setting={builderBlockId ? (isRtl ? 'ctaTextAr' : 'ctaText') : undefined}
           >
             {cta}
           </Link>
@@ -269,6 +272,8 @@ export function HeroBanner({
       style={mobileAspectStyle}
       dir={isRtl ? 'rtl' : 'ltr'}
       data-frame-draw={drawFrame ? '' : undefined}
+      data-builder-block={!inSlider ? builderBlockId : undefined}
+      data-builder-image={builderBlockId ? (isRtl && imageAr ? 'imageAr' : 'image') : undefined}
     >
       <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
         {desktopSrc &&
@@ -298,6 +303,9 @@ export function HeroBanner({
                 <h1
                   className={styles.heroHeadline}
                   data-zone="heroHeadline"
+                  data-builder-setting={
+                    builderBlockId ? (isRtl ? 'headlineAr' : 'headline') : undefined
+                  }
                   style={{
                     fontFamily: headingZone?.fontFamily,
                     fontSize: responsiveFontSize(headingZone?.fontSize),
@@ -331,6 +339,9 @@ export function HeroBanner({
                     styles.heroCta
                   )}
                   data-cta="button"
+                  data-builder-setting={
+                    builderBlockId ? (isRtl ? 'ctaTextAr' : 'ctaText') : undefined
+                  }
                 >
                   {cta}
                 </Link>

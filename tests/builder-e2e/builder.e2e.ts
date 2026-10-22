@@ -188,6 +188,185 @@ test('click in the canvas selects the section in the tree and panel', async ({ p
   );
 });
 
+test('click on a hero slide selects the slide; header and footer select their sections', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  // dispatchEvent: at 390 a pane drawer can sit over the canvas, which Playwright cannot see from the frame
+  await canvas(page).locator('[data-builder-block="slide-2"]').dispatchEvent('click');
+  await settings(page);
+  // the slide's own settings are open (its headline field carries slide 2's value)
+  await expect(page.getByTestId('field-headline')).toHaveValue('Gift boxes');
+  await structure(page);
+  await expect(page.getByTestId('tree-block-hero-slide-2').getByRole('button').first()).toHaveClass(
+    /ring-primary/
+  );
+
+  await canvas(page).locator('[data-zone="header"]').dispatchEvent('click');
+  await settings(page);
+  await expect(page.getByTestId('header-chrome-content')).toBeVisible();
+  await canvas(page).locator('[data-zone="footer"]').dispatchEvent('click');
+  await settings(page);
+  await expect(page.getByTestId('footer-chrome-content')).toBeVisible();
+});
+
+test('inline Arabic edit of a slide headline reaches the draft, undo restores it; a non-text key is dropped', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  const slideHeadline = async () => {
+    const hero = (await state(page)).draft?.definition.sections.find(x => x.id === 'hero') as
+      | { blocks?: Array<{ id: string; settings: Record<string, unknown> }> }
+      | undefined;
+    return hero?.blocks?.find(b => b.id === 'slide-2')?.settings.headlineAr;
+  };
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__patch('hero', 'headlineAr', 'علب جديدة', 'slide-2'));
+  // poll the draft: `saved` is also the idle state before the debounced autosave fires
+  await expect.poll(slideHeadline, { timeout: 15_000 }).toBe('علب جديدة');
+
+  // a key that is not a text setting of the block never reaches the document
+  const saves = (await state(page)).saves;
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__patch('hero', 'image', 'https://evil.test/x.png', 'slide-2'));
+  await page.waitForTimeout(1600);
+  expect((await state(page)).saves).toBe(saves);
+
+  await page.getByTestId('undo').click();
+  await expect.poll(slideHeadline, { timeout: 15_000 }).toBe('علب هدايا');
+});
+
+test('change image from the canvas: pick, describe, one undo step; a non-image key opens nothing', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  const slide = async () => {
+    const hero = (await state(page)).draft?.definition.sections.find(x => x.id === 'hero') as
+      | { blocks?: Array<{ id: string; settings: Record<string, unknown> }> }
+      | undefined;
+    return hero?.blocks?.find(b => b.id === 'slide-2')?.settings;
+  };
+  // the canvas names a target that is NOT an image setting: nothing opens
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__requestMedia('hero', 'headline', 'slide-2'));
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('media-picker')).toHaveCount(0);
+
+  await canvas(page)
+    .locator('body')
+    .evaluate(() => (window as any).__requestMedia('hero', 'image', 'slide-2'));
+  await expect(page.getByTestId('media-picker')).toBeVisible();
+  // the recommended size comes from the image standard, in the admin language
+  await expect(page.getByTestId('media-hint')).toContainText(L('الحجم الموصى به', 'Recommended'));
+  await page.getByTestId('media-picker').locator('ul button').first().click();
+
+  // a slide has an alt text: the description step follows the pick
+  await expect(page.getByTestId('image-swap-alt')).toBeVisible();
+  await page.getByTestId('swap-alt-en').fill('Gift boxes of dates');
+  await page.getByTestId('swap-apply').click();
+  await expect(page.getByTestId('image-swap-alt')).toHaveCount(0);
+  await expect.poll(slide, { timeout: 15_000 }).toMatchObject({
+    image: 'https://media.ebda.app/stores/e2e/builder/a.jpg',
+    alt: 'Gift boxes of dates',
+  });
+
+  // the picture and its description are ONE undo step
+  await page.getByTestId('undo').click();
+  await expect
+    .poll(slide, { timeout: 15_000 })
+    .toMatchObject({ image: 'https://media.ebda.app/hero-2.jpg' });
+  expect((await slide())?.alt).toBeUndefined();
+});
+
+const sendFromCanvas = (page: Page, msg: Record<string, unknown>) =>
+  canvas(page)
+    .locator('body')
+    .evaluate((_b, m) => (window as any).__send(m), msg);
+
+test('canvas drop reorders the sections, the tree follows, one undo restores it', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  const before = await templateIds(page);
+  expect(before.length).toBeGreaterThan(2);
+  const last = before[before.length - 1];
+  // the canvas dropped the last section above the first
+  await sendFromCanvas(page, { type: 'move', sectionId: last, toIndex: 0 });
+  await expect.poll(async () => (await templateIds(page))[0]).toBe(last);
+  expect(await templateIds(page)).toEqual([last, ...before.slice(0, -1)]);
+  await expect
+    .poll(async () => (await state(page)).draft?.definition.sections.map(x => x.id), {
+      timeout: 15_000,
+    })
+    .toEqual([last, ...before.slice(0, -1)]);
+  // ONE undo restores the original order
+  await page.getByTestId('undo').click();
+  expect(await templateIds(page)).toEqual(before);
+  // a drop where it already is changes nothing and adds no history
+  await sendFromCanvas(page, { type: 'move', sectionId: before[1], toIndex: 1 });
+  await page.waitForTimeout(300);
+  expect(await templateIds(page)).toEqual(before);
+});
+
+test('"+" between sections opens the picker and inserts at that index', async ({ page }) => {
+  await openBuilder(page);
+  await structure(page);
+  const before = await templateIds(page);
+  await sendFromCanvas(page, { type: 'request-add', list: 'template', index: 1 });
+  await expect(page.getByTestId('add-section-dialog')).toBeVisible();
+  await page.getByTestId('preset-image-text-0').click();
+  await structure(page);
+  const after = await templateIds(page);
+  expect(after).toHaveLength(before.length + 1);
+  expect(after[1]).toMatch(/^image-text/);
+  expect(after.filter((_, i) => i !== 1)).toEqual(before);
+  // an index past the end of the list is ignored
+  await sendFromCanvas(page, { type: 'request-add', list: 'template', index: 40 });
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId('add-section-dialog')).toHaveCount(0);
+});
+
+test('toolbar remove asks in the app first; cancel keeps it, confirm removes, undo restores', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  const before = await templateIds(page);
+  const target = before[1];
+  let nativeDialogs = 0;
+  page.on('dialog', d => {
+    nativeDialogs++;
+    void d.dismiss();
+  });
+  await sendFromCanvas(page, { type: 'section-op', sectionId: target, op: 'remove' });
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-cancel').click();
+  await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
+  expect(await templateIds(page)).toEqual(before);
+
+  await sendFromCanvas(page, { type: 'section-op', sectionId: target, op: 'remove' });
+  await page.getByTestId('confirm-ok').click();
+  await structure(page);
+  expect(await templateIds(page)).toEqual(before.filter(id => id !== target));
+  await page.getByTestId('undo').click();
+  expect(await templateIds(page)).toEqual(before);
+  // never window.confirm
+  expect(nativeDialogs).toBe(0);
+
+  // moveDown / hide / duplicate act without a prompt, one reducer action each
+  await sendFromCanvas(page, { type: 'section-op', sectionId: before[0], op: 'moveDown' });
+  await expect.poll(async () => (await templateIds(page))[1]).toBe(before[0]);
+  await sendFromCanvas(page, { type: 'section-op', sectionId: before[0], op: 'hide' });
+  await waitSaved(page);
+  expect((await state(page)).draft!.definition.sections.find(x => x.id === before[0])?.hidden).toBe(
+    true
+  );
+});
+
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {
   await openBuilder(page);
   for (const [v, w] of [

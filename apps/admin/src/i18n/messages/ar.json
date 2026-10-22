@@ -10076,6 +10076,12 @@
       "close": "إغلاق",
       "limitReached": "وصلت للحد ({max})"
     },
+    "canvasOps": {
+      "removeTitle": "تحذف {name}؟",
+      "removeBody": "تقدر ترجّعه على طول بزر التراجع.",
+      "removeConfirm": "احذف",
+      "cancel": "إلغاء"
+    },
     "media": {
       "title": "الوسائط",
       "upload": "رفع صورة",
@@ -10084,7 +10090,13 @@
       "loadError": "تعذّر تحميل الصور.",
       "empty": "لا توجد صور بعد — ارفع صورة.",
       "more": "تحميل المزيد",
-      "loading": "جارٍ التحميل…"
+      "loading": "جارٍ التحميل…",
+      "altTitle": "وصف الصورة",
+      "altHint": "اكتب سطر قصير يوصف الصورة لمن مش شايفها. ممكن تسيبه فاضي.",
+      "altEn": "الوصف (إنجليزي)",
+      "altAr": "الوصف (عربي)",
+      "altApply": "استخدم الصورة",
+      "altBack": "اختار صورة تانية"
     },
     "settings": {
       "empty": "اختر قسماً من الصفحة أو من القائمة لتعديله.",
@@ -10651,15 +10663,15 @@
       "saving": "جاري الحفظ"
     },
     "events": {
-      "order.created": "طلب جديد",
-      "order.paid": "طلب اتدفع",
-      "order.status_changed": "طلب اتشحن أو وصل أو اتلغى",
-      "order.refunded": "طلب اتسترد",
-      "product.created": "منتج اتضاف",
-      "product.updated": "منتج اتعدّل",
-      "product.deleted": "منتج اتحذف",
-      "inventory.low": "المخزون قليل",
-      "webhook.test": "حدث تجريبي"
+      "order_created": "طلب جديد",
+      "order_paid": "طلب اتدفع",
+      "order_status_changed": "طلب اتشحن أو وصل أو اتلغى",
+      "order_refunded": "طلب اتسترد",
+      "product_created": "منتج اتضاف",
+      "product_updated": "منتج اتعدّل",
+      "product_deleted": "منتج اتحذف",
+      "inventory_low": "المخزون قليل",
+      "webhook_test": "حدث تجريبي"
     },
     "secret": {
       "title": "السر الخاص بالتوقيع",

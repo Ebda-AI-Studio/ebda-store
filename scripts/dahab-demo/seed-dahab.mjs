@@ -368,7 +368,8 @@ try {
   }
 
   // ── store ──────────────────────────────────────────────────────────────
-  let store = await prisma.store.findUnique({ where: { slug: SLUG } });
+  // `stores` is under strict RLS and the tenant guard: look it up as the owner role, not the app role.
+  let store = await withOwnerTx(tx => tx.store.findUnique({ where: { slug: SLUG } }));
   if (!store)
     store = await StoreService.create(
       owner.id,

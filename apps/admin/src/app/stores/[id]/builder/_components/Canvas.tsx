@@ -27,6 +27,7 @@ interface Props {
   doc: PageDefinition;
   viewport: Viewport;
   selectedId: string | null;
+  selectedBlockId?: string | null;
   /** Bumps when saved data changed (new carousel, product source): reload the canvas. */
   reloadKey: number;
   onMessage: (msg: ChildToParent) => void;
@@ -38,6 +39,7 @@ export function Canvas({
   doc,
   viewport,
   selectedId,
+  selectedBlockId,
   reloadKey,
   onMessage,
 }: Props) {
@@ -80,8 +82,13 @@ export function Canvas({
   }, [ready, doc, post]);
 
   useEffect(() => {
-    if (ready) post({ type: 'select', sectionId: selectedId } as Omit<ParentToChild, 'protocol'>);
-  }, [ready, selectedId, post]);
+    if (ready)
+      post({
+        type: 'select',
+        sectionId: selectedId,
+        ...(selectedBlockId ? { blockId: selectedBlockId } : {}),
+      } as Omit<ParentToChild, 'protocol'>);
+  }, [ready, selectedId, selectedBlockId, post]);
 
   useEffect(() => setReady(false), [src]);
 

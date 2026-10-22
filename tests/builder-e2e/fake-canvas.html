@@ -27,6 +27,16 @@
         window.__doc = doc;
         const root = document.getElementById('root');
         root.innerHTML = '';
+        // chrome zones carry `data-zone` like the storefront; the document ids are
+        // resolved by type (what the real overlay's targetOf does)
+        const zoneEl = (zone, text) => {
+          const z = document.createElement('div');
+          z.dataset.zone = zone;
+          z.textContent = text;
+          z.style.padding = '12px';
+          return z;
+        };
+        root.appendChild(zoneEl('header', 'header'));
         for (const s of doc.sections) {
           if (s.hidden) continue;
           const el = document.createElement('section');
@@ -34,21 +44,48 @@
           const h = document.createElement('h2');
           h.textContent = s.settings.heading || s.settings.title || s.type;
           el.appendChild(h);
+          for (const b of s.blocks || []) {
+            const be = document.createElement('div');
+            be.dataset.builderBlock = b.id;
+            be.textContent = b.id;
+            el.appendChild(be);
+          }
           root.appendChild(el);
         }
+        root.appendChild(zoneEl('footer', 'footer'));
       }
       window.addEventListener('message', e => {
         if (e.origin !== parentOrigin || e.source !== window.parent) return;
         if (!e.data || e.data.protocol !== P) return;
         window.__received.push(e.data.type);
         if (e.data.type === 'render') render(e.data.definition);
-        if (e.data.type === 'select') window.__selected = e.data.sectionId;
+        if (e.data.type === 'select') {
+          window.__selected = e.data.sectionId;
+          window.__selectedBlock = e.data.blockId;
+        }
       });
       document.addEventListener('click', e => {
-        const id = e.target.closest('[data-builder-id]')?.dataset.builderId;
-        if (id) send({ type: 'select', sectionId: id });
+        const section = e.target.closest('[data-builder-id]');
+        if (section) {
+          const block = e.target.closest('[data-builder-block]');
+          send({
+            type: 'select',
+            sectionId: section.dataset.builderId,
+            ...(block && section.contains(block) ? { blockId: block.dataset.builderBlock } : {}),
+          });
+          return;
+        }
+        const zone = e.target.closest('[data-zone]')?.dataset.zone;
+        const type = { header: 'header', footer: 'footer' }[zone];
+        const group = zone === 'footer' ? 'footer' : 'header';
+        const node = type && window.__doc?.sectionGroups[group].find(n => n.type === type);
+        if (node) send({ type: 'select', sectionId: node.id });
       });
-      window.__patch = (sectionId, key, value) => send({ type: 'patch-text', sectionId, key, value });
+      window.__patch = (sectionId, key, value, blockId) =>
+        send({ type: 'patch-text', sectionId, ...(blockId ? { blockId } : {}), key, value });
+      window.__send = m => send(m);
+      window.__requestMedia = (sectionId, key, blockId) =>
+        send({ type: 'request-media', sectionId, ...(blockId ? { blockId } : {}), key });
       send({ type: 'ready' });
     </script>
   </body>

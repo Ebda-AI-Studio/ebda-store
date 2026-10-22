@@ -10,6 +10,7 @@
  * delete; cardinality is enforced by the reducer, which refuses and says why.
  * Logical CSS only (`ps-`, `ms-`, `text-start`), so the tree mirrors in Arabic.
  */
+import { useEffect } from 'react';
 import { useLocale } from 'next-intl';
 import {
   DndContext,
@@ -313,6 +314,17 @@ function Group({
 
 export function SectionTree({ doc, ...rest }: Props) {
   const t = useT('builder.tree');
+  const sel = rest.selection;
+  // A click on the canvas selects here too: bring the row into view.
+  useEffect(() => {
+    if (!sel) return;
+    const testId = sel.blockId
+      ? `tree-block-${sel.sectionId}-${sel.blockId}`
+      : `tree-row-${sel.sectionId}`;
+    document
+      .querySelector(`[data-testid="${window.CSS.escape(testId)}"]`)
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [sel?.sectionId, sel?.blockId]); // eslint-disable-line react-hooks/exhaustive-deps -- the ids are the identity
   return (
     <nav aria-label={t('label')} className="p-2">
       <Group list="header" title={t('header')} nodes={doc.sectionGroups.header} {...rest} />

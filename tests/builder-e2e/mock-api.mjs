@@ -28,8 +28,13 @@ function freshState() {
         enabled: true,
         mode: 'slider',
         autoplayMs: 5000,
-        slides: [{ image: 'https://media.ebda.app/hero.jpg', headline: 'Fresh dates', headlineAr: 'تمور طازجة' }],
+        slides: [
+          { image: 'https://media.ebda.app/hero.jpg', headline: 'Fresh dates', headlineAr: 'تمور طازجة' },
+          { image: 'https://media.ebda.app/hero-2.jpg', headline: 'Gift boxes', headlineAr: 'علب هدايا' },
+        ],
       },
+      header: {},
+      footer: {},
       categories: { enabled: true, layout: 'grid', captionPosition: 'below', desktopColumns: 3, mobileColumns: 2, title: 'Shop by category', titleAr: 'تسوق حسب الفئة' },
     },
     'modern'

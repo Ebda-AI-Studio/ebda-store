@@ -13,7 +13,7 @@
  *
  * Below `lg` the side panes become toggleable drawers over the canvas.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
@@ -23,6 +23,16 @@ import {
   applyTemplateFamily,
   effectiveTheme,
   getLook,
+  addRequestFor,
+  getSectionDefinition,
+  imageSwapActions,
+  intentToAction,
+  locateSection,
+  type IntentResult,
+  mediaRequestFor,
+  recommendedSizeTextForTemplateI18n,
+  type MediaRequest,
+  type TemplateId,
   type ChildToParent,
   type DraftTheme,
   type DocumentAction,
@@ -34,6 +44,8 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
+import { ConfirmDialog } from './ConfirmDialog';
+import { ImageSwapDialog } from './ImageSwapDialog';
 import { Canvas } from './Canvas';
 import { SectionTree, type Selection } from './SectionTree';
 import { SettingsPanel } from './SettingsPanel';
@@ -49,6 +61,7 @@ interface StoreInfo {
   domain?: string | null;
   theme?: StoreTheme;
   look?: string | null;
+  template?: string | null;
 }
 
 type StartTab = 'sections' | 'theme' | 'history';
@@ -64,6 +77,14 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [addTo, setAddTo] = useState<SectionList | null>(null);
+  // Where "+" on the canvas asked to insert (undefined: the end, from the tree's own button).
+  const [addAt, setAddAt] = useState<number | undefined>(undefined);
+  // A destructive canvas action waiting for the in-app confirmation.
+  const [pending, setPending] = useState<{ intent: IntentResult; name: string } | null>(null);
+  // "Change image" asked for on the canvas (the file is picked HERE, never by the canvas).
+  const [mediaReq, setMediaReq] = useState<MediaRequest | null>(null);
+  // A fresh number per swap, so each swap is its own undo step.
+  const swapSeq = useRef(0);
   const [tab, setTab] = useState<StartTab>('sections');
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
@@ -115,6 +136,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     [b.dispatch, selection, toastError]
   );
 
+  // The latest document, read by the canvas message handler without re-subscribing it.
+  const docRef = useRef(b.doc);
+  docRef.current = b.doc;
+
   const onCanvasMessage = useCallback(
     (msg: ChildToParent) => {
       if (msg.type === 'select') {
@@ -122,27 +147,40 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         setDrawer(d => (d === 'start' ? null : d));
       }
       if (msg.type === 'hover') setHovered(msg.sectionId);
-      if (msg.type === 'patch-text') {
-        const coalesce = `${msg.sectionId}/${msg.blockId ?? ''}/${msg.key}`;
-        if (msg.blockId)
-          dispatch(
-            {
-              type: 'setBlockSetting',
-              sectionId: msg.sectionId,
-              blockId: msg.blockId,
-              key: msg.key,
-              value: msg.value,
-            },
-            coalesce
-          );
-        else
-          dispatch(
-            { type: 'setSectionSetting', id: msg.sectionId, key: msg.key, value: msg.value },
-            coalesce
-          );
+      // Every other intent is re-validated against the CURRENT document and the registry
+      // (VE-2) and becomes exactly one document action, or is dropped.
+      const doc = docRef.current;
+      if (msg.type === 'request-media') {
+        const req = doc ? mediaRequestFor(doc, msg) : null;
+        if (req) setMediaReq(req);
+        return;
       }
+      if (msg.type === 'request-add') {
+        const req = doc ? addRequestFor(doc, msg) : null;
+        if (req) {
+          setAddAt(req.index);
+          setAddTo(req.list);
+        }
+        return;
+      }
+      const intent = doc ? intentToAction(doc, msg) : null;
+      if (!intent) return;
+      if (intent.confirm && doc && msg.type === 'section-op') {
+        // Remove asks first, in the app (not window.confirm); Undo brings it back.
+        const node = locateSection(doc, msg.sectionId)?.node;
+        const def = node ? getSectionDefinition(node.type) : undefined;
+        const blockType = node?.blocks?.find(x => x.id === msg.blockId)?.type;
+        const bd = msg.blockId ? def?.blocks.find(b => b.type === blockType) : undefined;
+        const ar = locale === 'ar';
+        setPending({
+          intent,
+          name: (bd ? (ar ? bd.labelAr : bd.labelEn) : ar ? def?.labelAr : def?.labelEn) ?? '',
+        });
+        return;
+      }
+      dispatch(intent.action, intent.coalesce);
     },
-    [dispatch]
+    [dispatch, locale]
   );
 
   // Undo / redo shortcuts (leave native text undo alone inside inputs).
@@ -265,7 +303,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
               setDrawer(d => (d === 'start' ? 'end' : d));
             }}
             dispatch={dispatch}
-            onAddSection={setAddTo}
+            onAddSection={list => {
+              setAddAt(undefined);
+              setAddTo(list);
+            }}
           />
         )}
         {tab === 'theme' && (
@@ -509,6 +550,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
             doc={b.doc}
             viewport={viewport}
             selectedId={selection?.sectionId ?? null}
+            selectedBlockId={selection?.blockId ?? null}
             reloadKey={reloadKey}
             onMessage={onCanvasMessage}
           />
@@ -521,14 +563,54 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         </aside>
       </div>
 
+      {pending && (
+        <ConfirmDialog
+          title={t('canvasOps.removeTitle', { name: pending.name })}
+          body={t('canvasOps.removeBody')}
+          confirmLabel={t('canvasOps.removeConfirm')}
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            dispatch(pending.intent.action, pending.intent.coalesce);
+            setPending(null);
+          }}
+        />
+      )}
+
+      {mediaReq && (
+        <ImageSwapDialog
+          storeId={storeId}
+          request={mediaReq}
+          hint={
+            mediaReq.target.standard
+              ? recommendedSizeTextForTemplateI18n(
+                  mediaReq.target.standard,
+                  (store?.template as TemplateId | undefined) ?? undefined,
+                  locale === 'ar' ? 'ar' : 'en'
+                )
+              : undefined
+          }
+          onClose={() => setMediaReq(null)}
+          onApply={(url, alt) => {
+            // One coalesce key: the picture and its description are ONE undo step.
+            for (const i of imageSwapActions(mediaReq, url, alt, swapSeq.current++))
+              dispatch(i.action, i.coalesce);
+            setMediaReq(null);
+          }}
+        />
+      )}
+
       {addTo && (
         <AddSectionDialog
           list={addTo}
           doc={b.doc}
-          onClose={() => setAddTo(null)}
-          onPick={(sectionType, presetIndex) => {
-            dispatch({ type: 'addSection', list: addTo, sectionType, presetIndex });
+          onClose={() => {
             setAddTo(null);
+            setAddAt(undefined);
+          }}
+          onPick={(sectionType, presetIndex) => {
+            dispatch({ type: 'addSection', list: addTo, sectionType, presetIndex, index: addAt });
+            setAddTo(null);
+            setAddAt(undefined);
           }}
         />
       )}

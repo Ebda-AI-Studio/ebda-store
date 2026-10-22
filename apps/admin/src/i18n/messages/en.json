@@ -10076,6 +10076,12 @@
       "close": "Close",
       "limitReached": "Limit reached ({max})"
     },
+    "canvasOps": {
+      "removeTitle": "Remove {name}?",
+      "removeBody": "You can bring it back right after with Undo.",
+      "removeConfirm": "Remove",
+      "cancel": "Cancel"
+    },
     "media": {
       "title": "Media",
       "upload": "Upload image",
@@ -10084,7 +10090,13 @@
       "loadError": "Images could not be loaded.",
       "empty": "No images yet — upload one.",
       "more": "Load more",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "altTitle": "Describe this picture",
+      "altHint": "One short line for people who cannot see it. You can leave it empty.",
+      "altEn": "Description (English)",
+      "altAr": "Description (Arabic)",
+      "altApply": "Use this image",
+      "altBack": "Choose another"
     },
     "settings": {
       "empty": "Select a section in the page or the list to edit it.",
@@ -10651,15 +10663,15 @@
       "saving": "Saving"
     },
     "events": {
-      "order.created": "Order placed",
-      "order.paid": "Order paid",
-      "order.status_changed": "Order shipped, delivered or cancelled",
-      "order.refunded": "Order refunded",
-      "product.created": "Product added",
-      "product.updated": "Product changed",
-      "product.deleted": "Product deleted",
-      "inventory.low": "Stock is low",
-      "webhook.test": "Test event"
+      "order_created": "Order placed",
+      "order_paid": "Order paid",
+      "order_status_changed": "Order shipped, delivered or cancelled",
+      "order_refunded": "Order refunded",
+      "product_created": "Product added",
+      "product_updated": "Product changed",
+      "product_deleted": "Product deleted",
+      "inventory_low": "Stock is low",
+      "webhook_test": "Test event"
     },
     "secret": {
       "title": "Your signing secret",

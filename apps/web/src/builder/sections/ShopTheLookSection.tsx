@@ -38,6 +38,7 @@ import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { EmptySectionHint } from '../render/EmptySectionHint';
 import { SectionHeader } from './SectionHeader';
 import { lookPanelPath } from '../../lib/shop-the-look';
+import { displayedImageKey, imageMarker } from '../render/image-key';
 
 export interface ShopTheLookSettings extends SectionPaddingMaxWidthVisibility {
   heading?: string;
@@ -100,6 +101,11 @@ export function ShopTheLookSection({
         id: b.id,
         title: pick(b.settings.title, b.settings.titleAr),
         image: pick(b.settings.image, b.settings.imageAr),
+        imageKey: displayedImageKey(
+          ar,
+          typeof b.settings.image === 'string' ? b.settings.image : undefined,
+          typeof b.settings.imageAr === 'string' ? b.settings.imageAr : undefined
+        ),
         alt: pick(b.settings.alt, b.settings.altAr),
         pieces,
       };
@@ -138,10 +144,18 @@ export function ShopTheLookSection({
               const total = buyable.reduce((sum, p) => sum + p.pricing.displayPrice, 0);
               const totalFrom = buyable.some(p => p.pricing.mode === 'fromMin');
               return (
-                <li key={l.id} data-part="look" className={PANEL}>
+                <li
+                  key={l.id}
+                  data-part="look"
+                  {...(editorMode ? { 'data-builder-block': l.id } : undefined)}
+                  className={PANEL}
+                >
                   <article className="flex h-full flex-col">
                     {l.image && (
-                      <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-muted">
+                      <div
+                        className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-muted"
+                        {...imageMarker(editorMode, l.imageKey)}
+                      >
                         <Image
                           src={l.image}
                           alt={l.alt || l.title}
@@ -152,7 +166,12 @@ export function ShopTheLookSection({
                       </div>
                     )}
                     {l.title && (
-                      <h3 className="font-display mt-4 text-balance text-xl leading-snug text-foreground">
+                      <h3
+                        className="font-display mt-4 text-balance text-xl leading-snug text-foreground"
+                        {...(editorMode
+                          ? { 'data-builder-setting': ar ? 'titleAr' : 'title' }
+                          : undefined)}
+                      >
                         {l.title}
                       </h3>
                     )}
