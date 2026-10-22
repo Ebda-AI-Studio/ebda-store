@@ -50,7 +50,8 @@ export function LookSwitchPane({
     const d = getSectionDefinition(type);
     return d ? (locale === 'ar' ? d.labelAr : d.labelEn) : type;
   };
-  const list = (xs: Array<{ type: string }>) => [...new Set(xs.map(x => typeName(x.type)))].join(locale === "ar" ? "، " : ", ");
+  const list = (xs: Array<{ type: string }>) =>
+    [...new Set(xs.map(x => typeName(x.type)))].join(locale === 'ar' ? '، ' : ', ');
 
   return (
     <div className="flex h-full flex-col" data-testid="look-switch-pane">
@@ -61,11 +62,16 @@ export function LookSwitchPane({
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {currentLook && (
           <p className="text-xs text-muted-foreground">
-            {t('current')}: <span className="font-semibold text-foreground">{name(currentLook)}</span>
+            {t('current')}:{' '}
+            <span className="font-semibold text-foreground">{name(currentLook)}</span>
           </p>
         )}
         {preview ? (
-          <section aria-label={t('reportTitle')} data-testid="look-report" className="space-y-2 text-sm">
+          <section
+            aria-label={t('reportTitle')}
+            data-testid="look-report"
+            className="space-y-2 text-sm"
+          >
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t('reportTitle')}
             </h3>
