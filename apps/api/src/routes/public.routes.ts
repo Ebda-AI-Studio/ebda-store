@@ -199,6 +199,17 @@ export const createOrderSchema = z.object({
   billingAddress: shippingAddressSchema.optional(),
   paymentMethod: z.string().min(1),
   notes: z.string().max(2000).optional(),
+  /**
+   * The delivery date (store-local `YYYY-MM-DD`) and window the shopper picked, for a store with
+   * `checkoutDelivery.daysAhead` (Ruling B4-7). A REQUEST: the server recomputes the offered set
+   * from live settings and refuses anything else (422 DELIVERY_SLOT_UNAVAILABLE), then writes the
+   * delivery line of the notes itself. Ignored by a store without `daysAhead`.
+   */
+  deliveryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  deliveryWindowId: z.string().min(1).max(80).optional(),
   couponCode: z.string().trim().min(1).max(50).optional(),
   /** Loyalty points the customer requests to redeem. A request, not a
    *  trusted discount — the server re-resolves it against the customer's

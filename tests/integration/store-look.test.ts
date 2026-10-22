@@ -71,7 +71,9 @@ vi.mock('@ebda/shared', async importOriginal => {
     // presented as built here (the registry itself is untouched).
     // The Jasmine looks are presented as built too: they flip to `built` in the same phase (B3
     // Task 6), and the switch mechanics below must be proven with their real mixes either way.
-    if (look && (id === 'lamma.table' || id?.startsWith('jasmine.')))
+    // The Lamma looks get the same treatment until Phase B4 Task 7 flips them. The plumbing fixture
+    // is `dahab.worn` (no mix, no skin of its own): `lamma.table` was the fixture until B4 gave it a mix.
+    if (look && (id === 'dahab.worn' || id?.startsWith('jasmine.') || id?.startsWith('lamma.')))
       return { ...look, status: 'built' as const };
     return look && id && lookMix[id] ? { ...look, sections: lookMix[id] as never } : look;
   };
@@ -186,7 +188,7 @@ async function seedMerchant(
 // switch plumbing; the Souq and Jasmine mixes have their own cases below and in
 // souq-look-mix.test.ts / jasmine-look-mix.test.ts. (Jasmine had this role until Phase B3 gave it a
 // skin and three mixes; Lamma is the next designed-only look.)
-const LOOK_ID = 'lamma.table';
+const LOOK_ID = 'dahab.worn';
 
 describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => {
   let app: Express;
@@ -448,7 +450,9 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       delete lookMix['qamar.vitrine'];
       try {
         const v = await seedMerchant('vitrine-real');
-        await ok(v, LOOK_ID);
+        // The first switch is Atelier itself (not the mix-less plumbing fixture): the fixture's own
+        // family (Dahab) now seeds a featured collection with the registry preset's heading, and
+        // the point here is that what ATELIER seeded survives Atelier -> Vitrine.
         await ok(v, 'qamar.atelier');
         await ok(v, 'qamar.vitrine');
         const draft = (await docOf(v.storeId, 'draft')).document;
@@ -729,6 +733,82 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       expect(await row(m.storeId)).toMatchObject({ look: 'jasmine.clinic', template: 'jasmine' });
       const doc = await draftOf(m.storeId);
       expect(sec(doc, 'category-grid')).toMatchObject({ source: 'tags', layout: 'chips' });
+      await awaitDeferredWork(5000);
+    });
+  });
+
+  // Phase B4 Task 3/4: the three REAL Lamma mixes, applied the way production applies them.
+  describe('Lamma mixes (real, Phase B4)', () => {
+    type Doc = {
+      appliedLook?: string;
+      sections: Array<{ type: string; settings: Record<string, unknown>; blocks?: unknown[] }>;
+    };
+    const draftOf = async (storeId: string) =>
+      (
+        (await prisma.storePageRevision.findFirstOrThrow({
+          where: { storeId, pageKey: 'home' },
+          orderBy: { rev: 'desc' },
+          select: { document: true },
+        })) as { document: Doc }
+      ).document;
+    const sec = (doc: Doc, type: string) => doc.sections.find(x => x.type === type)?.settings;
+    const ok = async (m: { storeId: string; token: string }, lookId: string) => {
+      const res = await put(m.storeId, m.token, { lookId, design: 'keep' });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    };
+
+    it('Table -> Notebook -> Market -> Table: the store lands on the lamma skin, the mix follows, no design leaks', async () => {
+      const m = await seedMerchant('lamma-cycle');
+      await ok(m, 'lamma.table');
+      expect(await row(m.storeId)).toMatchObject({ look: 'lamma.table', template: 'lamma' });
+      let doc = await draftOf(m.storeId);
+      expect(doc.appliedLook).toBe('lamma.table');
+      expect(doc.sections.map(x => x.type).slice(0, 4)).toEqual([
+        'hero',
+        'product-carousel',
+        'featured-collection',
+        'maker-profile',
+      ]);
+      expect(sec(doc, 'featured-collection')).toMatchObject({ layout: 'menu', tabs: 'categories' });
+      expect(sec(doc, 'maker-profile')?.variant).toBe('strip');
+
+      await ok(m, 'lamma.notebook');
+      doc = await draftOf(m.storeId);
+      expect(sec(doc, 'maker-profile')?.variant).toBe('lead');
+      // Table's menu layout must not leak into Notebook's light-band grid
+      expect(sec(doc, 'featured-collection')?.layout).not.toBe('menu');
+      expect(sec(doc, 'featured-collection')).toMatchObject({
+        bgColor: 'token:inverse',
+        columns: 2,
+      });
+
+      await ok(m, 'lamma.market');
+      doc = await draftOf(m.storeId);
+      expect(sec(doc, 'category-grid')).toMatchObject({
+        layout: 'tiles',
+        tint: 'aisles',
+        mobileColumns: 3,
+      });
+      expect(sec(doc, 'featured-collection')?.bgColor).not.toBe('token:inverse');
+      expect(await row(m.storeId)).toMatchObject({ look: 'lamma.market', template: 'lamma' });
+
+      await ok(m, 'lamma.table');
+      doc = await draftOf(m.storeId);
+      expect(sec(doc, 'featured-collection')).toMatchObject({ layout: 'menu' });
+      expect(sec(doc, 'category-grid')?.tint).not.toBe('aisles');
+      await awaitDeferredWork(5000);
+    });
+
+    it('Souq <-> Lamma and Qamar <-> Lamma switches keep the skin and the look in step', async () => {
+      const m = await seedMerchant('lamma-cross');
+      await ok(m, 'souq.night');
+      await ok(m, 'lamma.market');
+      expect(await row(m.storeId)).toMatchObject({ look: 'lamma.market', template: 'lamma' });
+      await ok(m, 'qamar.atelier');
+      expect(await row(m.storeId)).toMatchObject({ look: 'qamar.atelier', template: 'qamar' });
+      await ok(m, 'lamma.notebook');
+      expect(await row(m.storeId)).toMatchObject({ look: 'lamma.notebook', template: 'lamma' });
+      expect(sec(await draftOf(m.storeId), 'maker-profile')?.variant).toBe('lead');
       await awaitDeferredWork(5000);
     });
   });

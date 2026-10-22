@@ -47,6 +47,9 @@ import {
   computeOrderAmounts,
   type CodFeeConfig,
   type CheckoutDeliverySettings,
+  daysAheadSchema,
+  deliveryDateChoices,
+  checkDeliveryPick,
   fromMinor,
   REGION,
   isValidEgyptianMobile,
@@ -209,6 +212,10 @@ export default function CheckoutClient() {
     | CheckoutDeliverySettings
     | undefined;
   const [selectedDeliveryWindowId, setSelectedDeliveryWindowId] = useState<string | null>(null);
+  // Phase B4 (Ruling B4-7): `checkoutDelivery.daysAhead` turns the picker into date chips; the
+  // server recomputes the offered set at order time and writes the note's delivery line.
+  const dateMode = daysAheadSchema.safeParse(checkoutDelivery?.daysAhead).success;
+  const [selectedDeliveryDate, setSelectedDeliveryDate] = useState<string | null>(null);
   const [deliveryWindowError, setDeliveryWindowError] = useState<string | null>(null);
   // The day the picker showed when the customer chose (today/tomorrow) — the
   // id alone cannot tell a same-slot midnight crossing from a rollover that
@@ -225,9 +232,15 @@ export default function CheckoutClient() {
   // every window's order-by time has passed for today.
   const storeTimezone = store?.timezone || 'Africa/Cairo';
   const [nowMinutes, setNowMinutes] = useState(() => getNowMinutesInTimezone(storeTimezone));
-  const deliveryWindowsEnabled = !!checkoutDelivery?.windows?.enabled;
+  // null until the first tick: a render-time `new Date()` would differ between the server and the
+  // first client render (B0-46); the date chips appear on the first tick, which runs on mount.
+  const [nowDate, setNowDate] = useState<Date | null>(null);
+  const deliveryWindowsEnabled = !!checkoutDelivery?.windows?.enabled || dateMode;
   useEffect(() => {
-    const tick = () => setNowMinutes(getNowMinutesInTimezone(storeTimezone));
+    const tick = () => {
+      setNowMinutes(getNowMinutesInTimezone(storeTimezone));
+      setNowDate(new Date());
+    };
     tick();
     if (!deliveryWindowsEnabled) return;
     const interval = setInterval(tick, 30_000);
@@ -247,6 +260,28 @@ export default function CheckoutClient() {
         : { day: 'today' as const, windows: [] },
     [checkoutDelivery, nowMinutes]
   );
+  // The dates on offer (the pure function the order endpoint also runs). The longest made-to-order
+  // lead time in the cart pushes the first date out; the store's `deliveryDays.min` is the estimate.
+  const maxLeadTimeDays = Math.max(0, ...cartContextItems.map(i => i.leadTimeDays ?? 0));
+  const windowItems = checkoutDelivery?.windows?.enabled ? checkoutDelivery.windows.items : [];
+  const deliveryDateOptions = useMemo(
+    () =>
+      dateMode && checkoutDelivery && nowDate
+        ? deliveryDateChoices({
+            now: nowDate,
+            timeZone: storeTimezone,
+            offDays: (store?.settings?.deliveryOffDays as number[] | null | undefined) ?? null,
+            windows: windowItems,
+            daysAhead: checkoutDelivery.daysAhead as number,
+            estimateDays:
+              (store?.settings?.deliveryDays as { min?: number } | null | undefined)?.min ?? 0,
+            maxLeadTimeDays,
+          })
+        : null,
+    // windowItems is derived from checkoutDelivery
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dateMode, checkoutDelivery, nowDate, storeTimezone, store?.settings, maxLeadTimeDays]
+  );
   const lapsedWindowMessage = t(
     'The time you chose is no longer available — please pick another.',
     'الموعد اللي اخترته مبقاش متاح — اختار موعد تاني.'
@@ -255,7 +290,24 @@ export default function CheckoutClient() {
   // page is dropped with a SPECIFIC message, and the picker (same clock)
   // already shows it closed — never a generic "please select" next to a
   // window that still looks selectable.
+  // Date mode: a picked date or window that is no longer on offer (the clock crossed a cut-off or
+  // midnight, a cart edit moved the lead time) is dropped with the same specific message.
   useEffect(() => {
+    if (!deliveryDateOptions) return;
+    if (!selectedDeliveryDate && !selectedDeliveryWindowId) return;
+    const pick = checkDeliveryPick(
+      deliveryDateOptions,
+      { deliveryDate: selectedDeliveryDate, deliveryWindowId: selectedDeliveryWindowId },
+      windowItems.length > 0
+    );
+    if (pick.ok || pick.reason === 'DATE_REQUIRED' || pick.reason === 'WINDOW_REQUIRED') return;
+    setSelectedDeliveryDate(null);
+    setSelectedDeliveryWindowId(null);
+    setDeliveryWindowError(lapsedWindowMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryDateOptions, selectedDeliveryDate, selectedDeliveryWindowId, lapsedWindowMessage]);
+  useEffect(() => {
+    if (dateMode) return;
     if (!selectedDeliveryWindowId) return;
     if (findStillBookableWindow(deliverySelection, selectedDeliveryWindowId, selectedDeliveryDay)) {
       return;
@@ -1328,9 +1380,45 @@ export default function CheckoutClient() {
     // reading is written back to `nowMinutes` so the picker agrees with the
     // refusal (#2047/#2050).
     const submitNowMinutes = getNowMinutesInTimezone(storeTimezone);
-    const freshDeliverySelection = checkoutDelivery?.windows?.enabled
-      ? resolveDeliverySelection(checkoutDelivery.windows.items, submitNowMinutes)
-      : { day: 'today' as const, windows: [] };
+    // Date mode (Ruling B4-7): validate the pick against the dates on offer RIGHT NOW. The server
+    // re-checks and is the authority; this only saves the round trip.
+    if (dateMode && checkoutDelivery) {
+      const freshChoices = deliveryDateChoices({
+        now: new Date(),
+        timeZone: storeTimezone,
+        offDays: (store?.settings?.deliveryOffDays as number[] | null | undefined) ?? null,
+        windows: windowItems,
+        daysAhead: checkoutDelivery.daysAhead as number,
+        estimateDays:
+          (store?.settings?.deliveryDays as { min?: number } | null | undefined)?.min ?? 0,
+        maxLeadTimeDays,
+      });
+      const pick = checkDeliveryPick(
+        freshChoices,
+        { deliveryDate: selectedDeliveryDate, deliveryWindowId: selectedDeliveryWindowId },
+        windowItems.length > 0
+      );
+      if (!pick.ok) {
+        setNowDate(new Date());
+        if (pick.reason === 'DATE_REQUIRED') {
+          setDeliveryWindowError(t('Please choose a delivery date', 'اختار يوم التوصيل'));
+        } else if (pick.reason === 'WINDOW_REQUIRED') {
+          setDeliveryWindowError(t('Please select a delivery window', 'اختار موعد التوصيل'));
+        } else {
+          setSelectedDeliveryDate(null);
+          setSelectedDeliveryWindowId(null);
+          setDeliveryWindowError(lapsedWindowMessage);
+        }
+        requestAnimationFrame(() => focusFirstError());
+        return;
+      }
+    }
+    // The today / tomorrow picker's rules apply only to a store WITHOUT `daysAhead`.
+    const legacyWindows = !dateMode && !!checkoutDelivery?.windows?.enabled;
+    const freshDeliverySelection =
+      legacyWindows && checkoutDelivery
+        ? resolveDeliverySelection(checkoutDelivery.windows.items, submitNowMinutes)
+        : { day: 'today' as const, windows: [] };
     const freshAnyWindowAvailable = freshDeliverySelection.windows.some(w => w.available);
     const freshSelectedWindow = findStillBookableWindow(
       freshDeliverySelection,
@@ -1342,7 +1430,7 @@ export default function CheckoutClient() {
     // renders closed, drop the choice, and say WHY — then stop: the customer
     // re-picks from what is actually bookable (#2047/#2050). Never ship the
     // order without the slot they believe they booked.
-    if (checkoutDelivery?.windows?.enabled && selectedDeliveryWindowId && !freshSelectedWindow) {
+    if (legacyWindows && selectedDeliveryWindowId && !freshSelectedWindow) {
       setNowMinutes(submitNowMinutes);
       setSelectedDeliveryWindowId(null);
       setSelectedDeliveryDay(null);
@@ -1355,7 +1443,7 @@ export default function CheckoutClient() {
     // least one is actually available NOW — when none are available the
     // "no windows today" message shows and the order proceeds unselected
     // (per the platform rule: never hard-block checkout on this).
-    if (checkoutDelivery?.windows?.enabled && freshAnyWindowAvailable && !freshSelectedWindow) {
+    if (legacyWindows && freshAnyWindowAvailable && !freshSelectedWindow) {
       setDeliveryWindowError(t('Please select a delivery window', 'اختار موعد التوصيل'));
       requestAnimationFrame(() => focusFirstError());
       return;
@@ -1475,7 +1563,14 @@ export default function CheckoutClient() {
         },
         // The provider only: the method (card / Meeza / ...) belongs to /payments/create.
         paymentMethod: selectedProvider.split(':')[0],
-        notes: notesWithDelivery,
+        // A date store: the SERVER writes the delivery line from the structured pick (Ruling B4-7).
+        notes: dateMode ? formData.notes : notesWithDelivery,
+        ...(dateMode && selectedDeliveryDate
+          ? {
+              deliveryDate: selectedDeliveryDate,
+              ...(selectedDeliveryWindowId ? { deliveryWindowId: selectedDeliveryWindowId } : {}),
+            }
+          : {}),
         couponCode: appliedCoupon?.code,
         // Only send a redemption request when the customer opted in AND the
         // amount clears the store minimum. The server re-validates against the
@@ -1687,6 +1782,18 @@ export default function CheckoutClient() {
       if (subscriptionFriendly) {
         setCheckoutError(subscriptionFriendly);
         setIsProcessing(false);
+        return;
+      }
+
+      // The server refused the picked delivery slot (Ruling B4-7): drop the pick, say so next to
+      // the chips, and let the shopper choose again from the refreshed dates.
+      if (code === 'DELIVERY_SLOT_UNAVAILABLE') {
+        setNowDate(new Date());
+        setSelectedDeliveryDate(null);
+        setSelectedDeliveryWindowId(null);
+        setDeliveryWindowError(lapsedWindowMessage);
+        setIsProcessing(false);
+        requestAnimationFrame(() => focusFirstError());
         return;
       }
 
@@ -2542,6 +2649,14 @@ export default function CheckoutClient() {
                               setDeliveryWindowError(null);
                             }}
                             error={deliveryWindowError}
+                            dateChoices={dateMode ? deliveryDateOptions : undefined}
+                            selectedDate={selectedDeliveryDate}
+                            onSelectDate={date => {
+                              setSelectedDeliveryDate(date);
+                              // a window booked for another date may not be bookable on this one
+                              setSelectedDeliveryWindowId(null);
+                              setDeliveryWindowError(null);
+                            }}
                           />
                         </div>
                       ) : undefined

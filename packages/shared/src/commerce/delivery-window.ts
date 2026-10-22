@@ -35,11 +35,11 @@ type Zone = {
   estimatedDays?: number | null;
 };
 
-const DAY = 86_400_000;
-const DEFAULT_TZ = 'Africa/Cairo';
+export const DAY = 86_400_000;
+export const DEFAULT_TZ = 'Africa/Cairo';
 
 /** A usable IANA zone: a typo in store settings falls back to Cairo instead of throwing. */
-function safeZone(timeZone: string): string {
+export function safeZone(timeZone: string): string {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone });
     return timeZone;
@@ -48,7 +48,7 @@ function safeZone(timeZone: string): string {
   }
 }
 
-function wallClock(instant: number, timeZone: string) {
+export function wallClock(instant: number, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     hourCycle: 'h23',

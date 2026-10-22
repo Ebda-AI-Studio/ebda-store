@@ -57,8 +57,9 @@ function buildApp(): Express {
   return app;
 }
 
-const token = (userId: string, role: 'customer' | 'store_admin') =>
-  jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
+// A customer token is bound to ONE store (F-01 / S11-1): it carries `storeId` and only works there.
+const token = (userId: string, role: 'customer' | 'store_admin', storeId?: string) =>
+  jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0, storeId }, config.jwtSecret, {
     expiresIn: '10m',
     issuer: 'ebda-api',
     audience: 'ebda-app',
@@ -134,6 +135,7 @@ describe.skipIf(!hasDb)('customer reorder source (Ruling B4-8)', () => {
           subtotal: 5000,
           total: 5000,
           shippingAddress: {},
+          billingAddress: {},
           createdAt: opts.at,
           items: {
             create: opts.keys.map(k => ({
@@ -218,8 +220,9 @@ describe.skipIf(!hasDb)('customer reorder source (Ruling B4-8)', () => {
 
   it('is the distinct products of the last three paid or delivered orders, newest order first, at most 12, on sale only', async () => {
     const ids = await CustomerReorderService.productIds(storeId, customerId);
-    // order3 has 11 products (d..n), then order2 adds c (a is next), then order1 adds b: capped at 12
-    expect(ids).toEqual([...'defghijklmn', 'c'].map(k => p[k]));
+    // order3 has 11 products (d..n); order2 adds a, archived, c, deleted (name order inside an order, the
+    // archived and deleted ones are not on sale); order1 adds b: the first 12 on sale are d..n and a
+    expect(ids).toEqual([...'defghijklmn', 'a'].map(k => p[k]));
     expect(ids).toHaveLength(12);
     const all = await CustomerReorderService.productIds(storeId, customerId, 12);
     expect(all.every(id => id !== p.archived && id !== p.deleted)).toBe(true);
@@ -246,7 +249,7 @@ describe.skipIf(!hasDb)('customer reorder source (Ruling B4-8)', () => {
     const res = await request(app)
       .get('/api/v1/public/customers/me/reorder')
       .set('x-store-id', storeId)
-      .set('Authorization', `Bearer ${token(customerId, 'customer')}`);
+      .set('Authorization', `Bearer ${token(customerId, 'customer', storeId)}`);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.data.productIds).toHaveLength(12);
     expect(res.headers['cache-control']).toBe('private, no-store');
@@ -257,12 +260,19 @@ describe.skipIf(!hasDb)('customer reorder source (Ruling B4-8)', () => {
     const mine = await request(app)
       .get('/api/v1/public/customers/me/reorder')
       .set('x-store-id', storeId)
-      .set('Authorization', `Bearer ${token(otherCustomerId, 'customer')}`);
+      .set('Authorization', `Bearer ${token(otherCustomerId, 'customer', storeId)}`);
     expect(mine.body.data.productIds).toEqual([p.b]);
+    // a token minted for store A is dead on store B (F-01): it can never read B's data
+    const crossStore = await request(app)
+      .get('/api/v1/public/customers/me/reorder')
+      .set('x-store-id', otherStoreId)
+      .set('Authorization', `Bearer ${token(customerId, 'customer', storeId)}`);
+    expect(crossStore.status).toBe(401);
+    // the same customer id with a token bound to store B sees only store B's orders: none
     const elsewhere = await request(app)
       .get('/api/v1/public/customers/me/reorder')
       .set('x-store-id', otherStoreId)
-      .set('Authorization', `Bearer ${token(customerId, 'customer')}`);
+      .set('Authorization', `Bearer ${token(customerId, 'customer', otherStoreId)}`);
     expect(elsewhere.status).toBe(200);
     expect(elsewhere.body.data.productIds).toEqual([]);
   });

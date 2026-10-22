@@ -12,6 +12,8 @@
  * this stays trivially testable.
  */
 
+import { formatWindowTime12 } from '@ebda/shared';
+
 export interface DeliveryWindowItem {
   id: string;
   label: string;
@@ -59,15 +61,7 @@ export function parseTimeToMinutes(time: string): number {
  * isn't a parseable time, so a bad value never breaks the picker/label.
  */
 export function formatWindowTime(time: string, locale: string): string {
-  const match = /^(\d{1,2}):(\d{2})$/.exec((time ?? '').trim());
-  if (!match) return time;
-  const hours = Number(match[1]);
-  const minutes = match[2];
-  if (!Number.isFinite(hours) || hours > 23 || Number(minutes) > 59) return time;
-  const isAr = locale === 'ar';
-  const period = hours < 12 ? (isAr ? 'ص' : 'AM') : isAr ? 'م' : 'PM';
-  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
-  return `${hour12}:${minutes} ${period}`;
+  return formatWindowTime12(time, locale);
 }
 
 /**

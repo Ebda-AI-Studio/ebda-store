@@ -8499,7 +8499,11 @@
       "deliveryOffDay3": "Wednesday",
       "deliveryOffDay4": "Thursday",
       "deliveryOffDay5": "Friday",
-      "deliveryOffDay6": "Saturday"
+      "deliveryOffDay6": "Saturday",
+      "daysAheadTitle": "Delivery date",
+      "daysAheadHint": "Let customers pick a delivery date instead of only today or tomorrow. The date, and the time window if you use them, are checked again when the order is placed.",
+      "daysAheadLabel": "Days to offer",
+      "daysAheadOff": "Off (today or tomorrow only)"
     }
   },
   "customerGroups": {

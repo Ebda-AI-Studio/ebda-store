@@ -290,6 +290,37 @@ export default function CheckoutDeliveryPage() {
             </label>
           </div>
 
+          <label className="flex flex-col gap-1 border-t pt-3 md:max-w-xs">
+            <span
+              data-setting-id="delivery.days-ahead"
+              className="text-sm font-semibold text-foreground"
+            >
+              {t('daysAheadTitle')}
+            </span>
+            <span className="text-xs text-muted-foreground">{t('daysAheadHint')}</span>
+            <select
+              value={config.daysAhead ?? ''}
+              onChange={e => {
+                const v = e.target.value;
+                setConfig(prev => {
+                  const { daysAhead: _drop, ...rest } = prev;
+                  return v === ''
+                    ? { ...rest, daysAhead: null }
+                    : { ...rest, daysAhead: Number(v) };
+                });
+              }}
+              aria-label={t('daysAheadLabel')}
+              className="min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">{t('daysAheadOff')}</option>
+              {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+
           {config.windows.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('noWindowsYet')}</p>
           ) : (

@@ -262,3 +262,12 @@ On a look that sets `chrome.cardStepper: 'inline'` (the three Lamma looks), the 
 - **Renders nothing** for an anonymous shopper, a first-time customer, a refused list or a failed request: no wrapper, no placeholder, no empty padded band (`ReorderRow` owns its `<section>`). It mounts after hydration, so a look places it below the first screen (CLS is measured in the matrix).
 - **Reorder this order.** An order's page (paid or delivered, never cancelled or refunded) has one "إعادة الطلب" button. It re-adds every line through `api.addToCart` with the SAME product, variant and note and the same quantity (bundle components are skipped, equal lines add up), refetches the cart once, then says in one sentence how many could not go back ("تعذّرت الإضافة: قطعتين مش متاحين دلوقتي"); with at least one line added the shopper lands on the cart. It never edits the old order.
 - **Demo limit (Ruling B4-9).** A demo store refuses customer registration, so the row can never render on `storedemo-lamma`; it is exercised on the non-demo `lamma-reorder` scenario store.
+
+## 18. Delivery date chips at checkout (Phase B4, Lamma; Ruling B4-7)
+
+`settings.checkoutDelivery.daysAhead` (1-14) turns the today / tomorrow windows picker into date chips plus the windows bookable on the chosen date. The rule, the order-endpoint validation, the 422 `DELIVERY_SLOT_UNAVAILABLE` and the server-written notes line are specified in `docs/architecture/store-checkout-settings.md` (`daysAhead`). Platform behaviour in short:
+
+- **Truth.** A chip is offered only if the server would accept it: earliest date = store estimate + the cart's longest `leadTimeDays` in business days, the store's off days skipped, store timezone (DST-safe: calendar days, never 24 h), today's windows obey `orderBy`. A stale tab, a clock that crossed a cut-off or midnight, or a hand-edited date is refused with a sentence next to the chips and the picks are cleared.
+- **Chips.** `role=radiogroup`, roving tabindex, arrow keys move AND select (RTL-aware), 44 px targets, the selected chip is filled and carries a check (never colour alone). Relative words for the first two ("النهاردة", "بكرة"), then the date with Western digits. No date on offer says so in a sentence and never blocks checkout.
+- **A store without `daysAhead` is unchanged**, pinned by a markup snapshot of `DeliverySection`.
+- **Data flow.** The pick travels cart → checkout → order → receipt → admin notes as one line, proven end to end in `tests/integration/order-delivery-date.test.ts` (Review Focus 3), not at component level.

@@ -44,6 +44,8 @@ export interface CartItem {
   /** B2B minimum order quantity: true when this product's total quantity in the cart is below it. */
   belowMoq?: boolean;
   moqRequired?: number;
+  /** Product made-to-order lead time (business days); read by the checkout's delivery date chips. */
+  leadTimeDays?: number;
 }
 
 /**

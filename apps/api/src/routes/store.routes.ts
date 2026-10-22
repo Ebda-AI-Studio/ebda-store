@@ -29,6 +29,7 @@ import {
   deliveryDaysSchema,
   instalmentsSchema,
   deliveryOffDaysSchema,
+  daysAheadSchema,
   receiptBarcodeShapeSchema,
   footerBottomBarSchema,
   normalizeStoredBottomBar,
@@ -104,6 +105,27 @@ function addDeliveryOffDaysIssues(
   }
 }
 
+/**
+ * `settings.checkoutDelivery.daysAhead` (Phase B4, Ruling B4-7): null / absent keeps today and
+ * tomorrow; else an integer 1-14. The rest of `checkoutDelivery` passes through unvalidated, as
+ * before (a merchant's windows and note keep working exactly as saved).
+ */
+function addCheckoutDeliveryIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const cd = settings?.checkoutDelivery;
+  if (!cd || typeof cd !== 'object') return;
+  const v = (cd as Record<string, unknown>).daysAhead;
+  if (v === undefined || v === null) return;
+  if (daysAheadSchema.safeParse(v).success) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['checkoutDelivery', 'daysAhead'],
+    message: 'Days ahead must be a whole number from 1 to 14',
+  });
+}
+
 /** `settings.receiptBarcodeShape`: plain | off | one of the approved shape ids; null clears. */
 function addReceiptBarcodeShapeIssues(
   settings: Record<string, unknown> | undefined,
@@ -176,6 +198,7 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
   }
   addDeliveryDaysIssues(settings, ctx);
   addDeliveryOffDaysIssues(settings, ctx);
+  addCheckoutDeliveryIssues(settings, ctx);
   addReceiptBarcodeShapeIssues(settings, ctx);
   addPackingSlipNoteIssues(settings, ctx);
   addInstalmentsIssues(settings, ctx);

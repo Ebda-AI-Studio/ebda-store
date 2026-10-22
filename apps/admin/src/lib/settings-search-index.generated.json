@@ -1099,6 +1099,18 @@
     "pageAr": "التوصيل عند الدفع"
   },
   {
+    "id": "delivery.days-ahead",
+    "kind": "setting",
+    "route": "/delivery",
+    "access": "owner",
+    "en": "Delivery date",
+    "ar": "يوم التوصيل",
+    "synEn": "delivery date picker days ahead choose a day schedule delivery calendar",
+    "synAr": "يوم التوصيل اختيار اليوم جدولة التوصيل تقويم",
+    "pageEn": "Checkout Delivery",
+    "pageAr": "التوصيل عند الدفع"
+  },
+  {
     "id": "delivery.min-order",
     "kind": "setting",
     "route": "/delivery",
