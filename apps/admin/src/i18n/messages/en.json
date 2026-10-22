@@ -10121,7 +10121,8 @@
     "addSection": {
       "title": "Add a section",
       "close": "Close",
-      "limitReached": "Limit reached ({max})"
+      "limitReached": "Limit reached ({max})",
+      "more": "More sections"
     },
     "ai": {
       "filled": "Added a kicker and subtitle. You can edit or undo them.",

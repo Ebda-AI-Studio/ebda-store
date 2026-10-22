@@ -3,6 +3,9 @@
  * audit matrix and the tests, so "shown" means the same thing everywhere.
  */
 import type { ShownFor, ShownRule } from './settings-schema';
+import type { SectionDefinition } from './registry';
+import type { SectionNode } from './schema';
+import { VIEWPORTS } from './viewports';
 
 export interface ShownContext {
   /** The store's resolved template (skin). Unknown / legacy ids match no `templates` rule. */
@@ -37,4 +40,29 @@ export function isShown(d: { shownFor?: ShownFor }, ctx: ShownContext = {}): boo
       ctx.variant!(key).some(v => allowed.includes(v as never))
     );
   });
+}
+
+/**
+ * `ShownContext.variant` for a section in a document: the key's value on the section, on each
+ * viewport override (`responsive.<viewport>.settings`), and the registry's default preset when
+ * the document stores none, so a section nobody touched answers with the value it renders with.
+ */
+export function sectionVariants(
+  def: Pick<SectionDefinition, 'presets'>,
+  node: Pick<SectionNode, 'settings' | 'responsive'>
+): NonNullable<ShownContext['variant']> {
+  return key => {
+    const values: unknown[] = [];
+    const own = node.settings[key];
+    if (own !== undefined) values.push(own);
+    for (const v of VIEWPORTS) {
+      const o = node.responsive?.[v]?.settings?.[key];
+      if (o !== undefined) values.push(o);
+    }
+    if (own === undefined) {
+      const preset = def.presets[0]?.settings?.[key];
+      if (preset !== undefined) values.push(preset);
+    }
+    return values;
+  };
 }
