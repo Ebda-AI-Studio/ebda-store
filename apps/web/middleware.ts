@@ -354,7 +354,8 @@ function handleStoreHost(
   // client-sent one was stripped in `middleware`), for the resolver to apply to an `isDemo` store
   // only. Such a request is per-visitor by construction: it never takes the shared tenant-tree
   // (full-route-cache) rewrite and its response is `private, no-store`, so a previewed look can
-  // never be cached and served to another visitor or another store. Middleware is synchronous and
+  // never be cached and served to another visitor or another store (the Worker's demo edge cache,
+  // Ruling DEMO-EDGE-1, re-keys by look and caches the DEMO hosts only). Middleware is synchronous and
   // cannot ask whether the store is a demo, so the guard covers every store host; the page for a
   // non-demo store is identical to the one without the param.
   const demoLook = parseDemoLook(request.nextUrl.searchParams.get('look'));

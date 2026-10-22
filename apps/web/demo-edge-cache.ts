@@ -1,0 +1,203 @@
+/**
+ * Ruling DEMO-EDGE-1: the showroom's pages are identical for every cookieless visitor (noindex,
+ * checkout refused, no personal data), so the Worker serves them from the Cloudflare edge cache
+ * instead of re-rendering. A Worker route runs BEFORE the zone cache, so this uses `caches.default`
+ * directly. Hardened after the security review of #128 (cache poisoning, scope bypass, parser
+ * differential); every rule below has a negative control in tests/unit/demo-edge-cache.test.ts.
+ *
+ *  - SCOPE (finding 2): a request is eligible only when BOTH hold: (a) its hostname, taken from
+ *    the request URL alone (never Host / X-Forwarded-Host / Forwarded, which make the request
+ *    ineligible when present), is EXACTLY `<label>.ebda.app` for a label of the `DEMO_HOSTS` map
+ *    (lower-case, no trailing dot, no port, no custom domain); and (b) the API's own store
+ *    resolver says that host's store is `isDemo === true` and active (`isDemoStoreHost`, fail
+ *    closed on any error or doubt, remembered per isolate for 5 minutes).
+ *  - KEY (finding 3): built by us from a strict allowlist, never from the raw URL: canonical host,
+ *    a path of `[A-Za-z0-9._~%/-]` (no `//`, no `..`), and ONLY a `look` value that is a BUILT look
+ *    of the registry (single occurrence). Any other query key, a malformed or unknown look, a
+ *    repeated look, or a fragment-like oddity makes the request ineligible. The synthetic key
+ *    request never reaches Cloudflare's own cache key logic.
+ *  - PER-VISITOR STATE (finding 1): ANY Cookie header (consent, language, draft, analytics, auth),
+ *    Authorization, or a non-HTML/RSC/action/prefetch request is ineligible, so the cached body is
+ *    the one a cookieless visitor gets, by construction: the storefront server's only per-visitor
+ *    inputs are the cookies (`force-language`, `force-cookie-consent`, `force-preview-draft`; the
+ *    headers it reads are host-derived), and none can be present. A visitor who has set the
+ *    language or consent cookie is rendered live, never from this cache. A response with
+ *    `Set-Cookie`, a non-200 or a non-HTML body is never stored.
+ * Real merchant stores and every ineligible request keep the app's `private, no-store`.
+ * CACHE CLASS: BOUNDED-stale. Fresh 300 s, then served stale while one request refreshes, up to
+ * 86400 s. Residual: a demo catalogue/layout edit shows after <= 300 s. No NEVER-stale data
+ * (price, stock, permissions) is decided from a demo page; checkout is refused.
+ */
+import { getLook } from '@ebda/shared';
+import { DEMO_HOSTS } from './src/lib/demo-hosts';
+
+export const DEMO_EDGE_FRESH_S = 300;
+export const DEMO_EDGE_STALE_S = 86400;
+/** What the CLIENT is told: never cacheable downstream. The Worker's own cache is internal. */
+export const DEMO_EDGE_CACHE_CONTROL = 'private, no-store';
+const APEX = 'ebda.app';
+/** The API the resolver check asks (the same one the storefront resolves stores against). */
+export const DEMO_EDGE_API_URL = 'https://api.ebda.app/api/v1';
+
+const BYPASS_PATH = /^\/(api|_next|checkout)(\/|$)/;
+const SAFE_PATH = /^\/[A-Za-z0-9._~%/-]*$/;
+
+/** The canonical demo host of this request URL, or null. Exact match, nothing else. */
+export function canonicalDemoHost(url: URL): string | null {
+  const host = url.hostname;
+  if (url.port !== '' || host !== host.toLowerCase()) return null;
+  for (const label of Object.values(DEMO_HOSTS) as string[])
+    if (host === `${label}.${APEX}`) return host;
+  return null;
+}
+
+/** The strict cache key for this request, or null when it must not touch the demo edge cache. */
+export function demoEdgeKey(request: Request): string | null {
+  if (request.method !== 'GET') return null;
+  const url = new URL(request.url);
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash) return null;
+  const host = canonicalDemoHost(url);
+  if (!host) return null;
+  const h = request.headers;
+  // Spoof / per-visitor inputs: any of these makes the request ineligible.
+  for (const name of [
+    'cookie',
+    'authorization',
+    'x-forwarded-host',
+    'forwarded',
+    'x-original-host',
+    'x-store-domain',
+    'rsc',
+    'next-action',
+    'next-router-prefetch',
+    'next-router-state-tree',
+  ])
+    if (h.has(name)) return null;
+  if (!(h.get('accept') ?? '').includes('text/html')) return null;
+  const path = url.pathname;
+  if (
+    !SAFE_PATH.test(path) ||
+    path.length > 200 ||
+    path.includes('//') ||
+    path.includes('..') ||
+    BYPASS_PATH.test(path)
+  )
+    return null;
+  let look = '';
+  const keys = [...url.searchParams.keys()];
+  if (keys.length > 1 || keys.some(k => k !== 'look')) return null;
+  if (keys.length === 1) {
+    const all = url.searchParams.getAll('look');
+    if (all.length !== 1 || getLook(all[0])?.status !== 'built') return null;
+    look = all[0];
+  }
+  return `https://${host}${path}${look ? `?look=${look}` : ''}`;
+}
+
+const demoVerdict = new Map<string, { demo: boolean; until: number }>();
+
+/**
+ * True only when the API's store resolver says `host` is an ACTIVE `isDemo` store. Fails closed.
+ * The verdict (either way) is remembered for 5 minutes in this isolate.
+ */
+export async function isDemoStoreHost(
+  host: string,
+  apiUrl: string,
+  fetcher: typeof fetch = fetch,
+  now = Date.now()
+): Promise<boolean> {
+  const known = demoVerdict.get(host);
+  if (known && known.until > now) return known.demo;
+  let demo = false;
+  try {
+    const res = await fetcher(`${apiUrl}/public/store/resolve`, {
+      headers: { 'x-store-domain': host },
+    });
+    if (res.ok) {
+      const store = (
+        (await res.json()) as { data?: { store?: { isDemo?: unknown; status?: unknown } } }
+      )?.data?.store;
+      demo = store?.isDemo === true && store?.status === 'active';
+    }
+  } catch {
+    demo = false;
+  }
+  demoVerdict.set(host, { demo, until: now + 300_000 });
+  return demo;
+}
+
+/** Test seam. */
+export function resetDemoVerdicts(): void {
+  demoVerdict.clear();
+}
+
+/** Only a clean 200 HTML document without cookies is worth keeping. */
+export function isStorable(res: Response): boolean {
+  return (
+    res.status === 200 &&
+    (res.headers.get('content-type') ?? '').includes('text/html') &&
+    !res.headers.has('set-cookie')
+  );
+}
+
+/** Age in seconds of a stored copy; Infinity when unstamped. */
+export function ageSeconds(stored: Response, now = Date.now()): number {
+  const at = Number(stored.headers.get('x-edge-cached-at'));
+  return Number.isFinite(at) && at > 0 ? (now - at) / 1000 : Infinity;
+}
+
+function withEdgeHeaders(res: Response, state: 'HIT' | 'MISS' | 'STALE'): Response {
+  const out = new Response(res.body, res);
+  // The Worker caches internally; clients (and office/ISP proxies) must not keep copies.
+  out.headers.set('Cache-Control', 'private, no-store');
+  out.headers.set('x-demo-edge', state);
+  out.headers.set('x-demo-cache', state.toLowerCase());
+  out.headers.delete('vary');
+  return out;
+}
+
+type EdgeCtx = { waitUntil(p: Promise<unknown>): void };
+type Origin = (request: Request) => Promise<Response>;
+
+/** Serve `request` through the demo edge cache; falls through to `origin` when not eligible. */
+export async function serveDemoEdge(
+  request: Request,
+  ctx: EdgeCtx,
+  origin: Origin,
+  isDemoHost: (host: string) => Promise<boolean>,
+  cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
+): Promise<Response> {
+  const key = demoEdgeKey(request);
+  if (!key || !(await isDemoHost(new URL(key).hostname))) return origin(request);
+
+  const store = async (res: Response) => {
+    const copy = new Response(res.body, res);
+    copy.headers.set('Cache-Control', `public, max-age=${DEMO_EDGE_STALE_S}`);
+    copy.headers.set('x-edge-cached-at', String(Date.now()));
+    copy.headers.delete('vary');
+    await cache.put(key, copy);
+  };
+
+  try {
+    const hit = await cache.match(key);
+    if (hit) {
+      const age = ageSeconds(hit);
+      if (age < DEMO_EDGE_FRESH_S) return withEdgeHeaders(hit, 'HIT');
+      if (age < DEMO_EDGE_STALE_S) {
+        ctx.waitUntil(
+          origin(new Request(request))
+            .then(r => (isStorable(r) ? store(r) : undefined))
+            .catch(() => {})
+        );
+        return withEdgeHeaders(hit, 'STALE');
+      }
+    }
+  } catch {
+    // cache unavailable: render normally
+  }
+
+  const res = await origin(request);
+  if (!isStorable(res)) return res;
+  ctx.waitUntil(store(res.clone()).catch(() => {}));
+  return withEdgeHeaders(res, 'MISS');
+}
