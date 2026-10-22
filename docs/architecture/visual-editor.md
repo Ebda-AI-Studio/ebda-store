@@ -92,7 +92,7 @@ reduced motion), keyboard focus reveals its own, and touch devices always show
 them. It posts `request-add`; the parent re-checks the list and index
 (`addRequestFor`) and opens the section picker at that index. The header, the
 announcement bar and the footer are chrome: no toolbar, edited in the panes.
-`aiFill` joins the ops in Task 6.
+`aiFill` (sections the AI supports only, see below) is the sixth op.
 
 Not yet marked (listed for the editor matrix): skin-owned text under
 `apps/web/src/templates/<skin>/` and the legacy `trustStrip` items.
@@ -122,3 +122,17 @@ fixed; accepting a new gap is a deliberate edit with a reason.
 round-trip through the builder reducer to the same layout the form writes, and the
 lists of live theme/typography writes and of files that still mention the classic
 builder (`parity-baseline.json`) can only shrink. Task 12 requires them empty.
+
+## Section design controls (Task 6)
+
+The registry's `typography` and `dividers` settings render the form page builder's own blocks, shared
+from `apps/admin/src/components/section-design/`: `SectionTypographyField` (per-role overrides with the
+store's global zones as the inherit hint; the roles a section offers are in `typographyRolesFor`) and
+`DividersField` (five slots, one shared style). They write the same `typography` / `dividers` objects
+the layout stores, so there is no migration, and every edit is a draft edit. Padding, max width, kicker,
+subtitle and title were already registry settings. `aiFill` (toolbar and a settings-panel button) asks
+`POST /stores/:id/ai/section-content` for category-grid, new-arrivals, best-sellers, featured-collection
+and testimonials, then dispatches only the EMPTY kicker/subtitle fields as ordinary `setSectionSetting`
+edits under one coalesce key (`aiFillActions`): undo takes the whole fill back and the merchant's own
+words are never overwritten. Colour scheme, density and text scale are page-type settings (Ruling VE-7),
+not section settings.

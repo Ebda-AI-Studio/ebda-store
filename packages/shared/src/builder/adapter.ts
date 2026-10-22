@@ -64,7 +64,7 @@ import {
 type LegacyObject = Record<string, unknown>;
 
 /** Mobile-only legacy prop names, per registry responsive prop. */
-const MOBILE_PROP_LEGACY_NAME: Record<string, Record<string, string>> = {
+export const MOBILE_PROP_LEGACY_NAME: Record<string, Record<string, string>> = {
   categories: { layout: 'layoutMobile', captionPosition: 'captionPositionMobile' },
 };
 

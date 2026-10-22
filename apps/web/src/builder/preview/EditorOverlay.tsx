@@ -527,6 +527,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
           pageWidth={pageWidth}
           draggable={toolbarState.draggable}
           disabled={toolbarState.disabled}
+          ai={toolbarState.ai}
           onDragStart={startDrag}
           onOp={(op: SectionOp) =>
             post({

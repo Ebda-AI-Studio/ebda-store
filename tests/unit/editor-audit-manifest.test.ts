@@ -51,11 +51,13 @@ describe('classic manifest of the real page builder', () => {
       true
     );
   });
-  it('a field with a registry setting is wired; a compound editor is classic-only', () => {
+  it('a field with a registry setting is wired, the compound editors included (Task 6)', () => {
     expect(m.find(e => e.key === 'hero.mode')?.status).toBe('wired');
-    expect(m.find(e => e.key === 'hero.typography')).toMatchObject({
-      status: 'classic-only',
-      capability: 'P-03',
+    expect(m.find(e => e.key === 'hero.typography')?.status).toBe('wired');
+    // the mobile-only legacy name is a viewport override of the registry setting
+    expect(m.find(e => e.key === 'categories.layoutMobile')).toMatchObject({
+      status: 'wired',
+      builder: expect.stringContaining('mobile viewport override'),
     });
   });
   it('theme and typography writes are flagged as live writes (VE-4)', () => {

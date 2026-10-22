@@ -17,6 +17,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import {
   LOOKS,
+  MOBILE_PROP_LEGACY_NAME,
   SECTION_REGISTRY,
   THEME_SETTINGS_SCHEMA,
   type SettingDefinition,
@@ -112,6 +113,8 @@ export function buildMatrix(): Matrix {
     for (const def of templateSections) {
       for (const s of def.settings) {
         const values = PROBE_UNREACHABLE.has(def.type) ? null : probeValues(s);
+        // typography / dividers are compound editors: their effect is a nested object, so the probe
+        // flips no scalar. They are static evidence only (the renderer reads the key).
         const compound = s.type === 'typography' || s.type === 'dividers';
         const keys = settingKeys(s);
         const staticHit = keys.some(k => reads(src, k));
@@ -143,10 +146,9 @@ export function buildMatrix(): Matrix {
             staticHit,
             probeDiffers: differs,
             probeable: !!values && !compound,
-            classicOnly: compound,
             markerMissing,
           }),
-          evidence: compound ? 'manifest' : evidence,
+          evidence,
         });
       }
       // Block settings: static evidence only (a block needs its section's content to render).
@@ -201,6 +203,11 @@ export function buildMatrix(): Matrix {
     for (const spec of look.sections ?? []) {
       const def = sectionTypes.get(spec.type);
       const known = new Set(def?.settings.flatMap(settingKeys) ?? []);
+      // The mobile-only legacy names (`layoutMobile`) are viewport overrides of a registry setting.
+      for (const legacy of Object.values(
+        (def?.legacyKey && MOBILE_PROP_LEGACY_NAME[def.legacyKey]) || {}
+      ))
+        known.add(legacy);
       if (!def)
         rows.push({
           id: `${look.id}|section:${spec.type}|add`,

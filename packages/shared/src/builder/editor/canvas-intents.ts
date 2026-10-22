@@ -116,6 +116,9 @@ function sectionOpAction(
           ? { type: 'setBlockHidden', sectionId, blockId, hidden: true }
           : { type: 'setSectionHidden', id: sectionId, hidden: true },
       };
+    case 'aiFill':
+      // Not a document action: the parent asks the API, then dispatches the fills (`aiFillActions`).
+      return null;
     case 'remove':
       return {
         action: blockId
@@ -188,6 +191,87 @@ export function imageSwapActions(
     if (alt.en !== undefined) out.push(set(req.target.alt.en, alt.en.trim().slice(0, 300)));
     if (alt.ar !== undefined && req.target.alt.ar)
       out.push(set(req.target.alt.ar, alt.ar.trim().slice(0, 300)));
+  }
+  return out;
+}
+
+/**
+ * Sections the AI can write a kicker and subtitle for, by the name the API knows them by
+ * (`POST /stores/:id/ai/section-content`). Everything else gets no AI button.
+ */
+export const AI_FILL_SECTIONS: Readonly<Record<string, string>> = {
+  'category-grid': 'categories',
+  'new-arrivals': 'newArrivals',
+  'best-sellers': 'bestSellers',
+  'featured-collection': 'featured',
+  testimonials: 'testimonials',
+};
+
+export interface AiFillRequest {
+  sectionId: string;
+  /** The API's name for the section. */
+  section: string;
+  existingTitle?: string;
+  existingTitleAr?: string;
+}
+
+/** `section-op aiFill` re-checked against the current document: a page section the AI supports. */
+export function aiFillRequestFor(doc: PageDefinition, msg: ChildToParent): AiFillRequest | null {
+  if (msg.type !== 'section-op' || msg.op !== 'aiFill' || msg.blockId) return null;
+  return aiFillRequestForSection(doc, msg.sectionId);
+}
+
+export function aiFillRequestForSection(
+  doc: PageDefinition,
+  sectionId: string
+): AiFillRequest | null {
+  const at = locateSection(doc, sectionId);
+  if (!at || at.list !== 'template') return null;
+  const section = AI_FILL_SECTIONS[at.node.type];
+  if (!section) return null;
+  const str = (k: string) =>
+    typeof at.node.settings[k] === 'string' && (at.node.settings[k] as string).trim()
+      ? (at.node.settings[k] as string)
+      : undefined;
+  return { sectionId, section, existingTitle: str('title'), existingTitleAr: str('titleAr') };
+}
+
+export interface AiSuggestion {
+  kicker: string;
+  kickerAr: string;
+  subtitle: string;
+  subtitleAr: string;
+}
+
+/**
+ * The fills for an AI suggestion: text settings of that section only, and only the ones that are
+ * EMPTY now (a merchant's own words are never overwritten). One coalesce key per fill, so the whole
+ * fill is one undo step. Empty result = nothing to fill.
+ */
+export function aiFillActions(
+  doc: PageDefinition,
+  sectionId: string,
+  suggestion: AiSuggestion,
+  nonce: string | number = ''
+): IntentResult[] {
+  const node = locateSection(doc, sectionId)?.node;
+  if (!node) return [];
+  const out: IntentResult[] = [];
+  for (const key of ['kicker', 'kickerAr', 'subtitle', 'subtitleAr'] as const) {
+    const target = textTargetIn(doc, sectionId, undefined, key);
+    const current = node.settings[key];
+    const next = typeof suggestion[key] === 'string' ? suggestion[key].trim() : '';
+    if (!target || !next) continue;
+    if (typeof current === 'string' && current.trim()) continue;
+    out.push({
+      action: {
+        type: 'setSectionSetting',
+        id: sectionId,
+        key,
+        value: normalizeInlineText(next, false, target.max),
+      },
+      coalesce: `${sectionId}/ai-fill/${nonce}`,
+    });
   }
   return out;
 }

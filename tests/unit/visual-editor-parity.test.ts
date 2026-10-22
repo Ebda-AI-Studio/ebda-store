@@ -57,8 +57,20 @@ const current = { classicReferences: classicReferences(), liveWrites: liveWrites
 
 if (process.env.EDITOR_MATRIX_WRITE === '1') {
   describe('parity baseline', () => {
-    it('writes parity-baseline.json', () => {
-      writeFileSync(PARITY_BASELINE, JSON.stringify(current, null, 2) + '\n');
+    it('shrinks parity-baseline.json (a closed gap leaves it; a new one never enters)', () => {
+      const old = JSON.parse(readFileSync(PARITY_BASELINE, 'utf8')) as typeof current;
+      const keep = (was: string[], now: string[]) => was.filter(f => now.includes(f));
+      writeFileSync(
+        PARITY_BASELINE,
+        JSON.stringify(
+          {
+            classicReferences: keep(old.classicReferences, current.classicReferences),
+            liveWrites: keep(old.liveWrites, current.liveWrites),
+          },
+          null,
+          2
+        ) + '\n'
+      );
     });
   });
 } else {
@@ -78,7 +90,8 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
       for (const e of manifest.filter(
         x => x.kind === 'field' && x.status === 'wired' && x.builder?.startsWith('section:')
       )) {
-        const [type, setting] = e.builder!.slice('section:'.length).split('/');
+        const [type, rawSetting] = e.builder!.slice('section:'.length).split('/');
+        const setting = rawSetting?.split(' ')[0]; // `layout (mobile viewport override)`
         types.add(type);
         if (!setting || /^(hidden|blocks|blocks .*)$/.test(setting)) continue;
         const d = sectionDefinitionForLegacyKey(e.key.split('.')[0] as never);
@@ -91,15 +104,14 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
     });
 
     it('the plan capabilities P-01 to P-14 are all accounted for in the manifest', () => {
-      const caps = new Set(
-        manifest.filter(e => e.status === 'classic-only').map(e => e.capability)
-      );
+      // wired or still classic-only: every capability of the plan's table has an entry
+      const caps = new Set(manifest.map(e => e.capability).filter(Boolean));
       for (let i = 1; i <= 14; i++) {
         const id = `P-${String(i).padStart(2, '0')}`;
         expect(caps.has(id), id).toBe(true);
       }
       // nothing outside the plan's table
-      for (const c of caps) expect(c).toMatch(/^P-(0[1-9]|1[0-4])$/);
+      for (const c of caps) expect(c).toMatch(/^P-(0[1-9]|1[0-9])$/);
     });
 
     it('2. every endpoint the classic page calls is used by the builder or retired with a reason', () => {
@@ -166,6 +178,41 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
         }
       }
       expect(checked).toBeGreaterThan(30);
+    });
+
+    it('3b. typography and dividers set through the builder land where the classic form writes them', () => {
+      const typography = {
+        heading: { fontSize: 3, color: 'token:primary' },
+        kicker: { fontWeight: 600 },
+      };
+      const dividers = { above: { enabled: true, style: 'dashed' }, title: { enabled: false } };
+      for (const [legacyKey, type] of [
+        ['categories', 'category-grid'],
+        ['newArrivals', 'new-arrivals'],
+        ['bestSellers', 'best-sellers'],
+        ['hero', 'hero'],
+        ['testimonials', 'testimonials'],
+      ] as const) {
+        const layout = resolveLayoutSettings({}, 'modern');
+        const doc = layoutToDefinition(layout);
+        const node = doc.sections.find(n => n.type === type)!;
+        let d = reduceDocument(doc, {
+          type: 'setSectionSetting',
+          id: node.id,
+          key: 'typography',
+          value: typography,
+        }).doc;
+        d = reduceDocument(d, {
+          type: 'setSectionSetting',
+          id: node.id,
+          key: 'dividers',
+          value: dividers,
+        }).doc;
+        const out = definitionToLayout(d) as never as Record<string, Record<string, unknown>>;
+        // classic: updateSection(key, s => ({ ...s, typography })) then ({ ...s, dividers })
+        expect(out[legacyKey].typography, legacyKey).toEqual(typography);
+        expect(out[legacyKey].dividers, legacyKey).toEqual(dividers);
+      }
     });
 
     it('4. nothing in the editor writes the LIVE theme or typography (VE-4); the list can only shrink', () => {

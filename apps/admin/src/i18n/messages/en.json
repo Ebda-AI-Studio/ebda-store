@@ -10076,6 +10076,11 @@
       "close": "Close",
       "limitReached": "Limit reached ({max})"
     },
+    "ai": {
+      "filled": "Added a kicker and subtitle. You can edit or undo them.",
+      "nothing": "The kicker and subtitle already have text.",
+      "failed": "The AI could not write this just now. Try again in a minute."
+    },
     "canvasOps": {
       "removeTitle": "Remove {name}?",
       "removeBody": "You can bring it back right after with Undo.",
@@ -10115,7 +10120,7 @@
       "english": "English",
       "unsafeUrl": "Use a link that starts with / or https://",
       "default": "Default",
-      "editInClassic": "Edit in the classic page builder",
+      "aiFill": "Write with AI",
       "editInBranding": "Edit the logo in Branding",
       "editAnnouncement": "Edit announcement text",
       "editStoreDescription": "Edit store description",

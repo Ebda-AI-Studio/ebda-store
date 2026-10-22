@@ -37,7 +37,6 @@ vi.mock('next-intl', async () => {
     announcementContentEmpty: "This bar's text lives elsewhere for now.",
     brandStoryContentEmpty: "This section's text and image live elsewhere for now.",
     trustStripContentEmpty: 'Write your own trust items: add them under this section.',
-    editInClassic: 'Edit in the classic page builder',
     editAnnouncement: 'Edit announcement text',
     editStoreDescription: 'Edit store description',
     editTrustStripStyle: 'Edit strip style',

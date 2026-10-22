@@ -82,7 +82,7 @@ describe('editor matrix', () => {
 
   // The method is only trusted if it reproduces cases whose answer is known from the code
   // (plan Task 1 step 5 of the template editor pass).
-  it('hand-verified cases: a wired control, a dead control, a variant with no control', () => {
+  it('hand-verified cases: a wired control, a dead control, a mobile-only legacy name', () => {
     const row = (id: string) => live.rows.find(r => r.id === id);
     // (a) the chips layout of the category row is read by the Qamar skin and changes its HTML
     expect(row('qamar|section:category-grid|layout')).toMatchObject({
@@ -91,7 +91,9 @@ describe('editor matrix', () => {
     });
     // (b) the hero comment says padding does not apply to the hero wrapper: flipping it changes nothing
     expect(row('qamar|section:hero|paddingTop')?.status).toBe('no-op');
-    // (c) a look that uses a design key the editor has no control for is `missing`
-    expect(row('qamar.atelier|section:category-grid|design:layoutMobile')?.status).toBe('missing');
+    // (c) a look's design key the editor has no control for would be `missing`; the mobile-only legacy
+    // names (`layoutMobile`) are viewport overrides, so none is missing today
+    expect(row('qamar.atelier|section:category-grid|design:layoutMobile')).toBeUndefined();
+    expect(live.rows.filter(r => r.status === 'missing').map(r => r.id)).toEqual([]);
   });
 });

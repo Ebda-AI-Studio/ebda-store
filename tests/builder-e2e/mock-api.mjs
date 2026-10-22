@@ -93,6 +93,12 @@ function route(method, path, body) {
     return ok({ categories: [{ id: 'c1', slug: 'dates', name: 'Dates', nameAr: 'تمور' }, { id: 'c2', slug: 'nuts', name: 'Nuts', nameAr: 'مكسرات' }] });
   if (p.startsWith(`/stores/${STORE_ID}/products`))
     return ok({ products: [{ id: 'p1', name: 'Medjool', nameAr: 'مجدول' }, { id: 'p2', name: 'Cashew', nameAr: 'كاجو' }], meta: {} });
+  if (method === 'GET' && p === `/stores/${STORE_ID}/typography`)
+    return ok({ typography: { fonts: [], zones: {} } });
+  if (method === 'POST' && p === `/stores/${STORE_ID}/ai/section-content`)
+    return ok({
+      suggestion: { kicker: 'EXPLORE', kickerAr: 'استكشف', subtitle: 'Top picks', subtitleAr: 'أفضل الاختيارات' },
+    });
   if (p.startsWith('/uploads/list'))
     return ok({ items: [{ key: `stores/${STORE_ID}/builder/a.jpg`, url: 'https://media.ebda.app/stores/e2e/builder/a.jpg', size: 10, lastModified: '2026-10-07T00:00:00.000Z' }], nextCursor: null });
 

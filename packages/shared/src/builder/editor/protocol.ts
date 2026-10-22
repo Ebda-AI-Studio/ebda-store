@@ -32,7 +32,7 @@ const settingKey = z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,40}$/);
 const base = { protocol: z.literal(BUILDER_PROTOCOL) };
 
 /** Toolbar operations the canvas may ask for. `remove` always passes an in-app confirmation first. */
-export const SECTION_OPS = ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove'] as const;
+export const SECTION_OPS = ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove', 'aiFill'] as const;
 export type SectionOp = (typeof SECTION_OPS)[number];
 
 export const parentToChildSchema = z.discriminatedUnion('type', [
