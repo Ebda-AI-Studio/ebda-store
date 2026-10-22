@@ -92,22 +92,26 @@ describe('jasmine demo catalogue: shape', () => {
   });
 });
 
-describe('jasmine demo catalogue: skin-type and concern chips (Ruling B3-5)', () => {
+describe('jasmine demo catalogue: skin-type and concern chips (Rulings B3-5, B3-13)', () => {
+  const NAMES = (JASMINE_TAGS as Array<{ name: string; nameAr: string }>).map(t => t.name);
   it('every product tag is a known tag and every known tag has products (no dead-end chip)', () => {
-    for (const p of PRODUCTS)
-      for (const t of p.tags) expect(JASMINE_TAGS, `${p.slug}: ${t}`).toContain(t);
-    for (const t of JASMINE_TAGS)
+    for (const p of PRODUCTS) for (const t of p.tags) expect(NAMES, `${p.slug}: ${t}`).toContain(t);
+    for (const t of NAMES)
       expect(PRODUCTS.filter(p => p.tags.includes(t)).length, t).toBeGreaterThanOrEqual(2);
   });
-  it('the chips are the six skin types and concerns the research names', () => {
+  it('the chips are the six skin types and concerns the research names, each in BOTH languages', () => {
     expect(JASMINE_TAGS).toEqual([
-      'بشرة دهنية',
-      'بشرة جافة',
-      'بشرة حساسة',
-      'حب الشباب',
-      'تصبغات',
-      'جفاف',
+      { name: 'Oily skin', nameAr: 'بشرة دهنية' },
+      { name: 'Dry skin', nameAr: 'بشرة جافة' },
+      { name: 'Sensitive skin', nameAr: 'بشرة حساسة' },
+      { name: 'Acne', nameAr: 'حب الشباب' },
+      { name: 'Dark spots', nameAr: 'تصبغات' },
+      { name: 'Dryness', nameAr: 'جفاف' },
     ]);
+    for (const t of JASMINE_TAGS as Array<{ name: string; nameAr: string }>) {
+      expect(/[؀-ۿ]/.test(t.name), `${t.name} is the English label`).toBe(false);
+      expect(/[؀-ۿ]/.test(t.nameAr), `${t.nameAr} is Arabic`).toBe(true);
+    }
   });
   it('every tagged product is ACTIVE with a price (a chip never lands on an unbuyable page)', () => {
     for (const p of PRODUCTS.filter(x => x.tags.length)) expect(p.price, p.slug).toBeGreaterThan(0);
@@ -320,7 +324,6 @@ describe('jasmine demo catalogue: images and the home document', () => {
       'product-spotlight',
       'product-carousel',
       'featured-collection',
-      'image-text',
       'product-carousel',
       'testimonials',
       'trust-strip',
@@ -355,13 +358,13 @@ describe('jasmine demo catalogue: images and the home document', () => {
       );
     });
   }
-  it('Clinic shows the real routine; Apothecary and Bloom leave the steps out of the render', () => {
+  it('Clinic and Apothecary show the real routine; Bloom leaves the steps out of the render', () => {
     const steps = (id: string) =>
       applyTemplateFamily(build() as PageDefinition, 'jasmine', getLook(id)!).sections.filter(
         s => s.type === 'steps'
       ).length;
     expect(steps('jasmine.clinic')).toBe(1);
-    expect(steps('jasmine.apothecary')).toBe(0);
+    expect(steps('jasmine.apothecary')).toBe(1);
     expect(steps('jasmine.bloom')).toBe(0);
   });
 });

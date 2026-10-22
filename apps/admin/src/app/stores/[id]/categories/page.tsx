@@ -49,6 +49,7 @@ export default function StoreCategoriesPage() {
   const t = useT('categories.page');
   const tForm = useT('categories.form');
   const tCommon = useT('common');
+  const tTags = useT('tags.page');
 
   const [categories, setCategories] = useState<Category[]>([]);
   // Size-guide picker options for the category form (B0 Task 9).
@@ -420,6 +421,11 @@ export default function StoreCategoriesPage() {
       subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
+          <Link href={`/stores/${storeId}/tags`}>
+            <Button type="button" variant="outline">
+              {tTags('manage')}
+            </Button>
+          </Link>
           <Link href={`/stores/${storeId}`}>
             <Button type="button" variant="outline">
               {t('backToStore')}

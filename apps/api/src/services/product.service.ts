@@ -2165,6 +2165,7 @@ export class ProductService {
       select: {
         id: true,
         name: true,
+        nameAr: true,
         _count: {
           select: {
             products: {
@@ -2179,7 +2180,7 @@ export class ProductService {
       take: 60,
     });
     return rows
-      .map(r => ({ id: r.id, name: r.name, productCount: r._count.products }))
+      .map(r => ({ id: r.id, name: r.name, nameAr: r.nameAr, productCount: r._count.products }))
       .filter(r => r.productCount > 0)
       .sort((a, b) => b.productCount - a.productCount || a.name.localeCompare(b.name))
       .slice(0, 12);

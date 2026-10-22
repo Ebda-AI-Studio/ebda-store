@@ -282,6 +282,8 @@ export interface PublicBundleDetail extends PublicBundle {
 export interface PublicTag {
   id: string;
   name: string;
+  /** Arabic label; the Arabic storefront falls back to `name` without it. */
+  nameAr?: string | null;
   productCount: number;
 }
 
@@ -1349,6 +1351,11 @@ class ApiClient {
     return this.request<{ bundles: PublicBundle[] }>(
       `/stores/public/${encodeURIComponent(storeId)}/bundles`
     );
+  }
+
+  /** GET /public/tags — the store's tags with published products (labels in both languages). */
+  async getPublicTags() {
+    return this.request<{ tags: PublicTag[] }>('/public/tags');
   }
 
   /** GET /stores/public/:storeId/bundle-savings — the bundles that save money on these products.

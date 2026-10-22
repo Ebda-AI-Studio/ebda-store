@@ -17,7 +17,7 @@
       "$comment": "Phase B3 (Ruling B3-8): the Jasmine demo catalogue. Category = a skin-type tag PLP (the chip target); PDP = the Shade x Size lipstick (the checkout-data-flow case: the variant names must reach the cart summary and the receipt); the second cart line is an option-less, in-stock product. `--template jasmine` on the shoot script applies this set.",
       "secondProductPath": "/products/sunscreen-spf50",
       "paths": {
-        "category": "/products?tag=%D8%A8%D8%B4%D8%B1%D8%A9%20%D8%AF%D9%87%D9%86%D9%8A%D8%A9",
+        "category": "/products?tag=Oily%20skin",
         "pdp": "/products/matte-lipstick",
         "pdp-add-missing-option": "/products/matte-lipstick",
         "pdp-added": "/products/matte-lipstick"

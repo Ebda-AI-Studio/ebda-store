@@ -501,10 +501,11 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
         if (spec.tags?.length) {
           await tx.productTag.deleteMany({ where: { productId: product.id } });
           for (const name of p.tags ?? []) {
+            const nameAr = spec.tags.find(x => x.name === name)?.nameAr ?? null;
             const tag = await tx.tag.upsert({
               where: { storeId_name: { storeId, name } },
-              update: {},
-              create: { storeId, name },
+              update: { nameAr },
+              create: { storeId, name, nameAr },
             });
             await tx.productTag.create({ data: { productId: product.id, tagId: tag.id } });
           }

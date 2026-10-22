@@ -1163,6 +1163,9 @@ model Tag {
   id       String       @id @default(uuid())
   storeId  String       @map("store_id")
   name     String
+  /// Arabic label (Phase B3 fix wave 1): `name` is the canonical / English label and the filter key
+  /// (`?tag=<name>`); the Arabic storefront shows `nameAr` and falls back to `name` with a `lang`.
+  nameAr   String?      @map("name_ar")
   products ProductTag[]
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)

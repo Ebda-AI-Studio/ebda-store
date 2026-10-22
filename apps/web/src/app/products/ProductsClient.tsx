@@ -42,6 +42,7 @@ import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 import { roundToMinor } from '@ebda/shared';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { countText, RESULTS } from '../../lib/plural';
+import { tagLabel } from '../../lib/tag-label';
 import { darkLookListingBand } from '../../templates/shared/section-bg';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
@@ -93,6 +94,26 @@ export default function ProductsClient({
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || '');
   // Store tag NAME from `?tag=` (Phase B3, Ruling B3-5): the skin-type / concern chips land here.
   const [tagFilter, setTagFilter] = useState((searchParams.get('tag') || '').slice(0, 120));
+  // The filter key is the tag NAME; the label shown is the shopper's language (Ruling B3-13).
+  const [tagNameAr, setTagNameAr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tagFilter) {
+      setTagNameAr(null);
+      return;
+    }
+    let live = true;
+    api
+      .getPublicTags()
+      .then(res => {
+        if (live) setTagNameAr(res.data?.tags.find(x => x.name === tagFilter)?.nameAr ?? null);
+      })
+      .catch(() => {
+        if (live) setTagNameAr(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [tagFilter]);
   // Honour the `?sort=` URL parameter on initial render so deep links from
   // the homepage carousels ("Newest" → /products?sort=newest, "Best
   // Sellers" → /products?sort=best_seller) actually filter the list.
@@ -229,11 +250,15 @@ export default function ProductsClient({
   const ctxEn =
     categoryFilter === 'best-sellers'
       ? 'Best Sellers'
-      : (activeCategory?.name ?? (tagFilter || 'All Products'));
+      : (activeCategory?.name ??
+        (tagFilter ? tagLabel({ name: tagFilter, nameAr: tagNameAr }, 'en').text : 'All Products'));
   const ctxAr =
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
-      : (pickLocalizedName(activeCategory, true) ?? (tagFilter || translations['All Products']));
+      : (pickLocalizedName(activeCategory, true) ??
+        (tagFilter
+          ? tagLabel({ name: tagFilter, nameAr: tagNameAr }, 'ar').text
+          : translations['All Products']));
   // Subtitle = the category's own description in the shopper's language, or nothing. Never a
   // generated "Browse X" line (quality bar Y-06: empty means absent; Ruling B1-44).
   const subtitle = (
@@ -310,7 +335,6 @@ export default function ProductsClient({
     });
 
     return () => cancelAnimationFrame(rafId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, products, store?.id]);
 
   // Track previous filter values to detect filter changes vs. page changes.
@@ -576,6 +600,14 @@ export default function ProductsClient({
           {/* Header */}
           <div className="mb-8">
             <h1
+              lang={
+                tagFilter && !activeCategory && categoryFilter !== 'best-sellers'
+                  ? tagLabel(
+                      { name: tagFilter, nameAr: tagNameAr },
+                      language === 'ar' ? 'ar' : 'en'
+                    ).lang
+                  : undefined
+              }
               className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
               style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
             >
@@ -598,7 +630,22 @@ export default function ProductsClient({
                   onClick={() => setTagFilter('')}
                   className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-input px-4 text-foreground hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  {t('Clear filter', translations['Clear filter'])} · {tagFilter}
+                  {t('Clear filter', translations['Clear filter'])} ·{' '}
+                  <span
+                    lang={
+                      tagLabel(
+                        { name: tagFilter, nameAr: tagNameAr },
+                        language === 'ar' ? 'ar' : 'en'
+                      ).lang
+                    }
+                  >
+                    {
+                      tagLabel(
+                        { name: tagFilter, nameAr: tagNameAr },
+                        language === 'ar' ? 'ar' : 'en'
+                      ).text
+                    }
+                  </span>
                 </button>
               </div>
             )}

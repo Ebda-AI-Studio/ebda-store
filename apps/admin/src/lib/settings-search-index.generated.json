@@ -60,6 +60,16 @@
     "synAr": "اقسام تصنيفات مجموعات"
   },
   {
+    "id": "page:/tags",
+    "kind": "page",
+    "route": "/tags",
+    "access": "staff",
+    "en": "Tags",
+    "ar": "الوسوم",
+    "synEn": "skin type concern chips labels translate",
+    "synAr": "وسوم نوع البشرة المشكلة ترجمة"
+  },
+  {
     "id": "page:/bulk",
     "kind": "page",
     "route": "/bulk",

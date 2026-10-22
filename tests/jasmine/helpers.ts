@@ -52,7 +52,7 @@ export async function runAxe(page: Page): Promise<AxeViolation[]> {
 }
 
 /** The skin-type tag the chips and the manifest category screen use. */
-export const TAG = 'بشرة دهنية';
+export const TAG = 'Oily skin';
 export const TAG_PATH = `/products?tag=${encodeURIComponent(TAG)}`;
 /** The Shade x Size lipstick: the checkout-data-flow case. */
 export const SHADE_PDP = '/products/matte-lipstick';

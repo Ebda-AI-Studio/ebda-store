@@ -47,8 +47,8 @@ async function mkProduct(
   pid[key] = p.id;
   return p.id;
 }
-async function tag(sid: string, name: string, productKeys: string[]) {
-  const t = await prisma.tag.create({ data: { storeId: sid, name } });
+async function tag(sid: string, name: string, productKeys: string[], nameAr?: string) {
+  const t = await prisma.tag.create({ data: { storeId: sid, name, nameAr } });
   for (const k of productKeys)
     await prisma.productTag.create({ data: { productId: pid[k], tagId: t.id } });
   return t.id;
@@ -75,7 +75,8 @@ describe.skipIf(!hasDb)('tag chips source and ?tag= filter', () => {
     await mkProduct(storeId, 'wholesale', { audience: 'wholesale_only' });
     await mkProduct(otherStoreId, 'f1');
     await tag(storeId, 'بشرة دهنية', ['a1', 'a2', 'a3']);
-    await tag(storeId, 'حب الشباب', ['a1']);
+    await tag(storeId, 'حب الشباب', ['a1'], 'حب الشباب');
+    await tag(storeId, 'Dry skin', ['a2'], 'بشرة جافة'); // bilingual: name is the English label
     await tag(storeId, 'فاضي', []); // no products at all
     await tag(storeId, 'مسودة بس', ['draft', 'gone', 'wholesale']); // only unpublished products
     await tag(otherStoreId, 'تصبغات', ['f1']); // another store's tag
@@ -84,8 +85,9 @@ describe.skipIf(!hasDb)('tag chips source and ?tag= filter', () => {
 
   it('lists only tags with published products, most used first, with the real count', async () => {
     expect(await ProductService.getPublicTags(storeId)).toEqual([
-      expect.objectContaining({ name: 'بشرة دهنية', productCount: 3 }),
-      expect.objectContaining({ name: 'حب الشباب', productCount: 1 }),
+      expect.objectContaining({ name: 'بشرة دهنية', nameAr: null, productCount: 3 }),
+      expect.objectContaining({ name: 'Dry skin', nameAr: 'بشرة جافة', productCount: 1 }),
+      expect.objectContaining({ name: 'حب الشباب', nameAr: 'حب الشباب', productCount: 1 }),
     ]);
   });
 
