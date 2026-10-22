@@ -18,7 +18,8 @@ import { storeLayoutSchema } from './layout-schema';
 import { allSections, sectionToLegacy } from './adapter';
 import { isPlaceholderCopy } from './placeholder-copy';
 import { getSectionDefinition, sectionAllowedOnPage, VIEWPORTS } from './registry';
-import { MAIN_SECTION_TYPE, isSectionPageKind } from './page-kinds';
+import { MAIN_SECTION_TYPE, isSectionPageKind, type SectionPageKind } from './page-kinds';
+import { PAGE_OWNED_SETTING_KEYS } from './page-settings';
 import { getLook } from '../looks/registry';
 import {
   BUILDER_LIMITS,
@@ -304,15 +305,18 @@ function validatePageKind(def: PageDefinition, errors: BuilderIssue[]): void {
           'الإعداد ده بيتعدل من الصفحة الرئيسية.'
         )
       );
-  if (Object.keys(def.siteSettings).length > 0)
-    errors.push(
-      issue(
-        'PAGE_MISMATCH',
-        '/siteSettings',
-        'Page settings are saved with the home document.',
-        'إعدادات الصفحة بتتحفظ مع المستند الرئيسي.'
-      )
-    );
+  // Page settings: only the keys this page owns (Ruling VE-13); the rest are written by their own page.
+  const owned = new Set<string>(PAGE_OWNED_SETTING_KEYS[def.pageKey as SectionPageKind] ?? []);
+  for (const key of Object.keys(def.siteSettings))
+    if (!owned.has(key))
+      errors.push(
+        issue(
+          'PAGE_MISMATCH',
+          `/siteSettings/${key}`,
+          `"${key}" is not a setting of this page.`,
+          'الإعداد ده مش بتاع الصفحة دي.'
+        )
+      );
 }
 
 /** Synchronous checks (no catalogue lookups). */

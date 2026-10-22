@@ -29,6 +29,7 @@ import {
   itemNodes,
   pageSectionsAround,
   usePageDocument,
+  withPageSettings,
 } from '../../../builder/render/PageDocument';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
@@ -302,9 +303,10 @@ export default function ProductDetailClient({
   const { localize, numerals } = useNumerals();
   const formatPrice = useLocalePrice();
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
-  const resolvedLayout = layout ?? ctxLayout ?? undefined;
   // The product page's section document (Ruling VE-3): which sections go around the pinned main block.
   const pageDoc = usePageDocument('product');
+  // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
+  const resolvedLayout = withPageSettings(pageDoc, layout ?? ctxLayout ?? undefined);
   // The API already drops `model3d` when `product_3d` is off; the flag check
   // here is the second gate (a super-admin override takes effect client-side
   // on the next store payload too).
@@ -314,7 +316,7 @@ export default function ProductDetailClient({
   // whose plan lacks `reviews`, or whose merchant switched the section off, shows neither.
   const reviewsOn =
     isEnabled('reviews') &&
-    !!layout?.reviewSection?.enabled &&
+    !!withPageSettings(pageDoc, layout)?.reviewSection?.enabled &&
     !!product &&
     !!store.id &&
     store.id !== 'demo';

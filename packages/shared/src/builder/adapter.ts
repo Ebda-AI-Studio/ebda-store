@@ -42,6 +42,7 @@ import {
   type StoreLayoutSettings,
 } from '../types/store-layout';
 import type { TemplateId } from '../types/store-theme';
+import { ALL_PAGE_OWNED_KEYS } from './page-settings';
 import {
   LEGACY_HOME_SECTION_KEYS,
   resolveLegacySectionOrder,
@@ -336,7 +337,14 @@ export function publishedDocumentAgrees(
 ): boolean {
   const json = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
   const served = resolveLayoutSettings(json(definitionToLayout(def)), templateId, look);
-  return isDeepEqualJson(json(served), json(layout));
+  // The keys a product / collection / cart document owns are written by that page's publish, so the
+  // home document's copy of them may lag the live layout without the home page having drifted.
+  const withoutOwned = (v: unknown): unknown => {
+    const o = { ...(v as Record<string, unknown>) };
+    for (const k of ALL_PAGE_OWNED_KEYS) delete o[k];
+    return o;
+  };
+  return isDeepEqualJson(withoutOwned(json(served)), withoutOwned(json(layout)));
 }
 
 /** Structural equality of two JSON values (object key order ignored). */

@@ -19,6 +19,7 @@ import {
   itemNodes,
   pageSectionsAround,
   usePageDocument,
+  withPageSettings,
 } from '../../builder/render/PageDocument';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
@@ -63,9 +64,11 @@ export default function CartClient() {
     total: cartTotal,
     isReady: cartIsReady,
   } = useCart();
-  const { store, layout } = useStore();
+  const { store, layout: liveLayout } = useStore();
   // The cart page's section document (Ruling VE-3): which sections go around the cart itself.
   const pageDoc = usePageDocument('cart');
+  // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
+  const layout = withPageSettings(pageDoc, liveLayout);
   const storeUrl = useStoreUrl();
   const { isEnabled } = useFeatures();
   // The basis a COUPON is quoted against: loose items only, never the

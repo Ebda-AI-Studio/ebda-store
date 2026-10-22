@@ -316,7 +316,7 @@ function ContentElsewhereNotice({
   );
 }
 
-function Field({
+export function Field({
   def,
   storeId,
   theme,

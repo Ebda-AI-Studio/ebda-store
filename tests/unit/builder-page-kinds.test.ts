@@ -18,6 +18,14 @@ import {
   reduceDocument,
   resolveLayoutSettings,
   validateDefinitionSync,
+  PAGE_SETTINGS,
+  PAGE_OWNED_SETTING_KEYS,
+  ALL_PAGE_OWNED_KEYS,
+  pageSettingFor,
+  pickOwnedSettings,
+  publishedDocumentAgrees,
+  definitionToLayout,
+  storeLayoutSchema,
   type PageDefinition,
 } from '@ebda/shared';
 
@@ -260,5 +268,159 @@ describe('validator enforces the same on every write', () => {
         e => e.code === 'PAGE_MISMATCH' || e.code === 'PINNED'
       )
     ).toEqual([]);
+  });
+});
+
+describe('page-type settings (Ruling VE-13)', () => {
+  it('every setting a page offers is a field the layout schema accepts, and owned keys are never shared', () => {
+    const seen = new Set<string>();
+    for (const [kind, groups] of Object.entries(PAGE_SETTINGS)) {
+      for (const g of groups) {
+        // one writer per key
+        expect(seen.has(g.key), `${g.key} listed twice`).toBe(false);
+        seen.add(g.key);
+        const shape = (storeLayoutSchema.shape as Record<string, { unwrap?: () => unknown }>)[
+          g.key
+        ];
+        expect(shape, `${kind}/${g.key} is not a layout key`).toBeDefined();
+        for (const st of g.settings) expect(st.id.split('.').length).toBeLessThanOrEqual(2);
+      }
+    }
+    // the owned keys are exactly the keys of the three section pages' groups
+    for (const kind of SECTION_PAGE_KINDS)
+      expect(PAGE_SETTINGS[kind].map(g => g.key)).toEqual([...PAGE_OWNED_SETTING_KEYS[kind]]);
+    // a look switch rewrites the card defaults on the home document: nobody else owns them
+    expect(ALL_PAGE_OWNED_KEYS.has('productCardDefaults')).toBe(false);
+    expect(PAGE_SETTINGS.home.some(g => g.key === 'productCardDefaults')).toBe(true);
+  });
+
+  it('every control value the panel can write passes the layout schema (select options, colours, toggles)', () => {
+    for (const groups of Object.values(PAGE_SETTINGS))
+      for (const g of groups)
+        for (const st of g.settings) {
+          const sample =
+            st.type === 'select'
+              ? st.options![0].value
+              : st.type === 'checkbox'
+                ? true
+                : st.type === 'color'
+                  ? '#112233'
+                  : 'text';
+          const [head, ...rest] = st.id.split('.');
+          const value = rest.length ? { [head]: { [rest[0]]: sample } } : { [head]: sample };
+          // `sizing` and `filterSidebar` are all-or-nothing in the layout schema: the editor always has the full object
+          const full =
+            g.key === 'sizing'
+              ? {
+                  heroAspect: '16:9',
+                  productImageAspect: '1:1',
+                  categoryImageAspect: '1:1',
+                  ...value,
+                }
+              : g.key === 'filterSidebar'
+                ? { enabled: true, defaultOpen: true, ...value }
+                : value;
+          const r = storeLayoutSchema.partial().safeParse({ [g.key]: full });
+          expect(r.success, `${g.key}.${st.id} = ${JSON.stringify(sample)}`).toBe(true);
+        }
+  });
+
+  it('setSiteSetting writes, nests one level, clears, prunes empty objects, and refuses a foreign setting', () => {
+    const cart = defaultPageDocument('cart');
+    const a = reduceDocument(cart, {
+      type: 'setSiteSetting',
+      key: 'cartPage',
+      path: 'density',
+      value: 'compact',
+    });
+    expect(a.doc.siteSettings).toEqual({ cartPage: { density: 'compact' } });
+    const b = reduceDocument(a.doc, {
+      type: 'setSiteSetting',
+      key: 'cartPage',
+      path: 'density',
+      value: undefined,
+    });
+    expect(b.doc.siteSettings).toEqual({});
+    // a key another page owns, an unknown path, and the home-only key are refused with the document untouched
+    for (const [key, path] of [
+      ['productDetailPage', 'density'],
+      ['cartPage', 'nonsense'],
+      ['sizing', 'heroAspect'],
+    ] as const) {
+      const r = reduceDocument(cart, { type: 'setSiteSetting', key, path, value: 'x' });
+      expect(r.rejected, `${key}.${path}`).toBe('UNKNOWN_SETTING');
+      expect(r.doc).toBe(cart);
+    }
+    // home: its own keys, one nesting level down for the card badges
+    const home = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const c = reduceDocument(home, {
+      type: 'setSiteSetting',
+      key: 'productCardDefaults',
+      path: 'discountBadge.position',
+      value: 'top-left',
+    });
+    expect(
+      (c.doc.siteSettings.productCardDefaults as Record<string, unknown>).discountBadge
+    ).toEqual({ position: 'top-left' });
+    const d = reduceDocument(c.doc, {
+      type: 'setSiteSetting',
+      key: 'productCardDefaults',
+      path: 'discountBadge.position',
+      value: undefined,
+    });
+    // the emptied badge object is removed; the other card defaults stay
+    expect(
+      'discountBadge' in (d.doc.siteSettings.productCardDefaults as Record<string, unknown>)
+    ).toBe(false);
+    expect(pageSettingFor('about', 'sizing', 'heroAspect')).toBeDefined(); // an unknown page key behaves like home
+  });
+
+  it('the first write to an all-or-nothing key starts from the baseline, so one toggle is a valid object', () => {
+    const collection = defaultPageDocument('collection');
+    const r = reduceDocument(collection, {
+      type: 'setSiteSetting',
+      key: 'filterSidebar',
+      path: 'enabled',
+      value: false,
+    });
+    expect(r.doc.siteSettings.filterSidebar).toEqual({ enabled: false, defaultOpen: true });
+    expect(validateDefinitionSync(r.doc).ok).toBe(true);
+  });
+
+  it('a section document validates with its own keys and refuses the others', () => {
+    const live = {
+      productDetailPage: { density: 'compact' },
+      cartPage: { density: 'wide?' },
+      sizing: {},
+    };
+    expect(pickOwnedSettings('product', live)).toEqual({
+      productDetailPage: { density: 'compact' },
+    });
+    expect(pickOwnedSettings('collection', live)).toEqual({});
+    const product = defaultPageDocument('product', live);
+    expect(product.siteSettings).toEqual({ productDetailPage: { density: 'compact' } });
+    expect(validateDefinitionSync(product).ok).toBe(true);
+    const foreign = { ...product, siteSettings: { cartPage: { density: 'compact' } } };
+    expect(validateDefinitionSync(foreign).errors.map(e => e.code)).toContain('PAGE_MISMATCH');
+    const invalid = { ...product, siteSettings: { productDetailPage: { density: 'huge' } } };
+    expect(validateDefinitionSync(invalid).ok).toBe(false);
+  });
+
+  it("the home document does not look drifted when another page's key changes the live layout", () => {
+    const layout = resolveLayoutSettings({ productDetailPage: { density: 'compact' } }, 'modern');
+    const home = layoutToDefinition(layout);
+    expect(publishedDocumentAgrees(home, layout, 'modern')).toBe(true);
+    const later = resolveLayoutSettings(
+      { productDetailPage: { density: 'spacious' }, cartPage: { textScale: 'lg' } },
+      'modern'
+    );
+    expect(publishedDocumentAgrees(home, later, 'modern')).toBe(true);
+    // a home-owned key still counts as drift
+    const drifted = resolveLayoutSettings(
+      { sizing: { heroAspect: '4:3', productImageAspect: '1:1', categoryImageAspect: '1:1' } },
+      'modern'
+    );
+    expect(publishedDocumentAgrees(home, drifted, 'modern')).toBe(false);
+    void definitionToLayout;
   });
 });

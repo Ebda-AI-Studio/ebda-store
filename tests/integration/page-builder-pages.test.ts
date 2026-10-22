@@ -220,3 +220,145 @@ describe('section page documents: default -> draft -> publish -> rollback', { re
     ).rejects.toBeDefined();
   });
 });
+
+describe(
+  'page-type settings (Ruling VE-13): each page writes only the layout keys it owns',
+  { retry: 0 },
+  () => {
+    let storeId = '';
+    const layoutNow = async () => (await layoutOf(storeId)) as Record<string, any>;
+    beforeAll(async () => {
+      storeId = await freshStore('settings');
+      await owner.store.update({
+        where: { id: storeId },
+        data: {
+          layoutSettings: {
+            productDetailPage: { density: 'spacious', bgColor: '#101010' },
+            cartPage: { textScale: 'lg' },
+            sizing: { heroAspect: '16:9', productImageAspect: '1:1', categoryImageAspect: '1:1' },
+          },
+        },
+      });
+    });
+
+    it('a page opens on the live values of its own keys, not on a stored copy', async () => {
+      const st = await inStore(storeId, () => getPageState(storeId, 'product'));
+      expect(st!.definition.siteSettings).toEqual({
+        productDetailPage: { density: 'spacious', bgColor: '#101010' },
+      });
+      const cart = await inStore(storeId, () => getPageState(storeId, 'cart'));
+      expect(cart!.definition.siteSettings).toEqual({ cartPage: { textScale: 'lg' } });
+    });
+
+    it('publishing the product page writes productDetailPage and nothing else in layout_settings', async () => {
+      const st = await inStore(storeId, () => getPageState(storeId, 'product'));
+      const doc = reduceDocument(st!.definition, {
+        type: 'setSiteSetting',
+        key: 'productDetailPage',
+        path: 'density',
+        value: 'compact',
+      });
+      expect(doc.rejected).toBeUndefined();
+      const saved = await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: 'product', baseRev: 0, definition: doc.doc, userId: null })
+      );
+      expect(saved).toMatchObject({ ok: true });
+      // a draft is not live
+      expect((await layoutNow()).productDetailPage.density).toBe('spacious');
+      await inStore(storeId, () => publishDraft({ storeId, pageKey: 'product', baseRev: 1 }));
+      const after = await layoutNow();
+      expect(after.productDetailPage).toEqual({ density: 'compact', bgColor: '#101010' });
+      expect(after.cartPage).toEqual({ textScale: 'lg' });
+      expect(after.sizing.heroAspect).toBe('16:9');
+    });
+
+    it('clearing the last value removes the key; a reorder alone writes no layout key', async () => {
+      let st = await inStore(storeId, () => getPageState(storeId, 'cart'));
+      const cleared = reduceDocument(st!.definition, {
+        type: 'setSiteSetting',
+        key: 'cartPage',
+        path: 'textScale',
+        value: undefined,
+      }).doc;
+      expect(cleared.siteSettings).toEqual({});
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: 'cart', baseRev: 0, definition: cleared, userId: null })
+      );
+      await inStore(storeId, () => publishDraft({ storeId, pageKey: 'cart', baseRev: 1 }));
+      expect('cartPage' in (await layoutNow())).toBe(false);
+      st = await inStore(storeId, () => getPageState(storeId, 'cart'));
+      const reordered = reduceDocument(st!.definition, {
+        type: 'moveSection',
+        id: 'cart-recommendations',
+        toIndex: 0,
+      }).doc;
+      const before = await layoutNow();
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: 'cart', baseRev: 1, definition: reordered, userId: null })
+      );
+      await inStore(storeId, () => publishDraft({ storeId, pageKey: 'cart', baseRev: 2 }));
+      expect(await layoutNow()).toEqual(before);
+    });
+
+    it('a cart document cannot write the home or product keys (422), and writes nothing', async () => {
+      const st = await inStore(storeId, () => getPageState(storeId, 'cart'));
+      for (const foreign of [
+        { sizing: { heroAspect: '4:3' } },
+        { productDetailPage: { density: 'compact' } },
+      ]) {
+        const r = await inStore(storeId, () =>
+          saveDraft({
+            storeId,
+            pageKey: 'cart',
+            baseRev: st!.rev,
+            definition: { ...st!.definition, siteSettings: foreign },
+            userId: null,
+          })
+        );
+        expect(r, JSON.stringify(foreign)).toMatchObject({ ok: false, status: 422 });
+      }
+      // a value the layout schema refuses is refused too
+      const bad = await inStore(storeId, () =>
+        saveDraft({
+          storeId,
+          pageKey: 'cart',
+          baseRev: st!.rev,
+          definition: { ...st!.definition, siteSettings: { cartPage: { density: 'huge' } } },
+          userId: null,
+        })
+      );
+      expect(bad).toMatchObject({ ok: false, status: 422 });
+    });
+
+    it("publishing HOME keeps the live value of the other pages' keys, even when its own copy is stale", async () => {
+      const st = await inStore(storeId, () => getPageState(storeId, 'home'));
+      // the editor shows the live value, not a stale copy
+      expect(st!.definition.siteSettings.productDetailPage).toEqual({
+        density: 'compact',
+        bgColor: '#101010',
+      });
+      const stale = {
+        ...st!.definition,
+        siteSettings: {
+          ...st!.definition.siteSettings,
+          productDetailPage: { density: 'spacious' },
+          cartPage: { textScale: 'xl' },
+          sizing: { heroAspect: '4:3', productImageAspect: '1:1', categoryImageAspect: '1:1' },
+        },
+      };
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: 'home', baseRev: st!.rev, definition: stale, userId: null })
+      );
+      const pub = await inStore(storeId, () =>
+        publishDraft({ storeId, pageKey: 'home', baseRev: st!.rev + 1 })
+      );
+      expect(pub).toMatchObject({ ok: true });
+      const after = await layoutNow();
+      // other pages' keys: live wins
+      expect(after.productDetailPage).toEqual({ density: 'compact', bgColor: '#101010' });
+      expect('cartPage' in after).toBe(false);
+      // the home-owned key took the home document's value
+      expect(after.sizing.heroAspect).toBe('4:3');
+    });
+  }
+);

@@ -761,3 +761,81 @@ test('switching page saves the unsaved edit first, and the URL carries the page'
   await expect.poll(async () => (await state(page, 'product')).saves).toBe(1);
   expect((await state(page, 'product')).draft!.definition.sections[4].id).toBe('product-related');
 });
+
+// ---- Page-type settings (Task 8e, Ruling VE-13) ----
+
+test("page settings: nothing selected shows the page's own settings; a change is a draft edit of that page only", async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openPage(page, 'product');
+  // the panel needs the end pane on a phone
+  if (narrow(page))
+    await page
+      .getByRole('button', { name: L('الإعدادات', 'Settings') })
+      .first()
+      .click();
+  await expect(page.getByTestId('page-settings-panel')).toBeVisible();
+  const group = page.getByTestId('page-settings-productDetailPage');
+  await group.locator('#setting-density').selectOption('compact');
+  await waitSaved(page);
+  const draft = (await state(page, 'product')).draft!;
+  expect((draft.definition as any).siteSettings.productDetailPage).toEqual({ density: 'compact' });
+  // the canvas received the draft with the setting (it repaints from it)
+  await expect
+    .poll(async () =>
+      canvas(page)
+        .locator('body')
+        .evaluate(() => (window as any).__doc?.siteSettings?.productDetailPage?.density)
+    )
+    .toBe('compact');
+  // the home document was not touched
+  expect((await state(page, 'home')).saves).toBe(0);
+  // selecting a section swaps the panel for the section's settings; "Page settings" brings it back
+  await structure(page);
+  await page.getByTestId('tree-select-product-faq').click();
+  await settings(page);
+  await structure(page);
+  await page.getByTestId('open-page-settings').click();
+  await expect(page.getByTestId('page-settings-panel')).toBeVisible();
+});
+
+test('page settings: filters on the collection page start from the baseline, cart has cart and checkout, home has cards and image shapes', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await openPage(page, 'collection');
+  if (narrow(page))
+    await page
+      .getByRole('button', { name: L('الإعدادات', 'Settings') })
+      .first()
+      .click();
+  const filters = page.getByTestId('page-settings-filterSidebar');
+  await filters.locator('summary').click();
+  await filters.getByRole('switch').first().click();
+  await waitSaved(page);
+  expect(
+    ((await state(page, 'collection')).draft!.definition as any).siteSettings.filterSidebar
+  ).toEqual({ enabled: false, defaultOpen: true });
+
+  await openPage(page, 'cart');
+  if (narrow(page))
+    await page
+      .getByRole('button', { name: L('الإعدادات', 'Settings') })
+      .first()
+      .click();
+  await expect(page.getByTestId('page-settings-cartPage')).toBeVisible();
+  await expect(page.getByTestId('page-settings-checkoutPage')).toBeVisible();
+  // the cards belong to the home page: this page points there
+  await page.getByTestId('page-settings-to-home').click();
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(page.getByTestId('builder')).toBeVisible();
+  if (narrow(page))
+    await page
+      .getByRole('button', { name: L('الإعدادات', 'Settings') })
+      .first()
+      .click();
+  await expect(page.getByTestId('page-settings-productCardDefaults')).toBeVisible();
+  await expect(page.getByTestId('page-settings-sizing')).toBeVisible();
+  await expect(page.getByTestId('page-settings-bottomBar')).toBeVisible();
+});

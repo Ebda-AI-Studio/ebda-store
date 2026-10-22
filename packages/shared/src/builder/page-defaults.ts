@@ -10,6 +10,7 @@
 import { sectionFromPreset } from './adapter';
 import { PAGE_DEFINITION_SCHEMA_VERSION, type PageDefinition } from './schema';
 import { MAIN_SECTION_TYPE, type SectionPageKind } from './page-kinds';
+import { pickOwnedSettings } from './page-settings';
 
 /** Section types in storefront order, per kind. The pinned main comes first or in its real place. */
 export const DEFAULT_PAGE_SECTIONS: Record<SectionPageKind, readonly string[]> = {
@@ -27,13 +28,20 @@ export const DEFAULT_PAGE_SECTIONS: Record<SectionPageKind, readonly string[]> =
   cart: ['cart-main', 'cart-recommendations'],
 };
 
-export function defaultPageDocument(kind: SectionPageKind): PageDefinition {
+/**
+ * `liveLayout` (the store's raw `layout_settings`) seeds the page's own settings, so the editor opens on
+ * what the storefront shows; without it the document carries none and the page uses its defaults.
+ */
+export function defaultPageDocument(
+  kind: SectionPageKind,
+  liveLayout?: Record<string, unknown> | null
+): PageDefinition {
   return {
     schemaVersion: PAGE_DEFINITION_SCHEMA_VERSION,
     pageKey: kind,
     sectionGroups: { header: [], footer: [] },
     sections: DEFAULT_PAGE_SECTIONS[kind].map(type => sectionFromPreset(type, 0, type)),
-    siteSettings: {},
+    siteSettings: liveLayout ? pickOwnedSettings(kind, liveLayout) : {},
   };
 }
 

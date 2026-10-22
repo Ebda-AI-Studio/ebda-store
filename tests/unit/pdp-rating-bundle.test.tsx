@@ -206,7 +206,7 @@ describe('PDP markup is unchanged when neither line applies', () => {
       'utf8'
     );
     expect(pdp).toMatch(
-      /const reviewsOn =\s*isEnabled\('reviews'\) &&\s*!!layout\?\.reviewSection\?\.enabled/
+      /const reviewsOn =\s*isEnabled\('reviews'\) &&\s*!!withPageSettings\(pageDoc, layout\)\?\.reviewSection\?\.enabled/
     );
     // ONE reviews slot of the page document, rendered by every skin (Ruling VE-12)
     expect(pdp.match(/reviewsOn && product \? \(/g)?.length).toBe(1);

@@ -10066,7 +10066,8 @@
       "notFound": "That item no longer exists.",
       "unknown": "Unknown section type.",
       "pinned": "This is the core of the page. You can move it, but not delete or hide it.",
-      "page": "This section does not belong on this page."
+      "page": "This section does not belong on this page.",
+      "setting": "This page does not have that setting."
     },
     "families": {
       "label": "Templates",
@@ -10248,6 +10249,13 @@
       "previewProduct": "Preview with product",
       "noProducts": "Add a product to preview this page",
       "saveFirst": "Fix the errors on this page before switching."
+    },
+    "pageSettings": {
+      "title": "{page} page settings",
+      "hint": "Settings for the whole page. Select a section on the page to edit that section instead.",
+      "cardsOnHome": "Product card style, image shapes and the phone bottom bar are set on the Home page.",
+      "openHome": "Open Home",
+      "open": "Page settings"
     }
   },
   "instapayReceipt": {

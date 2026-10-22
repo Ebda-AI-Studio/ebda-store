@@ -9,6 +9,7 @@
  * document the API will 422.
  */
 import { sectionFromPreset } from '../adapter';
+import { GROUP_FLOORS, pageSettingFor } from '../page-settings';
 import { getSectionDefinition, sectionAllowedOnPage } from '../registry';
 import type { BlockNode, PageDefinition, SectionGroupKey, SectionNode } from '../schema';
 import type { Viewport } from '../viewports';
@@ -36,7 +37,9 @@ export type DocumentAction =
   | { type: 'duplicateBlock'; sectionId: string; blockId: string }
   | { type: 'moveBlock'; sectionId: string; blockId: string; toIndex: number }
   | { type: 'setBlockHidden'; sectionId: string; blockId: string; hidden: boolean }
-  | { type: 'setBlockSetting'; sectionId: string; blockId: string; key: string; value: unknown };
+  | { type: 'setBlockSetting'; sectionId: string; blockId: string; key: string; value: unknown }
+  /** A page-type setting (`siteSettings.<key>.<path>`, one nesting level); `value: undefined` clears it. */
+  | { type: 'setSiteSetting'; key: string; path: string; value: unknown };
 
 export interface ReduceResult {
   doc: PageDefinition;
@@ -50,7 +53,9 @@ export interface ReduceResult {
     /** The page's main content cannot be removed, hidden or duplicated (it can be moved). */
     | 'PINNED'
     /** The section type does not belong on this page (a hero on the cart page). */
-    | 'PAGE_MISMATCH';
+    | 'PAGE_MISMATCH'
+    /** A page setting this page does not have (a cart setting asked of the product page). */
+    | 'UNKNOWN_SETTING';
   /** Id of the section/block the action created, for selection. */
   createdId?: string;
 }
@@ -215,6 +220,30 @@ export function reduceDocument(doc: PageDefinition, action: DocumentAction): Red
       if (action.hidden && at && getSectionDefinition(at.node.type)?.pinned)
         return { doc, rejected: 'PINNED' };
       return updateSection(doc, action.id, n => ({ ...n, hidden: action.hidden }));
+    }
+    case 'setSiteSetting': {
+      if (!pageSettingFor(doc.pageKey, action.key, action.path))
+        return { doc, rejected: 'UNKNOWN_SETTING' };
+      const [head, ...rest] = action.path.split('.');
+      const group = {
+        ...(GROUP_FLOORS[action.key] ?? {}),
+        ...((doc.siteSettings[action.key] as Record<string, unknown> | undefined) ?? {}),
+      };
+      if (rest.length === 0) {
+        if (action.value === undefined) delete group[head];
+        else group[head] = action.value;
+      } else {
+        // one level down (`discountBadge.position`); an emptied object is removed
+        const inner = { ...((group[head] as Record<string, unknown> | undefined) ?? {}) };
+        if (action.value === undefined) delete inner[rest[0]];
+        else inner[rest[0]] = action.value;
+        if (Object.keys(inner).length === 0) delete group[head];
+        else group[head] = inner;
+      }
+      const siteSettings = { ...doc.siteSettings };
+      if (Object.keys(group).length === 0) delete siteSettings[action.key];
+      else siteSettings[action.key] = group;
+      return { doc: { ...doc, siteSettings } };
     }
     case 'setSectionSetting':
       return updateSection(doc, action.id, n => ({

@@ -63,6 +63,7 @@ import { AddSectionDialog } from './AddSectionDialog';
 import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 import { RevisionsPanel } from './RevisionsPanel';
 import { PageSwitcher, type PreviewProduct } from './PageSwitcher';
+import { PageSettingsPanel } from './PageSettingsPanel';
 
 interface StoreInfo {
   id: string;
@@ -199,6 +200,7 @@ export function BuilderEditor({
     UNKNOWN_TYPE: t('rejected.unknown'),
     PINNED: t('rejected.pinned'),
     PAGE_MISMATCH: t('rejected.page'),
+    UNKNOWN_SETTING: t('rejected.setting'),
   };
   const dispatch = useCallback(
     (action: DocumentAction, coalesceKey?: string) => {
@@ -418,6 +420,20 @@ export function BuilderEditor({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'sections' && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelection(null);
+              setDrawer(d => (d === 'start' ? 'end' : d));
+            }}
+            aria-current={!selection ? 'true' : undefined}
+            className={`mx-2 mt-2 block w-[calc(100%-1rem)] rounded-lg border border-border px-2 py-1.5 text-start text-xs font-medium hover:bg-muted ${!selection ? 'bg-primary/15 ring-1 ring-primary' : ''}`}
+            data-testid="open-page-settings"
+          >
+            {t('pageSettings.open')}
+          </button>
+        )}
+        {tab === 'sections' && (
           <SectionTree
             doc={b.doc}
             selection={selection}
@@ -498,7 +514,17 @@ export function BuilderEditor({
     </div>
   );
 
-  const endPane = (
+  // Nothing selected: the page's own settings (background, spacing, filters, image shapes...).
+  const endPane = !selection ? (
+    <PageSettingsPanel
+      storeId={storeId}
+      pageKey={pageKey}
+      doc={b.doc}
+      theme={effectiveTheme(store.theme, b.doc.theme)}
+      dispatch={dispatch}
+      onSwitchPage={next => void switchPage(next)}
+    />
+  ) : (
     <SettingsPanel
       storeId={storeId}
       doc={b.doc}

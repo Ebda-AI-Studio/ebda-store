@@ -26,6 +26,7 @@ import {
   itemNodes,
   pageSectionsAround,
   usePageDocument,
+  withPageSettings,
 } from '../../builder/render/PageDocument';
 import { toggleCompare } from '@/lib/compare';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
@@ -92,8 +93,8 @@ export default function ProductsClient({
   initialProducts = [],
   initialMeta = null,
   productCardDefaults,
-  filterSidebar,
-  productsPage,
+  filterSidebar: liveFilterSidebar,
+  productsPage: liveProductsPage,
 }: ProductsClientProps) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
@@ -200,6 +201,11 @@ export default function ProductsClient({
   const { templateId } = useTemplateComponents();
   // The collection page's section document (Ruling VE-3): which sections go around the listing.
   const pageDoc = usePageDocument('collection');
+  // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
+  const { filterSidebar, productsPage } = withPageSettings(pageDoc, {
+    filterSidebar: liveFilterSidebar,
+    productsPage: liveProductsPage,
+  });
   // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
   const sortOptions = getSortOptions(t, meta?.ranked === true);
 

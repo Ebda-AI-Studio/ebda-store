@@ -19,6 +19,7 @@ import {
   defaultPageDocument,
   getSectionDefinition,
   MAIN_SECTION_TYPE,
+  PAGE_OWNED_SETTING_KEYS,
   sectionToLegacy,
   type PageDefinition,
   type SectionNode,
@@ -79,6 +80,24 @@ export function usePageDocument(kind: SectionPageKind): PageDocumentValue {
     [kind]
   );
   return ctx && ctx.kind === kind ? ctx : fallback;
+}
+
+/**
+ * The page's own settings (`siteSettings`, Task 8e) over a layout. In the editor canvas they come from the
+ * draft document so a change shows at once; a public render reads the live layout it was given.
+ */
+export function withPageSettings<L extends object | null | undefined>(
+  page: PageDocumentValue,
+  layout: L
+): L {
+  if (!page.editorMode) return layout;
+  const next = { ...(layout ?? {}) } as Record<string, unknown>;
+  for (const k of PAGE_OWNED_SETTING_KEYS[page.kind]) {
+    const v = page.definition.siteSettings[k];
+    if (v === undefined) delete next[k];
+    else next[k] = v;
+  }
+  return next as L;
 }
 
 /** Marks the pinned main block for the editor; transparent everywhere else. */

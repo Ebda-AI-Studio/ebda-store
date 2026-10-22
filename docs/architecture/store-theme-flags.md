@@ -211,3 +211,7 @@ without a snapshot leaves the live values alone. `getPageState` never re-opens a
 The canvas paints the draft: `HomePageBody` (first paint) and `BuilderPreviewShell` (live) apply the patch over the
 live typography through `emitZoneCss`. The theme has no `dividers` control (Ruling VE-9): there has been no editor for
 it since per-section dividers replaced it; a stored `theme.dividers` is still honoured by the storefront.
+
+## Page-type settings in the visual editor (Task 8e)
+
+The layout keys `sizing`, `bottomBar`, `locationsPage`, `productCardDefaults` (home document) and `productDetailPage`, `reviewSection`, `productsPage`, `filterSidebar`, `categoriesPage`, `cartPage`, `checkoutPage` (product / collection / cart documents) are edited in the visual editor's page-settings panel, one writer per key (Ruling VE-13). `filterSidebar.bgColor` / `textColor` are part of the layout schema since VE-14.
