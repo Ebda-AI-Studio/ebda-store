@@ -32,7 +32,8 @@ export type TemplateId =
   | 'dahab'
   | 'qamar'
   | 'souq'
-  | 'jasmine';
+  | 'jasmine'
+  | 'lamma';
 
 /**
  * Font family options for store themes
@@ -733,6 +734,24 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
     warningColor: '320 62% 40%',
     warningForeground: '0 0% 100%',
   },
+  // Lamma (home food and home kitchens, Phase B4): a neutral base; every Lamma store has a look
+  // and the look's tokens own colour, type, radius, density, image ratio and motion. No orange
+  // anywhere in the family (Ruling B4-2); dividers off like Souq. Warning is plum, not the
+  // platform amber, for the same reason as Souq (it reaches the cart / checkout notices).
+  lamma: {
+    primaryColor: '352 55% 41%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '342 24% 13%',
+    fontFamily: 'default',
+    borderRadius: 'md',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+    warningColor: '320 62% 40%',
+    warningForeground: '0 0% 100%',
+  },
   dahab: {
     primaryColor: '39 49% 58%', // gold #C9A35E
     primaryForeground: '222 29% 8%', // night
@@ -863,6 +882,16 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/looks/jasmine.apothecary.webp',
     tags: ['beauty', 'skincare', 'cosmetics'],
     bestFor: 'Beauty, skincare and cosmetics',
+  },
+  {
+    id: 'lamma',
+    name: 'Lamma',
+    nameAr: 'لمّة',
+    description: 'Home food and groceries: Family table, Kitchen notebook and Fresh market looks',
+    descriptionAr: 'أكل بيتي وبقالة: سفرة العيلة وكشكول المطبخ وسوق طازة',
+    thumbnail: '/looks/lamma.table.webp',
+    tags: ['food', 'homemade', 'grocery'],
+    bestFor: 'Home kitchens, bakeries and grocery',
   },
 ];
 

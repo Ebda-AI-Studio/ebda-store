@@ -1976,6 +1976,7 @@
         "sourceNewest": "الأحدث (كوصل حديثاً)",
         "sourceBestSellers": "الأكثر مبيعاً",
         "sourceOnSale": "المنتجات المخفّضة",
+        "sourceReorder": "اطلب تاني (آخر منتجات الزبون)",
         "sourceFeatured": "مميز",
         "sourceCategory": "فئة",
         "sourceManual": "قائمة منتجات يدوية",
@@ -5428,7 +5429,8 @@
         "dahab": "دهب",
         "qamar": "قمر",
         "souq": "سوق",
-        "jasmine": "ياسمين"
+        "jasmine": "ياسمين",
+        "lamma": "لمّة"
       }
     }
   },
@@ -8497,7 +8499,11 @@
       "deliveryOffDay3": "الأربعاء",
       "deliveryOffDay4": "الخميس",
       "deliveryOffDay5": "الجمعة",
-      "deliveryOffDay6": "السبت"
+      "deliveryOffDay6": "السبت",
+      "daysAheadTitle": "يوم التوصيل",
+      "daysAheadHint": "خلّي العميل يختار يوم التوصيل بدل النهاردة أو بكرة بس. اليوم، والموعد لو بتستخدم المواعيد، بيتراجعوا تاني وقت تأكيد الطلب.",
+      "daysAheadLabel": "عدد الأيام المعروضة",
+      "daysAheadOff": "مقفول (النهاردة أو بكرة بس)"
     }
   },
   "customerGroups": {

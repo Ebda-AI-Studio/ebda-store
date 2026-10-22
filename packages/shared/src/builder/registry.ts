@@ -32,6 +32,7 @@ import {
   shopTheLookBlockSchema,
   stepsSchema,
   stepsBlockSchema,
+  makerProfileSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -323,6 +324,16 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           responsive: ['mobile'],
         }
       ),
+      s.select(
+        'tint',
+        'Tile colours',
+        'ألوان المربعات',
+        [opt('none', 'Plain', 'سادة'), opt('aisles', 'Aisle colours', 'ألوان الممرات')],
+        {
+          hintEn: 'Square tiles take the look’s aisle colours as soft tints. Names always show.',
+          hintAr: 'مربعات الأقسام بتاخد ألوان الممرات كدرجات فاتحة، والاسم بيظهر دايمًا.',
+        }
+      ),
       s.select('desktopColumns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
         opt(2, '2', '2'),
         opt(3, '3', '3'),
@@ -471,6 +482,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
           opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
+          opt(
+            'reorder',
+            'Order again (the customer’s last products)',
+            'اطلب تاني (آخر منتجات الزبون)'
+          ),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -638,6 +654,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('featured', 'Featured', 'المميزة'),
           opt('category', 'From a category', 'من فئة'),
           opt('on_sale', 'On sale', 'المنتجات المخفّضة'),
+          opt(
+            'reorder',
+            'Order again (the customer’s last products)',
+            'اطلب تاني (آخر منتجات الزبون)'
+          ),
           opt('manual', 'Hand-picked', 'مختارة يدوياً'),
         ],
         { group: 'content' }
@@ -657,7 +678,21 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         group: 'content',
         max: 24,
       },
-      s.range('limit', 'Products to show', 'عدد المنتجات', 2, 12),
+      s.range('limit', 'Products to show', 'عدد المنتجات', 2, 24),
+      s.select(
+        'layout',
+        'Layout',
+        'التخطيط',
+        [opt('grid', 'Grid', 'شبكة'), opt('menu', 'Menu by category', 'قائمة بالأقسام')],
+        {
+          hintEn: 'A menu lists dishes in rows, grouped by category, with category tabs.',
+          hintAr: 'القائمة بتعرض الأطباق في صفوف حسب القسم، ومعاها تابات للأقسام.',
+        }
+      ),
+      s.select('tabs', 'Category tabs (menu)', 'تابات الأقسام (القائمة)', [
+        opt('categories', 'Show', 'إظهار'),
+        opt('none', 'Hide', 'إخفاء'),
+      ]),
       s.select('columns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
         opt(2, '2', '2'),
         opt(3, '3', '3'),
@@ -904,6 +939,45 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.text('heading', 'Heading', 'العنوان', { localized: true }),
       s.text('subheading', 'Subheading', 'عنوان فرعي', { localized: true }),
       s.text('buttonText', 'Add-all button text', 'نص زر إضافة الكل', { localized: true }),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'maker-profile',
+    labelEn: 'Maker profile',
+    // Neutral noun phrase, never a gendered imperative.
+    labelAr: 'ملف الطباخة',
+    legacyKey: null,
+    rendererKey: 'section.makerProfile',
+    group: 'template',
+    propsSchema: makerProfileSchema,
+    maxCount: 2,
+    presets: [
+      {
+        nameEn: 'Strip',
+        nameAr: 'شريط',
+        settings: { variant: 'strip' },
+      },
+      {
+        nameEn: 'Lead with the cook',
+        nameAr: 'الطباخة في الأول',
+        settings: { variant: 'lead' },
+      },
+    ],
+    settings: [
+      s.select('variant', 'Layout', 'التخطيط', [
+        opt('strip', 'Strip: avatar, name and a line', 'شريط: صورة واسم وسطر'),
+        opt('lead', 'Lead: large photo and story', 'الأول: صورة كبيرة وحكاية'),
+      ]),
+      s.image('image', 'Photo', 'الصورة', { localized: true }),
+      s.text('alt', 'Photo description', 'وصف الصورة', { localized: true }),
+      s.text('name', 'Name', 'الاسم', { localized: true }),
+      s.text('role', 'One line about you', 'سطر عنك', { localized: true }),
+      s.textarea('story', 'Your story', 'حكايتك', { localized: true }),
+      s.text('hygiene', 'Kitchen and hygiene line', 'سطر المطبخ والنظافة', { localized: true }),
+      s.range('years', 'Years cooking', 'سنين الطبخ', 0, 80),
+      s.url('storyLink', 'Story page link', 'رابط صفحة الحكاية'),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],

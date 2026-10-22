@@ -579,6 +579,10 @@ export const SETTINGS: SettingEntry[] = [
     en: 'delivery time slots morning evening window picker',
     ar: 'مواعيد التوصيل فترات صباحا مساء',
   }),
+  setting('delivery.days-ahead', '/delivery', 'checkoutDelivery.page.daysAheadTitle', 'owner', {
+    en: 'delivery date picker days ahead choose a day schedule delivery calendar',
+    ar: 'يوم التوصيل اختيار اليوم جدولة التوصيل تقويم',
+  }),
   setting(
     'delivery.min-order',
     '/delivery',
@@ -835,7 +839,7 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
  */
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/branding': 43,
-  '/delivery': 13,
+  '/delivery': 14,
   '/shipping': 20,
   '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
   '/tax': 13,

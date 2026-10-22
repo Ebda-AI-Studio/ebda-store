@@ -210,6 +210,8 @@ const layoutSchemaInternal = z
       layoutMobile: z.enum(['grid', 'horizontal', 'chips', 'rail', 'tiles']).optional(),
       // Phase B3 (Ruling B3-5): list the store's tags (skin-type / concern chips) instead of categories.
       source: z.enum(['categories', 'tags']).optional(),
+      // Phase B4 (Ruling B4-2): `aisles` paints square tiles in the look's aisle tints (names always show).
+      tint: z.enum(['none', 'aisles']).optional(),
       captionPosition: z.enum(['below', 'overlay']),
       captionPositionMobile: z.enum(['below', 'overlay']).optional(),
       desktopColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]),
@@ -513,6 +515,7 @@ const layoutSchemaInternal = z
               'on_sale',
               'category',
               'manual',
+              'reorder',
             ]),
             categorySlug: z.string().max(120).optional(),
             categoryFetchLimit: z.number().int().min(1).max(200).optional(),

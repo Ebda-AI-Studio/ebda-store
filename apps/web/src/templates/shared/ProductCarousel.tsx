@@ -893,6 +893,7 @@ function SharedProductCarousel({
                           !showQuickAdd &&
                           onAddToCart && (
                             <AdaptiveAddButton
+                              stepperProductId={product.id}
                               onClick={() => onAddToCart(product.id)}
                               className={cn(
                                 `block w-full text-center cursor-pointer ${ctaCls}`,

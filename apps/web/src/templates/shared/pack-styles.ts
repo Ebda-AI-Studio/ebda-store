@@ -324,6 +324,31 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'rounded-[var(--radius)] border border-border bg-card p-5',
     testimonialAuthor: 'text-sm font-medium text-muted-foreground',
   },
+  lamma: {
+    // Phase B4 (Ruling B4-1): a home-kitchen card in the look's own radius (Family table 8,
+    // Notebook 4, Market 16 via var(--radius)). Photo-led; one always-visible >= 44px add control
+    // (the card CTA turns into the stepper in place, Ruling B4-4); two fact chips come from the
+    // shared card. Token colours only, so the orange gate stays true.
+    card: 'h-full rounded-[var(--radius)] border border-border bg-card',
+    categoryFrame: 'rounded-[var(--radius)] bg-muted',
+    categoryCaption: 'text-sm font-semibold text-foreground',
+    productCardName: 'line-clamp-2 font-semibold text-foreground leading-snug [hyphens:none]',
+    productCardPrice: 'font-bold text-foreground',
+    productCardBody: 'text-start',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    sectionHeading:
+      'font-display text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-[1.25] text-balance',
+    sectionSeeAll:
+      'text-sm font-medium text-foreground underline decoration-primary underline-offset-4 hover:decoration-2',
+    sectionHeadingAlign: 'start',
+    heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/0 to-foreground/35',
+    heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
+    heroCta:
+      'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-semibold text-foreground hover:bg-background/90 min-h-[44px]',
+    testimonialCard: 'rounded-[var(--radius)] border border-border bg-card p-5',
+    testimonialAuthor: 'text-sm font-medium text-muted-foreground',
+  },
 };
 
 /** The qamar hero scrim, as painted by `PACK_STYLES.qamar.heroOverlay` (centre = under the text). */

@@ -170,6 +170,12 @@ export interface CheckoutDeliverySettings {
     enabled: boolean;
     items: CheckoutDeliveryWindow[];
   };
+  /**
+   * Phase B4 (Ruling B4-7): integer 1-14 turns the picker into date chips for the next N delivery
+   * days (`deliveryDateChoices`), each with the store's windows; the SERVER validates the pick and
+   * writes the order's delivery note line. Absent / null = today / tomorrow exactly as before.
+   */
+  daysAhead?: number | null;
 }
 
 /** A single merchant-configured delivery time window. */

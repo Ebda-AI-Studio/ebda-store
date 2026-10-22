@@ -40,6 +40,9 @@ import {
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
 import { ShopTheLookSection, type ShopTheLookSettings } from '../sections/ShopTheLookSection';
 import { StepsSection, type StepsSettings } from '../sections/StepsSection';
+import { MenuSection } from '../sections/MenuSection';
+import { ReorderRow } from '../sections/ReorderRow';
+import { MakerProfileSection, type MakerProfileSettings } from '../sections/MakerProfileSection';
 import { SectionHeader } from '../sections/SectionHeader';
 import { TagChips } from '../../templates/shared/TagChips';
 import { HeroCollage } from '../../templates/shared/HeroCollage';
@@ -684,6 +687,8 @@ export function PageRenderer({
                             pack={templateId}
                             mobileColumns={layout.categories.mobileColumns}
                             desktopColumns={layout.categories.desktopColumns}
+                            tint={layout.categories.tint}
+                            aisles={getLook(store.look)?.chrome?.aisles}
                           />
                         </div>
                       ) : kind === 'chips' ? (
@@ -1092,6 +1097,24 @@ export function PageRenderer({
         })();
         const extraJSX = extras.map((extra, extraIdx) => {
           if (extra.enabled === false) return null;
+          // "Order again" (Ruling B4-8): per customer, resolved in the browser; renders nothing
+          // for an anonymous or first-time shopper, so it cannot leave an empty padded band.
+          if (extra.productSource === 'reorder')
+            return (
+              <SectionErrorBoundary key={`extra:${extra.id}`} section={`extra:${extra.id}`}>
+                <ReorderRow
+                  title={extra.title}
+                  titleAr={extra.titleAr}
+                  limit={extra.limit}
+                  pack={templateId}
+                  onAddToCart={handleAddToCart}
+                  sectionProps={{
+                    className: `bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(extra, store.look).wrapperClass}`,
+                    style: sectionBgStyle(extra.bgColor, store.theme),
+                  }}
+                />
+              </SectionErrorBoundary>
+            );
           let sourceProducts: typeof templateNewArrivals;
           if (extra.productSource === 'best_seller') {
             sourceProducts = templateBestSellers;
@@ -1222,7 +1245,43 @@ export function PageRenderer({
               (settings as ProductSpotlightSettings).layout === 'stage' &&
               stagesSeen++ === 0;
             const node =
-              def.type === 'featured-collection' ? (
+              def.type === 'featured-collection' &&
+              (settings as { productSource?: string }).productSource === 'reorder' ? (
+                <ReorderRow
+                  title={(settings as FeaturedCollectionSettings).heading}
+                  titleAr={(settings as FeaturedCollectionSettings).headingAr}
+                  limit={(settings as FeaturedCollectionSettings).limit}
+                  pack={templateId}
+                  onAddToCart={handleAddToCart}
+                  sectionProps={{
+                    className: `bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(settings as FeaturedCollectionSettings, store.look).wrapperClass}`,
+                    style: sectionBgStyle(
+                      (settings as FeaturedCollectionSettings).bgColor,
+                      store.theme
+                    ),
+                  }}
+                />
+              ) : def.type === 'featured-collection' &&
+                (settings as FeaturedCollectionSettings).layout === 'menu' ? (
+                <MenuSection
+                  sectionId={section.id}
+                  settings={settings as FeaturedCollectionSettings}
+                  products={resolveSectionProducts(
+                    settings as FeaturedCollectionSettings,
+                    pools,
+                    24
+                  )}
+                  categories={categories}
+                  pack={templateId}
+                  onAddToCart={handleAddToCart}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'maker-profile' ? (
+                <MakerProfileSection
+                  settings={settings as MakerProfileSettings}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'featured-collection' ? (
                 <FeaturedCollectionSection
                   settings={settings as FeaturedCollectionSettings}
                   products={resolveSectionProducts(

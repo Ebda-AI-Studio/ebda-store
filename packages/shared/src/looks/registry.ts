@@ -699,8 +699,41 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'lamma.table',
     template: 'lamma',
     letter: 'A',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'lamma',
+    status: 'built',
+    chrome: {
+      header: { logoPlacement: 'start' },
+      cartBar: 'total',
+      cardStepper: 'inline',
+    },
+    // Ruling B4-1 (Family table). Order like a menu: a full-bleed food photo (the delivery line is
+    // merchant content, B4-12), "order again" for a returning customer (nothing for anyone else), the
+    // dishes as rows grouped by category under sticky tabs, the cook as a strip and the trust line.
+    sections: [
+      // textAnchor: the copy sits under the photo on a phone (taste rule 7: text never covers the food)
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'reorder',
+          limit: 8,
+          title: 'Order again',
+          titleAr: 'اطلب تاني',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { layout: 'menu', tabs: 'categories', paddingTop: 'tight' },
+        preset: {
+          productSource: 'newest',
+          limit: 24,
+          heading: "Today's menu",
+          headingAr: 'منيو النهاردة',
+        },
+      },
+      { type: 'maker-profile', design: { variant: 'strip' } },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'سفرة العيلة', en: 'Family table' },
     forWhom: {
       ar: 'لمطبخ بيتي بياخد طلبات زي المطعم.',
@@ -709,26 +742,63 @@ export const LOOKS: readonly LookDefinition[] = [
     idea: { ar: 'اطلب زي المنيو، مش زي المحل.', en: 'Order like a menu.' },
     tokens: {
       page: '#FFFFFF',
-      surface: '#F7E6E1',
-      ink: '#2A1A14',
-      muted: '#655149',
-      primary: '#B5482E',
+      // Ruling B4-2: the direction's terracotta (#B5482E, hue 12) is re-derived to pomegranate
+      // clay, surface/line/ink follow it (hue 342-353), the herb green is darkened for text.
+      surface: '#FBF1F2',
+      ink: '#2B1A1F',
+      muted: '#62505A',
+      primary: '#A5303F',
       onPrimary: '#FFFFFF',
-      accent: '#3E7A3A',
-      line: '#EAD8D2',
+      accent: '#2F6B34',
+      line: '#EBD6DA',
       fonts: { display: 'El Messiri', body: 'Cairo', latin: 'Fraunces' },
       radius: 'md',
       density: 'regular',
       imageRatio: '4/3',
       motion: 'subtle',
+      cardBadge: 'accent',
     },
   }),
   L({
     id: 'lamma.notebook',
     template: 'lamma',
     letter: 'B',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'lamma',
+    status: 'built',
+    chrome: {
+      header: { logoPlacement: 'centre' },
+      cartBar: 'total',
+      cardStepper: 'inline',
+      // Ruling B4-15: the listing pages stay on the green (no cream sheet); photos sit on a paper matte.
+      listing: 'ground',
+    },
+    // Ruling B4-1 (Kitchen notebook). The cook is the brand: her photo and story lead, no hero. The
+    // dish grid sits on the LIGHT band (`token:inverse`, quality bar section 9 rule 1) because the
+    // merchant's dish photos are shot on white and would read as white rectangles on the green.
+    sections: [
+      { type: 'maker-profile', design: { variant: 'lead' } },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'reorder',
+          limit: 8,
+          title: 'Order again',
+          titleAr: 'اطلب تاني',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 2, mobileColumns: 2, bgColor: 'token:inverse' },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'From the kitchen today',
+          headingAr: 'من المطبخ النهاردة',
+        },
+      },
+      { type: 'brand-story' },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'كشكول المطبخ', en: 'Kitchen notebook' },
     forWhom: { ar: 'لطباخة واحدة اسمها هو البراند.', en: 'For one named cook who is the brand.' },
     idea: { ar: 'الطباخة هي البراند.', en: 'The cook is the brand.' },
@@ -737,23 +807,81 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#29503A',
       ink: '#F5F7F2',
       muted: '#C3D3C8',
-      primary: '#E0A526',
+      // Ruling B4-2: the saffron (#E0A526) is re-derived to antique brass, the ONE metal of
+      // Lamma (a scoped exception of the no-orange gate for exactly this hex on this look).
+      primary: '#D3B87C',
       onPrimary: '#1F3D2B',
-      accent: '#E0A526',
+      accent: '#D3B87C',
       line: '#345E46',
-      fonts: { display: 'Aref Ruqaa', body: 'Noto Naskh Arabic', latin: 'Lora' },
+      // Ruling B4-16: UI text is a Sans Arabic face (Naskh reads 8-9px at 12px); Aref Ruqaa stays the display.
+      fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Lora' },
       radius: 'sm',
       density: 'airy',
       imageRatio: '4/3',
       motion: 'subtle',
+      cardBadge: 'accent',
+      cardCta: 'quiet',
+      overPhotoChrome: 'soft',
     },
   }),
   L({
     id: 'lamma.market',
     template: 'lamma',
     letter: 'C',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'lamma',
+    status: 'built',
+    chrome: {
+      header: { logoPlacement: 'start' },
+      cartBar: 'total',
+      cardStepper: 'inline',
+      aisles: ['#23744A', '#CC2F3F', '#5B2A6E', '#0F7F8C'],
+    },
+    // Ruling B4-1 (Fresh market). Aisle tiles first (three across on a phone, so eight or more fit
+    // the first screen), today's deals, then a dense two-across grid whose cards carry the stepper.
+    sections: [
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'tiles',
+          layoutMobile: 'tiles',
+          tint: 'aisles',
+          mobileColumns: 3,
+          captionPosition: 'below',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'product-carousel',
+        preset: {
+          productSource: 'reorder',
+          limit: 8,
+          title: 'Order again',
+          titleAr: 'اطلب تاني',
+        },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight' },
+        preset: {
+          productSource: 'on_sale',
+          limit: 8,
+          title: 'Deals today',
+          titleAr: 'عروض النهاردة',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2, paddingTop: 'tight' },
+        preset: {
+          productSource: 'newest',
+          limit: 24,
+          heading: 'Fresh today',
+          headingAr: 'طازة النهاردة',
+        },
+      },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'سوق طازة', en: 'Fresh market' },
     forWhom: {
       ar: 'للبقالة والخضار اللي الطلب بيتكرر فيها.',
@@ -767,13 +895,15 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#575757',
       primary: '#23744A',
       onPrimary: '#FFFFFF',
-      accent: '#C8361F',
+      // Ruling B4-2: the tomato (#C8361F, hue 8) is re-derived to crimson tomato.
+      accent: '#CC2F3F',
       line: '#E4E4E4',
       fonts: { display: 'Baloo Bhaijaan 2', body: 'Almarai', latin: 'Nunito' },
       radius: 'lg',
       density: 'compact',
       imageRatio: '1/1',
       motion: 'expressive',
+      cardBadge: 'accent',
     },
   }),
   L({

@@ -1236,8 +1236,22 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 
 /* 2.4.11 Focus Not Obscured: the sticky header's measured height (StickyHeaderOffset) keeps the
  * browser's focus / scrollIntoView scroll clear of it, on every template. */
+/* --sticky-extra: a sticky sub-bar under the header (the Lamma menu tab strip publishes its
+ * height) is opaque too, so a focus scroll must clear header + sub-bar (B4 a11y P1-1). */
 html {
-  scroll-padding-top: calc(var(--header-h, 0px) + 0.75rem);
+  scroll-padding-top: calc(var(--header-h, 0px) + var(--sticky-extra, 0px) + 0.75rem);
+}
+
+/* A page with a sticky sub-bar (the Lamma menu tab strip): `overflow-x: hidden` on html AND body
+ * (layout.tsx) makes <body> a scroll container that never scrolls, so a `position: sticky` descendant
+ * never sticks (measured: the strip scrolled away at 1400px). `clip` keeps the horizontal clipping
+ * without creating a scroll container. Scoped to pages that mount the strip: the same defect inerts
+ * every other sticky element on the storefront (headers, PDP gallery, cart summary, filter rail), which
+ * is reported as a platform finding, not changed here (docs/architecture/sticky-overflow-follow-up.md).
+ * Scoped to the Lamma skin: a `menu` section on any other template must not flip that page's stickiness. */
+html:has(body[data-pack='lamma'] [data-part='menu-tabs']),
+body[data-pack='lamma']:has([data-part='menu-tabs']) {
+  overflow-x: clip;
 }
 
 /* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
@@ -1579,6 +1593,97 @@ html[lang] [data-pack='jasmine'] [data-zone='filters'] :is(h2, h3, h4, legend) {
   font-family: var(--font-display, inherit);
   line-height: 1.3;
   font-weight: 600;
+}
+
+/* Lamma (Phase B4, Ruling B4-1): the type voice of a home-food store. Same rules as Souq's and
+   Jasmine's: the look's faces carry the voice, an Arabic display face is never letter-spaced and
+   gets open leading, tracked-caps classes from the minimal components are reset under the lamma
+   skin only. NO colour literal is set here: every Lamma colour is a look token (hsl(var(--token))
+   at most), which keeps the no-orange gate (Rulings B2-2, B4-2) true. The stepper and the browse
+   cart bar paint token colours only (Ruling B4-4, B4-6). */
+html[dir='rtl'] [data-pack='lamma'] h1,
+html[dir='rtl'] [data-pack='lamma'] h2,
+html[dir='rtl'] [data-pack='lamma'] h3,
+html[dir='rtl'] [data-pack='lamma'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='lamma']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='lamma'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+html[lang] [data-pack='lamma'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
+[data-pack='lamma'] :is(h1, h2, h3, .font-display) {
+  font-size-adjust: none;
+}
+:where([data-pack='lamma']) :where(h1[data-zone='productName']) {
+  font-family: var(--font-display, inherit);
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+/* Family table (Ruling B4-21): the cart and checkout panels were the pale-pink surface token flat on a
+   white page. A panel is now a white sheet with a pomegranate-tinted hairline and a soft lift, so the
+   page reads as paper on a tint, not pink on white. Panels only (they carry `shadow-sm`); the dish
+   cards keep the surface. Token colours only. */
+[data-look='lamma.table'] main .bg-card.shadow-sm {
+  background-color: hsl(var(--background));
+  border-color: color-mix(in srgb, hsl(var(--primary)) 16%, hsl(var(--border)));
+  box-shadow:
+    0 1px 2px hsl(var(--foreground) / 0.06),
+    0 10px 24px -14px color-mix(in srgb, hsl(var(--primary)) 40%, transparent);
+}
+
+/* Lamma, Arabic at desktop width (Ruling B4-21): the cart and checkout set their labels, helpers and
+   totals at text-sm / text-xs (14 / 12px), which an Arabic face reads a size smaller than Latin on a
+   1280 screen. One step up from lg, Arabic only, inside `main` (the header and footer keep theirs). */
+@media (min-width: 1024px) {
+  html[dir='rtl'] [data-pack='lamma'] main .text-sm {
+    font-size: 0.9375rem;
+    line-height: 1.5rem;
+  }
+  html[dir='rtl'] [data-pack='lamma'] main .text-xs {
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+  }
+}
+
+/* Kitchen notebook (Ruling B4-16): `font-size-adjust: 0.5` (the RTL rule above) scales a face by its
+   own x-height, and it shrank the notebook's Arabic UI text to ~9px. The look sets its sizes in rem,
+   so it opts out; the floor for small-text zones is asserted in tests/lamma/lamma-matrix.spec.ts. */
+html[dir='rtl'] [data-look='lamma.notebook'],
+[data-look='lamma.notebook'] {
+  font-size-adjust: none;
+}
+/* Ruling B4-15: the listing keeps the green; a card photo shot on white sits on a paper matte and
+   multiplies into it (quality bar section 9 rule 1), except inside an inverse band (see Apothecary). */
+[data-look='lamma.notebook']
+  [data-part='card-image']:not([style*='background-color'][style*='--bg-page'] *),
+[data-look='lamma.notebook']
+  [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *) {
+  background-color: hsl(var(--foreground));
+}
+[data-look='lamma.notebook']
+  [data-part='card-image']:not([style*='background-color'][style*='--bg-page'] *)
+  img,
+[data-look='lamma.notebook']
+  [data-part='tile']:not([style*='background-color'][style*='--bg-page'] *)
+  img {
+  mix-blend-mode: multiply;
 }
 
 /* Ruling B3-2: Apothecary's brass is a CTA FILL. As TEXT inside a card it is 5.0:1 (passes), but

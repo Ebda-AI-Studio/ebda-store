@@ -15,7 +15,7 @@ import type {
   FilterSidebarSettings,
   ProductsPageSettings,
 } from '@ebda/shared';
-import { resolveColor, colorToHslTriplet, getLook } from '@ebda/shared';
+import { resolveColor, colorToHslTriplet } from '@ebda/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useToast } from '@ebda/ui';
 import { useCart } from '../../contexts/CartContext';
@@ -190,8 +190,6 @@ export default function ProductsClient({
   const { language, t } = useLanguage();
   const { warning } = useToast();
   const { store } = useStore();
-  // STOP-2 taste P1-1: a look may ask for an auto-fill listing grid (cards fill the column).
-  const plpAutoFill = getLook(store.look)?.chrome?.plp === 'autoFill';
   const storeUrl = useStoreUrl();
   const { templateId } = useTemplateComponents();
   // A search the server ranked (hybrid relevance, Task 12) labels the default "Most relevant".
@@ -545,6 +543,18 @@ export default function ProductsClient({
     });
   }, []);
 
+  // ONE grid class for the loading skeleton and the real list, so nothing jumps when products arrive
+  // (CLS). Ruling B4-PLP-1 (amended B4-21): every template lists on an auto-fit grid (cards 11.5rem to
+  // 20rem, photos at full card width; empty tracks collapse, so a small catalogue fills or centres the
+  // row). Dahab keeps its own 3/4-up density control (its cards are always wide).
+  const plpGap = productCardDefaults?.cardGap
+    ? gridGapClass(productCardDefaults.cardGap)
+    : 'gap-3 sm:gap-4 lg:gap-6';
+  const plpGridClass =
+    templateId === 'dahab'
+      ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
+      : `grid grid-cols-2 md:grid-cols-3 lg:justify-center lg:[grid-template-columns:repeat(auto-fit,minmax(11.5rem,20rem))] ${plpGap}`;
+
   const handleClearAll = () => {
     setSearch('');
     setCategoryFilter('');
@@ -806,7 +816,7 @@ export default function ProductsClient({
 
               {/* Loading State */}
               {isLoading && (
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-6 xl:grid-cols-5 2xl:grid-cols-6">
+                <div className={plpGridClass}>
                   {[...Array(12)].map((_, i) => (
                     <ProductSkeleton key={i} />
                   ))}
@@ -840,16 +850,7 @@ export default function ProductsClient({
                 </div>
               )}
               {!isLoading && !error && viewMode === 'grid' && (
-                <div
-                  className={
-                    templateId === 'dahab'
-                      ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
-                      : plpAutoFill
-                        ? `grid grid-cols-2 md:grid-cols-3 lg:[grid-template-columns:repeat(auto-fill,minmax(11.5rem,1fr))] ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
-                        : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
-                  }
-                  dir={language === 'ar' ? 'rtl' : 'ltr'}
-                >
+                <div className={plpGridClass} dir={language === 'ar' ? 'rtl' : 'ltr'}>
                   {products.map((p, i) => (
                     // id="product-{id}" anchors the focus-scroll that fires
                     // when the shopper returns from cart via "Continue Shopping"

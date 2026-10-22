@@ -2,7 +2,8 @@
 
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatWindowTime, type DeliverySelection } from '../_lib/deliveryWindows';
-import type { CheckoutDeliverySettings } from '@ebda/shared';
+import type { CheckoutDeliverySettings, DeliveryDateChoice } from '@ebda/shared';
+import { DeliveryDateChips } from './DeliveryDateChips';
 
 interface DeliverySectionProps {
   settings: CheckoutDeliverySettings;
@@ -12,6 +13,14 @@ interface DeliverySectionProps {
   onSelectWindow: (id: string) => void;
   /** Validation message when windows are enabled + available but none picked. */
   error?: string | null;
+  /**
+   * Date chips (Phase B4, Ruling B4-7): present only for a store with `checkoutDelivery.daysAhead`.
+   * Absent = the today / tomorrow windows picker below, byte-identical to before. `null` = a date
+   * store whose first clock tick has not run yet: the heading shows, the chips follow on mount.
+   */
+  dateChoices?: DeliveryDateChoice[] | null;
+  selectedDate?: string | null;
+  onSelectDate?: (date: string) => void;
 }
 
 /**
@@ -28,6 +37,9 @@ export function DeliverySection({
   selectedWindowId,
   onSelectWindow,
   error,
+  dateChoices,
+  selectedDate = null,
+  onSelectDate,
 }: DeliverySectionProps) {
   const { language, t } = useLanguage();
 
@@ -36,7 +48,8 @@ export function DeliverySection({
   const { day, windows } = selection;
   const anyAvailable = windows.some(w => w.available);
 
-  if (!showNote && !showWindows) return null;
+  const dated = dateChoices !== undefined && !!onSelectDate;
+  if (!showNote && !showWindows && !dated) return null;
 
   return (
     <div className="rounded-[var(--radius)] border bg-card p-4 shadow-sm space-y-3">
@@ -46,7 +59,26 @@ export function DeliverySection({
         </div>
       )}
 
-      {showWindows && (
+      {dated && (
+        <div className={showNote ? 'pt-1' : undefined}>
+          <h3 className="text-sm font-medium text-foreground">
+            {t('Delivery date', 'يوم التوصيل')}
+          </h3>
+          {dateChoices && (
+            <DeliveryDateChips
+              choices={dateChoices}
+              windows={showWindows ? settings.windows.items : []}
+              selectedDate={selectedDate}
+              selectedWindowId={selectedWindowId}
+              onSelectDate={onSelectDate!}
+              onSelectWindow={onSelectWindow}
+              error={error}
+            />
+          )}
+        </div>
+      )}
+
+      {showWindows && !dated && (
         <div className={showNote ? 'pt-1' : undefined}>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-medium text-foreground">

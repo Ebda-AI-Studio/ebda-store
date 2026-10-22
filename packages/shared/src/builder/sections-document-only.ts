@@ -83,9 +83,19 @@ export const featuredCollectionSchema = z
     subheading: text(400),
     subheadingAr: text(400),
     ...productRefs,
-    limit: z.number().int().min(2).max(12).optional(),
+    // `reorder` (Phase B4, Ruling B4-8): the signed-in customer's last products; only the grid
+    // sections that render a row for it accept it (not the spotlight).
+    productSource: z
+      .enum(['newest', 'best_seller', 'featured', 'on_sale', 'category', 'manual', 'reorder'])
+      .optional(),
+    // 24 = the most the home page fetches for one section (HomePageBody). A `menu` lists up to that many.
+    limit: z.number().int().min(2).max(24).optional(),
     columns: z.number().int().min(2).max(5).optional(),
     mobileColumns: z.number().int().min(1).max(2).optional(),
+    // Phase B4 (Ruling B4-1): `grid` (absent) = the product grid; `menu` = dish rows grouped by the
+    // store's categories, with sticky category tabs when `tabs` is `categories` (absent = tabs on).
+    layout: z.enum(['grid', 'menu']).optional(),
+    tabs: z.enum(['categories', 'none']).optional(),
     buttonText: text(60),
     buttonTextAr: text(60),
     buttonLink: safeLink,
@@ -221,5 +231,33 @@ export const stepsBlockSchema = z
     bodyAr: text(240),
     link: safeLink,
     productIds: z.array(z.string().max(80)).max(1).optional(),
+  })
+  .strict();
+
+/**
+ * "Maker profile" (Phase B4, Lamma; Ruling B4-1): who cooks. `strip` = avatar, name, one line and
+ * the hygiene line; `lead` = a large photo first, a "from the kitchen of ..." heading and a
+ * clamped story. Every field is optional and a profile with neither a name nor a photo renders
+ * nothing (an unfilled feature renders nothing). Nothing here is a platform claim: the hygiene
+ * line is the merchant's own words.
+ */
+export const makerProfileSchema = z
+  .object({
+    ...frame,
+    variant: z.enum(['strip', 'lead']).optional(),
+    image: z.string().max(2048).optional(),
+    imageAr: z.string().max(2048).optional(),
+    alt: text(300),
+    altAr: text(300),
+    name: text(80),
+    nameAr: text(80),
+    role: text(120),
+    roleAr: text(120),
+    story: text(600),
+    storyAr: text(600),
+    hygiene: text(160),
+    hygieneAr: text(160),
+    years: z.number().int().min(0).max(80).optional(),
+    storyLink: safeLink,
   })
   .strict();

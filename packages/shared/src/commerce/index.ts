@@ -1,6 +1,7 @@
 export * from './swatch';
 export * from './product-facts';
 export * from './delivery-window';
+export * from './delivery-dates';
 export * from './personalisation';
 export * from './size-chart';
 export * from './instalments';

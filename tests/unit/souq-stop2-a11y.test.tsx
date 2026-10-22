@@ -60,17 +60,42 @@ describe('P1-1: the sticky header offset', () => {
     const header = document.createElement('header');
     header.style.position = 'sticky';
     Object.defineProperty(header, 'offsetHeight', { value: 120, configurable: true });
-    document.body.appendChild(header);
+    const wrap = document.createElement('div');
+    Object.defineProperty(wrap, 'offsetHeight', { value: 3000, configurable: true });
+    wrap.appendChild(header);
+    document.body.appendChild(wrap);
     const r = render(<StickyHeaderOffset />);
     expect(document.documentElement.style.getPropertyValue('--header-h')).toBe('120px');
     r.unmount();
     expect(document.documentElement.style.getPropertyValue('--header-h')).toBe('');
-    header.remove();
+    wrap.remove();
+  });
+  it('a sticky header with no room to stick (parent as tall as it) publishes 0px', () => {
+    class RO {
+      constructor(public cb: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', RO);
+    const header = document.createElement('header');
+    header.style.position = 'sticky';
+    Object.defineProperty(header, 'offsetHeight', { value: 68, configurable: true });
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-zone', 'header');
+    Object.defineProperty(wrap, 'offsetHeight', { value: 68, configurable: true });
+    wrap.appendChild(header);
+    document.body.appendChild(wrap);
+    const r = render(<StickyHeaderOffset />);
+    expect(document.documentElement.style.getPropertyValue('--header-h')).toBe('0px');
+    r.unmount();
+    wrap.remove();
   });
   it('globals.css turns it into scroll-padding-top, and ShopChrome mounts the component', () => {
     const root = path.resolve(__dirname, '../..');
     const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8');
     expect(css).toMatch(/html\s*\{\s*scroll-padding-top:\s*calc\(var\(--header-h,\s*0px\)/);
+    // a sticky sub-bar (the Lamma menu tabs) adds its own height to the same offset (B4 a11y P1-1)
+    expect(css).toContain('var(--sticky-extra, 0px)');
     const chrome = readFileSync(path.join(root, 'apps/web/src/components/ShopChrome.tsx'), 'utf8');
     expect(chrome).toContain('<StickyHeaderOffset />');
   });
@@ -101,10 +126,13 @@ describe('STOP-2 re-audit minors (R1, R2, M3, price, chip, stage)', () => {
     const header = document.createElement('header'); // static: not sticky by itself
     wrap.appendChild(header);
     document.body.appendChild(wrap);
+    // a sticky box only sticks inside a taller parent (jsdom has no layout: say how tall the page is)
+    Object.defineProperty(document.body, 'offsetHeight', { value: 3000, configurable: true });
     render(<StickyHeaderOffset />);
     expect(document.documentElement.style.getPropertyValue('--header-h')).toBe('96px');
     cleanup();
     wrap.remove();
+    delete (document.body as unknown as Record<string, unknown>).offsetHeight;
   });
 
   it('R2: every field type draws its error boundary in the destructive ink', () => {

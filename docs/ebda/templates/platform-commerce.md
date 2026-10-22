@@ -238,3 +238,36 @@ Four platform pieces, available to every skin (never one tenant). Ingredients, a
 **PDP bundle-saving line.** One line, "وفّر 15% لما تشتريه في باقة", linking to the bundle page, only when an active, purchasable bundle containing this product gives a saving > 0 on a store that has the `bundles` feature (read off `store.enabledFeatures`, so a store without it makes no request). CACHE CLASS: NEVER-stale for price. `GET /stores/public/:storeId/bundle-savings?productIds=<uuid>[,..]` (1-5 ids) computes it from `resolveBundle` (the cart's own bundle price) on every request, answers `no-store`, and has no cache layer to forget. **Rulings.** B3-6.
 
 With neither line applicable the PDP markup is unchanged and the 390 fold keeps gallery, title, price, first selector and the sticky add bar.
+
+## 15. Card stepper (Phase B4, Lamma; Ruling B4-4)
+
+On a look that sets `chrome.cardStepper: 'inline'` (the three Lamma looks), the card's one add control becomes `- qty +` once the product is in the cart. It is a state of the CTA, not a second control, and it lives in the shared pieces every card path already reaches: `AdaptiveAddButton` (the shared card and the shared carousel) and `ProductCardCta` (the five template cards), so there is no new card data path. `CardStepperProvider` (mounted by `ShopChrome`) hands the cart lines to the cards only on such a look; elsewhere it provides null and every card renders byte-identically.
+
+- **When.** One plain line of a non-variant product (`stepperLine`). A variant product keeps its "view" route to the page, a product with two lines (the same dish with two notes) keeps the single add control, an unavailable line never gets a stepper.
+- **Targets and signs.** Both buttons are 44px, drawn as icons (`MinusIcon`/`PlusIcon`, the stepper-minus-glyph gate), the quantity is a polite live region.
+- **Limits.** The server owns the cap: a refused `+` restores the quantity, the live region says "وصلت للحد الأقصى للكمية" and the `+` stays off until the quantity changes. `-` at 1 removes the line and raises the same Undo toast as the cart page (`cartRemovalToast`: same variant, same note, same quantity).
+
+## 16. Browse cart bar and minimum-order progress (Phase B4, Lamma; Ruling B4-6)
+
+`chrome.cartBar: 'total'` (look data) enables a phone bar with the item count, the total (the shared price formatter) and the cart link, on home, the product list, category pages and search only (`browseBarShownOn`), while the cart has items. It is a task bar in the C-04 sense: `useStickyBarHeight` marks `<html data-task-bar>`, so it REPLACES the bottom tab bar and never stacks with the PDP buy bar or the cart total bar (those routes are excluded). It reserves body space through `body[data-sticky-cart]`, which also lifts the floating widget; the value is `blocked` (taller) while the minimum-order progress shows.
+
+`MinOrderProgress` renders, only under a set `minimumOrderFils`, one sentence ("ضيف ٨٠ ج.م وتوصل للحد الأدنى للطلب") and a determinate `role=progressbar` (value, max, text; never colour alone). The bar carries it; the cart page shows it in place of the one-line notice on such a look. It is advice only: `checkMinimumOrder`, the blocked checkout button and the API's `MINIMUM_ORDER_NOT_MET` are unchanged. Absent minimum or a met minimum renders nothing.
+
+## 17. "Order again" row and reorder-this-order (Phase B4, Lamma; Ruling B4-8)
+
+`productSource: 'reorder'` is a source of the `product-carousel` (an extra carousel) and the `featured-collection` section: the signed-in customer's own last products.
+
+- **Endpoint.** `GET /public/customers/me/reorder` (customer token): the DISTINCT product ids of the customer's last three PAID or DELIVERED orders (`paymentStatus: paid` or `status: delivered`; cancelled and refunded never count), newest order first (inside one order the biggest line, then the name, so the answer is stable), at most 12, only products that are still `active` and not deleted. Every query carries `storeId` and `customerId` (tenant guard). Anonymous is 401, an admin token is 403.
+- **Staleness classes.** The id list is per customer and is NEVER cached (`Cache-Control: private, no-store`, `Vary: Cookie, Authorization`). The row then resolves current name, price and availability through the same tagged public product read every listing uses (`/public/products?ids=`: BOUNDED-stale, invalidated by `invalidateStoreProductCaches` on every product write) and keeps only what `canBuyNow`, in the customer's order. The add itself re-checks stock, variant and price server-side, so a stale row can mislead a tap but never a charge.
+- **Renders nothing** for an anonymous shopper, a first-time customer, a refused list or a failed request: no wrapper, no placeholder, no empty padded band (`ReorderRow` owns its `<section>`). It mounts after hydration, so a look places it below the first screen (CLS is measured in the matrix).
+- **Reorder this order.** An order's page (paid or delivered, never cancelled or refunded) has one "إعادة الطلب" button. It re-adds every line through `api.addToCart` with the SAME product, variant and note and the same quantity (bundle components are skipped, equal lines add up), refetches the cart once, then says in one sentence how many could not go back ("تعذّرت الإضافة: قطعتين مش متاحين دلوقتي"); with at least one line added the shopper lands on the cart. It never edits the old order.
+- **Demo limit (Ruling B4-9).** A demo store refuses customer registration, so the row can never render on `storedemo-lamma`; it is exercised on the non-demo `lamma-reorder` scenario store.
+
+## 18. Delivery date chips at checkout (Phase B4, Lamma; Ruling B4-7)
+
+`settings.checkoutDelivery.daysAhead` (1-14) turns the today / tomorrow windows picker into date chips plus the windows bookable on the chosen date. The rule, the order-endpoint validation, the 422 `DELIVERY_SLOT_UNAVAILABLE` and the server-written notes line are specified in `docs/architecture/store-checkout-settings.md` (`daysAhead`). Platform behaviour in short:
+
+- **Truth.** A chip is offered only if the server would accept it: earliest date = store estimate + the cart's longest `leadTimeDays` in business days, the store's off days skipped, store timezone (DST-safe: calendar days, never 24 h), today's windows obey `orderBy`. A stale tab, a clock that crossed a cut-off or midnight, or a hand-edited date is refused with a sentence next to the chips and the picks are cleared.
+- **Chips.** `role=radiogroup`, roving tabindex, arrow keys move AND select (RTL-aware), 44 px targets, the selected chip is filled and carries a check (never colour alone). Relative words for the first two ("النهاردة", "بكرة"), then the date with Western digits. No date on offer says so in a sentence and never blocks checkout.
+- **A store without `daysAhead` is unchanged**, pinned by a markup snapshot of `DeliverySection`.
+- **Data flow.** The pick travels cart → checkout → order → receipt → admin notes as one line, proven end to end in `tests/integration/order-delivery-date.test.ts` (Review Focus 3), not at component level.

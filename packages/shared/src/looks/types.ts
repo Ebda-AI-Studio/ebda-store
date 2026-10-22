@@ -104,6 +104,8 @@ export interface LookChrome {
    * Listing grid (Phase B2 STOP-2, taste P1-1): `autoFill` lays the PLP out as
    * `repeat(auto-fill, minmax(11.5rem, 1fr))` from `lg`, so the cards fill the whole column next to
    * the filter rail instead of five narrow cells with a 110px photo. Absent = the skin's own grid.
+   * Since Ruling B4-PLP-1 / B4-21 every template (Dahab aside) lists on the auto-fit grid, so this flag
+   * no longer changes anything; it stays on the Souq looks as a record of their ask.
    */
   plp?: 'autoFill';
   /**
@@ -112,6 +114,22 @@ export interface LookChrome {
    * instead (cream matte + multiply, globals.css), so its green runs through every page (STOP-2).
    */
   listing?: 'ground';
+  /**
+   * Browse cart bar (Ruling B4-6): `total` shows a phone bar with the item count, the total and the
+   * cart link on home, category and search while the cart has items; it replaces the tab bar
+   * (C-04). Absent = no bar.
+   */
+  cartBar?: 'total';
+  /**
+   * Card stepper (Ruling B4-4): `inline` turns the card's add control into - qty + once a
+   * non-variant product is in the cart. Absent = the card's own add control, byte-identical.
+   */
+  cardStepper?: 'inline';
+  /**
+   * Aisle tints (Ruling B4-2): the colours a `category-grid` with `tint: 'aisles'` cycles as
+   * 12-14% tints behind ink captions. Hex, no orange (gated with the look tokens).
+   */
+  aisles?: readonly string[];
 }
 
 /**
@@ -126,6 +144,9 @@ export const LOOK_DESIGN_KEYS = [
   'layout',
   'layoutMobile',
   'source',
+  'tint',
+  'tabs',
+  'variant',
   'captionPosition',
   'desktopColumns',
   'mobileColumns',

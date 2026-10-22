@@ -280,6 +280,8 @@ describe('authenticated /public routes are an explicit, reasoned list', () => {
     'GET /public/orders':
       'customer reads own orders (read-only; CORS still limits which origins get the body)',
     'GET /public/orders/:id/invoice': 'customer reads own invoice (read-only)',
+    'GET /public/customers/me/reorder':
+      'customer reads the ids of their own last products for "order again" (read-only, per customer, private no-store; the caller is the only subject, CORS still limits which origins get the body)',
     'GET /public/:storeId/loyalty/my-points': 'customer reads own points (read-only)',
     'GET /public/:storeId/loyalty/my-transactions': 'customer reads own history (read-only)',
     'POST /public/:storeId/loyalty/join':

@@ -5,6 +5,7 @@ import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
+import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
@@ -198,6 +199,17 @@ export const createOrderSchema = z.object({
   billingAddress: shippingAddressSchema.optional(),
   paymentMethod: z.string().min(1),
   notes: z.string().max(2000).optional(),
+  /**
+   * The delivery date (store-local `YYYY-MM-DD`) and window the shopper picked, for a store with
+   * `checkoutDelivery.daysAhead` (Ruling B4-7). A REQUEST: the server recomputes the offered set
+   * from live settings and refuses anything else (422 DELIVERY_SLOT_UNAVAILABLE), then writes the
+   * delivery line of the notes itself. Ignored by a store without `daysAhead`.
+   */
+  deliveryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  deliveryWindowId: z.string().min(1).max(80).optional(),
   couponCode: z.string().trim().min(1).max(50).optional(),
   /** Loyalty points the customer requests to redeem. A request, not a
    *  trusted discount — the server re-resolves it against the customer's
@@ -1219,6 +1231,33 @@ router.post(
       );
       setBuyerPrivate(res);
       res.json({ success: true, data: { quote } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /customers/me/reorder - "Order again" (Phase B4, Ruling B4-8): the signed-in customer's
+// last distinct products (ids only, newest first, <= 12). Per customer, so NEVER cached
+// (`private, no-store`); the storefront resolves current price and stock through the cached
+// public product read. Anonymous: 401 (the storefront row then renders nothing).
+router.get(
+  '/customers/me/reorder',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      const customerId = customerUserId(req);
+      setBuyerPrivate(res);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
+      const productIds = await CustomerReorderService.productIds(storeId, customerId);
+      res.json({ success: true, data: { productIds } });
     } catch (error) {
       next(error);
     }

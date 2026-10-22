@@ -24,6 +24,8 @@ import type {
 } from '../templates/types';
 import { ReactNode } from 'react';
 import { StickyHeaderOffset } from './StickyHeaderOffset';
+import { StickyBrowseCartBar } from './commerce/StickyBrowseCartBar';
+import { CardStepperProvider } from '../templates/shared/card-stepper-context';
 
 interface ShopChromeProps {
   children: ReactNode;
@@ -339,180 +341,186 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
     // a visible pink gap between the footer and the cookieFallback row
     // (Ahmad 2026-05-17 night: 'white space between footer and
     // underneath it'). Removed; body-pb is the single source of truth.
-    <div
-      className="flex min-h-screen flex-col bg-background"
-      data-ui-uppercase={store?.theme?.uppercaseStyle ? 'true' : undefined}
-    >
-      {/* `data-zone` wrappers let the per-store typography rules in
+    <CardStepperProvider>
+      <div
+        className="flex min-h-screen flex-col bg-background"
+        data-ui-uppercase={store?.theme?.uppercaseStyle ? 'true' : undefined}
+      >
+        {/* `data-zone` wrappers let the per-store typography rules in
           apps/web/src/app/layout.tsx target each storefront zone
           without having to rewrite the templates' internal markup.
           Six zones, applied uniformly across all 5 packs. */}
-      {/* Announcement bar — gated by both content presence AND page-builder
+        {/* Announcement bar — gated by both content presence AND page-builder
           layout.announcement.enabled (when explicitly false, hides regardless
           of content). bgColor falls back: layout.announcement.bgColor wins
           over the legacy store.announcementBar.bgColor. */}
-      {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
-        store.announcementBar?.text && (
-          <aside
-            data-zone="beforeHeader"
-            aria-label={isRtl ? 'إعلان المتجر' : 'Store announcement'}
-            className={sectionVisibilityClass(layout?.announcement) ?? undefined}
-          >
-            <T.AnnouncementBar
-              text={store.announcementBar.text}
-              textAr={store.announcementBar.textAr}
-              link={store.announcementBar.link}
-              linkText={store.announcementBar.linkText}
-              linkTextAr={store.announcementBar.linkTextAr}
-              bgColor={
-                (layout?.announcement?.bgColor
-                  ? resolveColor(layout.announcement.bgColor, store.theme)
-                  : undefined) ?? store.announcementBar.bgColor
-              }
-              textColor={store.announcementBar.textColor}
-              dismissible={store.announcementBar.dismissible}
-              isRtl={isRtl}
-              urlPrefix={storeUrl('')}
-            />
-          </aside>
-        )}
-      {/* Zone wrapper only: the skin's own header element is the one banner (a11y P2-1). */}
-      <div
-        data-zone="header"
-        className={
-          [
-            layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
-            sectionVisibilityClass(layout?.header),
-          ]
-            .filter(Boolean)
-            .join(' ') || undefined
-        }
-      >
-        <StickyHeaderOffset />
-        <T.Header
-          branding={branding}
-          navigation={filteredNavigation}
-          isRtl={isRtl}
-          cartItemCount={itemCount}
-          onSearch={handleSearch}
-          urlPrefix={urlPrefix}
-          utilityBar={utilityBar}
-          headerBgColor={
-            layout?.header?.bgColor
-              ? (resolveColor(layout.header.bgColor, store.theme) ?? undefined)
-              : undefined
+        {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
+          store.announcementBar?.text && (
+            <aside
+              data-zone="beforeHeader"
+              aria-label={isRtl ? 'إعلان المتجر' : 'Store announcement'}
+              className={sectionVisibilityClass(layout?.announcement) ?? undefined}
+            >
+              <T.AnnouncementBar
+                text={store.announcementBar.text}
+                textAr={store.announcementBar.textAr}
+                link={store.announcementBar.link}
+                linkText={store.announcementBar.linkText}
+                linkTextAr={store.announcementBar.linkTextAr}
+                bgColor={
+                  (layout?.announcement?.bgColor
+                    ? resolveColor(layout.announcement.bgColor, store.theme)
+                    : undefined) ?? store.announcementBar.bgColor
+                }
+                textColor={store.announcementBar.textColor}
+                dismissible={store.announcementBar.dismissible}
+                isRtl={isRtl}
+                urlPrefix={storeUrl('')}
+              />
+            </aside>
+          )}
+        {/* Zone wrapper only: the skin's own header element is the one banner (a11y P2-1). */}
+        <div
+          data-zone="header"
+          className={
+            [
+              layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
+              sectionVisibilityClass(layout?.header),
+            ]
+              .filter(Boolean)
+              .join(' ') || undefined
           }
-        />
-      </div>
-      <main role="main" className="flex-1">
-        {children}
-      </main>
-      {/* Footer divider (per-section opt-in) — renders between the last
+        >
+          <StickyHeaderOffset />
+          <T.Header
+            branding={branding}
+            navigation={filteredNavigation}
+            isRtl={isRtl}
+            cartItemCount={itemCount}
+            onSearch={handleSearch}
+            urlPrefix={urlPrefix}
+            utilityBar={utilityBar}
+            headerBgColor={
+              layout?.header?.bgColor
+                ? (resolveColor(layout.header.bgColor, store.theme) ?? undefined)
+                : undefined
+            }
+          />
+        </div>
+        <main role="main" className="flex-1">
+          {children}
+        </main>
+        {/* Footer divider (per-section opt-in) — renders between the last
           page section and the footer. Honors `layout.footer.dividers.above`. */}
-      {layout?.footer?.dividers?.above?.enabled && (
-        <SectionDivider
-          settings={resolveSlotDividerSettings(layout.footer.dividers, 'above')}
-          // Suppress the divider's transparent padding band (which paints the
-          // page bg — white on per-section-colored stores) when the footer
-          // itself is colored, so it never shows as a white stripe above a
-          // colored footer. Same fix as the homepage section dividers.
-          hideForExplicitBg={!!layout?.footer?.bgColor}
-        />
-      )}
-      {/* Footer wrapper carries data-zone for typography emitter targeting.
+        {layout?.footer?.dividers?.above?.enabled && (
+          <SectionDivider
+            settings={resolveSlotDividerSettings(layout.footer.dividers, 'above')}
+            // Suppress the divider's transparent padding band (which paints the
+            // page bg — white on per-section-colored stores) when the footer
+            // itself is colored, so it never shows as a white stripe above a
+            // colored footer. Same fix as the homepage section dividers.
+            hideForExplicitBg={!!layout?.footer?.bgColor}
+          />
+        )}
+        {/* Footer wrapper carries data-zone for typography emitter targeting.
           Background override is NOT applied here — the theme's <footer>
           inside paints over it. We pass bgColor down via the FooterProps
           prop instead so the theme can replace its default bg class with
           the merchant's inline color. Ahmad 2026-05-20: footer bg save was
           not landing because of this nested-bg paint-over. */}
-      <div data-zone="footer" className={sectionVisibilityClass(layout?.footer) ?? undefined}>
-        <T.Footer
-          branding={branding}
-          contact={{
-            email: contact.email,
-            phone: contact.phone,
-            phoneAr: contact.phoneAr,
-            whatsapp: contact.whatsapp,
-            address: contact.address,
-            addressAr: contact.addressAr,
-            addressUrl,
-            addressLink,
-          }}
-          socials={contact.socialLinks}
-          navigation={filteredNavigation}
-          footerLinks={footerLinks}
-          hidePoweredBy={store.enabledFeatures?.includes('remove_branding') === true}
-          // Pages the merchant explicitly disabled in /content/<slug>.
-          // The footer hides matching legal links so a disabled Privacy
-          // page doesn't leave a dead "Privacy" link in the bottom bar.
-          // The returns feature switched off counts as the returns page off: the
-          // legal row's Returns link drops with it (S-01). Unknown features keep it.
-          disabledCmsSlugs={footerDisabledSlugs(store.disabledCmsSlugs, store.enabledFeatures)}
-          isRtl={isRtl}
-          urlPrefix={urlPrefix}
-          bgColor={
-            layout?.footer?.bgColor
-              ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
-              : undefined
-          }
-          footerLogo={store.theme?.footerLogo ?? undefined}
-          footerLogoInvert={store.theme?.footerLogoInvert === true}
-          hideFooterLogoMobile={store.theme?.hideFooterLogoMobile === true}
-          footerLogoAutoFilter={footerLogoContrastFilter(
-            resolveFooterAutoContrastBg(
-              store.template,
-              store.theme,
+        <div data-zone="footer" className={sectionVisibilityClass(layout?.footer) ?? undefined}>
+          <T.Footer
+            branding={branding}
+            contact={{
+              email: contact.email,
+              phone: contact.phone,
+              phoneAr: contact.phoneAr,
+              whatsapp: contact.whatsapp,
+              address: contact.address,
+              addressAr: contact.addressAr,
+              addressUrl,
+              addressLink,
+            }}
+            socials={contact.socialLinks}
+            navigation={filteredNavigation}
+            footerLinks={footerLinks}
+            hidePoweredBy={store.enabledFeatures?.includes('remove_branding') === true}
+            // Pages the merchant explicitly disabled in /content/<slug>.
+            // The footer hides matching legal links so a disabled Privacy
+            // page doesn't leave a dead "Privacy" link in the bottom bar.
+            // The returns feature switched off counts as the returns page off: the
+            // legal row's Returns link drops with it (S-01). Unknown features keep it.
+            disabledCmsSlugs={footerDisabledSlugs(store.disabledCmsSlugs, store.enabledFeatures)}
+            isRtl={isRtl}
+            urlPrefix={urlPrefix}
+            bgColor={
               layout?.footer?.bgColor
                 ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
                 : undefined
-            ),
-            store.theme?.footerLogoInvert
-          )}
-          theme={store.theme}
-          locations={store.locations}
-        />
-      </div>
-      {/* afterFooter — empty placeholder so any merchant-injected text
+            }
+            footerLogo={store.theme?.footerLogo ?? undefined}
+            footerLogoInvert={store.theme?.footerLogoInvert === true}
+            hideFooterLogoMobile={store.theme?.hideFooterLogoMobile === true}
+            footerLogoAutoFilter={footerLogoContrastFilter(
+              resolveFooterAutoContrastBg(
+                store.template,
+                store.theme,
+                layout?.footer?.bgColor
+                  ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
+                  : undefined
+              ),
+              store.theme?.footerLogoInvert
+            )}
+            theme={store.theme}
+            locations={store.locations}
+          />
+        </div>
+        {/* afterFooter — empty placeholder so any merchant-injected text
           below the footer (cookie disclaimer, copyright, etc) inherits
           the typography zone. Kept zero-height when there's no content. */}
-      <div data-zone="afterFooter" />
-      {/* Sprint 3 (2026-05-17): mobile sticky bottom tab bar. Hides
+        <div data-zone="afterFooter" />
+        {/* Sprint 3 (2026-05-17): mobile sticky bottom tab bar. Hides
           itself on PDP / checkout / auth routes via usePathname inside
           the component. Mounts last so its fixed positioning sits above
           everything else in the chrome. Merchant color overrides from
           layout.bottomBar are threaded in (page-builder 2026-06-17). */}
-      <BottomTabBar
-        bottomBar={layout?.bottomBar}
-        theme={store.theme}
-        navigation={filteredNavigation}
-      />
+        <BottomTabBar
+          bottomBar={layout?.bottomBar}
+          theme={store.theme}
+          navigation={filteredNavigation}
+        />
+        {/* Ruling B4-6: a look with chrome.cartBar shows the browse cart bar on browse routes. */}
+        <StickyBrowseCartBar />
 
-      {/* Floating Widget — opt-in engagement feature 2026-05-21. Renders
+        {/* Floating Widget — opt-in engagement feature 2026-05-21. Renders
           only when:
             1. `floating_widget` is in store.enabledFeatures (super-admin
                gated via the feature registry), AND
             2. `store.settings.floatingWidget.enabled` is true (merchant
                flipped it on from /stores/[id]/floating-widget).
           When either gate fails, FloatingWidget returns null. */}
-      {store.enabledFeatures?.includes('floating_widget') && (
-        <FloatingWidget
-          config={(store.settings?.floatingWidget as FloatingWidgetConfig | undefined) ?? undefined}
-          theme={store.theme}
-          isRtl={isRtl}
-          contact={{ whatsapp: contact.whatsapp, phone: contact.phone }}
-          socials={{
-            instagram: contact.socialLinks?.instagram,
-            whatsapp: contact.socialLinks?.whatsapp,
-            tiktok: contact.socialLinks?.tiktok,
-            snapchat: contact.socialLinks?.snapchat,
-            youtube: contact.socialLinks?.youtube,
-            facebook: contact.socialLinks?.facebook,
-            twitter: contact.socialLinks?.twitter,
-            telegram: contact.socialLinks?.telegram,
-          }}
-        />
-      )}
-    </div>
+        {store.enabledFeatures?.includes('floating_widget') && (
+          <FloatingWidget
+            config={
+              (store.settings?.floatingWidget as FloatingWidgetConfig | undefined) ?? undefined
+            }
+            theme={store.theme}
+            isRtl={isRtl}
+            contact={{ whatsapp: contact.whatsapp, phone: contact.phone }}
+            socials={{
+              instagram: contact.socialLinks?.instagram,
+              whatsapp: contact.socialLinks?.whatsapp,
+              tiktok: contact.socialLinks?.tiktok,
+              snapchat: contact.socialLinks?.snapchat,
+              youtube: contact.socialLinks?.youtube,
+              facebook: contact.socialLinks?.facebook,
+              twitter: contact.socialLinks?.twitter,
+              telegram: contact.socialLinks?.telegram,
+            }}
+          />
+        )}
+      </div>
+    </CardStepperProvider>
   );
 }
 

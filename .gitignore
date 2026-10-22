@@ -195,7 +195,9 @@ scripts/qamar-demo/__pycache__/
 apps/web/public/__qamar-demo/
 scripts/souq-demo/img-src/
 scripts/jasmine-demo/img-src/
+scripts/lamma-demo/img-src/
 apps/web/public/__jasmine-demo/
+apps/web/public/__lamma-demo/
 
 # Python bytecode (any script folder), never committed
 **/__pycache__/

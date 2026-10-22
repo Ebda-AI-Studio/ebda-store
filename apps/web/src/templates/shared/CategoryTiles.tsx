@@ -6,6 +6,16 @@ import { SectionHeading } from './SectionHeading';
 import { pickLocalizedName } from './display-helpers';
 import type { CategoryStripProps } from '../types';
 
+/**
+ * Aisle tint (Phase B4, Ruling B4-2): a 20% wash of one aisle colour over the page (taste P2: 13% read as an empty pale frame); the still
+ * is cropped to the tile and multiplied into the wash, so a photo shot on white takes the aisle colour. The name
+ * is ALWAYS present and ink-coloured, so colour never carries the meaning alone; the washes stay
+ * above 10:1 for ink (checked in tests/unit/lamma-variants-render.test.tsx for the Market aisles).
+ */
+export const AISLE_TINT_PERCENT = 20;
+export const aisleTint = (hex: string) =>
+  `color-mix(in srgb, ${hex} ${AISLE_TINT_PERCENT}%, hsl(var(--background)))`;
+
 // Tile widths for a wrapping, CENTRED row (STOP-2 re-audit): seven categories at four across end
 // in a centred row of three instead of a left-hugging orphan. gap-3 = 0.75rem.
 const MOBILE_W: Record<number, string> = {
@@ -49,7 +59,15 @@ export function CategoryTiles({
   captionPosition = 'below',
   mobileColumns = 2,
   desktopColumns = 4,
-}: CategoryStripProps & { mobileColumns?: number; desktopColumns?: number }) {
+  tint,
+  aisles,
+}: CategoryStripProps & {
+  mobileColumns?: number;
+  desktopColumns?: number;
+  /** `aisles` washes each tile in the look's aisle colours in turn; absent = the card surface. */
+  tint?: 'none' | 'aisles';
+  aisles?: readonly string[];
+}) {
   const { store } = useStore();
   if (!categories || categories.length === 0) return null;
   const overlay = captionPosition === 'overlay';
@@ -82,8 +100,12 @@ export function CategoryTiles({
         />
         <nav aria-label={isRtl ? 'الأقسام' : 'Categories'}>
           <ul className="flex flex-wrap justify-center gap-3">
-            {categories.map(c => {
+            {categories.map((c, index) => {
               const name = pickLocalizedName(c, Boolean(isRtl)) ?? c.name;
+              const wash =
+                tint === 'aisles' && aisles && aisles.length > 0
+                  ? aisleTint(aisles[index % aisles.length])
+                  : undefined;
               return (
                 <li
                   key={c.id}
@@ -96,6 +118,8 @@ export function CategoryTiles({
                     <span
                       className="relative block aspect-square w-full overflow-hidden rounded-[var(--radius)] bg-card"
                       data-part="tile"
+                      data-aisle={wash ? index % (aisles?.length ?? 1) : undefined}
+                      style={wash ? { backgroundColor: wash } : undefined}
                     >
                       {c.image ? (
                         <Image
@@ -103,7 +127,9 @@ export function CategoryTiles({
                           alt=""
                           fill
                           sizes="(min-width: 768px) 25vw, 50vw"
-                          className="object-contain p-3"
+                          className={
+                            wash ? 'object-cover mix-blend-multiply' : 'object-contain p-3'
+                          }
                         />
                       ) : (
                         <span

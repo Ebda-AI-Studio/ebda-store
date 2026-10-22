@@ -17,7 +17,7 @@ import {
   TEMPLATE_FAMILIES,
   themeToCssVars,
 } from '@ebda/shared';
-import { isOrangeFamily } from './helpers/orange-gate';
+import { isOrangeFamily, isForbiddenOrange } from './helpers/orange-gate';
 
 const root = path.resolve(__dirname, '../..');
 const jasmine = LOOKS.filter(l => l.template === 'jasmine');
@@ -111,75 +111,10 @@ describe('jasmine looks: painted text pairs >= 4.5, UI pairs >= 3', () => {
   });
 });
 
-/**
- * Ruling B3-2: the scoped brass exception (B2-18) gains exactly one entry. Exactly this hex,
- * exactly `jasmine.apothecary`, exactly the primary-CTA roles (the look token `primary`, the
- * composed theme / CSS roles that carry it, and the chip fill `--chip-bg` that resolves to the
- * primary pair, as on Night souq, B2-26). Nothing else of Apothecary, no other Jasmine look, no
- * other hex.
- */
 const BRASS = '#C89B3C';
 const BRASS_TRIPLET = hexToHsl(BRASS);
-const BRASS_ALLOWLIST = [
-  { look: 'souq.night', hex: BRASS },
-  { look: 'jasmine.apothecary', hex: BRASS },
-] as const;
-const BRASS_KEYS = ['primary', 'primaryColor', 'ringColor', '--primary', '--ring', '--chip-bg'];
-function brassCtaException(lookId: string, key: string, value: string): boolean {
-  return (
-    BRASS_ALLOWLIST.some(a => a.look === lookId) &&
-    BRASS_KEYS.includes(key) &&
-    (value.toUpperCase() === BRASS || value === BRASS_TRIPLET)
-  );
-}
-const forbiddenOrange = (lookId: string, key: string, value: string) =>
-  isOrangeFamily(value) && !brassCtaException(lookId, key, value);
-
-describe('Ruling B3-2: brass is allowed ONLY as the Apothecary (and Night souq) CTA tokens', () => {
-  it('the allowlist is exactly two entries, one hex', () => {
-    expect(BRASS_ALLOWLIST.map(a => a.look)).toEqual(['souq.night', 'jasmine.apothecary']);
-    expect(new Set(BRASS_ALLOWLIST.map(a => a.hex))).toEqual(new Set([BRASS]));
-  });
-  it('passes for the Apothecary primary CTA roles', () => {
-    for (const k of BRASS_KEYS)
-      expect(
-        forbiddenOrange(
-          'jasmine.apothecary',
-          k,
-          k.includes('-') || /Color$/.test(k) ? BRASS_TRIPLET : BRASS
-        ),
-        k
-      ).toBe(false);
-  });
-  it('the same hex FAILS on another Jasmine look and on every other Apothecary role', () => {
-    for (const look of ['jasmine.bloom', 'jasmine.clinic', 'qamar.vitrine', 'souq.catalogue'])
-      expect(forbiddenOrange(look, 'primary', BRASS), look).toBe(true);
-    for (const k of ['accent', 'page', 'surface', 'line', 'ink', 'muted', 'onPrimary', 'onAccent'])
-      expect(forbiddenOrange('jasmine.apothecary', k, BRASS), k).toBe(true);
-    for (const k of [
-      'accentColor',
-      'borderColor',
-      '--accent',
-      '--warning',
-      '--warning-ink',
-      '--sale',
-    ])
-      expect(forbiddenOrange('jasmine.apothecary', k, BRASS_TRIPLET), k).toBe(true);
-  });
-  it('real oranges and ambers stay banned, even on Apothecary primary (exact hex only)', () => {
-    for (const hex of ['#C9822B', '#E68245', '#FF6E01', '#E8A33D', '#C89B3D', '#C99B3C', '#D4A03C'])
-      expect(forbiddenOrange('jasmine.apothecary', 'primary', hex), hex).toBe(true);
-    expect(forbiddenOrange('jasmine.apothecary', 'primaryColor', '38 92% 50%')).toBe(true);
-  });
-  it('brass appears in exactly one Jasmine look token', () => {
-    const withBrass = jasmine.flatMap(l =>
-      Object.entries(l.tokens)
-        .filter(([, v]) => typeof v === 'string' && v.toUpperCase() === BRASS)
-        .map(([k]) => `${l.id}.${k}`)
-    );
-    expect(withBrass).toEqual(['jasmine.apothecary.primary']);
-  });
-});
+/** Ruling METAL-1: one rule (`isMetal`, helpers/orange-gate.ts) replaces the per-look brass exceptions. */
+const forbiddenOrange = (_lookId: string, _key: string, value: string) => isForbiddenOrange(value);
 
 describe('Rulings B2-2 / B3-2 / B3-3: no orange anywhere in a Jasmine look', () => {
   for (const l of jasmine) {

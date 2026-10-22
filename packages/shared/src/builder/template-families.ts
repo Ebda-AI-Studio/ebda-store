@@ -107,13 +107,17 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'announcement',
       'header',
       'hero',
+      'maker-profile',
       'product-carousel',
+      'featured-collection',
       'category-grid',
       'trust-strip',
       'blog-carousel',
       'footer',
     ],
     pendingSectionTypes: [],
+    // Phase B4 (Ruling B4-1): Lamma has its own chrome skin; the looks decide the mixes.
+    skin: 'lamma',
   },
   {
     id: 'jasmine',

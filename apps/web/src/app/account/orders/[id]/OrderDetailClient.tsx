@@ -32,6 +32,7 @@ import {
 } from '@/lib/order-labels';
 import { WaMeOrderQuestionButton } from '../../../../templates/shared/WaMeButtons';
 import { CartLineNote } from '../../../../components/commerce/CartLineNote';
+import { ReorderOrderButton } from '../../../../components/commerce/ReorderOrderButton';
 
 interface OrderDetail {
   id: string;
@@ -396,7 +397,13 @@ export default function OrderDetailClient() {
         </div>
       </div>
 
-      <WaMeOrderQuestionButton orderNumber={order.orderNumber} className="self-start" />
+      <div className="flex flex-wrap items-center gap-3">
+        <WaMeOrderQuestionButton orderNumber={order.orderNumber} className="self-start" />
+        {/* Ruling B4-8: only on an order that was paid or delivered (never a cancelled one). */}
+        {(order.paymentStatus === 'paid' || order.status === 'delivered') &&
+          order.status !== 'cancelled' &&
+          order.status !== 'refunded' && <ReorderOrderButton items={order.items} />}
+      </div>
 
       {/* Timeline info */}
       {(order.shippedAt || order.deliveredAt) && (

@@ -65,6 +65,13 @@ interface StorefrontProductCardProps extends ProductCardProps {
    * tracking, color); this drives SIZE responsively. Sprint 1 2026-05-17.
    */
   cardSize?: ProductCardSize;
+  /**
+   * `row` (Phase B4, Ruling B4-1): the SAME card laid out as a dish row for a menu: the photo at
+   * the inline start as a fixed thumbnail, name, facts, price and the one add control / stepper
+   * beside it. Same data, same helpers, same badges; only the geometry differs. The wishlist heart
+   * is left off a row (a menu is not a browsing grid). Absent = the vertical card, unchanged.
+   */
+  orientation?: 'row';
 }
 
 /**
@@ -97,6 +104,7 @@ function StorefrontProductCardImpl({
   urlPrefix = '',
   pack,
   cardSize,
+  orientation,
   cardAspect,
   cardShape,
   showCardFrame,
@@ -158,6 +166,7 @@ function StorefrontProductCardImpl({
   const pricing = getProductPricing(product, undefined, 'card');
 
   const inStock = product.inStock !== false;
+  const row = orientation === 'row';
   // Task 13: backorder-aware orderable signal. OOS products with backorder
   // allowed are still orderable — CTA stays pressable, no OOS label shown.
   const orderable = canBuyNow(product);
@@ -242,7 +251,7 @@ function StorefrontProductCardImpl({
     // Issue #1998 — top-corner sale badge unless the store keeps the legacy
     // bottom-left corner (per-store StoreTheme DATA, never a slug check).
     saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
-    topStartReserved: true,
+    topStartReserved: !row,
     // No bottom-band CTA overlay here — Storefront's Add-to-Cart button is a
     // normal block element below the name/price, not an image overlay.
     bottomOverlay: 'none',
@@ -274,7 +283,7 @@ function StorefrontProductCardImpl({
   const onLook = !!getLook(store.look);
   // The heart holds top-start on this card; the sale chip may hold top-end (X-01 class).
   const newCorner = newBadgeCornerCls({
-    topStartReserved: true,
+    topStartReserved: !row,
     topEndReserved: onSale && discountBadgeAllowed && discountTopCorner === 'end',
   });
 
@@ -297,7 +306,7 @@ function StorefrontProductCardImpl({
       // verified zero rendered-output change for the `showCardFrame` +
       // pack-style combination (see design-sweep PR).
       className={cn(
-        'group relative flex flex-col w-full transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+        `group relative flex ${row ? 'flex-row items-stretch gap-3' : 'flex-col'} w-full transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]`,
         // IA-05 (W4): on a look store the card fills its grid column, so the first card starts at
         // the section edge like the carousels; a store with no look keeps the compact, centred cap.
         onLook ? '' : 'mx-auto',
@@ -324,37 +333,39 @@ function StorefrontProductCardImpl({
           so rounded card shapes never clip this button.
           Keeps absolute top-3 start-3 z-20 so it sits at the same
           visual position as before. */}
-      <button
-        type="button"
-        onClick={handleWishlist}
-        aria-label={cardActionLabel('wishlist-add', isRtl, name)}
-        aria-pressed={isWishlisted}
-        // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
-        // but before:-inset-1.5 grows the actual tap target to ~52px so it
-        // clears the 44px a11y floor without changing the rendered size.
-        className={
-          heartMaterial
-            ? overPhotoHeartCls(heartMaterial, isWishlisted)
-            : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
-                isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
-              }`
-        }
-      >
-        <svg
-          className="h-5 w-5"
-          fill={isWishlisted ? 'currentColor' : 'none'}
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden
+      {!row && (
+        <button
+          type="button"
+          onClick={handleWishlist}
+          aria-label={cardActionLabel('wishlist-add', isRtl, name)}
+          aria-pressed={isWishlisted}
+          // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
+          // but before:-inset-1.5 grows the actual tap target to ~52px so it
+          // clears the 44px a11y floor without changing the rendered size.
+          className={
+            heartMaterial
+              ? overPhotoHeartCls(heartMaterial, isWishlisted)
+              : `before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
+                  isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
+                }`
+          }
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-          />
-        </svg>
-      </button>
+          <svg
+            className="h-5 w-5"
+            fill={isWishlisted ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        </button>
+      )}
 
       <Link
         href={href}
@@ -367,7 +378,11 @@ function StorefrontProductCardImpl({
             ((isRtl ? resolvedOosLabelTextAr : resolvedOosLabelTextEn) ||
               t('Out of stock', 'نفد المخزون')),
         ])}
-        className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className={cn(
+          'group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+          row && 'w-32 shrink-0 self-start sm:w-44'
+        )}
+        data-card-thumb={row ? '' : undefined}
       >
         {/* Image: item 8 — aspect+radius driven by per-store cardImageAspect/cardImageRadius;
             falls back to the mobile-square / desktop-portrait theme default. Item 10 —
@@ -442,7 +457,7 @@ function StorefrontProductCardImpl({
             // Issue #548 — same reservation as the badge mutex above: this
             // card's heart is at top-start, so an OOS pill left at its
             // top-start default must move off it, not just narrow in place.
-            topStartReserved
+            topStartReserved={!row}
             topEndReserved={discountTopCorner === 'end'}
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
@@ -665,6 +680,7 @@ function StorefrontProductCardImpl({
           </button>
         ) : (
           <AdaptiveAddButton
+            stepperProductId={product.id}
             disabled={isAdding}
             loading={isAdding}
             showIcon

@@ -191,3 +191,38 @@ describe('settings.deliveryOffDays (create + update)', () => {
     expect(update.mock.calls[2][1].settings).toEqual({ deliveryOffDays: null });
   });
 });
+
+const BAD_DAYS_AHEAD = [0, 15, -1, 1.5, '5', true, {}];
+
+describe('settings.checkoutDelivery.daysAhead (Ruling B4-7, create + update)', () => {
+  it.each(BAD_DAYS_AHEAD)('POST rejects %j', async bad => {
+    const res = await request(app)
+      .post('/stores')
+      .send({ name: 'Shop', settings: { checkoutDelivery: { daysAhead: bad } } });
+    expect(res.status).toBe(400);
+    expect(create).not.toHaveBeenCalled();
+  });
+  it.each(BAD_DAYS_AHEAD)('PUT rejects %j', async bad => {
+    const res = await request(app)
+      .put(`/stores/${STORE_ID}`)
+      .send({ settings: { checkoutDelivery: { daysAhead: bad } } });
+    expect(res.status).toBe(400);
+    expect(update).not.toHaveBeenCalled();
+  });
+  it('accepts 1..14, an explicit null and an absent key, and leaves the rest of checkoutDelivery alone', async () => {
+    for (const daysAhead of [1, 5, 14, null, undefined]) {
+      const settings = {
+        checkoutDelivery: {
+          note: { enabled: false, text: '', textAr: '' },
+          windows: { enabled: true, items: [] },
+          ...(daysAhead === undefined ? {} : { daysAhead }),
+        },
+      };
+      const post = await request(app).post('/stores').send({ name: 'Shop', settings });
+      expect(post.status).toBe(201);
+      const put = await request(app).put(`/stores/${STORE_ID}`).send({ settings });
+      expect(put.status).toBe(200);
+    }
+    expect(update).toHaveBeenCalledTimes(5);
+  });
+});

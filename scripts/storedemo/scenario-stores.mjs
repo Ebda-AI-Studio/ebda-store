@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Local scenario stores for the Qamar, Souq and Jasmine matrices (tests/qamar, tests/souq, tests/jasmine). LOOPBACK
+// Local scenario stores for the Qamar, Souq, Jasmine and Lamma matrices (tests/qamar, tests/souq, tests/jasmine, tests/lamma). LOOPBACK
 // DATABASES ONLY: there is no --yes-production path. Each store is a NON-demo merchant store switched to a look through
 // StoreService.applyLook(..., { design: 'reset' }), then shaped:
 //   qamar-empty   0 products            qamar-one   1 product
@@ -19,11 +19,21 @@
 // merchant content, quality bar section 9 rule 1) and jasmine-cod. There is no card-provider store:
 // the card method is the PaymentStep unit render (B1-20).
 //
+// Lamma (--template lamma, Phase B4): lamma-empty, lamma-one, lamma-500, lamma-noimg, lamma-longnames,
+// lamma-edge-light / -dark, lamma-logo-wide / -tall / -none, lamma-white-photos (Notebook with
+// white-background merchant photos), lamma-reorder (a customer with two paid orders: the only store
+// where the "order again" row renders, Ruling B4-9), lamma-dates (a Friday off day with the made-to-order
+// lead times) and lamma-cod. The card method is the PaymentStep unit render (B1-20).
+//
 //   DATABASE_URL=<owner-role local postgres url> QAMAR_DEMO_ASSET_BASE=/__qamar-demo \
-//     npx tsx scripts/storedemo/scenario-stores.mjs [--template qamar|souq|jasmine]
+//     npx tsx scripts/storedemo/scenario-stores.mjs [--template qamar|souq|jasmine|lamma]
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+// bcryptjs is an API dependency, resolved from there (the scenario seed has no package of its own).
+const bcrypt = createRequire(import.meta.url)('bcryptjs');
 import {
   isLocalUrl,
   hostOf,
@@ -74,6 +84,27 @@ export const JASMINE_SCENARIOS = [
   ['jasmine-white-photos', 'jasmine.apothecary', { whitePhotos: true }],
   ['jasmine-cod', 'jasmine.clinic', {}],
 ];
+export const LAMMA_SCENARIOS = [
+  ['lamma-empty', 'lamma.table', { products: 0 }],
+  ['lamma-one', 'lamma.notebook', { products: 1 }],
+  ['lamma-500', 'lamma.market', { products: 500 }],
+  ['lamma-noimg', 'lamma.table', { noImages: true }],
+  ['lamma-longnames', 'lamma.market', { longNames: true }],
+  ['lamma-edge-light', 'lamma.market', { edge: 'wide', primary: '0 0% 98%' }],
+  ['lamma-edge-dark', 'lamma.table', { edge: 'tall', primary: '0 0% 4%' }],
+  ['lamma-logo-wide', 'lamma.table', { edge: 'wide' }],
+  ['lamma-logo-tall', 'lamma.notebook', { edge: 'tall' }],
+  ['lamma-logo-none', 'lamma.market', { edge: 'nologo' }],
+  // Notebook with white-background merchant photos: the dark look on real merchant content
+  // (quality bar section 9 rule 1, Review Focus 2).
+  ['lamma-white-photos', 'lamma.notebook', { whitePhotos: true }],
+  // A registered customer with two PAID orders: the only store where "order again" renders
+  // (a demo store refuses customers, Ruling B4-9). Login: lamma-reorder-customer@example.test.
+  ['lamma-reorder', 'lamma.market', { reorder: true }],
+  // The delivery-date chips with a Friday off day (store calendar) and the made-to-order lead times.
+  ['lamma-dates', 'lamma.table', { dates: true }],
+  ['lamma-cod', 'lamma.table', {}],
+];
 export const SCENARIOS = QAMAR_SCENARIOS;
 
 /** What differs per template: the lists, display names, asset dir, the one-product slug and the 500-store category/photo. */
@@ -108,6 +139,16 @@ const PER_TEMPLATE = {
     category: 'cleansers',
     photo: 'gentle-cleanser.webp',
   },
+  lamma: {
+    list: LAMMA_SCENARIOS,
+    assetDir: '__lamma-demo',
+    word: 'LAMMA',
+    name: 'Om Salma Kitchen',
+    nameAr: 'مطبخ أم سلمى',
+    one: 'okra-tagine',
+    category: 'produce',
+    photo: 'tomatoes.webp',
+  },
 };
 
 const svg = (w, h, word = 'QAMAR') =>
@@ -123,7 +164,7 @@ async function run() {
   }
   const spec = templateFromArgv(process.argv.slice(2));
   if (!spec) {
-    console.error('Unknown --template; expected qamar, souq or jasmine.');
+    console.error('Unknown --template; expected qamar, souq, jasmine or lamma.');
     process.exit(2);
   }
   const T = PER_TEMPLATE[spec.template];
@@ -264,6 +305,71 @@ async function run() {
               },
             });
         }
+        // A customer with two PAID orders (Ruling B4-8): the reorder row's only live exercise.
+        if (shape.reorder) {
+          const email = 'lamma-reorder-customer@example.test';
+          const passwordHash = await bcrypt.hash('Reorder-Customer-1', 10);
+          const cust =
+            (await prisma.user.findFirst({ where: { email, storeId: s.id } })) ??
+            (await prisma.user.create({
+              data: {
+                email,
+                storeId: s.id,
+                passwordHash,
+                firstName: 'Reorder',
+                lastName: 'Customer',
+                role: 'customer',
+                emailVerified: true,
+              },
+            }));
+          const prods = await prisma.product.findMany({
+            where: {
+              storeId: s.id,
+              status: 'active',
+              slug: { in: ['okra-tagine', 'kofta-grilled', 'tomatoes', 'fresh-milk'] },
+            },
+            select: { id: true, name: true, slug: true, price: true },
+          });
+          const addr = {
+            firstName: 'Reorder',
+            lastName: 'Customer',
+            address1: 'Demo',
+            city: 'Cairo',
+            country: 'EG',
+          };
+          for (const [n, slugs] of [
+            [1, ['okra-tagine', 'tomatoes']],
+            [2, ['kofta-grilled', 'fresh-milk']],
+          ]) {
+            const orderNumber = `LAMMA-RO-${s.id.slice(0, 8)}-${n}`;
+            if (await prisma.order.findUnique({ where: { orderNumber } })) continue;
+            const items = prods.filter(p => slugs.includes(p.slug));
+            const total = items.reduce((sum, p) => sum + p.price, 0);
+            await prisma.order.create({
+              data: {
+                storeId: s.id,
+                customerId: cust.id,
+                orderNumber,
+                status: 'delivered',
+                paymentStatus: 'paid',
+                subtotal: total,
+                total,
+                shippingAddress: addr,
+                billingAddress: addr,
+                createdAt: new Date(Date.now() - n * 86_400_000),
+                items: {
+                  create: items.map(p => ({
+                    productId: p.id,
+                    productName: p.name,
+                    quantity: 1,
+                    price: p.price,
+                    total: p.price,
+                  })),
+                },
+              },
+            });
+          }
+        }
         const r = await StoreService.applyLook(s.id, lookId, { design: 'reset' }, owner.id);
         if (r.builder === 'draft') {
           const state = await getPageState(s.id, 'home');
@@ -271,6 +377,16 @@ async function run() {
           // A re-run applies the same look again: nothing new to publish is not a failure.
           if (!pub.ok && !/not ready/i.test(pub.message))
             throw new Error(`publishDraft: ${pub.message}`);
+        }
+        if (shape.dates) {
+          const row = await prisma.store.findUnique({
+            where: { id: s.id },
+            select: { settings: true },
+          });
+          await prisma.store.update({
+            where: { id: s.id },
+            data: { settings: { ...(row?.settings ?? {}), deliveryOffDays: [5] } },
+          });
         }
         if (edge || shape.primary) {
           const row = await prisma.store.findUnique({

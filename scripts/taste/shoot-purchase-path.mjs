@@ -178,10 +178,31 @@ export const ACTIONS = {
       .click();
     await page.waitForTimeout(1500);
   },
+  async 'select-delivery-chips'(page) {
+    // A store with delivery date chips: the SELECTED state is the filled chip with its captions, the
+    // one a probe on unselected chips never sees (B4 a11y P1-2). Elsewhere this screen is a no-op.
+    const dates = page.getByRole('radiogroup', { name: /Delivery date|يوم التوصيل/ });
+    if (!(await dates.count())) return;
+    await dates.getByRole('radio').first().click();
+    const wins = page.getByRole('radiogroup', { name: /Delivery window|موعد التوصيل/ });
+    if (await wins.count())
+      await wins.getByRole('radio').and(page.locator(':enabled')).first().click();
+    await page.waitForTimeout(400);
+  },
   async 'place-cod-order'(page) {
     // Continues from the payment step the previous screen left open.
     const cod = page.locator('input[type="radio"][value="cod"]');
     if (await cod.count()) await cod.check();
+    // A store with delivery date chips (Phase B4, Ruling B4-7) needs a date and, with windows, a
+    // bookable window: take the first date and the first enabled window, as a shopper would.
+    const dates = page.getByRole('radiogroup', { name: /Delivery date|يوم التوصيل/ });
+    if (await dates.count()) {
+      await dates.getByRole('radio').first().click();
+      const wins = page.getByRole('radiogroup', { name: /Delivery window|موعد التوصيل/ });
+      if (await wins.count())
+        await wins.getByRole('radio').and(page.locator(':enabled')).first().click();
+      await page.waitForTimeout(300);
+    }
     await page
       .getByRole('button', { name: /Place order|تأكيد الطلب/ })
       .first()
@@ -224,7 +245,7 @@ async function main() {
   const screens = MANIFEST.screens
     .filter(s => !only || only.includes(s.id))
     .map(s => ({ ...s, path: pathOverride[s.id] ?? s.path }));
-  const viewportIds = MANIFEST.viewports.filter(v => !onlyViewports || onlyViewports.includes(v));
+  const viewportIds = onlyViewports ?? MANIFEST.viewports; // an explicit --viewports may name one the manifest does not list (e.g. 1280-ar)
   const u = new URL(base);
   const host = `${store}.${u.hostname}`;
   const origin = `${u.protocol}//${host}${u.port ? `:${u.port}` : ''}`;

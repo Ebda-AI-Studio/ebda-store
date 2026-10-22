@@ -51,6 +51,7 @@ import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
 import { variantRequiredError } from '../lib/variant-required';
+import { resolveOrderDeliveryNote } from '../lib/order-delivery-slot';
 import { CartService } from './cart.service';
 import { resolveBundle } from './bundle.service';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
@@ -198,6 +199,9 @@ interface CreateOrderData {
   };
   paymentMethod: string;
   notes?: string;
+  /** The delivery date (store-local YYYY-MM-DD) + window picked at a `daysAhead` checkout (Ruling B4-7). A request, validated against live settings. */
+  deliveryDate?: string;
+  deliveryWindowId?: string;
   couponCode?: string;
   /** Loyalty points the customer requested to redeem at checkout. The server
    *  re-resolves this against the customer's real balance + the store's
@@ -744,6 +748,8 @@ export class OrderService {
         costPrice: true,
         // B2B minimum order quantity (Review Focus 7): judged below on the product total.
         moq: true,
+        // Made-to-order lead time: the longest one in the cart sets the earliest delivery date (Ruling B4-7).
+        leadTimeDays: true,
         audience: true,
         name: true,
         nameAr: true,
@@ -1054,7 +1060,7 @@ export class OrderService {
     const storeForMinOrder = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { settings: true },
+        select: { settings: true, timezone: true },
       })
     );
     const minimumOrderFilsRaw = (storeForMinOrder?.settings as Record<string, unknown> | null)?.[
@@ -1070,6 +1076,28 @@ export class OrderService {
         `Minimum order value of ${minorToDecimalString(minimumOrderFils as number)} EGP required`
       );
     }
+
+    // Ruling B4-7: a store with `checkoutDelivery.daysAhead` takes a delivery DATE; the offered set is
+    // recomputed here from the live store row and the cart's longest lead time, a pick outside it is
+    // 422 DELIVERY_SLOT_UNAVAILABLE, and this is the only writer of the note's delivery line.
+    // A quote (dryRun) never refuses on it.
+    const deliveryNoteLine = requestContext?.dryRun
+      ? null
+      : resolveOrderDeliveryNote({
+          settings: storeForMinOrder?.settings as Record<string, unknown> | null | undefined,
+          timeZone: storeForMinOrder?.timezone,
+          now: new Date(),
+          maxLeadTimeDays: Math.max(0, ...productInternals.map(p => p.leadTimeDays ?? 0)),
+          deliveryDate: data.deliveryDate,
+          deliveryWindowId: data.deliveryWindowId,
+          locale: data.locale,
+          enforce: (data.source ?? 'web') === 'web',
+        });
+    const orderNotes = deliveryNoteLine
+      ? data.notes
+        ? `${deliveryNoteLine}\n${data.notes}`
+        : deliveryNoteLine
+      : data.notes;
 
     // Resolve the store's configured tax rate. The tax itself is computed
     // below, once the discount is known — VAT is levied after discount (#193).
@@ -1801,7 +1829,7 @@ export class OrderService {
             manualHoldAdmitted,
             shippingAddress: data.shippingAddress,
             billingAddress: data.billingAddress || data.shippingAddress,
-            notes: data.notes,
+            notes: orderNotes,
             items: {
               create: [
                 ...cart.items.map(item => ({

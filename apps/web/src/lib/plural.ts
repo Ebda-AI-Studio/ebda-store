@@ -128,6 +128,22 @@ export const ITEMS_ADDED: CountedNoun = {
   },
 };
 
+/** "Order again": the lines of an old order that could not go back into the cart. */
+export const ITEMS_UNAVAILABLE: CountedNoun = {
+  en: {
+    one: '{n} item is not available right now',
+    other: '{n} items are not available right now',
+  },
+  ar: {
+    zero: 'مفيش قطع مش متاحة',
+    one: 'قطعة واحدة مش متاحة دلوقتي',
+    two: 'قطعتين مش متاحين دلوقتي',
+    few: '{n} قطع مش متاحة دلوقتي',
+    many: '{n} قطعة مش متاحة دلوقتي',
+    other: '{n} قطعة مش متاحة دلوقتي',
+  },
+};
+
 /** FBT "add all": the lines that still need a size/colour. */
 export const ITEMS_NEED_OPTIONS: CountedNoun = {
   en: { one: '{n} item needs a variant', other: '{n} items need a variant' },

@@ -14,6 +14,7 @@ import {
   templateFromArgv,
   SOUQ_PROD_ASSET_BASE,
   JASMINE_PROD_ASSET_BASE,
+  LAMMA_PROD_ASSET_BASE,
   seedStoreClaim,
   SHOWROOM_THEME,
   // @ts-expect-error plain .mjs script
@@ -242,6 +243,77 @@ describe('storedemo seed: --template jasmine (Ruling B3-8)', () => {
     const remote = pg('a:b@ep-x.neon.tech/db');
     expect(guard(remote, ['--template', 'jasmine']).ok).toBe(false);
     expect(guard(remote, ['--template', 'jasmine', '--yes-production']).ok).toBe(true);
+  });
+});
+
+describe('storedemo seed: --template lamma (Ruling B4-10)', () => {
+  const lamma = TEMPLATE_SPECS.lamma;
+  it('--template lamma picks the fourth spec', () => {
+    expect(templateFromArgv(['--template', 'lamma'])).toBe(lamma);
+  });
+  it('the fourth demo store: own slug, own owner without a mailbox, own default look', () => {
+    expect(lamma.slug).toBe('storedemo-lamma');
+    expect(lamma.ownerEmail).toBe('storedemo-lamma-owner@ebda.app');
+    expect(lamma.defaultLook).toBe('lamma.table');
+    for (const other of [TEMPLATE_SPECS.qamar, TEMPLATE_SPECS.souq, TEMPLATE_SPECS.jasmine]) {
+      expect(lamma.slug).not.toBe(other.slug);
+      expect(lamma.ownerEmail).not.toBe(other.ownerEmail);
+    }
+    expect(lamma.slug.startsWith('storedemo-')).toBe(true);
+  });
+  it('local look stores: one per Lamma look, on its own look', () => {
+    expect(lamma.localLookStores).toEqual([
+      ['lamma-table', 'lamma.table'],
+      ['lamma-notebook', 'lamma.notebook'],
+      ['lamma-market', 'lamma.market'],
+    ]);
+  });
+  it('production run accepts only https://media.ebda.app/demo/lamma, never another template base', () => {
+    expect(LAMMA_PROD_ASSET_BASE).toBe('https://media.ebda.app/demo/lamma');
+    expect(
+      assetBase(['--yes-production'], { LAMMA_DEMO_ASSET_BASE: LAMMA_PROD_ASSET_BASE }, lamma).ok
+    ).toBe(true);
+    expect(assetBase(['--yes-production'], {}, lamma).base).toBe(LAMMA_PROD_ASSET_BASE);
+    for (const bad of [
+      'http://localhost:9000',
+      'https://media.ebda.app/demo/qamar',
+      JASMINE_PROD_ASSET_BASE,
+      SOUQ_PROD_ASSET_BASE,
+      '/__lamma-demo',
+    ])
+      expect(assetBase(['--yes-production'], { LAMMA_DEMO_ASSET_BASE: bad }, lamma).ok, bad).toBe(
+        false
+      );
+    expect(assetBase([], { LAMMA_DEMO_ASSET_BASE: '/__lamma-demo' }, lamma).base).toBe(
+      '/__lamma-demo'
+    );
+    // another template's asset env var never leaks into a Lamma run
+    expect(assetBase([], { JASMINE_DEMO_ASSET_BASE: '/__jasmine-demo' }, lamma).base).toBe(
+      LAMMA_PROD_ASSET_BASE
+    );
+  });
+  it('describePlan names the catalogue, the store settings and no archive, and never prints the password', () => {
+    const plan = describePlan(pg('user:secretpw@localhost:5432/x'), lamma);
+    expect(plan).toContain('lamma: 28 products,');
+    expect(plan).toContain('8 categories');
+    expect(plan).toContain('store settings: minimumOrderFils, deliveryOffDays, checkoutDelivery');
+    expect(plan).toContain('storedemo-lamma');
+    expect(plan).toContain('the Lamma superset document');
+    expect(plan).not.toContain('archived:');
+    expect(plan).not.toContain('secretpw');
+  });
+  it('only Lamma writes the food-shop settings; the other plans are unchanged', () => {
+    for (const other of [TEMPLATE_SPECS.qamar, TEMPLATE_SPECS.souq, TEMPLATE_SPECS.jasmine]) {
+      expect(other.storeSettings).toBeUndefined();
+      expect(other.zone).toBeUndefined();
+      expect(other.announcement).toBeUndefined();
+      expect(describePlan(pg('a:b@localhost/x'), other)).not.toContain('store settings:');
+    }
+  });
+  it('the guard is the same: a remote host needs --yes-production', () => {
+    const remote = pg('a:b@ep-x.neon.tech/db');
+    expect(guard(remote, ['--template', 'lamma']).ok).toBe(false);
+    expect(guard(remote, ['--template', 'lamma', '--yes-production']).ok).toBe(true);
   });
 });
 

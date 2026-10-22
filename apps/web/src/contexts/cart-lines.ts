@@ -20,6 +20,8 @@ export interface ServerCartItem {
     price: number;
     images?: Array<{ id: string; url: string; alt?: string | null }>;
     categories?: Array<{ category: { name?: string; nameAr?: string } }>;
+    /** Made-to-order lead time (business days): the longest in the cart sets the earliest delivery date. */
+    leadTimeDays?: number | null;
   };
   variant?: { id: string; title: string; titleAr?: string | null; price?: number } | null;
   unavailable?: boolean;
@@ -63,6 +65,7 @@ export function mapServerItem(item: ServerCartItem): CartItem {
     variantTitleAr: item.variant?.titleAr ?? undefined,
     note: item.note ?? undefined,
     unavailable: item.unavailable === true ? true : undefined,
+    leadTimeDays: item.product.leadTimeDays ?? undefined,
   };
 }
 

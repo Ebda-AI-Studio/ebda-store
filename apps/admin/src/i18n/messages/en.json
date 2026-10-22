@@ -1976,6 +1976,7 @@
         "sourceNewest": "Newest (same as New Arrivals)",
         "sourceBestSellers": "Best sellers",
         "sourceOnSale": "On sale",
+        "sourceReorder": "Order again (the customer's last products)",
         "sourceFeatured": "Featured",
         "sourceCategory": "Category",
         "sourceManual": "Manual product list",
@@ -5428,7 +5429,8 @@
         "dahab": "Dahab",
         "qamar": "Qamar",
         "souq": "Souq",
-        "jasmine": "Jasmine"
+        "jasmine": "Jasmine",
+        "lamma": "Lamma"
       }
     }
   },
@@ -8497,7 +8499,11 @@
       "deliveryOffDay3": "Wednesday",
       "deliveryOffDay4": "Thursday",
       "deliveryOffDay5": "Friday",
-      "deliveryOffDay6": "Saturday"
+      "deliveryOffDay6": "Saturday",
+      "daysAheadTitle": "Delivery date",
+      "daysAheadHint": "Let customers pick a delivery date instead of only today or tomorrow. The date, and the time window if you use them, are checked again when the order is placed.",
+      "daysAheadLabel": "Days to offer",
+      "daysAheadOff": "Off (today or tomorrow only)"
     }
   },
   "customerGroups": {

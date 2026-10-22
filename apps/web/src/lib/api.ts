@@ -327,6 +327,8 @@ interface Order {
   items: Array<{
     id: string;
     productId: string;
+    /** The variant the customer bought (the order row carries it; "order again" re-adds it). */
+    variantId?: string | null;
     quantity: number;
     price: number;
     product?: Product;
@@ -1474,6 +1476,11 @@ class ApiClient {
 
   async getOrders() {
     return this.request<{ orders: Order[] }>('/public/orders');
+  }
+
+  /** "Order again" (Ruling B4-8): the signed-in customer's last distinct product ids. Per customer, never cached. */
+  async getReorderProductIds() {
+    return this.request<{ productIds: string[] }>('/public/customers/me/reorder');
   }
 
   async getOrder(orderId: string) {

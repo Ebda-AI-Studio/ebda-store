@@ -4832,6 +4832,7 @@ function ExtraCarouselCard({
               <option value="best_seller">{t('extraCarousel.sourceBestSellers')}</option>
               <option value="featured">{t('extraCarousel.sourceFeatured')}</option>
               <option value="on_sale">{t('extraCarousel.sourceOnSale')}</option>
+              <option value="reorder">{t('extraCarousel.sourceReorder')}</option>
               <option value="category">{t('extraCarousel.sourceCategory')}</option>
               <option value="manual">{t('extraCarousel.sourceManual')}</option>
             </select>

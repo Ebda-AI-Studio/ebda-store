@@ -35,6 +35,9 @@ Minimum items **subtotal** (in piastres; 100 piastres = 1 EGP) required to place
   "add X more" message below the minimum.
 - **Checkout:** `CheckoutClient.tsx` blocks the Pay button + maps the `MINIMUM_ORDER_NOT_MET`
   API code to the same friendly message.
+- **Progress (Phase B4):** a look with `chrome.cartBar` shows what is left as a sentence plus a
+  progress bar (`MinOrderProgress`) in the cart and in the browse cart bar. Advice only: the three
+  guards above are unchanged. See `docs/ebda/templates/platform-commerce.md` § 16.
 
 ## `checkoutDelivery?: { note, windows }`
 
@@ -62,6 +65,32 @@ Availability logic is the pure, unit-tested `resolveDeliverySelection(items, now
 in `apps/web/.../checkout/_lib/deliveryWindows.ts` (`getNowMinutesInTimezone` derives the
 store-local minutes). Example — window A order-by 14:00, window B order-by 19:00: at 13:59
 both available (today); 14:01 only B; 18:59 only B; 19:01 → tomorrow, both.
+
+### `daysAhead?: number | null` (Phase B4, Ruling B4-7)
+
+An integer 1-14 turns the today / tomorrow picker into a row of **date chips** for the next N delivery
+days, each with the store's windows (`DeliveryDateChips`; the first two chips read "النهاردة" / "بكرة").
+Absent or `null` = everything above, byte-identical. Validated at the settings edge on create and update
+(`addCheckoutDeliveryIssues`: 400 outside 1-14; the rest of `checkoutDelivery` is not re-validated). Edited
+on Admin → Delivery ("Delivery date", one select, 0 = off).
+
+What is offered is ONE pure function, `deliveryDateChoices` (`packages/shared/src/commerce/delivery-dates.ts`),
+run by the storefront AND by the order endpoint: the first date is today in the store timezone moved forward by
+`deliveryDays.min` + the **longest `leadTimeDays` in the cart** BUSINESS days (the `deliveryOffDays` skipped, the
+same rule as the PDP chip); today stays on offer only while at least one window can still be booked (`orderBy`,
+else `start`); then N consecutive working days. A made-to-order product therefore hides today.
+
+The order payload carries `deliveryDate` (`YYYY-MM-DD`, store-local) and `deliveryWindowId`. `OrderService.create`
+(storefront path, `source: web`) **recomputes the set from the live store row** (`resolveOrderDeliveryNote`,
+NEVER cached), refuses anything outside it with **422 `DELIVERY_SLOT_UNAVAILABLE`** (a stale date, a hand-edited
+past date, a closed window, a missing date), and **writes the delivery line itself**: the first line of `notes`,
+`"Delivery: Fri 23 Oct, Evening (6:00 PM–8:00 PM)"` / `"التوصيل: الجمعة 23 أكتوبر، عشا (6:00 م–8:00 م)"` followed by
+the customer's own note. The client no longer writes that line for such a store. Other sources (WhatsApp, the agent
+checkout) may omit the date; a date they send is validated the same way. A quote (`dryRun`) never refuses on it.
+Because the line is the existing `notes` prefix, the receipt, the account order, the admin order, the orders app and
+the emails read it unchanged; there is no column, so no structured filter by delivery date until one is added.
+The estimate input is the store-wide `deliveryDays.min` (zone estimates depend on the address and are not part of
+the date set).
 
 ## `deliveryOffDays?: number[] | null`
 

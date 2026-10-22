@@ -191,7 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq' | 'jasmine'>,
+  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq' | 'jasmine' | 'lamma'>,
   TemplateIdentity
 > = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
@@ -361,6 +361,8 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   souq: buildSouqBaseline(),
   // Ruling B3-1: Jasmine owns chrome only, same shape as Souq (looks own the section bands).
   jasmine: buildSouqBaseline(),
+  // Ruling B4-1: Lamma owns chrome only, same shape as Souq and Jasmine.
+  lamma: buildSouqBaseline(),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */
