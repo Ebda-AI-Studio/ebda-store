@@ -54,6 +54,7 @@ import {
   planLimitReachedTemplate,
   type PlanLimitReachedData,
 } from './email-templates/plan-limit-reached';
+import { lifecycleTemplate, type LifecycleEmailData } from './email-templates/lifecycle';
 import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
@@ -438,6 +439,8 @@ export class EmailService {
       content: string;
       text?: string;
       replyTo?: string;
+      /** Shell direction + brand name; default = the platform default language. */
+      language?: 'en' | 'ar';
     },
     opts?: { queue?: boolean }
   ): Promise<void> {
@@ -449,7 +452,7 @@ export class EmailService {
       email: null,
       phone: null,
       address: null,
-      defaultLanguage: resolveDefaultLanguage(undefined),
+      defaultLanguage: args.language ?? resolveDefaultLanguage(undefined),
     });
     if (opts?.queue) {
       // Durable retry queue (storeId=null → platform sender on drain).
@@ -1179,6 +1182,28 @@ export class EmailService {
         subject: subscriptionBillingTemplate.subject[lang](data),
         content: subscriptionBillingTemplate[lang](data),
         language: lang,
+      },
+      { queue: true }
+    );
+  }
+
+  /**
+   * Self-serve lifecycle email (setup nudges, trial recap, first-order referral ask) to the store owner.
+   * Platform sender and Ebda shell (night/gold), through the durable queue. Refuses to send without an
+   * unsubscribe link: consent is part of the contract, not of the template.
+   */
+  static async sendLifecycleEmail(
+    data: LifecycleEmailData & { to: string },
+    language: 'en' | 'ar' = 'ar'
+  ): Promise<void> {
+    if (!data.unsubscribeUrl) throw new Error('LIFECYCLE_EMAIL_NEEDS_UNSUBSCRIBE_URL');
+    await this.sendPlatform(
+      {
+        to: data.to,
+        subject: lifecycleTemplate.subject(data, language),
+        content: lifecycleTemplate.content(data, language),
+        language,
+        replyTo: BRAND.supportEmail,
       },
       { queue: true }
     );

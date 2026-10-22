@@ -200,6 +200,12 @@ export const PAGES: PageEntry[] = [
     feature: 'payment_abandonment',
     syn: { en: 'failed payment abandoned checkout', ar: 'دفع فاشل تخلي' },
   }),
+  page('/lifecycle-emails', `${HUB}.lifecycleEmails`, 'staff', {
+    syn: {
+      en: 'setup emails onboarding trial reminder referral unsubscribe',
+      ar: 'رسائل البداية التجربة تذكير إلغاء اشتراك',
+    },
+  }),
   // ── Stock ──────────────────────────────────────────────────────────────────
   page('/stock/dashboard', 'stock.dashboard.title', 'staff', {
     syn: { en: 'inventory overview stock levels', ar: 'نظرة عامة على المخزون' },

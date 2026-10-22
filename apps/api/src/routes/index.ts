@@ -95,6 +95,8 @@ import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
+import lifecycleEmailsRoutes from './lifecycle-emails.routes';
+import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
 import realtimeRoutes from './realtime.routes';
@@ -555,6 +557,9 @@ router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 
 // Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
+// Self-serve lifecycle emails: the merchant's log (admin) and the login-free unsubscribe link (store from the signed token).
+router.use('/stores/:storeId/lifecycle-emails', tenantContext, lifecycleEmailsRoutes);
+router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not
 // the URL, so `tenantContext` can't reach it via a mount-path param). RLS

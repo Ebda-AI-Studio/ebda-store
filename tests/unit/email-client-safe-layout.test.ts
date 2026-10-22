@@ -58,6 +58,7 @@ import { returnStatusUpdateTemplate } from '@api/services/email-templates/return
 import { reviewRequestTemplate } from '@api/services/email-templates/review-request';
 import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-alert';
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
+import { lifecycleContent } from '@api/services/email-templates/lifecycle';
 import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-disabled';
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
@@ -165,6 +166,20 @@ const CART_RECOVERY_SAMPLE = {
   unsubscribeUrl: 'https://s.test/unsubscribe?token=t',
 };
 
+const LIFECYCLE_SAMPLE = {
+  kind: 'trial_recap' as const,
+  storeName: 'Demo Store',
+  links: {
+    products: 'https://s.test/p',
+    payment: 'https://s.test/pay',
+    storefront: 'https://s.test',
+    billing: 'https://s.test/billing',
+  },
+  unsubscribeUrl: 'https://s.test/unsubscribe?token=t',
+  recoveredCarts: 2,
+  daysLeft: 4,
+};
+
 type Tpl = Record<Locale, (...a: never[]) => string>;
 const TEMPLATES: Record<string, Tpl> = {
   welcome: welcomeTemplate,
@@ -191,6 +206,11 @@ const TEMPLATES: Record<string, Tpl> = {
   cartRecovery: {
     en: () => cartRecoveryTemplate.en(CART_RECOVERY_SAMPLE),
     ar: () => cartRecoveryTemplate.ar(CART_RECOVERY_SAMPLE),
+  },
+  // Lifecycle emails take a data object; trial_recap is the richest kind (stat + days + CTA + unsubscribe).
+  lifecycle: {
+    en: () => lifecycleContent(LIFECYCLE_SAMPLE, 'en'),
+    ar: () => lifecycleContent(LIFECYCLE_SAMPLE, 'ar'),
   },
   // One bilingual body for every recipient (Ruling LEGAL-6), so both locale keys render the same.
   // One entry covers wholesale.ts (received / approved / rejected share a single layout).

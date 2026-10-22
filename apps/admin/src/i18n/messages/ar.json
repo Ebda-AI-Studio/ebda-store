@@ -82,6 +82,10 @@
       "statTotalUsers": "إجمالي المستخدمين",
       "statTotalOrders": "إجمالي الطلبات",
       "statTotalRevenue": "إجمالي الإيرادات",
+      "referralsTitle": "تسجيلات من الترشيحات",
+      "referralsNote": "تسجيلات تجار أول مرة دخلوا فيها من لينك ترشيح (الرقم أقل من الحقيقي: بنعد اللي وافقوا على التتبع بس).",
+      "referralsBadge": "من شارة المتجر",
+      "referralsEmail": "من رسالة أول طلب",
       "recentStoresTitle": "أحدث المتاجر",
       "recentStoresSubtitle": "أحدث تسجيلات المتاجر",
       "recentOrdersTitle": "أحدث الطلبات",
@@ -6175,6 +6179,7 @@
         "affiliates": "التسويق بالعمولة",
         "abandonedCarts": "العربات المتروكة",
         "paymentAbandonments": "التخلي عن بوابة الدفع",
+        "lifecycleEmails": "رسائل البداية",
         "whatsapp": "واتساب",
         "locations": "الفروع",
         "customerGroups": "مجموعات العملاء",
@@ -7940,6 +7945,40 @@
       "notConnectedTitle": "لم يتم ربط Google Search Console بعد",
       "notConnectedBody": "بمجرد إعداد وصول ابدأ إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك."
     }
+  },
+  "lifecycleEmails": {
+    "title": "رسائل البداية",
+    "subtitle": "رسائل التعريف اللي ابدأ بعتها لحسابك، وإيه اللي حصل في كل واحدة.",
+    "optedOut": "إنت ألغيت الاشتراك: مش هتتبعتلك رسائل بداية أو تجربة تاني. رسائل الطلبات والفواتير مش هتتأثر.",
+    "colEmail": "الرسالة",
+    "colStatus": "الحالة",
+    "colWhen": "امتى",
+    "colNote": "ملاحظة",
+    "pending": "لسه ما اتبعتتش",
+    "sent": "اتبعتت",
+    "skipped": "مش محتاجة",
+    "failed": "فشل الإرسال",
+    "kind": {
+      "add_products": "أضف أول منتجاتك (اليوم 1، لو مفيش منتجات)",
+      "payment_shipping": "الكاش والشحن جاهزين؟ (اليوم 3، لو مش متظبطين)",
+      "test_order": "اطلب من متجرك كأنك عميل (اليوم 5، لو مفيش طلب)",
+      "share_link": "حط اللينك في البايو (اليوم 7)",
+      "trial_recap": "ملخص التجربة (قبل نهايتها بـ4 أيام)",
+      "first_order": "أول طلب: ترشيح لصاحب"
+    },
+    "reason": {
+      "products_added": "كنت ضفت منتجات",
+      "payment_and_shipping_done": "الدفع والشحن كانوا متظبطين",
+      "order_placed": "كان فيه طلب بالفعل",
+      "not_trialing": "مش في فترة تجربة",
+      "no_order": "مفيش طلب لسه",
+      "opted_out": "إنت ألغيت الاشتراك",
+      "store_not_active": "المتجر مش شغال",
+      "no_recipient": "مفيش إيميل للمالك",
+      "ENQUEUE_FAILED": "الرسالة ماتحطتش في الطابور",
+      "unsubscribed_by_link": "ألغيت الاشتراك من لينك في رسالة"
+    },
+    "loadFailed": "مقدرناش نحمّل سجل الرسائل."
   },
   "paymentAbandonments": {
     "page": {
