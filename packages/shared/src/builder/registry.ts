@@ -42,7 +42,6 @@ import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
-import type { TemplateId } from '../types/store-theme';
 import { PAGE_KINDS, type PageKind } from './page-kinds';
 import { pageKindDefs } from './page-section-defs';
 import {
@@ -242,23 +241,11 @@ const narrowed = (list: readonly SettingDefinition[], rules: Record<string, Show
  * Every skin except Dahab (Ruling B5-35). Dahab's cards, tiles, heading row and hero are the
  * look's own fixed design: one card size, the look's frame and corners, no label above the heading,
  * a hero that always anchors its copy at the inline start. A control only the other skins read is
- * therefore not offered on Dahab. `templates` is an inclusive list, so a skin added later must be
- * added here once it reads these controls (the matrix and `hiddenButWired` fail if it does and is
- * left out, and the matrix fails if it does not and is listed).
+ * therefore not offered on Dahab. It is an exclusion (`notTemplates`), so an unknown or
+ * legacy template keeps the universal controls (Ruling B5-37); a skin added later that ignores them
+ * must be added to the exclusion (the matrix fails until it is).
  */
-const NOT_DAHAB: ShownRule & { templates: readonly TemplateId[] } = {
-  templates: [
-    'modern',
-    'classic',
-    'minimal',
-    'bold',
-    'elegant',
-    'qamar',
-    'souq',
-    'jasmine',
-    'lamma',
-  ],
-};
+const NOT_DAHAB: ShownRule = { notTemplates: ['dahab'] };
 /** Card design Dahab's card ignores; it reads Show name and Hover effect (both wired). */
 const DAHAB_FIXED_CARD: Record<string, ShownFor> = Object.fromEntries(
   [
@@ -280,7 +267,7 @@ const DAHAB_NO_KICKER: Record<string, ShownFor> = Object.fromEntries(
 /** Category cards honour Aspect / Name / Hover in the scrolling row, and Modern's own grid card does. */
 const CATEGORY_CARD_LOOK: ShownFor = [
   // the scrolling row of every skin but Dahab (its tiles are the look's own)
-  { templates: NOT_DAHAB.templates, variants: { layout: ['horizontal'] } },
+  { ...NOT_DAHAB, variants: { layout: ['horizontal'] } },
   { templates: ['modern'] },
 ];
 const NO_WIDTH = ['maxWidth'] as const;

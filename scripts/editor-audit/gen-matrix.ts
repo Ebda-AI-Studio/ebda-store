@@ -161,6 +161,7 @@ export function rulesForSkin(
   return rulesOf(shownFor).filter(
     r =>
       (!r.templates || r.templates.includes(skin as TemplateId)) &&
+      !r.notTemplates?.includes(skin as TemplateId) &&
       (!r.looks || r.looks.some(l => looks.includes(l)))
   );
 }

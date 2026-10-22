@@ -24,6 +24,8 @@ export const rulesOf = (shownFor: ShownFor | undefined): readonly ShownRule[] =>
 
 /** Does one rule hold for the template and look alone (variants are checked separately)? */
 export function ruleMatchesStore(rule: ShownRule, ctx: Pick<ShownContext, 'template' | 'look'>) {
+  if (rule.notTemplates && ctx.template && rule.notTemplates.includes(ctx.template as never))
+    return false;
   if (rule.templates && !(ctx.template && rule.templates.includes(ctx.template as never)))
     return false;
   if (rule.looks && !(ctx.look && rule.looks.includes(ctx.look))) return false;
