@@ -10290,6 +10290,14 @@
       "saveFirst": "صلّح الأخطاء في الصفحة دي الأول وبعدين غيّر الستايل.",
       "applied": "الستايل اتطبّق.",
       "current": "الستايل الحالي"
+    },
+    "search": {
+      "fonts": "الخطوط",
+      "typographyZones": "شكل الكتابة لكل منطقة",
+      "sectionTypography": "شكل كتابة القسم",
+      "dividers": "فواصل القسم",
+      "video": "فيديو الخلفية",
+      "pageSwitcher": "بدّل الصفحة اللي بتعدّلها"
     }
   },
   "instapayReceipt": {

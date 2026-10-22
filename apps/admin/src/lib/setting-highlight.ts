@@ -17,7 +17,10 @@ const escapeId = (id: string): string =>
 
 export function findSettingElement(root: ParentNode, id: string): HTMLElement | null {
   try {
-    return root.querySelector<HTMLElement>(`[data-setting-id="${escapeId(id)}"]`);
+    const esc = escapeId(id);
+    // `data-field-id` marks a section field the visual editor generates from the settings schema
+    // (it has no registry anchor of its own), so `?field=typography` finds it too.
+    return root.querySelector<HTMLElement>(`[data-setting-id="${esc}"], [data-field-id="${esc}"]`);
   } catch {
     // an id that still is not a valid selector can never match a control
     return null;

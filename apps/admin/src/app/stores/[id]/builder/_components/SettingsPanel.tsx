@@ -45,6 +45,7 @@ import { SectionTypographyField } from './SectionTypographyField';
 import { MediaPicker } from './MediaPicker';
 import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
+import { fieldDefId } from '../_lib/deeplink';
 
 type Mode = 'content' | 'design';
 
@@ -65,6 +66,8 @@ interface Props {
   /** Ask the AI for the section's kicker and subtitle (fills only the empty ones). */
   onAiFill?: (sectionId: string) => void;
   /** Header / footer content edits (menu, footer links): draft-only until Publish. */
+  /** Deep link (Task 11): the control to open (design controls switch the panel to Design). */
+  focusField?: string;
   chromeEdit?: {
     chrome: DraftChrome | undefined;
     liveVersion: number | null;
@@ -83,12 +86,30 @@ export function SettingsPanel({
   errors,
   dispatch,
   onAiFill,
+  focusField,
   chromeEdit,
 }: Props) {
   const t = useT('builder.settings');
   const locale = useLocale();
   const [mode, setMode] = useState<Mode>('content');
   const at = selection ? locateSection(doc, selection.sectionId) : null;
+  // A deep link to a Design control opens the Design mode first, or the control is not rendered.
+  useEffect(() => {
+    if (!focusField || !selection) return;
+    const found = locateSection(doc, selection.sectionId);
+    const def = found ? getSectionDefinition(found.node.type) : undefined;
+    const settings = !def
+      ? []
+      : selection.blockId
+        ? (def.blocks.find(
+            b => b.type === found?.node.blocks?.find(x => x.id === selection.blockId)?.type
+          )?.settings ?? [])
+        : def.settings;
+    if (settings.some(s => s.id === fieldDefId(focusField) && s.group === 'design'))
+      setMode('design');
+    // doc is deliberately not a dependency: this runs when the link or the selection changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusField, selection?.sectionId, selection?.blockId]);
   if (!selection || !at) {
     return <p className="p-4 text-sm text-muted-foreground">{t('empty')}</p>;
   }
@@ -224,27 +245,30 @@ export function SettingsPanel({
           </button>
         )}
         {defs.map(s => (
-          <Field
-            key={s.id}
-            def={s}
-            storeId={storeId}
-            theme={theme}
-            locale={locale}
-            valueOf={key => valueOf(s, key)}
-            overridden={!!(vpOverrides && s.responsive?.includes(viewport) && s.id in vpOverrides)}
-            viewport={viewport}
-            onChange={(key, v) => set(s, key, v)}
-            onReset={() =>
-              dispatch({
-                type: 'setViewportSetting',
-                id: node.id,
-                viewport,
-                key: s.id,
-                value: undefined,
-              })
-            }
-            sectionType={node.type}
-          />
+          <div key={s.id} data-field-id={s.id}>
+            <Field
+              def={s}
+              storeId={storeId}
+              theme={theme}
+              locale={locale}
+              valueOf={key => valueOf(s, key)}
+              overridden={
+                !!(vpOverrides && s.responsive?.includes(viewport) && s.id in vpOverrides)
+              }
+              viewport={viewport}
+              onChange={(key, v) => set(s, key, v)}
+              onReset={() =>
+                dispatch({
+                  type: 'setViewportSetting',
+                  id: node.id,
+                  viewport,
+                  key: s.id,
+                  value: undefined,
+                })
+              }
+              sectionType={node.type}
+            />
+          </div>
         ))}
       </div>
     </div>

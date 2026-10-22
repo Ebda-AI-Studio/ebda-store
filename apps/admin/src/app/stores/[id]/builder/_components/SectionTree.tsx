@@ -333,6 +333,7 @@ function Group({
         onClick={() => rest.onAddSection(list)}
         className="mt-1 w-full rounded-lg border border-dashed border-border px-2 py-1.5 text-start text-xs font-medium text-primary hover:bg-muted"
         data-testid={`add-section-${list}`}
+        data-setting-id="builder.add-section"
       >
         + {t('addSection')}
       </button>

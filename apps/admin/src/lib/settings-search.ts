@@ -43,7 +43,9 @@ export function canSeeEntry(e: IndexEntry, ctx: SearchContext): boolean {
 export function entryHref(storeId: string, e: IndexEntry): string {
   const base = `/stores/${storeId}${e.route === '/' ? '' : e.route}`;
   if (e.kind === 'page') return base;
-  const params = [e.query, `setting=${encodeURIComponent(e.id)}`].filter(Boolean).join('&');
+  // The visual editor reads `field=` (and `select=` / `page=` from the entry's query), not `?setting=`.
+  const target = e.route === '/builder' ? 'field' : 'setting';
+  const params = [e.query, `${target}=${encodeURIComponent(e.id)}`].filter(Boolean).join('&');
   return `${base}?${params}`;
 }
 

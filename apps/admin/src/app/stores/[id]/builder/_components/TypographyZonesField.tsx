@@ -43,7 +43,11 @@ export function TypographyZonesField({
 }) {
   const t = useT('orders.layout');
   return (
-    <div className="space-y-3" data-testid="typography-zones-field">
+    <div
+      className="space-y-3"
+      data-testid="typography-zones-field"
+      data-setting-id="builder.typography-zones"
+    >
       {ZONE_ORDER.map(zone => (
         <ZoneEditor
           key={zone}

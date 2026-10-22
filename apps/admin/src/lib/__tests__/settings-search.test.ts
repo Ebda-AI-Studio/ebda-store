@@ -157,3 +157,26 @@ describe('admin settings search: links and palette items', () => {
     expect(merged.some(i => i.href.includes('setting=shipping.area-rates'))).toBe(true);
   });
 });
+
+describe('builder deep links (Task 11)', () => {
+  const entry = (id: string) => (index as IndexEntry[]).find(e => e.id === id)!;
+
+  it('a builder entry links with select/field/page, never ?setting=', () => {
+    expect(entryHref('st1', entry('builder.header-logo'))).toBe(
+      '/stores/st1/builder?select=theme&field=builder.header-logo'
+    );
+    expect(entryHref('st1', entry('builder.page-settings'))).toBe(
+      '/stores/st1/builder?page=product&field=builder.page-settings'
+    );
+    expect(entryHref('st1', entry('builder.look-switch'))).toBe(
+      '/stores/st1/builder?field=builder.look-switch'
+    );
+  });
+
+  it('Arabic and English everyday words find the editor controls', () => {
+    const ctx = { role: 'store_admin', isFeatureEnabled: () => true, featuresLoading: false };
+    expect(searchRegistry('الخطوط', ctx).map(h => h.entry.id)).toContain('builder.fonts');
+    expect(searchRegistry('فيديو', ctx).map(h => h.entry.id)).toContain('builder.video');
+    expect(searchRegistry('divider', ctx).map(h => h.entry.id)).toContain('builder.dividers');
+  });
+});

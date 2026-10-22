@@ -69,10 +69,14 @@ optional `feature`, optional `syn` (everyday words per language) and, for a sett
   `<details>`, scrolls to it, rings it for 3 s and focuses it. A tabbed page selects its tab from `?tab=`
   (Branding and WhatsApp do).
 
-The visual editor (`/builder`) is registered too: `builder.header-logo` and `builder.header-search` are anchored in
-`ThemeSettingsPanel.tsx` (its other panels are generated from the section registry; each new editor control gets an
-entry in the same commit, Task 11 adds the `?select=` deep link into the canvas). `/builder` has its own
-`SETTINGS_LABEL_BASELINE` row.
+The visual editor (`/builder`) is registered too, one entry per control Tasks 1 to 10 added (fonts, text styles by area, section text style, dividers, background video, header logo and search, page settings, page switcher, look switch, history, add section). Its panels are generated from the section registry, so a deep link does not use `?setting=`; it uses the editor link:
+
+`/stores/:id/builder?select=<sectionId|type|theme|history>&block=<blockId|type>&field=<id>&page=<kind>`
+
+- `select` is a section id, else the first section of that type (page body, header, footer); `theme` and `history` open that start-pane tab instead. The selection drives the canvas and the tree together. `block` picks a block of the section by id or type. `page` is `product`, `collection` or `cart` (home when absent). `entryHref` writes `field=<entry id>` for `/builder` entries and the entry's `query` carries `select`, `block` and `page`.
+- `field` is a registry id (`builder.fonts`, anchored `data-setting-id`) or a settings-schema field id (`typography`, marked `data-field-id` on the generated field). The editor opens Design mode when the field is a design field, waits for the control to render (the shared `locateAndHighlight`), scrolls to it, rings it and focuses it, once.
+- The query string is untrusted: each value must be a plain token (`[A-Za-z0-9][A-Za-z0-9._:-]{0,79}`), an unknown id or type selects nothing, and nothing throws (`_lib/deeplink.ts`, `deeplink.test.ts`). Switching page drops `select`, `block` and `field`.
+- `tests/unit/settings-registry.test.ts` pins the list of editor controls: a control added to the editor without an entry (or an entry without a control) fails it. `/builder` has its own `SETTINGS_LABEL_BASELINE` row.
 
 ### Adding an admin page or a setting
 

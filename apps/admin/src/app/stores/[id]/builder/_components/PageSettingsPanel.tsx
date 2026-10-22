@@ -45,7 +45,11 @@ export function PageSettingsPanel({
   const locale = useLocale();
   const groups = PAGE_SETTINGS[pageKey];
   return (
-    <div className="flex h-full flex-col" data-testid="page-settings-panel">
+    <div
+      className="flex h-full flex-col"
+      data-testid="page-settings-panel"
+      data-setting-id="builder.page-settings"
+    >
       <div className="border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">
           {t('title', {
