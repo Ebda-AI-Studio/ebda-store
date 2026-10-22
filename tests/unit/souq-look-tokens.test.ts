@@ -19,7 +19,7 @@ import {
 const root = path.resolve(__dirname, '../..');
 const souq = LOOKS.filter(l => l.template === 'souq');
 
-import { isOrangeFamily } from './helpers/orange-gate';
+import { isOrangeFamily, isForbiddenOrange } from './helpers/orange-gate';
 
 describe('no-orange gate has teeth (negative control)', () => {
   it('flags the brass and the lantern orange the first Night souq design used', () => {
@@ -114,92 +114,10 @@ describe('souq looks: skin-painted text pairs >= 4.5, UI pairs >= 3', () => {
   });
 });
 
-/**
- * Ruling B2-18: the ONE scoped exception to the no-orange gate. Ahmad chose brass CTAs for Night
- * souq at STOP-1. Exactly this hex, exactly `souq.night`, exactly the primary-CTA roles (the look
- * token `primary` and the theme/CSS roles that carry it); nothing else of Night, no other look,
- * no other hex (a real orange or amber stays banned, an off-by-one brass is not the allowlisted one).
- */
 const BRASS = '#C89B3C';
 const BRASS_TRIPLET = hexToHsl(BRASS); // '41 56% 51%'
-const BRASS_CTA_EXCEPTION = {
-  look: 'souq.night',
-  hex: BRASS,
-  /**
-   * look-token key, composed-theme keys and CSS variables that ARE the primary CTA colour. B2-26
-   * adds the sale / new chip and PDP discount-pill roles (`--chip-bg`, `--chip-fg` resolve to the
-   * primary pair): the chip is the same brass, so the gate must see that paint too.
-   */
-  keys: ['primary', 'primaryColor', 'ringColor', '--primary', '--ring', '--chip-bg'],
-} as const;
-function brassCtaException(lookId: string, key: string, value: string): boolean {
-  return (
-    lookId === BRASS_CTA_EXCEPTION.look &&
-    (BRASS_CTA_EXCEPTION.keys as readonly string[]).includes(key) &&
-    (value.toUpperCase() === BRASS || value === BRASS_TRIPLET)
-  );
-}
-/** The gate: orange-family unless it is exactly the scoped brass CTA exception. */
-const forbiddenOrange = (lookId: string, key: string, value: string) =>
-  isOrangeFamily(value) && !brassCtaException(lookId, key, value);
-
-describe('Ruling B2-18: brass is allowed ONLY as souq.night CTA tokens', () => {
-  it('brass is orange-family (so the exception is a real exception, not a loosened gate)', () => {
-    expect(isOrangeFamily(BRASS)).toBe(true);
-    expect(isOrangeFamily(BRASS_TRIPLET)).toBe(true);
-  });
-  it('passes for souq.night primary CTA roles', () => {
-    for (const k of BRASS_CTA_EXCEPTION.keys)
-      expect(
-        forbiddenOrange(
-          'souq.night',
-          k,
-          k.includes('-') || /Color$/.test(k) ? BRASS_TRIPLET : BRASS
-        ),
-        k
-      ).toBe(false);
-  });
-  it('the same hex FAILS anywhere else: another look, another Night role, a theme key outside the list', () => {
-    for (const look of ['souq.catalogue', 'souq.showroom', 'qamar.vitrine'])
-      expect(forbiddenOrange(look, 'primary', BRASS), look).toBe(true);
-    for (const k of ['accent', 'page', 'surface', 'line', 'ink', 'muted', 'onPrimary', 'onAccent'])
-      expect(forbiddenOrange('souq.night', k, BRASS), k).toBe(true);
-    for (const k of [
-      'accentColor',
-      'borderColor',
-      '--accent',
-      '--warning',
-      '--warning-ink',
-      '--sale',
-    ])
-      expect(forbiddenOrange('souq.night', k, BRASS_TRIPLET), k).toBe(true);
-  });
-  it('real oranges and ambers stay banned, even on Night primary (exact hex only)', () => {
-    for (const hex of ['#E68245', '#FF6E01', '#E8A33D', '#C89B3D', '#C99B3C', '#D4A03C'])
-      expect(forbiddenOrange('souq.night', 'primary', hex), hex).toBe(true);
-    expect(forbiddenOrange('souq.night', 'primaryColor', '38 92% 50%')).toBe(true); // platform amber
-  });
-  it('the allowlist is exactly one hex and one look', () => {
-    expect(BRASS_CTA_EXCEPTION.hex).toBe('#C89B3C');
-    expect(BRASS_CTA_EXCEPTION.look).toBe('souq.night');
-  });
-  it('brass contrast holds: ink on the CTA >= 4.5, CTA as text on the page >= 4.5, as a UI boundary on page and card >= 3', () => {
-    const t = souq.find(l => l.id === 'souq.night')!.tokens;
-    expect(t.primary).toBe(BRASS);
-    expect(contrastRatio(t.primary, t.onPrimary)).toBeGreaterThanOrEqual(4.5); // 7.16
-    expect(contrastRatio(t.page, t.primary)).toBeGreaterThanOrEqual(4.5); // 4.87
-    expect(contrastRatio(t.page, t.primary)).toBeGreaterThanOrEqual(3);
-    expect(contrastRatio(t.surface, t.primary)).toBeGreaterThanOrEqual(3);
-  });
-  it('no other Souq look sets a token in the band: brass appears in exactly one look token', () => {
-    const withBrass = souq.flatMap(l =>
-      Object.entries(l.tokens)
-        .filter(([, v]) => typeof v === 'string' && v.toUpperCase() === BRASS)
-        .map(([k]) => `${l.id}.${k}`)
-    );
-    expect(withBrass).toEqual(['souq.night.primary']);
-  });
-});
+/** Ruling METAL-1: one rule (`isMetal`, helpers/orange-gate.ts) replaces the per-look brass exceptions. */
+const forbiddenOrange = (_lookId: string, _key: string, value: string) => isForbiddenOrange(value);
 
 describe('Ruling B2-2: no orange anywhere in a Souq look', () => {
   for (const l of souq) {
@@ -470,7 +388,7 @@ describe('Ruling B2-26: Night chips and the PDP discount pill are brass (one acc
     // Ruling B3-2: Jasmine Apothecary takes the same brass-chip rule (one accent on a deep ground)
     expect(others.sort()).toEqual(['jasmine.apothecary', 'souq.night']);
   });
-  it('the chip style reads the --chip-bg chain, and the exception keys include it only for Night', () => {
+  it('the chip style reads the --chip-bg chain, and brass passes the one metal rule (METAL-1)', () => {
     expect(
       readFileSync(
         path.resolve(__dirname, '../../apps/web/src/templates/shared/look-card.ts'),
@@ -478,8 +396,7 @@ describe('Ruling B2-26: Night chips and the PDP discount pill are brass (one acc
       )
     ).toContain('var(--chip-bg, var(--accent))');
     expect(forbiddenOrange('souq.night', '--chip-bg', BRASS_TRIPLET)).toBe(false);
-    expect(forbiddenOrange('souq.catalogue', '--chip-bg', BRASS_TRIPLET)).toBe(true);
-    expect(forbiddenOrange('souq.night', '--accent', BRASS_TRIPLET)).toBe(true);
+    expect(forbiddenOrange('souq.catalogue', '--chip-bg', BRASS_TRIPLET)).toBe(false);
   });
   it('Night brass chip: dark ink on brass clears 4.5:1 (the chip text)', () => {
     const t = souq.find(l => l.id === 'souq.night')!.tokens;

@@ -62,3 +62,42 @@ export function isOrangeFamily(value: string): boolean {
     inBand && (sat >= ORANGE_MIN_SAT || (sat >= PALE_MIN_SAT && lightness < PALE_MAX_LIGHTNESS))
   );
 }
+
+/**
+ * Ruling METAL-1 (Ahmad, 2026-10-22): brass and antique gold are METAL, not orange, and are allowed
+ * for buttons, chips and accents on every template. ONE rule replaces the per-look exceptions of
+ * B2-18, B2-26, B3-2/B3-14 and B4-2: a colour is metal when its hue is 38-46 degrees AND its HSL
+ * saturation is <= 60% AND its HSL lightness is 40-76%. The band is the brass family
+ * (#C89B3C 41/56/51, #D3B87C 41/50/66, Apothecary brass) and excludes everything that reads as
+ * orange or amber: saffron #E0A526 (41/74/51), #F2B632 (42/88/57), amber 38/92/50 (saturation over
+ * 60%), terracotta #B5482E and lantern #E68245 (hue under 38), the in-band tan #C8A06A (hue 35).
+ * Metal is meaningful only as a CTA/chip/accent paint; the gate still bans a metal-band colour from
+ * nothing else, so a true orange keeps failing.
+ */
+export const METAL_HUE: [number, number] = [38, 46];
+const METAL_MAX_SAT = 0.6;
+const METAL_LIGHTNESS: [number, number] = [0.4, 0.76];
+export function isMetal(value: string): boolean {
+  const [r, g, b] = toRgb(value);
+  const max = Math.max(r, g, b) / 255;
+  const min = Math.min(r, g, b) / 255;
+  if (max === min) return false;
+  const d = max - min;
+  const l = (max + min) / 2;
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const rr = r / 255;
+  const gg = g / 255;
+  let hue =
+    max === rr ? ((gg - b / 255) / d) % 6 : max === gg ? (b / 255 - rr) / d + 2 : (rr - gg) / d + 4;
+  hue = Math.round((hue * 60 + 360) % 360);
+  return (
+    hue >= METAL_HUE[0] &&
+    hue <= METAL_HUE[1] &&
+    s <= METAL_MAX_SAT &&
+    l >= METAL_LIGHTNESS[0] &&
+    l <= METAL_LIGHTNESS[1]
+  );
+}
+/** The no-orange gate with the one metal rule applied: orange-family and not metal. */
+export const isForbiddenOrange = (value: string): boolean =>
+  isOrangeFamily(value) && !isMetal(value);

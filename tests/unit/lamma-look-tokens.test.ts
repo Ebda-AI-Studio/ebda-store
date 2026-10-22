@@ -18,7 +18,7 @@ import {
   TEMPLATE_FAMILIES,
   themeToCssVars,
 } from '@ebda/shared';
-import { isOrangeFamily } from './helpers/orange-gate';
+import { isOrangeFamily, isForbiddenOrange } from './helpers/orange-gate';
 
 const root = path.resolve(__dirname, '../..');
 const lamma = LOOKS.filter(l => l.template === 'lamma');
@@ -151,72 +151,10 @@ describe('lamma looks: painted text pairs >= 4.5, UI pairs >= 3', () => {
   });
 });
 
-/**
- * Ruling B4-2: the scoped metal exception (B2-18, B3-2 shape). Exactly this hex, exactly
- * `lamma.notebook`, exactly the CTA / accent roles (the look tokens `primary` and `accent`, the
- * composed theme / CSS roles that carry them). It also satisfies B4's metal rule (HSL saturation
- * <= 52 %, lightness 45-75 %). Nothing else of Notebook, no other Lamma look, no other hex.
- */
 const BRASS = '#D3B87C';
 const BRASS_TRIPLET = hexToHsl(BRASS);
-const BRASS_LOOK = 'lamma.notebook';
-const BRASS_KEYS = [
-  'primary',
-  'accent',
-  'primaryColor',
-  'accentColor',
-  'ringColor',
-  '--primary',
-  '--accent',
-  '--ring',
-  '--chip-bg',
-];
-function brassException(lookId: string, key: string, value: string): boolean {
-  return (
-    lookId === BRASS_LOOK &&
-    BRASS_KEYS.includes(key) &&
-    (value.toUpperCase() === BRASS || value === BRASS_TRIPLET)
-  );
-}
-const forbiddenOrange = (lookId: string, key: string, value: string) =>
-  isOrangeFamily(value) && !brassException(lookId, key, value);
-
-describe('Ruling B4-2: antique brass is allowed ONLY as the Notebook primary / accent tokens', () => {
-  it('is metal by the B4 rule: HSL saturation <= 52% and lightness 45-75%', () => {
-    const m = BRASS_TRIPLET.match(/^([\d.]+)\s+([\d.]+)%\s+([\d.]+)%$/)!;
-    expect(parseFloat(m[2])).toBeLessThanOrEqual(52);
-    expect(parseFloat(m[3])).toBeGreaterThanOrEqual(45);
-    expect(parseFloat(m[3])).toBeLessThanOrEqual(75);
-  });
-  it('passes for the Notebook CTA / accent roles', () => {
-    for (const k of BRASS_KEYS)
-      expect(
-        forbiddenOrange(BRASS_LOOK, k, k.includes('-') || /Color$/.test(k) ? BRASS_TRIPLET : BRASS),
-        k
-      ).toBe(false);
-  });
-  it('the same hex FAILS on the other Lamma looks and on every other Notebook role', () => {
-    for (const look of ['lamma.table', 'lamma.market', 'jasmine.bloom', 'qamar.vitrine'])
-      expect(forbiddenOrange(look, 'primary', BRASS), look).toBe(true);
-    for (const k of ['page', 'surface', 'line', 'ink', 'muted', 'onPrimary', 'onAccent'])
-      expect(forbiddenOrange(BRASS_LOOK, k, BRASS), k).toBe(true);
-    for (const k of ['borderColor', '--warning', '--warning-ink', '--sale'])
-      expect(forbiddenOrange(BRASS_LOOK, k, BRASS_TRIPLET), k).toBe(true);
-  });
-  it('real oranges, saffron and off-by-one tans stay banned, even on Notebook primary (exact hex only)', () => {
-    for (const hex of ['#E0A526', '#F2B632', '#C8A06A', '#D3B87D', '#D3B97C', '#B5482E', '#FF6E01'])
-      expect(forbiddenOrange(BRASS_LOOK, 'primary', hex), hex).toBe(true);
-    expect(forbiddenOrange(BRASS_LOOK, 'primaryColor', '38 92% 50%')).toBe(true);
-  });
-  it('brass appears in exactly the Notebook primary and accent tokens', () => {
-    const withBrass = lamma.flatMap(l =>
-      Object.entries(l.tokens)
-        .filter(([, v]) => typeof v === 'string' && v.toUpperCase() === BRASS)
-        .map(([k]) => `${l.id}.${k}`)
-    );
-    expect(withBrass.sort()).toEqual(['lamma.notebook.accent', 'lamma.notebook.primary']);
-  });
-});
+/** Ruling METAL-1: one rule (`isMetal`, helpers/orange-gate.ts) replaces the per-look brass exceptions. */
+const forbiddenOrange = (_lookId: string, _key: string, value: string) => isForbiddenOrange(value);
 
 describe('Rulings B2-2 / B4-2: no orange anywhere in a Lamma look', () => {
   for (const l of lamma) {

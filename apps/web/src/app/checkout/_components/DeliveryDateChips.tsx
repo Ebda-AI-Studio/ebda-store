@@ -46,11 +46,14 @@ function ChipRadioGroup<T extends { key: string; disabled?: boolean }>({
   const onKey = (e: KeyboardEvent, key: string) => {
     const fwd = isRtl ? 'ArrowLeft' : 'ArrowRight';
     const back = isRtl ? 'ArrowRight' : 'ArrowLeft';
-    if (e.key === fwd || e.key === 'ArrowDown') (e.preventDefault(), move(key, 1));
-    else if (e.key === back || e.key === 'ArrowUp') (e.preventDefault(), move(key, -1));
-    else if (e.key === 'Home')
-      (e.preventDefault(), move(enabled[enabled.length - 1]?.key ?? key, 1));
-    else if (e.key === 'End') (e.preventDefault(), move(enabled[0]?.key ?? key, -1));
+    const step = (to: string, by: number) => {
+      e.preventDefault();
+      move(to, by);
+    };
+    if (e.key === fwd || e.key === 'ArrowDown') step(key, 1);
+    else if (e.key === back || e.key === 'ArrowUp') step(key, -1);
+    else if (e.key === 'Home') step(enabled[enabled.length - 1]?.key ?? key, 1);
+    else if (e.key === 'End') step(enabled[0]?.key ?? key, -1);
   };
   return (
     <div
