@@ -53,6 +53,8 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
+import { RatingSummary } from '../../../components/commerce/RatingSummary';
+import { BundleSaving } from '../../../components/commerce/BundleSaving';
 import { TrustLine } from '../../../components/commerce/TrustLine';
 import { LOOK_CHIP_STYLE, relatedHeadingSize } from '../../../templates/shared/look-card';
 import type { CodOffer } from '../../../lib/cod-offer';
@@ -1194,6 +1196,12 @@ export default function ProductDetailClient({
                 {displayName}
               </h1>
 
+              {/* Phase B3 (Ruling B3-6): one inline rating line; renders nothing without a rating. */}
+              <RatingSummary
+                average={product.ratingStats?.ratingAverage}
+                count={product.ratingStats?.ratingCount}
+              />
+
               {displayExcerpt && (
                 <p className="mt-2 whitespace-pre-line text-base text-muted-foreground">
                   {displayExcerpt}
@@ -1219,6 +1227,8 @@ export default function ProductDetailClient({
                 <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+              {/* Phase B3 (Ruling B3-6): one live bundle-saving line; renders nothing without a saving. */}
+              <BundleSaving productId={product.id} />
               <B2bPdpPanel
                 productId={product.id}
                 variantId={selectedVariant?.id ?? null}

@@ -7,6 +7,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { prisma } from '@ebda/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
@@ -18,6 +19,21 @@ import { assertScalarQuery } from '../lib/query-params';
 // `requireStore` returns 400 VALIDATION_ERROR — which is what the merchant
 // saw when the storefront fetched /reviews/product/:productId.
 const router = Router({ mergeParams: true });
+
+/**
+ * The PDP rating line (Phase B3, Ruling B3-6) reads `ratingStats` off the cached public product
+ * payload (`public:product:<store>:<slug>`, 120 s, plus the 60 s edge copy). CACHE CLASS:
+ * BOUNDED-stale. Moderation (approve / reject / delete) changes the published set, so it busts the
+ * product caches now instead of waiting the TTL out; a failed purge never fails the moderation
+ * (the TTL is the residual window, about 8 minutes with the edge copy).
+ */
+async function refreshRatingCaches(storeId: string): Promise<void> {
+  try {
+    await invalidateStoreProductCaches(storeId);
+  } catch (err) {
+    logger.warn({ err, storeId }, '[ReviewRoutes] rating cache purge failed after moderation');
+  }
+}
 
 // Validation schemas
 const createReviewSchema = z.object({
@@ -238,6 +254,8 @@ router.put(
       const data = updateReviewSchema.parse(req.body);
 
       const review = await ReviewService.update(req.storeId!, id, data);
+      if (data.status !== undefined || data.rating !== undefined)
+        await refreshRatingCaches(req.storeId!);
 
       res.json({
         success: true,
@@ -262,6 +280,7 @@ router.post(
     try {
       const { id } = req.params;
       const review = await ReviewService.approve(req.storeId!, id);
+      await refreshRatingCaches(req.storeId!);
 
       await auditLog({
         action: 'review.approved',
@@ -313,6 +332,7 @@ router.post(
     try {
       const { id } = req.params;
       const review = await ReviewService.reject(req.storeId!, id);
+      await refreshRatingCaches(req.storeId!);
 
       await auditLog({
         action: 'review.rejected',
@@ -349,6 +369,7 @@ router.delete(
     try {
       const { id } = req.params;
       await ReviewService.delete(req.storeId!, id);
+      await refreshRatingCaches(req.storeId!);
 
       res.json({
         success: true,

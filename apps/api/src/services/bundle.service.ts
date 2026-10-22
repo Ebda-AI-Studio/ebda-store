@@ -465,3 +465,77 @@ export function describeBundleContents(
 
   return { description, descriptionAr };
 }
+
+/** One purchasable bundle that contains every requested product, with the saving it gives. */
+export interface BundleSaving {
+  bundleId: string;
+  slug: string;
+  name: string;
+  nameAr: string | null;
+  /** The bundle price the cart charges (piastres), from `resolveBundle`. */
+  price: number;
+  /** The sum of the components at retail price (piastres): what the saving is measured against. */
+  componentSum: number;
+  /** componentSum - price (piastres), always > 0. */
+  saving: number;
+  /** Whole percent of componentSum, 1..99. */
+  percent: number;
+  /** The bundle holds EXACTLY the requested products (so "add all" can add the bundle itself). */
+  exact: boolean;
+}
+
+/**
+ * Phase B3 (Ruling B3-6/B3-7, PDP "bundle saving" line and the routine "add all"): the purchasable
+ * bundles that contain EVERY one of `productIds`, best saving first, at most 3.
+ *
+ * CACHE CLASS: NEVER-stale for price. This shows money, so it is computed from `resolveBundle`
+ * (the one place the cart's bundle price comes from) on every request and is never cached here;
+ * the route answers `no-store`. Tenant: the candidate query and every resolve carry `storeId`.
+ */
+export async function listBundleSavingsForProducts(
+  client: DbClient,
+  storeId: string,
+  productIds: string[],
+  now: Date = new Date()
+): Promise<BundleSaving[]> {
+  const wanted = [...new Set(productIds)].slice(0, 5);
+  if (wanted.length === 0) return [];
+  const candidates = await client.bundle.findMany({
+    where: {
+      storeId,
+      isActive: true,
+      AND: wanted.map(productId => ({ items: { some: { productId } } })),
+    },
+    select: { id: true, items: { select: { productId: true } } },
+    take: 5,
+  });
+  const out: BundleSaving[] = [];
+  for (const c of candidates) {
+    let b: ResolvedBundle;
+    try {
+      b = await resolveBundle(client, storeId, c.id);
+    } catch (err) {
+      if (err instanceof AppError && err.statusCode === 404) continue;
+      throw err;
+    }
+    if (!b.sellableIgnoringWindow || !withinSaleWindow(b, now)) continue;
+    const saving = b.componentSum - b.price;
+    if (saving <= 0 || b.componentSum <= 0) continue;
+    const percent = Math.min(99, Math.max(1, Math.round((saving / b.componentSum) * 100)));
+    const have = new Set(c.items.map(i => i.productId));
+    out.push({
+      bundleId: b.id,
+      slug: b.slug,
+      name: b.name,
+      nameAr: b.nameAr,
+      price: b.price,
+      componentSum: b.componentSum,
+      saving,
+      percent,
+      exact: have.size === wanted.length && wanted.every(id => have.has(id)),
+    });
+  }
+  return out
+    .sort((a, z) => z.percent - a.percent || a.bundleId.localeCompare(z.bundleId))
+    .slice(0, 3);
+}

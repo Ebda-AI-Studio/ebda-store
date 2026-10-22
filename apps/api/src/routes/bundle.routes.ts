@@ -44,6 +44,7 @@ import {
   resolveBundle,
   compareBundleComponents,
   withinSaleWindow,
+  listBundleSavingsForProducts,
   type ResolvedBundle,
 } from '../services/bundle.service';
 import { invalidateStoreProductCaches, bundlesCacheKey, getCached } from '../lib/public-cache';
@@ -787,6 +788,43 @@ router.get(
             .map(({ startsAt: _s, expiresAt: _e, ...publicFields }) => publicFields),
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Public endpoint: the bundles that give a saving on a product (PDP line) or on a set of products
+// (the routine "add all"), Phase B3.
+// GET /public/:storeId/bundle-savings?productIds=<uuid>[,<uuid>...]   (1..5 ids)
+//
+// CACHE CLASS: NEVER-stale for price. A saving is money, so it is computed from `resolveBundle`
+// (the cart's own bundle price) on every request and answered `no-store`; there is no Redis layer,
+// no edge copy and no invalidation to forget. Same posture/gating as the list route below.
+const bundleSavingsQuerySchema = z.object({
+  productIds: z
+    .string()
+    .max(400)
+    .transform(v =>
+      v
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    )
+    .pipe(z.array(z.string().uuid()).min(1).max(5)),
+});
+router.get(
+  '/public/:storeId/bundle-savings',
+  publicLimiter,
+  publicTenantLimiter,
+  requireFeature('bundles'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { productIds } = bundleSavingsQuerySchema.parse({ productIds: req.query.productIds });
+      const savings = await listBundleSavingsForProducts(prisma, storeId, productIds);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ success: true, data: { savings } });
     } catch (error) {
       next(error);
     }
