@@ -82,7 +82,7 @@ describe('inParallel: every limiter runs, all must pass', () => {
 describe('the public router still mounts BOTH limiters', () => {
   const src = readFileSync(join(__dirname, '../../apps/api/src/routes/public.routes.ts'), 'utf8');
   it('per-IP and per-tenant limiters are both in the parallel group', () => {
-    expect(src).toContain('router.use(inParallel(publicLimiter, publicTenantLimiter));');
+    expect(src).toContain('inParallel(publicLimiter, publicTenantLimiter)');
   });
   it('no bare router-level publicLimiter is left behind', () => {
     expect(src).not.toMatch(/^router\.use\(publicLimiter\)/m);

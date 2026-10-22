@@ -98,6 +98,11 @@
   // per location). Auth limits (5 / 15 min per IP + email) are exact, on the AuthState DO.
   "ratelimits": [
     { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 1200, "period": 60 } },
+    // Anonymous public reads only (middleware/public-read-limit.ts): same numbers as the exact
+    // Durable Object limiters (publicLimiter 300/min/IP, publicTenantLimiter 6000/min/tenant),
+    // but counted per location. Authenticated requests and every write keep the exact DO limiters.
+    { "name": "PUBLIC_IP_LIMITER", "namespace_id": "1002", "simple": { "limit": 300, "period": 60 } },
+    { "name": "PUBLIC_TENANT_LIMITER", "namespace_id": "1003", "simple": { "limit": 6000, "period": 60 } },
   ],
 
   // Scheduled work that used to be setInterval loops (index.ts, Node only): see src/cf/cron.ts.

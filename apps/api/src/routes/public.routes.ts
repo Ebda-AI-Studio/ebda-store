@@ -88,13 +88,14 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 import { inParallel } from '../lib/run-in-parallel';
+import { publicReadLimit } from '../middleware/public-read-limit';
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
 // per-tenant aggregate backstop (see publicTenantLimiter's comment).
 // Both counters are independent keyed counters behind a Durable Object hop each; they run
 // together (one round trip, not two). Both still count every request and either can answer 429.
-router.use(inParallel(publicLimiter, publicTenantLimiter));
+router.use(publicReadLimit(inParallel(publicLimiter, publicTenantLimiter)));
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {
