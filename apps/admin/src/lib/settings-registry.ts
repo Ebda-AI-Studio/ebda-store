@@ -144,6 +144,12 @@ export const PAGES: PageEntry[] = [
       ar: 'جدول المقاسات قياسات مقاس عباية حذاء ملابس',
     },
   }),
+  page('/gold-rates', 'goldRates.page.title', 'staff', {
+    syn: {
+      en: 'gold price rate karat jewellery jewelry making charge',
+      ar: 'سعر الدهب عيار ذهب مصنعية مجوهرات',
+    },
+  }),
   // ── Sales ──────────────────────────────────────────────────────────────────
   page('/orders', `${HUB}.orders`, 'staff', {
     syn: { en: 'sales purchases', ar: 'مبيعات مشتريات' },

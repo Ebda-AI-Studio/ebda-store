@@ -71,6 +71,10 @@ export const PLATFORM_COLUMNS = [
   'option2Value',
   'option3Name',
   'option3Value',
+  // Gold-rate pricing (B5): 'gold_rate' | blank, karat 24|21|18, grams with up to 2 decimals.
+  'pricing_mode',
+  'gold_karat',
+  'gold_weight_g',
   // Meta: 1-based record number in the SOURCE file (header = 1), and a
   // pre-import rejection reason. Both are read by BulkService.importProducts.
   'sourceRow',

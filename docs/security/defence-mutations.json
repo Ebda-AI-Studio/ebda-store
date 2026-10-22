@@ -2570,6 +2570,56 @@
       "find": "    if (data.type === 'exchange') {\n      const goldLine",
       "replace": "    if (false as boolean) {\n      const goldLine",
       "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-redaction-snapshot",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a customer's order read carries the full gold snapshot again, so the shopper sees the merchant's margin, making charge and rate row id",
+      "source": "apps/api/src/services/gold-rate/public.ts",
+      "find": "goldSnapshot: Object.fromEntries(PUBLIC_SNAPSHOT_KEYS.map(k => [k, snap[k]])),",
+      "replace": "goldSnapshot: snap,",
+      "test": "tests/unit/gold-order-redaction.test.ts"
+    },
+    {
+      "id": "money-gold-order-redaction-cost",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the merchant's cost price is returned to the customer on their own order lines again",
+      "source": "apps/api/src/services/gold-rate/public.ts",
+      "find": "const { costPrice: _cost, goldSnapshot, ...rest } = item;",
+      "replace": "const { goldSnapshot, ...rest } = item; const _cost = 0;",
+      "test": "tests/unit/gold-order-redaction.test.ts"
+    },
+    {
+      "id": "money-gold-grams-two-decimals",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a weight typed with a third decimal (4.355 g) is accepted and silently rounded instead of refused",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "/^(\\d{1,4})(?:\\.(\\d{1,2}))?$/.exec(input.trim());",
+      "replace": "/^(\\d{1,4})(?:\\.(\\d{1,3}))?$/.exec(input.trim());",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-admin-needs-fresh-rate",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the admin lets a product be switched to gold pricing without a fresh rate for its karat",
+      "source": "apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx",
+      "find": "if (!freshRate) return setMsg({ ok: false, text: t('needFreshRate') });",
+      "replace": "",
+      "test": "tests/unit/gold-admin-pricing-card.test.tsx"
+    },
+    {
+      "id": "money-gold-admin-confirm-before-resend",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the rate editor sends confirm:true on the first request, so the jump gate never asks the merchant",
+      "source": "apps/admin/src/app/stores/[id]/gold-rates/_components/RateEditor.tsx",
+      "find": "...(confirmed ? { confirm: true } : {}),",
+      "replace": "confirm: true,",
+      "test": "tests/unit/gold-admin-rate-editor.test.tsx"
     }
   ]
 }

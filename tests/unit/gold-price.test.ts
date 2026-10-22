@@ -12,6 +12,10 @@ import {
   goldRateJumpBps,
   karatCoherenceBps,
   GoldPriceError,
+  bpsToPercentString,
+  mgToGramsString,
+  parseGramsToMg,
+  parsePercentToBps,
   GOLD_KARATS,
   GOLD_ROUNDING_STEPS,
   type GoldPriceSpec,
@@ -325,5 +329,41 @@ describe('gate helpers', () => {
     // 4 % gate: 21k at 3.9 % off passes, 4.1 % does not
     expect(karatCoherenceBps(720_000, Math.round(630_000 * 1.039), 21)).toBeLessThanOrEqual(400);
     expect(karatCoherenceBps(720_000, Math.round(630_000 * 1.041), 21)).toBeGreaterThan(400);
+  });
+});
+
+describe('typed units: grams, percent', () => {
+  it('parses grams with at most two decimals into milligrams, exactly', () => {
+    expect(parseGramsToMg('4.35')).toBe(4350);
+    expect(parseGramsToMg('12')).toBe(12000);
+    expect(parseGramsToMg('0.01')).toBe(10);
+    expect(parseGramsToMg(' 7.5 ')).toBe(7500);
+    expect(parseGramsToMg('4.355')).toBeNull(); // a third decimal is refused, never rounded
+    expect(parseGramsToMg('4,35')).toBeNull();
+    expect(parseGramsToMg('')).toBeNull();
+    expect(parseGramsToMg('0')).toBeNull();
+    expect(parseGramsToMg('-1')).toBeNull();
+    expect(parseGramsToMg('1001')).toBeNull(); // over the 1 000 g ceiling
+  });
+
+  it('round-trips milligrams through the grams string', () => {
+    for (const mg of [10, 4350, 12000, 999990])
+      expect(parseGramsToMg(mgToGramsString(mg))).toBe(mg);
+    expect(mgToGramsString(4350)).toBe('4.35');
+    expect(mgToGramsString(12000)).toBe('12.00');
+  });
+
+  it('parses a margin percent into basis points inside the allowed range', () => {
+    expect(parsePercentToBps('7.5')).toBe(750);
+    expect(parsePercentToBps('-2')).toBe(-200);
+    expect(parsePercentToBps('0')).toBe(0);
+    expect(parsePercentToBps('100')).toBe(10000);
+    expect(parsePercentToBps('100.01')).toBeNull();
+    expect(parsePercentToBps('-50.01')).toBeNull();
+    expect(parsePercentToBps('1.234')).toBeNull();
+    expect(bpsToPercentString(750)).toBe('7.5');
+    expect(bpsToPercentString(-200)).toBe('-2');
+    expect(bpsToPercentString(5)).toBe('0.05');
+    expect(bpsToPercentString(0)).toBe('0');
   });
 });

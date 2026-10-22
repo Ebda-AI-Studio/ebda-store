@@ -8,6 +8,7 @@
 import { Prisma } from '@ebda/database';
 import {
   computeGoldUnitPrice,
+  mgToGramsString,
   publicGoldPricingSchema,
   type GoldKarat,
   type PublicGoldPricing,
@@ -109,4 +110,58 @@ export async function publicGoldFields(
     goldPricing: map.get(goldQuoteKey(product.id, null)) ?? null,
     ...(Object.keys(variantGoldPricing).length > 0 ? { variantGoldPricing } : {}),
   };
+}
+
+const PUBLIC_SNAPSHOT_KEYS = [
+  'karat',
+  'weightMg',
+  'ratePerGram',
+  'rateAppliedAt',
+  'unitPrice',
+] as const;
+
+/**
+ * An order as the CUSTOMER may see it: each line's `goldSnapshot` cut down to what the shopper was
+ * shown at checkout (karat, weight, rate, when, unit price), and the merchant-only `costPrice` removed.
+ * The full snapshot holds the margin, the making charge and the rate row id; those stay with the
+ * merchant (Ruling B5-13). Used by every customer-facing order read; the admin read is unfiltered.
+ */
+export function redactOrderForCustomer<T extends { items?: unknown }>(order: T): T {
+  const items = (order.items ?? null) as Array<Record<string, unknown>> | null;
+  if (!Array.isArray(items)) return order;
+  return {
+    ...order,
+    items: items.map(item => {
+      const { costPrice: _cost, goldSnapshot, ...rest } = item;
+      void _cost;
+      if (goldSnapshot && typeof goldSnapshot === 'object') {
+        const snap = goldSnapshot as Record<string, unknown>;
+        return {
+          ...rest,
+          goldSnapshot: Object.fromEntries(PUBLIC_SNAPSHOT_KEYS.map(k => [k, snap[k]])),
+        };
+      }
+      return { ...rest, goldSnapshot: goldSnapshot ?? null };
+    }),
+  };
+}
+
+/**
+ * The one-line description of how a gold line was priced, for an invoice or a receipt: karat, weight
+ * and the per-gram rate frozen on the line. Null when the line was not gold-priced. Never the margin.
+ */
+export function goldLineNote(
+  snapshot: unknown,
+  lang: 'ar' | 'en',
+  money: (piastres: number) => string
+): string | null {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  const s = snapshot as Record<string, unknown>;
+  const { karat, weightMg, ratePerGram } = s;
+  if (typeof karat !== 'number' || typeof weightMg !== 'number' || typeof ratePerGram !== 'number')
+    return null;
+  const grams = mgToGramsString(weightMg);
+  return lang === 'ar'
+    ? `عيار ${String(karat)} · ${grams} جم · ${money(ratePerGram)} للجرام`
+    : `${String(karat)} karat · ${grams} g · ${money(ratePerGram)} per gram`;
 }

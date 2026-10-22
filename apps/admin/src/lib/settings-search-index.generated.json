@@ -141,6 +141,16 @@
     "synAr": "جدول المقاسات قياسات مقاس عباية حذاء ملابس"
   },
   {
+    "id": "page:/gold-rates",
+    "kind": "page",
+    "route": "/gold-rates",
+    "access": "staff",
+    "en": "Gold rates",
+    "ar": "سعر الدهب",
+    "synEn": "gold price rate karat jewellery jewelry making charge",
+    "synAr": "سعر الدهب عيار ذهب مصنعية مجوهرات"
+  },
+  {
     "id": "page:/orders",
     "kind": "page",
     "route": "/orders",

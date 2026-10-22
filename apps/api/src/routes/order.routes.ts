@@ -64,6 +64,7 @@ import {
 } from '../services/payment-providers/refund-settlement';
 import { rangeOrLegacyDays } from '../lib/report-range';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
+import { redactOrderForCustomer } from '../services/gold-rate/public';
 
 const router = Router({ mergeParams: true });
 
@@ -621,7 +622,8 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 
     res.json({
       success: true,
-      data: { order },
+      // A customer sees the order without the merchant's cost and the gold margin (Ruling B5-13).
+      data: { order: isStoreViewer ? order : redactOrderForCustomer(order) },
     });
   } catch (error) {
     next(error);
@@ -854,7 +856,7 @@ router.get('/my/list', authenticate, async (req: Request, res: Response, next: N
 
     res.json({
       success: true,
-      data: result,
+      data: { ...result, orders: result.orders.map(redactOrderForCustomer) },
     });
   } catch (error) {
     next(error);

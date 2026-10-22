@@ -136,6 +136,7 @@ export function AdminLayout({
     blog: t('hubTabs.blog'),
     floatingWidget: t('hubTabs.floatingWidget'),
     sizeCharts: t('hubTabs.sizeCharts'),
+    goldRates: t('hubTabs.goldRates'),
     // Sales tabs
     orders: t('hubTabs.orders'),
     invoices: t('hubTabs.invoices'),

@@ -42,6 +42,14 @@ export interface OrderItemDetail {
   priceTierMinQty?: number | null;
   /** The price came from the buyer's wholesale group, not a public quantity break (null on older lines). */
   priceGroupApplied?: boolean | null;
+  /** How a gold-rate line was priced, frozen at sale (B5); null on every other line. */
+  goldSnapshot?: {
+    karat: number;
+    weightMg: number;
+    ratePerGram: number;
+    rateAppliedAt: string;
+    unitPrice: number;
+  } | null;
   product?: {
     id: string;
     // Arabic product name from the live product (order_items only snapshots

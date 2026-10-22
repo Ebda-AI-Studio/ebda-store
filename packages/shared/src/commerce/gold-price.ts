@@ -212,3 +212,41 @@ export function karatCoherenceBps(rate24: number, rateK: number, karat: 21 | 18)
   const diff = got > exp ? got - exp : exp - got;
   return Number((diff * N10000 + exp - N1) / exp);
 }
+
+/**
+ * Grams typed by a person ("12.5", "3.25") to integer milligrams, with integer math. At most TWO
+ * decimals (a jeweller's scale), so the result is always a multiple of 10 mg. Anything else is null,
+ * never a rounded guess.
+ */
+export function parseGramsToMg(input: string): number | null {
+  const m = /^(\d{1,4})(?:\.(\d{1,2}))?$/.exec(input.trim());
+  if (!m) return null;
+  const mg = Number(m[1]) * 1000 + Number((m[2] ?? '').padEnd(2, '0')) * 10;
+  return mg >= GOLD_WEIGHT_MG_MIN && mg <= GOLD_WEIGHT_MG_MAX ? mg : null;
+}
+
+/** Milligrams to the grams string an input shows ("12.50"). */
+export function mgToGramsString(mg: number): string {
+  const whole = Math.floor(mg / 1000);
+  const hundredths = Math.round((mg % 1000) / 10);
+  return `${String(whole)}.${String(hundredths).padStart(2, '0')}`;
+}
+
+/** A margin typed as a percent ("7.5", "-2") to basis points; at most 2 decimals; null otherwise. */
+export function parsePercentToBps(input: string): number | null {
+  const m = /^(-?)(\d{1,3})(?:\.(\d{1,2}))?$/.exec(input.trim());
+  if (!m) return null;
+  const bps = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
+  const signed = m[1] ? -bps : bps;
+  return signed >= GOLD_MARGIN_BPS_MIN && signed <= GOLD_MARGIN_BPS_MAX ? signed : null;
+}
+
+/** Basis points to the percent string an input shows ("7.5"). */
+export function bpsToPercentString(bps: number): string {
+  const neg = bps < 0;
+  const abs = Math.abs(bps);
+  const frac = String(abs % 100)
+    .padStart(2, '0')
+    .replace(/0$/, '');
+  return `${neg ? '-' : ''}${String(Math.floor(abs / 100))}${frac === '' || frac === '0' ? '' : `.${frac}`}`;
+}
