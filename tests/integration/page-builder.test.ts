@@ -467,7 +467,7 @@ describe('tenant isolation (strict RLS on store_page_revisions)', { retry: 0 }, 
     doc.sections.push({
       id: 'stl',
       type: 'shop-the-look',
-      settings: { headingAr: 'تسوّق اللوك' },
+      settings: { headingAr: 'شوف اللوك كامل' },
       blocks: [{ id: 'look-1', type: 'look', settings: { productIds: [productA, productB] } }],
     });
     const head = (await inStore(storeA, () => getPageState(storeA, HOME)))!.rev;
