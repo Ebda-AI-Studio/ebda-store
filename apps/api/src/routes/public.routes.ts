@@ -644,8 +644,10 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const storeId = await getStoreIdFromRequest(req);
+    // No request transaction on this route (middleware/tenant-context.ts, Ruling LAZY-TX-1): the
+    // fill reads in its OWN short tenant transaction; a KV hit opens none.
     const categories = await getCached(`public:categories:${storeId}`, 120, () =>
-      ProductService.getCategories(storeId)
+      readInStoreContext(storeId, () => ProductService.getCategories(storeId))
     );
 
     setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
@@ -668,13 +670,15 @@ router.get('/tags', async (req: Request, res: Response, next: NextFunction) => {
     // `?name=` answers ONE tag (the PLP title label for a tag beyond the top-12 chips).
     const byName = typeof req.query.name === 'string' ? req.query.name.slice(0, 120) : '';
     if (byName) {
-      const one = await ProductService.getPublicTagByName(storeId, byName);
+      const one = await readInStoreContext(storeId, () =>
+        ProductService.getPublicTagByName(storeId, byName)
+      );
       setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
       res.json({ success: true, data: { tags: one ? [one] : [] } });
       return;
     }
     const tags = await getCached(`public:products:${storeId}:tags`, 120, () =>
-      ProductService.getPublicTags(storeId)
+      readInStoreContext(storeId, () => ProductService.getPublicTags(storeId))
     );
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({ success: true, data: { tags } });

@@ -3,6 +3,7 @@ import { runInStoreScope, runInTenantContext } from '@ebda/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';
+import { skipsRequestTransaction } from './public-read-limit';
 
 /**
  * Tenant Context Middleware
@@ -390,8 +391,10 @@ const PATH_STORE_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 export function publicStoreContext(req: Request, res: Response, next: NextFunction): void {
   void (async () => {
     let storeId: string | undefined;
+    let resolved = false; // true only when the store came from the host/id lookup, never the path
     try {
       storeId = await resolvePublicStoreId(req);
+      resolved = Boolean(storeId);
       if (!storeId) {
         const m = PATH_STORE_RE.exec(req.path);
         if (m) storeId = m[1].toLowerCase();
@@ -407,7 +410,12 @@ export function publicStoreContext(req: Request, res: Response, next: NextFuncti
     // The context middlewares read `req.params.storeId`; Express rewrites
     // `req.params` for every later layer, so setting it here cannot leak.
     req.params = { ...req.params, storeId };
-    if (SAFE_METHODS.has(req.method)) tenantContext(req, res, next);
+    // Ruling LAZY-TX-1: cached catalogue reads open NO request transaction and no tenant scope.
+    // Fail closed: with no ambient scope the tenant guard throws on any tenant-model query and RLS
+    // returns nothing, so the only DB access on this path is the handler's own
+    // `readInStoreContext` (a short, store-scoped transaction on a cache miss).
+    if (resolved && skipsRequestTransaction(req)) next();
+    else if (SAFE_METHODS.has(req.method)) tenantContext(req, res, next);
     else storeScopeContext(req, res, next);
   })();
 }
