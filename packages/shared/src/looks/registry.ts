@@ -460,7 +460,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'jasmine',
     letter: 'A',
     skin: 'jasmine',
-    status: 'designed',
+    status: 'built',
     // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Ruling B3-1/B3-2, plan Task 4: ingredients first. The hero is the bottle with its
@@ -535,7 +535,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'jasmine',
     letter: 'B',
     skin: 'jasmine',
-    status: 'designed',
+    status: 'built',
     // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Plan Task 4: colour is the page. A framed hero, a rail of "start here" tiles, the weekly
@@ -612,7 +612,7 @@ export const LOOKS: readonly LookDefinition[] = [
     template: 'jasmine',
     letter: 'C',
     skin: 'jasmine',
-    status: 'designed',
+    status: 'built',
     // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
     // Plan Task 4: the routine is the navigation. The concern chips come first, directly under the
