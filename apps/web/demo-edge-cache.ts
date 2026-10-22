@@ -33,7 +33,8 @@ import { DEMO_HOSTS } from './src/lib/demo-hosts';
 
 export const DEMO_EDGE_FRESH_S = 300;
 export const DEMO_EDGE_STALE_S = 86400;
-export const DEMO_EDGE_CACHE_CONTROL = `public, s-maxage=${DEMO_EDGE_FRESH_S}, stale-while-revalidate=${DEMO_EDGE_STALE_S}`;
+/** What the CLIENT is told: never cacheable downstream. The Worker's own cache is internal. */
+export const DEMO_EDGE_CACHE_CONTROL = 'private, no-store';
 const APEX = 'ebda.app';
 /** The API the resolver check asks (the same one the storefront resolves stores against). */
 export const DEMO_EDGE_API_URL = 'https://api.ebda.app/api/v1';
@@ -147,8 +148,10 @@ export function ageSeconds(stored: Response, now = Date.now()): number {
 
 function withEdgeHeaders(res: Response, state: 'HIT' | 'MISS' | 'STALE'): Response {
   const out = new Response(res.body, res);
-  out.headers.set('Cache-Control', DEMO_EDGE_CACHE_CONTROL);
+  // The Worker caches internally; clients (and office/ISP proxies) must not keep copies.
+  out.headers.set('Cache-Control', 'private, no-store');
   out.headers.set('x-demo-edge', state);
+  out.headers.set('x-demo-cache', state.toLowerCase());
   out.headers.delete('vary');
   return out;
 }

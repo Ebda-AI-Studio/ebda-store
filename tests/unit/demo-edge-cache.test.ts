@@ -179,9 +179,13 @@ describe('serveDemoEdge', () => {
     const r1 = await serveDemoEdge(req(`${D}/?look=qamar.lookbook`), c1, origin, yes, cache);
     await c1.settle();
     expect(r1.headers.get('x-demo-edge')).toBe('MISS');
-    expect(r1.headers.get('cache-control')).toBe(DEMO_EDGE_CACHE_CONTROL);
+    expect(r1.headers.get('cache-control')).toBe('private, no-store');
+    expect(DEMO_EDGE_CACHE_CONTROL).toBe('private, no-store');
+    expect(r1.headers.get('x-demo-cache')).toBe('miss');
     const r2 = await serveDemoEdge(req(`${D}/?look=qamar.lookbook`), ctx(), origin, yes, cache);
     expect(r2.headers.get('x-demo-edge')).toBe('HIT');
+    expect(r2.headers.get('x-demo-cache')).toBe('hit');
+    expect(r2.headers.get('cache-control')).toBe('private, no-store');
     expect(renders).toBe(1);
   });
   it('a demo-looking host the resolver rejects is rendered live and never stored', async () => {
