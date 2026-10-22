@@ -6,6 +6,7 @@ import { PLANS, PRICING_PLACEHOLDER, PRICING_PUBLISHED, comparisonRows } from '.
 import { initialLooksFragment } from '../lib/looks-initial';
 import { jsonLd } from '../lib/seo';
 import {
+  demoLookUrl,
   FIRST_MERCHANT,
   LOGIN_URL,
   SECTION_ORDER,
@@ -99,6 +100,16 @@ export function Home({ locale }: { locale: Locale }) {
             c.looks.live.template === c.looks.templates[0].id ? '' : initialLooksFragment()
           }
         />
+      </Section>
+    ),
+    demo: () => (
+      <Section id="demo" title={c.demo.title} className="demo">
+        <p className="lead">{c.demo.lead}</p>
+        <p className="actions">
+          <a href={demoLookUrl('atelier')} className="btn btn-primary btn-lg">
+            {c.demo.cta}
+          </a>
+        </p>
       </Section>
     ),
     features: () => (

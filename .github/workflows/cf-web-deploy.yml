@@ -78,7 +78,7 @@ jobs:
           SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN_WEB }}
         run: |
           # Server-side Sentry DSN for sentry-worker-entry.ts; omitted (clean no-op) when unset.
-          if [ -n "$SENTRY_DSN" ]; then npx wrangler deploy --var "SENTRY_DSN:$SENTRY_DSN"; else npx wrangler deploy; fi
+          if [ -n "$SENTRY_DSN" ]; then npx wrangler deploy --var "SENTRY_DSN:$SENTRY_DSN" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}"; else npx wrangler deploy --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}"; fi
       - name: Verify the live Worker serves THIS build, roll back automatically if not
         # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
         # previous version for a few seconds). Identity: /_next/static/<BUILD_ID>/_buildManifest.js

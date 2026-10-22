@@ -150,11 +150,23 @@ describe('marketing hero and structure', () => {
       existsSync(path.resolve(__dirname, '../../apps/marketing/scripts/story-frames/make.mjs'))
     ).toBe(true);
   });
+  it('MKT-15: a demo section after the looks links to the live demo store, in both languages', () => {
+    for (const [html, title] of [
+      [ar, 'جرّب المتجر التجريبي بنفسك'],
+      [en, 'Try the demo store yourself'],
+    ] as const) {
+      const s = html.match(/<section id="demo".*?<\/section>/s)![0];
+      expect(s).toContain(title);
+      expect(s).toContain('href="https://storedemo.ebda.app/?look=qamar.atelier"');
+      expect(s).not.toContain('target="_blank"');
+    }
+  });
   it('renders sections in the exact required order', () => {
     // MKT-14 (Ahmad 2026-10-14): story first, then the looks
     const expected = [
       'story',
       'looks',
+      'demo',
       'model3d',
       'payments',
       'features',
