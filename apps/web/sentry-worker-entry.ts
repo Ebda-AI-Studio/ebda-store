@@ -42,6 +42,7 @@ import { default as nextHandler } from './.open-next/worker.js';
 import * as Sentry from '@sentry/cloudflare';
 import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 import { companyHostRoute } from './company-host-route';
+import { serveDemoEdge } from './demo-edge-cache';
 
 interface WorkerEnv {
   /** Server-side Sentry DSN for this Worker. Set via `wrangler deploy --var
@@ -87,7 +88,10 @@ const baseHandler = {
     }
     // route.kind === 'next' — all merchant domains + platform subdomains,
     // routed to the Next storefront exactly as before this carve-out.
-    return nextHandler.fetch(request, env, ctx);
+    // Demo showroom hosts only (Ruling DEMO-EDGE-1): served from the edge cache when eligible.
+    return serveDemoEdge(request, ctx as { waitUntil(p: Promise<unknown>): void }, r =>
+      nextHandler.fetch(r, env, ctx)
+    );
   },
 };
 
