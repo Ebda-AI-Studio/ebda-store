@@ -179,7 +179,7 @@ export async function serveDemoEdge(
   cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
 ): Promise<Response> {
   const key = demoEdgeKey(request);
-  if (!key || !(await isDemoHost(new URL(key).hostname))) return origin(request);
+  if (!key) return origin(request);
 
   const store = async (res: Response) => {
     const copy = new Response(res.body, res);
@@ -207,8 +207,11 @@ export async function serveDemoEdge(
     // cache unavailable: render normally
   }
 
+  // MISS: the resolver verdict runs IN PARALLEL with the render (a stored entry only ever exists
+  // for a host that passed it, so a HIT/STALE above needs no second check) and gates the store.
+  const verdict = isDemoHost(new URL(key).hostname).catch(() => false);
   const res = await origin(request);
-  if (!isStorable(res)) return res;
+  if (!isStorable(res) || !(await verdict)) return res;
   ctx.waitUntil(store(res.clone()).catch(() => {}));
   return withEdgeHeaders(res, 'MISS');
 }
