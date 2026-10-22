@@ -108,6 +108,11 @@ interface ProductCategory {
 interface Product {
   id: string;
   name: string;
+  /**
+   * Published, verified-purchase review aggregate (PDP payload only; absent on list payloads).
+   * BOUNDED-stale: it rides the cached public product payload (Ruling B3-6).
+   */
+  ratingStats?: { ratingAverage: number | null; ratingCount: number };
   /** B2B minimum order quantity (public data), null / absent = none. */
   moq?: number | null;
   /** PUBLIC quantity price breaks only (group tiers are never in this payload). */
@@ -271,6 +276,31 @@ export interface PublicBundleDetail extends PublicBundle {
   descriptionAr: string | null;
   isPurchasable: boolean;
   componentNames: Array<{ name: string; nameAr: string | null }>;
+}
+
+/** One skin-type / concern chip (`GET /public/tags`, Phase B3): a tag with published products. */
+export interface PublicTag {
+  id: string;
+  name: string;
+  productCount: number;
+}
+
+/**
+ * A purchasable bundle that contains every requested product, with the saving it gives
+ * (`GET /stores/public/:storeId/bundle-savings`, Phase B3). The money comes from the same
+ * `resolveBundle` the cart prices from and is never cached.
+ */
+export interface BundleSavingInfo {
+  bundleId: string;
+  slug: string;
+  name: string;
+  nameAr: string | null;
+  price: number;
+  componentSum: number;
+  saving: number;
+  percent: number;
+  /** The bundle holds exactly the requested products. */
+  exact: boolean;
 }
 
 interface Order {
@@ -1318,6 +1348,14 @@ class ApiClient {
   async getPublicBundles(storeId: string) {
     return this.request<{ bundles: PublicBundle[] }>(
       `/stores/public/${encodeURIComponent(storeId)}/bundles`
+    );
+  }
+
+  /** GET /stores/public/:storeId/bundle-savings — the bundles that save money on these products.
+   *  `bundles` is a feature flag; callers gate on `bundlesNavVisible(store.enabledFeatures)`. */
+  async getBundleSavings(storeId: string, productIds: string[]) {
+    return this.request<{ savings: BundleSavingInfo[] }>(
+      `/stores/public/${encodeURIComponent(storeId)}/bundle-savings?productIds=${encodeURIComponent(productIds.join(','))}`
     );
   }
 

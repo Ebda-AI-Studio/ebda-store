@@ -18,7 +18,8 @@ export type EmptySectionKind =
   | 'blogCarousel'
   | 'trustStrip'
   | 'testimonials'
-  | 'shopTheLook';
+  | 'shopTheLook'
+  | 'steps';
 
 const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   categories: 'Add categories and they will appear here.',
@@ -29,6 +30,7 @@ const HINT_KEY: Record<EmptySectionKind, keyof typeof translations> = {
   trustStrip: 'Write your own trust items (delivery, payment, returns) and they will show here.',
   testimonials: 'Customer reviews appear here once customers leave them.',
   shopTheLook: 'Add a look with a photo and its pieces and it will appear here.',
+  steps: 'Add at least two steps and your routine will appear here.',
 };
 
 export function EmptySectionHint({ kind }: { kind: EmptySectionKind }) {

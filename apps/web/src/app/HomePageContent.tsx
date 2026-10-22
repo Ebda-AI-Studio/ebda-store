@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { Product, Category } from '@/lib/api';
+import type { Product, Category, PublicTag } from '@/lib/api';
 import { ShopChrome } from '../components';
 import type { TemplateId, StoreLayoutSettings, PageDefinition } from '@ebda/shared';
 import { layoutToDefinition } from '@ebda/shared';
@@ -42,6 +42,8 @@ interface HomePageContentProps {
   extraProducts?: Product[];
   /** The API's ordered deals pool (see HomePageBody `onSalePool`). */
   onSalePool?: Product[];
+  /** The skin-type / concern chips for a tag-sourced category row (Phase B3). */
+  tags?: PublicTag[];
   storeName: string;
   layout: StoreLayoutSettings;
   /** Published page document from `GET /public/stores/:id/layout`, already
@@ -60,6 +62,7 @@ export function HomePageContent({
   testimonials,
   extraProducts,
   onSalePool,
+  tags,
   layout,
   definition,
   editorMode,
@@ -77,6 +80,7 @@ export function HomePageContent({
         testimonials={testimonials}
         extraProducts={extraProducts}
         onSalePool={onSalePool}
+        tags={tags}
         editorMode={editorMode}
       />
     </ShopChrome>

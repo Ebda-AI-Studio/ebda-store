@@ -23,7 +23,10 @@ export default async function ProductsPage({
   const params = await searchParams;
   const rawCategory = params.category;
   const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;
+  // `?tag=<name>` (Phase B3, Ruling B3-5): the skin-type / concern chips land here.
+  const rawTag = params.tag;
+  const tag = (Array.isArray(rawTag) ? rawTag[0] : rawTag)?.trim().slice(0, 120) || undefined;
   const draftToken = await getPreviewDraftToken();
 
-  return <ProductsPageBody store={store} category={category} draftToken={draftToken} />;
+  return <ProductsPageBody store={store} category={category} tag={tag} draftToken={draftToken} />;
 }
