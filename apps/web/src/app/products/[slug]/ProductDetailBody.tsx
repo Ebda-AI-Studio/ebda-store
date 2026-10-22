@@ -5,7 +5,16 @@ import { API_URL } from '../../../lib/api';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
-import { resolveLayoutSettings, type StoreLayoutSettings, fromMinor, REGION } from '@ebda/shared';
+import {
+  resolveLayoutSettings,
+  type StoreLayoutSettings,
+  fromMinor,
+  REGION,
+  defaultPageDocument,
+} from '@ebda/shared';
+import { fetchPageDocument } from '../../../lib/page-document';
+import { PageDocumentProvider } from '../../../builder/render/PageDocument';
+import { allowedParentOrigins } from '../../../builder/preview/allowed-parent-origins';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
@@ -168,6 +177,7 @@ export async function ProductDetailBody({
   store,
   slug,
   draftToken,
+  builderToken,
   locale = 'en',
 }: {
   store: ResolvedStore;
@@ -177,8 +187,10 @@ export async function ProductDetailBody({
   /** Always `undefined` from the new `tenant-store` tree — see HomePageBody's
    *  doc comment for why Track-A never carries a draft token. */
   draftToken?: string;
+  /** Visual builder canvas token (`?_builder=` inside the `?_preview` iframe): renders the page's DRAFT document. */
+  builderToken?: string;
 }) {
-  const [initialProduct, layout, shippingZones, codOffer] = await Promise.all([
+  const [initialProduct, layout, shippingZones, codOffer, pageDocument] = await Promise.all([
     fetchInitialProduct(slug, store),
     fetchProductDetailLayoutSettings(store.id, draftToken),
     // Feeds `offers.shippingDetails` in the Product JSON-LD below. Resolves to
@@ -186,6 +198,9 @@ export async function ProductDetailBody({
     fetchPublicShippingZones(store.id),
     // S-02: the COD half of the trust line, in the server HTML (no post-load shift).
     fetchCodOffer(store),
+    // The product page's section document (published, or the draft for the editor canvas); a failure
+    // renders today's order.
+    fetchPageDocument(store.id, 'product', builderToken),
   ]);
 
   // Genuine miss on a real store: try to resolve a renamed-slug 308 before
@@ -273,15 +288,22 @@ export async function ProductDetailBody({
       {jsonLdScripts.map((jsonLd, i) => (
         <JsonLd key={i} data={jsonLd} />
       ))}
-      <ProductDetailClient
-        initialProduct={initialProduct}
-        layout={layout}
-        codOffer={codOffer}
-        // Canonical, store-aware URL for the share row: real in the server HTML and before hydration.
-        shareUrl={
-          initialProduct ? storeAbsoluteUrl(store, `/products/${initialProduct.slug}`) : undefined
-        }
-      />
+      <PageDocumentProvider
+        kind="product"
+        initialDefinition={pageDocument?.definition ?? defaultPageDocument('product')}
+        editorMode={pageDocument?.editorMode === true}
+        allowedOrigins={allowedParentOrigins()}
+      >
+        <ProductDetailClient
+          initialProduct={initialProduct}
+          layout={layout}
+          codOffer={codOffer}
+          // Canonical, store-aware URL for the share row: real in the server HTML and before hydration.
+          shareUrl={
+            initialProduct ? storeAbsoluteUrl(store, `/products/${initialProduct.slug}`) : undefined
+          }
+        />
+      </PageDocumentProvider>
     </>
   );
 }

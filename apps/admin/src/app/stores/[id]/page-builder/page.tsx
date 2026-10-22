@@ -3,6 +3,7 @@
 import { ModeButton } from './ModeButton';
 import { CategoryLayoutButtons } from './CategoryLayoutButtons';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   DndContext,
@@ -61,6 +62,7 @@ import { AiSectionFillButton } from '../../../../components/section-design/AiSec
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { FooterLinksEditor } from '../../../../components/FooterLinksEditor';
 import { NavMenuEditor } from '../../../../components/NavMenuEditor';
+import { withoutPageOwnedKeys } from '@ebda/shared';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { loadPageRev, saveLayoutAsPage } from '../../../../lib/page-builder-save';
 import { getStoreHref } from '../../../../lib/store-url';
@@ -283,7 +285,9 @@ export default function StoreLayoutPage() {
   // Layout save: builder draft + publish when the API has it (revisioned,
   // conflict-checked), else the legacy PUT. Resolves to the `{ error }`
   // shape the batch below already inspects.
-  const saveLayout = async (current: StoreLayoutSettings) => {
+  const saveLayout = async (full: StoreLayoutSettings) => {
+    // The page design cards moved to the visual editor (VE-15): this form no longer sends those keys.
+    const current = withoutPageOwnedKeys(full);
     if (pageRev === null) return apiPut(`/api/v1/admin/stores/${storeId}/layout`, current);
     const r = await saveLayoutAsPage(storeId, current, pageRev);
     setPageRev(r.rev);
@@ -1344,218 +1348,33 @@ export default function StoreLayoutPage() {
                 </div>
               </SectionCard>
 
-              {/* Filter sidebar */}
-              <SectionCard
-                title={t('sections.filterSidebar.title')}
-                description={t('sections.filterSidebar.description')}
-                enabled={layout.filterSidebar.enabled}
-                onToggle={v => updateSection('filterSidebar', s => ({ ...s, enabled: v }))}
-                defaultExpanded={false}
-              >
-                <RowToggle
-                  label={t('sections.filterSidebar.defaultOpen')}
-                  checked={layout.filterSidebar.defaultOpen}
-                  onChange={v => updateSection('filterSidebar', s => ({ ...s, defaultOpen: v }))}
-                />
-                <ColorField
-                  label={t('sections.filterSidebar.bgColor')}
-                  value={layout.filterSidebar.bgColor}
-                  onChange={v =>
-                    updateSection('filterSidebar', s => ({ ...s, bgColor: v ?? undefined }))
-                  }
-                  theme={storeInfo?.theme}
-                />
-                <ColorField
-                  label={t('sections.filterSidebar.textColor')}
-                  value={layout.filterSidebar.textColor}
-                  onChange={v =>
-                    updateSection('filterSidebar', s => ({ ...s, textColor: v ?? undefined }))
-                  }
-                  theme={storeInfo?.theme}
-                />
-              </SectionCard>
-
               {/* ── Page design: one card per storefront page (background +
                   typography). Each uses the shared pageDesign() handlers so they
                   behave identically. "Product cards (everywhere)" below is the
                   separate cross-page CARD styling. ── */}
 
-              {/* Products list page (/products) */}
-              {(() => {
-                const pg = pageDesign('productsPage');
-                const roles = ['heading', 'subtitle'] as const;
-                return (
-                  <SectionCard
-                    title={t('pageCards.productsListTitle')}
-                    description={t('pageCards.productsListDescription')}
-                    defaultExpanded={false}
-                    alwaysOn
-                  >
-                    <ColorField
-                      label={t('pageCards.backgroundLabel')}
-                      value={pg.bgColor}
-                      onChange={pg.onBg}
-                      theme={storeInfo?.theme}
-                    />
-                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
-                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
-                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
-                    <SectionTypographyBlock
-                      roles={roles}
-                      typography={pg.typography}
-                      globalZones={pg.globalZonesFor(roles)}
-                      onChangeRole={pg.onChangeRole}
-                      onResetRole={pg.onResetRole}
-                      theme={storeInfo?.theme}
-                    />
-                    {/* PLP text color knobs — breadcrumb, h1, subtitle.
-                        Stored on StoreTheme JSON (no migration). */}
-                    <div className="mt-4 space-y-1 border-t border-border/40 pt-4">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {t('pageCards.textColorsTitle')}
-                      </p>
-                      <ColorField
-                        label={t('pageCards.breadcrumbColorLabel')}
-                        value={
-                          (pendingThemeUpdates.plpBreadcrumbColor as string | undefined) ??
-                          storeInfo?.theme?.plpBreadcrumbColor
-                        }
-                        onChange={v =>
-                          setPendingThemeUpdates(prev => ({ ...prev, plpBreadcrumbColor: v }))
-                        }
-                        hint={t('pageCards.breadcrumbColorHint')}
-                        theme={storeInfo?.theme ?? FALLBACK_THEME}
-                        inheritFromToken="muted"
-                      />
-                      <ColorField
-                        label={t('pageCards.headingColorLabel')}
-                        value={
-                          (pendingThemeUpdates.plpHeadingColor as string | undefined) ??
-                          storeInfo?.theme?.plpHeadingColor
-                        }
-                        onChange={v =>
-                          setPendingThemeUpdates(prev => ({ ...prev, plpHeadingColor: v }))
-                        }
-                        hint={t('pageCards.headingColorHint')}
-                        theme={storeInfo?.theme ?? FALLBACK_THEME}
-                        inheritFromToken="foreground"
-                      />
-                      <ColorField
-                        label={t('pageCards.subtitleColorLabel')}
-                        value={
-                          (pendingThemeUpdates.plpSubheadingColor as string | undefined) ??
-                          storeInfo?.theme?.plpSubheadingColor
-                        }
-                        onChange={v =>
-                          setPendingThemeUpdates(prev => ({ ...prev, plpSubheadingColor: v }))
-                        }
-                        hint={t('pageCards.subtitleColorHint')}
-                        theme={storeInfo?.theme ?? FALLBACK_THEME}
-                        inheritFromToken="muted"
-                      />
-                    </div>
-                  </SectionCard>
-                );
-              })()}
-
-              {/* Product detail page (/products/[slug]) */}
-              {(() => {
-                const pg = pageDesign('productDetailPage');
-                const roles = ['heading', 'productName', 'productPrice'] as const;
-                return (
-                  <SectionCard
-                    title={t('pageCards.productDetailTitle')}
-                    description={t('pageCards.productDetailDescription')}
-                    defaultExpanded={false}
-                    alwaysOn
-                  >
-                    <ColorField
-                      label={t('pageCards.backgroundLabel')}
-                      value={pg.bgColor}
-                      onChange={pg.onBg}
-                      theme={storeInfo?.theme}
-                    />
-                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
-                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
-                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {t('pageCards.mainImageAspectLabel')}
-                      </span>
-                      <select
-                        value={layout.productDetailPage?.imageAspect ?? 'auto'}
-                        onChange={e =>
-                          setLayout(prev =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  productDetailPage: {
-                                    ...(prev.productDetailPage ?? {}),
-                                    imageAspect: e.target.value as
-                                      | 'auto'
-                                      | 'square'
-                                      | 'portrait'
-                                      | 'landscape'
-                                      | 'wide'
-                                      | 'ultrawide',
-                                  },
-                                }
-                              : prev
-                          )
-                        }
-                        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              {/* Page settings moved to the visual editor (Ruling VE-15): the product, products,
+                  categories, cart and checkout page design, the filter panel and the reviews switch
+                  are saved per page there. Saving them here would not reach the storefront. */}
+              <div
+                className="rounded-xl border border-dashed border-border p-4 text-sm"
+                data-testid="page-settings-moved"
+              >
+                <p className="font-medium text-foreground">{t('pageSettingsMoved.title')}</p>
+                <p className="mt-1 text-muted-foreground">{t('pageSettingsMoved.body')}</p>
+                <ul className="mt-2 flex flex-wrap gap-3">
+                  {(['product', 'collection', 'cart'] as const).map(k => (
+                    <li key={k}>
+                      <Link
+                        href={`/stores/${storeId}/builder?page=${k}`}
+                        className="text-primary underline"
                       >
-                        <option value="auto">{t('productCard.aspectAutoSquare')}</option>
-                        <option value="square">{t('productCard.aspectSquarePlain')}</option>
-                        <option value="portrait">{t('productCard.shapePortraitPlain')}</option>
-                        <option value="landscape">{t('productCard.shapeLandscapePlain')}</option>
-                        <option value="wide">{t('productCard.aspectWidePlain')}</option>
-                        <option value="ultrawide">{t('productCard.aspectUltrawidePlain')}</option>
-                      </select>
-                    </label>
-                    <SectionTypographyBlock
-                      roles={roles}
-                      typography={pg.typography}
-                      globalZones={pg.globalZonesFor(roles)}
-                      onChangeRole={pg.onChangeRole}
-                      onResetRole={pg.onResetRole}
-                      theme={storeInfo?.theme}
-                    />
-                  </SectionCard>
-                );
-              })()}
-
-              {/* Categories page (/categories) */}
-              {(() => {
-                const pg = pageDesign('categoriesPage');
-                const roles = ['heading', 'subtitle', 'categoryLabel'] as const;
-                return (
-                  <SectionCard
-                    title={t('pageCards.categoriesTitle')}
-                    description={t('pageCards.categoriesDescription')}
-                    defaultExpanded={false}
-                    alwaysOn
-                  >
-                    <ColorField
-                      label={t('pageCards.backgroundLabel')}
-                      value={pg.bgColor}
-                      onChange={pg.onBg}
-                      theme={storeInfo?.theme}
-                    />
-                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
-                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
-                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
-                    <SectionTypographyBlock
-                      roles={roles}
-                      typography={pg.typography}
-                      globalZones={pg.globalZonesFor(roles)}
-                      onChangeRole={pg.onChangeRole}
-                      onResetRole={pg.onResetRole}
-                      theme={storeInfo?.theme}
-                    />
-                  </SectionCard>
-                );
-              })()}
+                        {t(`pageSettingsMoved.${k}`)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
               {/* Locations page (/locations) */}
               {(() => {
@@ -1588,221 +1407,6 @@ export default function StoreLayoutPage() {
                   </SectionCard>
                 );
               })()}
-
-              {/* Checkout / payment page (/checkout) */}
-              {(() => {
-                const pg = pageDesign('checkoutPage');
-                const roles = ['heading', 'subtitle', 'productPrice'] as const;
-                return (
-                  <SectionCard
-                    title={t('pageCards.checkoutTitle')}
-                    description={t('pageCards.checkoutDescription')}
-                    defaultExpanded={false}
-                    alwaysOn
-                  >
-                    <ColorField
-                      label={t('pageCards.backgroundLabel')}
-                      value={pg.bgColor}
-                      onChange={pg.onBg}
-                      theme={storeInfo?.theme}
-                    />
-                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
-                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
-                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
-                    <SectionTypographyBlock
-                      roles={roles}
-                      typography={pg.typography}
-                      globalZones={pg.globalZonesFor(roles)}
-                      onChangeRole={pg.onChangeRole}
-                      onResetRole={pg.onResetRole}
-                      theme={storeInfo?.theme}
-                    />
-                  </SectionCard>
-                );
-              })()}
-
-              {/* Cart page — standalone background + typography control. Saved
-                  via the main page-builder save button (no separate save / page). */}
-              <SectionCard
-                title={t('pageCards.cartTitle')}
-                description={t('pageCards.cartDescription')}
-                defaultExpanded={false}
-                alwaysOn
-              >
-                <ColorField
-                  label={t('pageCards.backgroundLabel')}
-                  value={layout.cartPage?.bgColor}
-                  onChange={v =>
-                    setLayout(prev =>
-                      prev
-                        ? {
-                            ...prev,
-                            cartPage: { ...(prev.cartPage ?? {}), bgColor: v },
-                          }
-                        : prev
-                    )
-                  }
-                  theme={storeInfo?.theme}
-                />
-                <SchemeSelect
-                  value={layout.cartPage?.colorScheme ?? 'auto'}
-                  onChange={v =>
-                    setLayout(prev =>
-                      prev
-                        ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), colorScheme: v } }
-                        : prev
-                    )
-                  }
-                />
-                <DensitySelect
-                  value={layout.cartPage?.density ?? 'normal'}
-                  onChange={v =>
-                    setLayout(prev =>
-                      prev ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), density: v } } : prev
-                    )
-                  }
-                />
-                <TextScaleSelect
-                  value={layout.cartPage?.textScale ?? 'normal'}
-                  onChange={v =>
-                    setLayout(prev =>
-                      prev
-                        ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), textScale: v } }
-                        : prev
-                    )
-                  }
-                />
-                <SectionTypographyBlock
-                  roles={['heading', 'subtitle', 'productName', 'productPrice', 'productCta']}
-                  typography={layout.cartPage?.typography}
-                  globalZones={Object.fromEntries(
-                    (
-                      ['heading', 'subtitle', 'productName', 'productPrice', 'productCta'] as const
-                    ).map(r => [r, globalZones[ROLE_TO_GLOBAL_ZONE[r]]])
-                  )}
-                  onChangeRole={(role, next) =>
-                    setLayout(prev =>
-                      prev
-                        ? {
-                            ...prev,
-                            cartPage: {
-                              ...(prev.cartPage ?? {}),
-                              typography: {
-                                ...(prev.cartPage?.typography ?? {}),
-                                [role]: {
-                                  ...(prev.cartPage?.typography?.[
-                                    role as keyof SectionTypographyOverride
-                                  ] ?? {}),
-                                  ...next,
-                                },
-                              },
-                            },
-                          }
-                        : prev
-                    )
-                  }
-                  onResetRole={role =>
-                    setLayout(prev => {
-                      if (!prev) return prev;
-                      const rest = {
-                        ...(prev.cartPage?.typography ?? {}),
-                      } as SectionTypographyOverride;
-                      delete rest[role as keyof SectionTypographyOverride];
-                      return {
-                        ...prev,
-                        cartPage: { ...(prev.cartPage ?? {}), typography: rest },
-                      };
-                    })
-                  }
-                  theme={storeInfo?.theme}
-                />
-                {/* Order-summary label colors — cart, checkout, and address pages.
-                    Stored on StoreTheme JSON (no migration). Defaults match the
-                    current look so existing stores see no visual change. */}
-                <div className="mt-4 space-y-1 border-t border-border/40 pt-4">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {t('pageCards.orderSummaryLabelsTitle')}
-                  </p>
-                  <ColorField
-                    label={t('pageCards.labelColorLabel')}
-                    value={
-                      (pendingThemeUpdates.summaryLabelColor as string | undefined) ??
-                      storeInfo?.theme?.summaryLabelColor
-                    }
-                    onChange={v =>
-                      setPendingThemeUpdates(prev => ({ ...prev, summaryLabelColor: v }))
-                    }
-                    hint={t('pageCards.labelColorHint')}
-                    theme={storeInfo?.theme ?? FALLBACK_THEME}
-                    inheritFromToken="foreground"
-                  />
-                  <ColorField
-                    label={t('pageCards.totalColorLabel')}
-                    value={
-                      (pendingThemeUpdates.summaryTotalColor as string | undefined) ??
-                      storeInfo?.theme?.summaryTotalColor
-                    }
-                    onChange={v =>
-                      setPendingThemeUpdates(prev => ({ ...prev, summaryTotalColor: v }))
-                    }
-                    hint={t('pageCards.totalColorHint')}
-                    theme={storeInfo?.theme ?? FALLBACK_THEME}
-                    inheritFromToken="foreground"
-                  />
-                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold text-foreground">
-                        {t('pageCards.boldSummaryLabels')}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {t('pageCards.boldSummaryLabelsHint')}
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={
-                        pendingThemeUpdates.summaryLabelBold !== undefined
-                          ? (pendingThemeUpdates.summaryLabelBold as boolean)
-                          : storeInfo?.theme?.summaryLabelBold !== false
-                      }
-                      onChange={e =>
-                        setPendingThemeUpdates(prev => ({
-                          ...prev,
-                          summaryLabelBold: e.target.checked,
-                        }))
-                      }
-                      className="h-5 w-5 cursor-pointer accent-primary"
-                    />
-                  </label>
-                  {/* #2349 — per-store StoreTheme flag (shallow-merge theme PATCH on
-                      Save, via pendingThemeUpdates). Off = readable -ink message
-                      colours; on = the legacy bare role colours. */}
-                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold text-foreground">
-                        {t('pageCards.legacyBannerContrastTitle')}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {t('pageCards.legacyBannerContrastHint')}
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={
-                        pendingThemeUpdates.legacyBannerContrast ??
-                        storeInfo?.theme?.legacyBannerContrast === true
-                      }
-                      onChange={e =>
-                        setPendingThemeUpdates(prev => ({
-                          ...prev,
-                          legacyBannerContrast: e.target.checked,
-                        }))
-                      }
-                      className="h-5 w-5 cursor-pointer accent-primary"
-                    />
-                  </label>
-                </div>
-              </SectionCard>
 
               {/* Testimonials */}
               <SectionCard
@@ -1893,15 +1497,6 @@ export default function StoreLayoutPage() {
                   />
                 </div>
               </SectionCard>
-
-              {/* Product reviews (sibling of testimonials — both UGC) */}
-              <SectionCard
-                title={t('sections.reviewSection.title')}
-                description={t('sections.reviewSection.description')}
-                enabled={layout.reviewSection.enabled}
-                onToggle={v => updateSection('reviewSection', s => ({ ...s, enabled: v }))}
-                defaultExpanded={false}
-              ></SectionCard>
 
               {/* Brand Story — folded into page-builder 2026-05-20 (was a
                   theme toggle in Branding before). Content sourced from

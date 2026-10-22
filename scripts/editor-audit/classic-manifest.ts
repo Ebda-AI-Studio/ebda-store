@@ -11,7 +11,10 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
+  ALL_PAGE_OWNED_KEYS,
   MOBILE_PROP_LEGACY_NAME,
+  PAGE_KINDS,
+  PAGE_SETTINGS,
   SECTION_REGISTRY,
   SITE_SETTING_KEYS,
   sectionDefinitionForLegacyKey,
@@ -118,6 +121,21 @@ export function calledEndpoints(source: string): string[] {
   return [...out].sort();
 }
 
+/**
+ * The visual editor's page-type settings panel (Task 8e) covers a layout key, or one field of it. Returns the
+ * control that does, or null when the panel has none.
+ */
+export function pageSettingsControl(key: string): string | null {
+  const [group, ...path] = key.split('.');
+  for (const kind of PAGE_KINDS) {
+    const g = PAGE_SETTINGS[kind].find(x => x.key === group);
+    if (!g) continue;
+    if (path.length === 0) return `page-settings:${kind}/${group}`;
+    if (g.settings.some(s => s.id === path.join('.'))) return `page-settings:${kind}/${key}`;
+  }
+  return null;
+}
+
 /** Compound editors the page builder has and the visual panel does not (none left after Task 6). */
 const COMPOUND = new Set<string>();
 
@@ -160,9 +178,17 @@ const COMPONENTS: Array<{ name: string; capability: string; covered: string | nu
   },
   { name: 'SectionDividersBlock', capability: 'P-04', covered: 'DividersField (dividers setting)' },
   { name: 'DividerStyleSelect', capability: 'P-04', covered: 'DividersField (dividers setting)' },
-  { name: 'SchemeSelect', capability: 'P-05', covered: null },
-  { name: 'DensitySelect', capability: 'P-05', covered: null },
-  { name: 'TextScaleSelect', capability: 'P-05', covered: null },
+  {
+    name: 'SchemeSelect',
+    capability: 'P-05',
+    covered: 'PageSettingsPanel (colorScheme, every page)',
+  },
+  { name: 'DensitySelect', capability: 'P-05', covered: 'PageSettingsPanel (density, every page)' },
+  {
+    name: 'TextScaleSelect',
+    capability: 'P-05',
+    covered: 'PageSettingsPanel (textScale, every page)',
+  },
   {
     name: 'SectionPaddingMaxWidthBlock',
     capability: 'P-06',
@@ -174,7 +200,11 @@ const COMPONENTS: Array<{ name: string; capability: string; covered: string | nu
     covered: 'registry settings kicker, subtitle, dividers',
   },
   { name: 'SectionTitleFields', capability: 'P-06', covered: 'registry settings title, titleAr' },
-  { name: 'ProductCardControls', capability: 'P-07', covered: null },
+  {
+    name: 'ProductCardControls',
+    capability: 'P-07',
+    covered: 'PageSettingsPanel (productCardDefaults group, home)',
+  },
   {
     name: 'SmartPaletteModal',
     capability: 'P-13',
@@ -243,15 +273,28 @@ export function buildClassicManifest(): ManifestEntry[] {
   for (const [legacyKey, fields] of Object.entries(writtenFields(src))) {
     if ((SITE_SETTING_KEYS as readonly string[]).includes(legacyKey)) {
       // A site-wide / page-type setting written through `updateSection`: no visual panel yet.
-      for (const field of fields)
-        entries.push({
-          kind: 'site-setting',
-          key: `${legacyKey}.${field}`,
-          builder: null,
-          status: 'classic-only',
-          capability: siteCapability(legacyKey),
-          reason: 'siteSettings have no panel in the visual editor',
-        });
+      for (const field of fields) {
+        const key = `${legacyKey}.${field}`;
+        const control = pageSettingsControl(key);
+        entries.push(
+          control
+            ? {
+                kind: 'site-setting',
+                key,
+                builder: control,
+                status: 'wired',
+                capability: siteCapability(key),
+              }
+            : {
+                kind: 'site-setting',
+                key,
+                builder: null,
+                status: 'classic-only',
+                capability: siteCapability(legacyKey),
+                reason: 'no control for this siteSettings field in the page-settings panel',
+              }
+        );
+      }
       continue;
     }
     let def;
@@ -313,14 +356,40 @@ export function buildClassicManifest(): ManifestEntry[] {
 
   for (const key of SITE_SETTING_KEYS) {
     if (!new RegExp(`\\b(layout\\.${key}|'${key}')\\b`).test(src)) continue;
-    entries.push({
-      kind: 'site-setting',
-      key,
-      builder: null,
-      status: 'classic-only',
-      capability: siteCapability(key),
-      reason: 'siteSettings have no panel in the visual editor',
-    });
+    const control = pageSettingsControl(key);
+    entries.push(
+      control
+        ? {
+            kind: 'site-setting',
+            key,
+            builder: control,
+            status: 'wired',
+            capability: siteCapability(key),
+          }
+        : {
+            kind: 'site-setting',
+            key,
+            builder: null,
+            status: 'classic-only',
+            capability: siteCapability(key),
+            reason: 'no control for this siteSettings key in the page-settings panel',
+          }
+    );
+  }
+
+  // Page settings the classic form no longer edits (Ruling VE-15): they moved to the visual editor's
+  // page-settings panel, so each stays accounted for under its capability.
+  for (const key of ALL_PAGE_OWNED_KEYS) {
+    if (entries.some(e => e.key === key || e.key.startsWith(`${key}.`))) continue;
+    const control = pageSettingsControl(key);
+    if (control)
+      entries.push({
+        kind: 'site-setting',
+        key,
+        builder: control,
+        status: 'wired',
+        capability: siteCapability(key),
+      });
   }
 
   for (const c of COMPONENTS) {

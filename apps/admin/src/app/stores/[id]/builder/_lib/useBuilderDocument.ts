@@ -62,8 +62,8 @@ export function needsDataReload(action: DocumentAction): boolean {
   return false;
 }
 
-export function useBuilderDocument(storeId: string) {
-  const base = `/api/v1/admin/stores/${storeId}/builder/pages/${HOME_PAGE}`;
+export function useBuilderDocument(storeId: string, pageKey: string = HOME_PAGE) {
+  const base = `/api/v1/admin/stores/${storeId}/builder/pages/${pageKey}`;
   const [history, setHistoryState] = useState<History<PageDefinition> | null>(null);
   // The ref is the source of truth between renders, so two dispatches in one
   // tick both see the latest document (a setState updater runs later).

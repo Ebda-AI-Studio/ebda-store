@@ -91,6 +91,43 @@ describe('PUT /stores/:storeId/layout purges the storefront caches', () => {
   });
 });
 
+describe('PUT /stores/:storeId/layout refuses the settings the visual editor owns (Ruling VE-15)', () => {
+  it.each([
+    ['productsPage', { bgColor: '#101010' }],
+    ['productDetailPage', { density: 'compact' }],
+    ['cartPage', { textScale: 'lg' }],
+    ['checkoutPage', { density: 'compact' }],
+    ['categoriesPage', { bgColor: '#101010' }],
+    ['filterSidebar', { enabled: false, defaultOpen: true }],
+    ['reviewSection', { enabled: true }],
+  ])('%s is a 400, never silently dropped, and nothing is written', async (key, value) => {
+    vi.clearAllMocks();
+    const res = await request(app())
+      .put('/stores/store-1/layout')
+      .send({ [key]: value });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('PAGE_SETTINGS_MOVED');
+    expect(res.body.error.details.keys).toEqual([key]);
+    expect(m.update).not.toHaveBeenCalled();
+    expect(m.bustStoreCaches).not.toHaveBeenCalled();
+  });
+
+  it('a key the classic form still owns saves as before', async () => {
+    vi.clearAllMocks();
+    m.findUnique.mockResolvedValue({
+      layoutSettings: {},
+      template: 'modern',
+      slug: 'a',
+      domain: null,
+    });
+    m.update.mockResolvedValue({ id: 'store-1' });
+    const res = await request(app())
+      .put('/stores/store-1/layout')
+      .send({ bottomBar: { bgColor: '#101010' } });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe('bustStoreCaches purges the layout tag on the storefront', () => {
   it('passes layout:<storeId> to revalidateStorefront', async () => {
     vi.resetModules();

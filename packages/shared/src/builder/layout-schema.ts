@@ -381,6 +381,11 @@ const layoutSchemaInternal = z
     filterSidebar: z.object({
       enabled: z.boolean(),
       defaultOpen: z.boolean(),
+      // Read by the storefront filter panel (ProductsClient). They were missing here, so the layout
+      // PUT stripped them and a picked colour was saved but never rendered. Keep in sync with
+      // FilterSidebarSettings in packages/shared/src/types/store-layout.ts.
+      bgColor: colorValue,
+      textColor: colorValue,
     }),
     testimonials: z.object({
       enabled: z.boolean(),

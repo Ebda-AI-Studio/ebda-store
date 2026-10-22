@@ -39,6 +39,8 @@ import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
+import { PAGE_KINDS, type PageKind } from './page-kinds';
+import { pageKindDefs } from './page-section-defs';
 import {
   SETTING_OPTIONS,
   cardSettings,
@@ -87,6 +89,10 @@ export interface SectionDefinition {
   /** Storefront renderer the web app maps this type onto. */
   rendererKey: string;
   group: SectionGroup;
+  /** Page kinds this type may appear on (default: the home page only). */
+  pages: readonly PageKind[];
+  /** The page's main content: movable, but never removed or hidden (see `page-kinds.ts`). */
+  pinned: boolean;
   cardinality: 'one' | 'many';
   maxCount: number;
   settings: readonly SettingDefinition[];
@@ -112,15 +118,31 @@ const PACKAGED = DEFAULT_LAYOUT_SETTINGS as unknown as Record<
 
 const ALL: readonly Viewport[] = VIEWPORTS;
 
+export type SectionDefInput = Parameters<typeof def>[0];
+
 function def(
   d: Omit<
     SectionDefinition,
-    'propsSchema' | 'maxCount' | 'cardinality' | 'blocks' | 'responsive' | 'presets'
+    | 'propsSchema'
+    | 'maxCount'
+    | 'cardinality'
+    | 'blocks'
+    | 'responsive'
+    | 'presets'
+    | 'pages'
+    | 'pinned'
   > &
     Partial<
       Pick<
         SectionDefinition,
-        'cardinality' | 'maxCount' | 'blocks' | 'responsive' | 'presets' | 'propsSchema'
+        | 'cardinality'
+        | 'maxCount'
+        | 'blocks'
+        | 'responsive'
+        | 'presets'
+        | 'propsSchema'
+        | 'pages'
+        | 'pinned'
       >
     >
 ): SectionDefinition {
@@ -129,6 +151,8 @@ function def(
     if (!d.propsSchema) throw new Error(`document-only section ${d.type} needs a propsSchema`);
     return {
       cardinality: 'many',
+      pages: ['home'],
+      pinned: false,
       maxCount: 8,
       blocks: [],
       responsive: { hidden: ALL, settings: {} },
@@ -139,6 +163,8 @@ function def(
   }
   return {
     cardinality: 'one',
+    pages: ['home'],
+    pinned: false,
     maxCount: 1,
     blocks: [],
     responsive: { hidden: ALL, settings: {} },
@@ -521,6 +547,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
   }),
   def({
     type: 'image-text',
+    pages: PAGE_KINDS,
     labelEn: 'Image with text',
     labelAr: 'صورة مع نص',
     legacyKey: null,
@@ -577,6 +604,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
   }),
   def({
     type: 'newsletter',
+    pages: PAGE_KINDS,
     labelEn: 'Newsletter signup',
     labelAr: 'الاشتراك في النشرة',
     legacyKey: null,
@@ -945,6 +973,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
   }),
   def({
     type: 'maker-profile',
+    pages: PAGE_KINDS,
     labelEn: 'Maker profile',
     // Neutral noun phrase, never a gendered imperative.
     labelAr: 'ملف الطباخة',
@@ -984,6 +1013,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
   }),
   def({
     type: 'trust-badges',
+    pages: PAGE_KINDS,
     labelEn: 'Trust badges',
     labelAr: 'شارات الثقة',
     legacyKey: null,
@@ -1052,12 +1082,23 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     group: 'footer',
     settings: styleSettings(),
   }),
+  // ---- Page-kind sections (Ruling VE-3): the product, collection and cart pages as documents.
+  // Each page's main content is ONE pinned section, rendered by the page's own client (it shares the
+  // gallery / variant / quantity state, like Shopify's `main-product`). The rest are movable.
+  ...pageKindDefs(def),
 ];
 
 const BY_TYPE = new Map(SECTION_REGISTRY.map(d => [d.type, d]));
 const BY_LEGACY_KEY = new Map(
   SECTION_REGISTRY.filter(d => d.legacyKey !== null).map(d => [d.legacyKey, d])
 );
+
+/** Whether `d` may appear on the page document `pageKey` (an unknown key counts as the home page). */
+export function sectionAllowedOnPage(d: SectionDefinition, pageKey: string): boolean {
+  return d.pages.includes(
+    (PAGE_KINDS as readonly string[]).includes(pageKey) ? (pageKey as PageKind) : 'home'
+  );
+}
 
 export function getSectionDefinition(type: string): SectionDefinition | undefined {
   return BY_TYPE.get(type);

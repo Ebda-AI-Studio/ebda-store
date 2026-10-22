@@ -13,6 +13,10 @@ import {
 import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
+import { defaultPageDocument } from '@ebda/shared';
+import { fetchPageDocument } from '../../lib/page-document';
+import { PageDocumentProvider } from '../../builder/render/PageDocument';
+import { allowedParentOrigins } from '../../builder/preview/allowed-parent-origins';
 import { canBuyNow, inStockNow } from '../../lib/can-buy-now';
 
 /**
@@ -119,6 +123,7 @@ export async function ProductsPageBody({
   category,
   tag,
   draftToken,
+  builderToken,
 }: {
   store: ResolvedStore;
   category?: string;
@@ -127,13 +132,17 @@ export async function ProductsPageBody({
   /** Always `undefined` from the new `tenant-store` tree — see HomePageBody's
    *  doc comment for why Track-A never carries a draft token. */
   draftToken?: string;
+  /** Visual builder canvas token (`?_builder=` inside the `?_preview` iframe): renders the page's DRAFT document. */
+  builderToken?: string;
 }) {
   // Fetch layout in parallel with product data so PLP cards respect the
   // merchant's global productCardDefaults (size, frame color, etc.) and the
   // filterSidebar.enabled / filterSidebar.defaultOpen merchant preferences.
-  const [initialData, plpLayout] = await Promise.all([
+  const [initialData, plpLayout, pageDocument] = await Promise.all([
     fetchInitialData(store, { category, tag }),
     fetchPlpLayoutSettings(store, draftToken),
+    // The collection page's section document (published, or the draft for the editor canvas).
+    fetchPageDocument(store.id, 'collection', builderToken),
   ]);
   const { productCardDefaults, filterSidebar, productsPage } = plpLayout;
 
@@ -201,14 +210,21 @@ export async function ProductsPageBody({
           </main>
         }
       >
-        <ProductsClient
-          initialCategories={initialData.categories}
-          initialProducts={initialData.products}
-          initialMeta={initialData.meta}
-          productCardDefaults={productCardDefaults}
-          filterSidebar={filterSidebar}
-          productsPage={productsPage}
-        />
+        <PageDocumentProvider
+          kind="collection"
+          initialDefinition={pageDocument?.definition ?? defaultPageDocument('collection')}
+          editorMode={pageDocument?.editorMode === true}
+          allowedOrigins={allowedParentOrigins()}
+        >
+          <ProductsClient
+            initialCategories={initialData.categories}
+            initialProducts={initialData.products}
+            initialMeta={initialData.meta}
+            productCardDefaults={productCardDefaults}
+            filterSidebar={filterSidebar}
+            productsPage={productsPage}
+          />
+        </PageDocumentProvider>
       </Suspense>
     </>
   );

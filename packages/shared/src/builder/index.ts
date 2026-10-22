@@ -19,3 +19,6 @@ export { storeLayoutSchema, heroSlideSchema } from './layout-schema';
 export * from './template-families';
 export * from './sections-document-only';
 export * from './editor';
+export * from './page-kinds';
+export * from './page-defaults';
+export * from './page-settings';

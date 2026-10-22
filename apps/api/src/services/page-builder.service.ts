@@ -72,6 +72,14 @@ import {
   type TemplateFamily,
   type TemplateId,
   getLook,
+  PAGE_KINDS,
+  PAGE_OWNED_SETTING_KEYS,
+  ALL_PAGE_OWNED_KEYS,
+  pickOwnedSettings,
+  defaultPageDocument,
+  isSectionPageKind,
+  validateDefinitionSync,
+  type SectionPageKind,
 } from '@ebda/shared';
 import { withSavepoint } from '../lib/savepoint';
 import { fontLibraryProblems } from '../lib/font-url-guard';
@@ -82,6 +90,8 @@ import { cleanupRemovedJsonUrls, deleteR2ObjectIfOrphan } from './r2-cleanup.ser
 import logger from '../lib/logger';
 
 export const HOME_PAGE_KEY = 'home';
+/** The page documents the builder edits (home plus the product / collection / cart section pages). */
+export const BUILDER_PAGE_KEYS: ReadonlySet<string> = new Set(PAGE_KINDS);
 
 export type RevisionStatus = 'draft' | 'published' | 'archived';
 
@@ -157,6 +167,30 @@ async function loadStore(storeId: string) {
   );
 }
 
+/**
+ * The document a page has before anyone saved one: the home page is derived from `layout_settings`
+ * through the adapter; a product / collection / cart page is its default section document (Ruling
+ * VE-3 amended): the order the storefront already renders, so nothing is migrated.
+ */
+/** The home document with the keys other pages own taken from the live layout. */
+function overlayOwnedSettings(doc: PageDefinition, live: Record<string, unknown>): PageDefinition {
+  const siteSettings = { ...doc.siteSettings };
+  for (const k of ALL_PAGE_OWNED_KEYS) {
+    if (live[k] !== undefined) siteSettings[k] = live[k];
+    else delete siteSettings[k];
+  }
+  return { ...doc, siteSettings };
+}
+
+function fallbackDefinition(
+  store: { layoutSettings: unknown; template: string | null; look?: string | null },
+  pageKey: string
+): PageDefinition {
+  if (isSectionPageKind(pageKey))
+    return defaultPageDocument(pageKey, (store.layoutSettings ?? {}) as Record<string, unknown>);
+  return layoutToDefinition(resolvedLayout(store), pageKey);
+}
+
 async function loadRows(storeId: string, pageKey: string) {
   const [draft, published, head] = await Promise.all([
     prisma.storePageRevision.findFirst({
@@ -208,13 +242,25 @@ export async function getPageState(storeId: string, pageKey: string): Promise<Pa
   const store = await loadStore(storeId);
   if (!store) return null;
   const { draft, published, head } = await loadRows(storeId, pageKey);
+  const live = (store.layoutSettings ?? {}) as Record<string, unknown>;
+  // what the storefront resolves (template defaults filled in), for the home page's copy of other pages' keys
+  const resolved = resolvedLayout(store) as unknown as Record<string, unknown>;
+  const base = draft
+    ? (draft.document as PageDefinition)
+    : published
+      ? withoutTheme(published.document)
+      : fallbackDefinition(store, pageKey);
+  // The page opens on what the storefront shows: a section page's own settings come from the live
+  // layout (a draft keeps its own, it is the edit in progress), and home never shows a stale copy of them.
+  const definition =
+    isSectionPageKind(pageKey) && !draft
+      ? { ...base, siteSettings: pickOwnedSettings(pageKey, live) }
+      : !isSectionPageKind(pageKey)
+        ? overlayOwnedSettings(base, resolved)
+        : base;
   return {
     rev: head,
-    definition: draft
-      ? (draft.document as PageDefinition)
-      : published
-        ? withoutTheme(published.document)
-        : layoutToDefinition(resolvedLayout(store), pageKey),
+    definition,
     source: draft ? 'draft' : published ? 'published' : 'layout',
     draftRev: draft?.rev ?? null,
     publishedRev: published?.rev ?? null,
@@ -251,11 +297,16 @@ export async function getPublishedDefinition(
       select: { rev: true, document: true },
     })
   );
+  if (isSectionPageKind(pageKey)) return publishedPageDocument(pageKey, published);
   if (published) {
     const doc = published.document as unknown as PageDefinition;
     try {
       if (publishedDocumentAgrees(doc, layout, templateId ?? undefined, look))
-        return { definition: doc, rev: published.rev };
+        return {
+          // other pages' settings are read from the live layout, never from this document's copy
+          definition: overlayOwnedSettings(doc, layout as unknown as Record<string, unknown>),
+          rev: published.rev,
+        };
     } catch {
       // fall through: an unreadable document renders from layout_settings
     }
@@ -265,6 +316,40 @@ export async function getPublishedDefinition(
     );
   }
   return { definition: layoutToDefinition(layout, pageKey), rev: published?.rev ?? null };
+}
+
+/**
+ * A section page (product / collection / cart) has no `layout_settings` projection to disagree with, so
+ * its published document is served as it is, once it still validates; an unreadable or stale one falls
+ * back to the default document rather than breaking the page.
+ */
+function publishedPageDocument(
+  pageKey: SectionPageKind,
+  published: { rev: number; document: unknown } | null
+): { definition: PageDefinition; rev: number | null } {
+  if (published) {
+    const check = validateDefinitionSync(published.document);
+    if (check.ok) return { definition: published.document as PageDefinition, rev: published.rev };
+    logger.warn(
+      { pageKey, rev: published.rev },
+      '[page-builder] published page document no longer validates; rendering the default document'
+    );
+  }
+  return { definition: defaultPageDocument(pageKey), rev: published?.rev ?? null };
+}
+
+/** The PUBLISHED document of a product / collection / cart page (the default one when none is saved). */
+export async function getPublishedPageDocument(
+  storeId: string,
+  kind: SectionPageKind
+): Promise<{ definition: PageDefinition; rev: number | null }> {
+  const published = await readInStoreContext(storeId, () =>
+    prisma.storePageRevision.findFirst({
+      where: { storeId, pageKey: kind, status: 'published' },
+      select: { rev: true, document: true },
+    })
+  );
+  return publishedPageDocument(kind, published);
 }
 
 async function validateForWrite(storeId: string, input: unknown) {
@@ -448,10 +533,44 @@ async function promote(
  */
 async function applyPublishedLayout(
   storeId: string,
-  store: { layoutSettings: unknown; slug: string; domain: string | null },
+  store: {
+    layoutSettings: unknown;
+    template: string | null;
+    look: string | null;
+    slug: string;
+    domain: string | null;
+  },
   definition: PageDefinition
 ): Promise<StoreLayoutSettings> {
-  const layout = definitionToLayout(definition);
+  // A product / collection / cart document is not a projection of `layout_settings`: publishing it
+  // writes exactly the layout keys that page owns (Ruling VE-13) and nothing else, then purges the caches.
+  if (isSectionPageKind(definition.pageKey)) {
+    const owned = PAGE_OWNED_SETTING_KEYS[definition.pageKey];
+    const next = await withStore(storeId, async tx => {
+      const row = await tx.store.findUnique({
+        where: { id: storeId },
+        select: { layoutSettings: true },
+      });
+      const current = (row?.layoutSettings ?? {}) as Record<string, unknown>;
+      const merged = { ...current };
+      for (const k of owned) {
+        const v = definition.siteSettings[k];
+        if (v === undefined) delete merged[k];
+        else merged[k] = v;
+      }
+      // a reorder or a hidden section changes no layout key: leave the store row alone
+      if (!isDeepStrictEqual(merged, current))
+        await tx.store.update({
+          where: { id: storeId },
+          data: { layoutSettings: merged as object },
+        });
+      return merged;
+    });
+    purgePublishedCaches(storeId, store.slug, store.domain);
+    return resolvedLayout({ ...store, layoutSettings: next });
+  }
+  const layout = definitionToLayout(definition) as unknown as Record<string, unknown>;
+  let removedUrlsBase: unknown = store.layoutSettings ?? {};
   const themePatch = definition.theme;
   const typographyPatch = hasTypographyPatch(definition.typography)
     ? definition.typography
@@ -463,13 +582,18 @@ async function applyPublishedLayout(
     // values read in this same transaction (the Branding tab and the classic
     // builder also write other theme / settings keys), and write them with
     // layout_settings in one statement.
-    const live =
-      themePatch || typographyPatch || chromePatch
-        ? await tx.store.findUnique({
-            where: { id: storeId },
-            select: { theme: true, typography: true, settings: true },
-          })
-        : null;
+    const live = await tx.store.findUnique({
+      where: { id: storeId },
+      select: { theme: true, typography: true, settings: true, layoutSettings: true },
+    });
+    // The keys a product / collection / cart page owns are written only by that page's publish: the
+    // home document keeps the LIVE value (read in this same transaction), whatever its copy says.
+    const liveLayout = (live?.layoutSettings ?? {}) as Record<string, unknown>;
+    for (const k of ALL_PAGE_OWNED_KEYS) {
+      if (liveLayout[k] !== undefined) layout[k] = liveLayout[k];
+      else delete layout[k];
+    }
+    removedUrlsBase = liveLayout;
     const nextTypography = typographyPatch
       ? applyTypographyPatch(live?.typography, typographyPatch)
       : undefined;
@@ -500,11 +624,11 @@ async function applyPublishedLayout(
     void deleteR2ObjectIfOrphan(url).catch(err =>
       logger.warn({ err, storeId, url }, '[page-builder] font r2 cleanup failed')
     );
-  void cleanupRemovedJsonUrls(store.layoutSettings ?? {}, layout).catch(err =>
+  void cleanupRemovedJsonUrls(removedUrlsBase, layout).catch(err =>
     logger.warn({ err, storeId }, '[page-builder] r2 cleanup failed')
   );
   purgePublishedCaches(storeId, store.slug, store.domain);
-  return layout;
+  return layout as unknown as StoreLayoutSettings;
 }
 
 /** Exported for the purge-contract test. */

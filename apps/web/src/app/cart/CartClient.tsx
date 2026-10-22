@@ -14,6 +14,13 @@ import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
+import {
+  PageMark,
+  itemNodes,
+  pageSectionsAround,
+  usePageDocument,
+  withPageSettings,
+} from '../../builder/render/PageDocument';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
 import { pageSurfaceStyle } from '@/lib/page-surface';
@@ -57,7 +64,11 @@ export default function CartClient() {
     total: cartTotal,
     isReady: cartIsReady,
   } = useCart();
-  const { store, layout } = useStore();
+  const { store, layout: liveLayout } = useStore();
+  // The cart page's section document (Ruling VE-3): which sections go around the cart itself.
+  const pageDoc = usePageDocument('cart');
+  // In the editor canvas the page's own settings come from the draft document, otherwise the live layout.
+  const layout = withPageSettings(pageDoc, liveLayout);
   const storeUrl = useStoreUrl();
   const { isEnabled } = useFeatures();
   // The basis a COUPON is quoted against: loose items only, never the
@@ -455,386 +466,138 @@ export default function CartClient() {
         )
       : moqMessage);
 
+  const around = pageSectionsAround(pageDoc, {
+    // Under the cart: shown on all screen sizes, only with items in the cart.
+    'cart-recommendations':
+      isEnabled('upsell_crosssell') && cartItems.length > 0 && store.id && store.id !== 'demo' ? (
+        <div className="mt-8">
+          <CartRecommendations
+            storeId={store.id}
+            // Product ids, not cart-line ids (the API looks up relations by product; line ids
+            // matched nothing).
+            productIds={[...new Set(cartItems.map(i => i.productId))]}
+          />
+        </div>
+      ) : null,
+  });
+
   return (
     <ShopChrome>
       {/* rule (g): sub-headings and item names here read in the body face, not the display face. */}
       <div className="flex-1" style={cartBgStyle} data-transactional>
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={cartDensity}>
-          {/* Breadcrumb */}
-          <Breadcrumbs
-            items={[
-              { label: t('Home', translations['Home']), href: storeUrl('/') },
-              {
-                label: t(
-                  'Shopping cart',
-                  '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
-                ),
-              },
-            ]}
-          />
+          {itemNodes(around.before)}
+          <PageMark kind="cart">
+            {/* Breadcrumb */}
+            <Breadcrumbs
+              items={[
+                { label: t('Home', translations['Home']), href: storeUrl('/') },
+                {
+                  label: t(
+                    'Shopping cart',
+                    '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+                  ),
+                },
+              ]}
+            />
 
-          {/* STOP-2 P2-2: an empty cart says "your cart is empty" once. The page still has its h1
+            {/* STOP-2 P2-2: an empty cart says "your cart is empty" once. The page still has its h1
               (for screen readers); the visible heading is the empty state's own. */}
-          <h1
-            className={`text-3xl font-bold tracking-tight text-foreground${
-              cartItems.length === 0 && cartBundles.length === 0 ? ' sr-only' : ''
-            }`}
-            style={cartZoneStyle(cartHeadingZone)}
-          >
-            {t('Shopping cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
-          </h1>
-          {(cartItems.length > 0 || cartBundles.length > 0) && (
-            <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
-              {countText(lang, cartCount, ITEMS, localize(cartCount))}{' '}
-              {t('in your cart', 'في سلتك')}
-            </p>
-          )}
-          {unavailableItems.length > 0 && (
-            <p
-              role="alert"
-              data-cart-unavailable-banner=""
-              className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive-ink"
+            <h1
+              className={`text-3xl font-bold tracking-tight text-foreground${
+                cartItems.length === 0 && cartBundles.length === 0 ? ' sr-only' : ''
+              }`}
+              style={cartZoneStyle(cartHeadingZone)}
             >
-              {productUnavailableCopy(
-                t,
-                unavailableItems.length,
-                unavailableItems.map(i => (language === 'ar' && i.nameAr ? i.nameAr : i.name))
-              )}
-            </p>
-          )}
+              {t('Shopping cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
+            </h1>
+            {(cartItems.length > 0 || cartBundles.length > 0) && (
+              <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
+                {countText(lang, cartCount, ITEMS, localize(cartCount))}{' '}
+                {t('in your cart', 'في سلتك')}
+              </p>
+            )}
+            {unavailableItems.length > 0 && (
+              <p
+                role="alert"
+                data-cart-unavailable-banner=""
+                className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive-ink"
+              >
+                {productUnavailableCopy(
+                  t,
+                  unavailableItems.length,
+                  unavailableItems.map(i => (language === 'ar' && i.nameAr ? i.nameAr : i.name))
+                )}
+              </p>
+            )}
 
-          {moqShort.length > 0 && (
-            <div
-              data-cart-moq-fix=""
-              className="mt-4 space-y-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink"
-            >
-              {moqShort.map(sf => {
-                const fix = moqFix(sf, cartItems);
-                return (
-                  <div key={sf.productId} className="flex flex-wrap items-center gap-3">
-                    <span className="font-medium">
-                      <bdi>{language === 'ar' && sf.nameAr ? sf.nameAr : sf.name}</bdi>:{' '}
-                      {t(`minimum order is ${sf.required}`, `الحد الأدنى للطلب ${sf.required}`)}
-                    </span>
-                    {fix ? (
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-warning/50 px-4 font-medium hover:bg-warning/20"
-                        onClick={() => void handleUpdateQuantity(fix.lineId, fix.quantity)}
-                      >
-                        {t(`Set to ${fix.quantity}`, `اجعلها ${fix.quantity}`)}
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {cartItems.length === 0 && cartBundles.length === 0 ? (
-            T?.EmptyState ? (
-              <div className="mt-16">
-                <T.EmptyState
-                  title="Your cart is empty"
-                  titleAr="سلتك فاضية"
-                  description="Looks like you haven't added any items yet."
-                  descriptionAr="لسه مضفتش أي منتج."
-                  ctaLabel="Start shopping"
-                  ctaLabelAr="ابدأ التسوق"
-                  ctaHref={storeUrl('/products')}
-                  isRtl={language === 'ar'}
-                />
-              </div>
-            ) : (
-              <div className="mt-16 flex flex-col items-center justify-center py-12">
-                <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-muted">
-                  <CartIcon className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
-                </div>
-                <h2 className="text-2xl font-bold text-foreground">
-                  {t('Your cart is empty', 'سلة التسوق فاضية')}
-                </h2>
-                <p className="mt-2 text-muted-foreground">
-                  {t("Looks like you haven't added any items yet.", 'شكلك لسه مضفتش أي منتجات.')}
-                </p>
-                <Link href={storeUrl('/products')} className="inline-block">
-                  <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
-                    <CartIcon className="h-5 w-5" />
-                    {t(
-                      'Start shopping',
-                      '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'
-                    )}
-                  </Button>
-                </Link>
-
-                {/* Browse Products */}
-                <div className="mt-12">
-                  <Link
-                    href={storeUrl('/products')}
-                    className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-                  >
-                    <svg
-                      className="h-4 w-4 rtl:-scale-x-100"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                      />
-                    </svg>
-                    {t(
-                      'Browse all products',
-                      '\u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
-                    )}
-                  </Link>
-                </div>
-              </div>
-            )
-          ) : (
-            <>
-              <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
-                {/* Cart Items */}
-                <div className="lg:col-span-8">
-                  {/* Bundle boxes — always ONE row per box (never the split
-                      per-component allocation), rendered the same regardless
-                      of the active theme. `cartBundles` are `CartBundle` rows,
-                      each already priced/summed server-side. */}
-                  {cartBundles.length > 0 && (
-                    <div className="mb-4 space-y-4">
-                      {cartBundles.map(bundle => (
-                        <BundleLine
-                          key={bundle.id}
-                          variant="card"
-                          name={bundle.name}
-                          nameAr={bundle.nameAr}
-                          image={bundle.image}
-                          quantity={bundle.quantity}
-                          total={bundle.total}
-                          available={bundle.available}
-                          isRtl={language === 'ar'}
-                          onRemove={() =>
-                            handleRemoveBundle(
-                              bundle.id,
-                              language === 'ar' && bundle.nameAr ? bundle.nameAr : bundle.name
-                            )
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {T?.CartTable ? (
-                    <T.CartTable
-                      items={cartItems.map(item => ({
-                        id: item.id,
-                        productId: item.productId,
-                        name: item.name,
-                        nameAr: item.nameAr,
-                        slug: item.slug,
-                        price: item.price,
-                        quantity: item.quantity,
-                        image: item.image,
-                        variantTitle: item.variantTitle,
-                        variantTitleAr: item.variantTitleAr,
-                        note: item.note,
-                        unavailable: item.unavailable,
-                      }))}
-                      isRtl={language === 'ar'}
-                      currency={store.currency}
-                      urlPrefix={storeUrl('')}
-                      onUpdateQuantity={handleUpdateQuantity}
-                      onRemove={handleRemoveItem}
-                      typography={cartTypography}
-                    />
-                  ) : (
-                    <div className="space-y-4">
-                      {cartItems.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="cart-item animate-fade-in"
-                          style={{ animationDelay: `${index * 100}ms` }}
+            {moqShort.length > 0 && (
+              <div
+                data-cart-moq-fix=""
+                className="mt-4 space-y-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink"
+              >
+                {moqShort.map(sf => {
+                  const fix = moqFix(sf, cartItems);
+                  return (
+                    <div key={sf.productId} className="flex flex-wrap items-center gap-3">
+                      <span className="font-medium">
+                        <bdi>{language === 'ar' && sf.nameAr ? sf.nameAr : sf.name}</bdi>:{' '}
+                        {t(`minimum order is ${sf.required}`, `الحد الأدنى للطلب ${sf.required}`)}
+                      </span>
+                      {fix ? (
+                        <button
+                          type="button"
+                          className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-warning/50 px-4 font-medium hover:bg-warning/20"
+                          onClick={() => void handleUpdateQuantity(fix.lineId, fix.quantity)}
                         >
-                          {/* Product Image */}
-                          <div
-                            data-part="cart-thumb"
-                            className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32"
-                          >
-                            {item.image ? (
-                              <Image
-                                src={item.image}
-                                alt={language === 'ar' && item.nameAr ? item.nameAr : item.name}
-                                width={128}
-                                height={128}
-                                className="h-full w-full object-cover"
-                                sizes="(max-width: 640px) 112px, 128px"
-                              />
-                            ) : (
-                              <div className="flex h-full items-center justify-center">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                                  <svg
-                                    className="h-8 w-8 text-primary"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={1}
-                                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                                    />
-                                  </svg>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Product Details */}
-                          <div className="flex flex-1 flex-col gap-2 sm:gap-0">
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                {item.category && (
-                                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                    {item.category}
-                                  </span>
-                                )}
-                                <h3
-                                  className="mt-0.5 text-lg font-bold text-foreground [overflow-wrap:anywhere] sm:text-xl"
-                                  data-zone="productName"
-                                  style={cartZoneStyle(cartNameZone)}
-                                >
-                                  {language === 'ar' && item.nameAr ? item.nameAr : item.name}
-                                </h3>
-                                {(item.variantTitle || item.variantTitleAr) && (
-                                  <p className="mt-0.5 text-sm text-muted-foreground">
-                                    <VariantText
-                                      title={
-                                        (language === 'ar' && item.variantTitleAr
-                                          ? item.variantTitleAr
-                                          : item.variantTitle || item.variantTitleAr) ?? ''
-                                      }
-                                    />
-                                  </p>
-                                )}
-                                <CartLineNote
-                                  note={item.note}
-                                  className="mt-0.5 text-sm text-muted-foreground"
-                                />
-                                {item.unavailable && <CartLineUnavailableNotice />}
-                                {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
-                                {item.quantity > 1 && (
-                                  <p
-                                    className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
-                                    data-zone="productPrice"
-                                    style={cartZoneStyle(cartPriceZone)}
-                                  >
-                                    {formatPrice(item.price)}{' '}
-                                    {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
-                                  </p>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => handleRemoveItem(item.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
-                                aria-label={t('Remove item', 'إزالة المنتج')}
-                              >
-                                <svg
-                                  className="h-5 w-5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={1.5}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-
-                            <div className="mt-auto flex items-center justify-between pt-2">
-                              {/* Quantity Selector */}
-                              <div className="inline-flex items-center overflow-hidden rounded-md border border-input">
-                                <button
-                                  onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                  disabled={item.unavailable || item.quantity <= 1}
-                                  className={`flex h-11 w-11 items-center justify-center transition-colors ${
-                                    item.unavailable || item.quantity <= 1
-                                      ? 'cursor-not-allowed text-muted-foreground/40'
-                                      : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
-                                  }`}
-                                  aria-label={t('Decrease quantity', 'إنقاص الكمية')}
-                                >
-                                  <svg
-                                    className="h-4 w-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M20 12H4"
-                                    />
-                                  </svg>
-                                </button>
-                                <span className="w-10 border-x border-border text-center text-sm font-semibold text-foreground">
-                                  {localize(item.quantity)}
-                                </span>
-                                <button
-                                  onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                  disabled={item.unavailable || item.quantity >= 10}
-                                  className={`flex h-11 w-11 items-center justify-center transition-colors ${
-                                    item.unavailable || item.quantity >= 10
-                                      ? 'cursor-not-allowed text-muted-foreground/40'
-                                      : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
-                                  }`}
-                                  aria-label={t('Increase quantity', 'زيادة الكمية')}
-                                >
-                                  <svg
-                                    className="h-4 w-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M12 4v16m8-8H4"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-
-                              {/* Item Total */}
-                              <p
-                                className="text-base font-bold text-primary sm:text-lg"
-                                data-zone="productPrice"
-                                style={cartZoneStyle(cartPriceZone)}
-                              >
-                                {item.unavailable ? (
-                                  <s>{formatPrice(item.price * item.quantity)}</s>
-                                ) : (
-                                  formatPrice(item.price * item.quantity)
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                          {t(`Set to ${fix.quantity}`, `اجعلها ${fix.quantity}`)}
+                        </button>
+                      ) : null}
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+            )}
 
-                  {/* Continue Shopping */}
-                  <div className="mt-8">
+            {cartItems.length === 0 && cartBundles.length === 0 ? (
+              T?.EmptyState ? (
+                <div className="mt-16">
+                  <T.EmptyState
+                    title="Your cart is empty"
+                    titleAr="سلتك فاضية"
+                    description="Looks like you haven't added any items yet."
+                    descriptionAr="لسه مضفتش أي منتج."
+                    ctaLabel="Start shopping"
+                    ctaLabelAr="ابدأ التسوق"
+                    ctaHref={storeUrl('/products')}
+                    isRtl={language === 'ar'}
+                  />
+                </div>
+              ) : (
+                <div className="mt-16 flex flex-col items-center justify-center py-12">
+                  <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-muted">
+                    <CartIcon className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
+                  </div>
+                  <h2 className="text-2xl font-bold text-foreground">
+                    {t('Your cart is empty', 'سلة التسوق فاضية')}
+                  </h2>
+                  <p className="mt-2 text-muted-foreground">
+                    {t("Looks like you haven't added any items yet.", 'شكلك لسه مضفتش أي منتجات.')}
+                  </p>
+                  <Link href={storeUrl('/products')} className="inline-block">
+                    <Button className="mt-8 gap-2 rounded-[var(--radius)]" size="lg">
+                      <CartIcon className="h-5 w-5" />
+                      {t(
+                        'Start shopping',
+                        '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'
+                      )}
+                    </Button>
+                  </Link>
+
+                  {/* Browse Products */}
+                  <div className="mt-12">
                     <Link
-                      href={continuShoppingHref}
+                      href={storeUrl('/products')}
                       className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       <svg
@@ -851,155 +614,327 @@ export default function CartClient() {
                         />
                       </svg>
                       {t(
-                        'Continue shopping',
-                        '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+                        'Browse all products',
+                        '\u062a\u0635\u0641\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a'
                       )}
                     </Link>
                   </div>
                 </div>
-
-                {/* Order Summary */}
-                <div className="mt-8 lg:col-span-4 lg:mt-0">
-                  <div ref={summaryRef} className="sticky top-24 space-y-6">
-                    {T?.OrderSummary ? (
-                      <T.OrderSummary
-                        subtotal={subtotal}
-                        discount={discount}
-                        discountLabel={
-                          promoApplied
-                            ? `${t('Discount', 'الخصم')}${promoType === 'percentage' ? ` (${promoValue}%)` : promoName ? ` — ${promoName}` : ''}`
-                            : undefined
-                        }
-                        shipping={shipping}
-                        freeShipping={shipping === 0}
-                        // On the cart, shipping isn't resolved yet — the real
-                        // per-area fee is only known at checkout once the
-                        // customer picks a governorate/area. Show a neutral
-                        // "Calculated at checkout" label instead of a
-                        // misleading "Free".
-                        shippingPending
-                        tax={tax}
-                        taxRatePercent={taxRatePercent}
-                        taxIncludedInPrice={taxIncludedInPrice}
-                        total={total}
-                        currency={store.currency}
+              )
+            ) : (
+              <>
+                <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
+                  {/* Cart Items */}
+                  <div className="lg:col-span-8">
+                    {/* Bundle boxes — always ONE row per box (never the split
+                      per-component allocation), rendered the same regardless
+                      of the active theme. `cartBundles` are `CartBundle` rows,
+                      each already priced/summed server-side. */}
+                    {cartBundles.length > 0 && (
+                      <div className="mb-4 space-y-4">
+                        {cartBundles.map(bundle => (
+                          <BundleLine
+                            key={bundle.id}
+                            variant="card"
+                            name={bundle.name}
+                            nameAr={bundle.nameAr}
+                            image={bundle.image}
+                            quantity={bundle.quantity}
+                            total={bundle.total}
+                            available={bundle.available}
+                            isRtl={language === 'ar'}
+                            onRemove={() =>
+                              handleRemoveBundle(
+                                bundle.id,
+                                language === 'ar' && bundle.nameAr ? bundle.nameAr : bundle.name
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {T?.CartTable ? (
+                      <T.CartTable
+                        items={cartItems.map(item => ({
+                          id: item.id,
+                          productId: item.productId,
+                          name: item.name,
+                          nameAr: item.nameAr,
+                          slug: item.slug,
+                          price: item.price,
+                          quantity: item.quantity,
+                          image: item.image,
+                          variantTitle: item.variantTitle,
+                          variantTitleAr: item.variantTitleAr,
+                          note: item.note,
+                          unavailable: item.unavailable,
+                        }))}
                         isRtl={language === 'ar'}
-                        ctaLabel={CART_CHECKOUT_CTA.en}
-                        ctaLabelAr={CART_CHECKOUT_CTA.ar}
-                        ctaHref={storeUrl('/checkout')}
-                        ctaDisabled={checkoutBlocked}
-                        ctaBlockedMessage={checkoutBlockedMessage}
+                        currency={store.currency}
+                        urlPrefix={storeUrl('')}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onRemove={handleRemoveItem}
                         typography={cartTypography}
-                        summaryColors={{
-                          labelColor: summaryLabelColorResolved,
-                          totalColor: summaryTotalColorResolved,
-                          bold: summaryLabelBold,
-                        }}
-                      >
-                        {isEnabled('coupons') && (
-                          <div>
-                            <label
-                              htmlFor="cart-promo-code-t"
-                              className="text-sm font-medium text-foreground"
-                            >
-                              {t('Coupon code', 'كود الخصم')}
-                            </label>
-                            <div className="mt-2 flex gap-2">
-                              <input
-                                id="cart-promo-code-t"
-                                spellCheck={false}
-                                autoCapitalize="characters"
-                                autoCorrect="off"
-                                enterKeyHint="done"
-                                type="text"
-                                autoComplete="off"
-                                value={promoCode}
-                                onChange={e => setPromoCode(e.target.value)}
-                                placeholder={t('Enter code', 'أدخل الكود')}
-                                disabled={promoApplied}
-                                className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={applyPromoCode}
-                                disabled={promoApplied || isValidating}
-                              >
-                                {promoApplied
-                                  ? t('Applied', 'اتطبّق')
-                                  : isValidating
-                                    ? '…'
-                                    : t('Apply', 'تطبيق')}
-                              </Button>
-                            </div>
-                            {promoApplied && (
-                              <p
-                                role="status"
-                                className="mt-2 flex items-center gap-1 text-xs text-success-ink"
-                              >
-                                <svg
-                                  className="h-3.5 w-3.5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  aria-hidden
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                                {promoCode.toUpperCase()} — {formatPrice(discount)}{' '}
-                                {t('off', 'خصم')}
-                              </p>
-                            )}
-                            {promoApplied && cartBundles.length > 0 && (
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                {t(
-                                  'Coupon applies to items outside your bundles — a bundle is already discounted.',
-                                  translations[
-                                    'Coupon applies to items outside your bundles — a bundle is already discounted.'
-                                  ]
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </T.OrderSummary>
+                      />
                     ) : (
-                      <>
-                        {/* Summary Card */}
-                        <div className="rounded-[var(--radius)] border border-border bg-card p-6 shadow-sm">
-                          <h2
-                            className="text-lg font-bold text-foreground"
-                            style={{
-                              ...cartZoneStyle(cartHeadingZone),
-                              ...summaryLabelStyle,
-                            }}
+                      <div className="space-y-4">
+                        {cartItems.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="cart-item animate-fade-in"
+                            style={{ animationDelay: `${index * 100}ms` }}
                           >
-                            {t(
-                              'Order summary',
-                              '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
-                            )}
-                          </h2>
+                            {/* Product Image */}
+                            <div
+                              data-part="cart-thumb"
+                              className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10 sm:h-32 sm:w-32"
+                            >
+                              {item.image ? (
+                                <Image
+                                  src={item.image}
+                                  alt={language === 'ar' && item.nameAr ? item.nameAr : item.name}
+                                  width={128}
+                                  height={128}
+                                  className="h-full w-full object-cover"
+                                  sizes="(max-width: 640px) 112px, 128px"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center">
+                                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                                    <svg
+                                      className="h-8 w-8 text-primary"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1}
+                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                                      />
+                                    </svg>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
 
-                          {/* Promo Code */}
+                            {/* Product Details */}
+                            <div className="flex flex-1 flex-col gap-2 sm:gap-0">
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  {item.category && (
+                                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                      {item.category}
+                                    </span>
+                                  )}
+                                  <h3
+                                    className="mt-0.5 text-lg font-bold text-foreground [overflow-wrap:anywhere] sm:text-xl"
+                                    data-zone="productName"
+                                    style={cartZoneStyle(cartNameZone)}
+                                  >
+                                    {language === 'ar' && item.nameAr ? item.nameAr : item.name}
+                                  </h3>
+                                  {(item.variantTitle || item.variantTitleAr) && (
+                                    <p className="mt-0.5 text-sm text-muted-foreground">
+                                      <VariantText
+                                        title={
+                                          (language === 'ar' && item.variantTitleAr
+                                            ? item.variantTitleAr
+                                            : item.variantTitle || item.variantTitleAr) ?? ''
+                                        }
+                                      />
+                                    </p>
+                                  )}
+                                  <CartLineNote
+                                    note={item.note}
+                                    className="mt-0.5 text-sm text-muted-foreground"
+                                  />
+                                  {item.unavailable && <CartLineUnavailableNotice />}
+                                  {/* Taste re-audit P2-2: at quantity 1 the line total already says it. */}
+                                  {item.quantity > 1 && (
+                                    <p
+                                      className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
+                                      data-zone="productPrice"
+                                      style={cartZoneStyle(cartPriceZone)}
+                                    >
+                                      {formatPrice(item.price)}{' '}
+                                      {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
+                                  aria-label={t('Remove item', 'إزالة المنتج')}
+                                >
+                                  <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={1.5}
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              <div className="mt-auto flex items-center justify-between pt-2">
+                                {/* Quantity Selector */}
+                                <div className="inline-flex items-center overflow-hidden rounded-md border border-input">
+                                  <button
+                                    onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                                    disabled={item.unavailable || item.quantity <= 1}
+                                    className={`flex h-11 w-11 items-center justify-center transition-colors ${
+                                      item.unavailable || item.quantity <= 1
+                                        ? 'cursor-not-allowed text-muted-foreground/40'
+                                        : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
+                                    }`}
+                                    aria-label={t('Decrease quantity', 'إنقاص الكمية')}
+                                  >
+                                    <svg
+                                      className="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M20 12H4"
+                                      />
+                                    </svg>
+                                  </button>
+                                  <span className="w-10 border-x border-border text-center text-sm font-semibold text-foreground">
+                                    {localize(item.quantity)}
+                                  </span>
+                                  <button
+                                    onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                                    disabled={item.unavailable || item.quantity >= 10}
+                                    className={`flex h-11 w-11 items-center justify-center transition-colors ${
+                                      item.unavailable || item.quantity >= 10
+                                        ? 'cursor-not-allowed text-muted-foreground/40'
+                                        : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
+                                    }`}
+                                    aria-label={t('Increase quantity', 'زيادة الكمية')}
+                                  >
+                                    <svg
+                                      className="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 4v16m8-8H4"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+
+                                {/* Item Total */}
+                                <p
+                                  className="text-base font-bold text-primary sm:text-lg"
+                                  data-zone="productPrice"
+                                  style={cartZoneStyle(cartPriceZone)}
+                                >
+                                  {item.unavailable ? (
+                                    <s>{formatPrice(item.price * item.quantity)}</s>
+                                  ) : (
+                                    formatPrice(item.price * item.quantity)
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Continue Shopping */}
+                    <div className="mt-8">
+                      <Link
+                        href={continuShoppingHref}
+                        className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        <svg
+                          className="h-4 w-4 rtl:-scale-x-100"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                          />
+                        </svg>
+                        {t(
+                          'Continue shopping',
+                          '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+                        )}
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Order Summary */}
+                  <div className="mt-8 lg:col-span-4 lg:mt-0">
+                    <div ref={summaryRef} className="sticky top-24 space-y-6">
+                      {T?.OrderSummary ? (
+                        <T.OrderSummary
+                          subtotal={subtotal}
+                          discount={discount}
+                          discountLabel={
+                            promoApplied
+                              ? `${t('Discount', 'الخصم')}${promoType === 'percentage' ? ` (${promoValue}%)` : promoName ? ` — ${promoName}` : ''}`
+                              : undefined
+                          }
+                          shipping={shipping}
+                          freeShipping={shipping === 0}
+                          // On the cart, shipping isn't resolved yet — the real
+                          // per-area fee is only known at checkout once the
+                          // customer picks a governorate/area. Show a neutral
+                          // "Calculated at checkout" label instead of a
+                          // misleading "Free".
+                          shippingPending
+                          tax={tax}
+                          taxRatePercent={taxRatePercent}
+                          taxIncludedInPrice={taxIncludedInPrice}
+                          total={total}
+                          currency={store.currency}
+                          isRtl={language === 'ar'}
+                          ctaLabel={CART_CHECKOUT_CTA.en}
+                          ctaLabelAr={CART_CHECKOUT_CTA.ar}
+                          ctaHref={storeUrl('/checkout')}
+                          ctaDisabled={checkoutBlocked}
+                          ctaBlockedMessage={checkoutBlockedMessage}
+                          typography={cartTypography}
+                          summaryColors={{
+                            labelColor: summaryLabelColorResolved,
+                            totalColor: summaryTotalColorResolved,
+                            bold: summaryLabelBold,
+                          }}
+                        >
                           {isEnabled('coupons') && (
-                            <div className="mt-6">
+                            <div>
                               <label
-                                htmlFor="cart-promo-code"
+                                htmlFor="cart-promo-code-t"
                                 className="text-sm font-medium text-foreground"
                               >
-                                {t(
-                                  'Coupon code',
-                                  '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645'
-                                )}
+                                {t('Coupon code', 'كود الخصم')}
                               </label>
                               <div className="mt-2 flex gap-2">
                                 <input
-                                  id="cart-promo-code"
+                                  id="cart-promo-code-t"
                                   spellCheck={false}
                                   autoCapitalize="characters"
                                   autoCorrect="off"
@@ -1008,12 +943,9 @@ export default function CartClient() {
                                   autoComplete="off"
                                   value={promoCode}
                                   onChange={e => setPromoCode(e.target.value)}
-                                  placeholder={t(
-                                    'Enter code',
-                                    '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
-                                  )}
+                                  placeholder={t('Enter code', 'أدخل الكود')}
                                   disabled={promoApplied}
-                                  className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
+                                  className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                                 />
                                 <Button
                                   type="button"
@@ -1024,8 +956,8 @@ export default function CartClient() {
                                   {promoApplied
                                     ? t('Applied', 'اتطبّق')
                                     : isValidating
-                                      ? t('Validating...', 'بنتأكد...')
-                                      : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
+                                      ? '…'
+                                      : t('Apply', 'تطبيق')}
                                 </Button>
                               </div>
                               {promoApplied && (
@@ -1038,6 +970,7 @@ export default function CartClient() {
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
+                                    aria-hidden
                                   >
                                     <path
                                       strokeLinecap="round"
@@ -1046,8 +979,8 @@ export default function CartClient() {
                                       d="M5 13l4 4L19 7"
                                     />
                                   </svg>
-                                  {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)}{' '}
-                                  off)
+                                  {promoCode.toUpperCase()} — {formatPrice(discount)}{' '}
+                                  {t('off', 'خصم')}
                                 </p>
                               )}
                               {promoApplied && cartBundles.length > 0 && (
@@ -1062,69 +995,104 @@ export default function CartClient() {
                               )}
                             </div>
                           )}
+                        </T.OrderSummary>
+                      ) : (
+                        <>
+                          {/* Summary Card */}
+                          <div className="rounded-[var(--radius)] border border-border bg-card p-6 shadow-sm">
+                            <h2
+                              className="text-lg font-bold text-foreground"
+                              style={{
+                                ...cartZoneStyle(cartHeadingZone),
+                                ...summaryLabelStyle,
+                              }}
+                            >
+                              {t(
+                                'Order summary',
+                                '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
+                              )}
+                            </h2>
 
-                          {/* Price Breakdown */}
-                          <div className="mt-6 space-y-3">
-                            <div className="flex justify-between text-sm">
-                              <span
-                                className={`${summaryFontWeight} text-muted-foreground`}
-                                style={{
-                                  ...cartZoneStyle(cartLabelZone),
-                                  ...summaryLabelStyle,
-                                }}
-                              >
-                                {t(
-                                  'Subtotal',
-                                  '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
-                                )}{' '}
-                                ({countText(lang, cartCount, ITEMS, localize(cartCount))})
-                              </span>
-                              <span
-                                className="font-bold text-foreground"
-                                style={cartZoneStyle(cartPriceZone)}
-                              >
-                                {formatPrice(subtotal)}
-                              </span>
-                            </div>
-                            {promoApplied && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-success-ink">
-                                  {t('Discount', 'الخصم')} (
-                                  {promoType === 'percentage' ? `${promoValue}%` : promoName})
-                                </span>
-                                <span className="font-medium text-success-ink">
-                                  <SignedAmount sign={MINUS} value={formatPrice(discount)} />
-                                </span>
+                            {/* Promo Code */}
+                            {isEnabled('coupons') && (
+                              <div className="mt-6">
+                                <label
+                                  htmlFor="cart-promo-code"
+                                  className="text-sm font-medium text-foreground"
+                                >
+                                  {t(
+                                    'Coupon code',
+                                    '\u0643\u0648\u062f \u0627\u0644\u062e\u0635\u0645'
+                                  )}
+                                </label>
+                                <div className="mt-2 flex gap-2">
+                                  <input
+                                    id="cart-promo-code"
+                                    spellCheck={false}
+                                    autoCapitalize="characters"
+                                    autoCorrect="off"
+                                    enterKeyHint="done"
+                                    type="text"
+                                    autoComplete="off"
+                                    value={promoCode}
+                                    onChange={e => setPromoCode(e.target.value)}
+                                    placeholder={t(
+                                      'Enter code',
+                                      '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
+                                    )}
+                                    disabled={promoApplied}
+                                    className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={applyPromoCode}
+                                    disabled={promoApplied || isValidating}
+                                  >
+                                    {promoApplied
+                                      ? t('Applied', 'اتطبّق')
+                                      : isValidating
+                                        ? t('Validating...', 'بنتأكد...')
+                                        : t('Apply', '\u062a\u0637\u0628\u064a\u0642')}
+                                  </Button>
+                                </div>
+                                {promoApplied && (
+                                  <p
+                                    role="status"
+                                    className="mt-2 flex items-center gap-1 text-xs text-success-ink"
+                                  >
+                                    <svg
+                                      className="h-3.5 w-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                    {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)}{' '}
+                                    off)
+                                  </p>
+                                )}
+                                {promoApplied && cartBundles.length > 0 && (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    {t(
+                                      'Coupon applies to items outside your bundles — a bundle is already discounted.',
+                                      translations[
+                                        'Coupon applies to items outside your bundles — a bundle is already discounted.'
+                                      ]
+                                    )}
+                                  </p>
+                                )}
                               </div>
                             )}
-                            <div className="flex justify-between text-sm">
-                              <span
-                                className={`${summaryFontWeight} text-muted-foreground`}
-                                style={{
-                                  ...cartZoneStyle(cartLabelZone),
-                                  ...summaryLabelStyle,
-                                }}
-                              >
-                                {t('Shipping', 'الشحن')}
-                              </span>
-                              {/* Shipping is resolved at checkout (per delivery
-                                  area), not on the cart — show a neutral
-                                  "Calculated at checkout" label rather than a
-                                  premature "Free". */}
-                              <span
-                                className={`${summaryFontWeight} text-muted-foreground`}
-                                style={{
-                                  ...cartZoneStyle(cartLabelZone),
-                                  ...summaryLabelStyle,
-                                }}
-                              >
-                                {t(
-                                  'Calculated at checkout',
-                                  '\u064a\u062d\u0633\u0628 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
-                                )}
-                              </span>
-                            </div>
-                            {tax > 0 && taxLabel && !taxIncludedInPrice && (
+
+                            {/* Price Breakdown */}
+                            <div className="mt-6 space-y-3">
                               <div className="flex justify-between text-sm">
                                 <span
                                   className={`${summaryFontWeight} text-muted-foreground`}
@@ -1133,147 +1101,194 @@ export default function CartClient() {
                                     ...summaryLabelStyle,
                                   }}
                                 >
-                                  {taxLabel}
+                                  {t(
+                                    'Subtotal',
+                                    '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
+                                  )}{' '}
+                                  ({countText(lang, cartCount, ITEMS, localize(cartCount))})
                                 </span>
                                 <span
                                   className="font-bold text-foreground"
                                   style={cartZoneStyle(cartPriceZone)}
                                 >
-                                  {formatPrice(tax)}
+                                  {formatPrice(subtotal)}
                                 </span>
                               </div>
-                            )}
-                            <div className="border-t border-border pt-3">
-                              <div className="flex justify-between" data-cart-total="">
+                              {promoApplied && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-success-ink">
+                                    {t('Discount', 'الخصم')} (
+                                    {promoType === 'percentage' ? `${promoValue}%` : promoName})
+                                  </span>
+                                  <span className="font-medium text-success-ink">
+                                    <SignedAmount sign={MINUS} value={formatPrice(discount)} />
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-sm">
                                 <span
-                                  className={`text-lg ${summaryFontWeight} text-foreground`}
+                                  className={`${summaryFontWeight} text-muted-foreground`}
                                   style={{
-                                    ...cartZoneStyle(cartHeadingZone),
-                                    ...summaryTotalStyle,
+                                    ...cartZoneStyle(cartLabelZone),
+                                    ...summaryLabelStyle,
                                   }}
                                 >
-                                  {t('Total', 'الإجمالي')}
+                                  {t('Shipping', 'الشحن')}
                                 </span>
+                                {/* Shipping is resolved at checkout (per delivery
+                                  area), not on the cart — show a neutral
+                                  "Calculated at checkout" label rather than a
+                                  premature "Free". */}
                                 <span
-                                  className={`text-xl ${summaryFontWeight} text-primary`}
+                                  className={`${summaryFontWeight} text-muted-foreground`}
                                   style={{
-                                    ...cartZoneStyle(cartPriceZone),
-                                    ...summaryTotalStyle,
+                                    ...cartZoneStyle(cartLabelZone),
+                                    ...summaryLabelStyle,
                                   }}
                                 >
-                                  {formatPrice(total)}
+                                  {t(
+                                    'Calculated at checkout',
+                                    '\u064a\u062d\u0633\u0628 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
+                                  )}
                                 </span>
                               </div>
-                            </div>
-                            {/* Tax already inside the listed price is
+                              {tax > 0 && taxLabel && !taxIncludedInPrice && (
+                                <div className="flex justify-between text-sm">
+                                  <span
+                                    className={`${summaryFontWeight} text-muted-foreground`}
+                                    style={{
+                                      ...cartZoneStyle(cartLabelZone),
+                                      ...summaryLabelStyle,
+                                    }}
+                                  >
+                                    {taxLabel}
+                                  </span>
+                                  <span
+                                    className="font-bold text-foreground"
+                                    style={cartZoneStyle(cartPriceZone)}
+                                  >
+                                    {formatPrice(tax)}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="border-t border-border pt-3">
+                                <div className="flex justify-between" data-cart-total="">
+                                  <span
+                                    className={`text-lg ${summaryFontWeight} text-foreground`}
+                                    style={{
+                                      ...cartZoneStyle(cartHeadingZone),
+                                      ...summaryTotalStyle,
+                                    }}
+                                  >
+                                    {t('Total', 'الإجمالي')}
+                                  </span>
+                                  <span
+                                    className={`text-xl ${summaryFontWeight} text-primary`}
+                                    style={{
+                                      ...cartZoneStyle(cartPriceZone),
+                                      ...summaryTotalStyle,
+                                    }}
+                                  >
+                                    {formatPrice(total)}
+                                  </span>
+                                </div>
+                              </div>
+                              {/* Tax already inside the listed price is
                                 informational only — a muted caption below
                                 Total, never a row in the summed amount
                                 column (scoped-audit follow-up: an inclusive
                                 amount printed there implied it was added
                                 twice). */}
-                            {tax > 0 && taxLabel && taxIncludedInPrice && (
-                              <p className="text-xs text-muted-foreground">
-                                {taxLabel} {'\u2014'} {formatPrice(tax)}
+                              {tax > 0 && taxLabel && taxIncludedInPrice && (
+                                <p className="text-xs text-muted-foreground">
+                                  {taxLabel} {'\u2014'} {formatPrice(tax)}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Below-minimum progress (Ruling B4-6): a look with chrome.cartBar says what
+                              is left as a sentence plus a bar instead of the one-line notice. */}
+                            {minimumProgress && (
+                              <MinOrderProgress
+                                subtotalFils={subtotal}
+                                minimumOrderFils={minimumOrderFils}
+                                className="mt-4"
+                              />
+                            )}
+                            {/* Below-minimum notice */}
+                            {checkoutBlocked && checkoutBlockedMessage && !minimumProgressOnly && (
+                              <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning-ink">
+                                {checkoutBlockedMessage}
                               </p>
                             )}
-                          </div>
 
-                          {/* Below-minimum progress (Ruling B4-6): a look with chrome.cartBar says what
-                              is left as a sentence plus a bar instead of the one-line notice. */}
-                          {minimumProgress && (
-                            <MinOrderProgress
-                              subtotalFils={subtotal}
-                              minimumOrderFils={minimumOrderFils}
-                              className="mt-4"
-                            />
-                          )}
-                          {/* Below-minimum notice */}
-                          {checkoutBlocked && checkoutBlockedMessage && !minimumProgressOnly && (
-                            <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning-ink">
-                              {checkoutBlockedMessage}
-                            </p>
-                          )}
-
-                          {/* Checkout Button */}
-                          {checkoutBlocked ? (
-                            <Button
-                              type="button"
-                              disabled
-                              className="mt-6 w-full gap-2 rounded-[var(--radius)]"
-                              size="lg"
-                            >
-                              {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
-                            </Button>
-                          ) : (
-                            <Link
-                              href={storeUrl('/checkout')}
-                              data-cta="button"
-                              className="mt-6 block"
-                            >
-                              <Button className="w-full gap-2 rounded-[var(--radius)]" size="lg">
+                            {/* Checkout Button */}
+                            {checkoutBlocked ? (
+                              <Button
+                                type="button"
+                                disabled
+                                className="mt-6 w-full gap-2 rounded-[var(--radius)]"
+                                size="lg"
+                              >
                                 {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
-                                <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
                               </Button>
-                            </Link>
-                          )}
-
-                          {/* Security Badge */}
-                          <div className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-3 text-xs text-muted-foreground">
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                              />
-                            </svg>
-                            {t(
-                              'Secure checkout with SSL encryption',
-                              '\u062f\u0641\u0639 \u0622\u0645\u0646 \u0628\u062a\u0634\u0641\u064a\u0631 SSL'
+                            ) : (
+                              <Link
+                                href={storeUrl('/checkout')}
+                                data-cta="button"
+                                className="mt-6 block"
+                              >
+                                <Button className="w-full gap-2 rounded-[var(--radius)]" size="lg">
+                                  {t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}
+                                  <ArrowIcon className="h-5 w-5" isRtl={language === 'ar'} />
+                                </Button>
+                              </Link>
                             )}
+
+                            {/* Security Badge */}
+                            <div className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-3 text-xs text-muted-foreground">
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                />
+                              </svg>
+                              {t(
+                                'Secure checkout with SSL encryption',
+                                '\u062f\u0641\u0639 \u0622\u0645\u0646 \u0628\u062a\u0634\u0641\u064a\u0631 SSL'
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )}
 
-                    <AcceptedPaymentBadges />
+                      <AcceptedPaymentBadges />
 
-                    {/* IA-04 (W4): one quiet help line, not a card with an icon tile. */}
-                    <p data-testid="cart-help-line" className="text-sm text-muted-foreground">
-                      <Link
-                        href={storeUrl('/contact')}
-                        className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
-                      >
-                        {store.phone
-                          ? `${t('Questions? Call', 'عندك سؤال؟ كلّمنا على')} ${store.phone}`
-                          : t('Questions? Contact the store', 'عندك سؤال؟ كلّم المتجر')}
-                      </Link>
-                    </p>
+                      {/* IA-04 (W4): one quiet help line, not a card with an icon tile. */}
+                      <p data-testid="cart-help-line" className="text-sm text-muted-foreground">
+                        <Link
+                          href={storeUrl('/contact')}
+                          className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
+                        >
+                          {store.phone
+                            ? `${t('Questions? Call', 'عندك سؤال؟ كلّمنا على')} ${store.phone}`
+                            : t('Questions? Contact the store', 'عندك سؤال؟ كلّم المتجر')}
+                        </Link>
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Cart Recommendations — shown below cart grid on all screen sizes */}
-              {isEnabled('upsell_crosssell') &&
-                cartItems.length > 0 &&
-                store.id &&
-                store.id !== 'demo' && (
-                  <div className="mt-8">
-                    <CartRecommendations
-                      storeId={store.id}
-                      // Product ids, not cart-line ids (the API looks up
-                      // relations by product; line ids matched nothing).
-                      productIds={[...new Set(cartItems.map(i => i.productId))]}
-                    />
-                  </div>
-                )}
-            </>
-          )}
+              </>
+            )}
+          </PageMark>
+          {itemNodes(around.after)}
         </div>
       </div>
       {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA, and the

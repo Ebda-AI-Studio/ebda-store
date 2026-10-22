@@ -151,3 +151,18 @@ store's typography until the draft that references it is published.
 Font URLs are tenant-checked: a custom font must be a file under this store's `stores/<id>/fonts/` namespace and a
 Google font a `fonts.googleapis.com` stylesheet (`font-url-guard.ts`, enforced on every document write and on the
 typography PUT), and the R2 delete refuses any key outside the current store (Ruling VE-11).
+
+## Product, collection and cart pages are section documents (Task 8, Rulings VE-3, VE-12)
+
+- **Page kinds** (`packages/shared/src/builder/page-kinds.ts`): `home` plus `product`, `collection`, `cart`. Each of the three has one document per store in `store_page_revisions` (`page_key` = the kind), with the same draft / publish / revisions / rollback as home.
+- **Default = today's render, no migration.** A store with no saved document gets `defaultPageDocument(kind)` (`page-defaults.ts`): product = main, FAQ, reviews, bundles, recommendations, related; collection = main; cart = main, recommendations.
+- **One pinned main section per page** (`product-main`, `collection-main`, `cart-main`; `pinned: true` in the registry). It can move; the reducer and the validator refuse to remove, hide or duplicate it. A section type only goes on the pages its registry `pages` lists (`sectionAllowedOnPage`); image-text, newsletter, trust-badges and maker-profile are shared by all four.
+- **A section page holds sections only.** No header/footer group, theme, chrome, typography or page settings in the document (the validator says `PAGE_MISMATCH`); those stay on the home document.
+- **API.** `GET/PUT/POST /admin/stores/:id/builder/pages/:kind/...` accept the four kinds. Publishing or rolling back a non-home page writes nothing to `stores.layout_settings` (that projection is the home page's) and only purges the caches. The storefront reads `GET /public/stores/:storeId/pages/:kind` (published or default; fetched with the `layout:<storeId>` tag, so the existing purge covers it). The canvas keeps using `builder-preview?token=` (the token already carries the page key).
+
+## Page-type settings (Task 8e, Rulings VE-13, VE-14)
+
+- With nothing selected, the right pane shows the page's own settings (`PageSettingsPanel`), generated from `PAGE_SETTINGS` (`packages/shared/src/builder/page-settings.ts`) with the same field components as a section: page background, colour scheme, spacing and text size per page, the product photo shape, reviews, the filter panel, image shapes, the phone bottom bar and the product card defaults. "Page settings" at the top of the structure list brings the panel back after selecting a section.
+- Every change is `setSiteSetting { key, path, value }` on the draft (one nesting level, `undefined` clears). The reducer refuses a setting the page does not have (`UNKNOWN_SETTING`); the validator refuses a key the page does not own and checks values with `storeLayoutSchema`. The canvas paints the draft (`withPageSettings`), a public page reads the live layout.
+- Who writes which key is in VE-13. Publishing product / collection / cart writes only their keys into `layout_settings`; publishing home keeps the live value of theirs. `defaultPageDocument(kind, liveLayout)` and `getPageState` open a page on the live values.
+- `filterSidebar` and `sizing` are all-or-nothing in the layout schema: `GROUP_FLOORS` starts a missing `filterSidebar` at the baseline so one toggle is a valid object.

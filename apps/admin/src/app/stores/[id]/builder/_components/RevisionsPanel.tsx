@@ -20,16 +20,18 @@ interface Rev {
 
 export function RevisionsPanel({
   storeId,
+  pageKey = 'home',
   headRev,
   onRestored,
 }: {
   storeId: string;
+  pageKey?: string;
   headRev: number;
   onRestored: () => void;
 }) {
   const t = useT('builder.revisions');
   const format = useFormatter();
-  const base = `/api/v1/admin/stores/${storeId}/builder/pages/home`;
+  const base = `/api/v1/admin/stores/${storeId}/builder/pages/${pageKey}`;
   const [rows, setRows] = useState<Rev[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [busy, setBusy] = useState<number | null>(null);

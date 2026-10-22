@@ -103,7 +103,10 @@ export function buildMatrix(): Matrix {
   const rows: MatrixRow[] = [];
   const skins = [...new Set(LOOKS.map(l => l.skin))].sort();
   const looksOf = (skin: string) => LOOKS.filter(l => l.skin === skin).map(l => l.id);
-  const templateSections = SECTION_REGISTRY.filter(d => d.group === 'template');
+  // the home document's sections; product/collection/cart page sections have no settings (VE-12)
+  const templateSections = SECTION_REGISTRY.filter(
+    d => d.group === 'template' && d.pages.includes('home')
+  );
 
   // 1. Section controls and theme controls, once per skin.
   for (const skin of skins) {
