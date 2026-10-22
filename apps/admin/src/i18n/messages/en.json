@@ -82,6 +82,10 @@
       "statTotalUsers": "Total Users",
       "statTotalOrders": "Total Orders",
       "statTotalRevenue": "Total Revenue",
+      "referralsTitle": "Referral signups",
+      "referralsNote": "Merchant signups whose first touch was a referral link (a floor: only visitors who consented are counted).",
+      "referralsBadge": "From the store badge",
+      "referralsEmail": "From the first-order email",
       "recentStoresTitle": "Recent Stores",
       "recentStoresSubtitle": "Latest store registrations",
       "recentOrdersTitle": "Recent Orders",
@@ -6176,6 +6180,7 @@
         "affiliates": "Affiliates",
         "abandonedCarts": "Abandoned Carts",
         "paymentAbandonments": "Payment Abandonments",
+        "lifecycleEmails": "Setup emails",
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
@@ -7940,6 +7945,40 @@
       "notConnectedTitle": "Google Search Console not connected",
       "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
     }
+  },
+  "lifecycleEmails": {
+    "title": "Setup emails",
+    "subtitle": "The onboarding emails Ebda sent to your account, and what happened to each.",
+    "optedOut": "You unsubscribed: no more setup or trial emails will be sent. Order and billing emails are not affected.",
+    "colEmail": "Email",
+    "colStatus": "Status",
+    "colWhen": "When",
+    "colNote": "Note",
+    "pending": "Not sent yet",
+    "sent": "Sent",
+    "skipped": "Not needed",
+    "failed": "Failed to send",
+    "kind": {
+      "add_products": "Add your first products (day 1, if no products yet)",
+      "payment_shipping": "Cash and shipping ready? (day 3, if not set)",
+      "test_order": "Order from your store like a customer (day 5, if no order yet)",
+      "share_link": "Put the link in your bio (day 7)",
+      "trial_recap": "Trial recap (4 days before the trial ends)",
+      "first_order": "First order: ask for a referral"
+    },
+    "reason": {
+      "products_added": "You already added products",
+      "payment_and_shipping_done": "Payment and shipping were already set",
+      "order_placed": "An order was already placed",
+      "not_trialing": "Not on a trial",
+      "no_order": "No order yet",
+      "opted_out": "You unsubscribed",
+      "store_not_active": "Store not active",
+      "no_recipient": "No owner email",
+      "ENQUEUE_FAILED": "The email could not be queued",
+      "unsubscribed_by_link": "Unsubscribed from an email link"
+    },
+    "loadFailed": "Could not load the email log."
   },
   "paymentAbandonments": {
     "page": {

@@ -20,6 +20,7 @@ import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
+import { inngest } from '../lib/inngest/client';
 import { maskEmail } from '../lib/pii-mask';
 import {
   isValidTimeZone,
@@ -336,6 +337,19 @@ export class ProvisioningService {
           );
       }
       throw error;
+    }
+
+    // Self-serve (signup trial): start the lifecycle-emails run (setup nudges, trial recap). The
+    // transaction has committed; an enqueue failure is logged, never fails the provisioning.
+    if (input.growthTrial) {
+      void inngest
+        .send({ name: 'store/self-serve-provisioned', data: { storeId: result.store.id } })
+        .catch((err: unknown) =>
+          logger.warn(
+            { err, storeId: result.store.id },
+            '[PROVISIONING] lifecycle-emails event not sent'
+          )
+        );
     }
 
     // Store is provisioned — fire-and-forget the welcome email so SMTP latency

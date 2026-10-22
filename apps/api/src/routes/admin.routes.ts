@@ -70,6 +70,7 @@ import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
+import { referralSignupCounts } from '../services/lifecycle-emails.service';
 
 const router = Router();
 
@@ -1377,6 +1378,10 @@ router.get(
             }),
           }),
         ]);
+      // Super-admin only: signups that came through the store badge / referral email (UTM first touch).
+      const referrals = ownerScope
+        ? null
+        : await asPlatformOperator(req.user!.userId, () => referralSignupCounts());
       const orderCount = orderTotals.reduce((n, r) => n + r.value.count, 0);
       const revenueResult = {
         _sum: { total: orderTotals.reduce((n, r) => n + r.value.revenue, 0) },
@@ -1394,6 +1399,7 @@ router.get(
           },
           recentStores,
           recentOrders,
+          referrals,
         },
       });
     } catch (error) {

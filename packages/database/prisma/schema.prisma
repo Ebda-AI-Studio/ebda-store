@@ -533,6 +533,7 @@ model Store {
   manualPaymentClaims        ManualPaymentClaim[]
   instapayReceipts           InstapayReceipt[]
   billingReminders           BillingReminder[]
+  lifecycleEmails            StoreLifecycleEmail[]
 
   @@index([ownerId])
   @@index([status])
@@ -5286,6 +5287,30 @@ model BillingReminder {
   @@unique([subscriptionId, dueAt, kind])
   @@index([storeId])
   @@map("billing_reminders")
+}
+
+/// One row per (store, onboarding/lifecycle email kind): the idempotency handle AND the merchant-visible
+/// log of the self-serve lifecycle emails (setup nudges, trial recap, first-order referral ask). The
+/// Inngest function wins the INSERT before it sends, so a retry or a second run never sends the same
+/// email twice. `status`: sent | skipped (the step was already done, `reason` says why) | failed
+/// (enqueue threw). kind `optout` is the merchant's unsubscribe: while it exists nothing is sent.
+/// Viewer: /stores/[id]/lifecycle-emails. RLS: strict store policy.
+model StoreLifecycleEmail {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  /// add_products | payment_shipping | test_order | share_link | trial_recap | first_order | optout
+  kind      String
+  /// sent | skipped | failed
+  status    String
+  /// skipped / failed: why (step already done, no recipient, opted out, enqueue error code)
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, kind])
+  @@index([storeId, createdAt])
+  @@map("store_lifecycle_emails")
 }
 
 /// Provider webhook inbox (SP5 task 3): UNIQUE (provider, eventId) makes a

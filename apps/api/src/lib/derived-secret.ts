@@ -25,6 +25,7 @@ import { config } from '../config';
 export type DerivedSecretLabel =
   | 'ebda:sms-optout-mac:v2'
   | 'ebda:campaign-unsubscribe-mac:v1'
+  | 'ebda:lifecycle-unsubscribe-mac:v1'
   | 'ebda:review-link-mac:v1'
   | 'ebda:cart-restore-mac:v1'
   | 'ebda:mcp-confirm-mac:v1'

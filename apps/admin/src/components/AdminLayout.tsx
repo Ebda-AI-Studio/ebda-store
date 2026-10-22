@@ -189,6 +189,7 @@ export function AdminLayout({
     affiliates: t('hubTabs.affiliates'),
     abandonedCarts: t('hubTabs.abandonedCarts'),
     paymentAbandonments: t('hubTabs.paymentAbandonments'),
+    lifecycleEmails: t('hubTabs.lifecycleEmails'),
     // Settings tabs
   };
 

@@ -372,6 +372,13 @@ type WebhookInventoryLowEvent = EventPayload & {
   };
 };
 
+// A self-serve store was provisioned with its signup trial: starts the sleeping lifecycle-emails run
+// (setup nudges + trial recap). Emitted once, after the provisioning transaction committed.
+type StoreSelfServeProvisionedEvent = EventPayload & {
+  name: 'store/self-serve-provisioned';
+  data: { storeId: string };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -410,7 +417,8 @@ export type AppEvent =
   | LegalNoticeSendRequestedEvent
   | SearchStoreReindexRequestedEvent
   | WebhookDeliveryRequestedEvent
-  | WebhookInventoryLowEvent;
+  | WebhookInventoryLowEvent
+  | StoreSelfServeProvisionedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

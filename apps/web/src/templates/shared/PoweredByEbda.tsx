@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
+import { BRAND, referralUrl } from '@ebda/shared';
 
 /**
  * "Powered by Ebda" footer attribution. Rendered as the very last line
@@ -23,6 +24,12 @@ import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
  */
 export function PoweredByEbda({ hidden = false }: { hidden?: boolean }) {
   const { t } = useLanguage();
+  // Referral attribution: the link carries utm_source=ebda_store_badge and, as utm_content, the host of
+  // the store that showed it, so a signup can be traced back to the storefront that sent it (the marketing
+  // site keeps the UTMs as the first touch). The host is only known in the browser, so the first (server)
+  // render uses the bare badge link and the host is added after mount, with no hydration mismatch.
+  const [host, setHost] = useState('');
+  useEffect(() => setHost(window.location.hostname), []);
   // Plan decision made server-side: the API resolves `remove_branding` from the
   // store's plan (Growth + Business) or a super-admin override and ships it in
   // `enabledFeatures`; ShopChrome turns that into this prop. Absent/unknown ->
@@ -34,7 +41,7 @@ export function PoweredByEbda({ hidden = false }: { hidden?: boolean }) {
       className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground text-start`}
     >
       <a
-        href={BRAND_MARKETING_URL}
+        href={referralUrl('badge', host)}
         target="_blank"
         rel="noopener noreferrer"
         aria-label={t(
