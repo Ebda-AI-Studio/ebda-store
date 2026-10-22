@@ -13,6 +13,12 @@ const { searchProductIds, loggerCalls } = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: { product: { findMany: vi.fn().mockResolvedValue([]) } },
 }));
+// The search reads through readInStoreContext (needs the real tenant context in @ebda/database): this
+// file is about the header, so the scope is a pass-through here (the scope itself is covered by the
+// integration suites).
+vi.mock('@api/lib/store-scoped-read', () => ({
+  readInStoreContext: (_storeId: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/middleware/wa-bridge-auth', () => ({
   waBridgeAuth: (req: { bridgeStore?: unknown }, _res: unknown, next: () => void) => {
     req.bridgeStore = { id: 's1', currency: 'EGP' };

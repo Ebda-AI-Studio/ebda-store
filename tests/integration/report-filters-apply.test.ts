@@ -46,7 +46,10 @@ vi.mock('../../apps/api/src/middleware/store-access', () => ({
 vi.mock('../../apps/api/src/middleware/feature-gate', () => ({
   requireFeature: () => (_req: any, _res: any, next: any) => next(),
 }));
-vi.mock('../../apps/api/src/middleware/rbac', () => ({
+vi.mock('../../apps/api/src/middleware/rbac', async importOriginal => ({
+  // Keep the real hasPermission (order.routes calls it inline for the orders:read / orders:refund
+  // actor checks); only the requirePermission gate is a pass-through here.
+  ...(await importOriginal<Record<string, unknown>>()),
   requirePermission: () => (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('../../apps/api/src/middleware/require-mfa', () => ({
@@ -153,6 +156,9 @@ beforeAll(async () => {
         firstName: first,
         lastName: last,
         role: 'customer',
+        // Registered ON the store, as a real shopper is: the customer search matches only users
+        // whose users.store_id is this store (a store_id NULL customer is invisible to ebda_app).
+        storeId,
       },
     });
     customerIds.push(u.id);
@@ -204,12 +210,16 @@ beforeAll(async () => {
   const { default: abandonRoutes } =
     await import('../../apps/api/src/routes/payment-abandonments.routes');
   const { errorHandler } = await import('../../apps/api/src/middleware/error-handler');
+  const { tenantContext, orderRouteContext } =
+    await import('../../apps/api/src/middleware/tenant-context');
   app = express();
   app.use(express.json());
-  app.use('/stores/:storeId/analytics', analyticsRoutes);
-  app.use('/stores/:storeId/orders', orderRoutes);
-  app.use('/stores/:storeId', customersRoutes);
-  app.use('/stores/:storeId/payment-abandonments', abandonRoutes);
+  // Mounted the way routes/index.ts mounts them: the order and customer search definers read the
+  // store ONLY from app.current_store_id, which these context middlewares set.
+  app.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
+  app.use('/stores/:storeId/orders', orderRouteContext, orderRoutes);
+  app.use('/stores/:storeId', tenantContext, customersRoutes);
+  app.use('/stores/:storeId/payment-abandonments', tenantContext, abandonRoutes);
   app.use(errorHandler);
 });
 

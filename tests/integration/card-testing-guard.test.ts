@@ -52,6 +52,8 @@ vi.mock('@api/lib/definer', () => ({ getOrderStoreId: async () => 'store-from-or
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: any, _res: any, next: any) => next(),
   optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
+  // POST /payments/create mounts rejectImpersonated (no payment from an impersonation session).
+  rejectImpersonated: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/rbac', () => ({
   requirePermission: () => (_req: any, _res: any, next: any) => next(),

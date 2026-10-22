@@ -23,6 +23,7 @@ import { assertWholesaleEntitled } from '../lib/b2b-invalidate';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
@@ -1390,9 +1391,12 @@ export class ProductService {
     if (search && ranked) {
       // The ranked id list replaces the keyword id filter (it already holds every keyword match up
       // to the cap, plus the vector-only hits). ANDed, so an `ids` filter on `where.id` still applies.
-      const rankedResult = await rankedSearchWithMode(storeId, search, {
-        searcher: options.searcher,
-      });
+      // The search definers take the store ONLY from app.current_store_id: read through
+      // readInStoreContext so the storefront path is scoped by construction, not by whichever
+      // router happens to mount it (it joins the request's own scope when it is for this store).
+      const rankedResult = await readInStoreContext(storeId, () =>
+        rankedSearchWithMode(storeId, search, { searcher: options.searcher })
+      );
       rankedIds = rankedResult.ids;
       rankedDegraded = rankedResult.degraded;
       where.AND = [
@@ -1404,7 +1408,9 @@ export class ProductService {
       // (product-search.service): any subset / reordering of words matches.
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        ...(await buildProductSearchWhere(storeId, search, 'storefront')),
+        ...(await readInStoreContext(storeId, () =>
+          buildProductSearchWhere(storeId, search, 'storefront')
+        )),
       ];
     }
 
@@ -2560,12 +2566,14 @@ export class ProductService {
     // "مخبوزات بريتزوس مشكلة").
     // order 'featured': featured-first, then name, applied in SQL BEFORE the top
     // `take`, so a featured match can never be cut by the id cap.
-    const matchIds = await searchProductIds(storeId, trimmed, {
-      scope: 'storefront',
-      field: 'name',
-      order: 'featured',
-      limit: take,
-    });
+    const matchIds = await readInStoreContext(storeId, () =>
+      searchProductIds(storeId, trimmed, {
+        scope: 'storefront',
+        field: 'name',
+        order: 'featured',
+        limit: take,
+      })
+    );
     if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
     const products = await prisma.product.findMany({
       where: {

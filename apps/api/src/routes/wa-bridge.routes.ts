@@ -37,6 +37,7 @@ import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import { searchQueryFromHeader } from '../lib/search-term';
 import { searchProductIds } from '../services/product-search.service';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from '../middleware/wa-feature-gate';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import {
@@ -241,7 +242,9 @@ export async function bridgeProductSearchPage(
   page: number,
   limit: number
 ) {
-  const matchIds = await searchProductIds(storeId, q, { scope: 'storefront', withSku: true });
+  const matchIds = await readInStoreContext(storeId, () =>
+    searchProductIds(storeId, q, { scope: 'storefront', withSku: true })
+  );
   // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
   const products = await prisma.product.findMany({
     // B2B-7b: WhatsApp is an anonymous surface, wholesale-only products never appear

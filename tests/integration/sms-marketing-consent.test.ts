@@ -202,8 +202,10 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     const slug = (await withRlsBypass(tx =>
       tx.store.findUnique({ where: { id: storeId }, select: { slug: true } })
     ))!.slug;
+    // The label follows the store's language, and a store with no defaultLanguage gets the region
+    // default: Egyptian Arabic (SMS_OPT_OUT_LABEL.ar in notification-dispatcher.service).
     expect(
-      text.endsWith(` Stop offers: ${storefrontOrigin({ slug })}/sms-unsubscribe?t=${m![1]}`)
+      text.endsWith(` إيقاف العروض: ${storefrontOrigin({ slug })}/sms-unsubscribe?t=${m![1]}`)
     ).toBe(true);
     const consentId = verifySmsOptOutToken(m![1]);
     expect(consentId).not.toBeNull();

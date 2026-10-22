@@ -1381,6 +1381,9 @@ model ProductPriceTier {
   @@index([storeId, productId])
   @@index([variantId])
   @@index([groupId])
+  // Leading indexes for the composite ownership FKs (product_variant_fkey, store_group_fkey).
+  @@index([productId, variantId])
+  @@index([storeId, groupId])
   @@map("product_price_tiers")
 }
 
@@ -1416,6 +1419,8 @@ model WholesaleApplication {
   @@index([storeId, status, createdAt])
   @@index([userId])
   @@index([groupId])
+  // Leading index for the composite ownership FK (store_group_fkey).
+  @@index([storeId, groupId])
   @@map("wholesale_applications")
 }
 
@@ -5607,5 +5612,7 @@ model WebhookDelivery {
   @@unique([endpointId, dedupeKey])
   @@index([endpointId, createdAt(sort: Desc)])
   @@index([storeId, createdAt])
+  // Leading index for the composite FK (endpoint_id, store_id).
+  @@index([endpointId, storeId])
   @@map("webhook_deliveries")
 }
