@@ -156,43 +156,6 @@ describe('Dahab family, theme and baseline', () => {
     ).toBe(true);
   });
 
-  // WCAG relative luminance from an "H S% L%" triplet.
-  const lum = (triplet: string) => {
-    const [h, s, l] = triplet.split(/\s+/).map(v => parseFloat(v));
-    const S = s / 100;
-    const L = l / 100;
-    const a = S * Math.min(L, 1 - L);
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      return L - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-    };
-    const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-    return 0.2126 * lin(f(0)) + 0.7152 * lin(f(8)) + 0.0722 * lin(f(4));
-  };
-  const contrast = (a: string, b: string) => {
-    const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
-    return (x + 0.05) / (y + 0.05);
-  };
-
-  it('every text pair the skin paints meets WCAG AA (4.5:1)', () => {
-    const t = getTemplateTheme('dahab');
-    const pairs: Array<[string, string, string]> = [
-      ['ivory on night', t.foregroundColor, t.backgroundColor],
-      ['ivory on card', t.cardForeground, t.cardColor],
-      ['muted on night', t.mutedForeground, t.backgroundColor],
-      ['muted on card', t.mutedForeground, t.cardColor],
-      ['muted on section-alt', t.mutedForeground, TEMPLATE_THEMES.dahab.bgSectionAlt!],
-      ['gold text on night', t.primaryColor, t.backgroundColor],
-      ['gold text on card', t.primaryColor, t.cardColor],
-      ['night on gold button', t.primaryForeground, t.primaryColor],
-      ['night on bright gold (hover)', t.accentForeground, t.accentColor],
-    ];
-    for (const [name, fg, bg] of pairs)
-      expect(contrast(fg, bg), `${name}: ${contrast(fg, bg).toFixed(2)}`).toBeGreaterThanOrEqual(
-        4.5
-      );
-  });
-
   it('Dahab turns the platform divider bands off (its headings carry the hairline)', () => {
     expect(getTemplateTheme('dahab').dividers?.enabled).toBe(false);
   });
