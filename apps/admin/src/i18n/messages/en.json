@@ -2732,11 +2732,6 @@
         "hint": "Off by default on existing stores; new stores are created with this on. When your homepage carousels/strips have \"Show card frame\" enabled, this removes the extra inner border so each card shows a single frame instead of two nested ones.",
         "enableLabel": "Enable single card frame"
       },
-      "rtlPolish": {
-        "title": "RTL arrow polish (Elegant)",
-        "hint": "Off by default on existing stores; new stores are created with this on. Fixes the Elegant theme's empty-state CTA arrow to point the correct reading direction in Arabic (← instead of always →).",
-        "enableLabel": "Enable RTL arrow polish"
-      },
       "uppercaseStyle": {
         "title": "Uppercase text styling (nav, headings, labels)",
         "hint": "When enabled, nav links, footer column headings, section headings, category captions, hero text, and testimonial author names render in uppercase. Off by default (natural case). Product names have their own control on Page Builder.",

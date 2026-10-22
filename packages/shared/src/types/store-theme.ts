@@ -406,6 +406,10 @@ export interface StoreTheme {
    * (demo clones) — same seeding path as `personaChromeV2`;
    * existing stores can opt in manually via Branding → Theme. 2026-07-12
    * design-sweep batch.
+   *
+   * @deprecated Ruling EP-8 (2026-10-22): no renderer reads it any more (the elegant empty-state arrow
+   * mirrors on every store), so the Theme tab has no control and new stores are not seeded with it. A
+   * stored value stays accepted and is ignored.
    */
   rtlPolish?: boolean;
 

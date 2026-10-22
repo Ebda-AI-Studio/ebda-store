@@ -16,6 +16,9 @@ interface ThemeTabProps {
   storeId: string;
 }
 
+/** The skins that read `theme.personaChromeV2` (`git grep personaChromeV2 apps/web/src`). */
+export const PERSONA_CHROME_SKINS: readonly string[] = ['bold', 'classic', 'elegant'];
+
 /**
  * Cast the local StoreTheme (admin/branding types.ts) to the shared StoreTheme
  * for passing to ColorField. The local type is a strict subset; casting is safe.
@@ -95,6 +98,10 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
 
   const theme = branding.theme;
   const sharedTheme = asSharedTheme(theme);
+  // Only the skins whose renderers read `personaChromeV2` offer it (Ruling EP-1): bold's header and
+  // footer, classic's category grid, elegant's section headings. A store whose template is not
+  // known keeps the control (never hide on missing evidence).
+  const showPersonaChrome = !branding.template || PERSONA_CHROME_SKINS.includes(branding.template);
 
   function setSeed(key: keyof StoreTheme, value: string) {
     onChange({ ...branding, theme: { ...branding.theme, [key]: value } });
@@ -216,7 +223,10 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       </div>
 
       {/* ── Blog ─────────────────────────────────────────────────────────── */}
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
+      <label
+        data-theme-toggle="blog"
+        className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card p-4"
+      >
         <span className="min-w-0 flex-1">
           <span
             data-setting-id="branding.blog"
@@ -235,7 +245,10 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       </label>
 
       {/* ── Social icon brand colors ────────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <div
+        data-theme-toggle="social-icon-colors"
+        className="space-y-3 rounded-lg border border-border bg-card p-4"
+      >
         <div>
           <p className="text-sm font-semibold text-foreground">{t('socialIconColors.title')}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('socialIconColors.hint')}</p>
@@ -271,7 +284,10 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       </div>
 
       {/* ── Storefront web push ───────────────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <div
+        data-theme-toggle="web-push"
+        className="space-y-3 rounded-lg border border-border bg-card p-4"
+      >
         <div>
           <p data-setting-id="branding.web-push" className="text-sm font-semibold text-foreground">
             {t('webPush.title')}
@@ -295,29 +311,37 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       </div>
 
       {/* ── Persona chrome (2026-07-12) ──────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-        <div>
-          <p className="text-sm font-semibold text-foreground">{t('personaChrome.title')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('personaChrome.hint')}</p>
+      {showPersonaChrome && (
+        <div
+          data-theme-toggle="persona-chrome"
+          className="space-y-3 rounded-lg border border-border bg-card p-4"
+        >
+          <div>
+            <p className="text-sm font-semibold text-foreground">{t('personaChrome.title')}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('personaChrome.hint')}</p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={branding.theme.personaChromeV2 === true}
+              onChange={e =>
+                onChange({
+                  ...branding,
+                  theme: { ...branding.theme, personaChromeV2: e.target.checked },
+                })
+              }
+              className="h-4 w-4 cursor-pointer accent-primary"
+            />
+            <span className="text-xs text-foreground">{t('personaChrome.enableLabel')}</span>
+          </label>
         </div>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.personaChromeV2 === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, personaChromeV2: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('personaChrome.enableLabel')}</span>
-        </label>
-      </div>
+      )}
 
       {/* ── Card-frame dedup (2026-07-12) ────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <div
+        data-theme-toggle="card-frame-dedup"
+        className="space-y-3 rounded-lg border border-border bg-card p-4"
+      >
         <div>
           <p className="text-sm font-semibold text-foreground">{t('cardFrameDedup.title')}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('cardFrameDedup.hint')}</p>
@@ -338,30 +362,11 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </label>
       </div>
 
-      {/* ── RTL polish (2026-07-12) ───────────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-        <div>
-          <p className="text-sm font-semibold text-foreground">{t('rtlPolish.title')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('rtlPolish.hint')}</p>
-        </div>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={branding.theme.rtlPolish === true}
-            onChange={e =>
-              onChange({
-                ...branding,
-                theme: { ...branding.theme, rtlPolish: e.target.checked },
-              })
-            }
-            className="h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span className="text-xs text-foreground">{t('rtlPolish.enableLabel')}</span>
-        </label>
-      </div>
-
       {/* ── Uppercase styling ─────────────────────────────────────────────── */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <div
+        data-theme-toggle="uppercase"
+        className="space-y-3 rounded-lg border border-border bg-card p-4"
+      >
         <div>
           <p className="text-sm font-semibold text-foreground">{t('uppercaseStyle.title')}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('uppercaseStyle.hint')}</p>
