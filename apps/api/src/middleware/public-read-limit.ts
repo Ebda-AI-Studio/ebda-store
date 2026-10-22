@@ -88,3 +88,18 @@ export function publicReadLimit(exactLimiters: RequestHandler): RequestHandler {
       .catch(() => exactLimiters(req, res, next));
   };
 }
+
+/**
+ * Routes that never open the per-request tenant transaction (Ruling LAZY-TX-1): an anonymous
+ * GET/HEAD of exactly `/categories` or `/tags` with no query at all. A KV hit needs no database;
+ * the cache fill reads through `readInStoreContext` in its own short tenant transaction. Anything
+ * else, and every authenticated or cookie-bearing request, keeps the request transaction.
+ */
+export function skipsRequestTransaction(req: Request): boolean {
+  const m = req.method.toUpperCase();
+  if (m !== 'GET' && m !== 'HEAD') return false;
+  if (req.headers.authorization || req.headers.cookie) return false;
+  if (req.headers['x-search-query'] !== undefined) return false;
+  if (Object.keys(req.query ?? {}).length > 0) return false;
+  return /^\/(categories|tags)\/?$/.test(req.path ?? '');
+}

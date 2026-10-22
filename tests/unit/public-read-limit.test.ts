@@ -17,6 +17,7 @@ vi.mock('../../apps/api/src/utils/store-helpers', () => ({
 import {
   publicReadLimit,
   isAnonymousPublicRead,
+  skipsRequestTransaction,
 } from '../../apps/api/src/middleware/public-read-limit';
 
 function counter(limit: number) {
@@ -272,5 +273,28 @@ describe('wiring', () => {
     const sec = readFileSync(join(__dirname, '../../apps/api/src/middleware/security.ts'), 'utf8');
     expect(sec).toMatch(/max: 300,/);
     expect(sec).toMatch(/PUBLIC_TENANT_RATE_LIMIT_PER_MIN\) \|\| 6000/);
+  });
+});
+
+describe('skipsRequestTransaction (Ruling LAZY-TX-1): exactly /categories and /tags, anonymous, no query', () => {
+  const base = { method: 'GET', headers: {}, query: {} };
+  it.each([
+    [{ ...base, path: '/categories' }, true],
+    [{ ...base, path: '/categories/' }, true],
+    [{ ...base, path: '/tags' }, true],
+    [{ ...base, method: 'HEAD', path: '/tags' }, true],
+    [{ ...base, path: '/products' }, false],
+    [{ ...base, path: '/products/x' }, false],
+    [{ ...base, path: '/categories/x' }, false],
+    [{ ...base, path: '/categories', query: { x: '1' } }, false],
+    [{ ...base, path: '/tags', query: { name: 'oily' } }, false],
+    [{ ...base, path: '/categories', headers: { authorization: 'Bearer x' } }, false],
+    [{ ...base, path: '/categories', headers: { cookie: 'a=b' } }, false],
+    [{ ...base, path: '/categories', headers: { 'x-search-query': 'a' } }, false],
+    [{ ...base, method: 'POST', path: '/categories' }, false],
+    [{ ...base, path: '/size-charts' }, false],
+    [{ ...base, path: '/store/resolve' }, false],
+  ])('%j -> %s', (req, want) => {
+    expect(skipsRequestTransaction(req as any)).toBe(want);
   });
 });
