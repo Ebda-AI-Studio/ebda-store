@@ -9,7 +9,7 @@
  * document the API will 422.
  */
 import { sectionFromPreset } from '../adapter';
-import { getSectionDefinition } from '../registry';
+import { getSectionDefinition, sectionAllowedOnPage } from '../registry';
 import type { BlockNode, PageDefinition, SectionGroupKey, SectionNode } from '../schema';
 import type { Viewport } from '../viewports';
 
@@ -46,7 +46,11 @@ export interface ReduceResult {
     | 'NOT_FOUND'
     | 'BLOCK_NOT_SUPPORTED'
     | 'GROUP_MISMATCH'
-    | 'UNKNOWN_TYPE';
+    | 'UNKNOWN_TYPE'
+    /** The page's main content cannot be removed, hidden or duplicated (it can be moved). */
+    | 'PINNED'
+    /** The section type does not belong on this page (a hero on the cart page). */
+    | 'PAGE_MISMATCH';
   /** Id of the section/block the action created, for selection. */
   createdId?: string;
 }
@@ -166,6 +170,7 @@ export function reduceDocument(doc: PageDefinition, action: DocumentAction): Red
       const d = getSectionDefinition(action.sectionType);
       if (!d) return { doc, rejected: 'UNKNOWN_TYPE' };
       if (d.group !== action.list) return { doc, rejected: 'GROUP_MISMATCH' };
+      if (!sectionAllowedOnPage(d, doc.pageKey)) return { doc, rejected: 'PAGE_MISMATCH' };
       if (countType(doc, d.type) >= d.maxCount) return { doc, rejected: 'CARDINALITY' };
       const id = uniqueSectionId(doc, d.type);
       const node = sectionFromPreset(d.type, action.presetIndex, id);
@@ -176,6 +181,7 @@ export function reduceDocument(doc: PageDefinition, action: DocumentAction): Red
     case 'removeSection': {
       const at = locateSection(doc, action.id);
       if (!at) return { doc, rejected: 'NOT_FOUND' };
+      if (getSectionDefinition(at.node.type)?.pinned) return { doc, rejected: 'PINNED' };
       return {
         doc: withList(
           doc,
@@ -189,6 +195,7 @@ export function reduceDocument(doc: PageDefinition, action: DocumentAction): Red
       if (!at) return { doc, rejected: 'NOT_FOUND' };
       const d = getSectionDefinition(at.node.type);
       if (!d) return { doc, rejected: 'UNKNOWN_TYPE' };
+      if (d.pinned) return { doc, rejected: 'PINNED' };
       if (countType(doc, d.type) >= d.maxCount) return { doc, rejected: 'CARDINALITY' };
       const id = uniqueSectionId(doc, d.type);
       const copy: SectionNode = { ...clone(at.node), id };
@@ -203,8 +210,12 @@ export function reduceDocument(doc: PageDefinition, action: DocumentAction): Red
       if (!at) return { doc, rejected: 'NOT_FOUND' };
       return { doc: withList(doc, at.list, move(lists(doc)[at.list], at.index, action.toIndex)) };
     }
-    case 'setSectionHidden':
+    case 'setSectionHidden': {
+      const at = locateSection(doc, action.id);
+      if (action.hidden && at && getSectionDefinition(at.node.type)?.pinned)
+        return { doc, rejected: 'PINNED' };
       return updateSection(doc, action.id, n => ({ ...n, hidden: action.hidden }));
+    }
     case 'setSectionSetting':
       return updateSection(doc, action.id, n => ({
         ...n,

@@ -150,6 +150,8 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     BLOCK_NOT_SUPPORTED: t('rejected.block'),
     NOT_FOUND: t('rejected.notFound'),
     UNKNOWN_TYPE: t('rejected.unknown'),
+    PINNED: t('rejected.pinned'),
+    PAGE_MISMATCH: t('rejected.page'),
   };
   const dispatch = useCallback(
     (action: DocumentAction, coalesceKey?: string) => {

@@ -10064,7 +10064,9 @@
       "group": "This section belongs in another part of the page.",
       "block": "This section does not accept that block.",
       "notFound": "That item no longer exists.",
-      "unknown": "Unknown section type."
+      "unknown": "Unknown section type.",
+      "pinned": "This is the core of the page. You can move it, but not delete or hide it.",
+      "page": "This section does not belong on this page."
     },
     "families": {
       "label": "Templates",
