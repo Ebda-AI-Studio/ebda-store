@@ -1,0 +1,310 @@
+# Visual Editor Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. LEAN mode (Sonnet implementers, one review per task, minors batched at PR end). No STOP points for Ahmad.
+
+**Goal:** Ahmad, 2026-10-22: the Ebda merchant editor is ONE Shopify-style visual editor. Merchants work on the real storefront canvas by clicking, dragging and typing. They do not scroll a form and pick things by hand. `/stores/[id]/builder` becomes that editor. Every capability that only the form-like `/stores/[id]/page-builder` has today moves into it. After that the old routes redirect, the hubs show one "editor" entry, and the form page is deleted, gated by a parity test list.
+
+**Architecture:** No new editor; the visual builder grows. The canvas (`builder/_components/Canvas.tsx`, iframe of the real storefront) and the storefront overlay (`apps/web/src/builder/preview/EditorOverlay.tsx`) already speak `ebda-builder:v1` (`packages/shared/src/builder/editor/protocol.ts`). The pure reducer (`editor/document-reducer.ts`), history (`editor/history.ts`), draft and publish API (`apps/api/src/services/page-builder.service.ts`) and generated settings (`SettingsPanel`, `ThemeSettingsPanel`) already exist. This plan:
+
+1. turns the overlay into the main editing surface: select anything, show hover name chips, edit text and images in place, use a per-section toolbar, drag on the canvas, and insert with "+" between sections;
+2. ports the page-builder-only controls into the generated panels;
+3. adds a page switcher so the canvas can show home, product, collection, cart and the content pages;
+4. absorbs `docs/plans/2026-10-21-template-editor-pass.md` (EP), which is not executed yet (no `scripts/editor-audit/` on main as of 2026-10-22). Its look-switch preview, `shownFor`, no-op removal, flow order, chrome overrides and ⌘K move into this plan, and EP Rulings 1 to 5 stand;
+5. retires `/page-builder` behind a parity test list.
+
+Every saved document keeps working. The page builder already saves into the same `store_page_revisions` home document (`apps/admin/src/lib/page-builder-save.ts` → `PUT …/builder/pages/home/draft` + `publish`), so no data migration is needed. The one new persisted shape is an optional `definition.typography` draft patch, and when it is absent nothing changes.
+
+**Tech Stack:** Next.js 16 App Router (apps/admin, apps/web), Express on Cloudflare Workers (apps/api), Zod in `@ebda/shared`, dnd-kit (already a dependency), Vitest + Testing Library, Playwright + axe-core (`playwright.builder.config.ts`, `playwright.editor-live.config.ts`).
+
+**Read with it:** `CLAUDE.md` (§ Platform-level fixes, § UI/UX standing rules), `docs/architecture/store-theme-flags.md` (canonical owners, ThemeTab ceiling 7, admin mirrors storefront order), `docs/architecture/admin-search.md`, `docs/plans/2026-10-21-template-editor-pass.md` (absorbed), `docs/plans/2026-10-21-delete-old-force-skins.md` (touches page-builder, see § Dependencies), `docs/ebda/templates/quality-bar.md` (§ independent audits, Ruling B1-70), `AHMAD-TASTE-PROFILE.md`.
+
+## Finish line
+
+- **Must work:** a merchant on a 390 px Arabic phone or a 1280 px laptop can do all of the following without opening a form page. Click any text, image, section, block, header or footer on the canvas to select it. Type over a heading in Arabic. Swap a hero image. Drag a section to a new place. Insert a section between two others. Switch to the product, collection, cart or a content page. Switch the look with a preview. Undo every one of these. Autosave the draft, then publish.
+- **Exercised:** `tests/builder-e2e/*.e2e.ts` (mock API + fake canvas), `tests/editor-live-e2e/editor-live.e2e.ts` (real admin + web + API on a local DB), the protocol unit tests, `tests/unit/visual-editor-parity.test.ts`, and the RTL/a11y walk.
+- **Must NOT change:** checkout, pricing, inventory, permissions, tenant isolation, the storefront render output of any store outside the preview, published documents and revisions, `layout_settings` back-write semantics, the iframe origin and source checks, `sandbox="allow-scripts allow-same-origin allow-forms"`, and the Dahab skin.
+- **Done:** every row of the gap audit below reads `has`, or it is accepted with a Ruling. `visual-editor-parity.test.ts` is green with zero `classic-only` rows. `/page-builder`, `/hero`, `/navigation` and `/pages` redirect to `/builder`. The hubs show one editor entry, and `apps/admin/src/app/stores/[id]/page-builder/` is deleted. The independent UX and a11y audits score at least 28/40 with 0 P0 and 0 P1. Typecheck, lint, unit, integration and the builder e2e suites exit 0, with each exit code captured on its own command.
+
+## Global Constraints
+
+- Every EP Global Constraint applies unchanged: Arabic-first RTL, the taste bar, ThemeTab ceiling 7, admin mirrors the storefront order, platform-level rules, looks are data, tenant guard, ColorField everywhere, a settings-registry entry for every new control, docs parity in the same task, commit trailers and gate exit codes. They are not repeated here.
+- **One writer.** Every canvas action becomes an existing `DocumentAction` through `BuilderEditor`'s `dispatch`, so undo, coalescing, autosave and conflict handling come for free. The overlay never mutates the document. It only asks the parent.
+- **Draft only.** Nothing the editor does reaches the live store before Publish. Two page-builder writes break this rule today: Smart Palette and typography `PUT /theme` and `PUT /typography` directly. Both move onto the draft (Ruling VE-4).
+- **No new card render path** (Ruling B1-1). The editor changes no card code.
+- Commits: `git add <explicit paths>`, lowercase commitlint subjects, never `--no-verify`. Trailers:
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
+  `Claude-Session: https://claude.ai/code/session_01GeHFETcBQ3jaGrN6Q6L6W5`
+
+---
+
+## 1. Gap audit: Shopify theme editor vs `/builder` (verified from code, 2026-10-22)
+
+| #   | Capability                                                                                                        | Status      | Evidence                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 1   | Click any element on the canvas to select its section/block and open its settings                                 | **partial** | `EditorOverlay.tsx` `onClick` posts `select` with `sectionId` only; `sectionIdOf` reads `data-builder-id`, which `PageRenderer.tsx:1199` `mark()` puts on **template-group body sections only**. Blocks (hero slides, trust items) are never selected from the canvas, although the protocol allows `blockId`. Header and footer are not selectable.                                 |
+| 2   | Hover outlines and labels                                                                                         | **partial** | dashed gold outline in `EditorOverlay.tsx` `outline('hover')`; **no name label**; the tree mirrors hover via `hoveredId`                                                                                                                                                                                                                                                             |
+| 3   | Drag to reorder on the canvas itself                                                                              | **missing** | reorder exists only in `SectionTree.tsx` (dnd-kit `useSortable`, Alt+Arrow); the overlay has no drag                                                                                                                                                                                                                                                                                 |
+| 4   | "Add section" + between sections on the canvas                                                                    | **missing** | `AddSectionDialog` opens only from the tree (`onAddSection={setAddTo}`); the reducer already accepts `addSection.index` (`document-reducer.ts:21-26`)                                                                                                                                                                                                                                |
+| 5   | Inline text editing on the canvas, Arabic RTL included                                                            | **partial** | double-click → `contentEditable` → `patch-text`. `inlineSettingFor` (`overlay-logic.ts`) edits **section** settings only, never blocks. It needs an explicit `data-builder-setting` (7 of 10 files in `apps/web/src/builder/sections/`, 0 in `templates/`) or an exact-text match. It sets no `dir` per field, has no IME `isComposing` guard on Enter, and does not sanitize paste. |
+| 6   | Inline image swap                                                                                                 | **missing** | no image path in the overlay; images change only through `MediaPicker` in `SettingsPanel`                                                                                                                                                                                                                                                                                            |
+| 7   | Undo / redo                                                                                                       | **has**     | `editor/history.ts` (cap 100, coalesce 800 ms), ⌘Z / ⇧⌘Z in `BuilderEditor.tsx`, buttons `data-testid="undo                                                                                                                                                                                                                                                                          | redo"`; theme and chrome edits go through `replaceDocument`/`patchDocument`, which push history |
+| 8   | Autosave draft vs publish                                                                                         | **has**     | `useBuilderDocument.ts` `AUTOSAVE_MS = 1200`, 409 `REV_CONFLICT` → conflict banner (take theirs or keep mine), publish flushes the save first; service in `page-builder.service.ts`                                                                                                                                                                                                  |
+| 9   | Device preview                                                                                                    | **has**     | desktop 1280 / tablet 820 / mobile 390 radiogroup; `VIEWPORT_RANGES[viewport].previewPx`; scaled to fit (`Canvas.tsx`)                                                                                                                                                                                                                                                               |
+| 10  | Page switcher (home, product, collection, cart, custom pages)                                                     | **missing** | `Canvas.tsx` src is always `/`; preview token minted for `pages/home`; `SUPPORTED_PAGES = new Set([HOME_PAGE_KEY])` (`page-builder.routes.ts:44`); `BuilderPreviewShell` is mounted only by `HomePageBody`                                                                                                                                                                           |
+| 11  | Header / footer / navigation editing in place                                                                     | **partial** | `ChromeContentPanel.tsx` edits nav, utility bar and footer columns into the draft (`definition.chrome`). They are not selectable on the canvas (see 1), and the footer bottom bar (`siteSettings.bottomBar`) is page-builder only.                                                                                                                                                   |
+| 12  | Template and look switching from the editor                                                                       | **partial** | top-bar `<select>` of `TEMPLATE_FAMILIES` + `window.confirm` (`BuilderEditor.tsx` `applyFamily`), client-side, no preview; looks switch on `/template` (`LookSwitchDialog`), not in the editor                                                                                                                                                                                       |
+| 13  | Keyboard accessibility                                                                                            | **partial** | the tree has the dnd-kit `KeyboardSensor` + Alt+Arrow + move buttons, and tabs use `role="tab"`. The canvas content cannot be reached by keyboard at all. Mobile drawers have no focus trap or focus return, and the toolbar glyphs (↶ ↷) rely on `aria-label`.                                                                                                                      |
+| 14  | Performance on a 16 GB laptop and a mid-range phone                                                               | **partial** | not measured. Every keystroke posts the WHOLE `PageDefinition` (`Canvas.tsx` effect on `doc`), and the iframe re-renders all of `HomePageContent`. There is no budget test.                                                                                                                                                                                                          |
+| 15  | Per-section canvas toolbar (move, duplicate, hide, delete)                                                        | **missing** | these exist only as tree row buttons in `SectionTree.tsx`                                                                                                                                                                                                                                                                                                                            |
+| 16  | Revision history + restore                                                                                        | **has**     | `RevisionsPanel.tsx`, `GET/POST …/revisions                                                                                                                                                                                                                                                                                                                                          | rollback`                                                                                       |
+| 17  | Per-viewport visibility and responsive overrides                                                                  | **has**     | `setViewportHidden` / `setViewportSetting`, `SettingsPanel` per-viewport mode                                                                                                                                                                                                                                                                                                        |
+| 18  | Global theme settings (colours, type, fonts, dividers, palette)                                                   | **partial** | `ThemeSettingsPanel.tsx` renders `color`, `select`, `checkbox` and `text`. Everything else shows `classicOnly`, including theme `dividers`. Font library upload (`FontsCard`), global typography zones (`ZoneEditor`) and `SmartPaletteModal` exist only in the page builder.                                                                                                        |
+| 19  | Site-wide / page-type settings (card defaults, PLP, PDP, categories, locations, cart, checkout, filters, reviews) | **missing** | `siteSettings` (`SITE_SETTING_KEYS`, `adapter.ts:83`) has no UI in `/builder` (0 references under `builder/`)                                                                                                                                                                                                                                                                        |
+
+**Headline: 5 has · 8 partial · 6 missing (19 rows).** Missing: 3 canvas drag, 4 canvas "+", 6 inline image swap, 10 page switcher, 15 canvas section toolbar, 19 site-wide and page-type settings.
+
+## 2. Retiring the form page builder
+
+### 2.1 What only `/page-builder` has today (enumerated from `apps/admin/src/app/stores/[id]/page-builder/page.tsx`, 5,951 lines)
+
+| ID   | Capability                                                               | Code                                                                          | Data it writes                                                                                     | Goes to (task)                                                                    |
+| ---- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| P-01 | Font library: Google family add + custom font upload                     | `FontsCard` (`/api/v1/uploads/font`)                                          | `stores.typography.fonts` via `PUT /typography` (LIVE)                                             | Theme pane "Fonts" (T7)                                                           |
+| P-02 | Global typography zones                                                  | `ZoneEditor`, `normalizeZoneColors`                                           | `stores.typography.zones` (LIVE)                                                                   | Theme pane, draft (T7)                                                            |
+| P-03 | Per-section typography override                                          | `SectionTypographyBlock`                                                      | section setting `typography`                                                                       | `SettingsPanel` field (today `editInClassic`) (T6)                                |
+| P-04 | Section dividers (per section + theme)                                   | `SectionDividersBlock`, `DividerStyleSelect`                                  | section `dividers`, theme `dividers`                                                               | `SettingsPanel` + theme pane (today `classicOnly`) (T6)                           |
+| P-05 | Section colour scheme, density, text scale                               | `SchemeSelect`, `DensitySelect`, `TextScaleSelect`                            | section settings (pass through the adapter; not in the registry)                                   | registry settings, Design mode (T6)                                               |
+| P-06 | Section padding / max width, kicker + subtitle                           | `SectionPaddingMaxWidthBlock`, `KickerSubtitleControls`, `SectionTitleFields` | section settings                                                                                   | registry settings (T6)                                                            |
+| P-07 | Product-card controls, everywhere and per section                        | `ProductCardControls` (97 refs to `productCardDefaults`)                      | `siteSettings.productCardDefaults`, newArrivals and bestSellers settings                           | "Product cards" in the page settings + section Design (T8)                        |
+| P-08 | Filter sidebar                                                           | `sections.filterSidebar` card                                                 | `siteSettings.filterSidebar`                                                                       | Collection page settings (T8)                                                     |
+| P-09 | Review section                                                           | `sections.reviewSection` card                                                 | `siteSettings.reviewSection`                                                                       | Product page settings (T8)                                                        |
+| P-10 | Products / PDP / categories / locations / checkout / cart page cards     | `pageCards.*`                                                                 | `siteSettings.{productsPage,productDetailPage,categoriesPage,locationsPage,checkoutPage,cartPage}` | page switcher + page settings (T8)                                                |
+| P-11 | Footer bottom bar                                                        | `footer.bottomBarTitle` card                                                  | `siteSettings.bottomBar`                                                                           | Footer selection (T8)                                                             |
+| P-12 | Sizing                                                                   | `sizing`                                                                      | `siteSettings.sizing`                                                                              | Theme pane "Layout" (T8)                                                          |
+| P-13 | Smart Palette                                                            | `SmartPaletteModal` → `pendingThemeUpdates` → `PUT /theme` (LIVE)             | `stores.theme`                                                                                     | Theme pane, draft (T7)                                                            |
+| P-14 | AI section fill                                                          | `AiSectionFillButton` → `POST /stores/:id/ai/section-content`                 | section copy                                                                                       | Section toolbar "write with AI" (T6)                                              |
+| P-15 | Hero slides (single / slider mode, slide editor, recommended size hints) | `SlidesEditor`, `recommendedSizeTextForTemplate`                              | `hero` section + slide blocks                                                                      | already editable as blocks; the size hint moves into `MediaPicker` (T3)           |
+| P-16 | Categories layout buttons                                                | `CategoryLayoutButtons.tsx` (26 `updateSection('categories'` writes)          | categories settings                                                                                | parity-checked against the registry (T5)                                          |
+| P-17 | Nav menu, utility bar, footer link columns                               | `NavMenuEditor`, `FooterLinksEditor`                                          | `stores.settings` (LIVE on Save)                                                                   | **already in `/builder`** (`ChromeContentPanel`, draft). Parity is verified only. |
+| P-18 | Extra product carousels                                                  | `ExtraCarouselCard`, `ManualProductPicker`                                    | `layout.extraCarousels`                                                                            | **already** `product-carousel` sections + `ProductListPicker`. Verified only.     |
+| P-19 | Unsaved preview (`POST /layout/preview` + `?_layoutDraft=`)              | toolbar                                                                       | Redis token                                                                                        | replaced by the live canvas, retired with the page (T12)                          |
+
+Routes that redirect to it today: `/hero` (`hero/page.tsx`), `/navigation` (`navigation/page.tsx`), `/pages` (`pages/page.tsx`, the old footer-links editor; it is not custom pages). Entry points: `hubs.ts:96-109` (`visualBuilder` + `pageBuilder` tabs), `ThemeTab.tsx:181`, `SettingsPanel.tsx:220,524` (`editInClassic`), `ThemeSettingsPanel.tsx:160` (`classicOnly`), the page-builder toolbar `tryNewBuilder`, and `builder/page.tsx:6` comment.
+
+### 2.2 Saved data
+
+- Same documents. The page builder writes the home document through the builder API (`saveLayoutAsPage` → draft + publish), and every section setting it writes (P-03 to P-06) already round-trips because `legacyToSection` copies all legacy keys into `settings`. `siteSettings` are carried verbatim. **No migration** for these.
+- Typography (P-01, P-02) and Smart Palette (P-13) write live store columns today. In the editor they ride the draft (Ruling VE-4): `definition.theme` already carries the palette patch (THEME-DRAFT-1), and a new optional `definition.typography` patch `{ fonts?, zones? }` is merged over `stores.typography` by `applyPublishedLayout` in the same statement as `layout_settings`. An absent patch means today's behaviour. Older revisions have none, and a rollback to one leaves typography alone (the same contract as theme).
+- Old bookmarks: `/page-builder`, `/hero`, `/navigation` and `/pages` → `/stores/:id/builder` (with `?select=hero`, `?select=header` and `?select=footer` where a section is implied).
+
+### 2.3 Parity test list (gate for deleting the page): `tests/unit/visual-editor-parity.test.ts`
+
+The test reads `scripts/editor-audit/classic-manifest.json`. The manifest is generated by Task 5 from the page-builder source: every `updateSection('<key>'` field, every `siteSettings` key, and every API endpoint the page calls. The test asserts:
+
+1. Every manifest field has a builder control. The test finds it by `registry` / `THEME_SETTINGS_SCHEMA` / `PAGE_SETTINGS_SCHEMA` id. No `classic-only` row is allowed.
+2. Every endpoint is either called by the builder, or listed as retired with a reason (P-19 only).
+3. The same input document, edited through each field in the builder reducer, produces the same `definitionToLayout` output as the page-builder's `updateSection` for that field. This is a round-trip property over each field's option set.
+4. P-01, P-02 and P-13 write only the draft (a spy on `apiPut` asserts that no `/theme` or `/typography` call happens before publish).
+5. `rg -n "page-builder|editInClassic|classicOnly|tryNewBuilder" apps/admin/src` is empty, except for the redirect files.
+
+## 3. Rulings made by this plan (appended to `docs/RULINGS.md` under `## 2026-10-22 — Visual editor (VE-*)`, each at the task that makes it)
+
+- **VE-1: the canvas is the primary surface, and the panes serve it.** Every editable thing on the storefront is selectable on the canvas. The tree stays as an outline and the keyboard path. Evidence: Ahmad 2026-10-22, gap rows 1, 3, 4 and 6. Cost if wrong: panes stay heavier than the canvas, and merchants keep scrolling forms.
+- **VE-2: protocol growth is additive inside `ebda-builder:v1`. Child→parent requests are intents, never data.** The overlay asks (`select`, `section-op`, `move`, `request-add`, `request-media`, `patch-text`). The parent re-validates each intent against the current document and the registry, then dispatches. URLs, image keys and HTML never flow child→parent. Admin and web deploy separately, so a new parent tolerates an old child (missing intents just never arrive), and an old child drops an unknown parent message because it fails `parentToChildSchema`. Cost if wrong: one deploy window where canvas actions do nothing. That fails closed.
+- **VE-3: page-type pages (product, collection, cart, checkout, locations) are edited as page settings over the real page in the canvas. They do not become per-page section documents in this plan.** `SUPPORTED_PAGES` stays `home`. The other pages render live data with the draft `siteSettings` applied through the same preview token. Evidence: `siteSettings` is the existing owner of those settings (`adapter.ts:83`), and per-page section templates would need a new document type and storefront renderers for every skin. Cost if wrong: a merchant cannot reorder blocks on the product page yet. That is a follow-up program, not a regression.
+- **VE-4: every edit made in the editor is a draft until Publish, typography and palette included.** It extends THEME-DRAFT-1 with `definition.typography`. Cost if wrong: a merchant expecting an instant font change has to press Publish. That is the same model as every other edit.
+- **VE-5: content pages (`/content/[slug]`, `pages.service.ts` blocks) show in the page switcher with the canvas and inline text for their blocks. Their structure editor stays at `/content/[slug]`, linked from the switcher.** They were never in `/page-builder`, so retirement does not depend on them. Cost if wrong: two places edit a content page until a later pass folds the block editor in.
+- **VE-6: retirement is test-gated, not date-gated.** `/page-builder` is deleted only in the same PR in which `visual-editor-parity.test.ts` turns green with zero `classic-only` rows. Cost if wrong: the form page lives longer than wanted.
+- EP-1 to EP-5 (`2026-10-21-template-editor-pass.md`) are adopted unchanged. EP's tasks are executed here (map in § 6), and that plan is closed as superseded in Task 14.
+
+## 4. Arabic-first, taste, platform and protocol security rules (bind every task)
+
+**Arabic-first RTL**
+
+- Design, test and screenshot the editor chrome and every canvas affordance in Arabic at 390 first, then English at 1280. Use logical properties only (`ms-/me-/ps-/pe-/start-/end-`, `inset-inline-*`). Never use `left`/`right`/`ml-`/`mr-` in new code, including inline styles in `EditorOverlay`.
+- Inline text uses the FIELD's direction, not the page's: a `…Ar` key edits with `dir="rtl"` and any other key with `dir="ltr"`. Set `unicode-bidi: plaintext` while editing, and `lang` to match. Enter never commits during IME composition (`e.isComposing`). Paste inserts plain text (`insertText`), with no HTML. Shift+Enter is a newline only for `textarea` settings.
+- Overlay name chips and the section toolbar anchor at `inset-inline-start` / `inset-inline-end` and mirror in RTL. The "+" insertion line is vertical-direction-agnostic.
+- Arabic is the label source: chip labels come from registry `labelAr` / `labelEn` by admin locale. Copy lives in `apps/admin/messages/{ar,en}.json` and is written as full Egyptian sentences, with short neutral button labels. Labels never truncate mid-word, and text is never smaller than 12 px.
+- Numerals follow the store's `arabicNumerals` theme flag on the canvas. The editor chrome uses the admin locale.
+
+**Taste bar** (EP taste bar + `AHMAD-TASTE-PROFILE.md`)
+
+- No orange. The selection outline stays `BRAND.colors.gold` (solid when selected, dashed on hover). There is one accent, on Publish. Chips and toolbars use the admin surface tokens and `var(--radius)`, with no glassmorphism, gradient text or side-stripe borders.
+- Motion only where it means something: the drag ghost and drop line, and the "+" reveal at 150 ms ease-out. Everything is instant under `prefers-reduced-motion`.
+- Unfilled features render nothing, and each control has at most one helper line. An `impeccable` critique runs before each UI commit.
+
+**Platform-level** (CLAUDE.md § Platform-level fixes)
+
+- One implementation for every store and template. Never branch on slug or tenant id. Canvas markers live in shared code (`PageRenderer`, `builder/sections/*`, `ShopChrome.tsx`) and never in one skin.
+- Every new control gets a `settings-registry.ts` entry + `data-setting-id` (⌘K), in the same commit.
+- Docs parity in the same task: `docs/architecture/store-theme-flags.md` (canonical owners: typography draft, siteSettings UI), `docs/architecture/admin-search.md`, and a new `docs/architecture/visual-editor.md` (protocol table, marker contract, VE rulings).
+
+**Iframe protocol security**
+
+- `acceptMessage` stays the only entry: exact `event.origin` match AND `event.source` identity, on both sides. The parent posts only to `originOf(storefrontUrl)`. The child posts only to an origin from `allowedParentOrigins()` (the same list as CSP `frame-ancestors`, pinned by `builder-preview-canvas.test.tsx`). No wildcard `*` target, ever.
+- Every new message type is a `.strict()` Zod object in `protocol.ts`'s discriminated unions, with ids matching `SECTION_ID_RE`, keys `^[a-zA-Z][a-zA-Z0-9]{0,40}$`, ops as `z.enum`, indexes as `z.number().int().min(0).max(BUILDER_LIMITS…)`, and strings length-capped. `tests/unit/builder-protocol.test.ts` asserts that each new type rejects extra keys, a wrong origin, a wrong source, and an out-of-range index.
+- The parent re-validates semantics before dispatching: the id exists in the CURRENT document, the key is a registry setting of the right type for that section or block, and the list is a legal group. Every action still passes the registry-checked reducer, which already rejects `CARDINALITY` / `GROUP_MISMATCH`.
+- The `sandbox` attribute is unchanged. No `allow-top-navigation` and no `allow-popups`. The preview token stays short-lived and per store. Page-switcher routes reuse it and add no new public surface. The overlay chunk loads only behind `?_preview` + a valid token (`BuilderPreviewShell`), never on a public page. A test asserts that the public HTML of each newly covered route contains no `EditorOverlay`.
+- `contentEditable` reads `innerText`, never `innerHTML`. Values are trimmed and capped at 2048 (the existing contract). The canvas never renders merchant input as HTML.
+
+## 5. Tasks
+
+Order puts merchant value first: T1 and T2 ship click-to-select and inline text; T3 and T4 finish direct manipulation; T5 to T8 port the page-builder; T9 to T11 absorb EP; T12 retires; T13 hardens; T14 audits and closes.
+
+### File map
+
+| File                                                                                                                                                         | Responsibility                                                                                             | Task               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------ |
+| `packages/shared/src/builder/editor/protocol.ts`                                                                                                             | new strict intents                                                                                         | 1, 3, 4, 8         |
+| `packages/shared/src/builder/editor/canvas-targets.ts` (new)                                                                                                 | per-section-type inline text / image target map (kept OUT of `registry.ts` to avoid Dahab merge conflicts) | 2, 3               |
+| `apps/web/src/builder/preview/{EditorOverlay,overlay-logic,BuilderPreviewShell}.tsx`                                                                         | selection, chips, inline edit, toolbar, drag, "+"                                                          | 1–4                |
+| `apps/web/src/builder/preview/CanvasToolbar.tsx`, `InsertLine.tsx` (new)                                                                                     | canvas affordances                                                                                         | 4                  |
+| `apps/web/src/builder/render/PageRenderer.tsx` (`mark()`), `apps/web/src/builder/sections/*.tsx`, `apps/web/src/components/ShopChrome.tsx`                   | `data-builder-id` / `-block` / `-setting` / `-image` markers (editorMode only)                             | 1–3                |
+| `apps/admin/src/app/stores/[id]/builder/_components/{BuilderEditor,Canvas,SettingsPanel,ThemeSettingsPanel,MediaPicker,SectionTree}.tsx`                     | intent handling, ported fields, page switcher                                                              | 1–11               |
+| `apps/admin/src/app/stores/[id]/builder/_components/{PageSwitcher,PageSettingsPanel,FontsField,TypographyZonesField,DividersField,LookSwitchPane}.tsx` (new) | ported capabilities                                                                                        | 6–9                |
+| `packages/shared/src/builder/{settings-schema,registry,schema,theme-draft}.ts`, `page-settings-schema.ts` (new)                                              | P-03..P-12 fields, `definition.typography`                                                                 | 6–8                |
+| `apps/api/src/services/page-builder.service.ts`, `apps/api/src/routes/page-builder.routes.ts`                                                                | typography draft promote; preview token for page routes                                                    | 7, 8               |
+| `apps/web/src/app/{products/[slug],categories/[slug],cart,checkout,locations}/…` preview hook                                                                | mount `BuilderPreviewShell`-style overlay under token                                                      | 8                  |
+| `scripts/editor-audit/*`, `tests/unit/visual-editor-parity.test.ts`                                                                                          | EP matrix + classic manifest                                                                               | 5, 10              |
+| `apps/admin/src/components/admin-layout/hubs.ts`, `stores/[id]/{hero,navigation,pages,page-builder}/page.tsx`, `branding/_components/ThemeTab.tsx`           | retirement                                                                                                 | 12                 |
+| `tests/builder-e2e/*.e2e.ts`, `tests/editor-live-e2e/*`, `playwright.builder.config.ts`                                                                      | flows, perf, a11y                                                                                          | every task, 13, 14 |
+
+---
+
+### Task 1: Click to select anything, with hover name chips
+
+**Files:** `protocol.ts` (no new type; `hover` gains optional `blockId`), `PageRenderer.tsx` `mark()`, `builder/sections/*.tsx` (block wrappers get `data-builder-block`), `ShopChrome.tsx` (wrap the header and footer slots with `data-builder-id` = the document's header/footer section ids, editorMode only), `overlay-logic.ts` (`targetOf(el) → { sectionId, blockId? }`), `EditorOverlay.tsx` (chip), `BuilderEditor.tsx`.
+**Interfaces:** `targetOf(el: ElementLike): { sectionId: string; blockId?: string } | null`. Chip text = `labelFor(doc, target, locale)` from `getSectionDefinition(type).label{Ar,En}` (+ block label).
+
+- [ ] **Step 1: Failing tests.** `tests/unit/builder-overlay-target.test.ts`: (a) a click inside a hero slide resolves `{ sectionId: 'hero-…', blockId: 'slide-2' }`; (b) a click in the header resolves the header section id; (c) `labelFor` returns the Arabic label in `ar`. `tests/builder-e2e/builder.e2e.ts`: clicking slide 2 on `fake-canvas.html` opens slide 2's settings, and clicking the header opens `ChromeContentPanel`.
+- [ ] **Step 2: Run.** `npx vitest run tests/unit/builder-overlay-target.test.ts; echo "exit=$?"` → FAIL.
+- [ ] **Step 3: Implement.** Add the markers. They are `display: contents` wrappers in editorMode only, and the public render is byte-identical (pinned by `builder-homepage-characterization.test.tsx` staying green unchanged). `onClick` posts `select { sectionId, blockId }`, and the chip renders at the box's `inset-inline-start`, above the box. The selection scrolls into view in the tree.
+- [ ] **Step 4: Gates.** Unit + `npx playwright test -c playwright.builder.config.ts; echo "exit=$?"`. Run the impeccable critique on the chip (Arabic at 390).
+- [ ] **Step 5: Commit** → `feat(editor): select blocks, header and footer on the canvas with name chips`.
+
+### Task 2: Inline text editing v2 (blocks, Arabic RTL, IME, paste)
+
+**Files:** `canvas-targets.ts` (new: `TEXT_TARGETS: Record<sectionType, { section: string[]; blocks?: Record<blockType, string[]> }>` derived from registry `text`/`textarea` settings, so there is no second source of truth), `overlay-logic.ts` (`inlineSettingFor` → `inlineTargetFor(el, doc, target, locale) → { key, dir, multiline } | null`, block-aware), `builder/sections/*.tsx` + `PageRenderer.tsx` legacy section paths (explicit `data-builder-setting` on every merchant text node, Arabic and English variants), `EditorOverlay.tsx`.
+**Behaviour:** the first click selects. A click on text inside the already-selected section/block enters edit mode (Shopify behaviour), and double-click still works. Enter commits (not while `isComposing`), Escape cancels, Tab commits and moves to the next text target in DOM order, and paste is plain text. While editing: `dir` per field, `unicode-bidi: plaintext`, and a gold caret outline. Commit posts `patch-text { sectionId, blockId?, key, value }`. The parent re-checks that `key` is a text setting of that node (registry) before dispatching with the coalesce key.
+
+- [ ] **Step 1: Failing tests.** `tests/unit/builder-inline-target.test.ts`: (a) a slide title in `ar` resolves `titleAr`, `dir: 'rtl'`; (b) an English field on an Arabic page resolves `dir: 'ltr'`; (c) an unmarked text that matches two settings returns null (never guess); (d) the parent drops `patch-text` whose key is not a text setting of that block (`BuilderEditor` handler test). The e2e step types Arabic into the hero title on the canvas → the draft PUT carries `titleAr`, and undo restores it.
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** Mark every text node in `apps/web/src/builder/sections/` and the PageRenderer legacy paths. Skin-owned text (`apps/web/src/templates/<skin>/`) falls back to exact-match and is listed in the Task 5 matrix as `marker-pending`. Do NOT edit `templates/dahab/` (§ Dependencies).
+- [ ] **Step 4: Gates** + Arabic screenshot read at 390. **Step 5: Commit** → `feat(editor): edit any text in place, arabic first`.
+
+### Task 3: Inline image swap
+
+**Files:** `protocol.ts` (+ child→parent `request-media { sectionId, blockId?, key }`, strict), `canvas-targets.ts` (`IMAGE_TARGETS`), `data-builder-image="<key>"` markers, `EditorOverlay.tsx` (a "change image" button on the selected image, keyboard-focusable), `BuilderEditor.tsx` (opens `MediaPicker` as a dialog bound to the target), `MediaPicker.tsx` (shows `recommendedSizeTextForTemplate` (P-15) and asks for alt text Ar/En when the setting has an alt sibling).
+**Security:** the child sends only the target. The URL comes from `MediaPicker` on the parent (tenant-scoped `/uploads/list` / `/uploads/image`). The parent validates that the key is an `image` setting of that node.
+
+- [ ] **Step 1: Failing tests.** Protocol: `request-media` with an extra `url` field is rejected. Handler: a key that is not an image setting is dropped. e2e: click the hero image → change → pick → the canvas shows the new image, and undo reverts it.
+- [ ] **Step 2–4:** run → FAIL, implement, gates, screenshot. **Step 5: Commit** → `feat(editor): swap images in place on the canvas`.
+
+### Task 4: Canvas section toolbar, drag to reorder and "+" between sections
+
+**Files:** `protocol.ts` (+ child→parent `section-op { sectionId, op: z.enum(['moveUp','moveDown','duplicate','hide','remove','aiFill']) }`, `move { sectionId, blockId?, toIndex }`, `request-add { list: z.enum(['header','template','footer']), index }`), `CanvasToolbar.tsx`, `InsertLine.tsx`, `EditorOverlay.tsx`, `BuilderEditor.tsx` (maps to `moveSection` / `moveBlock` / `duplicateSection` / `setSectionHidden` / `removeSection` and `AddSectionDialog` with `index`).
+**Behaviour:** the toolbar sits on the selected section's top edge at `inset-inline-end`, with labelled icon buttons. Drag uses a handle in the toolbar (pointer events inside the iframe, a ghost plus a horizontal drop line between sections). Drop posts `move`, and the parent dispatches it (the reducer enforces group and cardinality and toasts rejections, as today). Hovering the gap between two sections reveals "+" (always visible on touch below `md`) → `request-add` → `AddSectionDialog` inserts at that index. Remove asks for confirmation in an in-app dialog, not `window.confirm`, and is undoable. Keyboard: the toolbar buttons are the accessible path. Blocks (hero slides) get the same move/duplicate/remove.
+
+- [ ] **Step 1: Failing tests.** Protocol (enum, index bounds, strict). Handler maps each op to exactly one reducer action. e2e: drag "new arrivals" above "categories" on the canvas → the tree order matches → one undo restores it; "+" between two sections inserts at that index; touch emulation at 390 works.
+- [ ] **Step 2–4.** **Step 5: Commit** → `feat(editor): drag, insert and section actions on the canvas`.
+
+### Task 5: The audit generator: the EP matrix + the classic parity manifest
+
+Absorbs EP Task 1 unchanged (method, statuses, `--check`, CI wiring, `baseline.json`), and adds:
+
+- `scripts/editor-audit/classic-manifest.ts` → `classic-manifest.json`: parses `page-builder/page.tsx` for `updateSection('<key>'` writes with their field names, `siteSettings` keys, theme/typography writes and API paths, then maps each to a builder control id or `classic-only`.
+- the statuses `classic-only` and `marker-pending` (a merchant text or image with no explicit canvas marker on a built skin).
+- `tests/unit/visual-editor-parity.test.ts` (§ 2.3). It starts by listing the expected `classic-only` rows P-01 to P-14 in `baseline.json` and fails if a row exists that is not listed.
+
+- [ ] Steps as EP Task 1 (failing classify tests → generator → committed `docs/ebda/templates/editor-matrix.{md,json}` + `classic-manifest.json` → CI `editor:matrix:check`). **Commit** → `feat(editor): audit generator for template controls and classic parity`.
+
+### Task 6: Port per-section design controls (P-03 to P-06, P-14)
+
+**Files:** `settings-schema.ts` / `registry.ts` (additive: `scheme`, `density`, `textScale`, `paddingY`, `maxWidth`, `kicker`, `subtitle` as typed settings with `group: 'design'`, `shownFor` per EP-1; the keys equal the legacy keys, so the stored values light up with no migration), `SettingsPanel.tsx` (real `typography` and `dividers` editors built from the page-builder components, extracted to `builder/_components/{SectionTypographyField,DividersField}.tsx`; delete `classicHref` / `editInClassic`), toolbar `aiFill` → `POST /stores/:id/ai/section-content` → dispatch the fills as `setSectionSetting` (undoable).
+
+- [ ] **Step 1: Failing tests.** For each field, setting it through the reducer then `definitionToLayout` equals the page-builder's write for the same value (parity property). `SettingsPanel` renders no `editInClassic`. The AI fill dispatches only text settings of that section.
+- [ ] **Step 2–4:** implement, flip the baseline rows to `wired`, critique. **Step 5: Commit** → `feat(editor): section design controls from the classic builder`.
+
+### Task 7: Theme pane: fonts, typography zones, dividers and Smart Palette, all as draft (P-01, P-02, P-04 theme, P-13)
+
+**Files:** `packages/shared/src/builder/schema.ts` (+ optional `typography: { fonts?, zones? }`), `theme-draft.ts` (`typographyPatch` merge + snapshot for rollback), `page-builder.service.ts` `applyPublishedLayout` (merge into `stores.typography` in the same `store.update`; the rollback snapshot mirrors theme), `ThemeSettingsPanel.tsx` (+ `FontsField`, `TypographyZonesField`, `DividersField`; no `classicOnly` branch remains), Smart Palette moved in as a theme-pane action writing `onSave(patch)`.
+**Ruling VE-4 lands here.**
+
+- [ ] **Step 1: Failing tests.** `tests/unit/builder-typography-draft.test.ts`: a draft with a typography patch leaves `stores.typography` untouched until publish, publish merges it, and rolling back to a pre-patch rev leaves typography alone. Integration (`tests/integration/`): publish purges every cache layer once (extends `page-builder-publish-purges-caches.test.ts`). Admin: no `PUT /typography` or `PUT /theme` call happens from the builder before publish.
+- [ ] **Step 2–4.** Docs: `store-theme-flags.md` canonical owners (typography's draft path). **Step 5: Commit** → `feat(editor): fonts, typography and palette in the editor as draft`.
+
+### Task 8: Page switcher + page settings (gap 10, 19; P-07 to P-12)
+
+**Files:** `PageSwitcher.tsx` (top bar: Home · Product · Collection · Cart · Checkout · Locations · content pages; Product and Collection pick a real item, defaulting to the first published one), `Canvas.tsx` (`path` prop; src = `<path>?_preview=…&_builder=…`), `page-settings-schema.ts` (`PAGE_SETTINGS_SCHEMA`: one generated group per `SITE_SETTING_KEYS` entry, fields typed from `storeLayoutSchema`), `PageSettingsPanel.tsx` (end pane when no section is selected on a page-type route; edits `definition.siteSettings` through a new reducer action `setSiteSetting { key, path, value }`), the footer selection shows `bottomBar`, the theme pane shows `sizing`, and `productCardDefaults` appears under "Product cards" on every page. Web: a small `usePreviewOverlay()` used by the product/collection/cart/checkout/locations/content page bodies that mounts `EditorOverlay` + the draft `siteSettings` override under the same token check as `HomePageBody`. API: the preview token stays `pages/home` and is accepted on these routes for the same store only.
+**Ruling VE-3 and VE-5 land here.**
+
+- [ ] **Step 1: Failing tests.** Reducer `setSiteSetting` validates against `storeLayoutSchema.partial()` (the same as `validate.ts:321`). Web: each covered route's public HTML (no token) has no overlay chunk, and with a token for ANOTHER store the overlay does not mount. e2e: switch to Product, toggle the review section → the canvas updates and the draft carries `siteSettings.reviewSection`, and Publish writes `layout_settings` through the existing back-write.
+- [ ] **Step 2–4.** Arabic walk of every page type at 390. **Step 5: Commit** → `feat(editor): page switcher with product, collection, cart and page settings`.
+
+### Task 9: Look and template switching inside the editor, with preview (absorbs EP Task 2)
+
+EP Task 2 executed as written (server `POST /stores/:id/look/preview` via `applyTemplateFamily` + change report, the revision-token conflict, EP-3). The UI lives in the editor: `LookSwitchPane.tsx` replaces the top-bar `<select>` + `window.confirm`, and the proposed draft renders in the SAME canvas (one iframe; "Apply" / "Keep editing" bar). `/template` keeps `LookSwitchDialog` for onboarding and links to the editor.
+
+- [ ] Steps per EP Task 2, plus: no `window.confirm` remains in `builder/` (grep test). **Commit** → `feat(editor): switch look with a live preview in the editor`.
+
+### Task 10: Template-aware controls, no-op removal, storefront flow order, chrome overrides (absorbs EP Tasks 3, 4, 5)
+
+Executed as written in EP, against this plan's panels (including the fields added in T6–T8). The matrix from T5 is the finish line: zero `no-op`, zero `missing`, zero `marker-pending` for built looks, and the ThemeTab ceiling of 7 is held. **Commit(s)** as EP.
+
+### Task 11: ⌘K into the visual editor (absorbs EP Task 6)
+
+EP Task 6, with the deep link `/stores/:id/builder?select=<sectionId|type>&field=<id>&page=<kind>` selecting on canvas + tree + field highlight. Every control added in T1–T10 has a registry entry. **Commit** → `feat(editor): find every editor control with command-k`.
+
+### Task 12: Retire the form page builder (VE-6)
+
+**Precondition:** `visual-editor-parity.test.ts` green with zero `classic-only` rows (T5–T8, T10).
+**Files:** `stores/[id]/{page-builder,hero,navigation,pages}/page.tsx` → server `redirect('/stores/:id/builder' + select)`; delete `page-builder/{CategoryLayoutButtons,ModeButton}.tsx` and the 5,951-line page; `hubs.ts` keeps `/page-builder` in `urlPrefixes` (redirect target highlighting) but `buildTabs` lists ONE `labels.editor` → `/builder` (messages `ar`: "المحرر"); `ThemeTab.tsx:181` link → `/builder`; remove `toolbar.tryNewBuilder`, `editInClassic`, `classicOnly` and the `pageBuilder` / `visualBuilder` messages; `builder/page.tsx` comment; `lib/page-builder-save.ts` + `POST /layout/preview` (P-19) removed if the manifest shows no other caller, otherwise kept with a Ruling; `settings-registry.ts` entries re-pointed.
+
+- [ ] **Step 1: Failing tests.** Each old route redirects (unit on the route modules). `hubs.ts` catalog tabs contain exactly one editor entry. The parity test item 5 grep is empty. `tests/unit/admin-page-builder-*.test.ts` are re-pointed or deleted with the code they cover (listed in the PR).
+- [ ] **Step 2–4.** Blast radius: `page-builder`, `pageBuilder`, `visualBuilder`, `tryNewBuilder`, `editInClassic`, `classicOnly`, `_layoutDraft`, `layout/preview`, `saveLayoutAsPage` across apps, tests, docs, `settings-search-index.generated.json`, the marketing app and the help docs. **Step 5: Commit** → `feat(editor): one editor, the classic page builder redirects to it`.
+
+### Task 13: Keyboard path and performance budget
+
+**Keyboard:** canvas targets reachable without a mouse: the tree is the outline. Pressing `Enter` on a tree row focuses the canvas target. In the canvas, `Tab` / `Shift+Tab` cycle the selected section's text, image and toolbar targets; `Esc` returns focus to the tree; and `Alt+↑/↓` moves the selection. Drawers below `lg` trap focus, return it on close, and close on `Esc`. Toolbar glyphs get visible labels at the `md` breakpoint and up. The live region announces moves ("اتنقل القسم لفوق").
+**Performance:** `Canvas.tsx` coalesces `render` posts to one per animation frame. Canvas-only transient state (hover, chip) never re-renders the admin tree. `PageRenderer` sections are memoized by node identity, so a text edit re-renders one section. Budgets measured in `tests/builder-e2e/perf.e2e.ts`: keystroke → canvas paint p95 < 100 ms on the laptop profile, and < 250 ms under Playwright CPU throttle 4× at 390 (the mid-range phone profile). Admin JS heap after 200 edits < 150 MB. Initial editor interactive < 2.5 s on throttled Fast 4G. Numbers go through `benchmark-vet` before they are reported.
+
+- [ ] **Step 1: Failing tests** (perf spec + axe keyboard spec). **Step 2–4.** **Step 5: Commit** → `perf(editor): frame-coalesced canvas and a full keyboard path`.
+
+### Task 14: Independent UX and a11y audits, RTL walk, rulings, close-out (absorbs EP Tasks 7, 8)
+
+- [ ] **Step 1: RTL walk** (EP Task 7 scenarios + this plan's): select, inline edit Arabic, image swap, canvas drag, "+", page switch to each page type, look switch preview, ⌘K deep link, undo after each. Run it Arabic 390 first, then 1280 Arabic and English at 390, and READ each PNG.
+- [ ] **Step 2: Independent audits.** Two auditors who did not build it: a UX/taste audit against `quality-bar.md` + the taste profile, and an a11y audit (axe + manual keyboard + screen reader labels). **Gate: each independent score ≥ 28/40, 0 P0, 0 P1** (Ruling B1-70: self-scores do not gate). Fix and re-audit until the gate holds.
+- [ ] **Step 3: Rulings + docs.** VE-1 to VE-6 checked complete in `docs/RULINGS.md`. Add a "Superseded by 2026-10-22-visual-editor.md (EP tasks executed there)" banner to the EP plan. Write `docs/architecture/visual-editor.md`, and update `store-theme-flags.md` and `admin-search.md`.
+- [ ] **Step 4: Gates.** `npm run editor:matrix:check`, `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:integration`, `npx playwright test -c playwright.builder.config.ts`, `npm run test:editor-live`, each followed by `echo "exit=$?"` on its own line. Blast-radius sweep stated in the PR body.
+- [ ] **Step 5: After deploy.** Verify against the running admin and web: a demo store's canvas selects a block, inline-edits Arabic, and switches to the product page; `/stores/:id/page-builder` 307s to `/builder`; the web `/health` commit equals main. State what could not be verified (real merchant documents) and why. **Commit** → `docs(editor): rulings, matrix and close-out for the visual editor`.
+
+## 6. EP absorption map
+
+| EP task                               | Here | Change                                                                   |
+| ------------------------------------- | ---- | ------------------------------------------------------------------------ |
+| 1 audit matrix                        | T5   | + `classic-only`, `marker-pending`, classic manifest                     |
+| 2 look preview                        | T9   | preview renders in the editor canvas, not a separate pane on `/template` |
+| 3 `shownFor` + variants               | T10  | also covers T6–T8 fields                                                 |
+| 4 no-op removal, ceiling 7            | T10  | unchanged                                                                |
+| 5 flow order, chrome overrides (EP-4) | T10  | chrome overrides selectable on the canvas header (T1)                    |
+| 6 ⌘K                                  | T11  | deep link selects on the canvas                                          |
+| 7 RTL walk                            | T14  | wider scenario list, independent audits                                  |
+| 8 close-out                           | T14  | + superseded banner on EP                                                |
+
+## 7. Dependencies and coordination
+
+- **Runs in parallel with the Dahab template build.** Do NOT touch `apps/web/src/templates/dahab/**`, `docs/ebda/templates/dahab.md`, the Dahab look entries in `packages/shared/src/looks/*`, `tests/dahab/` or `playwright.dahab.config.ts`. Coordination points:
+  1. **Shared section files** (`apps/web/src/builder/sections/*.tsx`, `PageRenderer.tsx`): T1 and T2 add attribute-only markers, and Dahab may add variants to the same files. The second to merge rebases. Markers never change public output (characterization tests).
+  2. **`registry.ts` / `settings-schema.ts`**: Dahab adds variants and this plan adds fields (T6, T10). Canvas metadata lives in the new `editor/canvas-targets.ts` to keep conflicts small, and the T6 fields are one contiguous block.
+  3. **Dahab skin-owned text and images** have no markers in this plan. The T5 matrix lists them as `pending-template`. After the Dahab PR merges, a follow-up commit inside T10 adds the markers in shared wrappers or, if the skin owns the node, in the Dahab skin with the Dahab owner's review.
+  4. **Header/footer markers** go in `ShopChrome.tsx` (the shared slot), not in any skin header. CLAUDE.md rule 2 (header/footer on every theme + Dahab) is satisfied by construction.
+- **Old-skin deletion plan** (`2026-10-21-delete-old-force-skins.md`, branch `docs/editor-pass-skin-removal`): its PR B edits page-builder code paths keyed on the old skins (`recommendedSizeTextForTemplate`). Whichever lands second drops the conflicting hunk. If T12 has deleted the page, the skin plan's page-builder edits become no-ops.
+- **In-flight editor fixes** (worktrees `fix-editor-mobile-overflow`, `fix-editor-theme-save-draft-only`, `fix-editor-fresh-store-empty-sections`, `fix-inactive-store-editor-preview`): check `git branch -r --no-merged origin/main` at the start of T1 and rebase onto any that have merged. Do not duplicate their fixes.
+- **The final impeccable polish pass** runs on all templates and the editor together after T14 and after the Dahab, Jasmine and Lamma builds merge. It is out of this plan's scope. T14's audits gate only the editor.
+- **Deploy order** (VE-2): web before admin for T1–T4 and T8. An admin running ahead of web just receives no new intents (fails closed).
+
+## Self-review (done while writing)
+
+- Coverage: every gap row maps to a task (1→T1, 2→T1, 3/4/15→T4, 5→T2, 6→T3, 10/19→T8, 11→T1+T8, 12→T9, 13→T13, 14→T13, 18→T7). Every P-row maps to a task, and P-17/P-18 are verify-only.
+- Saved data: same documents and no migration, except the optional `definition.typography` (absent = unchanged; rollback contract the same as theme).
+- No STOP points. Independent audits gate the end (T14). The deletion is test-gated (VE-6).
+- Nothing in the Dahab skin is touched. Public storefront output is unchanged (markers are editorMode only).
