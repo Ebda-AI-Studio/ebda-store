@@ -25,6 +25,27 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
   try {
     const { storeId } = req.params;
 
+    // DEMO-STORE-ONLY response cache (look-switch speed): the showroom's layout (3 DB reads, 1.4-3.5 s
+    // measured cold on prod) is re-read on every look/template switch. CACHE CLASS: BOUNDED-stale
+    // 120 s, residual = a layout edit on a demo store shows up to 2 min late; nothing is invalidated
+    // because only `stores.is_demo` rows are ever written here (below), so a real merchant store can
+    // never be served from, or populate, this key. Draft previews bypass it.
+    const demoKey = `public:layout-demo:${storeId}`;
+    const wantsDraft =
+      typeof req.query._layoutDraft === 'string' && req.query._layoutDraft.length > 0;
+    if (!wantsDraft) {
+      try {
+        const hit = await redis.get<string>(demoKey);
+        if (hit) {
+          res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
+          res.json(typeof hit === 'string' ? JSON.parse(hit) : hit);
+          return;
+        }
+      } catch {
+        // cache down: fall through to the DB path
+      }
+    }
+
     // Load store once (template + layoutSettings) so both the draft and
     // committed paths resolve against the store's template baseline without
     // a second round-trip.
@@ -35,7 +56,7 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
       ? await withStore(hit.id, tx =>
           tx.store.findUnique({
             where: { id: hit.id },
-            select: { layoutSettings: true, template: true, look: true },
+            select: { layoutSettings: true, template: true, look: true, isDemo: true },
           })
         )
       : null;
@@ -111,7 +132,15 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     );
     // Cache lightly at the edge — layout settings change rarely
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
-    res.json({ success: true, data: { layout, definition, rev } });
+    const body = { success: true, data: { layout, definition, rev } };
+    if (store.isDemo === true) {
+      try {
+        await redis.set(demoKey, JSON.stringify(body), 120);
+      } catch {
+        // best effort
+      }
+    }
+    res.json(body);
   } catch (error) {
     next(error);
   }
