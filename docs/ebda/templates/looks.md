@@ -144,3 +144,17 @@ Signup, onboarding, the admin look switcher and the API offer only looks with `s
 | Fresh market `lamma.market`       | logo start, cart bar, stepper, `aisles` (herb, crimson, aubergine, aqua) | `category-grid` **tiles** with `tint: 'aisles'` (three across on a phone), "order again" row, `on_sale` deals row, dense `featured-collection` (5 across / 2 on a phone), trust strip                                           |
 
 The "order again" row is a `product-carousel` with `productSource: 'reorder'` (Ruling B4-8): per customer, it renders nothing for an anonymous or first-time shopper. `tint`, `tabs` and `variant` are look design keys (`LOOK_DESIGN_KEYS`), so a look switch resets them like any other design field and `design: 'keep'` preserves a merchant's change. The registry colours are re-derived from the directions (Ruling B4-2); the per-look token tables with measured ratios are in `lamma.md`.
+
+## Moving a legacy Dahab store (Phase B5, Ruling B5-3)
+
+A store with `template = 'dahab'` and `look IS NULL` is on the retired night + gold + arch skin. It cannot crash and it does not stay night: the `dahab` skin theme is now a neutral base (white page, ink primary), so such a row renders plain until it is moved. **Production has none**: the read-only count `select count(*) filter (where template='dahab'), count(*) filter (where look like 'dahab.%'), count(*) from stores` returned `0 / 0 / 1` on 2026-10-21 (the one store is `modern`); re-run it at merge time. The script is a safety net for a future import or a restored backup.
+
+```bash
+DATABASE_URL=<owner-role url> npx tsx scripts/dahab-demo/migrate-legacy-dahab.mjs            # dry run (default)
+DATABASE_URL=<owner-role url> npx tsx scripts/dahab-demo/migrate-legacy-dahab.mjs --apply --look dahab.worn
+```
+
+- **Dry run first.** It prints every legacy store and, per store, the look-owned theme keys the merchant still has stored (the keep-diff: under `design: 'keep'` they stay as overrides on top of the new look, so a store that kept the night background keeps it until reset).
+- **`--apply`** calls `StoreService.applyLook(id, look, { design: 'keep' })`, the real merchant path (SQL cannot do the field-level keep-diff or the cache purge). A store that already has a builder revision gets a **draft**, never a live change; the merchant publishes it from the admin.
+- **Idempotent**: a store already on any `dahab.*` look is not selected. Refuses a non-loopback database without `--yes-production` (Ahmad approves that run, an agent never does).
+- **Content is the oracle** (`tests/integration/dahab-apply-look.test.ts`, real Postgres, ebda_app + tenant guard): Worn -> Workshop -> Gift box -> Worn leaves every product row, personalisation config, category photo, logo and hero text (AR + EN) identical; a saved page document with `tileShape: 'arch'` still validates and renders as a rectangle; `reset` drops the stored night/gold keys and keeps non-look keys.
