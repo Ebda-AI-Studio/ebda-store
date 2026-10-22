@@ -14,6 +14,7 @@ import { pageMetadata, jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
 import {
   LEGAL_SLUGS,
+  DEMO_STORES,
   SECTION_ORDER,
   LOGIN_URL,
   SIGNUP_URL,
@@ -157,7 +158,12 @@ describe('marketing hero and structure', () => {
     ] as const) {
       const s = html.match(/<section id="demo".*?<\/section>/s)![0];
       expect(s).toContain(title);
-      expect(s).toContain('href="https://storedemo.ebda.app/?look=qamar.atelier"');
+      for (const u of [
+        'https://storedemo.ebda.app/?look=qamar.atelier',
+        'https://storedemo-souq.ebda.app/?look=souq.catalogue',
+        'https://storedemo-jasmine.ebda.app/?look=jasmine.apothecary',
+      ])
+        expect(s).toContain(`href="${u}"`);
       expect(s).not.toContain('target="_blank"');
     }
   });
@@ -449,15 +455,22 @@ describe('marketing honesty', () => {
       expect(s).not.toContain('id="ph-qamar-');
       expect(s).not.toContain('base64');
     }
-    for (const l of ['atelier', 'lookbook', 'vitrine'])
-      for (const lang of ['ar', 'en'])
-        for (const ext of ['avif', 'webp']) {
-          const f = path.resolve(
-            __dirname,
-            `../../apps/marketing/public/looks/live/qamar-${l}-${lang}-780.${ext}`
-          );
-          expect(statSync(f).size).toBeLessThan(60_000);
+    // every live template: 3 looks x ar/en x avif/webp exist and stay small; every look has alt text
+    for (const [tpl, { looks }] of Object.entries(DEMO_STORES))
+      for (const lang of ['ar', 'en'] as const) {
+        const items = COPY[lang].looks.items[tpl];
+        expect(items).toHaveLength(3);
+        for (const [i, l] of looks.entries()) {
+          expect(items[i].alt?.length ?? 0).toBeGreaterThan(30);
+          for (const ext of ['avif', 'webp']) {
+            const f = path.resolve(
+              __dirname,
+              `../../apps/marketing/public/looks/live/${tpl}-${l}-${lang}-780.${ext}`
+            );
+            expect(statSync(f).size).toBeLessThan(60_000);
+          }
         }
+      }
     expect(en).toContain('Every template ships in Arabic and English');
     // the looks fetch is extensionless: Workers Static Assets 307-redirect /looks/x.html to /looks/x
     const showcase = readFileSync(

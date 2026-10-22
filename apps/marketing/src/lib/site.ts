@@ -6,10 +6,20 @@ export const LOCALES: readonly Locale[] = ['ar', 'en'] as const;
 export const SITE_URL = BRAND_MARKETING_URL;
 export const LOGIN_URL = `${BRAND_STORE_APP_URL}/login`;
 export const SIGNUP_URL = `${BRAND_STORE_APP_URL}/signup`;
-/** The live showroom (a real Ebda store, seeded with the Qamar looks). `?look=` previews a look. */
-export const DEMO_STORE_URL = `https://storedemo${BRAND.domains.storeSuffix}`;
-export const demoLookUrl = (look: 'atelier' | 'lookbook' | 'vitrine') =>
-  `${DEMO_STORE_URL}/?look=qamar.${look}`;
+/**
+ * The live demo stores, one per template (host labels mirror `apps/web/src/lib/demo-hosts.ts`), and
+ * the look ids each shows, in the order of the A/B/C looks in `content.ts`. `?look=` previews a look.
+ * Keep in step with `scripts/looks/live-shots.mjs`, which captures these.
+ */
+export const DEMO_STORES = {
+  qamar: { host: 'storedemo', looks: ['atelier', 'lookbook', 'vitrine'] },
+  souq: { host: 'storedemo-souq', looks: ['catalogue', 'night', 'showroom'] },
+  jasmine: { host: 'storedemo-jasmine', looks: ['apothecary', 'bloom', 'clinic'] },
+} as const;
+export type DemoTemplate = keyof typeof DEMO_STORES;
+export const isDemoTemplate = (id: string): id is DemoTemplate => id in DEMO_STORES;
+export const demoLookUrl = (template: DemoTemplate, look: string) =>
+  `https://${DEMO_STORES[template].host}${BRAND.domains.storeSuffix}/?look=${template}.${look}`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
 /** Home path per locale. Arabic is the default and lives at the root. */
