@@ -1,12 +1,12 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1174,
+    "wired": 1169,
     "no-op": 160,
     "missing": 0,
     "pending-template": 0,
     "marker-pending": 76,
-    "classic-only": 21,
+    "classic-only": 16,
     "exempt": 0
   },
   "coverage": {
@@ -38,26 +38,6 @@
   },
   "rows": [
     {
-      "id": "classic|api|PUT /api/v1/stores/:p/theme",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:api",
-      "control": "PUT /api/v1/stores/:p/theme",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-13"
-    },
-    {
-      "id": "classic|api|PUT /api/v1/stores/:p/typography",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:api",
-      "control": "PUT /api/v1/stores/:p/typography",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-01"
-    },
-    {
       "id": "classic|component|DensitySelect",
       "skin": "all",
       "looks": [],
@@ -66,16 +46,6 @@
       "status": "classic-only",
       "evidence": "manifest",
       "capability": "P-05"
-    },
-    {
-      "id": "classic|component|FontsCard",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "FontsCard",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-01"
     },
     {
       "id": "classic|component|ProductCardControls",
@@ -98,16 +68,6 @@
       "capability": "P-05"
     },
     {
-      "id": "classic|component|SmartPaletteModal",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "SmartPaletteModal",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-13"
-    },
-    {
       "id": "classic|component|TextScaleSelect",
       "skin": "all",
       "looks": [],
@@ -116,16 +76,6 @@
       "status": "classic-only",
       "evidence": "manifest",
       "capability": "P-05"
-    },
-    {
-      "id": "classic|component|ZoneEditor",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "ZoneEditor",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-02"
     },
     {
       "id": "classic|site-setting|bottomBar",
@@ -3810,19 +3760,6 @@
       "evidence": "static"
     },
     {
-      "id": "jasmine|theme|dividers",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "theme",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
       "id": "jasmine|theme|fontFamily",
       "skin": "jasmine",
       "looks": [
@@ -7472,19 +7409,6 @@
       ],
       "surface": "theme",
       "control": "cardColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "lamma|theme|dividers",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "theme",
-      "control": "dividers",
       "status": "wired",
       "evidence": "static"
     },
@@ -11142,19 +11066,6 @@
       "evidence": "static"
     },
     {
-      "id": "minimal|theme|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
       "id": "minimal|theme|fontFamily",
       "skin": "minimal",
       "looks": [
@@ -14808,19 +14719,6 @@
       "evidence": "static"
     },
     {
-      "id": "qamar|theme|dividers",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "theme",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
       "id": "qamar|theme|fontFamily",
       "skin": "qamar",
       "looks": [
@@ -18470,19 +18368,6 @@
       ],
       "surface": "theme",
       "control": "cardColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "souq|theme|dividers",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "theme",
-      "control": "dividers",
       "status": "wired",
       "evidence": "static"
     },

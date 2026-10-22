@@ -164,6 +164,7 @@ vi.mock('@api/lib/definer', () => ({
 }));
 
 import { AuthService, eraseNeedsCrmReview } from '@api/services/auth.service';
+import { deleteR2ObjectIfOrphan } from '@api/services/r2-cleanup.service';
 
 const CUSTOMER = {
   id: 'user-erase-1',
@@ -243,6 +244,15 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: CUSTOMER.id, storeId: CUSTOMER.storeId } })
     );
+  });
+
+  it('erasure hands the avatar to the R2 cleanup WITH the user\u2019s own store, so an avatar under a store folder is still deleted', async () => {
+    const avatar = 'https://cdn.example.com/stores/store-1/avatars/me.png';
+    mockPrisma.user.findUnique.mockResolvedValue({ ...CUSTOMER, avatar });
+    await AuthService.eraseAccount(CUSTOMER.id);
+    // A user-scoped erase has no store in scope, and the delete refuses a store-namespaced key it
+    // cannot attribute (Ruling VE-11): the store is taken from the user's own record.
+    expect(deleteR2ObjectIfOrphan).toHaveBeenCalledWith(avatar, { ownerStoreId: 'store-1' });
   });
 
   it('sends an empty oneSignalPlayerIds array when the user has no subscriptions', async () => {

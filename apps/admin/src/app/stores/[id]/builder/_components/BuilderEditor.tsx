@@ -24,6 +24,8 @@ import {
   effectiveTheme,
   getLook,
   addRequestFor,
+  applySmartPalette,
+  applyTypographyPatch,
   aiFillActions,
   aiFillRequestFor,
   aiFillRequestForSection,
@@ -43,6 +45,7 @@ import {
   type DocumentAction,
   type SectionList,
   type StoreTheme,
+  type ZoneOverride,
   type Viewport,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
@@ -50,6 +53,7 @@ import { apiGet, apiPost } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
 import { ConfirmDialog } from './ConfirmDialog';
+import type { FontEntry } from '../../../../../components/section-design/FontsCard';
 import { ImageSwapDialog } from './ImageSwapDialog';
 import { Canvas } from './Canvas';
 import { SectionTree, type Selection } from './SectionTree';
@@ -71,12 +75,21 @@ interface StoreInfo {
 
 type StartTab = 'sections' | 'theme' | 'history';
 
+/** Smart Palette over a document (the modal's `ThemeUpdates` is a plain record of theme keys). */
+const applyPalette = (
+  doc: Parameters<typeof applySmartPalette>[0],
+  palette: Parameters<typeof applySmartPalette>[1],
+  updates: object
+) => applySmartPalette(doc, palette, { ...updates });
+
 export function BuilderEditor({ storeId }: { storeId: string }) {
   const t = useT('builder');
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
   const b = useBuilderDocument(storeId);
   const [store, setStore] = useState<StoreInfo | null>(null);
+  // The LIVE typography (fonts + zones); the draft's patch is applied over it for the theme pane.
+  const [liveTypography, setLiveTypography] = useState<unknown>(null);
   const [token, setToken] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>('mobile');
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -107,7 +120,16 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     [storeId]
   );
 
+  const refreshTypography = useCallback(
+    () =>
+      apiGet<{ typography?: unknown }>(`/api/v1/stores/${storeId}/typography`).then(r => {
+        if (r.data?.typography) setLiveTypography(r.data.typography);
+      }),
+    [storeId]
+  );
+
   useEffect(() => {
+    void refreshTypography();
     void refreshStore();
     void apiPost<{ token: string }>(
       `/api/v1/admin/stores/${storeId}/builder/pages/home/preview-token`,
@@ -270,9 +292,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     if (r === 'ok') {
       toastSuccess(t('published'));
       void refreshStore();
-      // The header/footer patch is live now; re-open the page so the next edit
+      void refreshTypography();
+      // The header/footer and typography patches are live now; re-open the page so the next edit
       // starts from the live values instead of re-sending a stale patch.
-      if (b.doc?.chrome) void b.reload();
+      if (b.doc?.chrome || b.doc?.typography) void b.reload();
     } else if (r === 'failed') toastError(t('publishFailed'));
   };
 
@@ -318,6 +341,9 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     conflict: t('status.conflict'),
   };
 
+  // Fonts + zones as the theme pane shows them: the live typography with the draft patch on top.
+  const effectiveTypo = applyTypographyPatch(liveTypography, b.doc.typography);
+
   const startPane = (
     <div className="flex h-full flex-col">
       <div
@@ -359,22 +385,14 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           <ThemeSettingsPanel
             storeId={storeId}
             look={getLook(store.look) ?? null}
-            liveTheme={(store.theme ?? null) as Record<string, unknown> | null}
-            flushDraft={b.saveDraftNow}
-            removeDraftKey={key => {
-              b.patchDocument(d => {
-                const rest = { ...(d.theme ?? {}) } as DraftTheme;
-                delete rest[key];
-                const next = { ...d } as typeof d & { theme?: unknown };
-                if (Object.keys(rest).length > 0) next.theme = rest;
-                else delete next.theme;
-                return next as typeof d;
-              });
+            storeTemplate={(store.template as TemplateId | null | undefined) ?? undefined}
+            // A reset is a DRAFT edit: `null` in the draft theme removes the key at Publish.
+            onResetKey={key => {
+              b.patchDocument(d => ({
+                ...d,
+                theme: { ...(d.theme ?? {}), [key]: null } as DraftTheme,
+              }));
               return b.saveDraftNow();
-            }}
-            onThemeReset={() => {
-              // Both the draft and the LIVE theme may have changed: re-read each, repaint the canvas.
-              void Promise.all([refreshStore(), b.reload()]).then(() => setReloadKey(k => k + 1));
             }}
             theme={effectiveTheme(store.theme, b.doc.theme)}
             onSave={patch => {
@@ -383,6 +401,30 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
               // theme changes only when Publish promotes it.
               b.replaceDocument({ ...b.doc!, theme: { ...b.doc!.theme, ...patch } as DraftTheme });
               return b.saveDraftNow();
+            }}
+            typography={{
+              fonts: effectiveTypo.fonts as FontEntry[],
+              zones: effectiveTypo.zones as Record<string, ZoneOverride | undefined>,
+            }}
+            onTypography={patch =>
+              b.patchDocument(
+                d => ({
+                  ...d,
+                  typography: {
+                    ...(d.typography ?? {}),
+                    ...(patch.fonts ? { fonts: patch.fonts } : {}),
+                    ...(patch.zones
+                      ? { zones: { ...(d.typography?.zones ?? {}), ...patch.zones } }
+                      : {}),
+                  },
+                }),
+                `typography/${patch.fonts ? 'fonts' : Object.keys(patch.zones ?? {}).join(',')}`
+              )
+            }
+            onApplyPalette={(palette, updates) => {
+              // Smart Palette is one draft edit: the section colours and the brand tokens together, so
+              // a single Undo takes the whole palette back and nothing is live before Publish.
+              b.patchDocument(d => applyPalette(d, palette, updates), 'smart-palette');
             }}
           />
         )}
@@ -394,6 +436,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
               toastSuccess(t('restored'));
               void b.reload();
               void refreshStore();
+              void refreshTypography();
               setReloadKey(k => k + 1);
             }}
           />

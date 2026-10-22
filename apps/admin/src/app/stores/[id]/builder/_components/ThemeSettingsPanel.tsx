@@ -2,10 +2,13 @@
 
 /**
  * Global theme settings (Shopify `settings_schema`): colours, typography,
- * buttons, spacing — generated from `THEME_SETTINGS_SCHEMA`. Saving writes ONLY
- * the keys this panel changed into the page DRAFT (`PageDefinition.theme`, via
- * `onSave`); nothing reaches the live store theme until Publish promotes the
- * draft (Ruling THEME-DRAFT-1). `theme` is the effective theme: live + draft.
+ * buttons, spacing — generated from `THEME_SETTINGS_SCHEMA` — plus the font
+ * library, the global typography zones and Smart Palette. Everything here is a
+ * DRAFT edit (Rulings THEME-DRAFT-1 and VE-4): saving writes ONLY the keys this
+ * panel changed into the page draft (`PageDefinition.theme`, via `onSave`);
+ * fonts and zones go to `PageDefinition.typography`; resetting a key to the
+ * look's default writes a `null` into the draft. Nothing reaches the live store
+ * until Publish promotes the draft. `theme` is the effective theme: live + draft.
  * Theme colours are stored as HSL triplets; the colour field speaks hex.
  */
 import { useState } from 'react';
@@ -16,39 +19,55 @@ import {
   hexToHsl,
   hslToHex,
   overriddenLookKeys,
+  type DraftTypography,
   type LookDefinition,
   type StoreTheme,
+  type TemplateId,
+  type ZoneOverride,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';
-import { apiPut } from '../../../../../lib/api';
+import { SmartPaletteModal } from '../../../../../components/SmartPaletteModal';
+import type { FontEntry } from '../../../../../components/section-design/FontsCard';
+import { FontsField } from './FontsField';
+import { TypographyZonesField } from './TypographyZonesField';
 import { borderEditPatch } from './border-input-pairing';
+
+export interface EffectiveTypography {
+  fonts: FontEntry[];
+  zones: Record<string, ZoneOverride | undefined>;
+}
 
 export function ThemeSettingsPanel({
   theme,
   onSave,
   storeId,
   look = null,
-  onThemeReset,
-  liveTheme,
-  flushDraft,
-  removeDraftKey,
+  onResetKey,
+  typography,
+  onTypography,
+  onApplyPalette,
+  storeTemplate,
 }: {
   theme: StoreTheme | undefined;
   storeId?: string;
   /** The store's look; null/absent = legacy skin, no override tracking. */
   look?: LookDefinition | null;
-  /** Called after a single override was reset, so the caller re-reads the live theme. */
-  onThemeReset?: () => void;
-  /** The LIVE store theme (without the draft patch): decides whether a live PUT is needed. */
-  liveTheme?: Record<string, unknown> | null;
-  /** Resolves true once every pending/in-flight draft save has landed. */
-  flushDraft?: () => Promise<boolean>;
-  /** Omits the key from the draft document's theme and saves the draft; true when saved. */
-  removeDraftKey?: (key: string) => Promise<boolean>;
+  /** Reset one key to the look's default: a draft edit (`null` in the draft theme). True when saved. */
+  onResetKey?: (key: string) => Promise<boolean>;
   /** Writes the patch into the draft and resolves true once the draft is saved. */
   onSave: (patch: Partial<StoreTheme>) => Promise<boolean>;
+  /** The effective font library and zones (live + the draft patch). */
+  typography?: EffectiveTypography;
+  /** Merges a typography patch into the draft document. */
+  onTypography?: (patch: DraftTypography) => void;
+  /** Smart Palette applied: the caller writes section colours and the theme tokens into the draft. */
+  onApplyPalette?: (
+    palette: Parameters<React.ComponentProps<typeof SmartPaletteModal>['onApply']>[0],
+    themeUpdates: Parameters<React.ComponentProps<typeof SmartPaletteModal>['onApply']>[1]
+  ) => void;
+  storeTemplate?: TemplateId;
 }) {
   const t = useT('builder.theme');
   const locale = useLocale();
@@ -57,29 +76,23 @@ export function ThemeSettingsPanel({
   const current = { ...(theme ?? DEFAULT_THEME), ...patch } as Record<string, unknown>;
   const [resetting, setResetting] = useState<string | null>(null);
   const [resetFailed, setResetFailed] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const overridden = new Set<string>(
     look && theme ? overriddenLookKeys(theme as unknown as Record<string, unknown>, look) : []
   );
-  // This panel is the single writer of a reset, draft first: (1) flush any pending or in-flight
-  // draft save so it cannot re-introduce the key, (2) omit the key from the draft theme, (3) only
-  // if the LIVE theme holds it, PUT null (deletes the stored key), (4) let the caller re-read both.
+  // A reset is a draft edit like any other (Ruling VE-4): the caller writes `null` for the key into the
+  // draft theme and saves it; at Publish the key leaves the live theme, so the look's default shows.
   const resetOne = async (key: string) => {
-    if (!storeId) return;
+    if (!onResetKey) return;
     setResetting(key);
     setResetFailed(false);
     try {
-      if (flushDraft && !(await flushDraft())) return setResetFailed(true);
-      if (removeDraftKey && !(await removeDraftKey(key))) return setResetFailed(true);
-      if (!liveTheme || liveTheme[key] !== undefined) {
-        const { error } = await apiPut(`/api/v1/stores/${storeId}/theme`, { [key]: null });
-        if (error) return setResetFailed(true);
-      }
+      if (!(await onResetKey(key))) return setResetFailed(true);
       setPatch(p => {
         const rest = { ...p };
         delete rest[key as keyof StoreTheme];
         return rest;
       });
-      onThemeReset?.();
     } catch {
       setResetFailed(true);
     } finally {
@@ -155,16 +168,25 @@ export function ThemeSettingsPanel({
           />
         </label>
       );
-    return (
-      <p key={s.id} className="text-xs text-muted-foreground">
-        {label} · {t('classicOnly')}
-      </p>
-    );
+    return null;
   };
 
   return (
     <div className="flex h-full flex-col" data-testid="theme-settings">
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
+        {onApplyPalette && (
+          <div className="space-y-1">
+            <button
+              type="button"
+              data-testid="smart-palette"
+              onClick={() => setPaletteOpen(true)}
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold hover:bg-muted"
+            >
+              {t('smartPalette')}
+            </button>
+            <p className="text-xs text-muted-foreground">{t('smartPaletteHint')}</p>
+          </div>
+        )}
         {THEME_SETTINGS_SCHEMA.map(group => (
           <fieldset key={group.id} className="space-y-3">
             <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -193,6 +215,27 @@ export function ThemeSettingsPanel({
                 )}
               </div>
             ))}
+            {group.id === 'typography' && typography && onTypography && storeId && (
+              <div className="space-y-4 pt-2">
+                <FontsField
+                  storeId={storeId}
+                  fonts={typography.fonts}
+                  onChange={fonts =>
+                    onTypography({ fonts: fonts as NonNullable<DraftTypography['fonts']> })
+                  }
+                />
+                <TypographyZonesField
+                  zones={typography.zones}
+                  theme={theme}
+                  onChange={(zone, next) =>
+                    onTypography({
+                      zones: { [zone]: { ...(typography.zones[zone] ?? {}), ...next } },
+                    })
+                  }
+                  onReset={zone => onTypography({ zones: { [zone]: null } })}
+                />
+              </div>
+            )}
           </fieldset>
         ))}
       </div>
@@ -215,6 +258,19 @@ export function ThemeSettingsPanel({
           {state === 'saving' ? t('saving') : t('save')}
         </button>
       </div>
+      {onApplyPalette && (
+        <SmartPaletteModal
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          theme={theme}
+          storeId={storeId}
+          storeTemplate={storeTemplate}
+          onApply={(palette, updates) => {
+            onApplyPalette(palette, updates);
+            setPaletteOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

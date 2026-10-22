@@ -52,6 +52,10 @@ const {
 });
 
 vi.mock('@ebda/database', () => ({
+  // no store in scope: these cases delete legacy flat keys (the store-prefix guard has its own test)
+  currentStoreId: () => {
+    throw new Error('no ambient store');
+  },
   prisma: prismaDecoy,
   storeDirectory: storeFindMany,
   withStore: withRlsBypassMock,

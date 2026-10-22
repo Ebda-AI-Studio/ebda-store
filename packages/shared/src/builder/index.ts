@@ -7,6 +7,8 @@ export * from './viewports';
 export * from './schema';
 export * from './theme-draft';
 export * from './chrome-draft';
+export * from './typography-draft';
+export * from './smart-palette';
 export * from './rebase-draft';
 export * from './settings-schema';
 export * from './registry';

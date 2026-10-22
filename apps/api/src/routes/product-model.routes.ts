@@ -34,7 +34,11 @@ import { tenantContext } from '../middleware/tenant-context';
 import { uploadLimiter, dailyUploadLimiter, auditLog, writeLimiter } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 import { StorageService } from '../services/storage.service';
-import { deleteR2ObjectIfOrphan, urlToR2Key } from '../services/r2-cleanup.service';
+import {
+  deleteR2ObjectIfOrphan,
+  r2KeyBelongsToStore,
+  urlToR2Key,
+} from '../services/r2-cleanup.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { prisma } from '@ebda/database';
@@ -292,7 +296,7 @@ router.put(
       // third-party URL every shopper's browser would then fetch.
       if (body.posterUrl) {
         const key = urlToR2Key(body.posterUrl);
-        if (!key || !key.startsWith(`stores/${storeId}/`)) {
+        if (!key || !r2KeyBelongsToStore(key, storeId)) {
           throw new AppError(
             400,
             'INVALID_POSTER',

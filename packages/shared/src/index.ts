@@ -19,6 +19,7 @@ export * from './schemas/plan-limits';
 export * from './schemas/revalidate';
 export * from './schemas/campaign';
 export * from './schemas/webhook';
+export * from './schemas/typography';
 export * from './schemas/analytics';
 export * from './schemas/report-range';
 export * from './schemas/list-filters';

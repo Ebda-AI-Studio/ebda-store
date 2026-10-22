@@ -10,6 +10,9 @@ import {
   resolveDefaultLanguage,
   pageDefinitionSchema,
   definitionToLayout,
+  applyTypographyPatch,
+  applyThemePatch,
+  hasTypographyPatch,
   type PageDefinition,
 } from '@ebda/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
@@ -575,11 +578,21 @@ export async function HomePageBody({
   // committed-theme tag in source order). The client override in
   // BuilderPreviewShell takes over after hydration.
   const builderThemeCss = builderDefinition?.theme
-    ? buildThemeStyleTag({ ...(store.theme ?? {}), ...builderDefinition.theme }, store.look)
+    ? buildThemeStyleTag(applyThemePatch(store.theme ?? {}, builderDefinition.theme), store.look)
     : '';
+  // Same for the draft's pending fonts + typography zones (Ruling VE-4): the live typography with the
+  // patch on top, through the one zone-CSS emitter the draft preview already uses.
+  const builderTypographyCss =
+    builderDefinition && hasTypographyPatch(builderDefinition.typography)
+      ? emitZoneCss(
+          applyTypographyPatch(store.typography, builderDefinition.typography),
+          store.theme
+        )
+      : '';
   return (
     <>
       {builderThemeCss && <style dangerouslySetInnerHTML={{ __html: builderThemeCss }} />}
+      {builderTypographyCss && <style dangerouslySetInnerHTML={{ __html: builderTypographyCss }} />}
       {/* Draft typography override — emitted when ?_layoutDraft=token is
           present AND the draft bundle includes typography. Source order
           puts this AFTER the head's committed-typography style tag, so
@@ -604,6 +617,7 @@ export async function HomePageBody({
           storeName={store.name}
           layout={layout}
           initialDefinition={builderDefinition}
+          liveTypography={store.typography}
           allowedOrigins={allowedParentOrigins()}
         />
       ) : (

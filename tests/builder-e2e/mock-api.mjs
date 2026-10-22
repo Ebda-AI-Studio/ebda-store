@@ -47,6 +47,7 @@ function freshState() {
     revisions: [],
     saves: 0,
     publishes: 0,
+    liveWrites: [],
     theme: { ...shared.DEFAULT_THEME, primaryColor: '35 34% 52%' },
   };
 }
@@ -78,7 +79,9 @@ function route(method, path, body) {
     S.draft = { rev: S.rev, definition: def };
     return ok({ rev: S.rev });
   }
-  if (method === 'GET' && p === '/__test/state') return ok({ rev: S.rev, draft: S.draft, published: S.published, saves: S.saves, publishes: S.publishes, theme: S.theme });
+  if (method === 'GET' && p === '/__test/state') return ok({ rev: S.rev, draft: S.draft, published: S.published, saves: S.saves, publishes: S.publishes, theme: S.theme, liveWrites: S.liveWrites });
+  // every write to the LIVE theme / typography is recorded: the editor must make none before Publish (VE-4)
+  if (method !== 'GET' && (p === `/stores/${STORE_ID}/theme` || p === `/stores/${STORE_ID}/typography`)) S.liveWrites.push(`${method} ${p}`);
 
   if (p === '/auth/me') return ok({ user });
   if (p === '/auth/refresh') return ok({});

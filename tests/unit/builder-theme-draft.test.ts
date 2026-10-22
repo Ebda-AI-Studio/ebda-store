@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  DERIVED_THEME_KEYS,
   DRAFT_THEME_KEYS,
   THEME_SETTINGS_SCHEMA,
   effectiveTheme,
@@ -42,11 +43,14 @@ describe('draft theme schema', () => {
     expect(validateDefinitionSync(withTheme({ headingFont: 'x'.repeat(101) })).ok).toBe(false);
   });
 
-  it('every editable key comes from THEME_SETTINGS_SCHEMA (dividers is classic-only)', () => {
+  it('every editable key is a THEME_SETTINGS_SCHEMA setting or a colour token Smart Palette derives', () => {
     const all = THEME_SETTINGS_SCHEMA.flatMap(g => g.settings.map(s => String(s.id)));
     expect(DRAFT_THEME_KEYS).toContain('primaryColor');
     expect(DRAFT_THEME_KEYS).not.toContain('dividers');
-    for (const k of DRAFT_THEME_KEYS) expect(all).toContain(k);
+    for (const k of DRAFT_THEME_KEYS)
+      expect([...all, ...(DERIVED_THEME_KEYS as readonly string[])]).toContain(k);
+    // the derived tokens have no control of their own
+    for (const k of DERIVED_THEME_KEYS) expect(all).not.toContain(k);
   });
 });
 

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { checkStoreAccess } from '../middleware/store-access';
+import { r2KeyBelongsToStore } from '../services/r2-cleanup.service';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
@@ -582,7 +583,7 @@ router.delete(
         return;
       }
 
-      if (!key.startsWith(storeId + '/') && !key.startsWith('stores/' + storeId + '/')) {
+      if (!r2KeyBelongsToStore(key, storeId, { legacyFlat: true })) {
         res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'Cannot delete files from another store' },

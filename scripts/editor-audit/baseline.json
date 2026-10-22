@@ -1,23 +1,8 @@
 [
   {
-    "id": "classic|api|PUT /api/v1/stores/:p/theme",
-    "status": "classic-only",
-    "reason": "open: P-13 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|api|PUT /api/v1/stores/:p/typography",
-    "status": "classic-only",
-    "reason": "open: P-01 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "classic|component|DensitySelect",
     "status": "classic-only",
     "reason": "open: P-05 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|FontsCard",
-    "status": "classic-only",
-    "reason": "open: P-01 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "classic|component|ProductCardControls",
@@ -30,19 +15,9 @@
     "reason": "open: P-05 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
-    "id": "classic|component|SmartPaletteModal",
-    "status": "classic-only",
-    "reason": "open: P-13 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "classic|component|TextScaleSelect",
     "status": "classic-only",
     "reason": "open: P-05 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|ZoneEditor",
-    "status": "classic-only",
-    "reason": "open: P-02 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "classic|site-setting|bottomBar",
