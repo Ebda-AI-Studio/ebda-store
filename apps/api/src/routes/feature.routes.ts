@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
-import { asPlatformOperator, prisma } from '@ebda/database';
+import { asPlatformOperator, prisma, withStore } from '@ebda/database';
 import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
@@ -31,16 +31,20 @@ router.get(
 
       const [features, metadataRows] = await Promise.all([
         featureService.getStoreFeatures(id),
-        prisma.storeFeature.findMany({
-          where: { storeId: id },
-          select: {
-            featureKey: true,
-            enabled: true,
-            enabledAt: true,
-            enabledBy: true,
-            updatedAt: true,
-          },
-        }),
+        // This router is context-less (no ambient store): bind the target store AFTER
+        // requireStoreAccess authorised it, so the tenant guard and RLS both see it.
+        withStore(id, tx =>
+          tx.storeFeature.findMany({
+            where: { storeId: id },
+            select: {
+              featureKey: true,
+              enabled: true,
+              enabledAt: true,
+              enabledBy: true,
+              updatedAt: true,
+            },
+          })
+        ),
       ]);
 
       // Enrich metadata with enabledBy user name
@@ -306,10 +310,9 @@ router.put(
       }
 
       // Capture previous plan so the audit row shows from → to.
-      const prev = await prisma.store.findUnique({
-        where: { id: req.params.id },
-        select: { plan: true },
-      });
+      const prev = await withStore(req.params.id, tx =>
+        tx.store.findUnique({ where: { id: req.params.id }, select: { plan: true } })
+      );
 
       const features = await featureService.setStorePlan(
         req.params.id,

@@ -114,6 +114,11 @@
     "pino": "./src/cf/stubs/pino.ts",
     "iconv-lite": "./src/cf/stubs/iconv-lite.ts",
     "multer": "./src/cf/stubs/multer-formdata.ts",
+    // Workspace packages bundle from SOURCE (ESM), not their CommonJS dist: from dist, esbuild emits one
+    // `__toESM(require_dist())` per import site (451 in this Worker), each copying every export of the
+    // package, and nothing tree-shakes. Measured 2026-10-22: startup CPU 164 -> 90 ms (scripts/ci/worker-startup-budget.mjs).
+    "@ebda/shared": "../../packages/shared/src/index.ts",
+    "@ebda/database": "../../packages/database/src/index.ts",
   },
 
   // Non-secret configuration. BUILD_COMMIT_SHA is overridden per deploy
