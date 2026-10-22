@@ -104,6 +104,7 @@ export class SentryService {
           cookie,
           'x-csrf-token': csrfToken,
           'x-search-query': searchQuery,
+          'x-hop-timing': hopTimingToken,
           ...safeHeaders
         } = req.headers;
         // suppress unused-var warning — these are intentionally dropped (x-search-query is the
@@ -112,6 +113,7 @@ export class SentryService {
         void cookie;
         void csrfToken;
         void searchQuery;
+        void hopTimingToken; // the operator token of lib/hop-timing.ts must never reach Sentry
         Sentry.captureException(err, {
           ...(integrityDefect ? { level: 'warning' as const } : {}),
           extra: {
