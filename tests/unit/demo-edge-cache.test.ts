@@ -123,10 +123,22 @@ describe('finding 2: scope is the exact canonical demo host', () => {
   });
 });
 
+describe('language cookie is a keyed 2-way variant, nothing else', () => {
+  it('force-language=ar|en alone is keyed apart from each other and from cookieless', () => {
+    const ar = demoEdgeKey(req(`${D}/`, { cookie: 'force-language=ar' }));
+    const en = demoEdgeKey(req(`${D}/`, { cookie: 'force-language=en' }));
+    const none = demoEdgeKey(req(`${D}/`));
+    expect(new Set([ar, en, none]).size).toBe(3);
+    expect(ar).toBeTruthy();
+  });
+});
+
 describe('finding 1: no per-visitor state is ever cached', () => {
   it.each([
     ['consent cookie', { cookie: 'force-cookie-consent=granted' }],
-    ['language cookie', { cookie: 'force-language=ar' }],
+    ['language cookie with a second cookie', { cookie: 'force-language=ar; _ga=1' }],
+    ['language cookie with a bad value', { cookie: 'force-language=fr' }],
+    ['language cookie with injected value', { cookie: 'force-language=ar%0d' }],
     ['draft cookie', { cookie: 'force-preview-draft=x' }],
     ['auth cookie', { cookie: 'token=abc' }],
     ['analytics cookie', { cookie: '_ga=1' }],
