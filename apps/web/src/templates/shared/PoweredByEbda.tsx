@@ -54,16 +54,23 @@ export function PoweredByEbda({ hidden = false }: { hidden?: boolean }) {
             the brand gold (#B08D57) measured 3.09:1 on a white footer (STOP 1, Ruling B1-27), and
             the line is the full muted tone (the old /70 alpha also fell under 4.5:1). On a
             merchant-coloured footer both take the shared footer ink ([data-footer-ink], footer-ink.ts). */}
-        {/* The approved Ebda mark (2026-10-22 pack), decorative: the link's aria-label carries the name. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo.svg"
-          alt=""
+        {/* The approved Ebda mark (2026-10-22 pack) in ONE ink: currentColor, so it follows the footer ink
+            ([data-footer-ink], footer-ink.ts) on any merchant colour and is never gold on an arbitrary
+            background. The three faces keep their relative depth through opacity. Decorative. */}
+        <svg
+          viewBox="0 0 78.3 149"
           width={9}
           height={17}
-          className="h-4 w-auto"
+          className="h-4 w-auto shrink-0"
+          fill="currentColor"
           aria-hidden="true"
-        />
+          focusable="false"
+          data-testid="ebda-badge-mark"
+        >
+          <path d="M65.70 67.60 L78.30 73.90 L78.30 126.70 L65.70 120.50Z" opacity=".7" />
+          <path d="M0.00 35.80 L78.30 0.00 L78.30 74.90Z" />
+          <path d="M0.00 37.00 L42.60 58.30 L42.10 127.80 L0.20 149.00Z" opacity=".85" />
+        </svg>
         <span>{t('Powered by', 'مدعوم من')}</span>
         {/* IA-09 (W4): attribution never outweighs the store's own name: one muted weight. */}
         <span className="font-medium">{t(BRAND.product.nameEn, BRAND.product.nameAr)}</span>
