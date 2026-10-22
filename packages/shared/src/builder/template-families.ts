@@ -123,7 +123,11 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
     verticalAr: 'جمال وعناية بالبشرة',
     sectionTypes: [
       'hero',
+      'category-grid',
+      'steps',
       'product-carousel',
+      'featured-collection',
+      'product-spotlight',
       'trust-strip',
       'image-text',
       'testimonials',

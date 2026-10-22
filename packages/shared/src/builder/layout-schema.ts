@@ -208,6 +208,8 @@ const layoutSchemaInternal = z
       // CategoriesSettings). Mobile overrides are optional — fall back to
       // the legacy single field when unset.
       layoutMobile: z.enum(['grid', 'horizontal', 'chips', 'rail', 'tiles']).optional(),
+      // Phase B3 (Ruling B3-5): list the store's tags (skin-type / concern chips) instead of categories.
+      source: z.enum(['categories', 'tags']).optional(),
       captionPosition: z.enum(['below', 'overlay']),
       captionPositionMobile: z.enum(['below', 'overlay']).optional(),
       desktopColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]),

@@ -56,6 +56,7 @@ export const PUBLIC_PRODUCT_LIST_QUERY_KEYS = [
   'page',
   'limit',
   'category',
+  'tag',
   'search',
   'featured',
   'sort',
@@ -103,7 +104,7 @@ export function parseOptionalSortQuery(
 export function assertOnSaleQuery(query: Record<string, unknown>): void {
   const refused = Object.keys(query).filter(
     k =>
-      ['search', 'minPrice', 'maxPrice', 'featured'].includes(k) ||
+      ['search', 'minPrice', 'maxPrice', 'featured', 'tag'].includes(k) ||
       (k.startsWith('opt_') && query[k] !== undefined)
   );
   if (refused.length > 0) {

@@ -30,6 +30,8 @@ import {
   trustBadgeBlockSchema,
   shopTheLookSchema,
   shopTheLookBlockSchema,
+  stepsSchema,
+  stepsBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -297,6 +299,19 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         ],
         {
           responsive: ['mobile'],
+        }
+      ),
+      s.select(
+        'source',
+        'Shows',
+        'يعرض',
+        [
+          opt('categories', 'Categories', 'الأقسام'),
+          opt('tags', 'Tags (skin type, concern)', 'الوسوم (نوع البشرة، المشكلة)'),
+        ],
+        {
+          hintEn: 'Tags show as text chips. Each chip opens the products that carry the tag.',
+          hintAr: 'الوسوم بتظهر كأزرار نصية، وكل زر بيفتح المنتجات اللي عليها الوسم.',
         }
       ),
       s.select(
@@ -837,6 +852,58 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     ],
     settings: [
       s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'steps',
+    labelEn: 'Routine steps',
+    // Neutral noun phrase, never a gendered imperative.
+    labelAr: 'خطوات الروتين',
+    legacyKey: null,
+    rendererKey: 'section.steps',
+    group: 'template',
+    propsSchema: stepsSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'step',
+        labelEn: 'Step',
+        labelAr: 'خطوة',
+        maxCount: 5,
+        propsSchema: stepsBlockSchema,
+        settings: [
+          s.text('title', 'Step name', 'اسم الخطوة', { localized: true }),
+          s.textarea('body', 'One line on what it does', 'سطر عن فايدتها', { localized: true }),
+          {
+            id: 'productIds',
+            type: 'product_list',
+            labelEn: 'Product for this step',
+            labelAr: 'منتج الخطوة',
+            group: 'content',
+            max: 1,
+          },
+          s.url('link', 'Link (optional)', 'رابط (اختياري)'),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Three-step routine',
+        nameAr: 'روتين من 3 خطوات',
+        settings: { heading: 'Your routine in 3 steps', headingAr: 'روتينك في 3 خطوات' },
+        blocks: [
+          { type: 'step', settings: { title: 'Cleanse', titleAr: 'تنظيف' } },
+          { type: 'step', settings: { title: 'Treat', titleAr: 'علاج' } },
+          { type: 'step', settings: { title: 'Protect', titleAr: 'حماية' } },
+        ],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.text('subheading', 'Subheading', 'عنوان فرعي', { localized: true }),
+      s.text('buttonText', 'Add-all button text', 'نص زر إضافة الكل', { localized: true }),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],

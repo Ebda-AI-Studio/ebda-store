@@ -208,6 +208,11 @@ interface ListProductsOptions {
   limit?: number;
   status?: string;
   category?: string;
+  /**
+   * Store tag NAME (Phase B3, Ruling B3-5): the skin-type / concern chips link here. Matched
+   * exactly against `Tag.name` inside the same store; an unknown tag yields an empty list.
+   */
+  tag?: string;
   search?: string;
   featured?: boolean;
   /** Inclusive lower bound on `Product.price` (in piastres). */
@@ -1310,6 +1315,7 @@ export class ProductService {
     const {
       status = 'active',
       category,
+      tag,
       search,
       featured,
       minPrice,
@@ -1423,6 +1429,12 @@ export class ProductService {
           some: { category: { slug: category } },
         };
       }
+    }
+
+    if (tag) {
+      // Tenant-keyed on both sides: the product is already `storeId`-scoped above, and the tag
+      // row must belong to the same store, so a foreign store's tag name can never match.
+      where.tags = { some: { tag: { storeId, name: tag } } };
     }
 
     if (minPrice !== undefined) {
@@ -2134,6 +2146,43 @@ export class ProductService {
       ratingStats,
       ...(await this.b2bPublicFields(storeId, product)),
     };
+  }
+
+  /**
+   * The store's skin-type / concern chips (Phase B3, Ruling B3-5): tags with at least one ACTIVE,
+   * PUBLIC product, most-used first, at most 12. Every query carries `storeId` (the tag row and
+   * the product both), the select is explicit, and a tag with no published product is never
+   * returned, so no chip is a dead end.
+   */
+  static async getPublicTags(storeId: string) {
+    const rows = await prisma.tag.findMany({
+      where: {
+        storeId,
+        products: {
+          some: { product: { storeId, status: 'active', deletedAt: null, audience: 'public' } },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            products: {
+              where: {
+                product: { storeId, status: 'active', deletedAt: null, audience: 'public' },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+      take: 60,
+    });
+    return rows
+      .map(r => ({ id: r.id, name: r.name, productCount: r._count.products }))
+      .filter(r => r.productCount > 0)
+      .sort((a, b) => b.productCount - a.productCount || a.name.localeCompare(b.name))
+      .slice(0, 12);
   }
 
   static async getCategories(storeId: string) {

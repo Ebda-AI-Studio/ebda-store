@@ -378,6 +378,12 @@ export interface CategoriesSettings
   // breakpoint fields are unset, the legacy field applies to both.
   layout: CategoriesLayout;
   layoutMobile?: CategoriesLayout;
+  /**
+   * What the row lists (Phase B3, Ruling B3-5): the store's categories (default, absent) or its
+   * TAGS (`tags`, the skin-type / concern chips). `tags` is rendered as chips whatever the layout,
+   * each linking to the PLP filtered by that tag; a tag with no published product is never shown.
+   */
+  source?: 'categories' | 'tags';
   captionPosition: CategoriesCaption;
   captionPositionMobile?: CategoriesCaption;
   desktopColumns: 2 | 3 | 4;

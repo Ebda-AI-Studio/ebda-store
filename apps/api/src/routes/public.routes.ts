@@ -226,7 +226,8 @@ export const createOrderSchema = z.object({
 // GET /products - List all public products (cached 30s)
 router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, category, featured, sort, minPrice, maxPrice, cursor, ids } = req.query;
+    const { page, limit, category, tag, featured, sort, minPrice, maxPrice, cursor, ids } =
+      req.query;
     // Scalars only (M1): an array or `?x[op]=…` object is a 400, never a Prisma operator or a 500.
     assertScalarQuery(req.query, PUBLIC_PRODUCT_LIST_QUERY_KEYS, ['opt_']);
     // The shopper's term travels in the `X-Search-Query` header (percent-encoded), not the URL: a
@@ -317,6 +318,9 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       category: category as string,
+      // Tag NAME (Ruling B3-5); capped at the column's practical length so a crafted value cannot
+      // mint cache keys of unbounded size.
+      tag: typeof tag === 'string' && tag.trim() ? tag.trim().slice(0, 120) : undefined,
       search: effectiveSearch,
       featured: featuredFilter,
       sort: sortValue,
@@ -634,6 +638,23 @@ router.get('/categories', async (req: Request, res: Response, next: NextFunction
       success: true,
       data: { categories },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /tags - the skin-type / concern chips (Phase B3, Ruling B3-5): tags that have at least one
+// published product, most-used first, at most 12. CACHE CLASS: BOUNDED-stale 120 s (a chip count
+// is display content), cached under the `public:products:<storeId>:` prefix so every product write
+// (invalidateStoreProductCaches) busts it; the 60 s edge copy is the same residual as the list.
+router.get('/tags', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = await getStoreIdFromRequest(req);
+    const tags = await getCached(`public:products:${storeId}:tags`, 120, () =>
+      ProductService.getPublicTags(storeId)
+    );
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    res.json({ success: true, data: { tags } });
   } catch (error) {
     next(error);
   }

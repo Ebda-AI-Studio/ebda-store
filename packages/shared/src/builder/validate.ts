@@ -429,8 +429,8 @@ function scanPlaceholderCopy(
 /** Section types whose settings hold catalogue refs (`categorySlug` / `manualProductIds`). */
 const REF_SECTION_TYPES = new Set(['product-carousel', 'featured-collection', 'product-spotlight']);
 
-/** Block types whose settings hold product refs (`productIds`): shop-the-look looks (C11). */
-const REF_BLOCK_SECTION_TYPES = new Set(['shop-the-look']);
+/** Block types whose settings hold product refs (`productIds`): shop-the-look looks (C11) and routine steps (B3). */
+const REF_BLOCK_SECTION_TYPES = new Set(['shop-the-look', 'steps']);
 
 /** The product ids a shop-the-look `look` block names, as stored. */
 function blockProductIds(settings: Record<string, unknown>): unknown[] {
@@ -493,8 +493,12 @@ export async function validateDefinition(
               issue(
                 'REF_NOT_FOUND',
                 `/sections/${i}/blocks/${j}/settings/productIds/${k}`,
-                `Product "${id}" is not in this store and will not show in the look.`,
-                `المنتج "${id}" غير موجود في هذا المتجر ولن يظهر في اللوك.`
+                n.type === 'steps'
+                  ? `Product "${id}" is not in this store; the step shows without a product.`
+                  : `Product "${id}" is not in this store and will not show in the look.`,
+                n.type === 'steps'
+                  ? `المنتج "${id}" غير موجود في هذا المتجر؛ هتظهر الخطوة من غير منتج.`
+                  : `المنتج "${id}" غير موجود في هذا المتجر ولن يظهر في اللوك.`
               )
             );
         })

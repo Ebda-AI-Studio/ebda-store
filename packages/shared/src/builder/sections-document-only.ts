@@ -193,3 +193,33 @@ export const shopTheLookBlockSchema = z
     productIds: z.array(z.string().max(80)).min(1).max(4).optional(),
   })
   .strict();
+
+/**
+ * "Routine steps" (Phase B3, Jasmine Clinic; Ruling B3-6): an ordered list of 2-5 real steps
+ * (cleanse, treat, protect). Each step is a `step` block with an optional product BY REFERENCE
+ * (`productIds[0]`, resolved against the store at render time, price and stock never live in the
+ * document). Numbers appear only because the ORDER matters; "add all" exists only when every step
+ * has a purchasable product.
+ */
+export const stepsSchema = z
+  .object({
+    ...frame,
+    heading: text(200),
+    headingAr: text(200),
+    subheading: text(400),
+    subheadingAr: text(400),
+    buttonText: text(60),
+    buttonTextAr: text(60),
+  })
+  .strict();
+
+export const stepsBlockSchema = z
+  .object({
+    title: text(80),
+    titleAr: text(80),
+    body: text(240),
+    bodyAr: text(240),
+    link: safeLink,
+    productIds: z.array(z.string().max(80)).max(1).optional(),
+  })
+  .strict();
