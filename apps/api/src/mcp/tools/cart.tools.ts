@@ -65,6 +65,11 @@ export function cartView(cartId: string, cart: any, currency: string) {
       // #1766: the product was deleted — this line is excluded from
       // `subtotal` and blocks checkout until it is removed.
       ...(item.unavailable ? { unavailable: true } : {}),
+      // Gold-rate pricing (Ruling B5-17): the gold rate moved since the line was added. `place_order` with
+      // `acknowledgePrices: true` accepts the new price.
+      ...(item.priceChanged
+        ? { priceChanged: true, previousUnitPrice: item.previousUnitPrice }
+        : {}),
     })),
     bundles: (cart.bundles ?? []).map((b: CartBundleView) => ({
       cartBundleId: b.id,

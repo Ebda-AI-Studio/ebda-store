@@ -5,6 +5,8 @@
 //
 //   node scripts/taste/shoot-purchase-path.mjs --store qamar-atelier --base http://localhost:3412 \
 //     --out <dir> [--prefix atelier]
+//   Dahab adds its two gold screens on a store whose owner can log in:
+//     --template dahab --store dahab-worn --gold-store dahab-gold --gold-owner dahab-gold-owner@example.test:Gold-Owner-1
 //
 // Writes <out>/<prefix>-<screen>-<viewport>.png (the fold) and <...>-full.png (the page) for
 // every screen x viewport, and <out>/<prefix>-manifest-run.json listing what it shot. A screen
@@ -83,6 +85,65 @@ async function fillShipping(page) {
 }
 
 const SHIPPING_CALC = '**/shipping/calculate';
+
+/**
+ * The merchant side of the two gold screens (Phase B5): a real store_admin login against a LOCAL API,
+ * the 21 karat rate moved under the jump gate (+4.9 %), and put back afterwards. Configured by
+ * `--gold-owner <email>:<password>`, `--api <url>` and the gold store's own host; refuses a non-local API.
+ */
+export const GOLD = {
+  api: 'http://localhost:4000/api/v1',
+  owner: null,
+  storeHost: null,
+  token: null,
+  storeId: null,
+  baseRate: null,
+  async call(path, init = {}) {
+    const res = await fetch(`${GOLD.api}${path}`, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        ...(GOLD.token ? { authorization: `Bearer ${GOLD.token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  },
+  async ready() {
+    if (!GOLD.owner || !GOLD.storeHost)
+      throw new Error('the gold screens need --gold-store, --gold-owner <email>:<password>');
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(GOLD.api))
+      throw new Error(`refusing a non-local API for the gold screens: ${GOLD.api}`);
+    if (GOLD.token) return;
+    const [email, ...pw] = GOLD.owner.split(':');
+    const login = await GOLD.call('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password: pw.join(':') }),
+    });
+    GOLD.token = login.body?.data?.accessToken;
+    const resolved = await GOLD.call('/public/store/resolve', {
+      headers: { 'x-store-domain': GOLD.storeHost },
+    });
+    GOLD.storeId = resolved.body?.data?.store?.id;
+    if (!GOLD.token || !GOLD.storeId) throw new Error('gold login or store resolve failed');
+    const state = await GOLD.call(`/stores/${GOLD.storeId}/gold-rates`);
+    GOLD.baseRate = state.body.data.rates.find(r => r.karat === 21).ratePerGram;
+  },
+  async setRate(ratePerGram) {
+    const r = await GOLD.call(`/stores/${GOLD.storeId}/gold-rates`, {
+      method: 'PUT',
+      body: JSON.stringify({ rates: [{ karat: 21, ratePerGram }], confirm: true }),
+    });
+    if (r.status !== 200) throw new Error(`gold rate write failed: ${r.status}`);
+  },
+  async move() {
+    await GOLD.ready();
+    await GOLD.setRate(Math.round(GOLD.baseRate * 1.049));
+  },
+  async restore() {
+    if (GOLD.token && GOLD.baseRate) await GOLD.setRate(GOLD.baseRate);
+  },
+};
 
 const continueToPayment = page =>
   page
@@ -210,6 +271,44 @@ export const ACTIONS = {
     await page.waitForURL(/\/checkout\/success/, { timeout: 60000, waitUntil: 'commit' }); // client-side push: no load event
     await page.waitForTimeout(3500); // the receipt's print-in feed
   },
+  async 'gold-price-changed'(page, url, base) {
+    // A gold piece in the cart, then the merchant moves the rate: the checkout shows "السعر اتحدّث".
+    await GOLD.ready();
+    await page.goto(`${base}/products/gold-chain-21`, {
+      waitUntil: 'networkidle',
+      timeout: 180000,
+    });
+    await settle(page);
+    // Wait for the cart to be written (the add response, then the persisted line), not a fixed delay:
+    // on a slow 390-ar run the rate moved before the line existed, so there was nothing to re-price.
+    const added = page
+      .waitForResponse(r => /\/cart/.test(r.url()) && r.request().method() !== 'GET', {
+        timeout: 15000,
+      })
+      .catch(() => null);
+    await page.getByTestId('pdp-add').first().click();
+    await added;
+    await page.waitForFunction(
+      () =>
+        Object.keys(localStorage).some(
+          k =>
+            /cart/i.test(k) &&
+            !/bundles/i.test(k) &&
+            /"price|"unitPrice|"productId/.test(localStorage.getItem(k) ?? '')
+        ),
+      undefined,
+      { timeout: 15000 }
+    );
+    await GOLD.move();
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
+    await page.getByTestId('price-changed-notice').waitFor({ timeout: 20000 });
+  },
+  async 'gold-stale'(page, url) {
+    // The cached page turns stale by the BROWSER clock: 30 hours on, the piece cannot be ordered.
+    await page.clock.install({ time: new Date(Date.now() + 30 * 3600_000) });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
+    await page.getByTestId('gold-stale').waitFor({ timeout: 20000 });
+  },
   async 'scroll-to-footer'(page, url) {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
     await settle(page);
@@ -225,7 +324,7 @@ async function main() {
   const prefix = arg('prefix') ?? store;
   if (!store || !out) {
     console.error(
-      'usage: --store <slug> --out <dir> [--base url] [--prefix name] [--screens a,b] [--viewports 390-ar,1280-en] [--template souq] [--path <screen>=<path>]... [--second-product <path>]'
+      'usage: --store <slug> --out <dir> [--base url] [--prefix name] [--screens a,b] [--viewports 390-ar,1280-en] [--template souq] [--path <screen>=<path>]... [--second-product <path>] [--gold-store <slug> --gold-owner <email>:<password> [--api <url>]]'
     );
     process.exit(2);
   }
@@ -245,6 +344,12 @@ async function main() {
   const screens = MANIFEST.screens
     .filter(s => !only || only.includes(s.id))
     .map(s => ({ ...s, path: pathOverride[s.id] ?? s.path }));
+  // A template's extra screens (Dahab's two gold screens) are shot on `--gold-store`, a store of the same
+  // look whose owner can log in; without the flag they are not shot (and the run file says so).
+  const goldStore = arg('gold-store');
+  const extraScreens = (tpl?.extraScreens ?? []).filter(s => !only || only.includes(s.id));
+  if (arg('api')) GOLD.api = arg('api');
+  GOLD.owner = arg('gold-owner') ?? null;
   const viewportIds = onlyViewports ?? MANIFEST.viewports; // an explicit --viewports may name one the manifest does not list (e.g. 1280-ar)
   const u = new URL(base);
   const host = `${store}.${u.hostname}`;
@@ -321,6 +426,59 @@ async function main() {
       }
     }
     await ctx.close();
+  }
+  // The gold screens: their own pass on the gold store (same look, a merchant who can log in).
+  if (extraScreens.length && goldStore) {
+    const gHost = `${goldStore}.${u.hostname}`;
+    const gOrigin = `${u.protocol}//${gHost}${u.port ? `:${u.port}` : ''}`;
+    GOLD.storeHost = gHost;
+    for (const vid of viewportIds) {
+      const vp = viewportOf(vid);
+      const ctx = await browser.newContext({
+        viewport: { width: vp.w, height: vp.h },
+        deviceScaleFactor: 1,
+        isMobile: vp.mobile,
+        hasTouch: vp.mobile,
+        reducedMotion: 'reduce',
+      });
+      await ctx.addCookies([
+        { name: 'force-language', value: vp.lang, domain: gHost, path: '/' },
+        { name: 'force-cookie-consent', value: consent, domain: gHost, path: '/' },
+      ]);
+      const page = await ctx.newPage();
+      for (const s of extraScreens) {
+        const tag = `${prefix}-${s.id}-${vid}`;
+        try {
+          await ACTIONS[s.action](page, `${gOrigin}${s.path}`, gOrigin);
+          await settle(page);
+          await page.screenshot({ path: join(out, `${tag}.png`) });
+          await page.screenshot({ path: join(out, `${tag}-full.png`), fullPage: true });
+          const found = await probePage(page, { contrast: (s.probe ?? []).includes('contrast') });
+          probes.push({ screen: s.id, viewport: vid, ...found });
+          run.push({
+            screen: s.id,
+            viewport: vid,
+            ok: true,
+            url: page.url(),
+            title: await page.title(),
+          });
+        } catch (e) {
+          await page.screenshot({ path: join(out, `${tag}-FAILED.png`) }).catch(() => {});
+          run.push({ screen: s.id, viewport: vid, ok: false, error: String(e).slice(0, 300) });
+        } finally {
+          if (s.action === 'gold-price-changed') await GOLD.restore().catch(() => {});
+        }
+      }
+      await ctx.close();
+    }
+  } else if (extraScreens.length) {
+    for (const s of extraScreens)
+      run.push({
+        screen: s.id,
+        viewport: '-',
+        ok: false,
+        error: 'not shot: pass --gold-store <slug> --gold-owner <email>:<password>',
+      });
   }
   await browser.close();
   writeFileSync(join(out, `${prefix}-manifest-run.json`), JSON.stringify(run, null, 1));

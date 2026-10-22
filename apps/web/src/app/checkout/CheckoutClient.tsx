@@ -78,6 +78,8 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
+import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
+import { priceChangedLines } from '@/lib/gold-display';
 import { couponErrorCopy } from '../../lib/coupon-errors';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
 import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
@@ -190,6 +192,8 @@ export default function CheckoutClient() {
     total: cartContextTotal,
     isReady: cartIsReady,
     refetchCart,
+    priceChanged: goldPriceChanged,
+    acknowledgePrices,
   } = useCart();
   const { language, t } = useLanguage();
   // Passed down to PaymentStep as the `formatPrice` prop too.
@@ -200,6 +204,7 @@ export default function CheckoutClient() {
   const [heldQuote, setHeldQuote] = useState<HeldQuote | null>(null);
   const [quotePending, setQuotePending] = useState(false);
   const [quoteNonce, setQuoteNonce] = useState(0);
+  const [isAcknowledging, setIsAcknowledging] = useState(false);
   // True while shipping is being recomputed after a coupon was removed; holds
   // Place Order closed so the charge can never run ahead of the summary.
   const [repricingShipping, setRepricingShipping] = useState(false);
@@ -366,6 +371,7 @@ export default function CheckoutClient() {
           // left colour, size and length off the irreversible step (Ruling B1-87).
           variantTitle: item.variantTitle,
           variantTitleAr: item.variantTitleAr,
+          gold: item.gold,
           product: {
             id: item.productId,
             name: item.name,
@@ -1323,6 +1329,17 @@ export default function CheckoutClient() {
       return;
     }
 
+    // A gold line whose price moved (B5-17): payment waits until the shopper has seen the new price and pressed Continue.
+    if (goldPriceChanged) {
+      setCheckoutError(
+        t(
+          'The gold rate changed since you added a piece. Use the button on the price notice to see the new price, then place your order.',
+          'سعر الدهب اتغيّر من ساعة ما ضفت قطعة. دوس متابعة في تنبيه السعر عشان تشوف السعر الجديد، وبعدها كمّل الطلب.'
+        )
+      );
+      return;
+    }
+
     // An unavailable line can never be ordered — say so now rather than let the
     // shopper fill both steps and meet the server's refusal (#2117).
     if (unavailableLinesNotice) {
@@ -1970,7 +1987,33 @@ export default function CheckoutClient() {
             );
           setStep(1);
           break;
+        case 'GOLD_RATE_STALE':
+          // B5-16: fail closed. The store's gold rate is past its limit, so there is no price to charge.
+          // Nothing was charged; the merchant has to update the rate before this piece can be ordered.
+          // The sentence is the product page's own stale sentence (GoldRateLine), word for word.
+          friendly = t(
+            "We can't take orders for this piece right now because today's gold rate hasn't been updated. Please try again later or contact the store.",
+            'مش هنقدر نكمّل الطلب دلوقتي لأن سعر الدهب لسه مستني تحديث النهارده. جرّب تاني بعد شوية أو كلّم المحل.'
+          );
+          break;
+        case 'GOLD_PRICE_DRIFT':
+          friendly = t(
+            'One of the pieces cannot be ordered right now. Please try again in a moment.',
+            'إحدى القطع مش هتتطلب دلوقتي. جرّب تاني بعد شوية.'
+          );
+          break;
         case 'PRICE_CHANGED':
+          if (Array.isArray((details as { lines?: unknown } | null | undefined)?.lines)) {
+            // A gold line moved (B5-17): the cart now carries the notice. Nothing was charged.
+            setHeldQuote(null);
+            setQuoteNonce(n => n + 1);
+            void refetchCart().catch(() => undefined);
+            friendly = t(
+              'The gold rate changed since you added a piece. The new price is shown; confirm it with the button above and place your order again.',
+              'سعر الدهب اتغيّر من ساعة ما ضفت قطعة. السعر الجديد ظاهر، دوس متابعة وبعدها اطلب تاني.'
+            );
+            break;
+          }
           // B2B (Ruling B2B-9): the server re-priced the order and its total differs from the quote the buyer confirmed
           // (revoked approval, tier edit, plan change, a new price). Nothing was charged. Stay on the payment step, drop the
           // held quote and refetch the cart: a fresh server quote loads, the buyer sees the NEW total (named in this
@@ -2220,6 +2263,23 @@ export default function CheckoutClient() {
           <div className="flex flex-col lg:grid lg:grid-cols-12 lg:gap-8">
             {/* Form */}
             <div className="order-1 lg:order-none lg:col-span-8">
+              {/* Gold lines (B5-17): the new price is on the line; continuing records that the shopper saw it. */}
+              {goldPriceChanged && (
+                <PriceChangedNotice
+                  className="mb-4"
+                  lines={priceChangedLines(cartContextItems, language)}
+                  busy={isAcknowledging}
+                  onContinue={() => {
+                    setIsAcknowledging(true);
+                    void acknowledgePrices()
+                      .then(() => {
+                        setHeldQuote(null);
+                        setQuoteNonce(n => n + 1);
+                      })
+                      .finally(() => setIsAcknowledging(false));
+                  }}
+                />
+              )}
               <form id="checkout-shipping-form" onSubmit={handleSubmit}>
                 {unavailableLinesNotice && !checkoutError && (
                   <div
@@ -2608,7 +2668,12 @@ export default function CheckoutClient() {
                         type="submit"
                         className="w-full sm:w-auto"
                         size="lg"
-                        disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
+                        disabled={
+                          shippingUnavailable ||
+                          belowMinimumOrder ||
+                          goldPriceChanged ||
+                          !shippingSettled
+                        }
                       >
                         {t(
                           'Continue to payment',
@@ -2634,7 +2699,7 @@ export default function CheckoutClient() {
                     }
                     total={total}
                     formatPrice={formatPrice}
-                    belowMinimumOrder={belowMinimumOrder}
+                    belowMinimumOrder={belowMinimumOrder || goldPriceChanged}
                     isDemo={store.isDemo === true}
                     deliverySection={
                       checkoutDelivery ? (
@@ -2758,7 +2823,9 @@ export default function CheckoutClient() {
                   form="checkout-shipping-form"
                   className="w-full sm:w-auto"
                   size="lg"
-                  disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
+                  disabled={
+                    shippingUnavailable || belowMinimumOrder || goldPriceChanged || !shippingSettled
+                  }
                 >
                   {t('Continue to payment', 'المتابعة للدفع')}
                 </Button>

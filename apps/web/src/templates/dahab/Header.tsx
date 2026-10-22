@@ -7,7 +7,7 @@
  * drawer from the inline end (both mirror in Arabic).
  *
  * Sticky is the page builder's `header.sticky` (ShopChrome owns it); this
- * component only paints the night surface, a hairline and, once the page has
+ * component only paints the page surface, a hairline and, once the page has
  * scrolled, a translucent backdrop.
  */
 import { useEffect, useState } from 'react';
@@ -89,9 +89,7 @@ export default function DahabHeader({
     <header
       className={cx(
         'border-b transition-[background-color,border-color] duration-300',
-        scrolled
-          ? 'border-border bg-background/90 backdrop-blur-md'
-          : 'border-border/60 bg-background'
+        scrolled ? 'border-border bg-background' : 'border-border/60 bg-background'
       )}
       style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}

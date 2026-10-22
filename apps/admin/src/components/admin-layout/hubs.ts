@@ -25,6 +25,7 @@ export type HubLabels = {
   blog: string;
   floatingWidget: string;
   sizeCharts: string;
+  goldRates: string;
   // Sales tabs
   orders: string;
   invoices: string;
@@ -102,11 +103,14 @@ export const HUBS: HubDefinition[] = [
       '/catalog',
       '/floating-widget',
       '/size-charts',
+      '/gold-rates',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.products, href: `/stores/${storeId}/products` },
       // Size charts sit with the products they describe (B0 Task 9).
       { label: labels.sizeCharts, href: `/stores/${storeId}/size-charts` },
+      // Gold rate pricing sits with the products it prices (B5 Task 13).
+      { label: labels.goldRates, href: `/stores/${storeId}/gold-rates` },
       { label: labels.editor, href: `/stores/${storeId}/builder` },
       { label: labels.content, href: `/stores/${storeId}/content` },
       { label: labels.blog, href: `/stores/${storeId}/blog` },

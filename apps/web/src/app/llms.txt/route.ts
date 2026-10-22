@@ -63,6 +63,8 @@ interface PublicProduct {
   nameAr?: string;
   slug: string;
   price: number;
+  /** 'gold_rate' when the price follows the store's gold rate (Phase B5). */
+  pricingMode?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +194,9 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[] | null> {
       const res = await fetch(
         `${API_URL}/public/products?limit=${perPage}&page=${page}&status=active`,
         {
-          next: { revalidate: 600 },
+          // Tagged like the product feed so a gold-rate write (which revalidates `products:<store>`) drops this
+          // copy at once instead of leaving yesterday's rate in the data cache for 10 minutes (Ruling B5-21).
+          next: { revalidate: 600, tags: [`products:${storeId}`] },
           headers: {
             'Content-Type': 'application/json',
             'X-Store-ID': storeId,
@@ -518,6 +522,9 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
   // must still receive the feed section when `agent_feed` is on.
   let body: string;
   const degraded = categories === null;
+  // A store that sells gold-rate products lists prices that follow a rate a CDN purge cannot reach: its edge
+  // window is the same at-most-60-second, no-stale-tail BOUNDED-stale class as its product feed (B5-21).
+  let hasGold = false;
   if (store.llmsTxt && store.llmsTxt.trim()) {
     body = store.llmsTxt;
     const base = storeBaseUrl(store);
@@ -545,6 +552,7 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
       });
     }
     body = buildPerStoreBody(store, categories, products, products.length);
+    hasGold = products.some(p => p.pricingMode === 'gold_rate');
   }
 
   // Only sanitize against a category set we actually fetched: an empty set
@@ -565,7 +573,7 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
       // asked, #1853/#2224) gets a short retry TTL so the next request heals it.
       'Cache-Control': viaCookie
         ? 'private, max-age=600'
-        : degraded
+        : degraded || hasGold
           ? 'public, s-maxage=60'
           : 'public, s-maxage=600, stale-while-revalidate=86400',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),

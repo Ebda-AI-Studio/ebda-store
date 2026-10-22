@@ -525,7 +525,7 @@ export function collectRefs(def: PageDefinition): {
   const categorySlugs = new Set<string>();
   const productIds = new Set<string>();
   for (const n of def.sections) {
-    if (n.type === 'collection-list')
+    if (n.type === 'collection-list' || n.type === 'gift-finder')
       for (const b of n.blocks ?? [])
         if (typeof b.settings.categorySlug === 'string' && b.settings.categorySlug)
           categorySlugs.add(b.settings.categorySlug);
@@ -552,7 +552,7 @@ export async function validateDefinition(
   if (refs.categorySlugs.length === 0 && refs.productIds.length === 0) return res;
   const found = await opts.resolveRefs(refs);
   res.definition.sections.forEach((n, i) => {
-    if (n.type === 'collection-list')
+    if (n.type === 'collection-list' || n.type === 'gift-finder')
       (n.blocks ?? []).forEach((b, j) => {
         const s = b.settings.categorySlug;
         if (typeof s === 'string' && s && !found.categorySlugs.has(s))
@@ -560,8 +560,8 @@ export async function validateDefinition(
             issue(
               'REF_NOT_FOUND',
               `/sections/${i}/blocks/${j}/settings/categorySlug`,
-              `Category "${s}" is not in this store; the tile links to all products.`,
-              `الفئة "${s}" غير موجودة في هذا المتجر؛ ستفتح البطاقة كل المنتجات.`
+              `Category "${s}" is not in this store; the ${n.type === 'gift-finder' ? 'occasion is hidden' : 'tile links to all products'}.`,
+              `الفئة "${s}" غير موجودة في هذا المتجر؛ ${n.type === 'gift-finder' ? 'هتختفي المناسبة' : 'ستفتح البطاقة كل المنتجات'}.`
             )
           );
       });

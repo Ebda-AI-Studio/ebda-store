@@ -125,7 +125,10 @@ describe('look section mix', () => {
 
   it('without a look (or a look with no mix) behaves exactly as before', () => {
     const a = applyTemplateFamily(base(), 'qamar');
-    const b = applyTemplateFamily(base(), 'qamar', getLook('dahab.worn'));
+    const b = applyTemplateFamily(base(), 'qamar', {
+      ...getLook('qamar.atelier')!,
+      sections: undefined,
+    });
     expect(b).toEqual(a);
   });
 
@@ -563,7 +566,10 @@ describe('look section mix', () => {
 
     it('without a mix (or without a look) the document is unchanged', () => {
       const page = tagged();
-      expect(documentForLook(page, getLook('dahab.worn'))).toBe(page);
+      // every real look has a mix since Dahab (B5): a mixless look is a copy with the mix removed
+      expect(documentForLook(page, { ...getLook('qamar.atelier')!, sections: undefined })).toBe(
+        page
+      );
       expect(documentForLook(page, null)).toBe(page);
       const plain = base();
       expect(documentForLook(plain, getLook('qamar.atelier'))).toBe(plain);

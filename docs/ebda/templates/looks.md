@@ -13,25 +13,25 @@ Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/
 
 ## The 15 looks
 
-12 of the 15 are `status: 'built'` (the three Qamar looks, flipped in Phase B1 Task 10, the three Souq looks, flipped in Phase B2 Task 7, the three Jasmine looks, flipped in Phase B3 Task 5, and the three Lamma looks, flipped in Phase B4 Task 7, each after the independent audits; Ahmad's STOP rounds were withdrawn 2026-10-21); the other 3 (Dahab) are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks on the `souq` skin (Ruling B2-1); the Jasmine looks on the `jasmine` skin (Ruling B3-1); the Lamma looks on the `lamma` skin (Ruling B4-1); the three Dahab looks still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers the three Qamar, the three Souq, the three Jasmine and the three Lamma looks (each template on its own demo host, Rulings B2-7, B3-8, B4-10). The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
+15 of the 15 are `status: 'built'` (Phase B5 flipped the last three, the Dahab looks, in Task 6; `LOOK_TEMPLATES` keeps Dahab LAST so Qamar stays the signup default, Ruling B5-25). Earlier text: 12 of the 15 were built (the three Qamar looks, flipped in Phase B1 Task 10, the three Souq looks, flipped in Phase B2 Task 7, the three Jasmine looks, flipped in Phase B3 Task 5, and the three Lamma looks, flipped in Phase B4 Task 7, each after the independent audits; Ahmad's STOP rounds were withdrawn 2026-10-21); the other 3 (Dahab) are `designed`. The Qamar looks render on the `qamar` skin (Ruling B1-1); the Souq looks on the `souq` skin (Ruling B2-1); the Jasmine looks on the `jasmine` skin (Ruling B3-1); the Lamma looks on the `lamma` skin (Ruling B4-1); the three Dahab looks still render on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so today it offers the three Qamar, the three Souq, the three Jasmine and the three Lamma looks (each template on its own demo host, Rulings B2-7, B3-8, B4-10). The admin `LookPicker` shows all 15 and, with no look chosen, opens on the first template that has a built look (Qamar; Ruling B1-19).
 
-| Id                   | Template | Name (ar)    | Name (en)        | Status   |
-| -------------------- | -------- | ------------ | ---------------- | -------- |
-| `qamar.atelier`      | qamar    | أتيليه       | Atelier          | built    |
-| `qamar.lookbook`     | qamar    | لوك بوك      | Lookbook         | built    |
-| `qamar.vitrine`      | qamar    | فاترينة      | Vitrine          | built    |
-| `souq.catalogue`     | souq     | كتالوج       | Catalogue        | built    |
-| `souq.night`         | souq     | سوق الليل    | Night souq       | built    |
-| `souq.showroom`      | souq     | شو روم       | Showroom         | built    |
-| `jasmine.apothecary` | jasmine  | عطارة        | Apothecary       | built    |
-| `jasmine.bloom`      | jasmine  | بلوم         | Bloom            | built    |
-| `jasmine.clinic`     | jasmine  | عيادة        | Clinic           | built    |
-| `lamma.table`        | lamma    | سفرة العيلة  | Family table     | built    |
-| `lamma.notebook`     | lamma    | كشكول المطبخ | Kitchen notebook | built    |
-| `lamma.market`       | lamma    | سوق طازة     | Fresh market     | built    |
-| `dahab.worn`         | dahab    | على الإيد    | Worn             | designed |
-| `dahab.workshop`     | dahab    | الورشة       | Workshop         | designed |
-| `dahab.giftbox`      | dahab    | علبة هدية    | Gift box         | designed |
+| Id                   | Template | Name (ar)    | Name (en)        | Status |
+| -------------------- | -------- | ------------ | ---------------- | ------ |
+| `qamar.atelier`      | qamar    | أتيليه       | Atelier          | built  |
+| `qamar.lookbook`     | qamar    | لوك بوك      | Lookbook         | built  |
+| `qamar.vitrine`      | qamar    | فاترينة      | Vitrine          | built  |
+| `souq.catalogue`     | souq     | كتالوج       | Catalogue        | built  |
+| `souq.night`         | souq     | سوق الليل    | Night souq       | built  |
+| `souq.showroom`      | souq     | شو روم       | Showroom         | built  |
+| `jasmine.apothecary` | jasmine  | عطارة        | Apothecary       | built  |
+| `jasmine.bloom`      | jasmine  | بلوم         | Bloom            | built  |
+| `jasmine.clinic`     | jasmine  | عيادة        | Clinic           | built  |
+| `lamma.table`        | lamma    | سفرة العيلة  | Family table     | built  |
+| `lamma.notebook`     | lamma    | كشكول المطبخ | Kitchen notebook | built  |
+| `lamma.market`       | lamma    | سوق طازة     | Fresh market     | built  |
+| `dahab.worn`         | dahab    | على الإيد    | Worn             | built  |
+| `dahab.workshop`     | dahab    | الورشة       | Workshop         | built  |
+| `dahab.giftbox`      | dahab    | علبة هدية    | Gift box         | built  |
 
 The design intent of each direction is in `docs/ebda/templates/2026-10-14-directions.md`. The template ids qamar/souq/jasmine/lamma are `LookTemplate` values only; they are not `TemplateId`/`stores.template` enum values until Phase B (Ruling LOOKS-5). `LookDefinition.skin` is the skin that actually renders.
 
@@ -144,6 +144,20 @@ Signup, onboarding, the admin look switcher and the API offer only looks with `s
 | Fresh market `lamma.market`       | logo start, cart bar, stepper, `aisles` (herb, crimson, aubergine, aqua) | `category-grid` **tiles** with `tint: 'aisles'` (three across on a phone), "order again" row, `on_sale` deals row, dense `featured-collection` (5 across / 2 on a phone), trust strip                                           |
 
 The "order again" row is a `product-carousel` with `productSource: 'reorder'` (Ruling B4-8): per customer, it renders nothing for an anonymous or first-time shopper. `tint`, `tabs` and `variant` are look design keys (`LOOK_DESIGN_KEYS`), so a look switch resets them like any other design field and `design: 'keep'` preserves a merchant's change. The registry colours are re-derived from the directions (Ruling B4-2); the per-look token tables with measured ratios are in `lamma.md`.
+
+## Moving a legacy Dahab store (Phase B5, Ruling B5-3)
+
+A store with `template = 'dahab'` and `look IS NULL` is on the retired night + gold + arch skin. It cannot crash and it does not stay night: the `dahab` skin theme is now a neutral base (white page, ink primary), so such a row renders plain until it is moved. **Production has none**: the read-only count `select count(*) filter (where template='dahab'), count(*) filter (where look like 'dahab.%'), count(*) from stores` returned `0 / 0 / 1` on 2026-10-21 (the one store is `modern`); re-run it at merge time. The script is a safety net for a future import or a restored backup.
+
+```bash
+DATABASE_URL=<owner-role url> npx tsx scripts/dahab-demo/migrate-legacy-dahab.mjs            # dry run (default)
+DATABASE_URL=<owner-role url> npx tsx scripts/dahab-demo/migrate-legacy-dahab.mjs --apply --look dahab.worn
+```
+
+- **Dry run first.** It prints every legacy store and, per store, the look-owned theme keys the merchant still has stored (the keep-diff: under `design: 'keep'` they stay as overrides on top of the new look, so a store that kept the night background keeps it until reset).
+- **`--apply`** calls `StoreService.applyLook(id, look, { design: 'keep' })`, the real merchant path (SQL cannot do the field-level keep-diff or the cache purge). A store that already has a builder revision gets a **draft**, never a live change; the merchant publishes it from the admin.
+- **Idempotent**: a store already on any `dahab.*` look is not selected. Refuses a non-loopback database without `--yes-production` (Ahmad approves that run, an agent never does).
+- **Content is the oracle** (`tests/integration/dahab-apply-look.test.ts`, real Postgres, ebda_app + tenant guard): Worn -> Workshop -> Gift box -> Worn leaves every product row, personalisation config, category photo, logo and hero text (AR + EN) identical; a saved page document with `tileShape: 'arch'` still validates and renders as a rectangle; `reset` drops the stored night/gold keys and keeps non-look keys.
 
 ## Switching a look in the editor, with a preview (Task 9, Ruling EP-3)
 

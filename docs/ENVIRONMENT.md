@@ -160,6 +160,19 @@ To resume, remove the var (or set the old value) the same way. Re-enabling seman
 
 Storefront query embeds (Task 12) are stopped by `SEARCH_SEMANTIC_ENABLED=false` (the vector leg is off) or, keeping the flag on, by `SEARCH_QUERY_EMBED_GLOBAL_DAILY_CAP=0`; search stays keyword-only either way. `SEARCH_EMBED_STORE_DAILY_CAP` does not apply to query embeds.
 
+### Automatic gold rate (Phase B5, Ruling B5-15): NO secret
+
+The optional automatic gold rate needs **no key, token or env var**. The `gold-rate-feed-fetch` Inngest cron (every 6 hours) calls four public, keyless, free commercial-use hosts from the API Worker, and only when at least one store turned the automatic rate on:
+
+| Host                            | Used for                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `api.gold-api.com`              | XAU/USD spot (primary)                                                   |
+| `open.er-api.com`               | USD/EGP (primary; its response is reused until its own next-update time) |
+| `cdn.jsdelivr.net`              | one currency file with `egp` and `xau` (fallback)                        |
+| `latest.currency-api.pages.dev` | the same file, mirror (fallback of the fallback)                         |
+
+Roughly 240 requests a month across these hosts. The `ENVIRONMENT` smoke test boots with all four unreachable: the cron fails loud **at run time** (a P1 alert, nothing written), never at boot. A paid metals API was rejected (Ahmad: no paid plan; the free plan of the usual one forbids commercial use), so there is deliberately no `METALS_API_KEY`. Provider names appear only in `apps/api/src/services/gold-rate/feed/**`, this file, `docs/RULINGS.md` and the admin attribution link (`tests/unit/gold-provider-name-gate.test.ts`).
+
 ## Admin (Cloudflare Worker `ebda-admin`)
 
 - `NEXT_PUBLIC_API_URL` — the live API host, `https://api.ebda.app` (Cloudflare custom domain in front of the Railway API service; the old raw `api-production-c058.up.railway.app` hostname 404s — corrected 2026-09-02)

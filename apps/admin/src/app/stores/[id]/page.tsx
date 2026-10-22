@@ -1,5 +1,6 @@
 'use client';
 
+import { GoldRateBanner } from './_components/GoldRateBanner';
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, useToast } from '@ebda/ui';
@@ -127,6 +128,8 @@ export default function StoreDetailPage() {
         </div>
       }
     >
+      <GoldRateBanner storeId={store.id} />
+
       <SetupGuideCard
         storeId={store.id}
         storeUrl={getStoreHref(store)}

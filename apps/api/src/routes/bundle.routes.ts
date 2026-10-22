@@ -191,10 +191,25 @@ async function resolveBundleLines(
       id: true,
       name: true,
       price: true,
-      variants: { select: { id: true, price: true } },
+      pricingMode: true,
+      variants: { select: { id: true, price: true, pricingMode: true } },
     },
   });
   const productsById = new Map(products.map(p => [p.id, p]));
+
+  // Ruling B5-19: a gold-rate product cannot be a bundle component. A bundle price is fixed while its
+  // parts drift with the rate, so BUNDLE_PRICE_NOT_ALLOCATABLE would fire daily. Sell the set as one product.
+  for (const item of items) {
+    const p = productsById.get(item.productId);
+    const v = item.variantId ? p?.variants.find(x => x.id === item.variantId) : undefined;
+    if (p && (v?.pricingMode ?? p.pricingMode) === 'gold_rate')
+      throw new AppError(
+        409,
+        'GOLD_IN_BUNDLE',
+        `"${p.name}" is priced by the gold rate and cannot be part of a bundle. Sell the set as one product.`,
+        { messageAr: 'القطعة دي بتتسعّر بسعر الدهب ومينفعش تبقى جوه باقة. بيع الطقم كمنتج واحد.' }
+      );
+  }
 
   // Same rule as `noDuplicateComponents` on the schemas, enforced again here
   // so it holds for EVERY path into this resolver — and, unlike a Zod refine,

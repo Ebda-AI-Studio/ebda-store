@@ -25,8 +25,16 @@
 // where the "order again" row renders, Ruling B4-9), lamma-dates (a Friday off day with the made-to-order
 // lead times) and lamma-cod. The card method is the PaymentStep unit render (B1-20).
 //
+// Dahab (--template dahab, Phase B5): dahab-empty, dahab-one (a gold-rate chain: the single-product shape
+// still shows a gold line), dahab-500, dahab-noimg, dahab-longnames, dahab-edge-light / -dark,
+// dahab-logo-wide / -tall / -none, dahab-white-photos (Workshop with white-background merchant photos),
+// dahab-cod, dahab-legacy (a store created on the retired skin, `look` NULL, moved onto Worn through
+// applyLook(keep), the migration path of Ruling B5-3) and dahab-gold (the gold E2E store: its owner can
+// log in, dahab-gold-owner@example.test, so a test can change the rate through the admin API).
+// Every Dahab store is gold-priced with the demo's manual rates (seedGold).
+//
 //   DATABASE_URL=<owner-role local postgres url> QAMAR_DEMO_ASSET_BASE=/__qamar-demo \
-//     npx tsx scripts/storedemo/scenario-stores.mjs [--template qamar|souq|jasmine|lamma]
+//     npx tsx scripts/storedemo/scenario-stores.mjs [--template qamar|souq|jasmine|lamma|dahab]
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -39,6 +47,7 @@ import {
   hostOf,
   assetBase,
   seedCatalogue,
+  seedGold,
   seedStoreClaim,
   templateFromArgv,
   SHOWROOM_THEME,
@@ -105,6 +114,30 @@ export const LAMMA_SCENARIOS = [
   ['lamma-dates', 'lamma.table', { dates: true }],
   ['lamma-cod', 'lamma.table', {}],
 ];
+export const DAHAB_SCENARIOS = [
+  ['dahab-empty', 'dahab.worn', { products: 0 }],
+  ['dahab-one', 'dahab.workshop', { products: 1 }],
+  ['dahab-500', 'dahab.giftbox', { products: 500 }],
+  ['dahab-noimg', 'dahab.worn', { noImages: true }],
+  ['dahab-longnames', 'dahab.workshop', { longNames: true }],
+  ['dahab-edge-light', 'dahab.giftbox', { edge: 'wide', primary: '0 0% 98%' }],
+  ['dahab-edge-dark', 'dahab.worn', { edge: 'tall', primary: '0 0% 4%' }],
+  ['dahab-logo-wide', 'dahab.workshop', { edge: 'wide' }],
+  ['dahab-logo-tall', 'dahab.giftbox', { edge: 'tall' }],
+  ['dahab-logo-none', 'dahab.worn', { edge: 'nologo' }],
+  // Workshop is a committed teal page: white-background merchant photos must sit on a light band
+  // (quality bar section 9 rule 1).
+  ['dahab-white-photos', 'dahab.workshop', { whitePhotos: true }],
+  ['dahab-cod', 'dahab.giftbox', {}],
+  // A store that was on the retired night + gold skin (`look` NULL) and was moved onto Worn with
+  // `design: 'keep'`: its own theme overrides survive on top of the new look (Ruling B5-3).
+  ['dahab-legacy', 'dahab.worn', { legacy: true }],
+  // The gold E2E store: a merchant who can log in, to change the rate through the admin API.
+  ['dahab-gold', 'dahab.worn', { goldOwner: true }],
+  // The same merchant on the other two looks: the purchase-path pack shoots the two gold screens per look.
+  ['dahab-gold-workshop', 'dahab.workshop', { goldOwner: true }],
+  ['dahab-gold-giftbox', 'dahab.giftbox', { goldOwner: true }],
+];
 export const SCENARIOS = QAMAR_SCENARIOS;
 
 /** What differs per template: the lists, display names, asset dir, the one-product slug and the 500-store category/photo. */
@@ -149,6 +182,16 @@ const PER_TEMPLATE = {
     category: 'produce',
     photo: 'tomatoes.webp',
   },
+  dahab: {
+    list: DAHAB_SCENARIOS,
+    assetDir: '__dahab-demo',
+    word: 'DAHAB',
+    name: 'Cairo Jewellery',
+    nameAr: 'مجوهرات القاهرة',
+    one: 'gold-chain-21',
+    category: 'rings',
+    photo: 'ring-silver.webp',
+  },
 };
 
 const svg = (w, h, word = 'QAMAR') =>
@@ -164,7 +207,7 @@ async function run() {
   }
   const spec = templateFromArgv(process.argv.slice(2));
   if (!spec) {
-    console.error('Unknown --template; expected qamar, souq, jasmine or lamma.');
+    console.error('Unknown --template; expected qamar, souq, jasmine, lamma or dahab.');
     process.exit(2);
   }
   const T = PER_TEMPLATE[spec.template];
@@ -180,6 +223,9 @@ async function run() {
     `${root}/apps/api/src/services/page-builder.service.ts`
   );
   const { invalidateStoreProductCaches } = await import(`${root}/apps/api/src/lib/public-cache.ts`);
+  const { GoldRateService } = await import(
+    `${root}/apps/api/src/services/gold-rate/gold-rate.service.ts`
+  );
   mkdirSync(LOGO_DIR, { recursive: true });
   writeFileSync(resolve(LOGO_DIR, 'logo-wide.svg'), svg(600, 60, word));
   writeFileSync(resolve(LOGO_DIR, 'logo-tall.svg'), svg(60, 400, word));
@@ -209,14 +255,32 @@ async function run() {
         where: { slug },
         select: { id: true, isDemo: true, ownerId: true },
       });
-      const claim = seedStoreClaim(held, owner, { demo: false });
+      // dahab-gold belongs to a merchant who can log in (so a test can use the admin API); every other
+      // scenario store belongs to the seed owner.
+      let storeOwner = owner;
+      if (shape.goldOwner) {
+        const email = 'dahab-gold-owner@example.test';
+        storeOwner =
+          (await prisma.user.findFirst({ where: { email, storeId: null } })) ??
+          (await prisma.user.create({
+            data: {
+              email,
+              passwordHash: await bcrypt.hash('Gold-Owner-1', 10),
+              firstName: 'Gold',
+              lastName: 'Owner',
+              role: 'store_admin',
+              emailVerified: true,
+            },
+          }));
+      }
+      const claim = seedStoreClaim(held, storeOwner, { demo: false });
       if (!claim.ok) throw new Error(`refusing to touch store "${slug}": ${claim.why}`);
       const s = await prisma.store.upsert({
         where: { slug },
         update: data,
         create: {
           slug,
-          ownerId: owner.id,
+          ownerId: storeOwner.id,
           template: spec.template,
           theme: SHOWROOM_THEME,
           currency: 'EGP',
@@ -224,7 +288,17 @@ async function run() {
         },
       });
       await runInStoreScope(s.id, async () => {
-        await seedCatalogue(prisma, Prisma, s.id, a.base, spec);
+        const seeded = await seedCatalogue(prisma, Prisma, s.id, a.base, spec);
+        // Phase B5: every Dahab store prices its gold pieces from the demo's manual rates.
+        if (spec.gold)
+          await seedGold(
+            prisma,
+            s.id,
+            storeOwner.id,
+            spec,
+            seeded.productIdBySlug,
+            GoldRateService
+          );
         if (shape.products === 0) {
           await prisma.product.updateMany({
             where: { storeId: s.id },
@@ -370,7 +444,22 @@ async function run() {
             });
           }
         }
-        const r = await StoreService.applyLook(s.id, lookId, { design: 'reset' }, owner.id);
+        if (shape.legacy) {
+          // The retired skin: no look, the merchant's own theme on top (what `keep` must preserve).
+          await prisma.store.update({
+            where: { id: s.id },
+            data: {
+              look: null,
+              theme: { ...SHOWROOM_THEME, primaryColor: '36 52% 40%' },
+            },
+          });
+        }
+        const r = await StoreService.applyLook(
+          s.id,
+          lookId,
+          { design: shape.legacy ? 'keep' : 'reset' },
+          storeOwner.id
+        );
         if (r.builder === 'draft') {
           const state = await getPageState(s.id, 'home');
           const pub = await publishDraft({ storeId: s.id, pageKey: 'home', baseRev: state.rev });

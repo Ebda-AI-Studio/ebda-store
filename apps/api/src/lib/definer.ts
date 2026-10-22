@@ -1009,3 +1009,37 @@ export async function withdrawLegalNoticeSend(sendId: string): Promise<number> {
     SELECT public.ebda_withdraw_legal_notice_send(${sendId}) AS n`;
   return Number(rows[0]?.n ?? 0);
 }
+
+// ---------------------------------------------------------------------------
+// Gold-rate pricing crons (Phase B5 Task 11): cron-facing, UNGUARDED ON PURPOSE (no principal)
+// ---------------------------------------------------------------------------
+
+/** Stores that turned the automatic gold rate on, with their premium (bps). Empty on almost every tick. */
+export async function goldFeedStores(): Promise<Array<{ storeId: string; premiumBps: number }>> {
+  const rows = await prisma.$queryRaw<
+    Array<{ store_id: string; feed_premium_bps: number }>
+  >`SELECT store_id, feed_premium_bps FROM public.ebda_gold_feed_stores()`;
+  return rows.map(r => ({ storeId: r.store_id, premiumBps: r.feed_premium_bps }));
+}
+
+/** (store, karat) pairs whose applied gold rate is inside the stale-warning window or past the max age. */
+export async function goldRateWatch(): Promise<
+  Array<{ storeId: string; karat: number; rateId: string; appliedAt: Date; maxAgeMinutes: number }>
+> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      store_id: string;
+      karat: number;
+      rate_id: string;
+      applied_at: Date;
+      max_age_minutes: number;
+    }>
+  >`SELECT store_id, karat, rate_id, applied_at, max_age_minutes FROM public.ebda_gold_rate_watch()`;
+  return rows.map(r => ({
+    storeId: r.store_id,
+    karat: r.karat,
+    rateId: r.rate_id,
+    appliedAt: r.applied_at,
+    maxAgeMinutes: r.max_age_minutes,
+  }));
+}

@@ -14,6 +14,11 @@ import { ResendService } from './resend.service';
 // through the durable Redis retry queue (E2-5).
 import { emailQueue } from './email-queue.service';
 import { welcomeTemplate } from './email-templates/welcome';
+import {
+  GOLD_RATE_NOTICES,
+  type GoldRateNoticeData,
+  type GoldRateNoticeKind,
+} from './email-templates/gold-rate-notices';
 import { passwordResetTemplate } from './email-templates/password-reset';
 import { passkeyNoticeTemplate, type PasskeyNoticeData } from './email-templates/passkey-notice';
 import { emailVerificationTemplate } from './email-templates/email-verification';
@@ -1140,6 +1145,33 @@ export class EmailService {
     const subject = lowStockAlertTemplate.subject[lang](alertData);
     const content = lowStockAlertTemplate[lang](alertData);
     await this.sendForStore(storeId, { to: data.to, subject, content, language: lang });
+  }
+
+  /**
+   * Merchant notice about the gold rate (Phase B5 Task 11): a stale-rate warning, the selling-paused
+   * notice, or a pending automatic rate waiting for confirmation. Store default language.
+   */
+  static async sendGoldRateNotice(
+    storeId: string,
+    kind: GoldRateNoticeKind,
+    data: GoldRateNoticeData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+    );
+    const lang: 'en' | 'ar' =
+      language ??
+      resolveDefaultLanguage(
+        (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
+    const tpl = GOLD_RATE_NOTICES[kind];
+    await this.sendForStore(storeId, {
+      to: data.to,
+      subject: tpl.subject[lang](),
+      content: tpl[lang](data),
+      language: lang,
+    });
   }
 
   /**

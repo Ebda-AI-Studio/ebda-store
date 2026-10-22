@@ -83,6 +83,8 @@ Refuse: "ship on one tenant first, roll out later", "setting for store X only", 
 
 **`products.inventory` is stock ONLY for a product with NO variants; for a variant product it is unused and stays 0, and the stock is `SUM(product_variants.inventory)` over ACTIVE variants — a disabled (`isActive=false`) variant is not stock anywhere (owner, 2026-09-25).** Read stock via `effectiveInventory`/`isOrderable`/`EFFECTIVE_STOCK_SELECT` (`apps/api/src/lib/effective-inventory.ts`) or `ON_HAND_SQL` (`…-sql.ts`) — never by dereferencing `.inventory`, and never with a filter that disagrees with its computation. One line writes the variant row XOR the product row, never both. Every variant write busts the product caches. Full rules + the 2026-08-30 defect that produced them: **`docs/architecture/inventory-model.md`**.
 
+**Gold-rate pricing (Phase B5):** the `price` column of a gold-priced product or variant is the REPRICER's, never typed or written elsewhere (a DB trigger refuses it); stock is untouched. Rates, the formula, the order gate, cache layers, failure codes and the runbook: **`docs/architecture/gold-rate-pricing.md`**.
+
 ## Per-store visual configuration
 
 Canonical editors, all StoreTheme flags, the product-card CTA/OOS system, PLP facets, AI balancer, and layout invariants: **`docs/architecture/store-theme-flags.md`**. Binding headlines: the visual editor (`/stores/:id/builder`; the form Page Builder was retired 2026-10-22, its routes redirect) + Smart Palette are the canonical design system (the Branding tab's color/font/preset pickers are retired inputs); theme PUT is a server-side shallow-merge PATCH — send only the keys your surface owns; new visual toggles default OFF (rule 2 below); Store columns instead of StoreTheme JSON only when API-gated.

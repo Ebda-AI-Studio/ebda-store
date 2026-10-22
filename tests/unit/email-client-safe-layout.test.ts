@@ -57,6 +57,7 @@ import { returnConfirmationTemplate } from '@api/services/email-templates/return
 import { returnStatusUpdateTemplate } from '@api/services/email-templates/return-status-update';
 import { reviewRequestTemplate } from '@api/services/email-templates/review-request';
 import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-alert';
+import { GOLD_RATE_NOTICES } from '@api/services/email-templates/gold-rate-notices';
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
 import { lifecycleContent } from '@api/services/email-templates/lifecycle';
 import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-disabled';
@@ -197,6 +198,37 @@ const TEMPLATES: Record<string, Tpl> = {
   returnStatusUpdate: returnStatusUpdateTemplate,
   reviewRequest: reviewRequestTemplate,
   lowStockAlert: lowStockAlertTemplate,
+  // Gold-rate notices (Phase B5): the warning, the selling-paused and the pending-rate notice share one file.
+  goldRateNotices: {
+    en: () =>
+      (['warning', 'blocked', 'pending'] as const)
+        .map(k =>
+          GOLD_RATE_NOTICES[k].en({
+            storeName: 'Demo Store',
+            adminUrl: 'https://admin.test',
+            hours: 22,
+            maxHours: 26,
+            karat: 21,
+            rateText: '6,238 EGP',
+            jumpText: '7.0%',
+          })
+        )
+        .join(''),
+    ar: () =>
+      (['warning', 'blocked', 'pending'] as const)
+        .map(k =>
+          GOLD_RATE_NOTICES[k].ar({
+            storeName: 'Demo Store',
+            adminUrl: 'https://admin.test',
+            hours: 22,
+            maxHours: 26,
+            karat: 21,
+            rateText: '6,238 EGP',
+            jumpText: '7.0%',
+          })
+        )
+        .join(''),
+  },
   planLimitReached: planLimitReachedTemplate,
   webhookDisabled: webhookDisabledTemplate,
   subscriptionBilling: subscriptionBillingTemplate,

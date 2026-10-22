@@ -25,3 +25,22 @@ export function uniqueViolationTarget(err: unknown): string[] {
 export function isP2002(err: unknown): boolean {
   return (err as { code?: unknown } | null | undefined)?.code === 'P2002';
 }
+
+/**
+ * True when the database raised GOLD_PRICE_MANAGED (SQLSTATE P0001) from `ebda_gold_price_guard`:
+ * a writer tried to change the price of a gold-rate row outside the repricer (Ruling B5-13). The
+ * message lives in a different place per engine (`err.message` for the Rust engine,
+ * `meta.driverAdapterError.cause.originalMessage` over a driver adapter), so both are read.
+ */
+export function isGoldPriceManaged(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as {
+    message?: unknown;
+    meta?: { driverAdapterError?: { cause?: { originalMessage?: unknown; message?: unknown } } };
+    cause?: { message?: unknown };
+  };
+  const cause = e.meta?.driverAdapterError?.cause;
+  return [e.message, cause?.originalMessage, cause?.message, e.cause?.message].some(
+    m => typeof m === 'string' && m.includes('GOLD_PRICE_MANAGED')
+  );
+}

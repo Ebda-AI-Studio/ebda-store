@@ -34,6 +34,7 @@ import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 import { FactsCard } from './_components/FactsCard';
 import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
+import { GoldPricingCard } from './_components/GoldPricingCard';
 import { WholesalePricingCard } from './_components/WholesalePricingCard';
 import type { SizeChartOption } from '@/components/SizeChartSelect';
 import {
@@ -56,6 +57,13 @@ interface Product {
   excerpt?: string;
   excerptAr?: string;
   price: number;
+  /** Gold-rate pricing (B5): the price is the repricer's; the form never sends it. */
+  pricingMode?: 'fixed' | 'gold_rate' | null;
+  goldKarat?: number | null;
+  goldWeightMg?: number | null;
+  makingChargeType?: 'fixed' | 'per_gram' | null;
+  makingChargeValue?: number | null;
+  goldMarginBps?: number | null;
   compareAtPrice?: number | null;
   costPrice?: number | null;
   /** B2B (owned by WholesalePricingCard, not by this form). */
@@ -553,13 +561,18 @@ export default function EditProductPage() {
         ...productTextFields(formData, 'update'),
         excerpt: formData.excerpt || null,
         excerptAr: formData.excerptAr || null,
-        price: finalPrice,
-        // null clears an existing compare-at price when no discount is active.
-        compareAtPrice: finalCompareAtPrice,
+        // A gold-priced product's price, compare-at and discount belong to the repricer (Ruling B5-13).
+        ...(product.pricingMode === 'gold_rate'
+          ? {}
+          : {
+              price: finalPrice,
+              // null clears an existing compare-at price when no discount is active.
+              compareAtPrice: finalCompareAtPrice,
+              // null clears previously stored discount columns.
+              discountType: apiDiscountType,
+              discountValue: apiDiscountValue,
+            }),
         costPrice: costPriceInFils,
-        // null clears previously stored discount columns.
-        discountType: apiDiscountType,
-        discountValue: apiDiscountValue,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         // Only send when filled so an empty field doesn't clobber the existing
         // threshold with 0. The API leaves it untouched when omitted.
@@ -914,7 +927,8 @@ export default function EditProductPage() {
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
                   placeholder={tFields('pricePlaceholder')}
-                  required
+                  required={product?.pricingMode !== 'gold_rate'}
+                  disabled={product?.pricingMode === 'gold_rate'}
                 />
                 <Input
                   label={tFields('costPrice')}
@@ -930,6 +944,7 @@ export default function EditProductPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <Select
                   label={tFields('discountLabel')}
+                  disabled={product?.pricingMode === 'gold_rate'}
                   value={discountType}
                   onChange={e => {
                     setDiscountType(e.target.value as DiscountTypeUI);
@@ -1056,6 +1071,15 @@ export default function EditProductPage() {
                 />
               </div>
             </div>
+
+            {product ? (
+              <GoldPricingCard
+                storeId={storeId}
+                product={product}
+                facts={facts}
+                onSaved={() => window.location.reload()}
+              />
+            ) : null}
 
             {product ? (
               <WholesalePricingCard

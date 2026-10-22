@@ -8,7 +8,7 @@
  * These are page-composition presets, distinct from the five legacy component
  * skins (`TemplateId`: modern/elegant/classic/minimal/bold).
  */
-import type { PageDefinition, SectionNode } from './schema';
+import type { BlockNode, PageDefinition, SectionNode } from './schema';
 import type { TemplateId } from '../types/store-theme';
 import { getSectionDefinition } from './registry';
 import { layoutToDefinition, sectionFromPreset } from './adapter';
@@ -75,6 +75,12 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
       'testimonials',
       'trust-badges',
       'newsletter',
+      // Phase B5 (Rulings B5-7, B5-8): the gift finder is new; the journey strip reuses Jasmine's `steps`.
+      'gift-finder',
+      'steps',
+      'category-grid',
+      'product-carousel',
+      'brand-story',
       'footer',
     ],
     pendingSectionTypes: [],
@@ -326,6 +332,7 @@ export function applyTemplateFamily(
         continue;
       const freshNode = sectionFromPreset(spec.type, 0, uniqueSectionId(doc, spec.type));
       freshNode.settings = { ...freshNode.settings, ...(spec.preset ?? {}), ...incoming };
+      if (spec.blocks) freshNode.blocks = specBlocks(spec.blocks);
       fresh.add(freshNode.id);
       doc = { ...doc, sections: [...doc.sections, freshNode] };
       continue;
@@ -430,5 +437,18 @@ function editedSinceLook(n: SectionNode, opts: ApplyLookOptions, nth = 0): boole
       sameValue(n.settings[k], seed[k])
     );
   if (!seeds.some(untouched)) return true;
-  return !sameValue(n.blocks ?? [], preset.blocks ?? []);
+  // The baseline blocks are the outgoing mix's own (Ruling B5-8) when it named some, else the preset's.
+  const baseline = spec?.blocks
+    ? specBlocks(spec.blocks)
+    : (preset.blocks ?? []).map(b => ({ ...b }));
+  return !sameValue(n.blocks ?? [], baseline);
+}
+
+/** Blocks a look spec seeds, with the ids `sectionFromPreset` gives preset blocks. */
+function specBlocks(blocks: NonNullable<LookSectionSpec['blocks']>): BlockNode[] {
+  return blocks.map((b, i) => ({
+    id: `${b.type}-${i + 1}`,
+    type: b.type,
+    settings: { ...b.settings },
+  }));
 }

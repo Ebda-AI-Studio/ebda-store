@@ -47,6 +47,7 @@ import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
+import { plpUrlPrice } from '../../lib/plp-url-price';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { countText, RESULTS } from '../../lib/plural';
 import { tagLabel } from '../../lib/tag-label';
@@ -160,8 +161,11 @@ export default function ProductsClient({
 
   // Price range in MAJOR units (EGP). 0–5000 EGP covers most catalogue SKUs;
   // see PRICE_SLIDER_MAX.
-  const [priceMin, setPriceMin] = useState(0);
-  const [priceMax, setPriceMax] = useState(PRICE_SLIDER_MAX);
+  // Ruling B5-7: the URL seeds the range (lib/plp-url-price.ts), so budget links land filtered.
+  const [urlPrice] = useState(() => plpUrlPrice(searchParams, PRICE_SLIDER_MAX));
+  const sliderMax = urlPrice.sliderMax;
+  const [priceMin, setPriceMin] = useState(urlPrice.min);
+  const [priceMax, setPriceMax] = useState(urlPrice.max || sliderMax);
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -394,7 +398,7 @@ export default function ProductsClient({
         // Skip the bound when it equals the slider's natural rest position so
         // we don't restrict the result set unnecessarily.
         if (priceMin > 0) params.minPrice = String(roundToMinor(priceMin));
-        if (priceMax < PRICE_SLIDER_MAX) params.maxPrice = String(roundToMinor(priceMax));
+        if (priceMax < sliderMax) params.maxPrice = String(roundToMinor(priceMax));
 
         // Pass active option filters — API serialises them to ?opt_<name>=val1,val2
         const activeOptionFilters =
@@ -575,7 +579,7 @@ export default function ProductsClient({
     setTagFilter('');
     setSortBy('default');
     setPriceMin(0);
-    setPriceMax(100);
+    setPriceMax(sliderMax);
     setOptionFilters({});
   };
 
@@ -714,7 +718,7 @@ export default function ProductsClient({
                     priceMin={priceMin}
                     priceMax={priceMax}
                     priceFloor={0}
-                    priceCeil={PRICE_SLIDER_MAX}
+                    priceCeil={sliderMax}
                     priceStep={PRICE_SLIDER_STEP}
                     onPriceChange={(min, max) => {
                       setPriceMin(min);
@@ -727,17 +731,12 @@ export default function ProductsClient({
                     bgTriplet={
                       filterSidebar?.bgColor
                         ? colorToHslTriplet(filterSidebar.bgColor, store.theme) || undefined
-                        : templateId === 'dahab'
-                          ? // Dahab: a night card panel, not a gold slab (merchant colour still wins).
-                            colorToHslTriplet('token:card', store.theme) || undefined
-                          : undefined
+                        : undefined
                     }
                     fgTriplet={
                       filterSidebar?.textColor
                         ? colorToHslTriplet(filterSidebar.textColor, store.theme) || undefined
-                        : templateId === 'dahab'
-                          ? colorToHslTriplet('token:foreground', store.theme) || undefined
-                          : undefined
+                        : undefined
                     }
                   />
                   {/* View Mode */}
@@ -865,7 +864,7 @@ export default function ProductsClient({
                           type="button"
                           aria-pressed={dahabCols === n}
                           onClick={() => setDahabCols(n)}
-                          className={`h-9 w-10 tabular-nums transition-colors ${dahabCols === n ? 'text-primary' : 'hover:text-foreground'}`}
+                          className={`h-11 w-11 tabular-nums transition-colors ${dahabCols === n ? 'font-semibold text-primary underline underline-offset-4' : 'hover:text-foreground'}`}
                         >
                           {n}
                         </button>

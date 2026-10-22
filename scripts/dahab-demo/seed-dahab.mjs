@@ -53,7 +53,7 @@ const MEDIA = opt(
 const img = key => `${MEDIA}/${key}.webp`;
 const OWNER_EMAIL = opt('--owner-email', 'dahab-demo@ebda.app');
 
-const { COLLECTIONS, PRODUCTS, REVIEWS, OPTION_AR, VALUE_AR } = await import('./catalogue.mjs');
+const { COLLECTIONS, PRODUCTS, REVIEWS, OPTION_AR, VALUE_AR } = await import('./legacy-catalogue.mjs');
 const { prisma, runInStoreScope, withOwnerTx } = await import('@ebda/database');
 const shared = await import('@ebda/shared');
 const { ensureAdminUser } = await import(`${root}/apps/api/src/lib/definer.ts`);

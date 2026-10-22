@@ -68,6 +68,23 @@ import {
 import { OnboardingService } from '@api/services/onboarding.service';
 import { createStoreSchema } from '@api/routes/onboarding.schemas';
 
+/**
+ * Every look is built since Phase B5, so the "not built" cases flip ONE look back to designed for the
+ * duration of the check (the registry is a plain array; the gate reads `status` at call time).
+ */
+async function withDesignedLook<T>(
+  fn: (designed: (typeof LOOKS)[number]) => Promise<T> | T
+): Promise<T> {
+  const designed = LOOKS[LOOKS.length - 1]!;
+  const before = designed.status;
+  (designed as { status: string }).status = 'designed';
+  try {
+    return await fn(designed);
+  } finally {
+    (designed as { status: string }).status = before;
+  }
+}
+
 const LEGACY = ['modern', 'elegant', 'classic', 'minimal', 'bold'] as const;
 const body = { name: 'Shop', slug: 'my-shop' };
 
@@ -114,10 +131,11 @@ describe('the API refuses to CREATE a store on an old skin (Zod at the edge)', (
       true
     );
   });
-  it('rejects an unknown look and a look that is not built yet', () => {
+  it('rejects an unknown look and a look that is not built yet', async () => {
     expect(createStoreSchema.safeParse({ ...body, lookId: 'qamar.nope' }).success).toBe(false);
-    const designed = LOOKS.find(l => l.status === 'designed')!;
-    expect(createStoreSchema.safeParse({ ...body, lookId: designed.id }).success).toBe(false);
+    await withDesignedLook(designed => {
+      expect(createStoreSchema.safeParse({ ...body, lookId: designed.id }).success).toBe(false);
+    });
   });
 });
 
@@ -141,15 +159,18 @@ describe('OnboardingService.createStore (service layer, defence in depth)', () =
   });
 
   it('refuses a look that is not built before anything is created', async () => {
-    const designed = LOOKS.find(l => l.status === 'designed')!;
-    await expect(
-      OnboardingService.createStore({ userId: 'u1' }, { ...body, lookId: designed.id })
-    ).rejects.toMatchObject({ code: 'LOOK_NOT_AVAILABLE' });
+    await withDesignedLook(async designed => {
+      await expect(
+        OnboardingService.createStore({ userId: 'u1' }, { ...body, lookId: designed.id })
+      ).rejects.toMatchObject({ code: 'LOOK_NOT_AVAILABLE' });
+    });
     expect(m.provision).not.toHaveBeenCalled();
   });
 
   it('MUTATION: a look flipped to built becomes creatable with no code change; flipped back it is refused', async () => {
-    const designed = LOOKS.find(l => l.status === 'designed')!;
+    const designed = LOOKS[LOOKS.length - 1]!;
+    (designed as { status: string }).status = 'designed';
+    expect(createStoreSchema.safeParse({ ...body, lookId: designed.id }).success).toBe(false);
     try {
       (designed as { status: string }).status = 'built';
       expect(createStoreSchema.safeParse({ ...body, lookId: designed.id }).success).toBe(true);
@@ -161,5 +182,6 @@ describe('OnboardingService.createStore (service layer, defence in depth)', () =
       (designed as { status: string }).status = 'designed';
     }
     expect(createStoreSchema.safeParse({ ...body, lookId: designed.id }).success).toBe(false);
+    (designed as { status: string }).status = 'built'; // restore: every look is built
   });
 });

@@ -25,6 +25,8 @@ import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { withSavepoint } from '../lib/savepoint';
 import { PriceResolver } from './price-resolver.service';
+import { goldQuoteKey, goldQuotesForLines } from './gold-rate/gate';
+import { publicGoldPricingForLines } from './gold-rate/public';
 import { canSeeWholesaleOnly } from '../lib/audience';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
@@ -235,11 +237,43 @@ export class CartService {
           qty: item.quantity,
         }))
     ) ?? Promise.resolve(new Map<string, Resolved>()));
+    // Gold pieces: the storefront-safe pricing facts per line (karat, weight, today's rate, when). One
+    // query for the whole cart; fixed-price lines are absent.
+    const goldByLine = opts.skipPricing
+      ? new Map<string, never>()
+      : await publicGoldPricingForLines(
+          prisma as unknown as Prisma.TransactionClient,
+          storeId,
+          items
+            .filter(i => !i.unavailable)
+            .map(i => ({
+              productId: i.productId,
+              variantId: (i as { variantId?: string | null }).variantId ?? null,
+            }))
+        );
     const pricedItems = items.map(item => {
       const r = priced.get(item.id);
       if (!r) return item;
+      // Ruling B5-17: a gold line carries the price it was added at; when the current base price differs
+      // the cart says so and the checkout shows "السعر اتحدّث" until the shopper acknowledges.
+      const quoted = (item as { quotedUnitPrice?: number | null }).quotedUnitPrice ?? null;
+      const currentBase = item.variant?.price ?? item.product.price;
+      const goldChanged = quoted !== null && quoted !== currentBase;
       return {
         ...item,
+        ...(goldChanged ? { priceChanged: true, previousUnitPrice: quoted } : {}),
+        ...(goldByLine.get(
+          goldQuoteKey(item.productId, (item as { variantId?: string | null }).variantId ?? null)
+        )
+          ? {
+              goldPricing: goldByLine.get(
+                goldQuoteKey(
+                  item.productId,
+                  (item as { variantId?: string | null }).variantId ?? null
+                )
+              ),
+            }
+          : {}),
         // Server-resolved display values: the cart / checkout render THESE and never multiply a price client-side.
         unitPrice: r.unitMinor,
         lineTotal: r.unitMinor * item.quantity,
@@ -567,8 +601,20 @@ export class CartService {
         // Committed it's P2002, so the retry wrapper below is told to retry
         // P2002 too — on the re-run findFirst sees the winner's row and the
         // existing-branch above merges the quantity.
+        // Ruling B5-17: a gold line stores the price the SERVER shows right now as its quote (never a client
+        // value); a fixed-price line stores none. A quantity change later leaves it untouched.
+        const quote = (
+          await goldQuotesForLines(tx, storeId, [{ productId, variantId: variantId ?? null }])
+        ).get(goldQuoteKey(productId, variantId ?? null));
         await tx.cartItem.create({
-          data: { cartId: cart.id, productId, variantId: variantId ?? null, note, quantity },
+          data: {
+            cartId: cart.id,
+            productId,
+            variantId: variantId ?? null,
+            note,
+            quantity,
+            ...(quote ?? {}),
+          },
         });
       }
     };
@@ -636,6 +682,45 @@ export class CartService {
     });
 
     return this.getOrCreate(storeId, sessionId, customerId, buyer);
+  }
+
+  /**
+   * "متابعة" on the price-updated notice (Ruling B5-17): every gold line's quote becomes the CURRENT
+   * base price, so the checkout may proceed. The values come from the database, never the client.
+   * Returns how many lines were re-quoted.
+   */
+  static async acknowledgePrices(
+    storeId: string,
+    sessionId: string,
+    customerId?: string
+  ): Promise<{ acknowledged: number }> {
+    const cart = await prisma.cart.findFirst({
+      where: { storeId, OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])] },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true },
+    });
+    if (!cart) return { acknowledged: 0 };
+    const lines = await prisma.cartItem.findMany({
+      where: { cartId: cart.id, quotedUnitPrice: { not: null } },
+      select: {
+        id: true,
+        quotedUnitPrice: true,
+        product: { select: { price: true } },
+        variant: { select: { price: true } },
+      },
+    });
+    const now = new Date();
+    let acknowledged = 0;
+    for (const l of lines) {
+      const current = l.variant?.price ?? l.product.price;
+      if (current === l.quotedUnitPrice) continue;
+      await prisma.cartItem.updateMany({
+        where: { id: l.id, cartId: cart.id },
+        data: { quotedUnitPrice: current, quotedAt: now },
+      });
+      acknowledged++;
+    }
+    return { acknowledged };
   }
 
   /**
@@ -961,6 +1046,11 @@ export class CartService {
         } else {
           // Same-cart unique race → P2002, retried at the tx level (see
           // addItem + the extraRetryCodes below).
+          const quote = (
+            await goldQuotesForLines(tx, storeId, [
+              { productId: item.productId, variantId: item.variantId ?? null },
+            ])
+          ).get(goldQuoteKey(item.productId, item.variantId ?? null));
           await tx.cartItem.create({
             data: {
               cartId: cart.id,
@@ -968,6 +1058,7 @@ export class CartService {
               variantId: item.variantId ?? null,
               note: item.note,
               quantity: item.quantity,
+              ...(quote ?? {}),
             },
           });
         }
@@ -1246,6 +1337,9 @@ export class CartService {
             variantId: guestItem.variantId ?? null,
             note: guestItem.note ?? null,
             quantity: guestItem.quantity,
+            // what the shopper was shown stays what they were shown (Ruling B5-17)
+            quotedUnitPrice: guestItem.quotedUnitPrice ?? null,
+            quotedAt: guestItem.quotedAt ?? null,
           },
         });
       }

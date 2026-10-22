@@ -29,6 +29,7 @@ import { useNumerals } from '@/hooks/useNumerals';
 import { formatDate } from '@/lib/format-date';
 import { paymentMethodLabel, paymentProviderLabel } from '@/lib/order-labels';
 import { pickLocalizedName } from '@/templates/shared/display-helpers';
+import { goldSnapshotLine } from '@/lib/gold-display';
 import { CartLineNote } from './CartLineNote';
 import { Barcode } from './Barcode';
 import styles from './ReceiptPrinter.module.css';
@@ -176,6 +177,19 @@ export function ReceiptPrinter({
                     {variant && (
                       <p className={`mt-0.5 text-xs ${styles.inkMuted}`}>
                         <VariantText title={variant} />
+                      </p>
+                    )}
+                    {row.kind === 'item' && row.item.goldSnapshot && (
+                      <p
+                        data-testid="receipt-gold-line"
+                        className={`mt-0.5 text-xs ${styles.inkMuted}`}
+                      >
+                        {goldSnapshotLine(
+                          row.item.goldSnapshot,
+                          ar ? 'ar' : 'en',
+                          formatPrice,
+                          localize
+                        )}
                       </p>
                     )}
                     {row.kind === 'item' && (

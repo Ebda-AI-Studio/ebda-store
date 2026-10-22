@@ -8,22 +8,25 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { countText, PIECES } from '../../lib/plural';
 import { cx } from './ui';
 
+/**
+ * `'arch'` is accepted so a saved page document keeps validating and rendering (Ruling B5-3), but
+ * it is never drawn: the arch frame was the retired skin's signature, and a stored `'arch'` renders
+ * as the look's rectangle.
+ */
 export type DahabTileShape = 'arch' | 'rectangle' | 'circle';
 
-const SHAPE: Record<DahabTileShape, { frame: string; aspect: string }> = {
-  // The arch: a vitrine / mihrab outline, Dahab's one signature shape.
-  arch: { frame: 'rounded-t-[999px] rounded-b-[var(--radius)]', aspect: 'aspect-[3/4]' },
+const SHAPE: Record<'rectangle' | 'circle', { frame: string; aspect: string }> = {
   rectangle: { frame: 'rounded-[var(--radius)]', aspect: 'aspect-[4/5]' },
   circle: { frame: 'rounded-full', aspect: 'aspect-square' },
 };
 
-/** A collection tile: photograph in an arch, name below in the display face. */
+/** A collection tile: the photograph in the look's frame, name below in the display face. */
 export function DahabTile({
   href,
   image,
   label,
   meta,
-  shape = 'arch',
+  shape = 'rectangle',
   sizes = '(min-width: 1024px) 22vw, 45vw',
 }: {
   href: string;
@@ -33,7 +36,7 @@ export function DahabTile({
   shape?: DahabTileShape;
   sizes?: string;
 }) {
-  const s = SHAPE[shape];
+  const s = SHAPE[shape === 'circle' ? 'circle' : 'rectangle'];
   return (
     <Link
       href={href}

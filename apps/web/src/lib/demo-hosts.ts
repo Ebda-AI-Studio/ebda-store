@@ -3,7 +3,7 @@ import type { LookTemplate } from '@ebda/shared';
 /**
  * The ONE map from a template to its demo store's host label (Ruling B2-7): each template has its
  * own `is_demo` store, so the Qamar catalogue never appears on the Souq demo or the reverse. The
- * label is the first DNS label of the store host (`storedemo.ebda.app`, `storedemo-souq.ebda.app`, `storedemo-jasmine.ebda.app`, `storedemo-lamma.ebda.app`);
+ * label is the first DNS label of the store host (`storedemo.ebda.app`, `storedemo-souq.ebda.app`, `storedemo-jasmine.ebda.app`, `storedemo-lamma.ebda.app`, `storedemo-dahab.ebda.app`);
  * the apex comes from the host the visitor is on, so previews and staging work unchanged.
  * Only `is_demo` guards decide what a demo store may do; nothing branches on these labels.
  */
@@ -12,6 +12,7 @@ export const DEMO_HOSTS: Partial<Record<LookTemplate, string>> = {
   souq: 'storedemo-souq',
   jasmine: 'storedemo-jasmine',
   lamma: 'storedemo-lamma',
+  dahab: 'storedemo-dahab',
 };
 
 /** Templates that have a demo host (the bar lists only these, and only with a built look). */

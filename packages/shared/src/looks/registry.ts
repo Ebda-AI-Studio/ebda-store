@@ -1,11 +1,14 @@
 import type { LookDefinition, LookTemplate } from './types';
 
+// ORDER is product behaviour (Ruling B5-25): it is the order of the admin picker's tabs, of the demo bar
+// and, through `defaultNewStoreLook`, which look a store gets when none is asked for. Qamar stays first;
+// Dahab, flipped to built last, is last.
 export const LOOK_TEMPLATES: readonly LookTemplate[] = [
-  'dahab',
   'qamar',
   'souq',
   'jasmine',
   'lamma',
+  'dahab',
 ];
 
 const L = (d: LookDefinition) => d;
@@ -910,8 +913,54 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'dahab.worn',
     template: 'dahab',
     letter: 'A',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'dahab',
+    status: 'built',
+    // Ruling B5-1 / B1-4: logo at the start, the skin's own icon search (jewellery is bought by eye).
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Ruling B1-3 shape. Worn: the piece on a body, the size line under each name (karat and width
+    // are the two fact chips, Ruling B5-5), engraving as one band that links to the personalised
+    // piece. The chip row is navigation, so it sits right under the hero.
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed' } },
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'Worn every day',
+          headingAr: 'بتتلبس كل يوم',
+        },
+      },
+      {
+        type: 'image-text',
+        design: { layout: 'full-bleed', imagePosition: 'start', bgColor: 'token:card' },
+        preset: {
+          heading: 'Your name, engraved',
+          headingAr: 'اسمك محفور عليها',
+          body: 'Pick a piece, type the letters, and the workshop engraves them before it ships.',
+          bodyAr: 'اختار القطعة واكتب الحروف، والورشة بتحفرها قبل ما تتشحن.',
+          buttonText: 'Personalise',
+          buttonTextAr: 'خصّص',
+        },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'newest', limit: 8, title: 'New in', titleAr: 'وصل حديثاً' },
+      },
+      { type: 'testimonials' },
+      { type: 'brand-story' },
+    ],
     name: { ar: 'على الإيد', en: 'Worn' },
     forWhom: {
       ar: 'لصايغ زباينه بيسألوا عن المقاس والعيار.',
@@ -925,7 +974,9 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#5A5A5A',
       primary: '#121212',
       onPrimary: '#FFFFFF',
-      accent: '#9A6E2A',
+      // Ruling B5-2: rose gold (hue 351), not the brass the first design used.
+      accent: '#8F4F59',
+      onAccent: '#FFFFFF',
       line: '#E8E8E8',
       fonts: { display: 'Reem Kufi', body: 'IBM Plex Sans Arabic', latin: 'Bodoni Moda' },
       radius: 'none',
@@ -938,8 +989,75 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'dahab.workshop',
     template: 'dahab',
     letter: 'B',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'dahab',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Ruling B5-8: the journey of a piece (draw, cast, polish) reuses Jasmine's `steps` with the
+    // mix's own three blocks. The page is committed teal, so the merchant-photo sections sit on a
+    // light band (quality bar section 9 rule 1) and the CTA is silver.
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed' } },
+      {
+        type: 'steps',
+        preset: { heading: 'How a piece is made', headingAr: 'القطعة بتتعمل إزاي' },
+        blocks: [
+          {
+            type: 'step',
+            settings: {
+              title: 'Drawn',
+              titleAr: 'رسم',
+              body: 'The shape is drawn by hand, then the wax is carved.',
+              bodyAr: 'الشكل بيتحط على الورق بالإيد، وبعدين الشمع بيتنحت.',
+            },
+          },
+          {
+            type: 'step',
+            settings: {
+              title: 'Cast',
+              titleAr: 'صب',
+              body: 'The wax becomes silver in the mould, one piece at a time.',
+              bodyAr: 'الشمع بيتحوّل فضة في القالب، قطعة قطعة.',
+            },
+          },
+          {
+            type: 'step',
+            settings: {
+              title: 'Polished',
+              titleAr: 'تلميع',
+              body: 'Filed, polished and checked before it is packed.',
+              bodyAr: 'بتتبرد وتتلمّع وتتراجع قبل ما تتغلف.',
+            },
+          },
+        ],
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:inverse' },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'Made to order',
+          headingAr: 'بتتعمل بالطلب',
+        },
+      },
+      {
+        type: 'image-text',
+        design: { layout: 'split', imagePosition: 'end', imageAspect: 'landscape' },
+        preset: {
+          heading: 'Small workshop, real hands',
+          headingAr: 'ورشة صغيرة وإيد حقيقية',
+          body: 'Every piece is made in small batches, so a custom size is a normal request.',
+          bodyAr: 'كل قطعة بتتعمل في دفعات صغيرة، فالمقاس المخصوص طلب عادي.',
+        },
+      },
+      {
+        type: 'collection-list',
+        design: { tileShape: 'rectangle', columns: 4 },
+        preset: { heading: 'Shop by collection', headingAr: 'تسوّق حسب المجموعة' },
+      },
+      { type: 'trust-badges' },
+      { type: 'brand-story' },
+    ],
     name: { ar: 'الورشة', en: 'Workshop' },
     forWhom: { ar: 'لورشة فضة يدوي الصنعة فيها هي السبب.', en: 'For a handmade silver studio.' },
     idea: { ar: 'الصنعة هي المنتج.', en: 'The making is the product.' },
@@ -948,10 +1066,13 @@ export const LOOKS: readonly LookDefinition[] = [
       surface: '#135957',
       ink: '#FFFFFF',
       muted: '#CFE2E0',
-      primary: '#E2674A',
-      onPrimary: '#10151C',
-      accent: '#D9DDE2',
-      line: '#1F6664',
+      // Ruling B5-2: the CTA is silver with teal ink (the coral #E2674A failed the no-orange gate and
+      // was 2.91:1 on the page); enamel is the accent, champagne draws the hairlines.
+      primary: '#E4E7EB',
+      onPrimary: '#0F4C4A',
+      accent: '#9FD8CB',
+      onAccent: '#0F4C4A',
+      line: '#D8C9A8',
       fonts: { display: 'Markazi Text', body: 'Almarai', latin: 'Libre Caslon Text' },
       radius: 'sm',
       density: 'regular',
@@ -963,8 +1084,42 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'dahab.giftbox',
     template: 'dahab',
     letter: 'C',
-    skin: 'minimal',
-    status: 'designed',
+    skin: 'dahab',
+    status: 'built',
+    chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Ruling B5-4 / B5-7: start from who and how much. The gift finder sits right under the hero,
+    // wrap and the card message are product options, the delivery promise is the computed chip.
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed' } },
+      { type: 'gift-finder', design: { bgColor: 'token:card' } },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'Gifts she will keep',
+          headingAr: 'هدايا هتفضل معاها',
+        },
+      },
+      {
+        type: 'image-text',
+        design: { layout: 'full-bleed', imagePosition: 'end', bgColor: 'token:card' },
+        preset: {
+          heading: 'Wrapped to the front door',
+          headingAr: 'بنغلّفها لحد باب الفرح',
+          body: 'An emerald box, a satin ribbon and your own message on a card.',
+          bodyAr: 'علبة زمردية وشريط ساتان ورسالتك على كارت.',
+        },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'newest', limit: 8, title: 'New in', titleAr: 'وصل حديثاً' },
+      },
+      { type: 'trust-badges' },
+      { type: 'newsletter' },
+    ],
     name: { ar: 'علبة هدية', en: 'Gift box' },
     forWhom: {
       ar: 'لمشتري الهدايا اللي بيبدأ بمين وبكام.',
@@ -978,7 +1133,9 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#4E5A54',
       primary: '#0E5C46',
       onPrimary: '#FFFFFF',
-      accent: '#7E5E27',
+      // Ruling B5-2: the ribbon is rose gold; the first design's brass #7E5E27 is retired. Ruling B5-33: darkened from #8F4F59 (4.06:1 on the #F2C9C4 surface) to clear 4.5:1.
+      accent: '#7A4049',
+      onAccent: '#FFFFFF',
       line: '#E6E6E6',
       fonts: { display: 'Kufam', body: 'Tajawal', latin: 'Italiana' },
       radius: 'md',

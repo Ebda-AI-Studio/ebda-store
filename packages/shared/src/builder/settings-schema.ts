@@ -50,6 +50,8 @@ export interface SettingOption {
  */
 export interface ShownRule {
   templates?: readonly TemplateId[];
+  /** Hidden only on these templates; an unknown or legacy template is NOT hidden (Ruling B5-37). */
+  notTemplates?: readonly TemplateId[];
   looks?: readonly string[];
   variants?: Readonly<Record<string, readonly (string | number | boolean)[]>>;
 }

@@ -60,6 +60,11 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
+import {
+  GOLD_STALE_NOTE_ID,
+  GoldRateLine,
+  useGoldRateStale,
+} from '../../../components/commerce/GoldRateLine';
 import { RatingSummary } from '../../../components/commerce/RatingSummary';
 import { BundleSaving } from '../../../components/commerce/BundleSaving';
 import { TrustLine } from '../../../components/commerce/TrustLine';
@@ -567,6 +572,14 @@ export default function ProductDetailClient({
     recordFocusProduct(store?.id, product.id, existingListing ?? fallbackListing);
   };
 
+  // Gold-rate pricing (B5): the piece's public gold facts for the chosen variant, and whether the rate is past
+  // the store's limit by the browser clock (display only; checkout refuses with GOLD_RATE_STALE regardless).
+  const goldForSelection =
+    (selectedVariant ? product?.variantGoldPricing?.[selectedVariant.id] : undefined) ??
+    product?.goldPricing ??
+    null;
+  const goldStale = useGoldRateStale(goldForSelection);
+
   if (isLoading) {
     return (
       <ShopChrome layout={resolvedLayout}>
@@ -680,7 +693,7 @@ export default function ProductDetailClient({
   // `disabled` means the item cannot be bought (C-02). An option still to
   // choose is recoverable, so it never disables or relabels the button; the
   // tap nudges the selector instead (handleAddToCart).
-  const addDisabled = !buyableNow;
+  const addDisabled = !buyableNow || goldStale;
   // ONE source for the buy label and the price text: the main button, the Dahab
   // pinned bar and the default sticky bar all read these. The real verb at
   // every step: no "Select options" placeholder label.
@@ -862,6 +875,13 @@ export default function ProductDetailClient({
                 ) : undefined
               }
               bundleLine={<BundleSaving productId={product.id} />}
+              priceNote={
+                <GoldRateLine
+                  gold={goldForSelection}
+                  className="mt-1"
+                  staleId={GOLD_STALE_NOTE_ID}
+                />
+              }
               b2bPanel={
                 <B2bPdpPanel
                   productId={product.id}
@@ -910,6 +930,7 @@ export default function ProductDetailClient({
               onAddToCart={handleAddToCart}
               isAdding={isAdding}
               addDisabled={addDisabled}
+              addDescribedBy={goldStale ? GOLD_STALE_NOTE_ID : undefined}
               personalisation={product.personalisation}
               note={note}
               onNoteChange={setNote}
@@ -954,6 +975,43 @@ export default function ProductDetailClient({
                   />
                   <ShareProductRow productName={displayName} url={shareUrl} />
                 </>
+              }
+              // Ruling B5-1 (finding): the Dahab branch never passed `mediaSlot`, so a Dahab product
+              // with a 3D model showed no viewer. Same toggle + panel the default PDP renders, same
+              // flag and model gate; a product without a model renders nothing.
+              mediaSlot={
+                model3d ? (
+                  <div className="relative mt-4" data-part="model3d-slot">
+                    <Model3dToggle
+                      active={show3d}
+                      t={t}
+                      onToggle={() => {
+                        if (!show3d) {
+                          captureEvent('product_3d_opened', {
+                            storeId: store?.id,
+                            productId: product.id,
+                          });
+                        }
+                        setShow3d(v => !v);
+                      }}
+                    />
+                    {show3d ? (
+                      <ProductModel3dPanel
+                        model={model3d}
+                        storeId={store?.id ?? ''}
+                        productId={product.id}
+                        productName={displayName}
+                        fallbackPoster={productImages[0]?.url}
+                        selected={pickedOptions}
+                        optionOrder={productOptions.map(o => o.name)}
+                        isRtl={language === 'ar'}
+                        t={t}
+                      />
+                    ) : (
+                      <div aria-hidden="true" className="h-14" />
+                    )}
+                  </div>
+                ) : undefined
               }
               selectedImage={selectedImage}
               onSelectImage={setSelectedImage}
@@ -1336,6 +1394,11 @@ export default function ProductDetailClient({
                   <InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />
                 </div>
                 <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+                <GoldRateLine
+                  gold={goldForSelection}
+                  className="mt-1"
+                  staleId={GOLD_STALE_NOTE_ID}
+                />
                 {/* Phase B3 (Ruling B3-6): one live bundle-saving line; renders nothing without a saving. */}
                 <BundleSaving productId={product.id} />
                 <B2bPdpPanel
@@ -1383,7 +1446,7 @@ export default function ProductDetailClient({
                         onClick={() => setQuantity(Math.max(moqFloor, quantity - 1))}
                         aria-label={t('Decrease quantity', 'تقليل الكمية')}
                         // a11y re-audit P2-N11: no quantity to choose when it cannot be bought.
-                        disabled={!buyableNow}
+                        disabled={!buyableNow || goldStale}
                         className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <MinusIcon />
@@ -1407,7 +1470,7 @@ export default function ProductDetailClient({
                           setQuantity(Math.min(quantity + 1, Math.max(stockCap, moqFloor)));
                         }}
                         aria-label={t('Increase quantity', 'زيادة الكمية')}
-                        disabled={!buyableNow}
+                        disabled={!buyableNow || goldStale}
                         className="flex h-11 min-w-11 items-center justify-center px-4 text-muted-foreground hover:bg-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <PlusIcon />
@@ -1445,6 +1508,7 @@ export default function ProductDetailClient({
                       onClick={handleAddToCart}
                       isLoading={isAdding}
                       disabled={addDisabled}
+                      aria-describedby={goldStale ? GOLD_STALE_NOTE_ID : undefined}
                     >
                       {addLabel}
                     </Button>

@@ -35,6 +35,14 @@ const { mockPrisma, mockPaymentService, mockIsFeatureEnabled, mockAuditLog, mock
 
 // Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
 // by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+// Gold-rate pricing is proven in gold-*.test.ts and tests/integration/gold-checkout.test.ts; this suite
+// is about something else, so the gate is stubbed to "no gold lines".
+vi.mock('@api/services/gold-rate/gate', () => ({
+  assertGoldLinesPriceable: async () => ({ snapshots: new Map(), rateIds: new Map() }),
+  assertSameRates: async () => undefined,
+  goldQuotesForLines: async () => new Map(),
+  goldQuoteKey: (p: string, v: string | null) => `${p}|${v ?? ''}`,
+}));
 vi.mock('@api/lib/order-tax', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/lib/order-tax')>()),
   // A store that does not collect VAT (the gate is tested in vat-gate tests).

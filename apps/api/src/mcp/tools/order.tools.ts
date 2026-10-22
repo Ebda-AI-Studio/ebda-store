@@ -3,6 +3,7 @@ import { storefrontOrigin } from '@ebda/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { prisma, runInTenantContext, withTenantContext } from '@ebda/database';
 import type { McpStore } from '../resolve-store';
+import { CartService } from '../../services/cart.service';
 import { OrderService } from '../../services/order.service';
 import { PaymentService } from '../../services/payment-providers/payment.factory';
 import type { Currency } from '../../services/payment-providers/types';
@@ -69,9 +70,14 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
         cartId: z.string().min(1).max(MCP_ID_MAX_CHARS),
         paymentMethod: z.enum(['cod', 'online']),
         customer: customerSchema,
+        // Gold-rate pricing (Ruling B5-17): a gold piece is priced from today's rate. When the rate moved
+        // after the line was added the order is refused with PRICE_CHANGED and `view_cart` shows the old and
+        // new price; pass `true` to accept the new price and place the order. The new price always comes
+        // from the server, never from this argument.
+        acknowledgePrices: z.boolean().optional(),
       },
     },
-    async ({ cartId, paymentMethod, customer }, extra) => {
+    async ({ cartId, paymentMethod, customer, acknowledgePrices }, extra) => {
       // WRITE GATE — the money-and-inventory path. Enforced HERE, inside the
       // tool handler, and not as Express middleware: all seven tools ride one
       // POST, so a rejecting `router.use` would 401 the `initialize` handshake
@@ -93,6 +99,8 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
       }
 
       try {
+        if (acknowledgePrices === true)
+          await runInTenantContext(store.id, () => CartService.acknowledgePrices(store.id, cartId));
         const { firstName, lastName } = splitName(customer.name);
         const shippingAddress = {
           firstName,

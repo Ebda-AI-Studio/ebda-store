@@ -4,9 +4,14 @@ import {
   SEARCH_TERMS_MAX_LENGTH,
   cleanSearchTerms,
   csvField,
+  GOLD_KARATS,
   minorToDecimalString,
+  mgToGramsString,
+  parseGramsToMg,
   slugifyWithFallback,
+  type GoldKarat,
 } from '@ebda/shared';
+import { GoldRateService } from './gold-rate/gold-rate.service';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { stampHumanEdits } from './ai-autofill.service';
@@ -48,6 +53,10 @@ interface ProductImportRow {
   price: number; // In piastres
   compareAtPrice?: number;
   costPrice?: number;
+  /** Gold-rate pricing (B5): 'gold_rate' | 'fixed' | blank; karat; grams (<= 2 decimals). */
+  pricing_mode?: string;
+  gold_karat?: string | number;
+  gold_weight_g?: string | number;
   sku?: string;
   barcode?: string;
   inventory?: number;
@@ -414,6 +423,10 @@ export class BulkService {
       'option2Value',
       'option3Name',
       'option3Value',
+      // Gold-rate pricing (B5): 'gold_rate' | blank; karat 24|21|18; grams with up to 2 decimals.
+      'pricing_mode',
+      'gold_karat',
+      'gold_weight_g',
     ];
 
     const blanks = (n: number) => Array(n).fill('');
@@ -458,6 +471,9 @@ export class BulkService {
         csvField(product.metaDescriptionAr || ''),
         csvField(product.searchTerms || ''),
         ...blanks(7), // parentSku + option{1,2,3}Name/Value — empty on base rows
+        product.pricingMode === 'gold_rate' ? 'gold_rate' : '',
+        product.goldKarat ?? '',
+        product.goldWeightMg ? mgToGramsString(product.goldWeightMg) : '',
       ].join(',');
 
       const variantRows = product.variants.map(variant => {
@@ -494,6 +510,7 @@ export class BulkService {
           ...blanks(5), // meta fields + searchTerms (inherited)
           csvField(product.sku || ''), // parentSku
           ...optionCols, // option1Name/Value, option2..., option3...
+          ...blanks(3), // pricing_mode, gold_karat, gold_weight_g (product-level only)
         ].join(',');
       });
 
@@ -540,6 +557,10 @@ export class BulkService {
       'option2Value',
       'option3Name',
       'option3Value',
+      // Gold-rate pricing (B5): 'gold_rate' | blank; karat 24|21|18; grams with up to 2 decimals.
+      'pricing_mode',
+      'gold_karat',
+      'gold_weight_g',
     ];
 
     // Example row
@@ -576,6 +597,9 @@ export class BulkService {
       '',
       '',
       '',
+      '', // pricing_mode (gold_rate or blank)
+      '', // gold_karat
+      '', // gold_weight_g
     ].join(',');
 
     // Example VARIANT row: a 1 Kg size of the product above (parentSku = its
@@ -614,6 +638,9 @@ export class BulkService {
       '',
       '',
       '',
+      '', // pricing_mode (gold_rate or blank)
+      '', // gold_karat
+      '', // gold_weight_g
     ].join(',');
 
     return `${headers.join(',')}\n${exampleRow}\n${exampleVariantRow}`;
@@ -676,6 +703,16 @@ export class BulkService {
       if (p.sku) productBySku.set(p.sku, p);
       productBySlug.set(p.slug, p);
     }
+
+    // Ruling B5-13: a gold-rate product's price is the repricer's. A row for one may repeat its
+    // CURRENT price (an export edited and re-imported) but never change it or add a compare-at
+    // price: that row fails with a clear error and the other rows import.
+    const goldPrice = new Map<string, number>();
+    for (const g of await prisma.product.findMany({
+      where: { storeId, pricingMode: 'gold_rate', deletedAt: null },
+      select: { id: true, price: true },
+    }))
+      goldPrice.set(g.id, g.price);
 
     // Pre-load all existing slugs into a Set for fast unique-slug generation
     const existingSlugs = new Set(existingProducts.map(p => p.slug));
@@ -861,6 +898,44 @@ export class BulkService {
           continue;
         }
 
+        if (existing && goldPrice.has(existing.id)) {
+          const incoming = parseInt(String(row.price), 10);
+          const compare = row.compareAtPrice != null && String(row.compareAtPrice).trim() !== '';
+          if (incoming !== goldPrice.get(existing.id) || compare) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `"${row.name}" is priced by the gold rate: its price (and compare-at price) cannot be changed by import. Edit its karat, weight or making charge instead.`,
+            });
+            continue;
+          }
+        }
+
+        // Gold-rate pricing columns (B5): validate before the batch so a bad row fails alone.
+        const rowPricingMode = String(row.pricing_mode ?? '')
+          .trim()
+          .toLowerCase();
+        if (rowPricingMode !== '' && rowPricingMode !== 'gold_rate' && rowPricingMode !== 'fixed') {
+          result.failed++;
+          result.errors.push({
+            row: rowIndex,
+            error: `pricing_mode must be "gold_rate", "fixed" or blank (got "${rowPricingMode}")`,
+          });
+          continue;
+        }
+        if (rowPricingMode === 'gold_rate') {
+          const k = Number(String(row.gold_karat ?? '').trim());
+          const mg = parseGramsToMg(String(row.gold_weight_g ?? ''));
+          if (!(GOLD_KARATS as readonly number[]).includes(k) || mg === null) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `"${row.name}": gold_karat must be 24, 21 or 18 and gold_weight_g a weight in grams with up to 2 decimals`,
+            });
+            continue;
+          }
+        }
+
         // #1029 / issue 2048: a row claiming a SKU an earlier row in this
         // same import already claimed for a DIFFERENT product — fail this row
         // instead of letting both reach the batch write. Two rows updating the
@@ -1039,6 +1114,14 @@ export class BulkService {
       // Variants created in this batch — only folded into the result after the
       // transaction commits, so a rollback doesn't leave a phantom count.
       let batchVariants = 0;
+      // Gold specs to apply once the batch commits: the gold service runs its own money transaction.
+      const goldApply: Array<{
+        rowIndex: number;
+        productId: string;
+        mode: 'gold_rate' | 'fixed';
+        karat: GoldKarat;
+        weightMg: number | null;
+      }> = [];
 
       try {
         await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
@@ -1220,6 +1303,18 @@ export class BulkService {
                 batchVariants += made;
                 variantsByParent.delete(productFields.sku); // mark consumed
               }
+              const goldMode = String(row.pricing_mode ?? '')
+                .trim()
+                .toLowerCase();
+              if (goldMode === 'gold_rate' || (goldMode === 'fixed' && existing)) {
+                goldApply.push({
+                  rowIndex,
+                  productId,
+                  mode: goldMode,
+                  karat: Number(String(row.gold_karat ?? '').trim()) as GoldKarat,
+                  weightMg: parseGramsToMg(String(row.gold_weight_g ?? '')),
+                });
+              }
             } catch (error) {
               // Re-throw to roll back the batch transaction; per-row errors
               // are only possible for validation issues caught in Phase 2.
@@ -1231,6 +1326,52 @@ export class BulkService {
         });
         // Transaction committed — safe to count this batch's variants.
         result.variantsCreated += batchVariants;
+        for (const g of goldApply) {
+          if (!userId) {
+            result.errors.push({
+              row: g.rowIndex,
+              error: 'Imported, but gold pricing needs a signed-in user and was not applied',
+            });
+            continue;
+          }
+          try {
+            if (g.mode === 'fixed') {
+              await GoldRateService.setProductPricing(
+                storeId,
+                g.productId,
+                { product: { pricingMode: 'fixed' } },
+                { userId }
+              );
+              continue;
+            }
+            // Keep the making charge and margin a gold product already has; a new one starts at none.
+            const cur = await prisma.product.findFirst({
+              where: { id: g.productId, storeId },
+              select: { makingChargeType: true, makingChargeValue: true, goldMarginBps: true },
+            });
+            await GoldRateService.setProductPricing(
+              storeId,
+              g.productId,
+              {
+                product: {
+                  pricingMode: 'gold_rate',
+                  karat: g.karat,
+                  weightMg: g.weightMg,
+                  makingChargeType:
+                    (cur?.makingChargeType as 'fixed' | 'per_gram' | null) ?? 'per_gram',
+                  makingChargeValue: cur?.makingChargeValue ?? 0,
+                  marginBps: cur?.goldMarginBps ?? 0,
+                },
+              },
+              { userId }
+            );
+          } catch (e) {
+            result.errors.push({
+              row: g.rowIndex,
+              error: `Imported, but gold pricing was not applied: ${e instanceof Error ? e.message : 'unknown error'}`,
+            });
+          }
+        }
       } catch (error) {
         // If the batch transaction fails, mark all rows in the batch as failed
         const rowIndex =

@@ -16,7 +16,12 @@ const ROOT = path.resolve(__dirname, '../..');
 const WEB = path.join(ROOT, 'apps/web/src');
 const manifest = JSON.parse(
   readFileSync(path.join(ROOT, 'docs/ebda/templates/purchase-path.json'), 'utf8')
-) as { viewports: string[]; screens: { id: string; path: string }[]; files: string[] };
+) as {
+  viewports: string[];
+  screens: { id: string; path: string }[];
+  files: string[];
+  templates?: Record<string, { extraScreens?: Array<{ id: string; action?: string }> }>;
+};
 const src = (f: string) => readFileSync(path.join(WEB, f), 'utf8');
 
 /** Every opening JSX tag named `name`, brace-aware (an `=>` inside a handler does not end it). */
@@ -124,6 +129,12 @@ describe('(a) the screen manifest covers the whole purchase path', () => {
     const { ACTIONS, viewportOf } = await import('../../scripts/taste/shoot-purchase-path.mjs');
     for (const s of manifest.screens as Array<{ id: string; action?: string }>)
       expect(Object.keys(ACTIONS), s.id).toContain(s.action ?? 'none');
+    // a template's extra screens (Dahab's two gold screens) are shot by the same script
+    for (const t of Object.values(manifest.templates ?? {}) as Array<{
+      extraScreens?: Array<{ id: string; action?: string }>;
+    }>)
+      for (const s of t.extraScreens ?? [])
+        expect(Object.keys(ACTIONS), `extra ${s.id}`).toContain(s.action ?? 'none');
     expect(viewportOf('390-ar')).toMatchObject({ w: 390, lang: 'ar', mobile: true });
     expect(viewportOf('1280-en')).toMatchObject({ w: 1280, lang: 'en', mobile: false });
     expect(typeof manifest.secondProductPath).toBe('string');

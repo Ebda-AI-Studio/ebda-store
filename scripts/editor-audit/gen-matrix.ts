@@ -121,6 +121,22 @@ export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern:
     file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /layout\.testimonials\.minRating/,
   },
+  // the "Show gifts" link appears only after a shopper picks an occasion (client state)
+  'gift-finder/buttonText': {
+    file: 'apps/web/src/builder/sections/GiftFinderSection.tsx',
+    pattern: /settings\.buttonText/,
+  },
+  // Dahab fetches the hover photograph only where hover exists (a post-hydration media query), which
+  // static HTML cannot show; keyed `<skin>|<type>/<id>` so the other skins stay probed
+  ...Object.fromEntries(
+    ['new-arrivals', 'best-sellers', 'product-carousel'].map(type => [
+      `dahab|${type}/showHover`,
+      {
+        file: 'apps/web/src/templates/dahab/ProductCard.tsx',
+        pattern: /showHover !== false && canHover && secondary\?\.url/,
+      },
+    ])
+  ),
   // theme controls the header skins reach through the shared resolver
   'theme/headerLogoPlacement': {
     file: 'packages/shared/src/looks/compose.ts',
@@ -145,6 +161,7 @@ export function rulesForSkin(
   return rulesOf(shownFor).filter(
     r =>
       (!r.templates || r.templates.includes(skin as TemplateId)) &&
+      !r.notTemplates?.includes(skin as TemplateId) &&
       (!r.looks || r.looks.some(l => looks.includes(l)))
   );
 }
@@ -224,7 +241,9 @@ export function buildMatrix(): Matrix {
         // flips no scalar. They are static evidence only (the renderer reads the key).
         const compound = s.type === 'typography' || s.type === 'dividers';
         const keys = settingKeys(s);
-        const reader = BEHAVIOUR_READERS[`${def.type}/${s.id}`];
+        const reader =
+          BEHAVIOUR_READERS[`${skin}|${def.type}/${s.id}`] ??
+          BEHAVIOUR_READERS[`${def.type}/${s.id}`];
         const staticHit = reader
           ? reader.pattern.test(readFileSync(path.join(ROOT, reader.file), 'utf8'))
           : keys.some(k => reads(src, k));

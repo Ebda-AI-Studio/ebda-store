@@ -6,7 +6,7 @@ import type { AnnouncementBarProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ChevronIcon } from './ui';
 
-/** One quiet line in gold above the header. Merchant colours win when set. */
+/** One quiet line above the header. Merchant colours win when set. */
 export default function DahabAnnouncementBar({
   text,
   textAr,

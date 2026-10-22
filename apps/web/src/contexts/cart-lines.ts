@@ -2,6 +2,7 @@
  * Pure cart-line helpers shared by `CartContext` — kept out of the React
  * module so they can be tested on real values (no provider, no DOM).
  */
+import type { PublicGoldPricing } from '@ebda/shared';
 import type { CartItem, CartBundle } from './CartContext';
 
 // Shape returned by GET /public/cart
@@ -38,6 +39,10 @@ export interface ServerCartItem {
   priceLadderTopMinQty?: number | null;
   belowMoq?: boolean;
   moqRequired?: number | null;
+  /** Gold line (B5-17): the price moved since it was added; the cart / checkout show the notice. */
+  priceChanged?: boolean;
+  previousUnitPrice?: number | null;
+  goldPricing?: PublicGoldPricing;
 }
 
 export function mapServerItem(item: ServerCartItem): CartItem {
@@ -66,6 +71,9 @@ export function mapServerItem(item: ServerCartItem): CartItem {
     note: item.note ?? undefined,
     unavailable: item.unavailable === true ? true : undefined,
     leadTimeDays: item.product.leadTimeDays ?? undefined,
+    priceChanged: item.priceChanged === true ? true : undefined,
+    previousPrice: item.priceChanged === true ? (item.previousUnitPrice ?? undefined) : undefined,
+    gold: item.goldPricing ?? undefined,
   };
 }
 

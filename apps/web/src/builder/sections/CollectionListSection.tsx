@@ -263,7 +263,7 @@ export function CollectionListSection({
                 image={tile.image}
                 label={tile.label}
                 meta={tile.meta}
-                shape={(settings.tileShape as DahabTileShape | undefined) ?? 'arch'}
+                shape={(settings.tileShape as DahabTileShape | undefined) ?? 'rectangle'}
                 sizes={`(min-width: 768px) ${Math.round(100 / cols)}vw, 50vw`}
               />
             </li>

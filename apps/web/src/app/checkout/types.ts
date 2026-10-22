@@ -10,6 +10,8 @@ export interface CheckoutCartItem {
   /** The chosen variant ("Rose / S / 52"), as the cart and receipt show it (IA-02). */
   variantTitle?: string;
   variantTitleAr?: string;
+  /** Gold line (B5): today's rate behind the price; the summary prints it under the line. */
+  gold?: import('@ebda/shared').PublicGoldPricing;
   product: {
     id: string;
     name: string;

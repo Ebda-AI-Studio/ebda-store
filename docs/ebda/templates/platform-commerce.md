@@ -271,3 +271,12 @@ On a look that sets `chrome.cardStepper: 'inline'` (the three Lamma looks), the 
 - **Chips.** `role=radiogroup`, roving tabindex, arrow keys move AND select (RTL-aware), 44 px targets, the selected chip is filled and carries a check (never colour alone). Relative words for the first two ("النهاردة", "بكرة"), then the date with Western digits. No date on offer says so in a sentence and never blocks checkout.
 - **A store without `daysAhead` is unchanged**, pinned by a markup snapshot of `DeliverySection`.
 - **Data flow.** The pick travels cart → checkout → order → receipt → admin notes as one line, proven end to end in `tests/integration/order-delivery-date.test.ts` (Review Focus 3), not at component level.
+
+## Gold-rate pricing (Phase B5)
+
+A product (or a variant that has its own weight) can be priced from today's gold rate. The merchant sets karat, weight (grams, two decimals, stored as milligrams), a making charge (per gram or fixed) and a margin; the store has one rate per karat (typed by hand or fetched automatically a few times a day). `price` stays the one price every reader uses and only the repricer writes it for a gold row, so the cart, order, feed, search and JSON-LD need no gold logic of their own.
+
+- **Admin:** Catalog, Gold rates (rate editor with a confirm dialog on a big jump, pending automatic rate, settings, audited history); the product edit page has the Gold pricing card (live preview with the server's own formula, price field not typeable, switch refused without a fresh rate); bulk switch in mass edit; CSV columns `pricing_mode`, `gold_karat`, `gold_weight_g`.
+- **Storefront:** under the price, one line: karat, weight, today's rate per gram, when it was recorded; the gold / making split only if the merchant turned it on. Past the store's limit the piece says it cannot be ordered yet and its buy buttons are disabled. A moved price shows "السعر اتحدّث" with a "متابعة" button on the cart and at checkout.
+- **Rules a theme must keep:** never print the margin or the source of a rate; do not compute a price in the browser; the line is plain muted text (12px+), no motion.
+- **Full map (model, formula, cache layers, failure codes, runbook):** `docs/architecture/gold-rate-pricing.md`.

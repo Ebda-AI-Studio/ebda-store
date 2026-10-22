@@ -241,6 +241,10 @@ Adds `lamma` to the `"StoreTemplate"` enum (Phase B4; stamp 2026-10-31 so it sor
 
 Two additive tables (`product_models`, `product_model_bindings`); every FK into them CASCADEs and nothing else references them. Feature-only rollback without a deploy: a super-admin `StoreFeature` override `product_3d = false` hides the viewer for that store (the public payload drops `model3d`). Code rollback: revert (path B); the PDP then renders photos only. To also drop the data: `DROP TABLE product_model_bindings, product_models;` and delete the row from `_prisma_migrations`; the `.glb`/`.usdz` objects under `stores/<id>/models/` become orphans for the weekly R2 sweep. Re-check RLS state after any restore (`tests/integration/rls-ebda-app.test.ts`).
 
+## Gold-rate pricing (`20261102000200_gold_rate_pricing`)
+
+Additive: three tables (`gold_rates`, `gold_rates_current`, `gold_rate_settings`), new nullable / defaulted columns on `products`, `product_variants`, `cart_items` and `order_items`, the price-guard triggers and two cron-facing functions. Every FK into the new tables cascades; nothing existing references them. **Feature-only rollback without a deploy:** `node scripts/gold-rate/freeze-all.mjs --store <slug>` (dry run first; `--apply` with Ahmad's `--yes-production` on production) turns each gold product into a fixed-price product at its current price through the service, which purges every price cache; then the store's `gold_rate_settings.enabled` stays on or off as the merchant likes, nothing reads it for a fixed product. **Code rollback:** safe to roll the API back to a version without the feature as long as no gold product exists, or after the freeze: the old code reads `price` like always, and the price-guard trigger only fires for rows whose `pricing_mode` is `gold_rate`. Do NOT drop the migration while `order_items.gold_snapshot` holds snapshots (they are the only record of how a past line was priced; refunds read them). The two Inngest crons (`gold-rate-feed-fetch`, `gold-rate-staleness-watch`) stop with the deploy that removes them.
+
 ## Trace: what migrated when
 
 ```bash

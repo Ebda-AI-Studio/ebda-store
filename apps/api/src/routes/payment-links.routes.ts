@@ -36,6 +36,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { encryption } from '../services/encryption.service';
 import { PriceResolver, wholesaleEntitledUncached } from '../services/price-resolver.service';
+import { assertGoldLinesPriceable, assertSameRates } from '../services/gold-rate/gate';
 import { ANONYMOUS_BUYER } from '../lib/buyer-identity';
 import { assertMoqSatisfied, priceSnapshot } from '../lib/order-pricing';
 import { AppError } from '../middleware/error-handler';
@@ -316,6 +317,20 @@ router.post(
       // Price through the ONE resolver. Design review I6 / Ruling B2B-2d: a payment link is priced as an ANONYMOUS buyer
       // (retail + PUBLIC tiers) - the customer here is found by a typed WhatsApp phone, which is not a price identity, so
       // the group price is never resolved. MOQ is enforced (422 BELOW_MOQ); the entitlement is read UNCACHED (review I2).
+      // Ruling B5-17: the payment link is the THIRD order path. Same gold gate as checkout and the admin
+      // order (stale rate, price drift), with no shopper quote to compare; gold lines get a snapshot.
+      const linkGold = await assertGoldLinesPriceable(
+        prisma as unknown as Prisma.TransactionClient,
+        storeId,
+        items.map((it, i) => ({
+          key: String(i),
+          productId: it.productId,
+          variantId: it.variantId ?? null,
+          materialisedUnitPrice: lineVariant(it)?.price ?? byId.get(it.productId)?.price ?? 0,
+          quotedUnitPrice: null,
+        })),
+        { requireQuote: false }
+      );
       const linkResolver = await PriceResolver.forBuyer(storeId, ANONYMOUS_BUYER, {
         uncachedEntitlement: wholesaleEntitledUncached,
       });
@@ -413,6 +428,11 @@ router.post(
 
       // ── Create draft Order ─────────────────────────────────────────────────
       const orderNumber = generateOrderNumber('WA');
+      // Ruling B5-17: the gold rates the lines were priced from must still be the current ones. Checked on
+      // the SAME connection as the order write (the request's tenant transaction when there is one: the
+      // customer row above and the fiscal document below live on it, so a second transaction could not see
+      // them), `FOR SHARE`, which waits for a rate write in flight.
+      await assertSameRates(prisma as unknown as Prisma.TransactionClient, storeId, linkGold);
       const draftOrder = await prisma.order.create({
         data: {
           storeId,
@@ -458,6 +478,13 @@ router.post(
                 variantNameAr: v?.titleAr || null,
                 quantity: it.quantity,
                 price,
+                ...(linkGold.snapshots.has(String(items.indexOf(it)))
+                  ? {
+                      goldSnapshot: linkGold.snapshots.get(
+                        String(items.indexOf(it))
+                      ) as Prisma.InputJsonValue,
+                    }
+                  : {}),
                 ...priceSnapshot(linePricing(it)),
                 total: price * it.quantity,
                 sku: v?.sku || p.sku || null,

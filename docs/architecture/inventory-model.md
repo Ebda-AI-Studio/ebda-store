@@ -344,3 +344,5 @@ no variant edit could change.
 Full diagnosis and fix:
 `docs/superpowers/plans/2026-08-30-variant-stock-drift.md`.
 Repair migration: `20260830090000_zero_variant_parent_inventory`.
+
+Gold-rate pricing changes a product's PRICE, never its stock: the repricer writes `price` only, and `inventory` rules above are untouched (`docs/architecture/gold-rate-pricing.md`).

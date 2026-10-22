@@ -28,6 +28,8 @@ const NOT_ON_COMPLETION = new Set([
   'RETURN_ORDER_BUSY',
   // Create-path only: the store's published return window has closed / is 0.
   'RETURN_WINDOW_CLOSED',
+  // Create-path only (Ruling B5-19): an exchange request that includes a gold-rate line is refused.
+  'GOLD_EXCHANGE_UNSUPPORTED',
 ]);
 
 describe('return completion refusals are all translated (issue 2033)', () => {

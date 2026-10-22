@@ -161,6 +161,26 @@ router.put('/items/:itemId', async (req: Request, res: Response, next: NextFunct
 });
 
 // DELETE /stores/:storeId/cart/items/:itemId - Remove from cart
+// POST /stores/:storeId/cart/acknowledge-prices - the shopper tapped "متابعة" on "السعر اتحدّث" (Ruling B5-17).
+// The body is an EMPTY strict object: the new quote is the server's current price, never a client value.
+router.post('/acknowledge-prices', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    z.object({})
+      .strict()
+      .parse(req.body ?? {});
+    const { storeId } = req.params;
+    setBuyerPrivate(res);
+    const result = await CartService.acknowledgePrices(
+      storeId,
+      getSessionId(req),
+      customerUserId(req)
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/items/:itemId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId, itemId } = req.params;

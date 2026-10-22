@@ -36,7 +36,7 @@ export function Model3dToggle({
       type="button"
       onClick={onToggle}
       aria-pressed={active}
-      className="absolute top-3 end-3 z-10 inline-flex h-9 items-center gap-1.5 rounded-full border border-input bg-background/90 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur hover:bg-background"
+      className="absolute top-3 end-3 z-10 inline-flex h-11 items-center gap-1.5 rounded-full border border-input bg-background/90 px-4 text-xs font-semibold text-foreground shadow-sm backdrop-blur hover:bg-background"
     >
       <svg
         aria-hidden="true"

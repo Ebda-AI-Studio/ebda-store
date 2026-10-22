@@ -116,6 +116,10 @@ export function MassEditModal({
   const [priceMode, setPriceMode] = useState<PriceMode>('set');
   const [priceValue, setPriceValue] = useState('');
 
+  // Gold-rate pricing switch (B5): '' = leave alone. Its own endpoint, because it reprices under a lock.
+  const [goldSwitch, setGoldSwitch] = useState<'' | 'fixed' | 'gold_rate'>('');
+  const tGold = useT('goldRates.bulk');
+
   const [changeInventory, setChangeInventory] = useState(false);
   const [inventoryMode, setInventoryMode] = useState<InventoryMode>('set');
   const [inventoryValue, setInventoryValue] = useState('');
@@ -243,13 +247,37 @@ export function MassEditModal({
       }
     }
 
-    if (Object.keys(fields).length === 0) {
+    if (Object.keys(fields).length === 0 && goldSwitch === '') {
       toastError(t('massEdit.toast.errorTitle'), t('massEdit.toast.noChangesSelected'));
       return;
     }
 
     setApplying(true);
     try {
+      if (goldSwitch !== '') {
+        const gold = await apiPost<{
+          switched: string[];
+          skipped: { id: string; reason: string }[];
+        }>(`/api/v1/stores/${storeId}/gold-rates/bulk/pricing-mode`, {
+          productIds: selectedProducts.map(p => p.id),
+          mode: goldSwitch,
+        });
+        if (gold.error) {
+          toastError(t('massEdit.toast.errorTitle'), tGold('failed'));
+          return;
+        }
+        const skippedCount = gold.data?.skipped.length ?? 0;
+        if (Object.keys(fields).length === 0) {
+          toastSuccess(
+            t('massEdit.toast.successTitle'),
+            tGold('done', { count: gold.data?.switched.length ?? 0 }) +
+              (skippedCount > 0 ? ` ${tGold('skipped', { count: skippedCount })}` : '')
+          );
+          onSuccess();
+          onClose();
+          return;
+        }
+      }
       const { data, error } = await apiPost<{ updated: number; skippedVariantProducts: number }>(
         `/api/v1/stores/${storeId}/products/bulk-update`,
         {
@@ -464,6 +492,22 @@ export function MassEditModal({
                 />
               </div>
             )}
+          </div>
+
+          {/* Gold-rate pricing */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-foreground">
+              {tGold('title')}
+              <select
+                value={goldSwitch}
+                onChange={e => setGoldSwitch(e.target.value as '' | 'fixed' | 'gold_rate')}
+                className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">{t('massEdit.noChange')}</option>
+                <option value="gold_rate">{tGold('toGold')}</option>
+                <option value="fixed">{tGold('toFixed')}</option>
+              </select>
+            </label>
           </div>
 
           {/* Inventory */}

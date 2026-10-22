@@ -33,6 +33,9 @@ import {
   stepsSchema,
   stepsBlockSchema,
   makerProfileSchema,
+  giftFinderSchema,
+  giftOccasionBlockSchema,
+  giftBudgetBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
 import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
@@ -50,6 +53,7 @@ import {
   styleSettings,
   type SettingDefinition,
   type ShownFor,
+  type ShownRule,
 } from './settings-schema';
 
 export { VIEWPORTS, VIEWPORT_RANGES, type Viewport } from './viewports';
@@ -233,9 +237,37 @@ const narrowed = (list: readonly SettingDefinition[], rules: Record<string, Show
  * own container (`PageRenderer` comment on the hero wrapper; `T.ProductCarousel` ignores the
  * `innerContainerClass`), so Width, and for the hero Top / Bottom spacing, did nothing on any skin.
  */
+/**
+ * Every skin except Dahab (Ruling B5-35). Dahab's cards, tiles, heading row and hero are the
+ * look's own fixed design: one card size, the look's frame and corners, no label above the heading,
+ * a hero that always anchors its copy at the inline start. A control only the other skins read is
+ * therefore not offered on Dahab. It is an exclusion (`notTemplates`), so an unknown or
+ * legacy template keeps the universal controls (Ruling B5-37); a skin added later that ignores them
+ * must be added to the exclusion (the matrix fails until it is).
+ */
+const NOT_DAHAB: ShownRule = { notTemplates: ['dahab'] };
+/** Card design Dahab's card ignores; it reads Show name and Hover effect (both wired). */
+const DAHAB_FIXED_CARD: Record<string, ShownFor> = Object.fromEntries(
+  [
+    'cardSize',
+    'cardAspect',
+    'cardShape',
+    'cardGap',
+    'showCardFrame',
+    'cardFrameStyle',
+    'cardFrameWidth',
+    'cardFrameSize',
+    'cardFrameColor',
+  ].map(id => [id, NOT_DAHAB])
+);
+/** The heading row's label above the title and its flanking lines: Dahab's heading has none. */
+const DAHAB_NO_KICKER: Record<string, ShownFor> = Object.fromEntries(
+  ['kicker', 'showKickerLines', 'showSubtitleLines'].map(id => [id, NOT_DAHAB])
+);
 /** Category cards honour Aspect / Name / Hover in the scrolling row, and Modern's own grid card does. */
 const CATEGORY_CARD_LOOK: ShownFor = [
-  { variants: { layout: ['horizontal'] } },
+  // the scrolling row of every skin but Dahab (its tiles are the look's own)
+  { ...NOT_DAHAB, variants: { layout: ['horizontal'] } },
   { templates: ['modern'] },
 ];
 const NO_WIDTH = ['maxWidth'] as const;
@@ -308,10 +340,14 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('framed', 'Framed', 'داخل إطار'),
         opt('collage', 'Collage (3 photos)', 'كولاج (3 صور)'),
       ]),
-      s.select('frame', 'Frame line (framed only)', 'خط الإطار (داخل إطار فقط)', [
-        opt('none', 'None', 'بدون'),
-        opt('line', 'Hairline', 'خط رفيع'),
-      ]),
+      s.select(
+        'frame',
+        'Frame line (framed only)',
+        'خط الإطار (داخل إطار فقط)',
+        [opt('none', 'None', 'بدون'), opt('line', 'Hairline', 'خط رفيع')],
+        // Dahab's hero is one full-bleed photograph over a fade, with no frame to draw a line in
+        { shownFor: NOT_DAHAB }
+      ),
       s.select(
         'textAnchor',
         'Text position',
@@ -321,6 +357,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           opt('bottom-start', 'Bottom corner', 'في الركن السفلي'),
         ],
         {
+          // Dahab always sets its copy at the inline start
+          shownFor: NOT_DAHAB,
           // M-6 (B1-48): below xl the anchored copy leaves the photo, so its colour is the page's.
           hintEn:
             'On phones and tablets the text sits under the photo in the page colours, so the headline colour applies only on large screens.',
@@ -342,7 +380,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     // The storefront already renders a separate mobile layout + caption.
     responsive: { hidden: ALL, settings: { mobile: ['layout', 'captionPosition'] } },
     settings: [
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       s.select(
         'layout',
         'Layout',
@@ -378,6 +416,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         [opt('below', 'Below', 'أسفل'), opt('overlay', 'On image', 'على الصورة')],
         {
           responsive: ['mobile'],
+          // Dahab's tiles always carry the name below the photograph
+          shownFor: NOT_DAHAB,
         }
       ),
       s.select(
@@ -405,6 +445,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       // The grid and the aisle tiles ignore these on every skin built since the looks (their
       // cards are their own); the scrolling row, and Modern's grid card, read them.
       ...narrowed(cardSettings(), {
+        ...DAHAB_FIXED_CARD,
         cardAspect: CATEGORY_CARD_LOOK,
         showLabel: CATEGORY_CARD_LOOK,
         showHover: CATEGORY_CARD_LOOK,
@@ -420,9 +461,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     rendererKey: 'home.newArrivals',
     group: 'template',
     settings: [
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       carouselLimit(48),
-      ...cardSettings(),
+      ...narrowed(cardSettings(), DAHAB_FIXED_CARD),
       ...without(styleSettings(), NO_WIDTH),
     ],
     retired: NO_WIDTH,
@@ -435,9 +476,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     rendererKey: 'home.bestSellers',
     group: 'template',
     settings: [
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       carouselLimit(48),
-      ...cardSettings(),
+      ...narrowed(cardSettings(), DAHAB_FIXED_CARD),
       ...without(styleSettings(), NO_WIDTH),
     ],
     retired: NO_WIDTH,
@@ -590,9 +631,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         group: 'content',
         max: 50,
       },
-      ...headingSettings(),
+      ...narrowed(headingSettings(), DAHAB_NO_KICKER),
       carouselLimit(50),
-      ...cardSettings(),
+      ...narrowed(cardSettings(), DAHAB_FIXED_CARD),
       ...without(styleSettings(), NO_WIDTH),
     ],
     retired: NO_WIDTH,
@@ -832,7 +873,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         settings: {
           heading: 'Shop by collection',
           headingAr: 'تسوق حسب المجموعة',
-          tileShape: 'arch',
+          tileShape: 'rectangle',
           columns: 4,
         },
         blocks: [],
@@ -841,7 +882,6 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     settings: [
       s.text('heading', 'Heading', 'العنوان', { localized: true }),
       s.select('tileShape', 'Tile shape', 'شكل البطاقة', [
-        opt('arch', 'Arch', 'قوس'),
         opt('rectangle', 'Rectangle', 'مستطيل'),
         opt('circle', 'Circle', 'دائري'),
         opt('band', 'Full-width bands', 'شرائط بعرض الشاشة'),
@@ -1062,6 +1102,75 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.text('hygiene', 'Kitchen and hygiene line', 'سطر المطبخ والنظافة', { localized: true }),
       s.range('years', 'Years cooking', 'سنين الطبخ', 0, 80),
       s.url('storyLink', 'Story page link', 'رابط صفحة الحكاية'),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'gift-finder',
+    labelEn: 'Gift finder',
+    // Neutral noun phrase, never a gendered imperative.
+    labelAr: 'مساعد الهدايا',
+    legacyKey: null,
+    rendererKey: 'section.giftFinder',
+    group: 'template',
+    propsSchema: giftFinderSchema,
+    maxCount: 1,
+    blocks: [
+      {
+        type: 'occasion',
+        labelEn: 'Occasion',
+        labelAr: 'مناسبة',
+        maxCount: 8,
+        propsSchema: giftOccasionBlockSchema,
+        settings: [
+          {
+            id: 'categorySlug',
+            type: 'category',
+            labelEn: 'Category for this occasion',
+            labelAr: 'فئة المناسبة',
+            group: 'content',
+          },
+          s.text('label', 'Label', 'الاسم', { localized: true }),
+        ],
+      },
+      {
+        type: 'budget',
+        labelEn: 'Budget',
+        labelAr: 'ميزانية',
+        maxCount: 6,
+        propsSchema: giftBudgetBlockSchema,
+        settings: [
+          s.range('maxPrice', 'Up to (pounds)', 'لحد (بالجنيه)', 50, 100000, 50),
+          s.text('label', 'Label', 'الاسم', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Gift finder',
+        nameAr: 'مساعد الهدايا',
+        settings: { heading: 'Find the right gift', headingAr: 'اختار الهدية المناسبة' },
+        blocks: [
+          { type: 'occasion', settings: { label: 'Engagement', labelAr: 'خطوبة' } },
+          { type: 'occasion', settings: { label: 'Birthday', labelAr: 'عيد ميلاد' } },
+          { type: 'occasion', settings: { label: "Mother's day", labelAr: 'عيد الأم' } },
+          {
+            type: 'budget',
+            settings: { maxPrice: 2000, label: 'Up to 2,000', labelAr: 'لحد 2,000' },
+          },
+          {
+            type: 'budget',
+            settings: { maxPrice: 5000, label: 'Up to 5,000', labelAr: 'لحد 5,000' },
+          },
+        ],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.text('occasionsLabel', 'Occasions line', 'سطر المناسبات', { localized: true }),
+      s.text('budgetsLabel', 'Budgets line', 'سطر الميزانية', { localized: true }),
+      s.text('buttonText', 'Show-gifts link text', 'نص رابط عرض الهدايا', { localized: true }),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],

@@ -52,6 +52,8 @@ export default function DahabProductCard({
   priority,
   showCardName,
   showCardPrice,
+  showLabel,
+  showHover,
   imageSizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw',
 }: DahabProductCardProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
@@ -75,8 +77,10 @@ export default function DahabProductCard({
   const inStock = product.inStock !== false;
   const orderable = canBuyNow(product);
   const hasVariants = (product.variants?.length ?? 0) > 0;
-  const priceVisible = showCardPrice !== false && store.theme?.showPriceOnCards !== false;
-  const nameVisible = showCardName !== false;
+  const priceVisible =
+    showCardPrice !== false && showLabel !== false && store.theme?.showPriceOnCards !== false;
+  // Show name (showLabel) gates the name and price block, as on the other skins
+  const nameVisible = showCardName !== false && showLabel !== false;
 
   const discount =
     orderable && isOnSale(product)
@@ -118,6 +122,7 @@ export default function DahabProductCard({
           aria-label={name}
         >
           <div
+            data-part="card-image"
             className={cx(
               lookImageAspectClass(store.look)
                 ? `relative w-full ${lookImageAspectClass(store.look)}`
@@ -137,7 +142,7 @@ export default function DahabProductCard({
             ) : (
               <div aria-hidden="true" className="absolute inset-0 bg-muted" />
             )}
-            {canHover && secondary?.url && (
+            {showHover !== false && canHover && secondary?.url && (
               <Image
                 src={secondary.url}
                 alt=""
@@ -149,7 +154,7 @@ export default function DahabProductCard({
               />
             )}
             {/* Inner hairline: keeps a white-background photo from bleeding
-              into the night page. */}
+              into the page. */}
             <span
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 rounded-[var(--radius)] ring-1 ring-inset ring-foreground/[0.06]"
@@ -157,11 +162,12 @@ export default function DahabProductCard({
           </div>
           {badge && (
             <span
+              data-badge={orderable && badge === discount ? 'sale' : undefined}
               className={cx(
                 'absolute start-3 top-3 rounded-[2px] px-2 py-1 text-xs font-medium leading-none',
                 orderable
-                  ? 'bg-background/85 text-primary backdrop-blur-sm'
-                  : 'bg-background/85 text-muted-foreground'
+                  ? 'bg-background/90 text-primary'
+                  : 'bg-background/90 text-muted-foreground'
               )}
             >
               {badge}
@@ -176,7 +182,7 @@ export default function DahabProductCard({
                 href={href}
                 prefetch={false}
                 tabIndex={-1}
-                className="pointer-events-auto hidden w-full items-center justify-center rounded-[var(--radius)] bg-background/90 py-2.5 text-[13px] font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-primary hover:text-primary-foreground [@media(hover:hover)]:flex"
+                className="pointer-events-auto hidden w-full items-center justify-center rounded-[var(--radius)] bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:bg-primary hover:text-primary-foreground [@media(hover:hover)]:flex [@media(hover:hover)]:min-h-[44px]"
               >
                 {ctaLabel}
               </Link>
@@ -186,7 +192,7 @@ export default function DahabProductCard({
                 onClick={handleAdd}
                 disabled={!orderable || isAdding}
                 aria-label={`${ctaLabel}: ${name}`}
-                className="pointer-events-auto ms-auto flex h-10 w-10 items-center justify-center gap-2 rounded-[var(--radius)] bg-background/90 text-[13px] font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [@media(hover:hover)]:w-full [@media(hover:hover)]:py-2.5"
+                className="pointer-events-auto ms-auto flex h-11 w-11 items-center justify-center gap-2 rounded-[var(--radius)] bg-background text-[13px] font-medium text-foreground transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [@media(hover:hover)]:min-h-[44px] [@media(hover:hover)]:w-full [@media(hover:hover)]:py-2.5"
               >
                 <BagIcon className="h-[18px] w-[18px] [@media(hover:hover)]:hidden" />
                 <span className="hidden [@media(hover:hover)]:inline">

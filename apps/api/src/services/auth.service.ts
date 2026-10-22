@@ -26,6 +26,7 @@ import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { loginGate } from './login-gate';
+import { redactOrderForCustomer } from './gold-rate/public';
 import { announcePasskeyPurge } from './passkey-purge';
 import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
@@ -2494,7 +2495,8 @@ export class AuthService {
       exportedAt: new Date().toISOString(),
       user,
       addresses,
-      orders,
+      // The customer's own orders, without the merchant's cost and the gold margin (Ruling B5-13).
+      orders: orders.map(redactOrderForCustomer),
       abandonedCarts,
       wishlists,
       reviews,

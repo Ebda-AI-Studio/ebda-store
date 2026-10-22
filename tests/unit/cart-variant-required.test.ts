@@ -14,6 +14,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const isFeatureEnabled = vi.fn();
 
+// Gold-rate pricing is proven in gold-*.test.ts and tests/integration/gold-checkout.test.ts; this suite
+// is about something else, so the gate is stubbed to "no gold lines".
+vi.mock('@api/services/gold-rate/gate', () => ({
+  assertGoldLinesPriceable: async () => ({ snapshots: new Map(), rateIds: new Map() }),
+  assertSameRates: async () => undefined,
+  goldQuotesForLines: async () => new Map(),
+  goldQuoteKey: (p: string, v: string | null) => `${p}|${v ?? ''}`,
+}));
+vi.mock('@api/services/gold-rate/public', () => ({
+  publicGoldPricingForLines: async () => new Map(),
+  publicGoldFields: async () => ({ goldPricing: null }),
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {
     cart: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },

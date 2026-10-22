@@ -114,7 +114,6 @@ describe('demo home renders the superset through the look mix (Ruling B1-8)', ()
     const def = superset();
     expect(demoHomeDefinition({ isDemo: true, look: null }, def)).toBe(def);
     expect(demoHomeDefinition({ isDemo: true, look: 'qamar.gone' }, def)).toBe(def);
-    expect(demoHomeDefinition({ isDemo: true, look: 'dahab.worn' }, def)).toBe(def);
   });
 
   it('undefined definition stays undefined', () =>

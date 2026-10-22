@@ -10,6 +10,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
+import { GoldRateLine } from '../../components/commerce/GoldRateLine';
 import type { CheckoutCartItem, CheckoutCartBundle, Coupon } from './types';
 
 /** Loyalty redemption control state, threaded from CheckoutClient. Present
@@ -230,6 +231,7 @@ export function OrderSummary({
                   </p>
                 )}
                 <CartLineNote note={item.note} />
+                <GoldRateLine gold={item.gold} className="mt-1" />
                 <p className="mt-auto text-sm font-medium text-muted-foreground">
                   {formatPrice(item.price * item.quantity)}
                 </p>

@@ -91,10 +91,9 @@ describe('globals.css look rules', () => {
     expect(looksCss).not.toMatch(/group\\\/img/);
     expect(looksCss).not.toMatch(/\[data-section\]/);
   });
-  it('the look display face beats the dahab skin on <body>', () => {
-    expect(looksCss).toMatch(
-      /html\[lang\] body\[data-look\]\[data-pack='dahab'\]\s*\{\s*--font-display:\s*var\(--look-font-display\)/
-    );
+  it('the retired dahab skin no longer overrides --font-display on <body> (Ruling B5-1)', () => {
+    expect(looksCss).not.toMatch(/data-pack='dahab'\]\s*\{\s*--font-display/);
+    expect(css).not.toMatch(/--font-dahab|dahab-draw|dahab-rise|Amiri|Marcellus/);
   });
   it('English headings use the Latin display face', () => {
     expect(looksCss).toMatch(

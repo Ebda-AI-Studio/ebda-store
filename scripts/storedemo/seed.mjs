@@ -5,10 +5,13 @@
 // (`--template souq`, SOUQ_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/souq),
 // `storedemo-jasmine` = Jasmine (`--template jasmine`, JASMINE_DEMO_ASSET_BASE, prod asset base
 // https://media.ebda.app/demo/jasmine; Ruling B3-8), `storedemo-lamma` = Lamma (`--template lamma`,
-// LAMMA_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/lamma; Ruling B4-10).
+// LAMMA_DEMO_ASSET_BASE, prod asset base https://media.ebda.app/demo/lamma; Ruling B4-10),
+// `storedemo-dahab` = Dahab (`--template dahab`, DAHAB_DEMO_ASSET_BASE, prod asset base
+// https://media.ebda.app/demo/dahab; Ruling B5-10), which also turns gold-rate pricing on and prices its
+// six gold pieces from a manual rate through GoldRateService.
 //
 //   DATABASE_URL=<owner-role postgres url> [QAMAR_DEMO_ASSET_BASE=<url or /path>] \
-//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq|jasmine|lamma] [--yes-production] [--local-look-stores]
+//     npx tsx scripts/storedemo/seed.mjs [--template qamar|souq|jasmine|lamma|dahab] [--yes-production] [--local-look-stores]
 //
 // Prints the plan first. Refuses any non-local DATABASE_URL (anything but loopback) unless
 // `--yes-production` is passed: Ahmad approves that run, an agent never does (Ruling B1-16), and with
@@ -49,8 +52,16 @@ import { LAMMA_CATEGORIES, LAMMA_PRODUCTS } from '../lamma-demo/catalogue.mjs';
 import { buildSouqHome } from './souq-home.mjs';
 import { buildJasmineHome } from './jasmine-home.mjs';
 import { buildLammaHome } from './lamma-home.mjs';
+import {
+  DAHAB_CATEGORIES,
+  DAHAB_GOLD_RATES,
+  DAHAB_OCCASIONS,
+  DAHAB_PRODUCTS,
+  DAHAB_SIZE_CHARTS,
+} from '../dahab-demo/catalogue.mjs';
+import { buildDahabHome } from './dahab-home.mjs';
 
-export { buildQamarHome, buildSouqHome, buildJasmineHome, buildLammaHome };
+export { buildQamarHome, buildSouqHome, buildJasmineHome, buildLammaHome, buildDahabHome };
 
 export const SLUG = 'storedemo';
 export const OWNER_EMAIL = 'storedemo-owner@ebda.app';
@@ -161,6 +172,27 @@ export const PROD_ASSET_BASE = 'https://media.ebda.app/demo/qamar';
 export const SOUQ_PROD_ASSET_BASE = 'https://media.ebda.app/demo/souq';
 export const JASMINE_PROD_ASSET_BASE = 'https://media.ebda.app/demo/jasmine';
 export const LAMMA_PROD_ASSET_BASE = 'https://media.ebda.app/demo/lamma';
+export const DAHAB_PROD_ASSET_BASE = 'https://media.ebda.app/demo/dahab';
+
+/** Approved, verified reviews for the Dahab showroom (the Worn look's reviews row): [slug, rating, body, language]. */
+export const DAHAB_REVIEWS = [
+  ['gold-chain-21', 5, 'خفيفة وشكلها شيك، والعيار مكتوب بوضوح وجه زي ما اتوصف.', 'ar'],
+  ['pearl-necklace', 5, 'اللؤلؤ لونه هادي ومتناسق، والقفل متين. اتغلفت في علبة حلوة.', 'ar'],
+  ['engraved-ring', 4, 'الحفر طلع نضيف والحروف واضحة. خدت 5 أيام زي ما اتقال.', 'ar'],
+  [
+    'pearl-studs',
+    5,
+    'Small, even pearls and a clean post. Arrived in a gift box with my card.',
+    'en',
+  ],
+  [
+    'heart-pendant',
+    5,
+    'هدية لأمي في عيد الأم، فرحت بيها جدًا والرسالة على الكارت كانت لطيفة.',
+    'ar',
+  ],
+  ['silver-band-ring', 4, 'Comfortable band, the size chart was right for me.', 'en'],
+];
 
 /**
  * One entry per demo template (Ruling B2-7). Everything a template's showroom differs in is here;
@@ -322,6 +354,41 @@ export const TEMPLATE_SPECS = {
     },
     zone: { deliveryFee: 3_500, estimatedDaysMin: 0, estimatedDaysMax: 1 },
   },
+  dahab: {
+    template: 'dahab',
+    slug: 'storedemo-dahab',
+    // Ruling B5-10: no mailbox behind this address, no login (`passwordHash '!seed-no-login'`).
+    ownerEmail: 'storedemo-dahab-owner@ebda.app',
+    name: 'Ebda Dahab Demo',
+    nameAr: 'إبدا دهب ديمو',
+    defaultLook: 'dahab.worn',
+    categories: DAHAB_CATEGORIES,
+    products: DAHAB_PRODUCTS,
+    sizeCharts: DAHAB_SIZE_CHARTS,
+    occasionSlugs: DAHAB_OCCASIONS.map(o => o.slug),
+    archivePlaceholders: false,
+    assetEnv: 'DAHAB_DEMO_ASSET_BASE',
+    prodAssetBase: DAHAB_PROD_ASSET_BASE,
+    localLookStores: [
+      ['dahab-worn', 'dahab.worn'],
+      ['dahab-workshop', 'dahab.workshop'],
+      ['dahab-giftbox', 'dahab.giftbox'],
+    ],
+    localStoreName: l => [`Dahab ${l.name.en}`, `دهب ${l.name.ar}`],
+    buildHome: buildDahabHome,
+    description:
+      'An illustrative Egyptian jewellery shop: rings, necklaces, bracelets and earrings, plus gold pieces priced from the day\u2019s gold rate.',
+    descriptionAr:
+      'محل مجوهرات مصري توضيحي: خواتم وسلاسل وأساور وحلقان، وقطع دهب بتتسعّر من سعر الدهب النهارده.',
+    deliveryDays: { min: 2, max: 4 },
+    instalments: null,
+    reviews: DAHAB_REVIEWS,
+    // Phase B5 (Rulings B5-12, B5-15): the demo prices its gold pieces from a MANUAL rate that the seed
+    // re-stamps on every run, so a fresh seed is never stale. A production demo's rate goes stale after
+    // 26 hours by design; whether the production run turns the automatic rate on (feed: true) is Ahmad's
+    // call at the production step, never the seed's default (docs/ebda/templates/demo-store.md).
+    gold: { rates: DAHAB_GOLD_RATES, showBreakdown: true, feed: false },
+  },
 };
 /** `--template <name>` (default qamar); an unknown name is refused by the caller. */
 export function templateFromArgv(argv) {
@@ -372,6 +439,11 @@ export function describePlan(url, spec = TEMPLATE_SPECS.qamar) {
     ...(spec.tags?.length
       ? [
           `jasmine-style extras: ${spec.tags.length} skin-type / concern tags, ${spec.bundles?.length ?? 0} routine bundle(s), ${spec.reviews?.length ?? 0} approved reviews, features ${(spec.features ?? []).join(', ') || 'none'}`,
+        ]
+      : []),
+    ...(spec.gold
+      ? [
+          `gold pricing: ${spec.products.filter(p => p.gold).length} gold-rate products, rates ${spec.gold.rates.map(r => `${r.karat}k=${r.ratePerGram / 100}`).join(' / ')} EGP per gram (manual, re-stamped every run), automatic rate ${spec.gold.feed ? 'ON' : 'off'}`,
         ]
       : []),
     ...(spec.storeSettings
@@ -543,9 +615,13 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
             ? { enabled: true, ...p.personalisation }
             : Prisma.DbNull,
         };
+        // A gold-rate row's price belongs to the repricer (Ruling B5-13): on a re-seed the product is
+        // updated WITHOUT price / compare-at (the DB trigger would refuse them), and it is created as a
+        // fixed row with a placeholder that `seedGold` replaces through the service.
+        const { price: _price, compareAtPrice: _compare, ...dataNoPrice } = data;
         const product = await tx.product.upsert({
           where: { storeId_slug: { storeId, slug: p.slug } },
-          update: data,
+          update: p.gold ? dataNoPrice : data,
           create: { storeId, slug: p.slug, ...data },
         });
         productIdBySlug.set(p.slug, product.id);
@@ -644,6 +720,11 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
             isActive: true,
             position: vPos,
           };
+          // A variant of a gold-rate product carries the repricer's price (or inherits): never written here.
+          if (p.gold) {
+            delete vData.price;
+            delete vData.compareAtPrice;
+          }
           const found = await tx.productVariant.findFirst({
             where: { productId: product.id, sku },
             select: { id: true },
@@ -819,6 +900,77 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
   );
 }
 
+/**
+ * Gold-rate pricing for a showroom (Phase B5): turn it on, stamp today's MANUAL rates, then write each gold
+ * product's spec (and its variants' weights) through GoldRateService, the real merchant path, so the
+ * repricer computes every price and the caches are purged. Runs AFTER `seedCatalogue` has committed: the
+ * service opens its own money transaction. Idempotent: the same rates and specs reprice to the same prices
+ * (confirm: true because a re-seed with changed demo rates is a deliberate jump).
+ */
+export async function seedGold(prisma, storeId, userId, spec, productIdBySlug, GoldRateService) {
+  const gold = spec.gold;
+  const actor = { userId };
+  await GoldRateService.updateSettings(
+    storeId,
+    {
+      enabled: true,
+      feedEnabled: gold.feed === true,
+      feedPremiumBps: 0,
+      maxAgeMinutes: 1560,
+      jumpConfirmBps: 500,
+      roundingStep: 100,
+      showBreakdown: gold.showBreakdown === true,
+    },
+    actor
+  );
+  await GoldRateService.applyRates(
+    storeId,
+    { rates: gold.rates.map(r => ({ karat: r.karat, ratePerGram: r.ratePerGram })), confirm: true },
+    actor
+  );
+  let repriced = 0;
+  for (const p of spec.products.filter(x => x.gold)) {
+    const productId = productIdBySlug.get(p.slug);
+    if (!productId) throw new Error(`gold product ${p.slug} was not seeded`);
+    // A variant's own weight comes from the option value that names it (the ring's sizes weigh differently).
+    const variants = [];
+    if (p.options?.length) {
+      const rows = await prisma.productVariant.findMany({
+        where: { productId, isActive: true },
+        select: { id: true, sku: true },
+      });
+      for (const combo of combos(p.options)) {
+        const sku = variantSku(
+          p.slug,
+          combo.map(v => v.value)
+        );
+        const row = rows.find(r => r.sku === sku);
+        if (!row) throw new Error(`gold product ${p.slug}: variant ${sku} is missing`);
+        const weightMg = combo.map(v => v.weightMg).find(w => w != null) ?? null;
+        variants.push({ id: row.id, pricingMode: null, weightMg });
+      }
+    }
+    await GoldRateService.setProductPricing(
+      storeId,
+      productId,
+      {
+        product: {
+          pricingMode: 'gold_rate',
+          karat: p.gold.karat,
+          weightMg: p.gold.weightMg,
+          makingChargeType: p.gold.makingChargeType,
+          makingChargeValue: p.gold.makingChargeValue,
+          marginBps: p.gold.marginBps,
+        },
+        ...(variants.length ? { variants } : {}),
+      },
+      actor
+    );
+    repriced++;
+  }
+  return { repriced };
+}
+
 async function run() {
   const url = process.env.DATABASE_URL;
   const argv = process.argv.slice(2);
@@ -859,6 +1011,9 @@ async function run() {
     `${root}/apps/api/src/services/page-builder.service.ts`
   );
   const { invalidateStoreProductCaches } = await import(`${root}/apps/api/src/lib/public-cache.ts`);
+  const { GoldRateService } = await import(
+    `${root}/apps/api/src/services/gold-rate/gold-rate.service.ts`
+  );
   const look = getLook(spec.defaultLook);
   if (!look) throw new Error(`default look ${spec.defaultLook} is not in the registry`);
   const video = videoUrl(a.base);
@@ -923,10 +1078,15 @@ async function run() {
     const seeded = await runInStoreScope(store.id, () =>
       seedCatalogue(prisma, Prisma, store.id, a.base, spec)
     );
+    const goldSeeded = spec.gold
+      ? await runInStoreScope(store.id, () =>
+          seedGold(prisma, store.id, owner.id, spec, seeded.productIdBySlug, GoldRateService)
+        )
+      : null;
     const rev = await publishHome(store.id, owner.id, seeded.productIdBySlug);
     await invalidateStoreProductCaches(store.id);
     console.log(
-      `seeded ${spec.slug} (${store.id}): ${seeded.productIdBySlug.size} products, ${seeded.variantCount} variants, archived ${seeded.archived} placeholder products, home rev ${rev}`
+      `seeded ${spec.slug} (${store.id}): ${seeded.productIdBySlug.size} products, ${seeded.variantCount} variants, archived ${seeded.archived} placeholder products, home rev ${rev}${goldSeeded ? `, ${goldSeeded.repriced} gold-rate products priced` : ''}`
     );
 
     if (lookStores) {
@@ -961,6 +1121,10 @@ async function run() {
         const sSeeded = await runInStoreScope(s.id, () =>
           seedCatalogue(prisma, Prisma, s.id, a.base, spec)
         );
+        if (spec.gold)
+          await runInStoreScope(s.id, () =>
+            seedGold(prisma, s.id, owner.id, spec, sSeeded.productIdBySlug, GoldRateService)
+          );
         await publishHome(s.id, owner.id, sSeeded.productIdBySlug);
         const applied = await runInStoreScope(s.id, async () => {
           const r = await StoreService.applyLook(s.id, lookId, { design: 'reset' }, owner.id);

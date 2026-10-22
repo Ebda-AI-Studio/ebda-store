@@ -132,6 +132,8 @@ export const collectionListSchema = z
     ...frame,
     heading: text(200),
     headingAr: text(200),
+    // 'arch' stays ACCEPTED so saved documents keep validating (Ruling B5-3); it is never offered
+    // by the editor and renders as the look's rectangle.
     tileShape: z.enum(['arch', 'rectangle', 'circle', 'band']).optional(),
     columns: z.number().int().min(2).max(4).optional(),
   })
@@ -259,5 +261,44 @@ export const makerProfileSchema = z
     hygieneAr: text(160),
     years: z.number().int().min(0).max(80).optional(),
     storyLink: safeLink,
+  })
+  .strict();
+
+/**
+ * "Gift finder" (Phase B5, Dahab Gift box; Ruling B5-7): who is it for, and how much. Occasions are
+ * `occasion` blocks that name a CATEGORY by slug (a reference, checked against the store like a
+ * collection tile), budgets are `budget` blocks holding a cap in whole pounds (`maxPrice`, converted
+ * to minor units only when the link is built). The section is links over the product list's URL
+ * filters (`?category=`, `?maxPrice=`): no facet, no new API. With no occasion and no budget it
+ * renders nothing (an unfilled feature renders nothing).
+ */
+export const giftFinderSchema = z
+  .object({
+    ...frame,
+    heading: text(200),
+    headingAr: text(200),
+    occasionsLabel: text(80),
+    occasionsLabelAr: text(80),
+    budgetsLabel: text(80),
+    budgetsLabelAr: text(80),
+    buttonText: text(60),
+    buttonTextAr: text(60),
+  })
+  .strict();
+
+export const giftOccasionBlockSchema = z
+  .object({
+    categorySlug: z.string().max(120).optional(),
+    label: text(60),
+    labelAr: text(60),
+  })
+  .strict();
+
+export const giftBudgetBlockSchema = z
+  .object({
+    /** Whole pounds; the link carries it in minor units. */
+    maxPrice: z.number().int().min(1).max(1_000_000).optional(),
+    label: text(60),
+    labelAr: text(60),
   })
   .strict();

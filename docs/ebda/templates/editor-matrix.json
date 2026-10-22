@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1396,
+    "wired": 1403,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -28,15 +28,3096 @@
       "souq.showroom"
     ],
     "skins": [
+      "dahab",
       "jasmine",
       "lamma",
-      "minimal",
       "qamar",
       "souq"
     ],
     "sectionTypesMissing": []
   },
   "rows": [
+    {
+      "id": "dahab|section:best-sellers|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:best-sellers|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:best-sellers|limit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "limit",
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
+    },
+    {
+      "id": "dahab|section:best-sellers|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:best-sellers|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:best-sellers|showHover",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "showHover",
+      "status": "wired",
+      "evidence": "static (ProductCard.tsx)"
+    },
+    {
+      "id": "dahab|section:best-sellers|showLabel",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "showLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:best-sellers|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:best-sellers|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:best-sellers|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:best-sellers",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|limit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "limit",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:blog-carousel|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:blog-carousel",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:brand-story|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:brand-story",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:brand-story|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:brand-story",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:brand-story|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:brand-story",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:brand-story|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:brand-story",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:brand-story|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:brand-story",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:brand-story|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:brand-story",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:category-grid|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|desktopColumns",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "desktopColumns",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:category-grid|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|mobileColumns",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "mobileColumns",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|source",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "source",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:category-grid|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:category-grid",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:collection-list/collection|categorySlug",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list/collection",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:collection-list/collection|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list/collection",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:collection-list/collection|label",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list/collection",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:collection-list/collection|tone",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list/collection",
+      "control": "tone",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:collection-list|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:collection-list|columns",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "columns",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:collection-list|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:collection-list|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:collection-list|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:collection-list|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:collection-list|tileShape",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:collection-list",
+      "control": "tileShape",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|buttonLink",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "buttonLink",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|buttonText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|categorySlug",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:featured-collection|columns",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "columns",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|limit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "limit",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|manualProductIds",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "manualProductIds",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:featured-collection|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|mobileColumns",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "mobileColumns",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|productSource",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "productSource",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|subheading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "subheading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:featured-collection|tabs",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:featured-collection",
+      "control": "tabs",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder/budget|label",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:gift-finder/budget|maxPrice",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "maxPrice",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:gift-finder/occasion|categorySlug",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:gift-finder/occasion|label",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:gift-finder|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder|budgetsLabel",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "budgetsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder|buttonText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
+    },
+    {
+      "id": "dahab|section:gift-finder|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder|occasionsLabel",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "occasionsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:gift-finder|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero/slide|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|ctaHref",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "ctaHref",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|ctaText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "ctaText",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|focus",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "focus",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|headline",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "headline",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|imageMobile",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "imageMobile",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|link",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "link",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|video",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "video",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero/slide|videoMobile",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero/slide",
+      "control": "videoMobile",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero|autoplayMs",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "autoplayMs",
+      "status": "wired",
+      "evidence": "static (HeroSlider.tsx)"
+    },
+    {
+      "id": "dahab|section:hero|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:hero|mode",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "mode",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|presentation",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "presentation",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:hero|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:hero",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:image-text|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|body",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "body",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|buttonLink",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "buttonLink",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|buttonText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|imageAspect",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "imageAspect",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|imagePosition",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "imagePosition",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:image-text|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:image-text",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|hygiene",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "hygiene",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|name",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "name",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|role",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "role",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|story",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "story",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|storyLink",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "storyLink",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|variant",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "variant",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:maker-profile|years",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:maker-profile",
+      "control": "years",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:new-arrivals|limit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "limit",
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
+    },
+    {
+      "id": "dahab|section:new-arrivals|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|showHover",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "showHover",
+      "status": "wired",
+      "evidence": "static (ProductCard.tsx)"
+    },
+    {
+      "id": "dahab|section:new-arrivals|showLabel",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "showLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:new-arrivals|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:new-arrivals",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:newsletter|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:newsletter|body",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "body",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:newsletter|buttonText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:newsletter|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:newsletter|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:newsletter|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:newsletter|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:newsletter",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|categoryFetchLimit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "categoryFetchLimit",
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
+    },
+    {
+      "id": "dahab|section:product-carousel|categorySlug",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:product-carousel|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:product-carousel|limit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "limit",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|manualProductIds",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "manualProductIds",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:product-carousel|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|productSource",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "productSource",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|showHover",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "showHover",
+      "status": "wired",
+      "evidence": "static (ProductCard.tsx)"
+    },
+    {
+      "id": "dahab|section:product-carousel|showLabel",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "showLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|subtitle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "subtitle",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-carousel|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-carousel",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:product-spotlight|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|body",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "body",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|buttonLink",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "buttonLink",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|buttonText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|categorySlug",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:product-spotlight|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|imagePosition",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "imagePosition",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|limit",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "limit",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|manualProductIds",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "manualProductIds",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:product-spotlight|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:product-spotlight|productSource",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:product-spotlight",
+      "control": "productSource",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:shop-the-look/look|alt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look/look",
+      "control": "alt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:shop-the-look/look|image",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look/look",
+      "control": "image",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:shop-the-look/look|productIds",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look/look",
+      "control": "productIds",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:shop-the-look/look|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look/look",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:shop-the-look|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:shop-the-look|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:shop-the-look|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:shop-the-look|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:shop-the-look|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:shop-the-look",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps/step|body",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps/step",
+      "control": "body",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:steps/step|link",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps/step",
+      "control": "link",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:steps/step|productIds",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps/step",
+      "control": "productIds",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:steps/step|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps/step",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:steps|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps|buttonText",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:steps|subheading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:steps",
+      "control": "subheading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:testimonials|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:testimonials|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:testimonials|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:testimonials|minRating",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "minRating",
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
+    },
+    {
+      "id": "dahab|section:testimonials|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:testimonials|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:testimonials|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:testimonials|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:testimonials|verifiedOnly",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:testimonials",
+      "control": "verifiedOnly",
+      "status": "wired",
+      "evidence": "static (HomePageBody.tsx)"
+    },
+    {
+      "id": "dahab|section:trust-badges/badge|icon",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges/badge",
+      "control": "icon",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-badges/badge|text",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges/badge",
+      "control": "text",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-badges/badge|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges/badge",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-badges|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-badges|heading",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-badges|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-badges|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-badges|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-badges|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-badges",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip/item|icon",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip/item",
+      "control": "icon",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-strip/item|text",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip/item",
+      "control": "text",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-strip/item|title",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip/item",
+      "control": "title",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-strip|bgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|dividers",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "dividers",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|section:trust-strip|iconBgColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "iconBgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|iconColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "iconColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|layout",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "layout",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|maxWidth",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|paddingBottom",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|paddingTop",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|size",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "size",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|textColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "textColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "dahab|section:trust-strip|typography",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "section:trust-strip",
+      "control": "typography",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|accentColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "accentColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|arabicNumerals",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "arabicNumerals",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|backgroundColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "backgroundColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|backgroundPreset",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "backgroundPreset",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|bgPage",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "bgPage",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|bgSectionAlt",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "bgSectionAlt",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|bodyFont",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "bodyFont",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|borderColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "borderColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|borderRadius",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "borderRadius",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|cardColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|fontFamily",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "fontFamily",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|foregroundColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "foregroundColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|headingFont",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "headingFont",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|mutedColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "mutedColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|normalizeProductImages",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "normalizeProductImages",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|primaryColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "primaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|saleBadgeLegacyCorner",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "saleBadgeLegacyCorner",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|secondaryColor",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "secondaryColor",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|showBrandBadge",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "showBrandBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|showNewBadge",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "showNewBadge",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|showQuickAdd",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "showQuickAdd",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|uppercaseStyle",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "uppercaseStyle",
+      "status": "wired",
+      "evidence": "static"
+    },
     {
       "id": "jasmine|section:best-sellers|bgColor",
       "skin": "jasmine",
@@ -1191,6 +4272,162 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder/budget|label",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:gift-finder/budget|maxPrice",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "maxPrice",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:gift-finder/occasion|categorySlug",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:gift-finder/occasion|label",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "jasmine|section:gift-finder|bgColor",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder|budgetsLabel",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "budgetsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder|buttonText",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
+    },
+    {
+      "id": "jasmine|section:gift-finder|heading",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder|maxWidth",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder|occasionsLabel",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "occasionsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder|paddingBottom",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "jasmine|section:gift-finder|paddingTop",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -4835,6 +8072,162 @@
       "evidence": "static+probe"
     },
     {
+      "id": "lamma|section:gift-finder/budget|label",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:gift-finder/budget|maxPrice",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "maxPrice",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:gift-finder/occasion|categorySlug",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:gift-finder/occasion|label",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "lamma|section:gift-finder|bgColor",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:gift-finder|budgetsLabel",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "budgetsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:gift-finder|buttonText",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
+    },
+    {
+      "id": "lamma|section:gift-finder|heading",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:gift-finder|maxWidth",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:gift-finder|occasionsLabel",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "occasionsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:gift-finder|paddingBottom",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "lamma|section:gift-finder|paddingTop",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingTop",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
       "id": "lamma|section:hero/slide|alt",
       "skin": "lamma",
       "looks": [
@@ -7305,3620 +10698,6 @@
       "evidence": "static"
     },
     {
-      "id": "minimal|section:best-sellers|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardAspect",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardAspect",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardFrameColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardFrameSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardFrameStyle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameStyle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardFrameWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardFrameWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardGap",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardGap",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardShape",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardShape",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|cardSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "cardSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:best-sellers|kicker",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "kicker",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|limit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "limit",
-      "status": "wired",
-      "evidence": "static (HomePageBody.tsx)"
-    },
-    {
-      "id": "minimal|section:best-sellers|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|showCardFrame",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showCardFrame",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|showHover",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showHover",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|showKickerLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showKickerLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|showLabel",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showLabel",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|showSubtitleLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "showSubtitleLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|subtitle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "subtitle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:best-sellers|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:best-sellers",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|limit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "limit",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:blog-carousel|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:blog-carousel",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:brand-story|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:brand-story",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:brand-story|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:brand-story",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:brand-story|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:brand-story",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:brand-story|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:brand-story",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:brand-story|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:brand-story",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:brand-story|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:brand-story",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:category-grid|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|captionPosition",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "captionPosition",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardAspect",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardAspect",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardFrameColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardFrameSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardFrameStyle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameStyle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardFrameWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardFrameWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardGap",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardGap",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardShape",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardShape",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|cardSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "cardSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|desktopColumns",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "desktopColumns",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:category-grid|kicker",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "kicker",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|mobileColumns",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "mobileColumns",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|showCardFrame",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showCardFrame",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|showHover",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showHover",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|showKickerLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showKickerLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|showLabel",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showLabel",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|showSubtitleLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "showSubtitleLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|source",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "source",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|subtitle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "subtitle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:category-grid|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:category-grid",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:collection-list/collection|categorySlug",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list/collection",
-      "control": "categorySlug",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:collection-list/collection|image",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list/collection",
-      "control": "image",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:collection-list/collection|label",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list/collection",
-      "control": "label",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:collection-list/collection|tone",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list/collection",
-      "control": "tone",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:collection-list|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:collection-list|columns",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "columns",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:collection-list|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:collection-list|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:collection-list|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:collection-list|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:collection-list|tileShape",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:collection-list",
-      "control": "tileShape",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|buttonLink",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "buttonLink",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|buttonText",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "buttonText",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|categorySlug",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "categorySlug",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:featured-collection|columns",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "columns",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|limit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "limit",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|manualProductIds",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "manualProductIds",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:featured-collection|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|mobileColumns",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "mobileColumns",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|productSource",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "productSource",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|subheading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "subheading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:featured-collection|tabs",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:featured-collection",
-      "control": "tabs",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero/slide|alt",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "alt",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|ctaHref",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "ctaHref",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|ctaText",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "ctaText",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|focus",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "focus",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|headline",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "headline",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|image",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "image",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|imageMobile",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "imageMobile",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|link",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "link",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|video",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "video",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero/slide|videoMobile",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero/slide",
-      "control": "videoMobile",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero|autoplayMs",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "autoplayMs",
-      "status": "wired",
-      "evidence": "static (HeroSlider.tsx)"
-    },
-    {
-      "id": "minimal|section:hero|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:hero|frame",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "frame",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|mode",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "mode",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|presentation",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "presentation",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|textAnchor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "textAnchor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:hero|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:hero",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:image-text|alt",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "alt",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|body",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "body",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|buttonLink",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "buttonLink",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|buttonText",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "buttonText",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|image",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "image",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|imageAspect",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "imageAspect",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|imagePosition",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "imagePosition",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:image-text|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:image-text",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|alt",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "alt",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|hygiene",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "hygiene",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|image",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "image",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|name",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "name",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|role",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "role",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|story",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "story",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|storyLink",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "storyLink",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|variant",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "variant",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:maker-profile|years",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:maker-profile",
-      "control": "years",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardAspect",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardAspect",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardFrameColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardFrameSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardFrameStyle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameStyle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardFrameWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardFrameWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardGap",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardGap",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardShape",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardShape",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|cardSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "cardSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:new-arrivals|kicker",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "kicker",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|limit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "limit",
-      "status": "wired",
-      "evidence": "static (HomePageBody.tsx)"
-    },
-    {
-      "id": "minimal|section:new-arrivals|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|showCardFrame",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showCardFrame",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|showHover",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showHover",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|showKickerLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showKickerLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|showLabel",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showLabel",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|showSubtitleLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "showSubtitleLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|subtitle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "subtitle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:new-arrivals|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:new-arrivals",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:newsletter|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:newsletter|body",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "body",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:newsletter|buttonText",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "buttonText",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:newsletter|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:newsletter|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:newsletter|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:newsletter|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:newsletter",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardAspect",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardAspect",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardFrameColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardFrameSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardFrameStyle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameStyle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardFrameWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardFrameWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardGap",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardGap",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardShape",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardShape",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|cardSize",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "cardSize",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|categoryFetchLimit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "categoryFetchLimit",
-      "status": "wired",
-      "evidence": "static (HomePageBody.tsx)"
-    },
-    {
-      "id": "minimal|section:product-carousel|categorySlug",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "categorySlug",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:product-carousel|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:product-carousel|kicker",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "kicker",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|limit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "limit",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|manualProductIds",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "manualProductIds",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:product-carousel|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|productSource",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "productSource",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|showCardFrame",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showCardFrame",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|showHover",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showHover",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|showKickerLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showKickerLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|showLabel",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showLabel",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|showSubtitleLines",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "showSubtitleLines",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|subtitle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "subtitle",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-carousel|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-carousel",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:product-spotlight|alt",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "alt",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|body",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "body",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|buttonLink",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "buttonLink",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|buttonText",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "buttonText",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|categorySlug",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "categorySlug",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:product-spotlight|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|image",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "image",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|imagePosition",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "imagePosition",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|limit",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "limit",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|manualProductIds",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "manualProductIds",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:product-spotlight|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:product-spotlight|productSource",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:product-spotlight",
-      "control": "productSource",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:shop-the-look/look|alt",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look/look",
-      "control": "alt",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:shop-the-look/look|image",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look/look",
-      "control": "image",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:shop-the-look/look|productIds",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look/look",
-      "control": "productIds",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:shop-the-look/look|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look/look",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:shop-the-look|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:shop-the-look|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:shop-the-look|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:shop-the-look|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:shop-the-look|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:shop-the-look",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps/step|body",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps/step",
-      "control": "body",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:steps/step|link",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps/step",
-      "control": "link",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:steps/step|productIds",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps/step",
-      "control": "productIds",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:steps/step|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps/step",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:steps|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps|buttonText",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "buttonText",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:steps|subheading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:steps",
-      "control": "subheading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:testimonials|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:testimonials|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:testimonials|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:testimonials|minRating",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "minRating",
-      "status": "wired",
-      "evidence": "static (HomePageBody.tsx)"
-    },
-    {
-      "id": "minimal|section:testimonials|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:testimonials|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:testimonials|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:testimonials|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:testimonials|verifiedOnly",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:testimonials",
-      "control": "verifiedOnly",
-      "status": "wired",
-      "evidence": "static (HomePageBody.tsx)"
-    },
-    {
-      "id": "minimal|section:trust-badges/badge|icon",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges/badge",
-      "control": "icon",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-badges/badge|text",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges/badge",
-      "control": "text",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-badges/badge|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges/badge",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-badges|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-badges|heading",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges",
-      "control": "heading",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-badges|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-badges|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-badges|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-badges|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-badges",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip/item|icon",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip/item",
-      "control": "icon",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-strip/item|text",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip/item",
-      "control": "text",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-strip/item|title",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip/item",
-      "control": "title",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-strip|bgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "bgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|dividers",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "dividers",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|section:trust-strip|iconBgColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "iconBgColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|iconColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "iconColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|layout",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "layout",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|maxWidth",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "maxWidth",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|paddingBottom",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "paddingBottom",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|paddingTop",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "paddingTop",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|size",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "size",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|textColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "textColor",
-      "status": "wired",
-      "evidence": "static+probe"
-    },
-    {
-      "id": "minimal|section:trust-strip|typography",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "section:trust-strip",
-      "control": "typography",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|accentColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "accentColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|arabicNumerals",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "arabicNumerals",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|backgroundColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "backgroundColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|backgroundPreset",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "backgroundPreset",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|bgPage",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "bgPage",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|bgSectionAlt",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "bgSectionAlt",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|bodyFont",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "bodyFont",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|borderColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "borderColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|borderRadius",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "borderRadius",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|cardColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "cardColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|fontFamily",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "fontFamily",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|foregroundColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "foregroundColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|headingFont",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "headingFont",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|mutedColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "mutedColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|normalizeProductImages",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "normalizeProductImages",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|primaryColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "primaryColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|saleBadgeLegacyCorner",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "saleBadgeLegacyCorner",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|secondaryColor",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "secondaryColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|showBrandBadge",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "showBrandBadge",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|showNewBadge",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "showNewBadge",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|showQuickAdd",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "showQuickAdd",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "minimal|theme|uppercaseStyle",
-      "skin": "minimal",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "uppercaseStyle",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
       "id": "qamar|section:best-sellers|bgColor",
       "skin": "qamar",
       "looks": [
@@ -12072,6 +11851,162 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder/budget|label",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:gift-finder/budget|maxPrice",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "maxPrice",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:gift-finder/occasion|categorySlug",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:gift-finder/occasion|label",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "qamar|section:gift-finder|bgColor",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder|budgetsLabel",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "budgetsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder|buttonText",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
+    },
+    {
+      "id": "qamar|section:gift-finder|heading",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder|maxWidth",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder|occasionsLabel",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "occasionsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder|paddingBottom",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "qamar|section:gift-finder|paddingTop",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },
@@ -15699,6 +15634,162 @@
       ],
       "surface": "section:featured-collection",
       "control": "tabs",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder/budget|label",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:gift-finder/budget|maxPrice",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder/budget",
+      "control": "maxPrice",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:gift-finder/occasion|categorySlug",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "categorySlug",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:gift-finder/occasion|label",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder/occasion",
+      "control": "label",
+      "status": "wired",
+      "evidence": "static"
+    },
+    {
+      "id": "souq|section:gift-finder|bgColor",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "bgColor",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder|budgetsLabel",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "budgetsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder|buttonText",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "buttonText",
+      "status": "wired",
+      "evidence": "static (GiftFinderSection.tsx)"
+    },
+    {
+      "id": "souq|section:gift-finder|heading",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "heading",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder|maxWidth",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "maxWidth",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder|occasionsLabel",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "occasionsLabel",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder|paddingBottom",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingBottom",
+      "status": "wired",
+      "evidence": "static+probe"
+    },
+    {
+      "id": "souq|section:gift-finder|paddingTop",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "section:gift-finder",
+      "control": "paddingTop",
       "status": "wired",
       "evidence": "static+probe"
     },

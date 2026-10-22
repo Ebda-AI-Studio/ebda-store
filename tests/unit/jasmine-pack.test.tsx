@@ -145,6 +145,6 @@ describe('Apothecary: merchant white-background photos sit on a paper matte (qua
       /\[data-look='jasmine\.apothecary'\]\s*\{\s*--chip-bg: var\(--primary\);\s*--chip-fg: var\(--primary-foreground\)/
     );
     const others = [...css.matchAll(/\[data-look='([^']+)'\]\s*\{[^}]*--chip-bg/g)].map(m => m[1]);
-    expect(others.sort()).toEqual(['jasmine.apothecary', 'souq.night']);
+    expect(others.sort()).toEqual(['dahab.workshop', 'jasmine.apothecary', 'souq.night']);
   });
 });

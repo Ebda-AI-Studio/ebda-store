@@ -5,6 +5,7 @@ import { MINUS, SignedAmount } from '@/lib/bidi';
 import { Sheet } from '@/components/ui/Sheet';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
+import { useNumerals } from '../../../../hooks/useNumerals';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
@@ -32,6 +33,7 @@ import {
 } from '@/lib/order-labels';
 import { WaMeOrderQuestionButton } from '../../../../templates/shared/WaMeButtons';
 import { CartLineNote } from '../../../../components/commerce/CartLineNote';
+import { goldSnapshotLine } from '@/lib/gold-display';
 import { ReorderOrderButton } from '../../../../components/commerce/ReorderOrderButton';
 
 interface OrderDetail {
@@ -117,6 +119,12 @@ interface OrderDetail {
     variantNameAr?: string | null;
     /** The customer's personalisation text for this line. */
     personalisation?: string | null;
+    /** Gold-rate line (B5): the shopper-visible subset the server returns (no margin, no rate id). */
+    goldSnapshot?: {
+      karat: number;
+      weightMg: number;
+      ratePerGram: number;
+    } | null;
   }[];
   payments: {
     id: string;
@@ -134,6 +142,28 @@ interface OrderDetail {
     firstName: string;
     lastName: string;
   };
+}
+
+/** The karat, weight and per-gram rate a gold piece was priced at, frozen on the order (Ruling B5-17). */
+function GoldLine({
+  item,
+}: {
+  item: { goldSnapshot?: OrderDetail['items'][number]['goldSnapshot'] };
+}) {
+  const { language } = useLanguage();
+  const money = useLocalePrice();
+  const { localize } = useNumerals();
+  const line = goldSnapshotLine(
+    item.goldSnapshot,
+    language === 'ar' ? 'ar' : 'en',
+    money,
+    localize
+  );
+  return line ? (
+    <p className="text-xs text-muted-foreground" data-testid="order-gold-line">
+      {line}
+    </p>
+  ) : null;
 }
 
 export default function OrderDetailClient() {
@@ -509,6 +539,7 @@ export default function OrderDetailClient() {
                                 />
                               </p>
                             )}
+                          {row.kind === 'item' && <GoldLine item={row.item} />}
                           {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                         </div>
                       </div>
@@ -583,6 +614,7 @@ export default function OrderDetailClient() {
                       <VariantText title={orderLineVariantTitle(row.item, language === 'ar')!} />
                     </p>
                   )}
+                  {row.kind === 'item' && <GoldLine item={row.item} />}
                   {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                   <p className="text-sm text-muted-foreground">
                     {row.kind === 'bundle'

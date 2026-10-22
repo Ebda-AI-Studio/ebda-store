@@ -313,6 +313,8 @@ export const translations = {
     'ضيف خطوتين على الأقل والروتين هيظهر هنا.',
   'Add a name or a photo and your kitchen profile will appear here.':
     'ضيف اسم أو صورة وملف مطبخك هيظهر هنا.',
+  'Add an occasion or a budget and your gift finder will appear here.':
+    'ضيف مناسبة أو ميزانية ومساعد الهدايا هيظهر هنا.',
   // Jasmine routine, rating and bundle lines (Phase B3): sentences are Egyptian, buttons neutral.
   'Add all to cart': 'إضافة الكل للسلة',
   'In your cart': 'في سلتك',

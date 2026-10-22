@@ -1,0 +1,489 @@
+<!-- ar -->
+<div data-zone="products">
+<nav aria-label="مسار التصفح">
+<ol>
+<li>
+<a href="/">الرئيسية</a>
+</li>
+<li>
+<svg aria-hidden="true" data-breadcrumb-separator="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+</path>
+</svg>
+<a href="/products?category=rings">خواتم</a>
+</li>
+<li>
+<svg aria-hidden="true" data-breadcrumb-separator="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+</path>
+</svg>
+<span aria-current="page">خاتم سوليتير</span>
+</li>
+</ol>
+</nav>
+<div>
+<div>
+<div>
+<div>
+<div dir="ltr">
+<button type="button" aria-label="فتح الصورة 1 بملء الشاشة">
+<img alt="Ring" decoding="async" data-nimg="fill" sizes="100vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+</button>
+<button type="button" aria-label="فتح الصورة 2 بملء الشاشة">
+<img alt="خاتم سوليتير" loading="lazy" decoding="async" data-nimg="fill" sizes="100vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
+</button>
+</div>
+<div aria-hidden="true">
+<span>
+</span>
+<span>
+</span>
+</div>
+</div>
+<div>
+<ul aria-label="صور المنتج">
+<li>
+<button type="button" aria-current="true" aria-label="عرض الصورة 1">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+</button>
+</li>
+<li>
+<button type="button" aria-current="false" aria-label="عرض الصورة 2">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
+</button>
+</li>
+</ul>
+<button type="button" aria-label="فتح بملء الشاشة">
+<img alt="Ring" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 50vw, 60vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+<span>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="10.5" cy="10.5" r="6.5">
+</circle>
+<path d="m15.5 15.5 5 5M10.5 8v5M8 10.5h5">
+</path>
+</svg>
+</span>
+</button>
+</div>
+<dialog aria-label="خاتم سوليتير">
+<button type="button" aria-label="إغلاق">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M6 6l12 12M18 6 6 18">
+</path>
+</svg>
+</button>
+</dialog>
+</div>
+<div data-test="media-slot">3d</div>
+</div>
+<div>
+<div>
+<ul>
+<li>New</li>
+</ul>
+<h1 data-zone="productName">خاتم سوليتير</h1>
+<div data-zone="productPrice">
+<span>18,750 ج.م</span>
+</div>
+<p>A single brilliant.</p>
+<div>
+<div role="group" aria-labelledby=":R:-label-0" aria-describedby=":R:-hint-0" tabindex="-1" data-option-group="Metal">
+<div>
+<span id=":R:-label-0">المعدن:</span>
+</div>
+<div>
+<button aria-pressed="false">
+<span aria-hidden="true">
+</span>فضة</button>
+<button disabled="" aria-pressed="false" title="غير متوفر">
+<span aria-hidden="true">
+</span>ذهب وردي<span aria-hidden="true">
+<svg viewBox="0 0 100 100" preserveAspectRatio="none">
+<line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" stroke-width="2">
+</line>
+</svg>
+</span>
+</button>
+</div>
+<p id=":R:-hint-0" aria-live="polite" data-testid="variant-nudge">
+</p>
+</div>
+</div>
+<div>
+<label for=":R:">
+<bdi>الحروف</bdi>
+<span aria-hidden="true">*</span>
+</label>
+<input id=":R:" type="text" dir="auto" maxLength="12" required="" aria-required="true" aria-describedby=":R:-hint" autoComplete="off" enterKeyHint="done" placeholder="مثال: منى" value="AB"/>
+<p id=":R:-hint">
+<span data-testid="personalisation-hint">
+</span>
+<span aria-label="عدد الحروف">2/12</span>
+</p>
+</div>
+<div>
+<div>
+<button type="button" aria-label="تقليل الكمية">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</button>
+<span aria-live="polite">1</span>
+<button type="button" aria-label="زيادة الكمية">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 5v14M5 12h14">
+</path>
+</svg>
+</button>
+</div>
+<button type="button" data-testid="pdp-add">إضافة للسلة</button>
+<button type="button" aria-pressed="false" aria-label="إضافة للمفضلة">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z">
+</path>
+</svg>
+</button>
+</div>
+<p>متاح</p>
+<div>
+<details open="">
+<summary>التفاصيل<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<p>Four claws on a slim band.</p>
+<p>كود القطعة: <span dir="ltr">DH-01</span>
+</p>
+</div>
+</details>
+<details>
+<summary>تفاصيل المنتج<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<section aria-label="تفاصيل المنتج">
+<dl>
+<div>
+<dt>
+</dt>
+<dd>21</dd>
+</div>
+<div>
+<dt>
+</dt>
+<dd>4 مم</dd>
+</div>
+</dl>
+</section>
+</div>
+</details>
+<details>
+<summary>التوصيل<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<p>مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب. <a href="/shipping">سياسة التوصيل</a>
+</p>
+</div>
+</details>
+<details>
+<summary>الاسترجاع والاستبدال<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<p>اعرف إزاي الاسترجاع والاستبدال في المتجر ده. <a href="/returns">سياسة الاسترجاع</a>
+</p>
+</div>
+</details>
+</div>
+</div>
+</div>
+</div>
+<div aria-hidden="true">
+<div>
+<div>
+<p>خاتم سوليتير</p>
+<p>18,750 ج.م</p>
+</div>
+<button type="button" data-testid="dahab-pinned-add">إضافة للسلة</button>
+</div>
+</div>
+</div>
+
+<!-- en -->
+<div data-zone="products">
+<nav aria-label="Breadcrumb">
+<ol>
+<li>
+<a href="/">Home</a>
+</li>
+<li>
+<svg aria-hidden="true" data-breadcrumb-separator="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+</path>
+</svg>
+<a href="/products?category=rings">Rings</a>
+</li>
+<li>
+<svg aria-hidden="true" data-breadcrumb-separator="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+</path>
+</svg>
+<span aria-current="page">Solitaire ring</span>
+</li>
+</ol>
+</nav>
+<div>
+<div>
+<div>
+<div>
+<div dir="ltr">
+<button type="button" aria-label="Open image 1 full screen">
+<img alt="Ring" decoding="async" data-nimg="fill" sizes="100vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+</button>
+<button type="button" aria-label="Open image 2 full screen">
+<img alt="Solitaire ring" loading="lazy" decoding="async" data-nimg="fill" sizes="100vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
+</button>
+</div>
+<div aria-hidden="true">
+<span>
+</span>
+<span>
+</span>
+</div>
+</div>
+<div>
+<ul aria-label="Product images">
+<li>
+<button type="button" aria-current="true" aria-label="Show image 1">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+</button>
+</li>
+<li>
+<button type="button" aria-current="false" aria-label="Show image 2">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
+</button>
+</li>
+</ul>
+<button type="button" aria-label="Open full screen">
+<img alt="Ring" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 50vw, 60vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+<span>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="10.5" cy="10.5" r="6.5">
+</circle>
+<path d="m15.5 15.5 5 5M10.5 8v5M8 10.5h5">
+</path>
+</svg>
+</span>
+</button>
+</div>
+<dialog aria-label="Solitaire ring">
+<button type="button" aria-label="Close">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M6 6l12 12M18 6 6 18">
+</path>
+</svg>
+</button>
+</dialog>
+</div>
+<div data-test="media-slot">3d</div>
+</div>
+<div>
+<div>
+<ul>
+<li>New</li>
+</ul>
+<h1 data-zone="productName">Solitaire ring</h1>
+<div data-zone="productPrice">
+<span>EGP 18,750</span>
+</div>
+<p>A single brilliant.</p>
+<div>
+<div role="group" aria-labelledby=":R:-label-0" aria-describedby=":R:-hint-0" tabindex="-1" data-option-group="Metal">
+<div>
+<span id=":R:-label-0">Metal:</span>
+</div>
+<div>
+<button aria-pressed="false">
+<span aria-hidden="true">
+</span>Silver</button>
+<button disabled="" aria-pressed="false" title="Out of Stock">
+<span aria-hidden="true">
+</span>Rose gold<span aria-hidden="true">
+<svg viewBox="0 0 100 100" preserveAspectRatio="none">
+<line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" stroke-width="2">
+</line>
+</svg>
+</span>
+</button>
+</div>
+<p id=":R:-hint-0" aria-live="polite" data-testid="variant-nudge">
+</p>
+</div>
+</div>
+<div>
+<label for=":R:">
+<bdi>Letters</bdi>
+<span aria-hidden="true">*</span>
+</label>
+<input id=":R:" type="text" dir="auto" maxLength="12" required="" aria-required="true" aria-describedby=":R:-hint" autoComplete="off" enterKeyHint="done" placeholder="e.g. Mona" value="AB"/>
+<p id=":R:-hint">
+<span data-testid="personalisation-hint">
+</span>
+<span aria-label="Characters used">2/12</span>
+</p>
+</div>
+<div>
+<div>
+<button type="button" aria-label="Decrease quantity">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</button>
+<span aria-live="polite">1</span>
+<button type="button" aria-label="Increase quantity">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 5v14M5 12h14">
+</path>
+</svg>
+</button>
+</div>
+<button type="button" data-testid="pdp-add">Add to bag</button>
+<button type="button" aria-pressed="false" aria-label="Add to wishlist">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z">
+</path>
+</svg>
+</button>
+</div>
+<p>In stock</p>
+<div>
+<details open="">
+<summary>Details<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<p>Four claws on a slim band.</p>
+<p>Item code: <span dir="ltr">DH-01</span>
+</p>
+</div>
+</details>
+<details>
+<summary>Product details<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<section aria-label="Product details">
+<dl>
+<div>
+<dt>
+</dt>
+<dd>21</dd>
+</div>
+<div>
+<dt>
+</dt>
+<dd>4 mm</dd>
+</div>
+</dl>
+</section>
+</div>
+</details>
+<details>
+<summary>Delivery<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<p>Delivery times and fees for your area are shown at checkout. <a href="/shipping">Delivery policy</a>
+</p>
+</div>
+</details>
+<details>
+<summary>Returns and exchange<span aria-hidden="true">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</span>
+</summary>
+<div>
+<p>Read how returns and exchanges work for this store. <a href="/returns">Returns policy</a>
+</p>
+</div>
+</details>
+</div>
+</div>
+</div>
+</div>
+<div aria-hidden="true">
+<div>
+<div>
+<p>Solitaire ring</p>
+<p>EGP 18,750</p>
+</div>
+<button type="button" data-testid="dahab-pinned-add">Add to bag</button>
+</div>
+</div>
+</div>

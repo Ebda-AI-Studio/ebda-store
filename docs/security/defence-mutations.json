@@ -427,8 +427,8 @@
       "tier": "integration",
       "why": "a staff member (or any role outside COUPON_OVERRIDE_ROLES) waives every coupon rule by ticking \"Override coupon rules\" — the 403 COUPON_OVERRIDE_FORBIDDEN is the only thing reserving the override for store_admin/super_admin (#1370, Ruling M-OVR-1, issues 2304/2317)",
       "source": "apps/api/src/services/order.service.ts",
-      "find": "      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role)) {",
-      "replace": "      if (false) {",
+      "find": "    if (overrideCoupon) {\n      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role)) {",
+      "replace": "    if (overrideCoupon) {\n      if (false) {",
       "test": "tests/integration/admin-order-coupon-rules.test.ts"
     },
     {
@@ -2187,7 +2187,7 @@
       "tier": "unit",
       "why": "deleteR2ObjectIfOrphan stops checking whose object a merchant-supplied URL points at, so store A can name store B's R2 key (a font, a slide image, a category image), remove it, and delete B's object whenever B has not saved a reference to it yet",
       "source": "apps/api/src/services/r2-cleanup.service.ts",
-      "find": "  if (!mayDeleteKey(key)) {",
+      "find": "  if (!mayDeleteKey(key, ownerStoreId)) {",
       "replace": "  if (false) {",
       "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
     },
@@ -2197,8 +2197,8 @@
       "tier": "unit",
       "why": "inside a store scope the ownership rule accepts any key instead of only `stores/<thatStoreId>/`, so the guard is present but lets another store's object through",
       "source": "apps/api/src/services/r2-cleanup.service.ts",
-      "find": "  if (store) return r2KeyBelongsToStore(key, store);",
-      "replace": "  if (store) return true;",
+      "find": "  if (ambient) return r2KeyBelongsToStore(key, ambient);",
+      "replace": "  if (ambient) return true;",
       "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
     },
     {
@@ -2217,8 +2217,8 @@
       "tier": "unit",
       "why": "the ownership prefix is matched loosely (`stores/` instead of `stores/<storeId>/`), so a look-alike store id or any other store's namespace counts as the caller's own",
       "source": "apps/api/src/services/r2-cleanup.service.ts",
-      "find": "  return key.startsWith(`stores/${storeId}/`);",
-      "replace": "  return key.startsWith('stores/');",
+      "find": "  if (key.startsWith(`stores/${storeId}/`)) return true;",
+      "replace": "  if (key.startsWith('stores/')) return true;",
       "test": "tests/unit/r2-cleanup-store-prefix.test.ts"
     },
     {
@@ -2390,6 +2390,546 @@
       "find": "return keys.every(k => PAGING_KEYS.has(k) && typeof q[k] === 'string');",
       "replace": "return true;",
       "test": "tests/unit/public-read-limit.test.ts"
+    },
+    {
+      "id": "money-gold-single-rounding",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the gold price rounds in two stages (piastre, then step) instead of once, so a true 19 230.4975 pounds becomes 19 231 and every gold price drifts up by up to a pound (Ruling B5-14, vector C)",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  const final = roundHalfUpDiv(num, SCALE * step) * step;",
+      "replace": "  const piastres = roundHalfUpDiv(num, SCALE);\n  const final = roundHalfUpDiv(piastres, step) * step;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-half-up",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the gold price rounds down (floor) instead of half-up, so a true half-pound under-charges by a pound on every such piece",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => (N2 * a + b) / (N2 * b);",
+      "replace": "const roundHalfUpDiv = (a: bigint, b: bigint): bigint => a / b;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-int4-ceiling",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the int4 ceiling on a computed gold price is dropped, so an overflowing price is materialised (or wraps) instead of failing closed with GOLD_PRICE_OUT_OF_RANGE",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "if (final < N1 || final > BigInt(GOLD_PRICE_MAX))",
+      "replace": "if (final < N1)",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-zero-price-floor",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the floor on a computed gold price is dropped, so a piece can round to a price of 0 and sell for free",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "if (final < N1 || final > BigInt(GOLD_PRICE_MAX))",
+      "replace": "if (final > BigInt(GOLD_PRICE_MAX))",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-making-fixed-units",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a fixed making charge (piastres) is not scaled to the metal's piastre*mg/g unit, so a fixed making charge is charged 1000 times too little",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "      ? BigInt(spec.makingChargeValue) * N1000",
+      "replace": "      ? BigInt(spec.makingChargeValue)",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-margin-applied",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the merchant margin is dropped from the gold price, so a +/- margin silently has no effect on what is charged",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  const num = (metal + making) * BigInt(10_000 + spec.marginBps);",
+      "replace": "  const num = (metal + making) * N10000;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-spec-bounds",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the weight bound check is dropped, so a zero or oversized weight reaches the price formula instead of failing closed with GOLD_SPEC_INVALID",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  if (!isInt(spec.weightMg, GOLD_WEIGHT_MG_MIN, GOLD_WEIGHT_MG_MAX))\n    throw new GoldPriceError('GOLD_SPEC_INVALID', `weightMg ${String(spec.weightMg)} out of range`);",
+      "replace": "",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-rate-bounds",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the rate bound check is dropped, so a typo rate (9 999 or 10 000 001 piastres/g) prices pieces instead of failing closed with GOLD_RATE_INVALID",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "  if (!isInt(ratePerGram, GOLD_RATE_MIN, GOLD_RATE_MAX))\n    throw new GoldPriceError('GOLD_RATE_INVALID', `rate ${String(ratePerGram)} out of range`);",
+      "replace": "",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "tenant-gold-rates-force-rls",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "FORCE ROW LEVEL SECURITY is dropped from gold_rates, so the table owner and any BYPASS path read and write every store's rate history",
+      "source": "packages/database/prisma/migrations/20261102000200_gold_rate_pricing/migration.sql",
+      "find": "ALTER TABLE gold_rates FORCE ROW LEVEL SECURITY;",
+      "replace": "",
+      "test": "tests/unit/gold-migration-defences.test.ts"
+    },
+    {
+      "id": "tenant-gold-rates-current-policy-widened",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the gold_rates_current policy is widened to let a missing tenant through (IS NULL allowance), so a contextless query reads or rewrites any store's current rate",
+      "source": "packages/database/prisma/migrations/20261102000200_gold_rate_pricing/migration.sql",
+      "find": "CREATE POLICY ebda_tenant_isolation ON gold_rates_current AS PERMISSIVE FOR ALL TO ebda_app\n  USING (store_id = nullif(current_setting('app.current_store_id', true), ''))",
+      "replace": "CREATE POLICY ebda_tenant_isolation ON gold_rates_current AS PERMISSIVE FOR ALL TO ebda_app\n  USING (store_id = nullif(current_setting('app.current_store_id', true), '') OR current_setting('app.current_store_id', true) IS NULL)",
+      "test": "tests/unit/gold-migration-defences.test.ts"
+    },
+    {
+      "id": "money-gold-price-guard-trigger",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the BEFORE trigger on products is deleted, so any writer (import, mass edit, MCP tool, a future one) can overwrite a gold product's computed price and the repricer is no longer the only writer",
+      "source": "packages/database/prisma/migrations/20261102000200_gold_rate_pricing/migration.sql",
+      "find": "CREATE TRIGGER ebda_gold_price_guard BEFORE INSERT OR UPDATE OF price, compare_at_price, pricing_mode ON products\n  FOR EACH ROW EXECUTE FUNCTION gold_price_guard_products();",
+      "replace": "",
+      "test": "tests/unit/gold-migration-defences.test.ts"
+    },
+    {
+      "id": "money-gold-rates-append-only",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the DELETE-less grant on gold_rates is widened, so the app role can erase or re-rate the audited rate history",
+      "source": "packages/database/prisma/migrations/20261102000200_gold_rate_pricing/migration.sql",
+      "find": "GRANT SELECT, INSERT ON gold_rates TO ebda_app;",
+      "replace": "GRANT SELECT, INSERT, DELETE ON gold_rates TO ebda_app;",
+      "test": "tests/unit/gold-migration-defences.test.ts"
+    },
+    {
+      "id": "money-gold-guard-guc-is-checked",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the guard stops requiring app.gold_reprice, so every write to a gold price is allowed again",
+      "source": "packages/database/prisma/migrations/20261102000200_gold_rate_pricing/migration.sql",
+      "find": "  IF NEW.pricing_mode = 'gold_rate'\n     AND coalesce(current_setting('app.gold_reprice', true), '') <> 'on'",
+      "replace": "  IF NEW.pricing_mode = 'gold_rate'\n     AND false",
+      "test": "tests/unit/gold-migration-defences.test.ts"
+    },
+    {
+      "id": "money-gold-rate-write-purges-caches",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a rate write stops purging the product caches, so storefront lists, product pages, search suggest and the feed keep showing the previous gold price until a TTL lapses (price is NEVER-stale, Ruling B5-21)",
+      "source": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "find": "    if (out.applied.length > 0) await purgeGoldPrices(storeId);\n",
+      "replace": "",
+      "test": "tests/unit/gold-rate-cache-layers.test.ts"
+    },
+    {
+      "id": "money-gold-jump-confirm-gate",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the jump gate is dropped, so a mistyped rate (7 % off, or 21k and 18k swapped) is applied and re-prices the whole catalogue without a confirmation",
+      "source": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "find": "      if (offending.length > 0 && !isFeed && !input.confirm)",
+      "replace": "      if (false as boolean)",
+      "test": "tests/integration/gold-rate-apply.test.ts"
+    },
+    {
+      "id": "money-gold-rate-write-needs-store-settings",
+      "domain": "authz",
+      "tier": "integration",
+      "why": "writing a gold rate needs only products:write instead of store:settings, so a staff member can re-price the whole catalogue",
+      "source": "apps/api/src/routes/gold-rate.routes.ts",
+      "find": "const settingsChain = [...base, requirePermission('store:settings'), writeLimiter] as const;",
+      "replace": "const settingsChain = [...base, requirePermission('products:write'), writeLimiter] as const;",
+      "test": "tests/integration/gold-rate-apply.test.ts"
+    },
+    {
+      "id": "money-gold-feed-cross-check",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the 2 % cross-check between the two feed sources is dropped, so two disagreeing sources are averaged or the primary is trusted blindly and the whole catalogue is re-priced from a bad quote",
+      "source": "apps/api/src/services/gold-rate/feed/adapter.ts",
+      "find": "        if (diffBps > CROSS_CHECK_BPS) return { kind: 'disagree', primary, fallback, diffBps };\n",
+      "replace": "",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-premium-once",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the store premium is applied twice (or not at all) to the candidate rates, so an automatic rate is off by the premium",
+      "source": "apps/api/src/services/gold-rate/feed/adapter.ts",
+      "find": "      Number(roundDiv(num * B(karat) * B(10_000 + premiumBps), den * B(24) * B(10_000)))",
+      "replace": "      Number(roundDiv(num * B(karat) * B(10_000), den * B(24) * B(10_000)))",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-plausibility",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the plausibility bounds on a feed quote are dropped, so a garbage figure (a unit slip, a zero) becomes a candidate rate",
+      "source": "apps/api/src/services/gold-rate/feed/adapter.ts",
+      "find": "  if (!Number.isSafeInteger(per24) || per24 < 10_000 || per24 > 10_000_000) return null;",
+      "replace": "  if (!Number.isSafeInteger(per24)) return null;",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-down-writes-nothing",
+      "domain": "money",
+      "tier": "unit",
+      "why": "when both feeds are down the cron still applies a (stale or guessed) rate instead of writing nothing and alerting",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-feed-fetch.ts",
+      "find": "    if (result.kind === 'down') {",
+      "replace": "    if (false as boolean) {",
+      "test": "tests/unit/gold-rate-feed-cron.test.ts"
+    },
+    {
+      "id": "money-gold-feed-disagree-never-applies",
+      "domain": "money",
+      "tier": "unit",
+      "why": "disagreeing feeds are applied instead of stored pending, so a 2 %+ split between sources re-prices the catalogue without the merchant",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-feed-fetch.ts",
+      "find": "{ feed: reference, forcePending: disagree }",
+      "replace": "{ feed: reference, forcePending: false }",
+      "test": "tests/unit/gold-rate-feed-cron.test.ts"
+    },
+    {
+      "id": "money-gold-stale-alert-once",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the once-per-rate sentinel is dropped, so the owner is emailed (and the operator paged) every hour for the same stale rate",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-staleness-watch.ts",
+      "find": "if (await wasSent(sentinel)) return { sent: false, kind };",
+      "replace": "if (false as boolean) return { sent: false, kind };",
+      "test": "tests/unit/gold-rate-staleness-watch.test.ts"
+    },
+    {
+      "id": "privacy-gold-provider-names-stay-out-of-shopper-code",
+      "domain": "privacy",
+      "tier": "unit",
+      "why": "the provider-name gate stops exempting only one exact path and exempts a whole directory, so a provider name can enter shopper-facing code",
+      "source": "tests/unit/gold-provider-name-gate.test.ts",
+      "find": "      if (rel === exempt) continue;",
+      "replace": "      if (rel.startsWith(path.dirname(exempt))) continue;",
+      "test": "tests/unit/gold-provider-name-gate.test.ts"
+    },
+    {
+      "id": "money-gold-order-stale-gate",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the stale-rate check is dropped from the order gate, so an order is placed at a rate older than the store's max age (a guessed price)",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "  assertRatesFresh(st.rates, st.karats, st.settings, now);\n  let priced",
+      "replace": "\n  let priced",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-drift-check",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the recompute-vs-materialised comparison is dropped, so a repricer bug charges a wrong gold price without an alarm",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "const isDrift = (p: Priced) => p.g.dbPrice !== p.expected;",
+      "replace": "const isDrift = (_p: Priced) => false;",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-quote-check",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the shopper-quote comparison is dropped, so a rate that moved after add-to-cart charges the new price without ever telling the shopper",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "opts.requireQuote && line.quotedUnitPrice !== null && line.quotedUnitPrice !== expected",
+      "replace": "false as boolean",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-rate-recheck-in-tx",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the in-transaction rate re-check is dropped, so a rate write that commits between the pre-check and the money transaction produces an order at the old rate",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "if (now.get(karat)?.rateId !== rateId) throw changed(karat);",
+      "replace": "if (false as boolean) throw changed(karat);",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-order-server-quote",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the cart stops storing the server-read quote, so the \"price updated\" notice and the PRICE_CHANGED refusal can never fire",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "            ...(quote ?? {}),\n          },\n        });\n      }\n    };\n\n    if (hasTenantContext()) {\n      // Already inside the request-scoped tenant transaction opened by\n      // `tenantContext` middleware.",
+      "replace": "          },\n        });\n      }\n    };\n\n    if (hasTenantContext()) {\n      // Already inside the request-scoped tenant transaction opened by\n      // `tenantContext` middleware.",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-exchange-refused",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the exchange of a gold line is allowed again, so the replacement piece is priced at today's rate against a price fixed at the old one",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "    if (data.type === 'exchange') {\n      const goldLine",
+      "replace": "    if (false as boolean) {\n      const goldLine",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-redaction-snapshot",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a customer's order read carries the full gold snapshot again, so the shopper sees the merchant's margin, making charge and rate row id",
+      "source": "apps/api/src/services/gold-rate/public.ts",
+      "find": "goldSnapshot: Object.fromEntries(PUBLIC_SNAPSHOT_KEYS.map(k => [k, snap[k]])),",
+      "replace": "goldSnapshot: snap,",
+      "test": "tests/unit/gold-order-redaction.test.ts"
+    },
+    {
+      "id": "money-gold-order-redaction-cost",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the merchant's cost price is returned to the customer on their own order lines again",
+      "source": "apps/api/src/services/gold-rate/public.ts",
+      "find": "const { costPrice: _cost, goldSnapshot, ...rest } = item;",
+      "replace": "const { goldSnapshot, ...rest } = item; const _cost = 0;",
+      "test": "tests/unit/gold-order-redaction.test.ts"
+    },
+    {
+      "id": "money-gold-grams-two-decimals",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a weight typed with a third decimal (4.355 g) is accepted and silently rounded instead of refused",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "/^(\\d{1,4})(?:\\.(\\d{1,2}))?$/.exec(input.trim());",
+      "replace": "/^(\\d{1,4})(?:\\.(\\d{1,3}))?$/.exec(input.trim());",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-admin-needs-fresh-rate",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the admin lets a product be switched to gold pricing without a fresh rate for its karat",
+      "source": "apps/admin/src/app/stores/[id]/products/[productId]/edit/_components/GoldPricingCard.tsx",
+      "find": "if (!freshRate) return setMsg({ ok: false, text: t('needFreshRate') });",
+      "replace": "",
+      "test": "tests/unit/gold-admin-pricing-card.test.tsx"
+    },
+    {
+      "id": "money-gold-admin-confirm-before-resend",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the rate editor sends confirm:true on the first request, so the jump gate never asks the merchant",
+      "source": "apps/admin/src/app/stores/[id]/gold-rates/_components/RateEditor.tsx",
+      "find": "...(confirmed ? { confirm: true } : {}),",
+      "replace": "confirm: true,",
+      "test": "tests/unit/gold-admin-rate-editor.test.tsx"
+    },
+    {
+      "id": "money-gold-storefront-stale-rule",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the storefront treats a rate as fresh at exactly its limit, so the buy button stays live one minute after the server starts refusing the order",
+      "source": "apps/web/src/lib/gold-display.ts",
+      "find": "return Math.floor((now - applied) / 60_000) >= gold.maxAgeMinutes;",
+      "replace": "return Math.floor((now - applied) / 60_000) > gold.maxAgeMinutes;",
+      "test": "tests/unit/gold-storefront-display.test.tsx"
+    },
+    {
+      "id": "money-gold-pdp-stale-disables-buy",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the product page keeps its add-to-cart controls live when the gold rate is past the store's limit",
+      "source": "apps/web/src/app/products/[slug]/ProductDetailClient.tsx",
+      "find": "const addDisabled = !buyableNow || goldStale;",
+      "replace": "const addDisabled = !buyableNow;",
+      "test": "tests/unit/gold-storefront-display.test.tsx"
+    },
+    {
+      "id": "money-gold-checkout-holds-payment-on-moved-price",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the checkout submits the order while a moved-price notice is still open, so the shopper can pay a price they have not acknowledged",
+      "source": "apps/web/src/app/checkout/CheckoutClient.tsx",
+      "find": "if (goldPriceChanged) {\n      setCheckoutError(",
+      "replace": "if (false as boolean) {\n      setCheckoutError(",
+      "test": "tests/unit/gold-storefront-display.test.tsx"
+    },
+    {
+      "id": "money-gold-public-order-redaction",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the guest success page and the signed-in order list return the full order again, so the merchant's cost and the gold margin reach the shopper",
+      "source": "apps/api/src/routes/public.routes.ts",
+      "find": "(Ruling B5-23).\n        data: { order: redactOrderForCustomer(order) },",
+      "replace": "(Ruling B5-23).\n        data: { order },",
+      "test": "tests/unit/gold-order-redaction.test.ts"
+    },
+    {
+      "id": "money-gold-public-order-create-redaction",
+      "domain": "money",
+      "tier": "unit",
+      "why": "POST /public/orders returns the order straight from OrderService.create again, so the merchant's cost price and the full gold snapshot reach the shopper in the create response",
+      "source": "apps/api/src/routes/public.routes.ts",
+      "find": "(Ruling B5-36).\n        data: { order: redactOrderForCustomer(order) },",
+      "replace": "(Ruling B5-36).\n        data: { order },",
+      "test": "tests/unit/gold-order-create-response.test.ts"
+    },
+    {
+      "id": "money-gold-order-caller-price-vs-fresh",
+      "domain": "money",
+      "tier": "integration",
+      "why": "a price the caller read BEFORE a rate write is no longer compared with the fresh one, so a rate change mid-checkout pages a false P1 drift (or charges the old price) instead of asking the shopper to confirm",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "line.materialisedUnitPrice !== expected",
+      "replace": "false as boolean",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-order-price-recheck-in-tx",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the in-transaction re-select of the gold lines' price and spec is dropped, so a weight or making-charge edit that commits between the pre-check and the money transaction charges the old price",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "if (n === 0) throw changed();",
+      "replace": "if (false as boolean) throw changed();",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-order-rounding-recheck-in-tx",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the in-transaction rounding-step comparison is dropped, so a rounding change that commits between the pre-check and the money transaction charges the old rounding",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "fresh.settings.roundingStep !== gate.roundingStep",
+      "replace": "false as boolean",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-fixed-variant-needs-price",
+      "domain": "money",
+      "tier": "integration",
+      "why": "a fixed variant with no own price is accepted under a gold product again, so it falls back to the product price (the minimum over the variants) and the price only ever ratchets down",
+      "source": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "find": "v => v.pricingMode === 'fixed' && priceById.get(v.id) == null",
+      "replace": "v => false as boolean",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-repricer-no-ratchet",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the product's own price is counted for a priceless fixed variant again, so the product price can only go down",
+      "source": "apps/api/src/services/gold-rate/repricer.ts",
+      "find": "so counting it would only ratchet.\n      if (v.price != null) effective.push({ price: v.price, active: v.isActive });",
+      "replace": "so counting it would only ratchet.\n      effective.push({ price: v.price ?? p.price, active: v.isActive });",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-catalogue-cap-on-switch",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the catalogue cap is no longer enforced when a product becomes gold, so a store grows past 5000 gold products and the next rate write is refused for the whole store",
+      "source": "apps/api/src/services/gold-rate/gold-rate.service.ts",
+      "find": "if (goldCount >= GOLD_CATALOGUE_CAP)",
+      "replace": "if (false as boolean)",
+      "test": "tests/integration/gold-gate-review-fixes.test.ts"
+    },
+    {
+      "id": "money-gold-stale-alert-marked-after-send",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the once-only marker is claimed before the send again, so a send that throws is never retried and the owner is never told",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-staleness-watch.ts",
+      "find": "if (await wasSent(sentinel)) return { sent: false, kind };",
+      "replace": "if (await wasSent(sentinel)) return { sent: false, kind };\n        await markSent(sentinel);",
+      "test": "tests/unit/gold-rate-staleness-watch.test.ts"
+    },
+    {
+      "id": "money-gold-feed-store-failure-isolated",
+      "domain": "money",
+      "tier": "unit",
+      "why": "one store's apply error stops the feed for every store after it again",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-feed-fetch.ts",
+      "find": "return { failed: true as const, applied: 0, pending: [] };",
+      "replace": "throw err;",
+      "test": "tests/unit/gold-rate-feed-cron.test.ts"
+    },
+    {
+      "id": "money-gold-feed-pending-mail-once",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the per-rate dedupe of the pending-rate email is dropped, so the owner is emailed again for the same pending rate",
+      "source": "apps/api/src/lib/inngest/functions/gold-rate-feed-fetch.ts",
+      "find": "if (await wasSent(key)) continue;",
+      "replace": "if (false as boolean) continue;",
+      "test": "tests/unit/gold-rate-feed-cron.test.ts"
+    },
+    {
+      "id": "money-gold-feed-spot-freshness",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the spot quote's own timestamp is no longer checked, so a frozen feed counts as a live price",
+      "source": "apps/api/src/services/gold-rate/feed/gold-api.ts",
+      "find": "if (!isFreshQuoteTime(atMs, nowMs, MAX_QUOTE_AGE_MS)) return null;",
+      "replace": "",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-fx-freshness",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the USD/EGP file's own timestamp is no longer checked, so a frozen currency file counts as current",
+      "source": "apps/api/src/services/gold-rate/feed/er-api.ts",
+      "find": "if (!isFreshQuoteTime(atMs, nowMs, MAX_FX_AGE_MS)) return null;",
+      "replace": "",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-feed-fallback-freshness",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the fallback file's date is no longer checked, so a frozen currency file counts as current",
+      "source": "apps/api/src/services/gold-rate/feed/currency-api.ts",
+      "find": "!isFreshQuoteTime(startMs <= nowMs ? atMs : startMs, nowMs, MAX_QUOTE_AGE_MS)",
+      "replace": "false as boolean",
+      "test": "tests/unit/gold-rate-feed.test.ts"
+    },
+    {
+      "id": "money-gold-grams-string-carry",
+      "domain": "money",
+      "tier": "unit",
+      "why": "995 mg shows as \"0.100\" g again (the hundredths rounding does not carry into the whole part)",
+      "source": "packages/shared/src/commerce/gold-price.ts",
+      "find": "const total = Math.round(mg / 10);\n  return `${String(Math.floor(total / 100))}.${String(total % 100).padStart(2, '0')}`;",
+      "replace": "const whole = Math.floor(mg / 1000);\n  const hundredths = Math.round((mg % 1000) / 10);\n  return `${String(whole)}.${String(hundredths).padStart(2, '0')}`;",
+      "test": "tests/unit/gold-price.test.ts"
+    },
+    {
+      "id": "money-gold-weight-steps-at-edge",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a weight that is not a multiple of 10 mg is accepted at the API edge again, so the editor shows a rounded weight that is not the one stored",
+      "source": "packages/shared/src/schemas/gold-pricing.ts",
+      "find": "refine(n => n % 10 === 0, {",
+      "replace": "refine(n => true, {",
+      "test": "tests/unit/gold-pricing-schema.test.ts"
+    },
+    {
+      "id": "money-gold-price-error-is-409",
+      "domain": "money",
+      "tier": "unit",
+      "why": "a price the engine refuses (rate or spec out of range) is a 500 again instead of a business 409",
+      "source": "apps/api/src/middleware/error-handler.ts",
+      "find": "  if (isGoldPriceManaged(err) || isGoldPriceError(err)) return 409;",
+      "replace": "  if (isGoldPriceManaged(err)) return 409;",
+      "test": "tests/unit/gold-price-managed-error.test.ts"
     }
   ]
 }

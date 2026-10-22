@@ -15,6 +15,7 @@ import {
   SOUQ_PROD_ASSET_BASE,
   JASMINE_PROD_ASSET_BASE,
   LAMMA_PROD_ASSET_BASE,
+  DAHAB_PROD_ASSET_BASE,
   seedStoreClaim,
   SHOWROOM_THEME,
   // @ts-expect-error plain .mjs script
@@ -386,5 +387,84 @@ describe('showroom stores seed the NEW-chip toggle ON (STOP-2 final review, P2-4
       expect(src, f).not.toMatch(/\btheme:\s*\{\s*\}\s*,/);
       expect(src, f).toContain('SHOWROOM_THEME');
     }
+  });
+});
+
+describe('storedemo seed: --template dahab (Ruling B5-10)', () => {
+  const dahab = TEMPLATE_SPECS.dahab;
+  it('--template dahab picks the fifth spec', () => {
+    expect(templateFromArgv(['--template', 'dahab'])).toBe(dahab);
+  });
+  it('the fifth demo store: own slug, own owner without a mailbox, own default look', () => {
+    expect(dahab.slug).toBe('storedemo-dahab');
+    expect(dahab.ownerEmail).toBe('storedemo-dahab-owner@ebda.app');
+    expect(dahab.defaultLook).toBe('dahab.worn');
+    for (const other of [
+      TEMPLATE_SPECS.qamar,
+      TEMPLATE_SPECS.souq,
+      TEMPLATE_SPECS.jasmine,
+      TEMPLATE_SPECS.lamma,
+    ]) {
+      expect(dahab.slug).not.toBe(other.slug);
+      expect(dahab.ownerEmail).not.toBe(other.ownerEmail);
+    }
+    expect(dahab.slug.startsWith('storedemo-')).toBe(true);
+    expect(dahab.archivePlaceholders).toBe(false);
+  });
+  it('local look stores: one per Dahab look, on its own look', () => {
+    expect(dahab.localLookStores).toEqual([
+      ['dahab-worn', 'dahab.worn'],
+      ['dahab-workshop', 'dahab.workshop'],
+      ['dahab-giftbox', 'dahab.giftbox'],
+    ]);
+  });
+  it('production run accepts only https://media.ebda.app/demo/dahab, never another template base', () => {
+    expect(DAHAB_PROD_ASSET_BASE).toBe('https://media.ebda.app/demo/dahab');
+    expect(
+      assetBase(['--yes-production'], { DAHAB_DEMO_ASSET_BASE: DAHAB_PROD_ASSET_BASE }, dahab).ok
+    ).toBe(true);
+    expect(assetBase(['--yes-production'], {}, dahab).base).toBe(DAHAB_PROD_ASSET_BASE);
+    for (const bad of [
+      'http://localhost:9000',
+      'https://media.ebda.app/demo/qamar',
+      LAMMA_PROD_ASSET_BASE,
+      JASMINE_PROD_ASSET_BASE,
+      '/__dahab-demo',
+    ])
+      expect(assetBase(['--yes-production'], { DAHAB_DEMO_ASSET_BASE: bad }, dahab).ok, bad).toBe(
+        false
+      );
+    expect(assetBase([], { LAMMA_DEMO_ASSET_BASE: '/__lamma-demo' }, dahab).base).toBe(
+      DAHAB_PROD_ASSET_BASE
+    );
+  });
+  it('describePlan names the catalogue and the gold pricing, and never prints the password', () => {
+    const plan = describePlan(pg('user:secretpw@localhost:5432/x'), dahab);
+    expect(plan).toContain('dahab: 21 products,');
+    expect(plan).toContain('storedemo-dahab');
+    expect(plan).toContain('gold pricing: 6 gold-rate products');
+    expect(plan).toContain('automatic rate off');
+    expect(plan).toContain('the Dahab superset document');
+    expect(plan).not.toContain('archived:');
+    expect(plan).not.toContain('secretpw');
+  });
+  it('only Dahab prices gold: the other plans never mention it', () => {
+    for (const other of [
+      TEMPLATE_SPECS.qamar,
+      TEMPLATE_SPECS.souq,
+      TEMPLATE_SPECS.jasmine,
+      TEMPLATE_SPECS.lamma,
+    ]) {
+      expect(other.gold).toBeUndefined();
+      expect(describePlan(pg('a:b@localhost/x'), other)).not.toContain('gold pricing');
+    }
+  });
+  it('the demo does not turn the automatic rate on by itself (Ahmad decides at the production step)', () => {
+    expect(dahab.gold.feed).toBe(false);
+  });
+  it("a re-seed never writes a gold row's price (the DB trigger would refuse it)", () => {
+    const src = readFileSync(path.resolve(__dirname, '../../scripts/storedemo/seed.mjs'), 'utf8');
+    expect(src).toMatch(/update: p\.gold \? dataNoPrice : data/);
+    expect(src).toMatch(/if \(p\.gold\) \{\s+delete vData\.price;\s+delete vData\.compareAtPrice;/);
   });
 });

@@ -32,6 +32,30 @@
         "pdp-add-missing-option": "/products/mahshi-koronb",
         "pdp-added": "/products/mahshi-koronb"
       }
+    },
+    "dahab": {
+      "$comment": "Phase B5 (Rulings B5-10, B5-12, B5-17): the Dahab demo catalogue. Category = the rings page (the chip target); PDP = the Metal x Size ring (the checkout-data-flow case: the metal and the size must reach the cart summary and the receipt); the second cart line is an option-less, in-stock piece. `extraScreens` are the two gold screens, shot on a store whose owner can log in (`--gold-store`, e.g. dahab-gold): the \"السعر اتحدّث\" notice (the shopper adds a gold piece, the merchant moves the rate through the admin API, the checkout shows the notice) and the stale-rate block (the browser clock 30 hours on: the PDP says the piece cannot be ordered). `--template dahab` on the shoot script applies this set.",
+      "secondProductPath": "/products/pearl-necklace",
+      "paths": {
+        "category": "/products?category=rings",
+        "pdp": "/products/silver-band-ring",
+        "pdp-add-missing-option": "/products/silver-band-ring",
+        "pdp-added": "/products/silver-band-ring"
+      },
+      "extraScreens": [
+        {
+          "id": "gold-price-changed",
+          "path": "/checkout",
+          "action": "gold-price-changed",
+          "probe": ["contrast"]
+        },
+        {
+          "id": "gold-stale",
+          "path": "/products/gold-chain-21",
+          "action": "gold-stale",
+          "probe": ["contrast"]
+        }
+      ]
     }
   },
   "screens": [
@@ -166,6 +190,12 @@
     "components/commerce/ReorderOrderButton.tsx",
     "app/checkout/_components/DeliveryDateChips.tsx",
     "templates/shared/CardStepper.tsx",
-    "templates/lamma/Header.tsx"
+    "templates/lamma/Header.tsx",
+    "builder/sections/GiftFinderSection.tsx",
+    "components/commerce/GoldRateLine.tsx",
+    "components/commerce/PriceChangedNotice.tsx",
+    "templates/dahab/Header.tsx",
+    "templates/dahab/ProductDetail.tsx",
+    "templates/dahab/Drawer.tsx"
   ]
 }

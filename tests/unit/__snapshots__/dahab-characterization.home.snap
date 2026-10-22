@@ -1,0 +1,459 @@
+<!-- ar -->
+<div data-test="shop-chrome">
+<div data-section="hero">
+<section aria-label="دهب يتلبس كل يوم">
+<div>
+<div>
+<picture>
+<img src="https://media.example/dahab/h1.webp" alt="دهب يتلبس كل يوم" loading="eager" fetchPriority="high" decoding="sync"/>
+</picture>
+</div>
+<div aria-hidden="true">
+</div>
+<div>
+<div>
+<h1>دهب يتلبس كل يوم</h1>
+<a href="/products">تسوق</a>
+</div>
+</div>
+</div>
+</section>
+</div>
+<section data-section="collection-list">
+<div>
+<div>
+<div data-heading-row="true">
+<h2>مجموعات</h2>
+</div>
+<div aria-hidden="true">
+</div>
+</div>
+<ul>
+<li>
+<a href="/products?category=nuts">
+<div>
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 768px) 25vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<p>مكسرات</p>
+<p>قطعتين</p>
+</a>
+</li>
+</ul>
+</div>
+</section>
+<section data-section="featured-collection">
+<div>
+<div>
+<div data-heading-row="true">
+<h2>جديد</h2>
+<a href="/products">عرض الكل<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+<path d="m9 6 6 6-6 6">
+</path>
+</svg>
+</a>
+</div>
+<div aria-hidden="true">
+</div>
+</div>
+<div>
+<div>
+<article data-pack-card="dahab">
+<div>
+<a aria-label="كاجو" href="/products/cashew">
+<div data-part="card-image">
+<img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<span data-badge="sale">⁦−17%⁩</span>
+</a>
+<div>
+<button type="button" aria-label="إضافة للسلة: كاجو">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8Z">
+</path>
+<path d="M9 10V7a3 3 0 0 1 6 0v3">
+</path>
+</svg>
+<span>إضافة للسلة</span>
+</button>
+</div>
+</div>
+<div>
+<h3>
+<a tabindex="-1" href="/products/cashew">كاجو</a>
+</h3>
+<p>
+<span>250 ج.م</span>
+<span>
+<span>كان </span>300 ج.م</span>
+</p>
+</div>
+</article>
+</div>
+<div>
+<article data-pack-card="dahab">
+<div>
+<a aria-label="مجدول" href="/products/medjool">
+<div data-part="card-image">
+<img alt="p2" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<span>نفدت الكمية</span>
+</a>
+<div>
+<button type="button" disabled="" aria-label="نفدت الكمية: مجدول">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8Z">
+</path>
+<path d="M9 10V7a3 3 0 0 1 6 0v3">
+</path>
+</svg>
+<span>نفدت الكمية</span>
+</button>
+</div>
+</div>
+<div>
+<h3>
+<a tabindex="-1" href="/products/medjool">مجدول</a>
+</h3>
+<p>
+<span>180 ج.م</span>
+</p>
+</div>
+</article>
+</div>
+<div>
+<article data-pack-card="dahab">
+<div>
+<a aria-label="فستق" href="/products/pistachio">
+<div data-part="card-image">
+<img alt="p3" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<span>جديد</span>
+</a>
+<div>
+<a tabindex="-1" href="/products/pistachio">اختيار المقاس</a>
+</div>
+</div>
+<div>
+<h3>
+<a tabindex="-1" href="/products/pistachio">فستق</a>
+</h3>
+<p>
+<span>من 420 ج.م</span>
+</p>
+</div>
+</article>
+</div>
+</div>
+</div>
+</section>
+<section data-section="testimonials">
+<div>
+<div>
+<div>
+<div>
+<h2>قالوا</h2>
+</div>
+</div>
+<div aria-hidden="true">
+</div>
+</div>
+<ul tabindex="0" aria-label="قالوا">
+<li>
+<span role="img" aria-label="5 من 5 نجوم">
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+</span>
+<blockquote dir="auto">
+<p>Great</p>
+<p>Fresh and fast.</p>
+</blockquote>
+<p dir="auto">Mona A.</p>
+</li>
+<li>
+<span role="img" aria-label="4 من 5 نجوم">
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="none" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+</span>
+<blockquote dir="auto">
+<p>جيد جداً</p>
+</blockquote>
+<p dir="auto">Omar K.، Giza</p>
+</li>
+</ul>
+</div>
+</section>
+</div>
+
+<!-- en -->
+<div data-test="shop-chrome">
+<div data-section="hero">
+<section aria-label="Gold you live in">
+<div>
+<div>
+<picture>
+<img src="https://media.example/dahab/h1.webp" alt="Gold you live in" loading="eager" fetchPriority="high" decoding="sync"/>
+</picture>
+</div>
+<div aria-hidden="true">
+</div>
+<div>
+<div>
+<h1>Gold you live in</h1>
+<a href="/products">Shop</a>
+</div>
+</div>
+</div>
+</section>
+</div>
+<section data-section="collection-list">
+<div>
+<div>
+<div data-heading-row="true">
+<h2>Collections</h2>
+</div>
+<div aria-hidden="true">
+</div>
+</div>
+<ul>
+<li>
+<a href="/products?category=nuts">
+<div>
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 768px) 25vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fc1.webp&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<p>Nuts</p>
+<p>2 pieces</p>
+</a>
+</li>
+</ul>
+</div>
+</section>
+<section data-section="featured-collection">
+<div>
+<div>
+<div data-heading-row="true">
+<h2>New</h2>
+<a href="/products">View all<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+<path d="m9 6 6 6-6 6">
+</path>
+</svg>
+</a>
+</div>
+<div aria-hidden="true">
+</div>
+</div>
+<div>
+<div>
+<article data-pack-card="dahab">
+<div>
+<a aria-label="Cashew" href="/products/cashew">
+<div data-part="card-image">
+<img alt="p1" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp1.jpg&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<span data-badge="sale">⁦−17%⁩</span>
+</a>
+<div>
+<button type="button" aria-label="Add to bag: Cashew">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8Z">
+</path>
+<path d="M9 10V7a3 3 0 0 1 6 0v3">
+</path>
+</svg>
+<span>Add to bag</span>
+</button>
+</div>
+</div>
+<div>
+<h3>
+<a tabindex="-1" href="/products/cashew">Cashew</a>
+</h3>
+<p>
+<span>EGP 250</span>
+<span>
+<span>Was </span>EGP 300</span>
+</p>
+</div>
+</article>
+</div>
+<div>
+<article data-pack-card="dahab">
+<div>
+<a aria-label="Medjool" href="/products/medjool">
+<div data-part="card-image">
+<img alt="p2" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp2.jpg&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<span>Sold out</span>
+</a>
+<div>
+<button type="button" disabled="" aria-label="Sold out: Medjool">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8Z">
+</path>
+<path d="M9 10V7a3 3 0 0 1 6 0v3">
+</path>
+</svg>
+<span>Sold out</span>
+</button>
+</div>
+</div>
+<div>
+<h3>
+<a tabindex="-1" href="/products/medjool">Medjool</a>
+</h3>
+<p>
+<span>EGP 180</span>
+</p>
+</div>
+</article>
+</div>
+<div>
+<article data-pack-card="dahab">
+<div>
+<a aria-label="Pistachio" href="/products/pistachio">
+<div data-part="card-image">
+<img alt="p3" loading="lazy" decoding="async" data-nimg="fill" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" srcSet="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fpub-test.r2.dev%2Fp%2Fp3.jpg&amp;w=3840&amp;q=75"/>
+<span aria-hidden="true">
+</span>
+</div>
+<span>New</span>
+</a>
+<div>
+<a tabindex="-1" href="/products/pistachio">Choose options</a>
+</div>
+</div>
+<div>
+<h3>
+<a tabindex="-1" href="/products/pistachio">Pistachio</a>
+</h3>
+<p>
+<span>From EGP 420</span>
+</p>
+</div>
+</article>
+</div>
+</div>
+</div>
+</section>
+<section data-section="testimonials">
+<div>
+<div>
+<div>
+<div>
+<h2>Words</h2>
+</div>
+</div>
+<div aria-hidden="true">
+</div>
+</div>
+<ul tabindex="0" aria-label="Words">
+<li>
+<span role="img" aria-label="5 out of 5 stars">
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+</span>
+<blockquote dir="auto">
+<p>Great</p>
+<p>Fresh and fast.</p>
+</blockquote>
+<p dir="auto">Mona A.</p>
+</li>
+<li>
+<span role="img" aria-label="4 out of 5 stars">
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="currentColor" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+<svg viewBox="0 0 12 12" aria-hidden="true">
+<path d="M6 .8 7.5 4.3l3.7.3-2.8 2.4.9 3.7L6 8.7 2.7 10.7l.9-3.7L.8 4.6l3.7-.3L6 .8Z" fill="none" stroke="currentColor" stroke-width=".7">
+</path>
+</svg>
+</span>
+<blockquote dir="auto">
+<p>جيد جداً</p>
+</blockquote>
+<p dir="auto">Omar K., Giza</p>
+</li>
+</ul>
+</div>
+</section>
+</div>

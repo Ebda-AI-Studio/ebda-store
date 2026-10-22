@@ -5,6 +5,7 @@ import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
+import { redactOrderForCustomer } from '../services/gold-rate/public';
 import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
@@ -622,7 +623,20 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
             return { ...b, description, descriptionAr };
           })
         : [];
-      return { products, bundles };
+      // Ruling B5-21 (item 9): does this store sell gold-rate products? Cached WITH the feed inputs (same
+      // key, same purge), so a rate write that clears this key also re-reads the flag.
+      const hasGold =
+        (await prisma.product.count({
+          where: {
+            storeId,
+            status: 'active',
+            audience: 'public',
+            pricingMode: 'gold_rate',
+            deletedAt: null,
+          },
+          take: 1,
+        })) > 0;
+      return { products, bundles, hasGold };
     });
     const now = new Date();
     const live = inputs.bundles.filter(b => withinSaleWindow(b, now));
@@ -641,11 +655,25 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     // Never let the edge serve this body past the next window boundary: the
     // fresh window AND the stale-while-revalidate tail both end before it.
     const nextBoundarySec = nextSaleWindowBoundarySeconds(inputs.bundles, now);
-    const sMaxAge = Math.max(1, Math.min(600, nextBoundarySec));
-    setEdgeCache(res, {
-      sMaxAge,
-      staleWhileRevalidate: Math.min(86400, Math.max(0, nextBoundarySec - sMaxAge)),
-    });
+    // Ruling B5-21 (item 9), the one documented BOUNDED-stale residual of gold pricing: this feed is held
+    // by third-party caches (crawlers, shopping feeds, the CDN) that a rate write cannot purge. For a
+    // store that sells gold-rate products the window is at most 60 s and there is NO stale-while-revalidate
+    // tail, so a shopping feed can show the previous price for up to a minute. Checkout re-prices from the
+    // database and shows "السعر اتحدّث", so no one is charged it. `X-Gold-Pricing` tells the storefront's
+    // feed passthrough to apply the same window.
+    if (inputs.hasGold) {
+      res.setHeader('X-Gold-Pricing', '1');
+      setEdgeCache(res, {
+        sMaxAge: Math.max(1, Math.min(60, nextBoundarySec)),
+        staleWhileRevalidate: 0,
+      });
+    } else {
+      const sMaxAge = Math.max(1, Math.min(600, nextBoundarySec));
+      setEdgeCache(res, {
+        sMaxAge,
+        staleWhileRevalidate: Math.min(86400, Math.max(0, nextBoundarySec - sMaxAge)),
+      });
+    }
     res.json(feed);
   } catch (err) {
     next(err);
@@ -801,6 +829,35 @@ router.post(
         success: true,
         data: { cart },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /cart/acknowledge-prices - "متابعة" on the gold "السعر اتحدّث" notice (Ruling B5-17). The body is an
+// EMPTY strict object: each gold line's quote becomes the server's CURRENT price, never a client value.
+router.post(
+  '/cart/acknowledge-prices',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      z.object({})
+        .strict()
+        .parse(req.body ?? {});
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      const result = await CartService.acknowledgePrices(storeId, sessionId);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
@@ -1181,7 +1238,8 @@ router.post(
 
       res.status(201).json({
         success: true,
-        data: { order },
+        // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-36).
+        data: { order: redactOrderForCustomer(order) },
       });
     } catch (error) {
       next(error);
@@ -1359,7 +1417,8 @@ router.get(
 
       res.json({
         success: true,
-        data: { order },
+        // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-23).
+        data: { order: redactOrderForCustomer(order) },
       });
     } catch (error) {
       next(error);

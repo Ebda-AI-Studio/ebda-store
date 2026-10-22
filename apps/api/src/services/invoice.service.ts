@@ -21,6 +21,7 @@ import {
 } from './email-templates/_layout';
 import { AppError } from '../middleware/error-handler';
 import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
+import { goldLineNote } from './gold-rate/public';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
@@ -445,6 +446,13 @@ export class InvoiceService {
                 <div class="item-meta">
                   <div class="item-name">${escapeHtml(displayName)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}</div>
                   ${item.personalisation ? `<div class="item-note">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></div>` : ''}
+                  ${(() => {
+                    // Gold-rate line: karat, weight and the per-gram rate it was priced at (B5).
+                    const note = goldLineNote(item.goldSnapshot, ar ? 'ar' : 'en', formatPrice);
+                    return note
+                      ? `<div class="item-note" data-gold-line="1">${escapeHtml(note)}</div>`
+                      : '';
+                  })()}
                   ${(() => {
                     // B2B: the tier / wholesale label from the line's persisted snapshot (never re-resolved).
                     const label = priceLineLabel(item, ar ? 'ar' : 'en');

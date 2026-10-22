@@ -1,4 +1,5 @@
 import { prisma, Prisma, withMoneyTx } from '@ebda/database';
+import { GoldRateService } from './gold-rate/gold-rate.service';
 import { AppError } from '../middleware/error-handler';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -481,35 +482,51 @@ export class VariantService {
       ? optionValues.map(v => v.valueAr).join(' / ')
       : null;
 
+    // Ruling B5-13: a variant of a gold-rate product is priced by the repricer, never by the caller.
+    const isGold = product.pricingMode === 'gold_rate';
+    if (isGold && (input.price != null || input.compareAtPrice != null)) {
+      throw new AppError(
+        409,
+        'GOLD_PRICE_MANAGED',
+        "The price of a gold-rate product is calculated from the day's gold rate"
+      );
+    }
+
     // Create variant
-    const variant = await prisma.productVariant.create({
-      data: {
-        productId,
-        title,
-        titleAr,
-        sku: input.sku,
-        barcode: input.barcode,
-        price: input.price,
-        compareAtPrice: input.compareAtPrice,
-        costPrice: input.costPrice,
-        inventory: input.inventory || 0,
-        weight: input.weight,
-        imageUrl: input.imageUrl,
-        position: existingVariants.length,
-        options: {
-          create: input.optionValueIds.map(valueId => ({ valueId })),
+    const createVariantRow = (db: Pick<typeof prisma, 'productVariant'>) =>
+      db.productVariant.create({
+        data: {
+          productId,
+          title,
+          titleAr,
+          sku: input.sku,
+          barcode: input.barcode,
+          price: input.price,
+          compareAtPrice: input.compareAtPrice,
+          costPrice: input.costPrice,
+          inventory: input.inventory || 0,
+          weight: input.weight,
+          imageUrl: input.imageUrl,
+          position: existingVariants.length,
+          options: {
+            create: input.optionValueIds.map(valueId => ({ valueId })),
+          },
         },
-      },
-      include: {
-        options: {
-          include: {
-            value: {
-              include: { option: true },
+        include: {
+          options: {
+            include: {
+              value: {
+                include: { option: true },
+              },
             },
           },
         },
-      },
-    });
+      });
+    const variant = isGold
+      ? await GoldRateService.asRepricer(storeId, productId, tx =>
+          createVariantRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
+        )
+      : await createVariantRow(prisma);
 
     const result = {
       ...variant,
@@ -707,18 +724,26 @@ export class VariantService {
       const title = combo.map(v => v.value).join(' / ');
       const titleAr = combo.every(v => v.valueAr) ? combo.map(v => v.valueAr).join(' / ') : null;
 
-      const variant = await prisma.productVariant.create({
-        data: {
-          productId,
-          title,
-          titleAr,
-          inventory: 0,
-          position: product.variants.length + created.length,
-          options: {
-            create: combo.map(value => ({ valueId: value.id })),
+      const createRow = (db: Pick<typeof prisma, 'productVariant'>) =>
+        db.productVariant.create({
+          data: {
+            productId,
+            title,
+            titleAr,
+            inventory: 0,
+            position: product.variants.length + created.length,
+            options: {
+              create: combo.map(value => ({ valueId: value.id })),
+            },
           },
-        },
-      });
+        });
+      // Ruling B5-13: a generated variant of a gold-rate product is born priced by the repricer.
+      const variant =
+        product.pricingMode === 'gold_rate'
+          ? await GoldRateService.asRepricer(storeId, productId, tx =>
+              createRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
+            )
+          : await createRow(prisma);
 
       created.push(variant.id);
     }

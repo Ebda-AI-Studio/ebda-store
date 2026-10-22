@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
-import { orderLineVariantTitle } from '@ebda/shared';
+import { mgToGramsString, orderLineVariantTitle } from '@ebda/shared';
 import { VariantText } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { formatMoney } from './format';
@@ -264,8 +264,24 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
           ) : null}
         </div>
         {item.personalisation && <PersonalisationRow text={item.personalisation} />}
+        {item.goldSnapshot && <GoldSnapshotRow snap={item.goldSnapshot} />}
       </div>
     </li>
+  );
+}
+
+/** The karat, weight and per-gram rate this line was priced at, so a refund or a dispute can be checked later. */
+function GoldSnapshotRow({ snap }: { snap: NonNullable<OrderItemDetail['goldSnapshot']> }) {
+  const t = useT('goldRates.snapshot');
+  return (
+    <p className="mt-2 text-xs text-muted-foreground">
+      <span className="font-medium">{t('title')}: </span>
+      {t('line', {
+        karat: snap.karat,
+        grams: mgToGramsString(snap.weightMg),
+        rate: formatMoney(snap.ratePerGram),
+      })}
+    </p>
   );
 }
 

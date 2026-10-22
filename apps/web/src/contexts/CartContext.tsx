@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@ebda/ui';
+import type { PublicGoldPricing } from '@ebda/shared';
 import { api } from '@/lib/api';
 import { classifyBundleCartError, bundleCartErrorCopy } from '@/lib/bundle-cart-errors';
 import { useLanguage } from './LanguageContext';
@@ -46,6 +47,12 @@ export interface CartItem {
   moqRequired?: number;
   /** Product made-to-order lead time (business days); read by the checkout's delivery date chips. */
   leadTimeDays?: number;
+  /** Gold line (B5-17): its price moved since it was added; shown until the shopper continues. */
+  priceChanged?: boolean;
+  /** The unit price the shopper was last shown for a moved gold line. */
+  previousPrice?: number;
+  /** Public gold pricing for the line (karat, weight, today's rate), for the rate line. */
+  gold?: PublicGoldPricing;
 }
 
 /**
@@ -97,6 +104,10 @@ interface CartContextType {
   syncCartToBackend: () => Promise<void>;
   /** Refetch the server cart and update local state. Used by WaTokenHydrator. */
   refetchCart: () => Promise<void>;
+  /** True while any gold line's price moved since it was added (Ruling B5-17). */
+  priceChanged: boolean;
+  /** The shopper continues at the new price: the server re-quotes the gold lines, then the cart refreshes. */
+  acknowledgePrices: () => Promise<void>;
   itemCount: number;
   total: number;
 }
@@ -499,6 +510,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await refetchCart().catch(() => {});
   }, [refetchCart]);
 
+  const priceChanged = items.some(item => item.priceChanged === true);
+  const acknowledgePrices = useCallback(async () => {
+    if (!hasStore) return;
+    const res = await api.acknowledgePrices();
+    if (!res.success) {
+      toast.error(t('Unable to continue', 'مقدرناش نكمّل'), t('Please try again.', 'جرّب تاني.'));
+    }
+    await refetchCart().catch(() => {});
+  }, [hasStore, refetchCart, toast, t]);
+
   const { itemCount, total } = cartTotals(items, bundles);
 
   return (
@@ -515,6 +536,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         clearCart,
         syncCartToBackend,
         refetchCart,
+        priceChanged,
+        acknowledgePrices,
         itemCount,
         total,
       }}

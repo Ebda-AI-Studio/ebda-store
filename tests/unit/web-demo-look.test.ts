@@ -231,9 +231,9 @@ describe('store-resolver: x-demo-look', () => {
     expect(plain.template).toBe('modern');
   });
 
-  it('demo + designed look (the real registry today): ignored', async () => {
+  it('demo + a look that is not built (every registry look is built since B5, so an unregistered id stands in): ignored', async () => {
     fetchMock.mockResolvedValue(apiStore(true));
-    headerBag.value.set('x-demo-look', 'dahab.worn');
+    headerBag.value.set('x-demo-look', 'dahab.not-built-yet');
     expect((await resolver.getStoreOrNotFound()).look).toBe('qamar.atelier');
   });
 

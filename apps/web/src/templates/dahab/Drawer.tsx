@@ -39,7 +39,7 @@ export function DahabDrawer({
       className={`border-border bg-background text-foreground shadow-[0_0_60px_-10px_hsl(var(--background))] ${
         side === 'start' ? 'border-e' : 'border-s'
       }`}
-      backdropClassName="backdrop:bg-background/70 backdrop:backdrop-blur-[2px]"
+      backdropClassName="backdrop:bg-foreground/40"
       headerClassName="h-16 border-b border-border !pe-5 !pt-0"
       titleClassName="font-display text-xl text-foreground"
       closeClassName="-me-2 text-foreground/80 hover:text-primary"

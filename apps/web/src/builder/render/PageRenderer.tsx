@@ -43,6 +43,7 @@ import { StepsSection, type StepsSettings } from '../sections/StepsSection';
 import { MenuSection } from '../sections/MenuSection';
 import { ReorderRow } from '../sections/ReorderRow';
 import { MakerProfileSection, type MakerProfileSettings } from '../sections/MakerProfileSection';
+import { GiftFinderSection, type GiftFinderSettings } from '../sections/GiftFinderSection';
 import { SectionHeader } from '../sections/SectionHeader';
 import { EditorModeProvider } from './editor-mode';
 import { TagChips } from '../../templates/shared/TagChips';
@@ -136,6 +137,7 @@ const NO_PRODUCTS: Product[] = [];
 /** The document-only section types `DocumentSectionBody` draws (every other type draws nothing). */
 const DOCUMENT_SECTION_TYPES = new Set([
   'featured-collection',
+  'gift-finder',
   'maker-profile',
   'collection-list',
   'product-spotlight',
@@ -223,6 +225,13 @@ export const DocumentSectionBody = React.memo(function DocumentSectionBody({
       categories={categories}
       pack={templateId}
       onAddToCart={onAddToCart}
+      editorMode={editorMode}
+    />
+  ) : def.type === 'gift-finder' ? (
+    <GiftFinderSection
+      settings={settings as GiftFinderSettings}
+      blocks={section.blocks ?? []}
+      categories={categories}
       editorMode={editorMode}
     />
   ) : def.type === 'maker-profile' ? (

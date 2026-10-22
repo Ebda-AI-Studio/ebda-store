@@ -19,6 +19,8 @@ const walk = (d: string): string[] =>
 /** setInterval used as a CLOCK (no content moves): named so the exemption stays visible. */
 const CLOCKS: Record<string, string> = {
   'app/checkout/CheckoutClient.tsx': 'minute ticker that re-evaluates delivery-window availability',
+  'components/commerce/GoldRateLine.tsx':
+    'minute ticker that turns a cached gold rate stale on time (no visible motion)',
   'app/checkout/success/InstapayCard.tsx': 'a 30s poll of the transfer status (no visible motion)',
 };
 

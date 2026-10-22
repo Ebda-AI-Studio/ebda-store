@@ -52,6 +52,8 @@ export interface DahabProductDetailProps {
   ratingLine?: React.ReactNode;
   /** The live bundle-saving line (renders nothing without a saving). */
   bundleLine?: React.ReactNode;
+  /** Gold-rate line under the price (B5): karat, weight, today's rate. */
+  priceNote?: React.ReactNode;
   images: Array<{ id?: string; url: string; alt?: string | null }>;
   name: string;
   categoryName?: string;
@@ -78,6 +80,8 @@ export interface DahabProductDetailProps {
   onAddToCart: () => void;
   isAdding: boolean;
   addDisabled: boolean;
+  /** DOM id of the note that explains why add is disabled (the gold-rate stale sentence). */
+  addDescribedBy?: string;
   addLabel: string;
   isWishlisted: boolean;
   onToggleWishlist: () => void;
@@ -264,7 +268,7 @@ function Gallery({
                 : undefined
             }
           />
-          <span className="absolute bottom-4 end-4 flex h-10 w-10 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover/zoom:opacity-100">
+          <span className="absolute bottom-4 end-4 flex h-11 w-11 items-center justify-center rounded-full bg-background text-foreground opacity-0 transition-opacity group-hover/zoom:opacity-100">
             <ZoomIcon className="h-5 w-5" />
           </span>
         </button>
@@ -282,7 +286,7 @@ function Gallery({
         <button
           type="button"
           onClick={() => setLightbox(false)}
-          className="fixed end-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background/80 text-foreground backdrop-blur-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="fixed end-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={t('Close', 'إغلاق')}
         >
           <CloseIcon className="h-5 w-5" />
@@ -407,6 +411,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               )}
             </div>
             <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+            {p.priceNote}
             {p.bundleLine}
             {p.b2bPanel}
             {p.excerpt && (
@@ -466,6 +471,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 data-testid="pdp-add"
                 onClick={p.onAddToCart}
                 disabled={p.addDisabled || p.isAdding}
+                aria-describedby={p.addDescribedBy}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
               >
                 {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}
@@ -513,10 +519,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                     'Delivery times and fees for your area are shown at checkout.',
                     'مواعيد ومصاريف التوصيل لمنطقتك بتظهر في خطوة إتمام الطلب.'
                   )}{' '}
-                  <Link
-                    href={p.shippingHref}
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
+                  <Link href={p.shippingHref} className="text-primary underline underline-offset-4">
                     {t('Delivery policy', 'سياسة التوصيل')}
                   </Link>
                 </p>
@@ -527,10 +530,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                     'Read how returns and exchanges work for this store.',
                     'اعرف إزاي الاسترجاع والاستبدال في المتجر ده.'
                   )}{' '}
-                  <Link
-                    href={p.returnsHref}
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
+                  <Link href={p.returnsHref} className="text-primary underline underline-offset-4">
                     {t('Returns policy', 'سياسة الاسترجاع')}
                   </Link>
                 </p>
@@ -582,6 +582,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
             data-testid="dahab-pinned-add"
             onClick={p.onAddToCart}
             disabled={p.addDisabled || p.isAdding}
+            aria-describedby={p.addDescribedBy}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}
           >
             {p.isAdding ? t('Adding…', 'بنضيف…') : p.addLabel}

@@ -203,6 +203,15 @@ function seedContent(type: string, node: SectionNode): SectionNode {
           block('collection', i, { categorySlug: slug })
         ),
       };
+    case 'gift-finder':
+      // The chip rows exist only with an occasion (a category the store has) and a budget.
+      return {
+        ...node,
+        blocks: [
+          block('occasion', 0, { categorySlug: 'nuts', label: 'Seed occasion' }),
+          block('budget', 1, { maxPrice: 500, label: 'Seed budget' }),
+        ],
+      };
     case 'shop-the-look':
       return {
         ...node,

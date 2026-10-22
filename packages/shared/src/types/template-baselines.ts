@@ -261,12 +261,12 @@ export const TEMPLATE_IDENTITIES: Record<
 };
 
 /**
- * Dahab (jewellery, builder Phase 3 pilot). Not an identity delta on the
- * branded base: that base paints whole sections in `token:primary` /
- * `token:card` blocks, which on Dahab's night surface would flood the page in
- * gold. Dahab keeps every section on the night page token and lets the pack
- * components carry the gold (hairlines, prices, buttons), so the base's
- * section colours and typography colours are dropped here.
+ * Dahab (jewellery). Not an identity delta on the branded base: that base paints whole sections
+ * in `token:primary` / `token:card` blocks, which on a look with a committed ground (Workshop's
+ * teal) would flood the page. Dahab keeps every section on the page token and lets the looks
+ * (Ruling B5-3: tokens, section mix, bands) and the pack carry colour, so the base's section
+ * colours and typography colours are dropped here. The layout is colour-free, so it is the
+ * neutral base as it stands.
  */
 export function buildDahabBaseline(): StoreLayoutSettings {
   const b = clone(BASE_BRANDED_LAYOUT);

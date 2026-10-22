@@ -94,7 +94,12 @@ export function DemoLookBar({
         fetch(`${window.location.pathname}?${params.toString()}`, {
           credentials: 'same-origin',
           priority: 'low',
-        } as RequestInit).catch(() => {});
+        } as RequestInit)
+          // Drain the body: a page over the browser's fetch buffer (the image-rich Dahab homes are
+          // 150-180 KB) otherwise stays "pending" forever, which holds the connection and keeps
+          // the page from ever going network-idle.
+          .then(r => r?.arrayBuffer?.())
+          .catch(() => {});
       }
     };
     const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };

@@ -1,0 +1,441 @@
+<!-- ar -->
+<header dir="rtl">
+<div>
+<div>
+<button type="button" aria-label="القائمة" aria-expanded="false">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M4 7h16M4 12h16M4 17h10">
+</path>
+</svg>
+</button>
+<nav aria-label="الرئيسية">
+<ul>
+<li>
+<a href="/products?category=rings">خواتم</a>
+</li>
+</ul>
+</nav>
+</div>
+<a aria-label="دهب" href="/">
+<span translate="no">دهب</span>
+</a>
+<div>
+<button type="button" aria-label="بحث" aria-expanded="false" aria-controls="dahab-search">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="10.5" cy="10.5" r="6.5">
+</circle>
+<path d="m15.5 15.5 5 5">
+</path>
+</svg>
+</button>
+<a aria-label="حسابي" href="/account">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="12" cy="8.5" r="3.5">
+</circle>
+<path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2">
+</path>
+</svg>
+</a>
+<button type="button" aria-label="Switch to English" lang="en">EN</button>
+<button type="button" aria-label="السلة، قطعتين">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8Z">
+</path>
+<path d="M9 10V7a3 3 0 0 1 6 0v3">
+</path>
+</svg>
+<span>2</span>
+</button>
+</div>
+</div>
+<div id="dahab-search" hidden="">
+<form role="search">
+<label for="dahab-search-input">ابحث في المجموعة</label>
+<div>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="10.5" cy="10.5" r="6.5">
+</circle>
+<path d="m15.5 15.5 5 5">
+</path>
+</svg>
+<input id="dahab-search-input" type="search" placeholder="خواتم، سلاسل، دهب عيار 21…" value=""/>
+</div>
+</form>
+</div>
+<dialog aria-labelledby=":R:" data-sheet="start">
+</dialog>
+<dialog aria-labelledby=":R:" data-sheet="end">
+</dialog>
+</header>
+<footer dir="rtl">
+<div>
+<div>
+<p>دهب</p>
+</div>
+<div>
+<div>
+<h2>تسوق</h2>
+<ul>
+</ul>
+</div>
+<div>
+<h2>زورونا وتواصلوا</h2>
+<ul>
+<li>
+<a href="mailto:a@b.co">a@b.co</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div>
+<div>
+<div data-footer-legal="">
+<nav aria-label="سياسات المتجر">
+<ul>
+<li>
+<a href="/privacy">الخصوصية</a>
+</li>
+<li>
+<span aria-hidden="true">·</span>
+<a href="/terms">الشروط والأحكام</a>
+</li>
+<li>
+<span aria-hidden="true">·</span>
+<a href="/returns">الإرجاع</a>
+</li>
+</ul>
+</nav>
+<p>© 2026 دهب. جميع الحقوق محفوظة.</p>
+</div>
+</div>
+<div>
+<div data-zone="afterFooter">
+<a href="https://ebda.app/?utm_source=ebda_store_badge&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener noreferrer" aria-label="مدعوم من ابدأ ستور">
+<svg viewBox="0 0 78.3 149" width="9" height="17" fill="currentColor" aria-hidden="true" focusable="false" data-testid="ebda-badge-mark">
+<path d="M65.70 67.60 L78.30 73.90 L78.30 126.70 L65.70 120.50Z" opacity=".7">
+</path>
+<path d="M0.00 35.80 L78.30 0.00 L78.30 74.90Z">
+</path>
+<path d="M0.00 37.00 L42.60 58.30 L42.10 127.80 L0.20 149.00Z" opacity=".85">
+</path>
+</svg>
+<span>مدعوم من</span>
+<span>ابدأ ستور</span>
+</a>
+</div>
+</div>
+</div>
+</footer>
+<dialog aria-labelledby=":R:" data-sheet="end">
+<div>
+<h2 id=":R:">سلتك (2)</h2>
+<button type="button" aria-label="إغلاق السلة" data-sheet-close="true">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12">
+</path>
+</svg>
+</button>
+</div>
+<div data-sheet-body="true">
+<ul>
+<li>
+<a href="/products/undefined">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+</a>
+<div>
+<div>
+<p>Ring</p>
+<p>1,000 ج.م</p>
+</div>
+<p>
+<span aria-hidden="true">✎ </span>
+<span>التخصيص: </span>
+<bdi>AB</bdi>
+</p>
+<div>
+<div>
+<button type="button" aria-label="تقليل الكمية">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</button>
+<span aria-live="polite">1</span>
+<button type="button" aria-label="زيادة الكمية">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 5v14M5 12h14">
+</path>
+</svg>
+</button>
+</div>
+<button type="button">حذف</button>
+</div>
+</div>
+</li>
+<li>
+<a href="/products/undefined">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
+</a>
+<div>
+<div>
+<p>Chain</p>
+<p>5,000 ج.م</p>
+</div>
+<div>
+<div>
+<button type="button" aria-label="تقليل الكمية">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</button>
+<span aria-live="polite">2</span>
+<button type="button" aria-label="زيادة الكمية">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 5v14M5 12h14">
+</path>
+</svg>
+</button>
+</div>
+<button type="button">حذف</button>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div>
+<div>
+<div>
+<span>المجموع الفرعي</span>
+<span>6,000 ج.م</span>
+</div>
+<p>التوصيل وطرق الدفع (عند الاستلام، إنستاباي، الكروت) في الخطوة الجاية.</p>
+<div>
+<a href="/checkout">إتمام الطلب</a>
+<a href="/cart">عرض السلة</a>
+</div>
+</div>
+</div>
+</dialog>
+
+<!-- en -->
+<header dir="ltr">
+<div>
+<div>
+<button type="button" aria-label="Menu" aria-expanded="false">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M4 7h16M4 12h16M4 17h10">
+</path>
+</svg>
+</button>
+<nav aria-label="Main">
+<ul>
+<li>
+<a href="/products?category=rings">Rings</a>
+</li>
+</ul>
+</nav>
+</div>
+<a aria-label="Dahab" href="/">
+<span translate="no">Dahab</span>
+</a>
+<div>
+<button type="button" aria-label="Search" aria-expanded="false" aria-controls="dahab-search">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="10.5" cy="10.5" r="6.5">
+</circle>
+<path d="m15.5 15.5 5 5">
+</path>
+</svg>
+</button>
+<a aria-label="Account" href="/account">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="12" cy="8.5" r="3.5">
+</circle>
+<path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2">
+</path>
+</svg>
+</a>
+<button type="button" aria-label="التبديل إلى العربية" lang="ar">عربي</button>
+<button type="button" aria-label="Bag, 2 items">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8Z">
+</path>
+<path d="M9 10V7a3 3 0 0 1 6 0v3">
+</path>
+</svg>
+<span>2</span>
+</button>
+</div>
+</div>
+<div id="dahab-search" hidden="">
+<form role="search">
+<label for="dahab-search-input">Search the collection</label>
+<div>
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="10.5" cy="10.5" r="6.5">
+</circle>
+<path d="m15.5 15.5 5 5">
+</path>
+</svg>
+<input id="dahab-search-input" type="search" placeholder="Rings, chains, 21K gold…" value=""/>
+</div>
+</form>
+</div>
+<dialog aria-labelledby=":R:" data-sheet="start">
+</dialog>
+<dialog aria-labelledby=":R:" data-sheet="end">
+</dialog>
+</header>
+<footer dir="ltr">
+<div>
+<div>
+<p>Dahab</p>
+</div>
+<div>
+<div>
+<h2>Shop</h2>
+<ul>
+</ul>
+</div>
+<div>
+<h2>Visit and contact</h2>
+<ul>
+<li>
+<a href="mailto:a@b.co">a@b.co</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div>
+<div>
+<div data-footer-legal="">
+<nav aria-label="Store policies">
+<ul>
+<li>
+<a href="/privacy">Privacy</a>
+</li>
+<li>
+<span aria-hidden="true">·</span>
+<a href="/terms">Terms</a>
+</li>
+<li>
+<span aria-hidden="true">·</span>
+<a href="/returns">Returns</a>
+</li>
+</ul>
+</nav>
+<p>© 2026 Dahab. All rights reserved.</p>
+</div>
+</div>
+<div>
+<div data-zone="afterFooter">
+<a href="https://ebda.app/?utm_source=ebda_store_badge&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener noreferrer" aria-label="Powered by Ebda Store">
+<svg viewBox="0 0 78.3 149" width="9" height="17" fill="currentColor" aria-hidden="true" focusable="false" data-testid="ebda-badge-mark">
+<path d="M65.70 67.60 L78.30 73.90 L78.30 126.70 L65.70 120.50Z" opacity=".7">
+</path>
+<path d="M0.00 35.80 L78.30 0.00 L78.30 74.90Z">
+</path>
+<path d="M0.00 37.00 L42.60 58.30 L42.10 127.80 L0.20 149.00Z" opacity=".85">
+</path>
+</svg>
+<span>Powered by</span>
+<span>Ebda Store</span>
+</a>
+</div>
+</div>
+</div>
+</footer>
+<dialog aria-labelledby=":R:" data-sheet="end">
+<div>
+<h2 id=":R:">Your bag (2)</h2>
+<button type="button" aria-label="Close bag" data-sheet-close="true">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12">
+</path>
+</svg>
+</button>
+</div>
+<div data-sheet-body="true">
+<ul>
+<li>
+<a href="/products/undefined">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
+</a>
+<div>
+<div>
+<p>Ring</p>
+<p>EGP 1,000</p>
+</div>
+<p>
+<span aria-hidden="true">✎ </span>
+<span>Personalisation: </span>
+<bdi>AB</bdi>
+</p>
+<div>
+<div>
+<button type="button" aria-label="Decrease quantity">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</button>
+<span aria-live="polite">1</span>
+<button type="button" aria-label="Increase quantity">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 5v14M5 12h14">
+</path>
+</svg>
+</button>
+</div>
+<button type="button">Remove</button>
+</div>
+</div>
+</li>
+<li>
+<a href="/products/undefined">
+<img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
+</a>
+<div>
+<div>
+<p>Chain</p>
+<p>EGP 5,000</p>
+</div>
+<div>
+<div>
+<button type="button" aria-label="Decrease quantity">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+</svg>
+</button>
+<span aria-live="polite">2</span>
+<button type="button" aria-label="Increase quantity">
+<svg fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 5v14M5 12h14">
+</path>
+</svg>
+</button>
+</div>
+<button type="button">Remove</button>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div>
+<div>
+<div>
+<span>Subtotal</span>
+<span>EGP 6,000</span>
+</div>
+<p>Delivery and payment options (cash on delivery, InstaPay, cards) at checkout.</p>
+<div>
+<a href="/checkout">Checkout</a>
+<a href="/cart">View bag</a>
+</div>
+</div>
+</div>
+</dialog>
