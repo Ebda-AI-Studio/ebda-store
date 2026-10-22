@@ -229,6 +229,25 @@ describe.skipIf(!hasDb)('POST /stores/:id/look/preview (ebda_app + tenant guard)
     expect(plain.status, JSON.stringify(plain.body)).toBe(200);
   });
 
+  it('a theme or layout change with no new revision also moves the token (DRAFT_MOVED)', async () => {
+    const m = await seedMerchant('moved-theme', {}, HERO);
+    const preview = await post(m.storeId, m.token, { lookId: LOOK, design: 'keep' });
+    await withRlsBypass(tx =>
+      tx.store.update({
+        where: { id: m.storeId },
+        data: { theme: { primaryColor: '#123456' } },
+      })
+    );
+    const res = await put(m.storeId, m.token, {
+      lookId: LOOK,
+      design: 'keep',
+      revisionToken: preview.body.data.revisionToken,
+    });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DRAFT_MOVED');
+    expect((await storeRow(m.storeId)).look).toBeNull();
+  });
+
   it("refuses another merchant's store, an unknown look and a look that is not built", async () => {
     const a = await seedMerchant('owner-a', {}, HERO);
     const b = await seedMerchant('owner-b', {}, HERO);

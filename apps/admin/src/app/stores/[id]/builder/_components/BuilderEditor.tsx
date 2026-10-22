@@ -267,6 +267,17 @@ export function BuilderEditor({
   }, [selection]);
   const previewingRef = useRef(false);
   previewingRef.current = lookPreview !== null;
+  // A proposal is computed from the document as it was; if the draft moves under it (the tree,
+  // a tab, autosave) the proposal is stale and Apply would only answer DRAFT_MOVED, so drop it.
+  const previewBaseDoc = useRef<typeof b.doc>(null);
+  useEffect(() => {
+    if (!lookPreview) {
+      previewBaseDoc.current = null;
+      return;
+    }
+    if (previewBaseDoc.current === null) previewBaseDoc.current = b.doc;
+    else if (previewBaseDoc.current !== b.doc) setLookPreview(null);
+  }, [lookPreview, b.doc]);
   const onCanvasMessage = useCallback(
     (msg: ChildToParent) => {
       // While a proposed look is shown the canvas is read-only: nothing it sends edits the real page.

@@ -808,10 +808,10 @@ async function composeLookDocument(
 }> {
   const state = await getPageState(storeId, HOME_PAGE_KEY);
   if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
-  if (revisionToken !== undefined && revisionToken !== lookRevisionToken(state))
-    throw new AppError(409, 'DRAFT_MOVED', 'The page changed since the preview; preview again.');
   const store = await loadStore(storeId);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  if (revisionToken !== undefined && revisionToken !== lookRevisionToken(state, store))
+    throw new AppError(409, 'DRAFT_MOVED', 'The page changed since the preview; preview again.');
   const look = getLook(lookId);
   const start =
     state.source === 'layout' && look
@@ -873,11 +873,26 @@ async function composeLookDocument(
   return { state, definition, fresh, store };
 }
 
-/** An opaque token for the page's head: a preview carries it and the apply refuses when it moved. */
+/**
+ * An opaque token for everything a look switch reads: the revision head, the document it starts
+ * from (a layout-derived page has no revision rows), and the store's layout, theme, look and
+ * template. A preview carries it and the apply refuses (DRAFT_MOVED) when any of it moved.
+ */
 export function lookRevisionToken(
-  state: Pick<PageState, 'rev' | 'draftRev' | 'publishedRev'>
+  state: Pick<PageState, 'rev' | 'draftRev' | 'publishedRev' | 'definition' | 'source'>,
+  store: { layoutSettings?: unknown; theme?: unknown; look?: unknown; template?: unknown }
 ): string {
-  return `r${state.rev}d${state.draftRev ?? 0}p${state.publishedRev ?? 0}`;
+  const text = JSON.stringify([
+    state.source,
+    state.definition,
+    store.layoutSettings ?? null,
+    store.theme ?? null,
+    store.look ?? null,
+    store.template ?? null,
+  ]);
+  let h = 0x811c9dc5; // FNV-1a, 32 bit: a change detector, not a security boundary
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+  return `r${state.rev}d${state.draftRev ?? 0}p${state.publishedRev ?? 0}h${h.toString(36)}`;
 }
 
 /**
@@ -905,7 +920,12 @@ export async function previewFamilyForLook(
     definition,
     resetThemeKeys.filter(k => k in live || k in pending)
   );
-  return { draft: definition, report, revisionToken: lookRevisionToken(state), willPublish: fresh };
+  return {
+    draft: definition,
+    report,
+    revisionToken: lookRevisionToken(state, store),
+    willPublish: fresh,
+  };
 }
 
 export async function applyFamilyForLook(
