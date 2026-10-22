@@ -145,8 +145,11 @@ async function seedMerchant(
   theme: Record<string, unknown> = {},
   layoutSettings?: Record<string, unknown>
 ) {
+  // A per-CALL id, not the per-file `run`: a retry re-runs the test body against the same database
+  // and a fixture keyed on the file id trips the unique email/slug index (retry-safe fixtures).
+  const call = `${run}-${crypto.randomBytes(3).toString('hex')}`;
   return withRlsBypass(async tx => {
-    const email = `look-${tag}-${run}@test.local`;
+    const email = `look-${tag}-${call}@test.local`;
     const user = await tx.user.create({
       data: {
         email,
@@ -159,8 +162,8 @@ async function seedMerchant(
     });
     const store = await tx.store.create({
       data: {
-        name: `look-${tag}-${run}`,
-        slug: `look-${tag}-${run}`,
+        name: `look-${tag}-${call}`,
+        slug: `look-${tag}-${call}`,
         template: 'modern',
         currency: 'EGP',
         ownerId: user.id,

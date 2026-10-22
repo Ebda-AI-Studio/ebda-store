@@ -12,9 +12,10 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { prisma, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import {
+  builtLookTemplates,
+  defaultNewStoreLook,
   getLook,
   LOOKS,
-  LOOK_TEMPLATES,
   TEMPLATE_FAMILIES,
   validatePublishReadiness,
 } from '@ebda/shared';
@@ -107,13 +108,14 @@ describe.skipIf(!hasDb)('POST /onboarding/store with a look (ebda_app + tenant g
   const letterA = (template: string) =>
     LOOKS.find(l => l.template === template && l.letter === 'A')!.id;
 
-  it.each(LOOK_TEMPLATES.map(t => [t, letterA(t)] as const))(
+  // Only BUILT templates are offered to a new store (#111): an unbuilt look is refused below.
+  it.each(builtLookTemplates().map(t => [t, letterA(t)] as const))(
     '%s: a fresh store lands on a PUBLISHED, publish-ready home of that family (%s)',
     async (template, lookId) => {
       const m = await merchant(`fam${template}`);
       const res = await create(m.token, {
         name: 'Fam Shop',
-        slug: mkSlug(`fam${LOOK_TEMPLATES.indexOf(template)}`),
+        slug: mkSlug(`fam${builtLookTemplates().indexOf(template)}`),
         lookId,
       });
       expect(res.status, JSON.stringify(res.body)).toBe(201);
@@ -149,7 +151,7 @@ describe.skipIf(!hasDb)('POST /onboarding/store with a look (ebda_app + tenant g
       const res = await create(m.token, {
         name: 'Fail',
         slug: mkSlug('fail'),
-        lookId: 'dahab.worn',
+        lookId: defaultNewStoreLook().id,
       });
       expect(res.status, JSON.stringify(res.body)).toBe(201);
       expect(res.body.data.lookApplied).toBe(false);
@@ -171,14 +173,25 @@ describe.skipIf(!hasDb)('POST /onboarding/store with a look (ebda_app + tenant g
     expect(await prisma.store.count({ where: { slug } })).toBe(0);
   });
 
-  it('no lookId keeps the legacy behaviour (look stays null)', async () => {
+  it('an unbuilt (designed) look is refused with a 400 and creates no store (#111)', async () => {
+    const designed = LOOKS.find(l => l.status !== 'built')!;
+    expect(designed, 'fixture: the registry still has a designed look').toBeTruthy();
+    const m = await merchant('unbuilt');
+    const slug = mkSlug('unbuilt');
+    const res = await create(m.token, { name: 'Unbuilt', slug, lookId: designed.id });
+    expect(res.status).toBe(400);
+    expect(await prisma.store.count({ where: { slug } })).toBe(0);
+  });
+
+  it('no lookId starts the store on the registry default look, never the DB default (#111)', async () => {
     const m = await merchant('legacy');
     const res = await create(m.token, { name: 'Legacy', slug: mkSlug('legacy') });
     expect(res.status, JSON.stringify(res.body)).toBe(201);
     const row = await prisma.store.findUniqueOrThrow({
       where: { id: res.body.data.store.id },
-      select: { look: true },
+      select: { look: true, template: true },
     });
-    expect(row.look).toBeNull();
+    expect(row.look).toBe(defaultNewStoreLook().id);
+    expect(row.template).toBe(defaultNewStoreLook().skin);
   });
 });

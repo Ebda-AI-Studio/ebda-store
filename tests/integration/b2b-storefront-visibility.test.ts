@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import crypto from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
-import { prisma } from '@ebda/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 
 vi.mock('@api/middleware/auth', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/middleware/auth')>()),
@@ -155,9 +155,15 @@ describe.skipIf(!hasDb)(
       expect(list.products.map(p => p.id)).toEqual([id.pub]);
       expect(await code(ProductService.getPublicBySlug(id.s!, id.wsSlug!))).toBe('NOT_FOUND');
       expect(await code(ProductService.getPublicById(id.s!, id.ws!))).toBe('NOT_FOUND');
-      const adv = await ProductService.advancedSearch(id.s!, { query: `Tea ${SUF}` });
+      // The search definers take the store ONLY from app.current_store_id, so a direct service call needs the scope
+      // the /public middleware (publicStoreContext) and the admin tenantContext give a real request.
+      const adv = await runInTenantContext(id.s!, () =>
+        ProductService.advancedSearch(id.s!, { query: `Tea ${SUF}` })
+      );
       expect(adv.products.map((p: { id: string }) => p.id)).toEqual([id.pub]);
-      const sug = await ProductService.getSearchSuggestions(id.s!, `Tea ${SUF}`);
+      const sug = await runInTenantContext(id.s!, () =>
+        ProductService.getSearchSuggestions(id.s!, `Tea ${SUF}`)
+      );
       expect(JSON.stringify(sug)).not.toContain(id.ws!);
       const filters = await ProductService.getFilterOptions(id.s!);
       expect(JSON.stringify(filters.priceRange ?? filters)).not.toContain('8000');
@@ -181,13 +187,20 @@ describe.skipIf(!hasDb)(
         await prisma.product.update({ where: { id: pid }, data: { audience: 'wholesale_only' } });
         hidden.push(pid);
       }
-      const storefront = await searchProductIds(id.s!, tag, { scope: 'storefront', limit: 12 });
+      const inStore = <T>(fn: () => Promise<T>) => runInTenantContext(id.s!, fn);
+      const storefront = await inStore(() =>
+        searchProductIds(id.s!, tag, { scope: 'storefront', limit: 12 })
+      );
       expect(storefront).toHaveLength(12);
       expect(storefront.some(x => hidden.includes(x))).toBe(false);
       expect(
-        await searchProductIds(id.s!, `${tag} hidden`, { scope: 'storefront', limit: 12 })
+        await inStore(() =>
+          searchProductIds(id.s!, `${tag} hidden`, { scope: 'storefront', limit: 12 })
+        )
       ).toEqual([]);
-      const admin = await searchProductIds(id.s!, tag, { scope: 'admin', limit: 50 });
+      const admin = await inStore(() =>
+        searchProductIds(id.s!, tag, { scope: 'admin', limit: 50 })
+      );
       expect(hidden.every(h => admin.includes(h))).toBe(true); // the merchant still finds them
     });
 

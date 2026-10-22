@@ -444,11 +444,18 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         api().get('/api/v1/public/products?limit=10').set('x-store-domain', host);
       expect((await hostProducts()).status).toBe(400);
 
+      // A merchant restyles through a LOOK: a bare legacy template is refused (#111), and the
+      // store started on the registry default look.
       const tpl = await api()
+        .put(`/api/v1/stores/${storeId}/look`)
+        .set(bearer(jwt))
+        .send({ lookId: 'souq.catalogue', design: 'keep' });
+      expect(tpl.status, JSON.stringify(tpl.body)).toBe(200);
+      const bare = await api()
         .put(`/api/v1/stores/${storeId}/template`)
         .set(bearer(jwt))
         .send({ template: 'elegant' });
-      expect(tpl.status).toBe(200);
+      expect(bare.status).toBe(400);
 
       const product = await api().post(`/api/v1/stores/${storeId}/products`).set(bearer(jwt)).send({
         name: 'Cotton Scarf',
@@ -567,6 +574,14 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         'test_order',
         'share',
       ]);
+      // A new store always starts on a look (#111), and a look IS a brand palette (LOOKS-14), so
+      // "brand" is done from the start and nothing else is.
+      expect(done(g, 'brand')).toBe(true);
+      expect(g.doneCount).toBe(1);
+      // The rest of this flow proves the LEGACY brand signals (logo / colour), so take the look off.
+      await prisma.store.update({ where: { id: storeId }, data: { look: null } });
+      g = await guide();
+      expect(done(g, 'brand')).toBe(false);
       expect(g.doneCount).toBe(0);
       // COD is seeded ON but that alone does not tick "payment".
       expect(done(g, 'payment')).toBe(false);

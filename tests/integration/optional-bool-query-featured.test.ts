@@ -95,10 +95,13 @@ describe.skipIf(!hasDb)('optional boolean query params: featured filter', () => 
     const { default: publicRoutes } = await import('@api/routes/public.routes');
     const { default: productRoutes } = await import('@api/routes/product.routes');
     const { errorHandler } = await import('@api/middleware/error-handler');
+    const { tenantContext, publicStoreContext } = await import('@api/middleware/tenant-context');
     app = express();
     app.use(express.json());
-    app.use('/api/v1/public', publicRoutes);
-    app.use('/api/v1/stores/:storeId/products', productRoutes);
+    // Mounted the way routes/index.ts mounts them: the search definers read the store ONLY from
+    // app.current_store_id, which these context middlewares set.
+    app.use('/api/v1/public', publicStoreContext, publicRoutes);
+    app.use('/api/v1/stores/:storeId/products', tenantContext, productRoutes);
     app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
       errorHandler(err as any, req, res, next)
     );
@@ -263,9 +266,10 @@ describe.skipIf(!hasDb)(
       });
       const { default: productRoutes } = await import('@api/routes/product.routes');
       const { errorHandler } = await import('@api/middleware/error-handler');
+      const { tenantContext } = await import('@api/middleware/tenant-context');
       app = express();
       app.use(express.json());
-      app.use('/api/v1/stores/:storeId/products', productRoutes);
+      app.use('/api/v1/stores/:storeId/products', tenantContext, productRoutes);
       app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
         errorHandler(err as any, req, res, next)
       );

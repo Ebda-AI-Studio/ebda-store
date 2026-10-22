@@ -577,9 +577,8 @@ describe.skipIf(!hasDb)('InstaPay manual payment', () => {
       await import('@api/lib/inngest/functions/instapay-expiry');
       const reg = createFn.mock.calls.find(c => (c[0] as { id?: string }).id === 'instapay-expiry');
       expect(reg).toBeDefined();
-      expect((reg![0] as { triggers: Array<{ cron: string }> }).triggers[0].cron).toBe(
-        '*/15 * * * *'
-      );
+      // Hourly since Ruling INNGEST-BUDGET-1 (#118: the Inngest plan caps monthly executions).
+      expect((reg![0] as { triggers: Array<{ cron: string }> }).triggers[0].cron).toBe('7 * * * *');
       const handler = reg![1] as unknown as (a: unknown) => Promise<{ expired: number }>;
       createFn.mockRestore();
       const o = await mkOrder();
