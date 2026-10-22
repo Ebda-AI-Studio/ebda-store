@@ -3,6 +3,9 @@ import { cfBindings, type DurableObjectStubLike } from './bindings';
 import type { Op } from './auth-state-core';
 import { hop } from '../lib/hop-timing';
 
+export const CACHEGEN_PREFIX = 'cachegen:';
+const CACHEGEN_SHARD_KEY = 'cachegen';
+
 /** Shards the key space is spread over. A key always maps to the same shard. */
 export const AUTH_STATE_SHARDS = 32;
 
@@ -23,6 +26,12 @@ export function fnv1a(s: string): number {
  * pipeline over them stays atomic.
  */
 export function shardKey(key: string): string {
+  // Cache-generation counters (`cachegen:<name>`) are read as a group of ~5 names on every public
+  // cache fill, twice. Spread over 5 shards that was 5 parallel Durable Object round trips whose
+  // slowest (a cold shard: 0.8-1.3 s measured) set the latency; on ONE shard it is one call. The
+  // counters are only a fill-race guard (a lost counter can only make a fill skip caching once),
+  // never an authorisation decision, so concentrating them is safe.
+  if (key.startsWith(CACHEGEN_PREFIX)) return CACHEGEN_SHARD_KEY;
   return key.replace(/:(attempts|locked|row)$/, '');
 }
 
