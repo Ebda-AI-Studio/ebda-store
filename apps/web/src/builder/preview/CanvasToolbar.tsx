@@ -52,6 +52,8 @@ export interface ToolbarProps {
   /** False hides the drag handle (blocks cannot be dragged on the canvas). */
   draggable: boolean;
   disabled: Partial<Record<SectionOp, boolean>>;
+  /** From the `md` breakpoint (768px) the glyphs carry a visible text label (Task 13). */
+  labels?: boolean;
   /** The AI can write this section's kicker and subtitle: show the button. */
   ai?: boolean;
   onOp: (op: SectionOp) => void;
@@ -59,6 +61,8 @@ export interface ToolbarProps {
 }
 
 const SIZE = 36;
+/** The drag handle's visible label is the first word of its accessible name (label in name). */
+const SHORT_DRAG: Record<ToolbarLocale, string> = { en: 'Drag', ar: 'اسحب' };
 
 export function CanvasToolbar({
   locale,
@@ -67,6 +71,7 @@ export function CanvasToolbar({
   draggable,
   disabled,
   ai,
+  labels = false,
   onOp,
   onDragStart,
 }: ToolbarProps) {
@@ -94,10 +99,13 @@ export function CanvasToolbar({
       title={copy[key]}
       data-builder-toolbar={key}
       style={{
-        width: SIZE,
+        ...(labels
+          ? { minWidth: SIZE, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 6 }
+          : { width: SIZE, display: 'grid', placeItems: 'center' }),
         height: SIZE,
-        display: 'grid',
-        placeItems: 'center',
+        fontSize: 12,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
         border: 0,
         borderRadius: 6,
         background: 'transparent',
@@ -121,6 +129,7 @@ export function CanvasToolbar({
       >
         <path d={ICON[key]} />
       </svg>
+      {labels && <span>{key === 'drag' ? SHORT_DRAG[locale] : copy[key]}</span>}
     </button>
   );
   return (
@@ -135,6 +144,8 @@ export function CanvasToolbar({
         insetInlineEnd: end,
         zIndex: 2147483003,
         display: 'flex',
+        flexWrap: 'wrap',
+        maxWidth: Math.max(160, pageWidth - 16),
         gap: 2,
         padding: 2,
         borderRadius: 8,

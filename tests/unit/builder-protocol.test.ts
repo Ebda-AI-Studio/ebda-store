@@ -29,6 +29,7 @@ const VALID: Array<Record<string, unknown>> = [
   { type: 'move', sectionId: 'hero', toIndex: 2 },
   { type: 'move', sectionId: 'hero', blockId: 'slide-1', toIndex: 0 },
   { type: 'request-add', list: 'template', index: 3 },
+  { type: 'focus-tree' },
 ];
 
 describe('child -> parent messages', () => {
@@ -111,6 +112,19 @@ describe('parent -> child messages', () => {
         blockId: 'slide-1',
       }).success
     ).toBe(true);
+  });
+});
+
+describe('keyboard path messages (Task 13)', () => {
+  it('parent -> child focus names a target only, strictly', () => {
+    const ok = { ...base, type: 'focus', sectionId: 'hero' };
+    expect(parentToChildSchema.safeParse(ok).success).toBe(true);
+    expect(parentToChildSchema.safeParse({ ...ok, blockId: 'slide-1' }).success).toBe(true);
+    expect(parentToChildSchema.safeParse({ ...ok, sectionId: '../x' }).success).toBe(false);
+    expect(parentToChildSchema.safeParse({ ...ok, extra: 1 }).success).toBe(false);
+  });
+  it('child -> parent focus-tree carries nothing', () => {
+    expect(child({ type: 'focus-tree', sectionId: 'hero' }).success).toBe(false);
   });
 });
 

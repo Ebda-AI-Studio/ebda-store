@@ -37,6 +37,7 @@ import {
   isSectionPageKind,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useIsCanvasHovered } from '../_lib/canvas-hover-store';
 
 export interface Selection {
   sectionId: string;
@@ -46,8 +47,9 @@ export interface Selection {
 interface Props {
   doc: PageDefinition;
   selection: Selection | null;
-  hoveredId: string | null;
   onSelect: (s: Selection) => void;
+  /** Enter on a row: select it and hand keyboard focus to its first target on the canvas. */
+  onFocusCanvas?: (s: Selection) => void;
   dispatch: (a: DocumentAction) => void;
   onAddSection: (list: SectionList) => void;
 }
@@ -63,20 +65,22 @@ function Row({
   index,
   count,
   selection,
-  hoveredId,
   onSelect,
+  onFocusCanvas,
   dispatch,
 }: {
   node: SectionNode;
   index: number;
   count: number;
   selection: Selection | null;
-  hoveredId: string | null;
   onSelect: (s: Selection) => void;
+  onFocusCanvas?: (s: Selection) => void;
   dispatch: (a: DocumentAction) => void;
 }) {
   const t = useT('builder.tree');
   const locale = useLocale();
+  // A canvas hover is not editor state: only the row whose highlight flips re-renders.
+  const hovered = useIsCanvasHovered(node.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.id,
   });
@@ -98,7 +102,7 @@ function Row({
         className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm ${
           selected
             ? 'bg-primary/15 text-foreground ring-1 ring-primary'
-            : hoveredId === node.id
+            : hovered
               ? 'bg-muted'
               : 'hover:bg-muted'
         }`}
@@ -117,6 +121,12 @@ function Row({
           className={`min-w-0 flex-1 truncate text-start ${node.hidden ? 'text-muted-foreground line-through' : ''}`}
           onClick={() => onSelect({ sectionId: node.id })}
           onKeyDown={e => {
+            if (e.key === 'Enter' && !e.altKey && onFocusCanvas) {
+              e.preventDefault();
+              onSelect({ sectionId: node.id });
+              onFocusCanvas({ sectionId: node.id });
+              return;
+            }
             if (!e.altKey) return;
             if (e.key === 'ArrowUp' && index > 0) {
               e.preventDefault();
@@ -210,6 +220,12 @@ function Row({
                 <button
                   type="button"
                   onClick={() => onSelect({ sectionId: node.id, blockId: b.id })}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter' || !onFocusCanvas) return;
+                    e.preventDefault();
+                    onSelect({ sectionId: node.id, blockId: b.id });
+                    onFocusCanvas({ sectionId: node.id, blockId: b.id });
+                  }}
                   className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-start text-xs ${
                     bSelected ? 'bg-primary/15 ring-1 ring-primary' : 'hover:bg-muted'
                   } ${b.hidden ? 'text-muted-foreground line-through' : ''}`}

@@ -23,8 +23,11 @@
       window.__received = [];
       window.__doc = null;
       const send = m => window.parent.postMessage({ protocol: P, ...m }, parentOrigin);
+      // Task 13 perf: when each distinct heading was painted (epoch ms), read by perf.e2e.ts.
+      window.__paints = {};
       function render(doc) {
         window.__doc = doc;
+        const probe = doc.sections.find(x => x.id === 'categories')?.settings.title;
         const root = document.getElementById('root');
         root.innerHTML = '';
         // chrome zones carry `data-zone` like the storefront; the document ids are
@@ -53,12 +56,25 @@
           root.appendChild(el);
         }
         root.appendChild(zoneEl('footer', 'footer'));
+        if (probe !== undefined)
+          requestAnimationFrame(() => {
+            window.__paints[probe] = performance.timeOrigin + performance.now();
+          });
       }
       window.addEventListener('message', e => {
         if (e.origin !== parentOrigin || e.source !== window.parent) return;
         if (!e.data || e.data.protocol !== P) return;
         window.__received.push(e.data.type);
         if (e.data.type === 'render') render(e.data.definition);
+        if (e.data.type === 'focus') {
+          // like the real overlay: land focus on the first target of the section
+          const el = document.querySelector(`[data-builder-id="${e.data.sectionId}"]`);
+          const target = el && (el.querySelector('h2') || el);
+          if (target) {
+            target.setAttribute('tabindex', '-1');
+            target.focus();
+          }
+        }
         if (e.data.type === 'select') {
           window.__selected = e.data.sectionId;
           window.__selectedBlock = e.data.blockId;
@@ -80,6 +96,9 @@
         const group = zone === 'footer' ? 'footer' : 'header';
         const node = type && window.__doc?.sectionGroups[group].find(n => n.type === type);
         if (node) send({ type: 'select', sectionId: node.id });
+      });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') send({ type: 'focus-tree' });
       });
       window.__patch = (sectionId, key, value, blockId) =>
         send({ type: 'patch-text', sectionId, ...(blockId ? { blockId } : {}), key, value });
