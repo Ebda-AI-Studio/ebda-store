@@ -39,6 +39,7 @@ export default function ElegantCartTable({
           <div key={item.id} className="flex gap-6 py-8">
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
+              {...(item.image ? {} : { 'aria-hidden': true, tabIndex: -1 })}
               className="aspect-[3/4] w-24 flex-shrink-0 overflow-hidden bg-muted/30 sm:w-28"
             >
               {item.image ? (

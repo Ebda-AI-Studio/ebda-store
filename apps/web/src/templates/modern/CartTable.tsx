@@ -43,6 +43,7 @@ export default function ModernCartTable({
           >
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
+              {...(item.image ? {} : { 'aria-hidden': true, tabIndex: -1 })}
               className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-muted sm:h-28 sm:w-28"
             >
               {item.image ? (

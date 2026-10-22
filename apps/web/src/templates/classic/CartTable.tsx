@@ -42,6 +42,7 @@ export default function ClassicCartTable({
           <div key={item.id} className="flex gap-5 p-5">
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
+              {...(item.image ? {} : { 'aria-hidden': true, tabIndex: -1 })}
               className="h-28 w-28 flex-shrink-0 overflow-hidden bg-muted border border-input/60"
             >
               {item.image ? (

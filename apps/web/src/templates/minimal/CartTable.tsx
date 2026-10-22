@@ -39,6 +39,7 @@ export default function MinimalCartTable({
           <div key={item.id} className="flex gap-5">
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
+              {...(item.image ? {} : { 'aria-hidden': true, tabIndex: -1 })}
               className="aspect-[3/4] w-20 flex-shrink-0 overflow-hidden bg-muted/30"
             >
               {item.image ? (

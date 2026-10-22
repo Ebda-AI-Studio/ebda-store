@@ -39,6 +39,7 @@ export default function BoldCartTable({
           <div key={item.id} className="flex gap-4 border-2 border-foreground bg-background p-4">
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
+              {...(item.image ? {} : { 'aria-hidden': true, tabIndex: -1 })}
               className="h-28 w-28 flex-shrink-0 overflow-hidden bg-muted sm:h-32 sm:w-32"
             >
               {item.image ? (
