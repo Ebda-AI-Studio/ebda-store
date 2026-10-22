@@ -36,6 +36,8 @@ import { formatTaxRowLabel } from '../../lib/tax-display';
 import { resolveColor, checkMinimumOrder, computeOrderAmounts, getLook } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
+import { GoldRateLine } from '../../components/commerce/GoldRateLine';
+import { PriceChangedNotice } from '../../components/commerce/PriceChangedNotice';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 import { MinOrderProgress } from '../../components/commerce/MinOrderProgress';
 import { cartRemovalToast } from './cart-removal';
@@ -56,7 +58,10 @@ export default function CartClient() {
     itemCount,
     total: cartTotal,
     isReady: cartIsReady,
+    priceChanged,
+    acknowledgePrices,
   } = useCart();
+  const [acknowledging, setAcknowledging] = useState(false);
   const { store, layout } = useStore();
   const storeUrl = useStoreUrl();
   const { isEnabled } = useFeatures();
@@ -598,6 +603,17 @@ export default function CartClient() {
               <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
                 {/* Cart Items */}
                 <div className="lg:col-span-8">
+                  {/* Gold lines (B5-17): the moved price is already on the line; this records that the shopper saw it. */}
+                  {priceChanged && (
+                    <PriceChangedNotice
+                      className="mb-4"
+                      busy={acknowledging}
+                      onContinue={() => {
+                        setAcknowledging(true);
+                        void acknowledgePrices().finally(() => setAcknowledging(false));
+                      }}
+                    />
+                  )}
                   {/* Bundle boxes — always ONE row per box (never the split
                       per-component allocation), rendered the same regardless
                       of the active theme. `cartBundles` are `CartBundle` rows,
@@ -624,6 +640,24 @@ export default function CartClient() {
                         />
                       ))}
                     </div>
+                  )}
+                  {/* Gold lines: today's rate behind each price, once per piece (every theme's table shares it). */}
+                  {cartItems.some(i => i.gold) && (
+                    <ul
+                      className="mb-4 space-y-2 rounded-lg border border-border p-3"
+                      data-testid="cart-gold-rates"
+                    >
+                      {cartItems
+                        .filter(i => i.gold)
+                        .map(i => (
+                          <li key={i.id} className="text-sm">
+                            <span className="font-medium">
+                              {language === 'ar' && i.nameAr ? i.nameAr : i.name}
+                            </span>
+                            <GoldRateLine gold={i.gold} />
+                          </li>
+                        ))}
+                    </ul>
                   )}
                   {T?.CartTable ? (
                     <T.CartTable

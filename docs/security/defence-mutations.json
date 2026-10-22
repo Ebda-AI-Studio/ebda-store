@@ -2620,6 +2620,26 @@
       "find": "...(confirmed ? { confirm: true } : {}),",
       "replace": "confirm: true,",
       "test": "tests/unit/gold-admin-rate-editor.test.tsx"
+    },
+    {
+      "id": "money-gold-storefront-stale-rule",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the storefront treats a rate as fresh at exactly its limit, so the buy button stays live one minute after the server starts refusing the order",
+      "source": "apps/web/src/lib/gold-display.ts",
+      "find": "return Math.floor((now - applied) / 60_000) >= gold.maxAgeMinutes;",
+      "replace": "return Math.floor((now - applied) / 60_000) > gold.maxAgeMinutes;",
+      "test": "tests/unit/gold-storefront-display.test.tsx"
+    },
+    {
+      "id": "money-gold-pdp-stale-disables-buy",
+      "domain": "money",
+      "tier": "unit",
+      "why": "the product page keeps its add-to-cart controls live when the gold rate is past the store's limit",
+      "source": "apps/web/src/app/products/[slug]/ProductDetailClient.tsx",
+      "find": "const addDisabled = !buyableNow || goldStale;",
+      "replace": "const addDisabled = !buyableNow;",
+      "test": "tests/unit/gold-storefront-display.test.tsx"
     }
   ]
 }

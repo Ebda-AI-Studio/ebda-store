@@ -22,7 +22,12 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
-import { isIosWebkit, moveSearchToHeader, searchQueryHeaders } from '@ebda/shared';
+import {
+  isIosWebkit,
+  moveSearchToHeader,
+  searchQueryHeaders,
+  type PublicGoldPricing,
+} from '@ebda/shared';
 import type { buildQuoteRequest, OrderQuote } from './checkout-quote';
 import type { ResolvedPrice } from './b2b-tiers';
 import type {
@@ -115,6 +120,13 @@ interface Product {
   ratingStats?: { ratingAverage: number | null; ratingCount: number };
   /** B2B minimum order quantity (public data), null / absent = none. */
   moq?: number | null;
+  /**
+   * Gold-rate pricing (B5): what the shopper may know about a gold piece (karat, weight, today's rate, when it was
+   * recorded). Absent for a fixed-price product. NEVER the margin or where the rate came from.
+   */
+  goldPricing?: PublicGoldPricing | null;
+  /** The same for each variant that carries its own weight, keyed by variant id. */
+  variantGoldPricing?: Record<string, PublicGoldPricing>;
   /** PUBLIC quantity price breaks only (group tiers are never in this payload). */
   priceTiers?: Array<{ variantId: string | null; minQty: number; priceMinor: number }>;
   /**
@@ -212,6 +224,10 @@ interface CartItem {
   productId: string;
   quantity: number;
   price: number;
+  /** A gold line whose price moved since it was added (B5-17): the notice shows until the shopper continues. */
+  priceChanged?: boolean;
+  previousUnitPrice?: number | null;
+  goldPricing?: PublicGoldPricing;
   /** Personalisation text; part of the line identity. */
   note?: string | null;
   product: Product;
@@ -1294,6 +1310,14 @@ class ApiClient {
   // Cart (public endpoints - uses default store)
   async getCart() {
     return this.request<{ cart: Cart }>('/public/cart');
+  }
+
+  /** The shopper saw the moved gold price and continued: the server re-quotes every gold line at today's price. */
+  async acknowledgePrices() {
+    return this.request<{ cart?: Cart }>('/public/cart/acknowledge-prices', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
   }
 
   async addToCart(productId: string, quantity = 1, variantId?: string, note?: string) {

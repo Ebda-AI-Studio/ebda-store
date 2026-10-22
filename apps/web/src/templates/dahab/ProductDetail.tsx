@@ -52,6 +52,8 @@ export interface DahabProductDetailProps {
   ratingLine?: React.ReactNode;
   /** The live bundle-saving line (renders nothing without a saving). */
   bundleLine?: React.ReactNode;
+  /** Gold-rate line under the price (B5): karat, weight, today's rate. */
+  priceNote?: React.ReactNode;
   images: Array<{ id?: string; url: string; alt?: string | null }>;
   name: string;
   categoryName?: string;
@@ -407,6 +409,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               )}
             </div>
             <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+            {p.priceNote}
             {p.bundleLine}
             {p.b2bPanel}
             {p.excerpt && (

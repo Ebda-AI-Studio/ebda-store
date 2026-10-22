@@ -407,6 +407,10 @@ export const STOREFRONT_PRODUCT_SELECT = {
   // Made-to-order days for the PDP delivers-by chip. CACHE CLASS: BOUNDED-stale, rides the
   // PDP cache; invalidateStoreProductCache (called on every product update) busts it.
   leadTimeDays: true,
+  // 'fixed' | 'gold_rate' (Phase B5). Public and harmless: it tells llms.txt / feeds that the price follows a
+  // rate so they take the short edge window (Ruling B5-21). CACHE CLASS: BOUNDED-stale, rides the listing
+  // caches; every pricing-mode change purges them (setProductPricing / bulkSwitchMode).
+  pricingMode: true,
   // PDP personalisation field config (label, maxLength, required). CACHE CLASS: BOUNDED-stale,
   // rides the PDP cache; invalidateStoreProductCache (every product update) busts it. Display
   // only: CartService.addItem re-reads the column uncached to enforce required/maxLength.

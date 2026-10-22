@@ -117,3 +117,5 @@ Deleting a Worker removes its custom domain and zone route; verify afterwards th
 The footer and order summary share the cart's `AcceptedPaymentBadges` renderer. It reads fresh store-scoped `/payments/config` on mount/store changes; the stored `acceptedPaymentMethods` display override cannot enable a badge. Unknown, loading, failed or malformed configuration renders no payment claim. Only enabled method codes and configured COD/InstaPay appear, with Arabic/English labels. Checkout independently revalidates availability. No payment credentials or settings are changed by this display fix.
 
 Regression evidence: `tests/unit/storefront-payment-badges.test.tsx` drives the real cart, Dahab footer and order summary, including stale card overrides, loading, network failure/retry, malformed config, method-specific labels and tenant switches/late responses. Initial15cases failed against the old renderers before correction.
+
+> Gold-rate pricing (live price from today's gold rate) is a platform feature, not a Dahab one: it works on every template. The Dahab PDP shows its rate line under the price (`priceNote` slot). See `docs/architecture/gold-rate-pricing.md`.
