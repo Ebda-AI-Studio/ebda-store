@@ -24,6 +24,11 @@ import {
   effectiveTheme,
   getLook,
   addRequestFor,
+  aiFillActions,
+  aiFillRequestFor,
+  aiFillRequestForSection,
+  type AiFillRequest,
+  type AiSuggestion,
   getSectionDefinition,
   imageSwapActions,
   intentToAction,
@@ -85,6 +90,9 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [mediaReq, setMediaReq] = useState<MediaRequest | null>(null);
   // A fresh number per swap, so each swap is its own undo step.
   const swapSeq = useRef(0);
+  // One AI fill at a time; a fresh number per fill makes each one a single undo step.
+  const aiBusy = useRef(false);
+  const aiSeq = useRef(0);
   const [tab, setTab] = useState<StartTab>('sections');
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
@@ -140,6 +148,39 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const docRef = useRef(b.doc);
   docRef.current = b.doc;
 
+  // The latest dispatch, for async work (the AI fill) that outlives a render.
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
+
+  /** Ask the API for a kicker and subtitle, then dispatch the empty ones as ordinary, undoable edits. */
+  const runAiFill = useCallback(
+    async (req: AiFillRequest) => {
+      if (aiBusy.current) return;
+      aiBusy.current = true;
+      try {
+        const { data, error } = await apiPost<{ suggestion: AiSuggestion }>(
+          `/api/v1/stores/${storeId}/ai/section-content`,
+          {
+            section: req.section,
+            existingTitle: req.existingTitle,
+            existingTitleAr: req.existingTitleAr,
+          }
+        );
+        const cur = docRef.current;
+        if (error || !data || !cur) return toastError(t('ai.failed'));
+        const fills = aiFillActions(cur, req.sectionId, data.suggestion, aiSeq.current++);
+        if (fills.length === 0) return toastSuccess(t('ai.nothing'));
+        for (const f of fills) dispatchRef.current(f.action, f.coalesce);
+        toastSuccess(t('ai.filled'));
+      } catch {
+        toastError(t('ai.failed'));
+      } finally {
+        aiBusy.current = false;
+      }
+    },
+    [storeId, t, toastError, toastSuccess]
+  );
+
   const onCanvasMessage = useCallback(
     (msg: ChildToParent) => {
       if (msg.type === 'select') {
@@ -153,6 +194,11 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       if (msg.type === 'request-media') {
         const req = doc ? mediaRequestFor(doc, msg) : null;
         if (req) setMediaReq(req);
+        return;
+      }
+      if (msg.type === 'section-op' && msg.op === 'aiFill') {
+        const req = doc ? aiFillRequestFor(doc, msg) : null;
+        if (req) void runAiFill(req);
         return;
       }
       if (msg.type === 'request-add') {
@@ -180,7 +226,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       }
       dispatch(intent.action, intent.coalesce);
     },
-    [dispatch, locale]
+    [dispatch, locale, runAiFill]
   );
 
   // Undo / redo shortcuts (leave native text undo alone inside inputs).
@@ -365,6 +411,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       theme={effectiveTheme(store.theme, b.doc.theme)}
       errors={b.errors}
       dispatch={dispatch}
+      onAiFill={sectionId => {
+        const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
+        if (req) void runAiFill(req);
+      }}
       chromeEdit={{
         chrome: b.doc.chrome,
         liveVersion: b.publishedRev,

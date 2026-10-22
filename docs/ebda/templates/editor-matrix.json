@@ -1,12 +1,12 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1084,
+    "wired": 1174,
     "no-op": 160,
-    "missing": 9,
+    "missing": 0,
     "pending-template": 0,
     "marker-pending": 76,
-    "classic-only": 126,
+    "classic-only": 21,
     "exempt": 0
   },
   "coverage": {
@@ -38,16 +38,6 @@
   },
   "rows": [
     {
-      "id": "classic|api|POST /api/v1/stores/:p/ai/section-content",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:api",
-      "control": "POST /api/v1/stores/:p/ai/section-content",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-14"
-    },
-    {
       "id": "classic|api|PUT /api/v1/stores/:p/theme",
       "skin": "all",
       "looks": [],
@@ -68,16 +58,6 @@
       "capability": "P-01"
     },
     {
-      "id": "classic|component|AiSectionFillButton",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "AiSectionFillButton",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-14"
-    },
-    {
       "id": "classic|component|DensitySelect",
       "skin": "all",
       "looks": [],
@@ -88,16 +68,6 @@
       "capability": "P-05"
     },
     {
-      "id": "classic|component|DividerStyleSelect",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "DividerStyleSelect",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-04"
-    },
-    {
       "id": "classic|component|FontsCard",
       "skin": "all",
       "looks": [],
@@ -106,16 +76,6 @@
       "status": "classic-only",
       "evidence": "manifest",
       "capability": "P-01"
-    },
-    {
-      "id": "classic|component|KickerSubtitleControls",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "KickerSubtitleControls",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-06"
     },
     {
       "id": "classic|component|ProductCardControls",
@@ -136,46 +96,6 @@
       "status": "classic-only",
       "evidence": "manifest",
       "capability": "P-05"
-    },
-    {
-      "id": "classic|component|SectionDividersBlock",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "SectionDividersBlock",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-04"
-    },
-    {
-      "id": "classic|component|SectionPaddingMaxWidthBlock",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "SectionPaddingMaxWidthBlock",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-06"
-    },
-    {
-      "id": "classic|component|SectionTitleFields",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "SectionTitleFields",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-06"
-    },
-    {
-      "id": "classic|component|SectionTypographyBlock",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:component",
-      "control": "SectionTypographyBlock",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-03"
     },
     {
       "id": "classic|component|SmartPaletteModal",
@@ -206,76 +126,6 @@
       "status": "classic-only",
       "evidence": "manifest",
       "capability": "P-02"
-    },
-    {
-      "id": "classic|field|bestSellers.typography",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "bestSellers.typography",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-03"
-    },
-    {
-      "id": "classic|field|categories.captionPositionMobile",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "categories.captionPositionMobile",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-06"
-    },
-    {
-      "id": "classic|field|categories.layoutMobile",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "categories.layoutMobile",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-06"
-    },
-    {
-      "id": "classic|field|categories.typography",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "categories.typography",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-03"
-    },
-    {
-      "id": "classic|field|hero.typography",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "hero.typography",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-03"
-    },
-    {
-      "id": "classic|field|newArrivals.typography",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "newArrivals.typography",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-03"
-    },
-    {
-      "id": "classic|field|testimonials.typography",
-      "skin": "all",
-      "looks": [],
-      "surface": "classic:field",
-      "control": "testimonials.typography",
-      "status": "classic-only",
-      "evidence": "manifest",
-      "capability": "P-03"
     },
     {
       "id": "classic|site-setting|bottomBar",
@@ -396,39 +246,6 @@
       "status": "classic-only",
       "evidence": "manifest",
       "capability": "P-12"
-    },
-    {
-      "id": "jasmine.apothecary|section:category-grid|design:layoutMobile",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
-      "id": "jasmine.bloom|section:category-grid|design:layoutMobile",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.bloom"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
-      "id": "jasmine.clinic|section:category-grid|design:layoutMobile",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.clinic"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
     },
     {
       "id": "jasmine|section:best-sellers|bgColor",
@@ -557,8 +374,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:best-sellers|kicker",
@@ -726,8 +543,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:blog-carousel|bgColor",
@@ -752,8 +569,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:blog-carousel|limit",
@@ -817,8 +634,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:brand-story|bgColor",
@@ -843,8 +660,8 @@
       ],
       "surface": "section:brand-story",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:brand-story|maxWidth",
@@ -895,8 +712,8 @@
       ],
       "surface": "section:brand-story",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:category-grid|bgColor",
@@ -1051,8 +868,8 @@
       ],
       "surface": "section:category-grid",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:category-grid|kicker",
@@ -1259,8 +1076,8 @@
       ],
       "surface": "section:category-grid",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:collection-list/collection|categorySlug",
@@ -1779,8 +1596,8 @@
       ],
       "surface": "section:hero",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:hero|frame",
@@ -1883,8 +1700,8 @@
       ],
       "surface": "section:hero",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:image-text|alt",
@@ -2351,8 +2168,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:new-arrivals|kicker",
@@ -2520,8 +2337,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:newsletter|bgColor",
@@ -2767,8 +2584,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:product-carousel|kicker",
@@ -2962,8 +2779,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:product-spotlight|alt",
@@ -3456,8 +3273,8 @@
       ],
       "surface": "section:testimonials",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:testimonials|layout",
@@ -3547,8 +3364,8 @@
       ],
       "surface": "section:testimonials",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:testimonials|verifiedOnly",
@@ -3742,8 +3559,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|section:trust-strip|iconBgColor",
@@ -3859,8 +3676,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "jasmine|theme|accentColor",
@@ -4097,17 +3914,6 @@
       "evidence": "static"
     },
     {
-      "id": "lamma.market|section:category-grid|design:layoutMobile",
-      "skin": "lamma",
-      "looks": [
-        "lamma.market"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
       "id": "lamma|section:best-sellers|bgColor",
       "skin": "lamma",
       "looks": [
@@ -4234,8 +4040,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:best-sellers|kicker",
@@ -4403,8 +4209,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:blog-carousel|bgColor",
@@ -4429,8 +4235,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:blog-carousel|limit",
@@ -4494,8 +4300,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:brand-story|bgColor",
@@ -4520,8 +4326,8 @@
       ],
       "surface": "section:brand-story",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:brand-story|maxWidth",
@@ -4572,8 +4378,8 @@
       ],
       "surface": "section:brand-story",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:category-grid|bgColor",
@@ -4728,8 +4534,8 @@
       ],
       "surface": "section:category-grid",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:category-grid|kicker",
@@ -4936,8 +4742,8 @@
       ],
       "surface": "section:category-grid",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:collection-list/collection|categorySlug",
@@ -5456,8 +5262,8 @@
       ],
       "surface": "section:hero",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:hero|frame",
@@ -5560,8 +5366,8 @@
       ],
       "surface": "section:hero",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:image-text|alt",
@@ -6028,8 +5834,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:new-arrivals|kicker",
@@ -6197,8 +6003,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:newsletter|bgColor",
@@ -6444,8 +6250,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:product-carousel|kicker",
@@ -6639,8 +6445,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:product-spotlight|alt",
@@ -7133,8 +6939,8 @@
       ],
       "surface": "section:testimonials",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:testimonials|layout",
@@ -7224,8 +7030,8 @@
       ],
       "surface": "section:testimonials",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:testimonials|verifiedOnly",
@@ -7419,8 +7225,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|section:trust-strip|iconBgColor",
@@ -7536,8 +7342,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "lamma|theme|accentColor",
@@ -7900,8 +7706,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:best-sellers|kicker",
@@ -8069,8 +7875,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:blog-carousel|bgColor",
@@ -8095,8 +7901,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:blog-carousel|limit",
@@ -8160,8 +7966,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:brand-story|bgColor",
@@ -8186,8 +7992,8 @@
       ],
       "surface": "section:brand-story",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:brand-story|maxWidth",
@@ -8238,8 +8044,8 @@
       ],
       "surface": "section:brand-story",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:category-grid|bgColor",
@@ -8394,8 +8200,8 @@
       ],
       "surface": "section:category-grid",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:category-grid|kicker",
@@ -8602,8 +8408,8 @@
       ],
       "surface": "section:category-grid",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:collection-list/collection|categorySlug",
@@ -9122,8 +8928,8 @@
       ],
       "surface": "section:hero",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:hero|frame",
@@ -9226,8 +9032,8 @@
       ],
       "surface": "section:hero",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:image-text|alt",
@@ -9694,8 +9500,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:new-arrivals|kicker",
@@ -9863,8 +9669,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:newsletter|bgColor",
@@ -10110,8 +9916,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:product-carousel|kicker",
@@ -10305,8 +10111,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:product-spotlight|alt",
@@ -10799,8 +10605,8 @@
       ],
       "surface": "section:testimonials",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:testimonials|layout",
@@ -10890,8 +10696,8 @@
       ],
       "surface": "section:testimonials",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:testimonials|verifiedOnly",
@@ -11085,8 +10891,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|section:trust-strip|iconBgColor",
@@ -11202,8 +11008,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "minimal|theme|accentColor",
@@ -11440,28 +11246,6 @@
       "evidence": "static"
     },
     {
-      "id": "qamar.atelier|section:category-grid|design:layoutMobile",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
-      "id": "qamar.lookbook|section:category-grid|design:layoutMobile",
-      "skin": "qamar",
-      "looks": [
-        "qamar.lookbook"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
       "id": "qamar|section:best-sellers|bgColor",
       "skin": "qamar",
       "looks": [
@@ -11588,8 +11372,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:best-sellers|kicker",
@@ -11757,8 +11541,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:blog-carousel|bgColor",
@@ -11783,8 +11567,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:blog-carousel|limit",
@@ -11848,8 +11632,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:brand-story|bgColor",
@@ -11874,8 +11658,8 @@
       ],
       "surface": "section:brand-story",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:brand-story|maxWidth",
@@ -11926,8 +11710,8 @@
       ],
       "surface": "section:brand-story",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:category-grid|bgColor",
@@ -12082,8 +11866,8 @@
       ],
       "surface": "section:category-grid",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:category-grid|kicker",
@@ -12290,8 +12074,8 @@
       ],
       "surface": "section:category-grid",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:collection-list/collection|categorySlug",
@@ -12810,8 +12594,8 @@
       ],
       "surface": "section:hero",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:hero|frame",
@@ -12914,8 +12698,8 @@
       ],
       "surface": "section:hero",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:image-text|alt",
@@ -13382,8 +13166,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:new-arrivals|kicker",
@@ -13551,8 +13335,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:newsletter|bgColor",
@@ -13798,8 +13582,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:product-carousel|kicker",
@@ -13993,8 +13777,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:product-spotlight|alt",
@@ -14487,8 +14271,8 @@
       ],
       "surface": "section:testimonials",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:testimonials|layout",
@@ -14578,8 +14362,8 @@
       ],
       "surface": "section:testimonials",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:testimonials|verifiedOnly",
@@ -14773,8 +14557,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|section:trust-strip|iconBgColor",
@@ -14890,8 +14674,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "qamar|theme|accentColor",
@@ -15128,39 +14912,6 @@
       "evidence": "static"
     },
     {
-      "id": "souq.catalogue|section:category-grid|design:layoutMobile",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
-      "id": "souq.night|section:category-grid|design:layoutMobile",
-      "skin": "souq",
-      "looks": [
-        "souq.night"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
-      "id": "souq.showroom|section:category-grid|design:layoutMobile",
-      "skin": "souq",
-      "looks": [
-        "souq.showroom"
-      ],
-      "surface": "section:category-grid",
-      "control": "design:layoutMobile",
-      "status": "missing",
-      "evidence": "mix"
-    },
-    {
       "id": "souq|section:best-sellers|bgColor",
       "skin": "souq",
       "looks": [
@@ -15287,8 +15038,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:best-sellers|kicker",
@@ -15456,8 +15207,8 @@
       ],
       "surface": "section:best-sellers",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:blog-carousel|bgColor",
@@ -15482,8 +15233,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:blog-carousel|limit",
@@ -15547,8 +15298,8 @@
       ],
       "surface": "section:blog-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:brand-story|bgColor",
@@ -15573,8 +15324,8 @@
       ],
       "surface": "section:brand-story",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:brand-story|maxWidth",
@@ -15625,8 +15376,8 @@
       ],
       "surface": "section:brand-story",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:category-grid|bgColor",
@@ -15781,8 +15532,8 @@
       ],
       "surface": "section:category-grid",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:category-grid|kicker",
@@ -15989,8 +15740,8 @@
       ],
       "surface": "section:category-grid",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:collection-list/collection|categorySlug",
@@ -16509,8 +16260,8 @@
       ],
       "surface": "section:hero",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:hero|frame",
@@ -16613,8 +16364,8 @@
       ],
       "surface": "section:hero",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:image-text|alt",
@@ -17081,8 +16832,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:new-arrivals|kicker",
@@ -17250,8 +17001,8 @@
       ],
       "surface": "section:new-arrivals",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:newsletter|bgColor",
@@ -17497,8 +17248,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:product-carousel|kicker",
@@ -17692,8 +17443,8 @@
       ],
       "surface": "section:product-carousel",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:product-spotlight|alt",
@@ -18186,8 +17937,8 @@
       ],
       "surface": "section:testimonials",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:testimonials|layout",
@@ -18277,8 +18028,8 @@
       ],
       "surface": "section:testimonials",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:testimonials|verifiedOnly",
@@ -18472,8 +18223,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "dividers",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|section:trust-strip|iconBgColor",
@@ -18589,8 +18340,8 @@
       ],
       "surface": "section:trust-strip",
       "control": "typography",
-      "status": "classic-only",
-      "evidence": "manifest"
+      "status": "wired",
+      "evidence": "static"
     },
     {
       "id": "souq|theme|accentColor",

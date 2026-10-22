@@ -367,6 +367,69 @@ test('toolbar remove asks in the app first; cancel keeps it, confirm removes, un
   );
 });
 
+test('section design: typography and dividers are editors in the panel, never a link to the classic page', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  await page.getByTestId('tree-select-categories').click();
+  await settings(page);
+  await page.getByRole('tab', { name: L('التصميم', 'Design') }).click();
+  await expect(page.getByTestId('section-typography-field')).toBeVisible();
+  await expect(page.getByTestId('dividers-field')).toBeVisible();
+  await expect(page.locator('a[href*="page-builder"]')).toHaveCount(0);
+
+  // a divider slot written through the panel reaches the draft as the section's `dividers`
+  await page.getByTestId('dividers-field').locator('label').first().getByRole('switch').click();
+  await expect
+    .poll(
+      async () =>
+        (
+          (await state(page)).draft?.definition.sections.find(x => x.id === 'categories')
+            ?.settings as { dividers?: { above?: { enabled?: boolean } } } | undefined
+        )?.dividers?.above?.enabled,
+      { timeout: 15_000 }
+    )
+    .toBe(true);
+});
+
+test('AI fill from the canvas toolbar fills only the empty kicker and subtitle, as one undo step', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  const settingsOf = async () =>
+    (await state(page)).draft?.definition.sections.find(x => x.id === 'categories')?.settings as
+      | Record<string, string>
+      | undefined;
+  // the merchant already wrote a kicker: it must survive
+  await sendFromCanvas(page, {
+    type: 'patch-text',
+    sectionId: 'categories',
+    key: 'kicker',
+    value: 'MINE',
+  });
+  await expect.poll(async () => (await settingsOf())?.kicker, { timeout: 15_000 }).toBe('MINE');
+
+  await sendFromCanvas(page, { type: 'section-op', sectionId: 'categories', op: 'aiFill' });
+  await expect
+    .poll(async () => (await settingsOf())?.subtitleAr, { timeout: 15_000 })
+    .toBe('أفضل الاختيارات');
+  const filled = await settingsOf();
+  expect(filled).toMatchObject({ kicker: 'MINE', kickerAr: 'استكشف', subtitle: 'Top picks' });
+
+  // one undo takes the whole fill back, the merchant's kicker stays
+  await page.getByTestId('undo').click();
+  await expect.poll(async () => (await settingsOf())?.subtitleAr, { timeout: 15_000 }).toBeFalsy();
+  expect((await settingsOf())?.kicker).toBe('MINE');
+  expect((await settingsOf())?.kickerAr).toBeFalsy();
+
+  // an unsupported section (the hero) asks nothing and changes nothing
+  const saves = (await state(page)).saves;
+  await sendFromCanvas(page, { type: 'section-op', sectionId: 'hero', op: 'aiFill' });
+  await page.waitForTimeout(1800);
+  expect((await state(page)).saves).toBe(saves);
+});
+
 test('viewport switch sizes the canvas 1280 / 820 / 390', async ({ page }) => {
   await openBuilder(page);
   for (const [v, w] of [

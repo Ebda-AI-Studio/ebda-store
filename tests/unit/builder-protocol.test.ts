@@ -24,6 +24,7 @@ const VALID: Array<Record<string, unknown>> = [
   { type: 'patch-text', sectionId: 'hero', blockId: 'slide-1', key: 'headlineAr', value: 'تمور' },
   { type: 'request-media', sectionId: 'hero', blockId: 'slide-1', key: 'image' },
   { type: 'section-op', sectionId: 'hero', op: 'moveUp' },
+  { type: 'section-op', sectionId: 'category-grid', op: 'aiFill' },
   { type: 'section-op', sectionId: 'hero', blockId: 'slide-1', op: 'remove' },
   { type: 'move', sectionId: 'hero', toIndex: 2 },
   { type: 'move', sectionId: 'hero', blockId: 'slide-1', toIndex: 0 },
@@ -66,9 +67,9 @@ describe('child -> parent messages', () => {
 
 describe('toolbar, drag and insert intents', () => {
   it('section-op accepts only the listed ops', () => {
-    for (const op of ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove'])
+    for (const op of ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove', 'aiFill'])
       expect(child({ type: 'section-op', sectionId: 'hero', op }).success).toBe(true);
-    for (const op of ['delete', 'aiFill', 'eval', '', 'MOVEUP'])
+    for (const op of ['delete', 'publish', 'eval', '', 'MOVEUP'])
       expect(child({ type: 'section-op', sectionId: 'hero', op }).success).toBe(false);
     expect(child({ type: 'section-op', sectionId: 'hero' }).success).toBe(false);
   });

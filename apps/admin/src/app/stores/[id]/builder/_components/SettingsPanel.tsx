@@ -11,12 +11,14 @@
  * - Per-viewport: while the canvas is on tablet/mobile, a setting the type
  *   declares responsive edits that viewport's override (with a reset), and
  *   the section's visibility is set per viewport.
- * - `typography` / `dividers` (compound editors) open the classic page
- *   builder until they are ported (Ruling BUILDER2-ADVANCED-1).
+ * - `typography` / `dividers` (compound editors) are the page builder's
+ *   own blocks, shared (`components/section-design`), so nothing sends the
+ *   merchant to the classic page (Ruling BUILDER2-ADVANCED-1, superseded by VE-6).
  */
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
+  AI_FILL_SECTIONS,
   DEFAULT_THEME,
   VIEWPORTS,
   getSectionDefinition,
@@ -26,6 +28,7 @@ import {
   type DraftChrome,
   type DocumentAction,
   type PageDefinition,
+  type SectionTypographyOverride,
   type SettingDefinition,
   type StoreTheme,
   type Viewport,
@@ -35,6 +38,8 @@ import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';
 import { apiGet } from '../../../../../lib/api';
 import { ChromeContentPanel } from './ChromeContentPanel';
+import { DividersField } from './DividersField';
+import { SectionTypographyField } from './SectionTypographyField';
 import { MediaPicker } from './MediaPicker';
 import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
@@ -52,6 +57,8 @@ interface Props {
   theme: StoreTheme | undefined;
   errors: Array<{ path: string; messageEn: string; messageAr: string }>;
   dispatch: (a: DocumentAction, coalesceKey?: string) => void;
+  /** Ask the AI for the section's kicker and subtitle (fills only the empty ones). */
+  onAiFill?: (sectionId: string) => void;
   /** Header / footer content edits (menu, footer links): draft-only until Publish. */
   chromeEdit?: {
     chrome: DraftChrome | undefined;
@@ -68,6 +75,7 @@ export function SettingsPanel({
   theme,
   errors,
   dispatch,
+  onAiFill,
   chromeEdit,
 }: Props) {
   const t = useT('builder.settings');
@@ -197,6 +205,16 @@ export function SettingsPanel({
           !(chromeEdit && (node.type === 'header' || node.type === 'footer')) && (
             <ContentElsewhereNotice sectionType={node.type} storeId={storeId} t={t} />
           )}
+        {!block && mode === 'content' && onAiFill && node.type in AI_FILL_SECTIONS && (
+          <button
+            type="button"
+            onClick={() => onAiFill(node.id)}
+            data-testid="ai-fill"
+            className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10"
+          >
+            {t('aiFill')}
+          </button>
+        )}
         {defs.map(s => (
           <Field
             key={s.id}
@@ -217,7 +235,7 @@ export function SettingsPanel({
                 value: undefined,
               })
             }
-            classicHref={`/stores/${storeId}/page-builder`}
+            sectionType={node.type}
           />
         ))}
       </div>
@@ -282,7 +300,7 @@ function Field({
   viewport,
   onChange,
   onReset,
-  classicHref,
+  sectionType,
 }: {
   def: SettingDefinition;
   storeId: string;
@@ -293,7 +311,7 @@ function Field({
   viewport: Viewport;
   onChange: (key: string, value: unknown) => void;
   onReset: () => void;
-  classicHref: string;
+  sectionType: string;
 }) {
   const t = useT('builder.settings');
   const label = locale === 'ar' ? def.labelAr : def.labelEn;
@@ -517,14 +535,27 @@ function Field({
         </div>
       );
     case 'typography':
+      return (
+        <SectionTypographyField
+          storeId={storeId}
+          sectionType={sectionType}
+          value={valueOf(def.id) as SectionTypographyOverride | undefined}
+          theme={theme}
+          onChange={next => onChange(def.id, next)}
+        />
+      );
     case 'dividers':
       return (
-        <div className="rounded-lg border border-dashed border-border p-2 text-xs text-muted-foreground">
-          {label} ·{' '}
-          <a href={classicHref} className="text-primary hover:underline">
-            {t('editInClassic')}
-          </a>
-        </div>
+        <DividersField
+          sectionType={sectionType}
+          settings={{
+            dividers: valueOf(def.id),
+            showKickerLines: valueOf('showKickerLines'),
+            showSubtitleLines: valueOf('showSubtitleLines'),
+          }}
+          theme={theme}
+          onChange={next => onChange(def.id, next)}
+        />
       );
   }
 }

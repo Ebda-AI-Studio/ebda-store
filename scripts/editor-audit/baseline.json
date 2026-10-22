@@ -1,10 +1,5 @@
 [
   {
-    "id": "classic|api|POST /api/v1/stores/:p/ai/section-content",
-    "status": "classic-only",
-    "reason": "open: P-14 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "classic|api|PUT /api/v1/stores/:p/theme",
     "status": "classic-only",
     "reason": "open: P-13 moves into the visual editor (plan Tasks 6 to 8)"
@@ -15,29 +10,14 @@
     "reason": "open: P-01 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
-    "id": "classic|component|AiSectionFillButton",
-    "status": "classic-only",
-    "reason": "open: P-14 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "classic|component|DensitySelect",
     "status": "classic-only",
     "reason": "open: P-05 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
-    "id": "classic|component|DividerStyleSelect",
-    "status": "classic-only",
-    "reason": "open: P-04 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "classic|component|FontsCard",
     "status": "classic-only",
     "reason": "open: P-01 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|KickerSubtitleControls",
-    "status": "classic-only",
-    "reason": "open: P-06 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "classic|component|ProductCardControls",
@@ -48,26 +28,6 @@
     "id": "classic|component|SchemeSelect",
     "status": "classic-only",
     "reason": "open: P-05 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|SectionDividersBlock",
-    "status": "classic-only",
-    "reason": "open: P-04 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|SectionPaddingMaxWidthBlock",
-    "status": "classic-only",
-    "reason": "open: P-06 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|SectionTitleFields",
-    "status": "classic-only",
-    "reason": "open: P-06 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|component|SectionTypographyBlock",
-    "status": "classic-only",
-    "reason": "open: P-03 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "classic|component|SmartPaletteModal",
@@ -83,41 +43,6 @@
     "id": "classic|component|ZoneEditor",
     "status": "classic-only",
     "reason": "open: P-02 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|bestSellers.typography",
-    "status": "classic-only",
-    "reason": "open: P-03 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|categories.captionPositionMobile",
-    "status": "classic-only",
-    "reason": "open: P-06 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|categories.layoutMobile",
-    "status": "classic-only",
-    "reason": "open: P-06 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|categories.typography",
-    "status": "classic-only",
-    "reason": "open: P-03 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|hero.typography",
-    "status": "classic-only",
-    "reason": "open: P-03 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|newArrivals.typography",
-    "status": "classic-only",
-    "reason": "open: P-03 moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "classic|field|testimonials.typography",
-    "status": "classic-only",
-    "reason": "open: P-03 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "classic|site-setting|bottomBar",
@@ -180,26 +105,6 @@
     "reason": "open: P-12 moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
-    "id": "jasmine.apothecary|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine.bloom|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine.clinic|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine|section:best-sellers|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:best-sellers|kicker",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -240,44 +145,14 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:best-sellers|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "jasmine|section:blog-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "jasmine|section:blog-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:brand-story|bgColor",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:brand-story|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "jasmine|section:brand-story|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:category-grid|cardAspect",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine|section:category-grid|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "jasmine|section:category-grid|kicker",
@@ -320,11 +195,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:category-grid|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:featured-collection|limit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -338,11 +208,6 @@
     "id": "jasmine|section:hero|autoplayMs",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine|section:hero|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "jasmine|section:hero|maxWidth",
@@ -360,11 +225,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:hero|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:image-text|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -373,11 +233,6 @@
     "id": "jasmine|section:maker-profile|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine|section:new-arrivals|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "jasmine|section:new-arrivals|kicker",
@@ -420,19 +275,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:new-arrivals|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:product-carousel|categoryFetchLimit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine|section:product-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "jasmine|section:product-carousel|kicker",
@@ -470,11 +315,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:product-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:product-spotlight|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -495,11 +335,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:testimonials|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:testimonials|maxWidth",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -515,11 +350,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "jasmine|section:testimonials|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "jasmine|section:testimonials|verifiedOnly",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -528,26 +358,6 @@
     "id": "jasmine|section:trust-badges|heading",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "jasmine|section:trust-strip|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "jasmine|section:trust-strip|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "lamma.market|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "lamma|section:best-sellers|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "lamma|section:best-sellers|kicker",
@@ -590,44 +400,14 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:best-sellers|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "lamma|section:blog-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "lamma|section:blog-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:brand-story|bgColor",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:brand-story|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "lamma|section:brand-story|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:category-grid|cardAspect",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "lamma|section:category-grid|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "lamma|section:category-grid|kicker",
@@ -670,11 +450,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:category-grid|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:featured-collection|limit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -688,11 +463,6 @@
     "id": "lamma|section:hero|autoplayMs",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "lamma|section:hero|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "lamma|section:hero|maxWidth",
@@ -710,11 +480,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:hero|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:image-text|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -723,11 +488,6 @@
     "id": "lamma|section:maker-profile|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "lamma|section:new-arrivals|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "lamma|section:new-arrivals|kicker",
@@ -770,19 +530,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:new-arrivals|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:product-carousel|categoryFetchLimit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "lamma|section:product-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "lamma|section:product-carousel|kicker",
@@ -820,11 +570,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:product-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:product-spotlight|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -845,11 +590,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:testimonials|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:testimonials|maxWidth",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -865,11 +605,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "lamma|section:testimonials|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "lamma|section:testimonials|verifiedOnly",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -878,21 +613,6 @@
     "id": "lamma|section:trust-badges|heading",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "lamma|section:trust-strip|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "lamma|section:trust-strip|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "minimal|section:best-sellers|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "minimal|section:best-sellers|limit",
@@ -920,44 +640,14 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:best-sellers|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "minimal|section:blog-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "minimal|section:blog-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:brand-story|bgColor",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:brand-story|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "minimal|section:brand-story|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:category-grid|cardAspect",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "minimal|section:category-grid|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "minimal|section:category-grid|showHover",
@@ -985,11 +675,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:category-grid|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:featured-collection|limit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1005,11 +690,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:hero|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:hero|maxWidth",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1023,16 +703,6 @@
     "id": "minimal|section:hero|paddingTop",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "minimal|section:hero|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "minimal|section:new-arrivals|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "minimal|section:new-arrivals|limit",
@@ -1060,19 +730,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:new-arrivals|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:product-carousel|categoryFetchLimit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "minimal|section:product-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "minimal|section:product-carousel|maxWidth",
@@ -1095,19 +755,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:product-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:steps|buttonText",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "minimal|section:testimonials|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "minimal|section:testimonials|maxWidth",
@@ -1120,39 +770,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "minimal|section:testimonials|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "minimal|section:testimonials|verifiedOnly",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "minimal|section:trust-strip|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "minimal|section:trust-strip|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "qamar.atelier|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar.lookbook|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar|section:best-sellers|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "qamar|section:best-sellers|kicker",
@@ -1195,44 +815,14 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:best-sellers|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "qamar|section:blog-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "qamar|section:blog-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:brand-story|bgColor",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:brand-story|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "qamar|section:brand-story|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:category-grid|cardAspect",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar|section:category-grid|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "qamar|section:category-grid|kicker",
@@ -1275,11 +865,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:category-grid|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:featured-collection|limit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1293,11 +878,6 @@
     "id": "qamar|section:hero|autoplayMs",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar|section:hero|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "qamar|section:hero|maxWidth",
@@ -1315,11 +895,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:hero|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:image-text|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1328,11 +903,6 @@
     "id": "qamar|section:maker-profile|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar|section:new-arrivals|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "qamar|section:new-arrivals|kicker",
@@ -1375,19 +945,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:new-arrivals|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:product-carousel|categoryFetchLimit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar|section:product-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "qamar|section:product-carousel|kicker",
@@ -1425,11 +985,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:product-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:product-spotlight|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1450,11 +1005,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:testimonials|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:testimonials|maxWidth",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1470,11 +1020,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "qamar|section:testimonials|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "qamar|section:testimonials|verifiedOnly",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1483,36 +1028,6 @@
     "id": "qamar|section:trust-badges|heading",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "qamar|section:trust-strip|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "qamar|section:trust-strip|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "souq.catalogue|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq.night|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq.showroom|section:category-grid|design:layoutMobile",
-    "status": "missing",
-    "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq|section:best-sellers|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "souq|section:best-sellers|kicker",
@@ -1555,44 +1070,14 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:best-sellers|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "souq|section:blog-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "souq|section:blog-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:brand-story|bgColor",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:brand-story|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "souq|section:brand-story|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:category-grid|cardAspect",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq|section:category-grid|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "souq|section:category-grid|kicker",
@@ -1635,11 +1120,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:category-grid|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:featured-collection|limit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1653,11 +1133,6 @@
     "id": "souq|section:hero|autoplayMs",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq|section:hero|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "souq|section:hero|maxWidth",
@@ -1675,11 +1150,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:hero|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:image-text|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1688,11 +1158,6 @@
     "id": "souq|section:maker-profile|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq|section:new-arrivals|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "souq|section:new-arrivals|kicker",
@@ -1735,19 +1200,9 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:new-arrivals|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:product-carousel|categoryFetchLimit",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq|section:product-carousel|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   },
   {
     "id": "souq|section:product-carousel|kicker",
@@ -1785,11 +1240,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:product-carousel|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:product-spotlight|alt",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1810,11 +1260,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:testimonials|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:testimonials|maxWidth",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1830,11 +1275,6 @@
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
   },
   {
-    "id": "souq|section:testimonials|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
     "id": "souq|section:testimonials|verifiedOnly",
     "status": "no-op",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
@@ -1843,15 +1283,5 @@
     "id": "souq|section:trust-badges|heading",
     "status": "marker-pending",
     "reason": "open: template-aware controls and no-op removal (plan Task 10)"
-  },
-  {
-    "id": "souq|section:trust-strip|dividers",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
-  },
-  {
-    "id": "souq|section:trust-strip|typography",
-    "status": "classic-only",
-    "reason": "open: classic moves into the visual editor (plan Tasks 6 to 8)"
   }
 ]

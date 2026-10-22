@@ -19,6 +19,7 @@ const COPY: Record<ToolbarLocale, Record<SectionOp | 'drag', string>> = {
     duplicate: 'Duplicate',
     hide: 'Hide',
     remove: 'Remove',
+    aiFill: 'Write with AI',
     drag: 'Drag to reorder',
   },
   ar: {
@@ -27,6 +28,7 @@ const COPY: Record<ToolbarLocale, Record<SectionOp | 'drag', string>> = {
     duplicate: 'تكرار',
     hide: 'إخفاء',
     remove: 'حذف',
+    aiFill: 'اكتب بالذكاء الاصطناعي',
     drag: 'اسحب لتغيير الترتيب',
   },
 };
@@ -37,6 +39,8 @@ const ICON: Record<SectionOp | 'drag', string> = {
   duplicate: 'M9 9h10v10H9zM5 15V5h10',
   hide: 'M3 3l18 18M10.6 6.2A9 9 0 0121 12a9 9 0 01-3 3.6M6.4 7.8A9 9 0 003 12a9 9 0 009 6 8.8 8.8 0 003.4-.7',
   remove: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+  aiFill:
+    'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z',
   drag: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
 };
 
@@ -48,6 +52,8 @@ export interface ToolbarProps {
   /** False hides the drag handle (blocks cannot be dragged on the canvas). */
   draggable: boolean;
   disabled: Partial<Record<SectionOp, boolean>>;
+  /** The AI can write this section's kicker and subtitle: show the button. */
+  ai?: boolean;
   onOp: (op: SectionOp) => void;
   onDragStart: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }
@@ -60,12 +66,20 @@ export function CanvasToolbar({
   pageWidth,
   draggable,
   disabled,
+  ai,
   onOp,
   onDragStart,
 }: ToolbarProps) {
   const rtl = locale === 'ar';
   const copy = COPY[locale];
-  const ops: SectionOp[] = ['moveUp', 'moveDown', 'duplicate', 'hide', 'remove'];
+  const ops: SectionOp[] = [
+    ...(ai ? (['aiFill'] as const) : []),
+    'moveUp',
+    'moveDown',
+    'duplicate',
+    'hide',
+    'remove',
+  ];
   // On the box's top edge, at its inline-end; inside the box when there is no room above.
   const top = box.top >= SIZE + 8 ? box.top - SIZE - 4 : box.top + 4;
   const end = rtl ? box.left + 4 : Math.max(0, pageWidth - (box.left + box.width)) + 4;

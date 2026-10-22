@@ -6,8 +6,11 @@ import { describe, it, expect } from 'vitest';
 import {
   BUILDER_PROTOCOL,
   addRequestFor,
+  aiFillActions,
+  aiFillRequestFor,
   childToParentSchema,
   intentToAction,
+  textTargetIn,
   layoutToDefinition,
   reduceDocument,
   resolveLayoutSettings,
@@ -237,5 +240,86 @@ describe('canvas geometry', () => {
     const header = d.sectionGroups.header.find(n => n.type === 'header')!.id;
     expect(toolbarStateFor(d, { sectionId: header })).toBeNull();
     expect(toolbarStateFor(d, { sectionId: 'ghost' })).toBeNull();
+  });
+});
+
+describe('aiFill (Task 6): the parent asks the API, then fills only what is empty', () => {
+  const d = doc();
+  const grid = d.sections.find(n => n.type === 'category-grid')!;
+  const ask = (sectionId: string, blockId?: string) =>
+    msg({ type: 'section-op', sectionId, op: 'aiFill', ...(blockId ? { blockId } : {}) });
+  const suggestion = {
+    kicker: 'EXPLORE',
+    kickerAr: 'استكشف',
+    subtitle: 'Top picks',
+    subtitleAr: 'أفضل الاختيارات',
+  };
+
+  it('is not a document action and only a supported page section yields a request', () => {
+    expect(intentToAction(d, ask(grid.id))).toBeNull();
+    expect(aiFillRequestFor(d, ask(grid.id))).toMatchObject({
+      sectionId: grid.id,
+      section: 'categories',
+    });
+    const types = ['hero', 'image-text', 'steps'];
+    for (const t of types) {
+      const n = d.sections.find(x => x.type === t);
+      if (n) expect(aiFillRequestFor(d, ask(n.id)), t).toBeNull();
+    }
+    // chrome, unknown ids and block-level asks are refused
+    const header = d.sectionGroups.header.find(n => n.type === 'header')!;
+    expect(aiFillRequestFor(d, ask(header.id))).toBeNull();
+    expect(aiFillRequestFor(d, ask('ghost'))).toBeNull();
+    const hero = d.sections.find(n => n.type === 'hero')!;
+    expect(aiFillRequestFor(d, ask(hero.id, 'slide-1'))).toBeNull();
+  });
+
+  it('fills the empty kicker and subtitle (en and ar) as ordinary setSectionSetting edits, one undo step', () => {
+    const acts = aiFillActions(d, grid.id, suggestion, 1);
+    expect(acts.map(a => a.action)).toEqual([
+      { type: 'setSectionSetting', id: grid.id, key: 'kicker', value: 'EXPLORE' },
+      { type: 'setSectionSetting', id: grid.id, key: 'kickerAr', value: 'استكشف' },
+      { type: 'setSectionSetting', id: grid.id, key: 'subtitle', value: 'Top picks' },
+      { type: 'setSectionSetting', id: grid.id, key: 'subtitleAr', value: 'أفضل الاختيارات' },
+    ]);
+    expect(new Set(acts.map(a => a.coalesce)).size).toBe(1);
+    expect(aiFillActions(d, grid.id, suggestion, 2)[0].coalesce).not.toBe(acts[0].coalesce);
+    let out = d;
+    for (const a of acts) out = reduceDocument(out, a.action).doc;
+    expect(out.sections.find(n => n.id === grid.id)!.settings).toMatchObject({
+      kicker: 'EXPLORE',
+      subtitleAr: 'أفضل الاختيارات',
+    });
+  });
+
+  it("never overwrites the merchant's own words, and cuts at the field limit", () => {
+    let withText = reduceDocument(d, {
+      type: 'setSectionSetting',
+      id: grid.id,
+      key: 'kicker',
+      value: 'MINE',
+    }).doc;
+    withText = reduceDocument(withText, {
+      type: 'setSectionSetting',
+      id: grid.id,
+      key: 'subtitleAr',
+      value: 'بتاعي',
+    }).doc;
+    const acts = aiFillActions(withText, grid.id, suggestion);
+    expect(acts.map(a => (a.action as { key: string }).key)).toEqual(['kickerAr', 'subtitle']);
+    expect(
+      aiFillActions(withText, grid.id, { kicker: '', kickerAr: ' ', subtitle: '', subtitleAr: '' })
+    ).toEqual([]);
+    const max = textTargetIn(d, grid.id, undefined, 'kicker')!.max;
+    const long = aiFillActions(d, grid.id, { ...suggestion, kicker: 'x'.repeat(max + 100) })[0]
+      .action as { value: string };
+    expect(long.value.length).toBe(max);
+  });
+
+  it('the toolbar offers the AI button on supported sections only', () => {
+    expect(toolbarStateFor(d, { sectionId: grid.id })?.ai).toBe(true);
+    const hero = d.sections.find(n => n.type === 'hero')!;
+    expect(toolbarStateFor(d, { sectionId: hero.id })?.ai).toBe(false);
+    expect(toolbarStateFor(d, { sectionId: hero.id, blockId: 'slide-1' })?.ai).toBe(false);
   });
 });

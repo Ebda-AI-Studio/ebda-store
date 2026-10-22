@@ -11,6 +11,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
+  MOBILE_PROP_LEGACY_NAME,
   SECTION_REGISTRY,
   SITE_SETTING_KEYS,
   sectionDefinitionForLegacyKey,
@@ -102,8 +103,8 @@ export function calledEndpoints(source: string): string[] {
   return [...out].sort();
 }
 
-/** Compound editors the page builder has and the visual panel does not (yet). */
-const COMPOUND = new Set(['typography', 'dividers']);
+/** Compound editors the page builder has and the visual panel does not (none left after Task 6). */
+const COMPOUND = new Set<string>();
 
 /** Capability ids of the plan (§ 2.1), by field name. Anything not listed maps to P-06. */
 const CAPABILITY_BY_FIELD: Record<string, string> = {
@@ -133,18 +134,34 @@ const siteCapability = (key: string) => SITE_CAPABILITY[key.split('.')[0]] ?? 'P
 const COMPONENTS: Array<{ name: string; capability: string; covered: string | null }> = [
   { name: 'FontsCard', capability: 'P-01', covered: null },
   { name: 'ZoneEditor', capability: 'P-02', covered: null },
-  { name: 'SectionTypographyBlock', capability: 'P-03', covered: null },
-  { name: 'SectionDividersBlock', capability: 'P-04', covered: null },
-  { name: 'DividerStyleSelect', capability: 'P-04', covered: null },
+  {
+    name: 'SectionTypographyBlock',
+    capability: 'P-03',
+    covered: 'SectionTypographyField (typography setting)',
+  },
+  { name: 'SectionDividersBlock', capability: 'P-04', covered: 'DividersField (dividers setting)' },
+  { name: 'DividerStyleSelect', capability: 'P-04', covered: 'DividersField (dividers setting)' },
   { name: 'SchemeSelect', capability: 'P-05', covered: null },
   { name: 'DensitySelect', capability: 'P-05', covered: null },
   { name: 'TextScaleSelect', capability: 'P-05', covered: null },
-  { name: 'SectionPaddingMaxWidthBlock', capability: 'P-06', covered: null },
-  { name: 'KickerSubtitleControls', capability: 'P-06', covered: null },
-  { name: 'SectionTitleFields', capability: 'P-06', covered: null },
+  {
+    name: 'SectionPaddingMaxWidthBlock',
+    capability: 'P-06',
+    covered: 'registry settings paddingTop, paddingBottom, maxWidth',
+  },
+  {
+    name: 'KickerSubtitleControls',
+    capability: 'P-06',
+    covered: 'registry settings kicker, subtitle, dividers',
+  },
+  { name: 'SectionTitleFields', capability: 'P-06', covered: 'registry settings title, titleAr' },
   { name: 'ProductCardControls', capability: 'P-07', covered: null },
   { name: 'SmartPaletteModal', capability: 'P-13', covered: null },
-  { name: 'AiSectionFillButton', capability: 'P-14', covered: null },
+  {
+    name: 'AiSectionFillButton',
+    capability: 'P-14',
+    covered: 'toolbar aiFill and the settings panel button',
+  },
   {
     name: 'SlidesEditor',
     capability: 'P-15',
@@ -231,6 +248,19 @@ export function buildClassicManifest(): ManifestEntry[] {
           kind: 'field',
           key,
           builder: `section:${def?.type ?? legacyKey}/hidden`,
+          status: 'wired',
+        });
+        continue;
+      }
+      // `layoutMobile` is the mobile viewport override of `layout` in the document (a per-viewport edit).
+      const mobileOf = Object.entries(MOBILE_PROP_LEGACY_NAME[legacyKey] ?? {}).find(
+        ([, legacy]) => legacy === field
+      )?.[0];
+      if (mobileOf && def) {
+        entries.push({
+          kind: 'field',
+          key,
+          builder: `section:${def.type}/${mobileOf} (mobile viewport override)`,
           status: 'wired',
         });
         continue;

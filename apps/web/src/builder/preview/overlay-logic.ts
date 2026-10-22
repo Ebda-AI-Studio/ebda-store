@@ -2,6 +2,7 @@
  * DOM-free logic for the builder canvas overlay (unit-tested in node).
  */
 import {
+  AI_FILL_SECTIONS,
   getSectionDefinition,
   locateSection,
   nodeFor,
@@ -231,6 +232,8 @@ export function dropTargetFor(
 }
 
 export interface ToolbarState {
+  /** The AI can write a kicker and subtitle for this section. */
+  ai: boolean;
   /** Only a section drags on the canvas; a block moves with the arrows. */
   draggable: boolean;
   disabled: Partial<Record<SectionOp, boolean>>;
@@ -250,6 +253,7 @@ export function toolbarStateFor(doc: PageDefinition, target: CanvasTarget): Tool
   if (!target.blockId) {
     const sameType = doc.sections.filter(n => n.type === at.node.type).length;
     return {
+      ai: at.node.type in AI_FILL_SECTIONS,
       draggable: true,
       disabled: {
         moveUp: at.index === 0,
@@ -263,6 +267,7 @@ export function toolbarStateFor(doc: PageDefinition, target: CanvasTarget): Tool
   if (i < 0) return null;
   const bd = def.blocks.find(b => b.type === blocks[i].type);
   return {
+    ai: false,
     draggable: false,
     disabled: {
       moveUp: i === 0,

@@ -7,7 +7,7 @@
  * the production query turns a test red: that is how the consent filter, the
  * once-per-cart claim and the converted-cart stop are mutation-checkable.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { matches, uuid, STORE_A, STORE_B } from '../helpers/campaign-fake-db';
 
 type Row = Record<string, any>;
@@ -193,7 +193,13 @@ function sub(email: string, extra: Row = {}) {
   };
 }
 
+// The service reads the wall clock (`new Date()` / `Date.now()` for the 24 h send budget, the stamps it
+// writes) while these fixtures are built around the fixed NOW above. Pin the clock to NOW, or every
+// "sent an hour ago" fixture ages out of the 24 h window as real time passes (the daily-cap case
+// started failing a day after NOW). Only Date is faked: timers and promises stay real.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   db.carts.length = 0;
   db.configs.length = 0;
   db.stores.length = 0;
@@ -208,6 +214,9 @@ beforeEach(() => {
   h.sendMarketingEmail.mockReset().mockResolvedValue({ id: 'msg_1' });
   h.isFeatureEnabled.mockReset().mockResolvedValue(true);
   h.awaitSlot.mockReset().mockResolvedValue(true);
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('delay', () => {

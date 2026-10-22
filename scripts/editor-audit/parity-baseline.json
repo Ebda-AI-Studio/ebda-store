@@ -2,8 +2,6 @@
   "classicReferences": [
     "apps/admin/src/app/stores/[id]/announcement/page.tsx",
     "apps/admin/src/app/stores/[id]/branding/_components/ThemeTab.tsx",
-    "apps/admin/src/app/stores/[id]/builder/_components/SettingsPanel.header-footer-content.test.tsx",
-    "apps/admin/src/app/stores/[id]/builder/_components/SettingsPanel.tsx",
     "apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx",
     "apps/admin/src/app/stores/[id]/builder/page.tsx",
     "apps/admin/src/app/stores/[id]/hero/page.tsx",
@@ -18,6 +16,7 @@
     "apps/admin/src/components/admin-layout/SidebarNav.tsx",
     "apps/admin/src/components/admin-layout/buildPaletteItems.ts",
     "apps/admin/src/components/admin-layout/hubs.ts",
+    "apps/admin/src/components/section-design/SectionDividersBlock.tsx",
     "apps/admin/src/i18n/messages/ar.json",
     "apps/admin/src/i18n/messages/en.json",
     "apps/admin/src/lib/__tests__/api-double-unwrap-sweep.test.ts",
