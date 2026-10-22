@@ -200,6 +200,22 @@ describe('serveDemoEdge', () => {
     expect(r2.headers.get('cache-control')).toBe('private, no-store');
     expect(renders).toBe(1);
   });
+  it('a HIT or STALE never waits for the resolver (entries exist only after a passed verdict)', async () => {
+    const cache = fakeCache();
+    const c = ctx();
+    await serveDemoEdge(req(`${D}/x`), c, async () => html(), yes, cache);
+    await c.settle();
+    let asked = 0;
+    const r = await serveDemoEdge(
+      req(`${D}/x`),
+      ctx(),
+      async () => html(),
+      async () => (asked++, false),
+      cache
+    );
+    expect(r.headers.get('x-demo-edge')).toBe('HIT');
+    expect(asked).toBe(0);
+  });
   it('a demo-looking host the resolver rejects is rendered live and never stored', async () => {
     const cache = fakeCache();
     const c = ctx();
