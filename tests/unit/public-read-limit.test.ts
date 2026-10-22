@@ -11,6 +11,9 @@ vi.mock('../../apps/api/src/middleware/public-limiter-keys', () => ({
   publicTenantKey: (r: any) => `t:${r.headers['x-store-domain'] ?? r.ip}`,
   skipPublicLimiters: () => false,
 }));
+vi.mock('../../apps/api/src/utils/store-helpers', () => ({
+  resolvePublicStoreId: async (r: any) => r.__resolved,
+}));
 import {
   publicReadLimit,
   isAnonymousPublicRead,
@@ -43,6 +46,9 @@ const call = (mw: any, req: any) =>
   });
 const get = (extra: Record<string, unknown> = {}) => ({
   method: 'GET',
+  path: '/categories',
+  query: {},
+  __resolved: 'store-1',
   ip: '1.1.1.1',
   headers: { 'x-store-domain': 'a.ebda.app' },
   ...extra,
@@ -52,17 +58,133 @@ beforeEach(() => clearCfBindings());
 afterEach(() => clearCfBindings());
 
 describe('who counts as an anonymous public read', () => {
+  const ok = { path: '/categories', query: {} };
   it.each([
-    [{ method: 'GET', headers: {} }, true],
-    [{ method: 'HEAD', headers: {} }, true],
-    [{ method: 'POST', headers: {} }, false],
-    [{ method: 'PUT', headers: {} }, false],
-    [{ method: 'DELETE', headers: {} }, false],
-    [{ method: 'GET', headers: { authorization: 'Bearer x' } }, false],
-    [{ method: 'GET', headers: { cookie: 'token=abc' } }, false],
-    [{ method: 'GET', headers: { cookie: 'anything=1' } }, false],
+    [{ method: 'GET', headers: {}, ...ok }, true],
+    [{ method: 'HEAD', headers: {}, ...ok }, true],
+    [{ method: 'POST', headers: {}, ...ok }, false],
+    [{ method: 'PUT', headers: {}, ...ok }, false],
+    [{ method: 'DELETE', headers: {}, ...ok }, false],
+    [{ method: 'GET', headers: { authorization: 'Bearer x' }, ...ok }, false],
+    [{ method: 'GET', headers: { cookie: 'token=abc' }, ...ok }, false],
+    [{ method: 'GET', headers: { cookie: 'anything=1' }, ...ok }, false],
   ])('%j -> %s', (req, want) => {
     expect(isAnonymousPublicRead(req as any)).toBe(want);
+  });
+});
+
+describe('explicit allowlist: only KV-cached catalogue reads take the native path', () => {
+  const H = { 'x-store-domain': 'a.ebda.app' };
+  it.each([
+    ['/categories', {}],
+    ['/tags', {}],
+    ['/products', {}],
+    ['/products', { page: '2', limit: '24', sort: 'price' }],
+    ['/products/linen-abaya', {}],
+    ['/size-charts', {}],
+    ['/redirects/resolve', { type: 'product', slug: 'old-slug' }],
+  ])('%s %j is on the allowlist', (path, query) => {
+    expect(isAnonymousPublicRead({ method: 'GET', headers: H, path, query } as any)).toBe(true);
+  });
+  it.each([
+    ['/products', { search: 'abaya' }],
+    ['/products', { q: 'abaya' }],
+    ['/products', { category: 'abayas' }],
+    ['/products', { tag: 'oily' }],
+    ['/products', { minPrice: '1' }],
+    ['/products', { ids: 'a,b' }],
+    ['/products', { page: ['1', '2'] }],
+    ['/products', { 'page[$ne]': '1' }],
+    ['/tags', { name: 'oily' }],
+    ['/categories', { x: '1' }],
+    ['/feed/products.json', {}],
+    ['/wishlist', {}],
+    ['/orders', {}],
+    ['/orders/track', {}],
+    ['/store/resolve', {}],
+    ['/stores/some-slug', {}],
+    ['/abc/search/suggest', { q: 'ab' }],
+    ['/search', {}],
+    ['/reviews/can-submit', {}],
+    ['/products/a/b', {}],
+    ['/products/..%2Fx', {}],
+    ['/anything-else', {}],
+    ['/', {}],
+  ])('%s %j is NOT on the allowlist (keeps the exact DO limiters)', (path, query) => {
+    expect(isAnonymousPublicRead({ method: 'GET', headers: H, path, query } as any)).toBe(false);
+  });
+  it('an X-Search-Query header on an allowlisted path still disqualifies it', () => {
+    expect(
+      isAnonymousPublicRead({
+        method: 'GET',
+        headers: { 'x-search-query': 'a' },
+        path: '/products',
+        query: {},
+      } as any)
+    ).toBe(false);
+  });
+  it('a route not on the allowlist always goes to the exact limiters, native never consulted', async () => {
+    const native = { limit: vi.fn(async () => ({ success: true })) };
+    setCfBindings({ PUBLIC_IP_LIMITER: native, PUBLIC_TENANT_LIMITER: native } as any);
+    for (const path of [
+      '/feed/products.json',
+      '/wishlist',
+      '/orders',
+      '/store/resolve',
+      '/x/search/suggest',
+    ]) {
+      const exact = vi.fn((_q: any, _r: any, n: any) => n());
+      await call(publicReadLimit(exact as any), get({ path }));
+      expect(exact).toHaveBeenCalledTimes(1);
+    }
+    expect(native.limit).not.toHaveBeenCalled();
+  });
+});
+
+describe('the tenant bucket is the RESOLVED store, never a raw header', () => {
+  it('rotating fake x-store-domain values does not buy a fresh tenant bucket', async () => {
+    setCfBindings({ PUBLIC_IP_LIMITER: counter(1000), PUBLIC_TENANT_LIMITER: counter(2) } as any);
+    const mw = publicReadLimit(((_q: any, _r: any, n: any) => n()) as any);
+    const codes = [];
+    for (let i = 0; i < 4; i++)
+      codes.push(
+        (
+          await call(
+            mw,
+            get({ ip: `5.5.5.${i}`, headers: { 'x-store-domain': `fake-${i}.ebda.app` } })
+          )
+        ).res.code
+      );
+    expect(codes).toEqual([200, 200, 429, 429]);
+  });
+  it('different resolved stores have separate buckets', async () => {
+    setCfBindings({ PUBLIC_IP_LIMITER: counter(1000), PUBLIC_TENANT_LIMITER: counter(1) } as any);
+    const mw = publicReadLimit(((_q: any, _r: any, n: any) => n()) as any);
+    expect((await call(mw, get({ __resolved: 's1' }))).res.code).toBe(200);
+    expect((await call(mw, get({ __resolved: 's2' }))).res.code).toBe(200);
+    expect((await call(mw, get({ __resolved: 's1' }))).res.code).toBe(429);
+  });
+  it('an unresolved store goes to the exact limiters, native never consulted', async () => {
+    const native = { limit: vi.fn(async () => ({ success: true })) };
+    setCfBindings({ PUBLIC_IP_LIMITER: native, PUBLIC_TENANT_LIMITER: native } as any);
+    const exact = vi.fn((_q: any, _r: any, n: any) => n());
+    await call(publicReadLimit(exact as any), get({ __resolved: undefined }));
+    expect(exact).toHaveBeenCalledTimes(1);
+    expect(native.limit).not.toHaveBeenCalled();
+  });
+  it('the exact tenant limiter key also prefers the resolved id', async () => {
+    const { publicTenantKey } = await vi.importActual<any>(
+      '../../apps/api/src/middleware/public-limiter-keys'
+    );
+    const { setResolvedStoreId } = await import('../../apps/api/src/utils/resolved-store');
+    const req: any = {
+      headers: { 'x-store-domain': 'attacker-rotated.ebda.app' },
+      ip: '1.1.1.1',
+      params: {},
+    };
+    expect(publicTenantKey(req)).toBe('t:attacker-rotated.ebda.app');
+    setResolvedStoreId(req, 'real-id');
+    expect(publicTenantKey(req)).toBe('t:real-id');
   });
 });
 
@@ -113,6 +235,26 @@ describe('publicReadLimit', () => {
     setCfBindings({ PUBLIC_IP_LIMITER: boom, PUBLIC_TENANT_LIMITER: boom } as any);
     await call(publicReadLimit(exact as any), get());
     expect(exact).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('search requests never use the native limiter', () => {
+  it.each([
+    [
+      'X-Search-Query header',
+      { headers: { 'x-search-query': 'abaya', 'x-store-domain': 'a' }, path: '/products' },
+    ],
+    ['legacy ?search', { query: { search: 'abaya' }, path: '/products' }],
+    ['?q', { query: { q: 'abaya' }, path: '/products' }],
+    ['typeahead path', { path: '/abc/search/suggest' }],
+    ['search path', { path: '/search' }],
+  ])('a cookie-less anonymous %s goes through the exact DO limiter', async (_n, extra) => {
+    const native = { limit: vi.fn(async () => ({ success: true })) };
+    setCfBindings({ PUBLIC_IP_LIMITER: native, PUBLIC_TENANT_LIMITER: native } as any);
+    const exact = vi.fn((_q: any, _r: any, n: any) => n());
+    await call(publicReadLimit(exact as any), get(extra as any));
+    expect(exact).toHaveBeenCalledTimes(1);
+    expect(native.limit).not.toHaveBeenCalled();
   });
 });
 

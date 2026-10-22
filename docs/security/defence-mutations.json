@@ -2317,7 +2317,7 @@
       "tier": "unit",
       "why": "an authenticated, cookie-bearing or write request is counted by the in-colo native limiter instead of the exact Durable Object limiters, so the strict per-IP/per-tenant ceilings no longer apply to the requests that need them",
       "source": "apps/api/src/middleware/public-read-limit.ts",
-      "find": " && !req.headers.authorization && !req.headers.cookie",
+      "find": "    !req.headers.authorization &&\n    !req.headers.cookie &&\n",
       "replace": "",
       "test": "tests/unit/public-read-limit.test.ts"
     },
@@ -2337,8 +2337,28 @@
       "tier": "unit",
       "why": "a failing native limiter binding lets anonymous reads through with no limit at all instead of falling back to the exact limiters",
       "source": "apps/api/src/middleware/public-read-limit.ts",
-      "find": "      () => exactLimiters(req, res, next)\n",
-      "replace": "      () => next()\n",
+      "find": "      .catch(() => exactLimiters(req, res, next));",
+      "replace": "      .catch(() => next());",
+      "test": "tests/unit/public-read-limit.test.ts"
+    },
+    {
+      "id": "public-read-native-allowlist",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "routes that reach the database (search, typeahead, filters, feed, orders, store resolution) are counted by the per-location native limiter instead of the exact Durable Object limiters",
+      "source": "apps/api/src/middleware/public-read-limit.ts",
+      "find": "    !req.headers.cookie &&\n    isCachedCatalogueRead(req)\n",
+      "replace": "    !req.headers.cookie\n",
+      "test": "tests/unit/public-read-limit.test.ts"
+    },
+    {
+      "id": "public-read-tenant-bucket-is-resolved-store",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "the native per-tenant bucket is keyed from a raw request header again, so rotating fake tenant values escapes the per-tenant limit",
+      "source": "apps/api/src/middleware/public-read-limit.ts",
+      "find": "tenantLimiter.limit({ key: `t:${storeId}` })",
+      "replace": "tenantLimiter.limit({ key: `t:${String(req.headers['x-store-domain'] ?? storeId)}` })",
       "test": "tests/unit/public-read-limit.test.ts"
     }
   ]
