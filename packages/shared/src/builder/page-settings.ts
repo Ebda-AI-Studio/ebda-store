@@ -29,6 +29,18 @@ export interface PageSettingsGroup {
   settings: SettingDefinition[];
 }
 
+/** The keys of `layout` that a product / collection / cart document owns (present, whatever the value). */
+export function pageOwnedKeysIn(layout: object | null | undefined): string[] {
+  return Object.keys(layout ?? {}).filter(k => ALL_PAGE_OWNED_KEYS.has(k));
+}
+
+/** `layout` without the keys the visual editor owns (the classic form never sends them: Ruling VE-15). */
+export function withoutPageOwnedKeys<T extends object>(layout: T): T {
+  const out = { ...layout } as Record<string, unknown>;
+  for (const k of ALL_PAGE_OWNED_KEYS) delete out[k];
+  return out as T;
+}
+
 /** The layout keys a product / collection / cart document owns. */
 export const PAGE_OWNED_SETTING_KEYS: Record<SectionPageKind, readonly string[]> = {
   product: ['productDetailPage', 'reviewSection'],

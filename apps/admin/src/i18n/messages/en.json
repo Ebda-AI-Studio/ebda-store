@@ -2053,6 +2053,13 @@
         "successTitle": "AI filled empty kicker + subtitle fields",
         "generating": "Generating…",
         "generateWithAi": "Generate with AI"
+      },
+      "pageSettingsMoved": {
+        "title": "Page settings moved to the visual editor",
+        "body": "The design of the product, products, categories, cart and checkout pages, the filter panel and the reviews switch are edited per page in the visual editor, where you see them live. Saving them here would not reach your store.",
+        "product": "Product page settings",
+        "collection": "Products page settings",
+        "cart": "Cart and checkout settings"
       }
     },
     "devices": {

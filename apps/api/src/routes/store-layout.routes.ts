@@ -10,7 +10,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@ebda/database';
-import { resolveLayoutSettings, storeLayoutSchema, heroSlideSchema } from '@ebda/shared';
+import {
+  resolveLayoutSettings,
+  storeLayoutSchema,
+  heroSlideSchema,
+  pageOwnedKeysIn,
+} from '@ebda/shared';
 import type { TemplateId } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -76,6 +81,20 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      // Product / collection / cart page settings are written by the visual editor, per page (VE-13).
+      // Taking them here would be accepted and then ignored by the next home publish, so refuse loudly.
+      const moved = pageOwnedKeysIn(req.body);
+      if (moved.length > 0) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'PAGE_SETTINGS_MOVED',
+            message: `These settings are edited per page in the visual editor: ${moved.join(', ')}`,
+            details: { keys: moved },
+          },
+        });
+        return;
+      }
       const patch = layoutSchema.parse(req.body);
 
       const current = await prisma.store.findUnique({

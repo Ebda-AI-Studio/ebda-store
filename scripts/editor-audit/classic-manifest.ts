@@ -11,6 +11,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
+  ALL_PAGE_OWNED_KEYS,
   MOBILE_PROP_LEGACY_NAME,
   PAGE_KINDS,
   PAGE_SETTINGS,
@@ -374,6 +375,21 @@ export function buildClassicManifest(): ManifestEntry[] {
             reason: 'no control for this siteSettings key in the page-settings panel',
           }
     );
+  }
+
+  // Page settings the classic form no longer edits (Ruling VE-15): they moved to the visual editor's
+  // page-settings panel, so each stays accounted for under its capability.
+  for (const key of ALL_PAGE_OWNED_KEYS) {
+    if (entries.some(e => e.key === key || e.key.startsWith(`${key}.`))) continue;
+    const control = pageSettingsControl(key);
+    if (control)
+      entries.push({
+        kind: 'site-setting',
+        key,
+        builder: control,
+        status: 'wired',
+        capability: siteCapability(key),
+      });
   }
 
   for (const c of COMPONENTS) {

@@ -360,5 +360,36 @@ describe(
       // the home-owned key took the home document's value
       expect(after.sizing.heroAspect).toBe('4:3');
     });
+
+    it('the same key the classic PUT /layout now refuses (productsPage.bgColor) reaches the PUBLIC storefront layout through the editor save', async () => {
+      const pub = express();
+      pub.use('/public', publicStoreLayoutRoutes);
+      const st = await inStore(storeId, () => getPageState(storeId, 'collection'));
+      const edited = reduceDocument(st!.definition, {
+        type: 'setSiteSetting',
+        key: 'productsPage',
+        path: 'bgColor',
+        value: '#112233',
+      });
+      expect(edited.rejected).toBeUndefined();
+      const saved = await inStore(storeId, () =>
+        saveDraft({
+          storeId,
+          pageKey: 'collection',
+          baseRev: st!.rev,
+          definition: edited.doc,
+          userId: null,
+        })
+      );
+      expect(saved).toMatchObject({ ok: true });
+      // a draft is not live
+      const before = await request(pub).get(`/public/stores/${storeId}/layout`);
+      expect(before.body.data.layout.productsPage?.bgColor).toBeUndefined();
+      const rev = (saved as { value: { rev: number } }).value.rev;
+      await inStore(storeId, () => publishDraft({ storeId, pageKey: 'collection', baseRev: rev }));
+      const after = await request(pub).get(`/public/stores/${storeId}/layout`);
+      expect(after.status).toBe(200);
+      expect(after.body.data.layout.productsPage.bgColor).toBe('#112233');
+    });
   }
 );
