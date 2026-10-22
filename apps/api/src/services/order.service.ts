@@ -39,6 +39,7 @@ function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown>
 import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
+import { assertGoldLinesPriceable, assertSameRates } from './gold-rate/gate';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { canSeeWholesaleOnly } from '../lib/audience';
 import {
@@ -977,6 +978,23 @@ export class OrderService {
     // request that creates the order). Fresh group read, UNCACHED entitlement (a just-made downgrade binds the next order).
     // The pricing happens moments before the money transaction opens, the same window the totals above always had.
     // `expectedTotal` (below) catches a price that moved since the shopper last saw the cart.
+    // Gold-rate pricing gate (Ruling B5-17), BEFORE the resolver sees a price: every gold line must be
+    // inside the store's max rate age (GOLD_RATE_STALE), its materialised price must equal the price
+    // recomputed from the stored spec and the CURRENT rate (GOLD_PRICE_DRIFT), and it must equal the
+    // price the shopper was shown (PRICE_CHANGED). A quote (dryRun) returns the new totals instead of
+    // refusing a moved price, so the checkout can show "السعر اتحدّث".
+    const goldGate = await assertGoldLinesPriceable(
+      prisma as unknown as Prisma.TransactionClient,
+      storeId,
+      cart.items.map(item => ({
+        key: item.id,
+        productId: item.productId,
+        variantId: (item as { variantId?: string | null }).variantId ?? null,
+        materialisedUnitPrice: item.variant?.price ?? item.product.price,
+        quotedUnitPrice: (item as { quotedUnitPrice?: number | null }).quotedUnitPrice ?? null,
+      })),
+      { requireQuote: requestContext?.dryRun !== true }
+    );
     const resolver = await PriceResolver.forBuyer(
       storeId,
       requestContext?.buyer ?? ANONYMOUS_BUYER,
@@ -1430,6 +1448,10 @@ export class OrderService {
       // the ambient tenant transaction, so the code-level tenant guard (R-EBDA-003) and the
       // `prisma` proxy both see the store.
       scopeTransaction(moneyTx, { storeId }, async (tx: Prisma.TransactionClient) => {
+        // Ruling B5-17: the gold rates this order was priced from must still be the current ones. Read
+        // FOR SHARE, so a rate write in flight is waited for and a committed one is seen: PRICE_CHANGED,
+        // never an order at the old rate.
+        await assertSameRates(tx, storeId, goldGate.rateIds);
         // Admission and stock reservation share one transaction. Full-wallet
         // orders are already paid; a failed wallet debit below rolls back all work.
         const manualHoldAdmitted =
@@ -1859,6 +1881,10 @@ export class OrderService {
                   // product for variant-less products). Persisting product.price
                   // here undercharged every variant at the parent (lowest) price.
                   price: lineUnit(item).unitMinor,
+                  // How a gold line's price was made (Ruling B5-17): refunds read `price`, this is for display and audit.
+                  ...(goldGate.snapshots.has(item.id)
+                    ? { goldSnapshot: goldGate.snapshots.get(item.id) as Prisma.InputJsonValue }
+                    : {}),
                   // Price provenance snapshot (Ruling B2B-3b): invoices, returns and analytics read these and never
                   // re-resolve a price. A pre-B2B order has NULLs, which read as 'base'.
                   ...priceSnapshot(lineUnit(item)),
@@ -3097,6 +3123,20 @@ export class OrderService {
 
     // Price every line through the ONE resolver (Ruling B2B-2d): as the Customer the merchant selected, else retail + public
     // tiers. UNCACHED entitlement (review I2). The admin form submits no price, and the route's zod object strips any.
+    // Ruling B5-17: the admin path runs the SAME gold gate as checkout (stale rate, price drift), with
+    // no shopper quote to compare (requireQuote false). Gold lines get their snapshot below.
+    const adminGoldGate = await assertGoldLinesPriceable(
+      prisma as unknown as Prisma.TransactionClient,
+      storeId,
+      unpricedLines.map((r, i) => ({
+        key: String(i),
+        productId: r.productId,
+        variantId: r.variantId ?? null,
+        materialisedUnitPrice: r.variantPrice ?? r.productPrice,
+        quotedUnitPrice: null,
+      })),
+      { requireQuote: false }
+    );
     const adminResolver = await PriceResolver.forBuyer(
       storeId,
       pricingOpts.buyer ?? ANONYMOUS_BUYER,
@@ -3319,6 +3359,8 @@ export class OrderService {
     // confirms physical availability before placing. The mark-paid
     // path elsewhere decrements as needed when payment lands.
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+      // Ruling B5-17: the gold rates the lines were priced from must still be the current ones.
+      await assertSameRates(tx, storeId, adminGoldGate.rateIds);
       // Per-customer coupon usage limit (same money-integrity gap as
       // OrderService.create, 2026-07-02 audit: createAdminOrder resolved
       // coupons via CouponService.getByCode, which only enforces the
@@ -3432,11 +3474,14 @@ export class OrderService {
           ) as Prisma.InputJsonValue,
           notes: data.notes ?? null,
           items: {
-            create: resolved.map(r => ({
+            create: resolved.map((r, i) => ({
               productId: r.productId,
               productName: r.productName,
               sku: r.sku,
               variantId: r.variantId,
+              ...(adminGoldGate.snapshots.has(String(i))
+                ? { goldSnapshot: adminGoldGate.snapshots.get(String(i)) as Prisma.InputJsonValue }
+                : {}),
               // OrderItem's column is `variantName`. Writing `variantTitle`
               // (no such field) made Prisma reject the whole create, so every
               // admin manual order with a variant line failed since the

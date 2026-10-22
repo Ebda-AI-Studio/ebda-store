@@ -815,6 +815,35 @@ router.post(
   }
 );
 
+// POST /cart/acknowledge-prices - "متابعة" on the gold "السعر اتحدّث" notice (Ruling B5-17). The body is an
+// EMPTY strict object: each gold line's quote becomes the server's CURRENT price, never a client value.
+router.post(
+  '/cart/acknowledge-prices',
+  cartLimiter,
+  optionalAuthenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      z.object({})
+        .strict()
+        .parse(req.body ?? {});
+      const storeId = await getStoreIdFromRequest(req);
+      setBuyerPrivate(res);
+      const result = await CartService.acknowledgePrices(storeId, sessionId);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /cart/sync - bulk-merge a guest cart into the session cart (post-login
 // migration). Mirrors POST /cart/items but takes an array; uses the existing
 // CartService.addItems. Without this the storefront's guest->login cart

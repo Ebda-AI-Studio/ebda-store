@@ -39,6 +39,12 @@ interface AllowEntry {
 }
 
 const ALLOW: Record<string, AllowEntry> = {
+  'services/gold-rate/gate.ts': {
+    category: 'catalog-read',
+    reason:
+      "Ruling B5-17: the order gate recomputes a gold line's BASE price from its spec (computeGoldUnitPrice) and compares it with the materialised base the caller hands to PriceResolver; goldQuotesForLines reads the base price the cart stores as the shopper's quote. The gate never decides a charged price",
+    reads: { assertGoldLinesPriceable: 1, buildGoldSnapshot: 1, goldQuotesForLines: 4 },
+  },
   'services/gold-rate/feed/gold-api.ts': {
     category: 'unrelated',
     reason:
@@ -60,17 +66,17 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/cart.service.ts': {
     category: 'resolver-input',
     reason: 'computeTotals feeds item/variant base prices to priceCart',
-    reads: { '<module>': 1, computeTotals: 4 },
+    reads: { '<module>': 1, acknowledgePrices: 4, computeTotals: 6 },
   },
   'services/order.service.ts': {
     category: 'resolver-input',
     reason: 'create + createAdminOrder feed base prices to priceCart; persisted values elsewhere',
-    reads: { create: 7, createAdminOrder: 4 },
+    reads: { create: 9, createAdminOrder: 4 },
   },
   'routes/payment-links.routes.ts': {
     category: 'resolver-input',
     reason: 'link lines priced via priceCart as an anonymous buyer',
-    reads: { 'POST /': 6 },
+    reads: { 'POST /': 8 },
   },
   'routes/promotion.routes.ts': {
     category: 'resolver-input',
@@ -457,9 +463,13 @@ describe('B2B: direct price reads are classified per file and per symbol (AST sc
       }
     }
     expect(found.sort()).toEqual([
+      // Ruling B5-17: the gold order gate is a CHECK on the base price, not a price decision (PriceResolver still decides)
+      'routes/payment-links.routes.ts -> services/gold-rate/gate.ts: assertGoldLinesPriceable,assertSameRates',
       // STOREFRONT_PRODUCT_SELECT is a Prisma select constant (no price decision).
       'routes/wholesale.routes.ts -> services/product.service.ts: ProductService', // the approved-buyer catalogue list / detail (no price decision)
+      'services/cart.service.ts -> services/gold-rate/gate.ts: goldQuoteKey,goldQuotesForLines',
       'services/cart.service.ts -> services/product.service.ts: STOREFRONT_PRODUCT_SELECT',
+      'services/order.service.ts -> services/gold-rate/gate.ts: assertGoldLinesPriceable,assertSameRates',
       'services/order.service.ts -> services/product.service.ts: STOREFRONT_PRODUCT_SELECT',
     ]);
   });

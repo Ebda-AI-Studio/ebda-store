@@ -8,6 +8,18 @@ import { CartService, resolveLineNote } from '@api/services/cart.service';
 import { prisma } from '@ebda/database';
 
 // Mock Prisma
+// Gold-rate pricing is proven in gold-*.test.ts and tests/integration/gold-checkout.test.ts; this suite
+// is about something else, so the gate is stubbed to "no gold lines".
+vi.mock('@api/services/gold-rate/gate', () => ({
+  assertGoldLinesPriceable: async () => ({ snapshots: new Map(), rateIds: new Map() }),
+  assertSameRates: async () => undefined,
+  goldQuotesForLines: async () => new Map(),
+  goldQuoteKey: (p: string, v: string | null) => `${p}|${v ?? ''}`,
+}));
+vi.mock('@api/services/gold-rate/public', () => ({
+  publicGoldPricingForLines: async () => new Map(),
+  publicGoldFields: async () => ({ goldPricing: null }),
+}));
 vi.mock('@api/services/price-resolver.service', async () =>
   (await import('../helpers/retail-price-resolver')).retailPriceResolverModule()
 );
@@ -611,6 +623,9 @@ describe('CartService', () => {
           variantId: null,
           note: null,
           quantity: 1,
+          // the quote a gold line was added with travels with it (null for a fixed-price line)
+          quotedUnitPrice: null,
+          quotedAt: null,
         },
       });
     });

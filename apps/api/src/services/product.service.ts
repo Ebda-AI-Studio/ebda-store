@@ -28,6 +28,7 @@ import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
+import { publicGoldFields } from './gold-rate/public';
 import {
   assertSizeChartInStore,
   resolvePdpSizeChart,
@@ -2139,6 +2140,8 @@ export class ProductService {
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
       ...(await this.b2bPublicFields(storeId, product)),
+      // Gold-rate pricing (Ruling B5-13): the storefront-safe view (no margin, no rate id, no source).
+      ...(await publicGoldFields(prisma as unknown as Prisma.TransactionClient, storeId, product)),
     };
   }
 
@@ -2170,6 +2173,8 @@ export class ProductService {
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
       ...(await this.b2bPublicFields(storeId, product)),
+      // Gold-rate pricing (Ruling B5-13): the storefront-safe view (no margin, no rate id, no source).
+      ...(await publicGoldFields(prisma as unknown as Prisma.TransactionClient, storeId, product)),
     };
   }
 

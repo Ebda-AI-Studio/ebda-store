@@ -457,6 +457,24 @@ export class ReturnService {
       }
     }
 
+    // Ruling B5-19: an exchange of a gold-rate line is refused. The replacement piece would be priced at
+    // TODAY's rate against a price fixed at the old one; the supported shape is a return plus a new order.
+    // Refunds are unaffected: they read `order_items.price`, the price actually charged, never the rate.
+    if (data.type === 'exchange') {
+      const goldLine = order.items.find(
+        oi =>
+          (data.items ?? []).some(i => i.orderItemId === oi.id) &&
+          (oi as { goldSnapshot?: unknown }).goldSnapshot != null
+      );
+      if (goldLine)
+        throw new AppError(
+          409,
+          'GOLD_EXCHANGE_UNSUPPORTED',
+          'A gold-priced piece cannot be exchanged. Return it and place a new order.',
+          { messageAr: 'القطعة المسعّرة بالدهب مبتتبدّلش. رجّعها واعمل طلب جديد.' }
+        );
+    }
+
     const items: CreateReturnItemInput[] = [...(data.items ?? []), ...bundleGroupItems];
     if (items.length === 0) {
       throw new AppError(

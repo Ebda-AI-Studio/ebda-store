@@ -13,6 +13,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 const h = vi.hoisted(() => ({ wrapCalls: 0, failPaymentCommit: false, orphanAlert: vi.fn() }));
 
+// place_order may call CartService.acknowledgePrices (Ruling B5-17); these suites are about payment bookkeeping.
+vi.mock('@api/services/cart.service', () => ({ CartService: { acknowledgePrices: vi.fn() } }));
 vi.mock('@ebda/database', () => ({
   prisma: { paymentConfig: { findFirst: vi.fn() } },
   runInTenantContext: vi.fn(async (_storeId: string, fn: () => unknown) => {

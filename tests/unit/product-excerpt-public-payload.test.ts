@@ -20,6 +20,10 @@ const { findFirstMock, reviewAggregateMock } = vi.hoisted(() => ({
   reviewAggregateMock: vi.fn().mockResolvedValue({ _avg: { rating: null }, _count: { rating: 0 } }),
 }));
 
+vi.mock('../../apps/api/src/services/gold-rate/public', () => ({
+  publicGoldPricingForLines: async () => new Map(),
+  publicGoldFields: async () => ({ goldPricing: null }),
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {
     product: {

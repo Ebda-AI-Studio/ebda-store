@@ -2510,6 +2510,66 @@
       "find": "      if (rel === exempt) continue;",
       "replace": "      if (rel.startsWith(path.dirname(exempt))) continue;",
       "test": "tests/unit/gold-provider-name-gate.test.ts"
+    },
+    {
+      "id": "money-gold-order-stale-gate",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the stale-rate check is dropped from the order gate, so an order is placed at a rate older than the store's max age (a guessed price)",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "  assertRatesFresh(rates, karats, settings, now);\n\n  const drift",
+      "replace": "\n  const drift",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-drift-check",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the recompute-vs-materialised comparison is dropped, so a repricer bug charges a wrong gold price without an alarm",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "    if (expected !== line.materialisedUnitPrice) {",
+      "replace": "    if (false as boolean) {",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-quote-check",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the shopper-quote comparison is dropped, so a rate that moved after add-to-cart charges the new price without ever telling the shopper",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "    if (opts.requireQuote && line.quotedUnitPrice !== null && line.quotedUnitPrice !== expected)",
+      "replace": "    if (false as boolean)",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-rate-recheck-in-tx",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the in-transaction rate re-check is dropped, so a rate write that commits between the pre-check and the money transaction produces an order at the old rate",
+      "source": "apps/api/src/services/gold-rate/gate.ts",
+      "find": "    if (now.get(karat)?.rateId !== rateId)",
+      "replace": "    if (false as boolean)",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-order-server-quote",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the cart stops storing the server-read quote, so the \"price updated\" notice and the PRICE_CHANGED refusal can never fire",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "            ...(quote ?? {}),\n          },\n        });\n      }\n    };\n\n    if (hasTenantContext()) {\n      // Already inside the request-scoped tenant transaction opened by\n      // `tenantContext` middleware.",
+      "replace": "          },\n        });\n      }\n    };\n\n    if (hasTenantContext()) {\n      // Already inside the request-scoped tenant transaction opened by\n      // `tenantContext` middleware.",
+      "test": "tests/integration/gold-checkout.test.ts"
+    },
+    {
+      "id": "money-gold-exchange-refused",
+      "domain": "money",
+      "tier": "integration",
+      "why": "the exchange of a gold line is allowed again, so the replacement piece is priced at today's rate against a price fixed at the old one",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "    if (data.type === 'exchange') {\n      const goldLine",
+      "replace": "    if (false as boolean) {\n      const goldLine",
+      "test": "tests/integration/gold-checkout.test.ts"
     }
   ]
 }
