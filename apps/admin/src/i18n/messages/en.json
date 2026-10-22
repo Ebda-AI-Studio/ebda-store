@@ -5443,7 +5443,8 @@
         "jasmine": "Jasmine",
         "lamma": "Lamma"
       },
-      "previewInEditor": "Want to see a look on your own page first? Preview it in the editor."
+      "previewInEditor": "Want to see a look on your own page first? Preview it in the editor.",
+      "openEditorPreview": "Open the editor preview"
     }
   },
   "seo": {
@@ -10276,8 +10277,8 @@
       "applying": "Applying…",
       "keepEditing": "Keep editing",
       "reportTitle": "What changes",
-      "kept": "{count, plural, one {# section keeps its content} other {# sections keep their content}}",
-      "designChanged": "{count, plural, one {# section changes its design} other {# sections change their design}}",
+      "kept": "{count, plural, one {{count} section keeps its content} other {{count} sections keep their content}}",
+      "designChanged": "{count, plural, one {{count} section changes its design} other {{count} sections change their design}}",
       "added": "New sections: {names}",
       "dropped": "Leaves your draft (restorable from History): {names}",
       "themeReset": "Colours and fonts reset to this look",

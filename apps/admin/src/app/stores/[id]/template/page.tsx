@@ -164,7 +164,7 @@ export default function StoreTemplatePage() {
         <p className="text-sm text-muted-foreground">
           {t('previewInEditor')}{' '}
           <Link href={`/stores/${storeId}/builder`} className="text-primary underline">
-            {t('openBuilder')}
+            {t('openEditorPreview')}
           </Link>
         </p>
 
