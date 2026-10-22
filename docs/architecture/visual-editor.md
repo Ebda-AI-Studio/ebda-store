@@ -54,7 +54,13 @@ inside the already-selected target edits it in place (double-click always
 does). The editable takes the FIELD's direction (`…Ar` is RTL) with
 `unicode-bidi: plaintext`; Enter commits except during IME composition; Escape
 cancels; Tab / Shift+Tab commit and move to the next / previous text; paste and
-drop insert plain text. The value is read from `innerText`.
+drop insert plain text. The value is read as the RAW characters
+(`textContent`, with `<br>` and block wrappers turned back into newlines), never
+`innerText`, which applies CSS `text-transform` and would store an uppercase
+heading as `SUMMER SALE`; `text-transform` is switched off while editing and
+restored after. Each field carries the save schema's own length limit (`max`,
+read from the registry's Zod props: a step title is 80); typing and pasting stop
+at it and the parent cuts the committed value there.
 
 ## Changing an image
 

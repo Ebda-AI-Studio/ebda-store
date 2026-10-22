@@ -16,6 +16,9 @@ function dotted(o: unknown, path = ''): string[] {
   ]);
 }
 
+const events = (m: unknown) =>
+  (m as { webhooks: { events: Record<string, string> } }).webhooks.events;
+
 describe('admin message keys', () => {
   it.each([
     ['en', en],
@@ -28,8 +31,8 @@ describe('admin message keys', () => {
     const types = [...WEBHOOK_EVENT_TYPES, WEBHOOK_TEST_EVENT];
     for (const t of types) {
       const key = t.replace('.', '_');
-      expect((en as any).webhooks.events[key], `en ${key}`).toBeTruthy();
-      expect((ar as any).webhooks.events[key], `ar ${key}`).toBeTruthy();
+      expect(events(en)[key], `en ${key}`).toBeTruthy();
+      expect(events(ar)[key], `ar ${key}`).toBeTruthy();
     }
   });
 });

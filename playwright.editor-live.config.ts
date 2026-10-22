@@ -59,6 +59,8 @@ export default defineConfig({
       name: 'ar-1280',
       use: {
         ...devices['Desktop Chrome'],
+        // real Google Chrome, the browser merchants use (EDITOR_E2E_CHANNEL= to use bundled Chromium)
+        channel: process.env.EDITOR_E2E_CHANNEL ?? 'chrome',
         viewport: { width: 1280, height: 860 },
         locale: 'ar-EG',
       },
