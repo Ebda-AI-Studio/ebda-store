@@ -289,6 +289,12 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=2048
         run: npx vitest run $UNIT_PATHS --reporter=verbose --retry=0
 
+      # The editor control matrix and the classic-builder parity ratchet (plan 2026-10-22-visual-editor,
+      # Task 5): the committed docs/ebda/templates/editor-matrix.* must be current and every not-wired row
+      # accepted in scripts/editor-audit/baseline.json. Cheap (a few seconds), so it always runs.
+      - name: Editor matrix check
+        run: npm run editor:matrix:check
+
       # apps/status runs on workerd via @cloudflare/vitest-pool-workers, outside
       # the root vitest config.
       - name: Run status worker tests

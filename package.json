@@ -54,6 +54,8 @@
     "ai:cost:baseline": "tsx scripts/ai-cost-baseline.ts",
     "test:contract": "TEST_DATABASE_URL=sqlite://placeholder vitest run tests/unit/contract-wbs-bridge.test.ts",
     "test:e2e": "vitest run tests/e2e",
+    "editor:matrix": "EDITOR_MATRIX_WRITE=1 vitest run tests/unit/editor-matrix.test.ts tests/unit/visual-editor-parity.test.ts",
+    "editor:matrix:check": "vitest run tests/unit/editor-matrix.test.ts tests/unit/visual-editor-parity.test.ts tests/unit/editor-audit-manifest.test.ts tests/unit/editor-audit-classify.test.ts",
     "test:editor-live": "playwright test -c playwright.editor-live.config.ts",
     "test:integration": "vitest run tests/integration",
     "test:watch": "vitest",

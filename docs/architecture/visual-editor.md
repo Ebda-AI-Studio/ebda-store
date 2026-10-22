@@ -96,3 +96,29 @@ announcement bar and the footer are chrome: no toolbar, edited in the panes.
 
 Not yet marked (listed for the editor matrix): skin-owned text under
 `apps/web/src/templates/<skin>/` and the legacy `trustStrip` items.
+
+## The editor control matrix and the parity ratchet
+
+`npm run editor:matrix` regenerates `docs/ebda/templates/editor-matrix.{md,json}`
+(`scripts/editor-audit/`). One row per skin and control: sections and blocks from
+`SECTION_REGISTRY`, theme controls from `THEME_SETTINGS_SCHEMA`, the look mixes'
+design keys, and the form page builder's write surface read from its source
+(`classic-manifest.ts`). A control is `wired` only when two independent sources
+agree: a reverse grep finds a reader on the skin, and the flip probe (`probe.tsx`)
+renders the section through the real `PageRenderer` once per option value and sees
+the HTML change. The probe seeds content a section needs (hero slides, collections,
+looks), flips a control inside the context that shows it (`PROBE_CONTEXT`), and
+checks that a merchant text or image carries an explicit canvas marker
+(`marker-pending` when it does not). Theme, block and chrome controls cannot be
+rendered alone, so they carry `static` evidence only. Statuses: `wired`, `no-op`,
+`missing`, `marker-pending`, `classic-only`, `pending-template`.
+
+`npm run editor:matrix:check` (CI) fails when the committed files are stale or a
+not-wired row is not listed in `scripts/editor-audit/baseline.json` with a reason.
+It is a ratchet: `npm run editor:matrix` only ever REMOVES baseline rows that were
+fixed; accepting a new gap is a deliberate edit with a reason.
+`tests/unit/visual-editor-parity.test.ts` is the gate for deleting `/page-builder`
+(Ruling VE-6): every classic capability P-01 to P-14 is accounted for, wired fields
+round-trip through the builder reducer to the same layout the form writes, and the
+lists of live theme/typography writes and of files that still mention the classic
+builder (`parity-baseline.json`) can only shrink. Task 12 requires them empty.
