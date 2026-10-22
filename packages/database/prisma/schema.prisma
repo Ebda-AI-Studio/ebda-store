@@ -949,7 +949,7 @@ model Product {
   lowStockThreshold    Int           @default(5) @map("low_stock_threshold")
   trackInventory       Boolean       @default(true) @map("track_inventory")
   // Gold-rate pricing (Phase B5, Rulings B5-12/B5-13). `price` stays the ONE price every reader uses; for a
-  // gold-priced row only the repricer writes it (trigger ebda_gold_price_guard, migration 20261101000100).
+  // gold-priced row only the repricer writes it (trigger ebda_gold_price_guard, migration 20261102000100).
   // 'fixed' | 'gold_rate' (DB CHECK). The spec below is integer-only: weight in MILLIGRAMS, making charge in
   // piastres (fixed) or piastres per gram (per_gram), margin in basis points. Never Float, never `facts`.
   pricingMode          String        @default("fixed") @map("pricing_mode")
@@ -5654,7 +5654,7 @@ model WebhookDelivery {
 // ==========================================
 
 /// Append-only history of every rate written. ebda_app may SELECT, INSERT and UPDATE (status, decided_by,
-/// applied_at) only: no DELETE, no re-rating (column grants in migration 20261101000100).
+/// applied_at) only: no DELETE, no re-rating (column grants in migration 20261102000100).
 model GoldRate {
   id            String    @id @default(uuid())
   storeId       String    @map("store_id")

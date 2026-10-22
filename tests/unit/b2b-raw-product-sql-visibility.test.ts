@@ -112,7 +112,7 @@ const EXEMPT_MIGRATIONS = new Set<string>(
     .map(f => f.migration)
     // everything before the audience column existed, plus the gold price guard (Ruling B5-13): its trigger
     // function reads ONE product's pricing_mode by id to guard a write and returns no product data
-    .filter(m => m < '20261028' || m === '20261101000100_gold_rate_pricing')
+    .filter(m => m < '20261028' || m === '20261102000100_gold_rate_pricing')
 );
 
 function evaluate(queries: readonly RawProductQuery[]): string[] {

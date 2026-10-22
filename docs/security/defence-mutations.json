@@ -2366,7 +2366,7 @@
       "domain": "tenant / RLS",
       "tier": "unit",
       "why": "FORCE ROW LEVEL SECURITY is dropped from gold_rates, so the table owner and any BYPASS path read and write every store's rate history",
-      "source": "packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql",
+      "source": "packages/database/prisma/migrations/20261102000100_gold_rate_pricing/migration.sql",
       "find": "ALTER TABLE gold_rates FORCE ROW LEVEL SECURITY;",
       "replace": "",
       "test": "tests/unit/gold-migration-defences.test.ts"
@@ -2376,7 +2376,7 @@
       "domain": "tenant / RLS",
       "tier": "unit",
       "why": "the gold_rates_current policy is widened to let a missing tenant through (IS NULL allowance), so a contextless query reads or rewrites any store's current rate",
-      "source": "packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql",
+      "source": "packages/database/prisma/migrations/20261102000100_gold_rate_pricing/migration.sql",
       "find": "CREATE POLICY ebda_tenant_isolation ON gold_rates_current AS PERMISSIVE FOR ALL TO ebda_app\n  USING (store_id = nullif(current_setting('app.current_store_id', true), ''))",
       "replace": "CREATE POLICY ebda_tenant_isolation ON gold_rates_current AS PERMISSIVE FOR ALL TO ebda_app\n  USING (store_id = nullif(current_setting('app.current_store_id', true), '') OR current_setting('app.current_store_id', true) IS NULL)",
       "test": "tests/unit/gold-migration-defences.test.ts"
@@ -2386,7 +2386,7 @@
       "domain": "money",
       "tier": "unit",
       "why": "the BEFORE trigger on products is deleted, so any writer (import, mass edit, MCP tool, a future one) can overwrite a gold product's computed price and the repricer is no longer the only writer",
-      "source": "packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql",
+      "source": "packages/database/prisma/migrations/20261102000100_gold_rate_pricing/migration.sql",
       "find": "CREATE TRIGGER ebda_gold_price_guard BEFORE INSERT OR UPDATE OF price, compare_at_price, pricing_mode ON products\n  FOR EACH ROW EXECUTE FUNCTION gold_price_guard_products();",
       "replace": "",
       "test": "tests/unit/gold-migration-defences.test.ts"
@@ -2396,7 +2396,7 @@
       "domain": "money",
       "tier": "unit",
       "why": "the DELETE-less grant on gold_rates is widened, so the app role can erase or re-rate the audited rate history",
-      "source": "packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql",
+      "source": "packages/database/prisma/migrations/20261102000100_gold_rate_pricing/migration.sql",
       "find": "GRANT SELECT, INSERT ON gold_rates TO ebda_app;",
       "replace": "GRANT SELECT, INSERT, DELETE ON gold_rates TO ebda_app;",
       "test": "tests/unit/gold-migration-defences.test.ts"
@@ -2406,7 +2406,7 @@
       "domain": "money",
       "tier": "unit",
       "why": "the guard stops requiring app.gold_reprice, so every write to a gold price is allowed again",
-      "source": "packages/database/prisma/migrations/20261101000100_gold_rate_pricing/migration.sql",
+      "source": "packages/database/prisma/migrations/20261102000100_gold_rate_pricing/migration.sql",
       "find": "  IF NEW.pricing_mode = 'gold_rate'\n     AND coalesce(current_setting('app.gold_reprice', true), '') <> 'on'",
       "replace": "  IF NEW.pricing_mode = 'gold_rate'\n     AND false",
       "test": "tests/unit/gold-migration-defences.test.ts"
