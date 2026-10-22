@@ -6,7 +6,7 @@ import { sendAlert } from '../../../services/alerts.service';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 
 /**
- * Every-15-min watcher that surfaces stuck background jobs as P1
+ * Hourly watcher that surfaces stuck background jobs as P1
  * Telegram alerts. The Inngest dashboard already shows function-level
  * status; this catches the failure modes that Inngest itself can't:
  *
@@ -79,8 +79,9 @@ const queueDepthWatchFn = inngest.createFunction(
   {
     id: 'queue-depth-watch',
     name: 'Queue-depth watcher (stuck BulkAiJob rows → Telegram)',
-    retries: 0, // failing to alert is recoverable; the next tick fires in 15 min
-    triggers: [{ cron: '*/15 * * * *' }],
+    retries: 0, // failing to alert is recoverable; the next tick fires in an hour
+    // HOURLY (Ruling INNGEST-BUDGET-1): a 30/60-min stuck threshold watch; an hourly tick sees it at most 1h late.
+    triggers: [{ cron: '7 * * * *' }],
   },
   async () => {
     const now = Date.now();

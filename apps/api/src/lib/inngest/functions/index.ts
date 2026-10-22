@@ -166,7 +166,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // Weekly R2 orphan sweep: lists bucket vs DB references and reports
   // orphans via logger + Telegram. Deletion gated on R2_ORPHAN_SWEEP_APPLY=true.
   r2OrphanSweep,
-  // Enterprise: every-30-min sweep that stamps paymentGatewayAbandonedAt on
+  // Enterprise: hourly sweep that stamps paymentGatewayAbandonedAt on
   // orders that reached a payment gateway (paymentUrl non-null) but never paid.
   // Only runs for stores with the 'payment_abandonment' feature enabled.
   paymentAbandonmentSweep,
@@ -176,10 +176,10 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // Prisma pool / auth (P2024). See payment-webhook-process.ts.
   paymentWebhookProcess,
   // Safety net: re-sends undelivered payment webhook inbox rows + P0-alerts
-  // wedged ones (the inngest.send-ok-but-never-delivered gap). 5-min cron.
+  // wedged ones (the inngest.send-ok-but-never-delivered gap). 30-min cron (INNGEST-BUDGET-1).
   paymentWebhookStuckSweep,
   // Safety net: re-sends order/created for PAID orders whose fanout never ran
-  // (the order/created enqueue is fire-and-forget with no fallback). 5-min cron.
+  // (the order/created enqueue is fire-and-forget with no fallback). Hourly cron.
   orderCreatedStuckSweep,
   refundReversalStuckSweep,
   orderStatusFanoutStuckSweep,

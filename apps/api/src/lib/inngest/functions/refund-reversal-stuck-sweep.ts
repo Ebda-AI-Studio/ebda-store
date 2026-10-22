@@ -2,12 +2,13 @@ import type { InngestFunction } from 'inngest';
 import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { stepRunUnlessEmpty } from '../empty-exit';
 import { sendAlert } from '../../../services/alerts.service';
 import { handleStuckRefundClaimSweep } from './refund-claim-stuck-sweep';
 import { sweepAcrossStores } from '../../cross-store';
 
 /**
- * Stuck refund-reversal sweep — scheduled safety net (every 5 min).
+ * Stuck refund-reversal sweep — scheduled safety net (hourly, Ruling INNGEST-BUDGET-1).
  *
  * The mirror of `order-created-stuck-sweep`, for the `order/refunded` fanout.
  *
@@ -97,7 +98,7 @@ export async function handleRefundReversalStuckSweep(
   const floorCutoff = new Date(Date.now() - REFUND_REVERSAL_MAX_AGE_MINUTES * 60_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
-  const stuck: StuckReversal[] = await step.run('find-stuck-reversals', async () =>
+  const stuck: StuckReversal[] = await stepRunUnlessEmpty(step, 'find-stuck-reversals', async () =>
     sweepAcrossStores({
       fetch: storeId =>
         prisma.order.findMany({
@@ -229,33 +230,36 @@ export async function handlePartialReturnReversalSweep(
 ): Promise<{ swept: number; resent: number; alerted: number }> {
   const cutoff = new Date(Date.now() - REFUND_REVERSAL_STUCK_MINUTES * 60_000);
 
-  const stuck: StuckPartialReturn[] = await step.run('find-stuck-partial-returns', async () =>
-    sweepAcrossStores({
-      fetch: storeId =>
-        prisma.return.findMany({
-          where: {
-            storeId,
-            reversalAppliedAt: null,
-            // NO recency floor (PR 2279 audit): the column is new and NULL for
-            // every historical return, so there is no back-catalog to protect,
-            // and this sweep is the ONLY recovery — a floor would silently
-            // abandon a return armed before a >12h Inngest outage.
-            reversalRequestedAt: { lt: cutoff },
-          },
-          select: {
-            id: true,
-            storeId: true,
-            orderId: true,
-            refundAmount: true,
-            reversalRequestedAt: true,
-            items: { select: { orderItemId: true, quantity: true } },
-          },
-          orderBy: { reversalRequestedAt: 'asc' },
-          take: SWEEP_TAKE,
-        }),
-      orderKey: r => r.reversalRequestedAt ?? 0,
-      take: SWEEP_TAKE,
-    })
+  const stuck: StuckPartialReturn[] = await stepRunUnlessEmpty(
+    step,
+    'find-stuck-partial-returns',
+    async () =>
+      sweepAcrossStores({
+        fetch: storeId =>
+          prisma.return.findMany({
+            where: {
+              storeId,
+              reversalAppliedAt: null,
+              // NO recency floor (PR 2279 audit): the column is new and NULL for
+              // every historical return, so there is no back-catalog to protect,
+              // and this sweep is the ONLY recovery — a floor would silently
+              // abandon a return armed before a >12h Inngest outage.
+              reversalRequestedAt: { lt: cutoff },
+            },
+            select: {
+              id: true,
+              storeId: true,
+              orderId: true,
+              refundAmount: true,
+              reversalRequestedAt: true,
+              items: { select: { orderItemId: true, quantity: true } },
+            },
+            orderBy: { reversalRequestedAt: 'asc' },
+            take: SWEEP_TAKE,
+          }),
+        orderKey: r => r.reversalRequestedAt ?? 0,
+        take: SWEEP_TAKE,
+      })
   );
 
   if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
@@ -336,7 +340,10 @@ export const refundReversalStuckSweep: InngestFunction.Any = inngest.createFunct
     //
     // Do NOT tighten this back to */5 without re-checking the Neon bill: the whole
     // saving comes from leaving a gap LONGER than the 300s suspend timeout.
-    triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
+    // HOURLY (Ruling INNGEST-BUDGET-1): Inngest Hobby caps executions at 50k/month and Ebda is pre-launch;
+    // worst-case detection of a lost order/refunded enqueue is now 10-70 min, not 10-25.
+    // Revisit at launch, when real orders exist (docs/RULINGS.md, docs/ENVIRONMENT.md).
+    triggers: [{ cron: '7 * * * *' }], // hourly, off the :00 pile-up
   },
   async ({ step }) => {
     const reversals = await handleRefundReversalStuckSweep(step);

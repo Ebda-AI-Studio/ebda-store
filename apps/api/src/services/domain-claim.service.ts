@@ -15,7 +15,7 @@
  * - A domain ACTIVE on another store can never be claimed.
  * - A fresh PENDING claim by another store blocks (DOMAIN_TAKEN); a stale one
  *   (> TTL) is released on the spot, so a squatter cannot hold a name forever.
- * - The sweep (Inngest, every 15 min) verifies pending claims and releases the
+ * - The sweep (Inngest, hourly) verifies pending claims and releases the
  *   stale ones, removing the hostname from the provider so the real owner can
  *   attach it.
  *

@@ -3,9 +3,10 @@ import { webhookInbox } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
+import { stepRunUnlessEmpty } from '../empty-exit';
 
 /**
- * Stuck payment-webhook sweep — scheduled safety net (every 5 min).
+ * Stuck payment-webhook sweep — scheduled safety net (every 30 min, Ruling INNGEST-BUDGET-1).
  *
  * Closes the one gap the offload introduced that neither the inline fallback
  * nor the function.failed P0 covers: inngest.send() SUCCEEDS at the route but
@@ -65,7 +66,10 @@ export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunct
     //
     // Do NOT tighten this back to */5 without re-checking the Neon bill: the whole
     // saving comes from leaving a gap LONGER than the 300s suspend timeout.
-    triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
+    // EVERY 30 MIN (Ruling INNGEST-BUDGET-1): the one sweep kept shorter than hourly. A captured payment whose
+    // webhook never reached the consumer leaves a shopper who HAS PAID on a pending order; the payment
+    // provider's own retries are the only other recovery. Worst-case detection is 10-40 min.
+    triggers: [{ cron: '7,37 * * * *' }],
   },
   async ({ step }) => {
     const cutoff = new Date(Date.now() - STUCK_WEBHOOK_MINUTES * 60_000);
@@ -73,7 +77,7 @@ export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunct
     // Cross-tenant read of the inbox (storeId may be null) — withRlsBypass.
     // Cross-store by nature (the inbox spans every store, including rows with a
     // NULL store): one definer call, `ebda_webhook_inbox_stuck`.
-    const stuck: StuckRow[] = await step.run('find-stuck', async () =>
+    const stuck: StuckRow[] = await stepRunUnlessEmpty(step, 'find-stuck', async () =>
       webhookInbox.stuck(cutoff, SWEEP_TAKE)
     );
 
