@@ -463,6 +463,41 @@ export const LOOKS: readonly LookDefinition[] = [
     status: 'designed',
     // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Ruling B3-1/B3-2, plan Task 4: ingredients first. The hero is the bottle with its
+    // ingredients (the mobile hero is already capped at 45vh by HeroBanner), the skin-type chips
+    // sit directly under it so the first screen shows a path to the shelf, the product rows live
+    // on the LIGHT band (inverse: quality bar section 9 rule 1, merchant photos are shot on
+    // white), then the ritual story band and the trust strip. Strings are Egyptian, controls neutral.
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
+      {
+        type: 'category-grid',
+        design: {
+          source: 'tags',
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+        preset: { title: 'By your skin type', titleAr: 'حسب نوع بشرتك' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:inverse' },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'Ingredients you know',
+          headingAr: 'مكوّنات تعرفها',
+        },
+      },
+      {
+        type: 'image-text',
+        design: { layout: 'split', imagePosition: 'end' },
+        preset: { heading: 'The ritual', headingAr: 'الطقس' },
+      },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'عطارة', en: 'Apothecary' },
     forWhom: {
       ar: 'للعناية الطبيعية اللي الثقة فيها من مكوناتها.',
@@ -503,6 +538,49 @@ export const LOOKS: readonly LookDefinition[] = [
     status: 'designed',
     // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Plan Task 4: colour is the page. A framed hero, a rail of "start here" tiles, the weekly
+    // routine (curated), the shade-dot grid (2 across on a phone, radius 12 from the token), the
+    // customer-photo strip (merchant content, nothing until filled), a deals row and trust.
+    sections: [
+      { type: 'hero', design: { presentation: 'framed' } },
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'rail',
+          layoutMobile: 'rail',
+          paddingTop: 'tight',
+          paddingBottom: 'tight',
+        },
+        preset: { title: 'Start here', titleAr: 'ابدأ من هنا' },
+      },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: {
+          productSource: 'manual',
+          limit: 8,
+          title: 'This week routine',
+          titleAr: 'روتين الأسبوع',
+        },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 3, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'All shades',
+          headingAr: 'كل الدرجات',
+        },
+      },
+      { type: 'testimonials' },
+      {
+        type: 'product-carousel',
+        design: { paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'on_sale', limit: 8, title: 'Deals', titleAr: 'عروض' },
+      },
+      { type: 'trust-strip' },
+    ],
     name: { ar: 'بلوم', en: 'Bloom' },
     forWhom: {
       ar: 'للمكياج وجمهور صغير بيختار بالدرجة.',
@@ -537,6 +615,43 @@ export const LOOKS: readonly LookDefinition[] = [
     status: 'designed',
     // Ruling B3-1: logo-forward header, the skin's own icon search (beauty is bought by brand trust).
     chrome: { header: { logoPlacement: 'start', search: 'icon' } },
+    // Plan Task 4: the routine is the navigation. The concern chips come first, directly under the
+    // header (the first screen is a path, not a banner), then the real 3-step routine, one featured
+    // active on a stage, the actives grid on the aqua surface, trust and the newsletter.
+    sections: [
+      {
+        type: 'category-grid',
+        design: {
+          source: 'tags',
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+        preset: { title: 'Pick your concern', titleAr: 'اختار مشكلتك' },
+      },
+      {
+        type: 'steps',
+        preset: { heading: 'Your routine in 3 steps', headingAr: 'روتينك في 3 خطوات' },
+      },
+      {
+        type: 'product-spotlight',
+        design: { layout: 'stage', paddingTop: 'tight', paddingBottom: 'tight' },
+        preset: { productSource: 'featured', limit: 1, heading: '', headingAr: '' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:card' },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'Actives',
+          headingAr: 'المواد الفعّالة',
+        },
+      },
+      { type: 'trust-strip' },
+      { type: 'newsletter' },
+    ],
     name: { ar: 'عيادة', en: 'Clinic' },
     forWhom: {
       ar: 'للمواد الفعالة لما الزبون عنده مشكلة يحلها.',

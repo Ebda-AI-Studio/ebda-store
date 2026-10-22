@@ -66,6 +66,13 @@ vi.mock('@ebda/shared', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/shared')>();
   const getLook = (id: string | null | undefined) => {
     const look = real.getLook(id);
+    // The plumbing fixture look (LOOK_ID below) has no mix and no skin of its own. Since #111 only
+    // BUILT looks can be switched into, and every built look now has a mix, so the fixture is
+    // presented as built here (the registry itself is untouched).
+    // The Jasmine looks are presented as built too: they flip to `built` in the same phase (B3
+    // Task 6), and the switch mechanics below must be proven with their real mixes either way.
+    if (look && (id === 'lamma.table' || id?.startsWith('jasmine.')))
+      return { ...look, status: 'built' as const };
     return look && id && lookMix[id] ? { ...look, sections: lookMix[id] as never } : look;
   };
   return {
@@ -176,8 +183,10 @@ async function seedMerchant(
 }
 
 // A look with no mix and no skin of its own (still on minimal): keeps these cases about the
-// switch plumbing; the Souq mixes have their own cases below and in souq-look-mix.test.ts.
-const LOOK_ID = 'jasmine.clinic';
+// switch plumbing; the Souq and Jasmine mixes have their own cases below and in
+// souq-look-mix.test.ts / jasmine-look-mix.test.ts. (Jasmine had this role until Phase B3 gave it a
+// skin and three mixes; Lamma is the next designed-only look.)
+const LOOK_ID = 'lamma.table';
 
 describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => {
   let app: Express;
@@ -618,7 +627,10 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect((await row(a.storeId)).look).toBeNull();
   });
 
-  it('PUT /template with a bare legacy template clears the look', async () => {
+  it('PUT /template refuses a bare legacy template and leaves the look alone (#111)', async () => {
+    // Since #111 nobody can switch INTO a bare skin (StoreService.updateTemplate): a store moves
+    // between templates only through a look. The old case asserted the pre-#111 behaviour (200,
+    // look cleared) and had been red on main since.
     const m = await seedMerchant('legacy');
     await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'keep' });
     expect((await row(m.storeId)).look).toBe(LOOK_ID);
@@ -626,10 +638,95 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       .put(`/api/v1/stores/${m.storeId}/template`)
       .set({ Authorization: `Bearer ${m.token}` })
       .send({ template: 'classic' });
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.status, JSON.stringify(res.body)).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_TEMPLATE');
     const s = await row(m.storeId);
-    expect(s.look).toBeNull();
-    expect(s.template).toBe('classic');
+    expect(s.look).toBe(LOOK_ID);
+    expect(s.template).toBe(getLook(LOOK_ID)!.skin);
+  });
+
+  // Phase B3 Task 4: the three REAL Jasmine mixes, applied the way production applies them
+  // (ebda_app + tenant guard), switched across looks and across templates.
+  describe('Jasmine mixes (real, Phase B3)', () => {
+    type Doc = {
+      appliedLook?: string;
+      sections: Array<{ type: string; settings: Record<string, unknown>; blocks?: unknown[] }>;
+    };
+    const draftOf = async (storeId: string) =>
+      (
+        (await prisma.storePageRevision.findFirstOrThrow({
+          // a fresh store's first switch PUBLISHES; every later one is a draft: read the newest revision
+          where: { storeId, pageKey: 'home' },
+          orderBy: { rev: 'desc' },
+          select: { document: true },
+        })) as { document: Doc }
+      ).document;
+    const sec = (doc: Doc, type: string) => doc.sections.find(x => x.type === type)?.settings;
+    const ok = async (m: { storeId: string; token: string }, lookId: string) => {
+      const res = await put(m.storeId, m.token, { lookId, design: 'keep' });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    };
+
+    it('Apothecary -> Bloom -> Clinic -> Apothecary: the store lands on the jasmine skin, the mix follows, no design leaks', async () => {
+      const m = await seedMerchant('jasmine-cycle');
+      await ok(m, 'jasmine.apothecary');
+      let s = await row(m.storeId);
+      expect(s).toMatchObject({ look: 'jasmine.apothecary', template: 'jasmine' });
+      let doc = await draftOf(m.storeId);
+      expect(doc.appliedLook).toBe('jasmine.apothecary');
+      expect(sec(doc, 'category-grid')).toMatchObject({ source: 'tags', layout: 'chips' });
+      expect(sec(doc, 'featured-collection')?.bgColor).toBe('token:inverse');
+
+      await ok(m, 'jasmine.bloom');
+      doc = await draftOf(m.storeId);
+      expect(sec(doc, 'category-grid')).toMatchObject({ layout: 'rail' });
+      expect(sec(doc, 'category-grid')?.source).not.toBe('tags'); // look-owned, returned to default
+      expect(sec(doc, 'featured-collection')?.bgColor).not.toBe('token:inverse');
+      expect(sec(doc, 'hero')?.presentation).toBe('framed');
+
+      await ok(m, 'jasmine.clinic');
+      doc = await draftOf(m.storeId);
+      expect(doc.sections.map(x => x.type).slice(0, 3)).toEqual([
+        'category-grid',
+        'steps',
+        'product-spotlight',
+      ]);
+      expect(sec(doc, 'category-grid')).toMatchObject({ source: 'tags', layout: 'chips' });
+      expect((doc.sections.find(x => x.type === 'steps')?.blocks ?? []).length).toBe(3);
+      s = await row(m.storeId);
+      expect(s).toMatchObject({ look: 'jasmine.clinic', template: 'jasmine' });
+
+      await ok(m, 'jasmine.apothecary');
+      doc = await draftOf(m.storeId);
+      expect(sec(doc, 'featured-collection')?.bgColor).toBe('token:inverse');
+      // An UNTOUCHED section the outgoing look seeded leaves the DRAFT (B1-45); the PUBLISHED page
+      // is never touched by a switch. (An edited section survives: tests/unit/jasmine-look-mix.test.ts.)
+      expect(doc.sections.some(x => x.type === 'steps')).toBe(false);
+      const published = (
+        (await prisma.storePageRevision.findFirstOrThrow({
+          where: { storeId: m.storeId, pageKey: 'home', status: 'published' },
+          select: { document: true },
+        })) as { document: Doc }
+      ).document;
+      expect(published.appliedLook).toBe('jasmine.apothecary'); // the first switch of a fresh store
+      expect(published.sections.some(x => x.type === 'steps')).toBe(false);
+      await awaitDeferredWork(5000);
+    });
+
+    it('Souq <-> Jasmine and Qamar <-> Jasmine switches keep the skin and the look in step', async () => {
+      const m = await seedMerchant('jasmine-cross');
+      await ok(m, 'souq.night');
+      expect(await row(m.storeId)).toMatchObject({ look: 'souq.night', template: 'souq' });
+      await ok(m, 'jasmine.bloom');
+      expect(await row(m.storeId)).toMatchObject({ look: 'jasmine.bloom', template: 'jasmine' });
+      await ok(m, 'qamar.atelier');
+      expect(await row(m.storeId)).toMatchObject({ look: 'qamar.atelier', template: 'qamar' });
+      await ok(m, 'jasmine.clinic');
+      expect(await row(m.storeId)).toMatchObject({ look: 'jasmine.clinic', template: 'jasmine' });
+      const doc = await draftOf(m.storeId);
+      expect(sec(doc, 'category-grid')).toMatchObject({ source: 'tags', layout: 'chips' });
+      await awaitDeferredWork(5000);
+    });
   });
 
   it('PUT /theme with a null value removes that key', async () => {
