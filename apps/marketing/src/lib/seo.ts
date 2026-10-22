@@ -124,7 +124,7 @@ export function jsonLd(
         name: BRAND.product.nameEn,
         alternateName: [BRAND.product.nameAr, brandLine()],
         url: `${SITE_URL}/#store`,
-        logo: `${SITE_URL}/icon-512.png`,
+        logo: `${SITE_URL}/logo-store.png`,
         email: BRAND.supportEmail,
         parentOrganization: { '@id': org },
         sameAs: [] as string[],

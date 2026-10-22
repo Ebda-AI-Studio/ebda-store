@@ -286,20 +286,20 @@ export default function LoginPage() {
           </div>
           <DocumentTitle title={t('title')} />
           <div className="text-center">
-            <div className="flex justify-center">
+            <div className="flex items-center justify-center gap-3">
               <Image
                 src="/logo-on-light.svg"
                 alt={tb('brandAlt')}
-                width={32}
-                height={60}
+                width={21}
+                height={40}
                 className="dark:hidden"
                 unoptimized
               />
               <Image
                 src="/logo.svg"
                 alt={tb('brandAlt')}
-                width={32}
-                height={60}
+                width={21}
+                height={40}
                 className="hidden dark:block"
                 unoptimized
               />

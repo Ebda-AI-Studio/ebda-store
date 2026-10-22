@@ -146,3 +146,10 @@ await sharp(SRC('svg/03d-symbol-gold.svg'), { density: 288 })
   .png({ compressionLevel: 9 })
   .toFile(P('apps/marketing/public/email-logo.png'));
 console.log('ok apps/marketing/public/email-logo.png');
+
+// Ebda Store product lockup as a hosted PNG (JSON-LD logo of the product Organization): light master, 600px wide.
+await sharp(SRC('svg/04a-product-store.svg'), { density: 288 })
+  .resize({ width: 600 })
+  .png({ compressionLevel: 9 })
+  .toFile(P('apps/marketing/public/logo-store.png'));
+console.log('ok apps/marketing/public/logo-store.png');
