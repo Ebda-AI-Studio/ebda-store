@@ -84,6 +84,27 @@ describe('ThemeSettingsPanel order and header controls', () => {
     expect(onSave).toHaveBeenCalledWith({ headerLogoPlacement: 'centre' });
   });
 
+  it('an unset override shows "inherit" instead of the first option, a stored one shows its value', () => {
+    const mount = (theme: never) =>
+      render(
+        <ThemeSettingsPanel
+          theme={theme}
+          storeTemplate="qamar"
+          look={getLook('qamar.atelier')}
+          onSave={async () => true}
+        />
+      );
+    const sel = () =>
+      document.querySelector('[data-setting-id="builder.header-logo"] select') as HTMLSelectElement;
+    const first = mount(undefined as never);
+    expect(sel().value).toBe('');
+    expect(sel().querySelector('option[value=""]')?.textContent).toBe('inherit');
+    first.unmount();
+    mount({ headerLogoPlacement: 'centre' } as never);
+    expect(sel().value).toBe('centre');
+    expect(sel().querySelector('option[value=""]')).toBeNull();
+  });
+
   it('a stored override is marked edited and can be reset to the look', () => {
     const onResetKey = vi.fn(async () => true);
     render(

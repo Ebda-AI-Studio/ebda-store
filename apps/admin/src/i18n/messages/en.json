@@ -10230,7 +10230,8 @@
       "resetOne": "Reset {field} to the look",
       "resetError": "Could not reset. Try again.",
       "headerLogo": "Logo position",
-      "headerSearch": "Header search"
+      "headerSearch": "Header search",
+      "inherit": "Same as the look"
     },
     "revisions": {
       "error": "History could not be loaded.",

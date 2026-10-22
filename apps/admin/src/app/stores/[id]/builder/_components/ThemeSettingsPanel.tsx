@@ -148,6 +148,12 @@ export function ThemeSettingsPanel({
             onChange={e => set(s.id, e.target.value)}
             className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
           >
+            {typeof v !== 'string' &&
+              (s.id === 'headerLogoPlacement' || s.id === 'headerSearch') && (
+                <option value="" disabled>
+                  {t('inherit')}
+                </option>
+              )}
             {s.options?.map(o => (
               <option key={String(o.value)} value={String(o.value)}>
                 {locale === 'ar' ? o.labelAr : o.labelEn}

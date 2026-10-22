@@ -10230,7 +10230,8 @@
       "resetOne": "رجّع {field} لشكل اللوك",
       "resetError": "ماقدرناش نرجّعها. جرّب تاني.",
       "headerLogo": "مكان الشعار",
-      "headerSearch": "البحث في الهيدر"
+      "headerSearch": "البحث في الهيدر",
+      "inherit": "زي الستايل"
     },
     "revisions": {
       "error": "تعذّر تحميل السجل.",
