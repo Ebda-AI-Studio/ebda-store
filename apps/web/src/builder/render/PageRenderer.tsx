@@ -19,7 +19,9 @@ import {
   documentForLook,
   getLook,
   getSectionDefinition,
+  INVERSE_SURFACE,
   renderableSections,
+  resolveColor,
   sectionToLegacy,
 } from '@ebda/shared';
 import { EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
@@ -710,6 +712,11 @@ export function PageRenderer({
                   subtitle={isRtl ? heroSubtitleArVal || heroSubtitleEn : heroSubtitleEn}
                   ctaText={isRtl ? heroCtaArVal : heroCtaEn}
                   ctaLink={heroCtaLink}
+                  bg={
+                    layout.hero.bgColor === INVERSE_SURFACE
+                      ? undefined
+                      : resolveColor(layout.hero.bgColor, store.theme)
+                  }
                 />
               ) : (
                 <T.Hero

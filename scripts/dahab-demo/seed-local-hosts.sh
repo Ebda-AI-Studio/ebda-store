@@ -16,6 +16,7 @@ mkdir -p apps/web/public/__dahab-demo
 cp scripts/dahab-demo/assets/*.webp apps/web/public/__dahab-demo/
 if [ "${DAHAB_ALL_SHOWROOMS:-0}" = "1" ]; then
   mkdir -p apps/web/public/__lamma-demo apps/web/public/__jasmine-demo apps/web/public/__souq-demo apps/web/public/__qamar-demo
+  cp scripts/qamar-demo/assets/* apps/web/public/__qamar-demo/
   cp scripts/lamma-demo/assets/*.webp apps/web/public/__lamma-demo/
   cp scripts/jasmine-demo/assets/*.webp apps/web/public/__jasmine-demo/
   QAMAR_DEMO_ASSET_BASE=/__qamar-demo npx tsx scripts/storedemo/seed.mjs
@@ -25,4 +26,4 @@ if [ "${DAHAB_ALL_SHOWROOMS:-0}" = "1" ]; then
 fi
 DAHAB_DEMO_ASSET_BASE=/__dahab-demo npx tsx scripts/storedemo/seed.mjs --template dahab --local-look-stores
 DAHAB_DEMO_ASSET_BASE=/__dahab-demo npx tsx scripts/storedemo/scenario-stores.mjs --template dahab
-psql "${DIRECT_URL:-$DATABASE_URL}" -v ON_ERROR_STOP=1 -c "update stores set domain = slug || '.localhost-b5.test', domain_status = 'active', domain_verified_at = now() where (slug like 'storedemo%' or slug like 'dahab-%') and domain is distinct from slug || '.localhost-b5.test'"
+psql "${DIRECT_URL:-$DATABASE_URL}" -v ON_ERROR_STOP=1 -c "update stores set domain = slug || '.localhost-b5.test', domain_status = 'active', domain_verified_at = now() where (slug like 'storedemo%' or slug like 'dahab-%' or slug like 'qamar-%') and domain is distinct from slug || '.localhost-b5.test'"

@@ -32,7 +32,7 @@ import { assertBillingConfigAtBoot } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import waBridgeRoutes from './routes/wa-bridge.routes';
 import { setupSwagger } from './docs/swagger';
-import { prisma } from '@ebda/database';
+import { prisma, setDbHopObserver } from '@ebda/database';
 import { lookupStore } from './lib/definer';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
@@ -49,6 +49,18 @@ import logger from './lib/logger';
 SentryService.init();
 
 // SP5 task 3: refuse BILLING_PROVIDER=stub in production before serving anything.
+import {
+  corsDomainCache,
+  corsStoreOriginWhere,
+  corsEntryAfterFailure,
+  corsEntryAfterLookup,
+  decideAfterFailedLookup,
+  decideCorsCache,
+  isPlatformOrigin,
+} from './lib/cors-cache';
+import { buildIdentity } from './lib/build-identity';
+import { hopTiming, markHop, recordHop } from './lib/hop-timing';
+import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 assertBillingConfigAtBoot();
 
 const app = express();
@@ -161,19 +173,6 @@ if (!isWorkers) {
 }
 
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
-import {
-  corsDomainCache,
-  corsStoreOriginWhere,
-  corsEntryAfterFailure,
-  corsEntryAfterLookup,
-  decideAfterFailedLookup,
-  decideCorsCache,
-  isPlatformOrigin,
-} from './lib/cors-cache';
-import { buildIdentity } from './lib/build-identity';
-import { hopTiming, markHop, recordHop } from './lib/hop-timing';
-import { setDbHopObserver } from '@ebda/database';
-import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 
 /**
  * A cross-origin request from an origin we don't recognise is a CLIENT

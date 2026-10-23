@@ -1,6 +1,6 @@
 /** The showroom (`storedemo`): bar, ?look= preview, link persistence, closed ordering, noindex. */
 import { test, expect } from '@playwright/test';
-import { open, hostOf } from './helpers';
+import { open, hostOf, fetchVia } from './helpers';
 
 test('storedemo: bar, look switch, persistence, no-store, closed checkout, noindex', async ({
   page,
@@ -66,7 +66,7 @@ test('storedemo: bar, look switch, persistence, no-store, closed checkout, noind
   // No pay action on a demo store. The API's own 403 DEMO_STORE refusal needs a valid cart and
   // body; it is proved by tests/integration/demo-store.test.ts (every order path), not here.
   await expect(page.locator('button[type="submit"]')).toHaveCount(0);
-  const robots = await page.request.get(`${hostOf('storedemo')}/robots.txt`);
+  const robots = await fetchVia(page, `${hostOf('storedemo')}/robots.txt`);
   // Crawlable on purpose (B1-14, M-5): the page's noindex meta must be readable. No bare root disallow.
-  expect(await robots.text()).not.toMatch(/^Disallow: \/$/m);
+  expect(robots.text).not.toMatch(/^Disallow: \/$/m);
 });
