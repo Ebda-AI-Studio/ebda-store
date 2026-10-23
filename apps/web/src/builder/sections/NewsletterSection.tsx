@@ -123,7 +123,9 @@ export function NewsletterSection({
             />
             <button
               type="submit"
-              disabled={editorMode || state === 'busy'}
+              // Not `disabled` in the editor: a disabled button swallows the tap that selects and edits
+              // its text, and the submit is already inert there (`submit` returns early).
+              disabled={state === 'busy'}
               className="min-h-[44px] rounded-[var(--radius)] bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
               {...edit('buttonText')}
             >

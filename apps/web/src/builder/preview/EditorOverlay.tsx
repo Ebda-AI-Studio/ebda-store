@@ -286,6 +286,11 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       // Inside the canvas a click selects; it never navigates or submits.
       if (target?.closest('a, button, form')) e.preventDefault();
       if (!hit || !target) return;
+      // The text of a control (a step's "add all" button, a link) is a text target, but the control
+      // itself stays inert in the canvas: its own handler would act (cart add) and, worse, disable
+      // the button and blur the inline editor the instant it opened.
+      if (target.closest('[data-builder-setting]')?.matches('button, a, summary, [role="button"]'))
+        e.stopPropagation();
       // A click on text inside the target that is ALREADY selected edits it (Shopify's
       // behaviour); the first click only selects.
       const cur = selectedRef.current;
