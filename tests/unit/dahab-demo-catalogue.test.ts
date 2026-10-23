@@ -174,7 +174,7 @@ describe('dahab demo catalogue: gold-rate pieces (Rulings B5-12, B5-13)', () => 
       );
       expect(r.unitPrice % 100, p.slug).toBe(0);
       expect(r.unitPrice, p.slug).toBeGreaterThan(500_000); // above 5,000 EGP
-      expect(r.unitPrice, p.slug).toBeLessThan(6_000_000); // below 60,000 EGP
+      expect(r.unitPrice, p.slug).toBeLessThan(8_000_000); // below 80,000 EGP (21k bangle ~63,853 at the 2026-10-23 market)
     }
   });
   it('the three demo rates cover every karat and agree within 0.5 % of 24k x karat / 24', () => {
