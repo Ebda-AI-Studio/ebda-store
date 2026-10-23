@@ -90,6 +90,13 @@ class LeasedAdapter implements SqlDriverAdapter {
   readonly provider = 'postgres' as const;
   readonly adapterName = '@prisma/adapter-pg (leased)';
   scope: ConnectionScope | undefined;
+  /**
+   * Set when the lease was abandoned as stale (its request was cancelled). Its open transaction
+   * sits on a socket from a dead request context, so `rollback`/`commit` may never answer; they
+   * are then given 1 s, so `$disconnect()` (which rolls back open transactions BEFORE it frees the
+   * QueryCompiler) cannot hang and leak the compiler.
+   */
+  abandoned = false;
 
   constructor(private readonly onError?: (err: Error, op: string) => void) {}
 
@@ -132,7 +139,17 @@ class LeasedAdapter implements SqlDriverAdapter {
         if (typeof v !== 'function') return v;
         return (...args: unknown[]) => {
           const r = (v as (...a: unknown[]) => unknown).apply(target, args);
-          return r instanceof Promise ? this.guard(`tx.${String(prop)}`, () => r) : r;
+          if (!(r instanceof Promise)) return r;
+          const guarded = this.guard(`tx.${String(prop)}`, () => r);
+          if (prop !== 'rollback' && prop !== 'commit') return guarded;
+          return Promise.race([
+            guarded,
+            new Promise<void>(res =>
+              setTimeout(() => {
+                if (this.abandoned) res();
+              }, 1_000)
+            ),
+          ]);
         };
       },
     });
@@ -393,7 +410,9 @@ export class ClientPool {
       // Free its QueryCompiler NOW. A cancelled request never releases, so nothing else would: the
       // compiler lives in the isolate's single wasm memory, ~4.5 MB each, and that memory never
       // shrinks (27 abandoned leaks reached "Invalid array buffer length" in `new QueryCompiler`,
-      // incident 2026-10-23). A live-but-slow request on it (> staleLeaseMs) gets a connection error.
+      // incident 2026-10-23). A live-but-slow request on it (> staleLeaseMs) has its open transaction rolled back and
+      // quietly rebuilds a compiler on its own lease, freed by its late release.
+      slot.adapter.abandoned = true;
       void slot.client.$disconnect().catch(() => undefined);
     }
   }

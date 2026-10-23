@@ -513,4 +513,38 @@ describe('an abandoned (stale) lease frees its QueryCompiler', () => {
     expect(grown).toBeLessThan(50);
     expect(pool.stats().abandoned).toBe(25);
   }, 60_000);
+
+  it('frees the compiler even when the cancelled request has an open transaction whose rollback never answers', async () => {
+    let t = 1_000;
+    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, now: () => t });
+    const dead = await pool.acquire();
+    const never = new Promise<never>(() => undefined);
+    const result = { columnNames: [], columnTypes: [], rows: [] };
+    const tx = {
+      provider: 'postgres',
+      adapterName: 'fake',
+      options: { usePhantomQuery: false },
+      queryRaw: () => Promise.resolve(result),
+      executeRaw: () => Promise.resolve(0),
+      commit: () => never,
+      rollback: () => never, // the socket belongs to a dead request context
+    };
+    dead.scope.get = () =>
+      Promise.resolve({ startTransaction: () => Promise.resolve(tx) } as never);
+    void dead.client.$transaction(async c => {
+      await c.$queryRaw`SELECT 1`;
+      await never; // the request is cancelled mid-transaction
+    });
+    await tick();
+    await new Promise(r => setTimeout(r, 50));
+    let done = false;
+    const orig = dead.client.$disconnect.bind(dead.client);
+    vi.spyOn(dead.client, '$disconnect').mockImplementation(() =>
+      orig().finally(() => (done = true))
+    );
+    t += 60;
+    const next = await pool.acquire();
+    await vi.waitFor(() => expect(done).toBe(true), { timeout: 5_000 });
+    await next.release();
+  }, 20_000);
 });
