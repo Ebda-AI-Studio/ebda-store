@@ -559,22 +559,6 @@ export const JASMINE_PRODUCTS = [
       ),
     ],
   },
-  {
-    slug: 'makeup-brush-set',
-    name: 'Makeup brush set, 8 pieces',
-    nameAr: 'طقم فرش مكياج 8 قطع',
-    category: 'tools-devices',
-    tags: [],
-    price: 32_000,
-    images: [], // the product with no photo (taste bar: the card must hold up without one)
-    description: 'Eight soft brushes for face and eyes in a zip pouch.',
-    descriptionAr: 'تمن فرش ناعمة للوش والعينين في كيس بسوستة.',
-    facts: [
-      chip('Includes', 'يشمل', '8 brushes + pouch', '8 فرش + كيس'),
-      chip('Bristles', 'الشعر', 'Soft synthetic', 'صناعي ناعم'),
-      HOW('Wash weekly with mild soap and dry flat.', 'اغسلها كل أسبوع بصابون خفيف وجففها أفقي.'),
-    ],
-  },
 ];
 
 /**

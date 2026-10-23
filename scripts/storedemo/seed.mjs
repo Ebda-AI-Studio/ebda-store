@@ -211,6 +211,7 @@ export const TEMPLATE_SPECS = {
     sizeCharts: QAMAR_SIZE_CHARTS,
     occasionSlugs: QAMAR_OCCASIONS.map(o => o.slug),
     archivePlaceholders: true,
+    retiredSlugs: ['modal-scarf-no-image'],
     assetEnv: 'QAMAR_DEMO_ASSET_BASE',
     prodAssetBase: PROD_ASSET_BASE,
     localLookStores: LOCAL_LOOK_STORES,
@@ -234,6 +235,7 @@ export const TEMPLATE_SPECS = {
     sizeCharts: {},
     occasionSlugs: [],
     archivePlaceholders: false,
+    retiredSlugs: ['phone-case-set'],
     assetEnv: 'SOUQ_DEMO_ASSET_BASE',
     prodAssetBase: SOUQ_PROD_ASSET_BASE,
     localLookStores: [
@@ -264,6 +266,7 @@ export const TEMPLATE_SPECS = {
     sizeCharts: {},
     occasionSlugs: [],
     archivePlaceholders: false,
+    retiredSlugs: ['makeup-brush-set'],
     assetEnv: 'JASMINE_DEMO_ASSET_BASE',
     prodAssetBase: JASMINE_PROD_ASSET_BASE,
     localLookStores: [
@@ -541,6 +544,15 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
         await tx.category.updateMany({
           where: { storeId, slug: { in: PLACEHOLDER_CATEGORY_SLUGS } },
           data: { isActive: false },
+        });
+
+      // DQ-1 (2026-10-23): a showroom never shows a no-photo product (the no-photo case lives in the
+      // *-noimg scenario stores). Products dropped from a catalogue are ARCHIVED here, never deleted
+      // (cart lines may point at them), so a re-seed of an old showroom retires them.
+      if (spec.retiredSlugs?.length)
+        await tx.product.updateMany({
+          where: { storeId, slug: { in: spec.retiredSlugs }, status: { not: 'archived' } },
+          data: { status: 'archived' },
         });
 
       // Size charts: no unique key, so find by (store, name) then update or create (C17).

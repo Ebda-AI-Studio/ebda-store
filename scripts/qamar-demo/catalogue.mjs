@@ -226,17 +226,6 @@ export const QAMAR_PRODUCTS = [
     facts: [FABRIC('Satin', 'ستان')],
   },
   {
-    slug: 'modal-scarf-no-image',
-    name: 'Modal scarf',
-    nameAr: 'طرحة موديل',
-    category: 'scarves',
-    price: 28000,
-    images: [],
-    description: 'A soft modal jersey scarf for every day. (Shown without a photo on purpose.)',
-    descriptionAr: 'طرحة موديل جيرسيه ناعمة لكل يوم. (معروضة من غير صورة عن قصد.)',
-    stock: 40,
-  },
-  {
     slug: 'hand-embroidered-abaya',
     name: 'Black abaya, gold hand embroidery and belt',
     nameAr: 'عباية سوداء مطرزة يدويًا بخيط ذهبي مع حزام جلد طبيعي وأكمام واسعة للسهرات',

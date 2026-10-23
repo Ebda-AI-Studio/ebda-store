@@ -12,7 +12,7 @@ const ALL_PAGES = [
   '/products',
   '/products?category=abayas',
   '/products/linen-abaya',
-  '/products/modal-scarf-no-image',
+  '/products/cotton-scarf-set',
   '/cart',
   '/checkout',
   '/search?q=عباية',
@@ -25,8 +25,8 @@ const ALL_PAGES = [
 const NO_FOOTER = /^\/(checkout|account)/;
 // Products a scenario store does not carry: the PDP is a 404, correctly.
 const ABSENT: Record<string, string[]> = {
-  'qamar-empty': ['/products/linen-abaya', '/products/modal-scarf-no-image'],
-  'qamar-one': ['/products/modal-scarf-no-image'],
+  'qamar-empty': ['/products/linen-abaya', '/products/cotton-scarf-set'],
+  'qamar-one': ['/products/cotton-scarf-set'],
 };
 // Ruling B1-111: a merchant primaryColor at the extremes is honoured verbatim, so text-primary
 // can fail contrast on those stores; every other axe rule still applies.
