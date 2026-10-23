@@ -179,6 +179,30 @@ describe('EditorOverlay (real)', () => {
     expect(h.hasAttribute('contenteditable')).toBe(false);
   });
 
+  it('editable text inside a button never runs the button: select, then edit, and the section handler stays silent', () => {
+    // Jasmine's "add all to the cart" step button: its click handler used to run in the canvas
+    // (cart add, then `disabled` blurred the inline editor the same instant, so the second tap
+    // never visibly edited). The text of a control is a text target; the control stays inert.
+    const d = doc();
+    const heroId = page(d);
+    document
+      .getElementById('s2')!
+      .insertAdjacentHTML(
+        'beforeend',
+        '<button id="cta" type="button" data-builder-setting="headline">Add all</button>'
+      );
+    const action = vi.fn();
+    document.getElementById('cta')!.addEventListener('click', action); // a bubbling handler, like React's root
+    mountOverlay(d, 'en');
+    const cta = document.getElementById('cta')!;
+    fireEvent.click(cta);
+    expect(posted().some(m => m.type === 'select' && m.sectionId === heroId)).toBe(true);
+    expect(action).not.toHaveBeenCalled(); // the select tap does not run the button either
+    fireEvent.click(cta);
+    expect(cta.getAttribute('contenteditable')).toBeTruthy();
+    expect(action).not.toHaveBeenCalled();
+  });
+
   it('a click on text of ANOTHER target only selects it (no edit)', () => {
     const d = doc();
     page(d);
