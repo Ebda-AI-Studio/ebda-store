@@ -140,7 +140,7 @@
 <div data-sheet-body="true">
 <ul>
 <li>
-<a href="/products/undefined">
+<a aria-label="Ring" href="/products/undefined">
 <img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
 </a>
 <div>
@@ -174,7 +174,7 @@
 </div>
 </li>
 <li>
-<a href="/products/undefined">
+<a aria-label="Chain" href="/products/undefined">
 <img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
 </a>
 <div>
@@ -361,7 +361,7 @@
 <div data-sheet-body="true">
 <ul>
 <li>
-<a href="/products/undefined">
+<a aria-label="Ring" href="/products/undefined">
 <img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr1.webp&amp;w=3840&amp;q=75"/>
 </a>
 <div>
@@ -395,7 +395,7 @@
 </div>
 </li>
 <li>
-<a href="/products/undefined">
+<a aria-label="Chain" href="/products/undefined">
 <img alt="" loading="lazy" decoding="async" data-nimg="fill" sizes="80px" srcSet="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=32&amp;q=75 32w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=48&amp;q=75 48w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=64&amp;q=75 64w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=96&amp;q=75 96w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=128&amp;q=75 128w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=256&amp;q=75 256w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=384&amp;q=75 384w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=640&amp;q=75 640w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=750&amp;q=75 750w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=828&amp;q=75 828w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1080&amp;q=75 1080w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1200&amp;q=75 1200w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=1920&amp;q=75 1920w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=2048&amp;q=75 2048w, /_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75 3840w" src="/_next/image?url=https%3A%2F%2Fmedia.example%2Fdahab%2Fr2.webp&amp;w=3840&amp;q=75"/>
 </a>
 <div>
