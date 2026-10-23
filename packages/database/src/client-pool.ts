@@ -218,6 +218,20 @@ interface Waiter {
 interface Slot {
   client: AppPrismaClient;
   adapter: LeasedAdapter;
+  /** Times this client was leased (its first lease is the one that builds its QueryCompiler). */
+  uses: number;
+  born: number;
+  /** A Prisma-internal RangeError was seen on it: dropped on release, never reused. */
+  poisoned: boolean;
+}
+
+export interface ClientRangeErrorContext {
+  model: string | undefined;
+  operation: string;
+  /** Leases this client had served when it failed (1 = it was freshly built for this request). */
+  clientUses: number;
+  clientAgeMs: number;
+  pool: ReturnType<ClientPool['stats']>;
 }
 
 export interface ClientPoolOptions {
@@ -262,6 +276,12 @@ export interface ClientPoolOptions {
   now?: () => number;
   log?: CreatePrismaClientOptions['log'];
   onPoolError?: (err: Error) => void;
+  /**
+   * "Invalid array buffer length" surfaced by Prisma itself (not the adapter), with the model,
+   * operation and the failing client's history. Prisma drops the original stack, so this is the
+   * closest point that still knows what ran. The client is dropped after the lease.
+   */
+  onClientRangeError?: (err: Error, ctx: ClientRangeErrorContext) => void;
   /** A RangeError thrown under a lease, with the operation and the pool state (diagnostics). */
   onAdapterError?: (err: Error, op: string, stats: ReturnType<ClientPool['stats']>) => void;
 }
@@ -325,7 +345,41 @@ export class ClientPool {
       connect: async () => adapter,
     };
     this.created++;
-    return { adapter, client: createPrismaClientWithAdapter(factory, this.opts.log) };
+    const slot: Slot = {
+      adapter,
+      client: undefined as unknown as AppPrismaClient,
+      uses: 0,
+      born: this.now(),
+      poisoned: false,
+    };
+    const base = createPrismaClientWithAdapter(factory, this.opts.log);
+    slot.client = base.$extends({
+      name: 'ebda-pool-diagnostics',
+      query: {
+        $allOperations: async ({ model, operation, args, query }) => {
+          try {
+            return await query(args);
+          } catch (err) {
+            if (err instanceof Error && /Invalid array buffer length/.test(err.message)) {
+              slot.poisoned = true;
+              try {
+                this.opts.onClientRangeError?.(err, {
+                  model,
+                  operation,
+                  clientUses: slot.uses,
+                  clientAgeMs: this.now() - slot.born,
+                  pool: this.stats(),
+                });
+              } catch {
+                // reporting must never change the query's outcome
+              }
+            }
+            throw err;
+          }
+        },
+      },
+    }) as unknown as AppPrismaClient;
+    return slot;
   }
 
   /** Stop counting leases older than `staleLeaseMs` (see the option). */
@@ -342,6 +396,13 @@ export class ClientPool {
   /** An idle client, a new one under `max`, or (at capacity) one freed by reclaiming stale leases. */
   private take(): Slot | undefined {
     let slot = this.idle.pop();
+    // A client poisoned AFTER its release (a query still running when its request ended) is dropped here.
+    while (slot?.poisoned) {
+      this.discarded++;
+      this.created--;
+      void slot.client.$disconnect().catch(() => undefined);
+      slot = this.idle.pop();
+    }
     if (!slot && this.created >= this.max) this.reclaimStale();
     if (!slot && this.created < this.max) slot = this.build();
     if (slot) this.out.set(slot, this.now());
@@ -423,6 +484,7 @@ export class ClientPool {
         if (signal && onAbort) signal.removeEventListener('abort', onAbort);
       }
     }
+    slot.uses++;
     const scope = new ConnectionScope(
       this.opts.connectionString,
       this.opts.onPoolError ?? (() => undefined),
@@ -450,8 +512,8 @@ export class ClientPool {
           return;
         }
         let back: Slot | undefined = held;
-        if (hasStuckDispatch(held.client)) {
-          // Never hand a client with a lost dispatch to the next request.
+        if (held.poisoned || hasStuckDispatch(held.client)) {
+          // Never hand a client with a lost dispatch (or a Prisma-internal RangeError) to the next request.
           this.discarded++;
           this.created--;
           void held.client.$disconnect().catch(() => undefined);
