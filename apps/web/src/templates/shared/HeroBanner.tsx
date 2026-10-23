@@ -192,7 +192,7 @@ export function HeroBanner({
               // Framed: the page container already pads the copy; the scrim follows the frame.
               isFramed
                 ? `px-1 sm:px-0 ${drawFrame ? 'xl:rounded-b-[var(--radius)]' : 'xl:rounded-b-2xl'}`
-                : 'px-5 sm:px-8'
+                : 'px-4 sm:px-6 lg:px-8'
             )
           : 'absolute inset-x-0 bottom-0 z-10 hidden px-10 pb-7 pt-8 xl:block',
         'text-start'
