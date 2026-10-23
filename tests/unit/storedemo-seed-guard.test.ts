@@ -443,7 +443,7 @@ describe('storedemo seed: --template dahab (Ruling B5-10)', () => {
     expect(plan).toContain('dahab: 21 products,');
     expect(plan).toContain('storedemo-dahab');
     expect(plan).toContain('gold pricing: 6 gold-rate products');
-    expect(plan).toContain('automatic rate off');
+    expect(plan).toContain('automatic rate ON');
     expect(plan).toContain('the Dahab superset document');
     expect(plan).not.toContain('archived:');
     expect(plan).not.toContain('secretpw');
@@ -459,8 +459,8 @@ describe('storedemo seed: --template dahab (Ruling B5-10)', () => {
       expect(describePlan(pg('a:b@localhost/x'), other)).not.toContain('gold pricing');
     }
   });
-  it('the demo does not turn the automatic rate on by itself (Ahmad decides at the production step)', () => {
-    expect(dahab.gold.feed).toBe(false);
+  it('the demo turns the automatic rate on (Ruling DEMO-GOLD-1, Ahmad 2026-10-23)', () => {
+    expect(dahab.gold.feed).toBe(true);
   });
   it("a re-seed never writes a gold row's price (the DB trigger would refuse it)", () => {
     const src = readFileSync(path.resolve(__dirname, '../../scripts/storedemo/seed.mjs'), 'utf8');
