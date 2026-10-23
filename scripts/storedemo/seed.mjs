@@ -918,6 +918,26 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
  * service opens its own money transaction. Idempotent: the same rates and specs reprice to the same prices
  * (confirm: true because a re-seed with changed demo rates is a deliberate jump).
  */
+/**
+ * Rates to stamp for a gold showroom: the same free feed the cron uses (karats 24/21/18 from one exact
+ * quote, zero premium) so the first automatic run is not a jump; the spec's constants when the feed is down,
+ * disagrees, or throws. `feed` = { goldFeed, storeCandidateRates } from the API's feed module (injected so
+ * the unit test needs no network). Returns { rates, source: 'feed' | 'fallback' }.
+ */
+export async function marketGoldRates(fallbackRates, feed) {
+  try {
+    const res = await feed.goldFeed().fetch(AbortSignal.timeout(8000));
+    if (res.kind !== 'ok') return { rates: fallbackRates, source: 'fallback' };
+    const cand = feed.storeCandidateRates(res.quote, 0);
+    const rates = fallbackRates.map(r => ({ karat: r.karat, ratePerGram: cand.get(r.karat) }));
+    if (rates.some(r => !Number.isSafeInteger(r.ratePerGram) || r.ratePerGram <= 0))
+      return { rates: fallbackRates, source: 'fallback' };
+    return { rates, source: 'feed' };
+  } catch {
+    return { rates: fallbackRates, source: 'fallback' };
+  }
+}
+
 export async function seedGold(prisma, storeId, userId, spec, productIdBySlug, GoldRateService) {
   const gold = spec.gold;
   const actor = { userId };
@@ -1025,6 +1045,7 @@ async function run() {
   const { GoldRateService } = await import(
     `${root}/apps/api/src/services/gold-rate/gold-rate.service.ts`
   );
+  const feedAdapter = await import(`${root}/apps/api/src/services/gold-rate/feed/adapter.ts`);
   const look = getLook(spec.defaultLook);
   if (!look) throw new Error(`default look ${spec.defaultLook} is not in the registry`);
   const video = videoUrl(a.base);
@@ -1089,9 +1110,17 @@ async function run() {
     const seeded = await runInStoreScope(store.id, () =>
       seedCatalogue(prisma, Prisma, store.id, a.base, spec)
     );
+    let goldSpec = spec;
+    if (spec.gold) {
+      const m = await marketGoldRates(spec.gold.rates, feedAdapter);
+      console.log(
+        `gold rates stamped from ${m.source}: ${m.rates.map(r => `${r.karat}k=${r.ratePerGram / 100}`).join(' / ')} EGP/g`
+      );
+      goldSpec = { ...spec, gold: { ...spec.gold, rates: m.rates } };
+    }
     const goldSeeded = spec.gold
       ? await runInStoreScope(store.id, () =>
-          seedGold(prisma, store.id, owner.id, spec, seeded.productIdBySlug, GoldRateService)
+          seedGold(prisma, store.id, owner.id, goldSpec, seeded.productIdBySlug, GoldRateService)
         )
       : null;
     const rev = await publishHome(store.id, owner.id, seeded.productIdBySlug);
