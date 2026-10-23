@@ -40,6 +40,7 @@ export default function DahabCartTable({
           >
             <Link
               href={`${urlPrefix}/products/${item.slug}`}
+              {...(item.image ? {} : { 'aria-hidden': true, tabIndex: -1 })}
               className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-[var(--radius)] bg-card sm:w-28"
             >
               {item.image && (

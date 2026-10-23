@@ -5,6 +5,7 @@
 //   node scripts/visual/polish-audit.mjs storedemo qamar qamar.atelier,qamar.lookbook,qamar.vitrine
 // Caveats: `small` measures the element box, so a control with a ::before hit-box extension
 // (cards' heart) over-reports; the PDP step needs a PDP link on the PLP and can time out on a cold start.
+// Env: PDP=/products/<slug> (recommended), LANGS=ar,en, WIDTHS=390,1280.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 const W = process.cwd();
@@ -90,8 +91,8 @@ async function metrics(page) {
   });
 }
 for (const look of looks)
-  for (const lang of ['ar', 'en'])
-    for (const w of [390, 1280]) {
+  for (const lang of (process.env.LANGS || 'ar,en').split(','))
+    for (const w of (process.env.WIDTHS || '390,1280').split(',').map(Number)) {
       const ctx = await b.newContext({
         viewport: { width: w, height: w < 500 ? 844 : 800 },
         locale: lang === 'ar' ? 'ar-EG' : 'en-US',
@@ -108,7 +109,7 @@ for (const look of looks)
       });
       const tag = `${look.split('.')[1]}-${lang}-${w}`;
       const row = { look, lang, w, pages: {} };
-      let pdp = null;
+      let pdp = process.env.PDP || null;
       for (const [name, p] of [
         ['home', '/'],
         ['plp', '/products'],
@@ -131,6 +132,10 @@ for (const look of looks)
           });
           await page.waitForTimeout(2800);
           if (name === 'plp')
+            await page
+              .waitForSelector('main a[href^="/products/"]', { timeout: 30000 })
+              .catch(() => {});
+          if (name === 'plp' && !process.env.PDP)
             pdp = await page.evaluate(() => {
               const a = [...document.querySelectorAll('a[href*="/products/"]')]
                 .map(a => a.getAttribute('href'))
@@ -149,7 +154,16 @@ for (const look of looks)
           const ax = await page.evaluate(async () =>
             (
               await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa'] })
-            ).violations.map(v => v.id + '(' + v.impact + ',' + v.nodes.length + ')')
+            ).violations.map(
+              v =>
+                v.id +
+                '(' +
+                v.impact +
+                ',' +
+                v.nodes.length +
+                ')' +
+                (v.nodes[0].html || '').slice(0, 160)
+            )
           );
           m.axe = ax;
           row.pages[name] = m;
@@ -163,7 +177,6 @@ for (const look of looks)
       await ctx.close();
     }
 fs.writeFileSync(`${OUT}/report.json`, JSON.stringify(res, null, 1));
-// summary
 for (const r of res) {
   const bad = Object.entries(r.pages).map(([k, v]) =>
     v.err

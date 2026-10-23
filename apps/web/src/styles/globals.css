@@ -1271,7 +1271,6 @@ html {
   scroll-padding-top: calc(var(--header-h, 0px) + var(--sticky-extra, 0px) + 0.75rem);
 }
 
-
 /* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
  * reserved on <body> (never the chrome wrapper). Body already carries pb-32 for the
  * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it.
@@ -1708,6 +1707,19 @@ html[dir='rtl'] [data-look='lamma.notebook'],
    a text-primary link on a card still reads as ink there so the brass stays the one CTA metal.
    Sale / new chips and the PDP discount pill are the same brass (one accent, B2-26 pattern): the
    chip pair resolves to the primary pair, no new hex. */
+/* Bloom: the neutral near-black hero scrim (HERO_TEXT_SCRIM) read as a murky grey slab over the pastel
+ * pink photo at xl. Tint it from the look's own ink (the deep plum) so it reads as shade, not dirt;
+ * the same band shape, mask and 0.72+ alpha keep the white copy above 4.5:1. */
+[data-look='jasmine.bloom'] [data-part='hero-scrim'],
+[data-look='jasmine.bloom'] [data-part='hero-copy'][data-anchor='corner'] {
+  background-image: linear-gradient(
+    to top,
+    hsl(var(--foreground) / 0.82) 0%,
+    hsl(var(--foreground) / 0.82) calc(100% - 2rem),
+    hsl(var(--foreground) / 0) 100%
+  ) !important;
+}
+
 [data-look='jasmine.apothecary'] {
   --chip-bg: var(--primary);
   --chip-fg: var(--primary-foreground);
