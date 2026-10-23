@@ -86,11 +86,16 @@ export const DAHAB_SIZE_CHARTS = {
   },
 };
 
-/** Today's illustrative rates for the demo, piastres per gram. The seed re-stamps them on every run. */
+/**
+ * FALLBACK rates for the demo, piastres per gram (market on 2026-10-23: 24k 7,101 EGP/g, 21k and 18k derived
+ * from it). The seed stamps the LIVE feed rate instead (`marketGoldRates` in scripts/storedemo/seed.mjs) and
+ * uses these only when the feed is down or its sources disagree. Keep them near market: a manual rate far
+ * from the feed makes the first automatic run PENDING (jump gate) and the gold pieces pause when it goes stale.
+ */
 export const DAHAB_GOLD_RATES = [
-  { karat: 24, ratePerGram: 468_600 },
-  { karat: 21, ratePerGram: 410_000 },
-  { karat: 18, ratePerGram: 351_400 },
+  { karat: 24, ratePerGram: 710_100 },
+  { karat: 21, ratePerGram: 621_400 },
+  { karat: 18, ratePerGram: 532_600 },
 ];
 
 // ---- fact helpers: at most TWO `onCard` chips per product (B0-4/B0-49, B5-5): karat and weight are

@@ -18,6 +18,7 @@ import {
   DAHAB_PROD_ASSET_BASE,
   seedStoreClaim,
   SHOWROOM_THEME,
+  marketGoldRates,
   // @ts-expect-error plain .mjs script
 } from '../../scripts/storedemo/seed.mjs';
 // @ts-expect-error plain .mjs data module
@@ -466,5 +467,46 @@ describe('storedemo seed: --template dahab (Ruling B5-10)', () => {
     const src = readFileSync(path.resolve(__dirname, '../../scripts/storedemo/seed.mjs'), 'utf8');
     expect(src).toMatch(/update: p\.gold \? dataNoPrice : data/);
     expect(src).toMatch(/if \(p\.gold\) \{\s+delete vData\.price;\s+delete vData\.compareAtPrice;/);
+  });
+});
+
+describe('dahab seed gold rates track the market', () => {
+  const fallback = [
+    { karat: 24, ratePerGram: 710_100 },
+    { karat: 21, ratePerGram: 621_400 },
+    { karat: 18, ratePerGram: 532_600 },
+  ];
+  const cand = new Map([
+    [24, 720_000],
+    [21, 630_000],
+    [18, 540_000],
+  ]);
+  const feedOf = (res: unknown, throws = false) => ({
+    goldFeed: () => ({
+      fetch: async () => {
+        if (throws) throw new Error('network');
+        return res;
+      },
+    }),
+    storeCandidateRates: () => cand,
+  });
+  it('stamps the live feed rates when the feed is ok', async () => {
+    const r = await marketGoldRates(fallback, feedOf({ kind: 'ok', quote: {} }));
+    expect(r.source).toBe('feed');
+    expect(r.rates).toEqual([
+      { karat: 24, ratePerGram: 720_000 },
+      { karat: 21, ratePerGram: 630_000 },
+      { karat: 18, ratePerGram: 540_000 },
+    ]);
+  });
+  it('falls back to the constants when the feed is down, disagrees or throws', async () => {
+    for (const f of [feedOf({ kind: 'down' }), feedOf({ kind: 'disagree' }), feedOf(null, true)]) {
+      const r = await marketGoldRates(fallback, f);
+      expect(r).toEqual({ rates: fallback, source: 'fallback' });
+    }
+  });
+  it('the fallback constants stay within the 500 bps jump gate of market (24k 7,101 EGP/g on 2026-10-23)', () => {
+    const k24 = TEMPLATE_SPECS.dahab.gold.rates.find((x: { karat: number }) => x.karat === 24)!;
+    expect(Math.abs(k24.ratePerGram - 710_142) / 710_142).toBeLessThan(0.05);
   });
 });
