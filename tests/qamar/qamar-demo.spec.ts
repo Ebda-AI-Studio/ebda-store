@@ -34,7 +34,7 @@ test('storedemo: bar, look switch, persistence, no-store, closed checkout, noind
   expect(page.url()).toContain('look=qamar.lookbook');
   await expect(page.locator('body')).toHaveAttribute('data-look', 'qamar.lookbook');
   // Closed ordering: put a piece in the cart (the demo store takes cart lines, not orders).
-  await page.goto(`${hostOf('storedemo')}/products/modal-scarf-no-image?look=qamar.lookbook`, {
+  await page.goto(`${hostOf('storedemo')}/products/cotton-scarf-set?look=qamar.lookbook`, {
     waitUntil: 'networkidle',
   });
   for (const g of await page.locator('[data-option-group]').all()) {

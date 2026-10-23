@@ -58,8 +58,8 @@ export const TAG_PATH = `/products?tag=${encodeURIComponent(TAG)}`;
 export const SHADE_PDP = '/products/matte-lipstick';
 /** An option-less product (second cart line, no-option PDP). */
 export const PLAIN_PDP = '/products/sunscreen-spf50';
-/** The no-photo product. */
-export const NOIMG_PDP = '/products/makeup-brush-set';
+/** A plain product: the no-photo case is the jasmine-noimg scenario store (DQ-1). */
+export const NOIMG_PDP = '/products/sonic-face-brush';
 
 /**
  * Status and body of a URL through the BROWSER (its host resolver maps the store hosts to the local

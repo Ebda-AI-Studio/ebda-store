@@ -445,22 +445,6 @@ export const SOUQ_PRODUCTS = [
       CONDITION.new,
     ],
   },
-  {
-    slug: 'phone-case-set',
-    name: 'Protective phone case set',
-    nameAr: 'طقم جراب حماية للموبايل',
-    category: 'accessories',
-    price: 35_000,
-    images: [], // the product with no photo (taste bar: the card must hold up without one)
-    description: 'A clear case and a tempered glass screen protector in one pack.',
-    descriptionAr: 'جراب شفاف وزجاج حماية للشاشة في علبة واحدة.',
-    facts: [
-      spec('Includes', 'يشمل', 'Case + glass', 'جراب + زجاج'),
-      spec('Fit', 'الملاءمة', 'Most 6.7 inch phones', 'أغلب موبايلات 6.7 بوصة'),
-      WARRANTY('None', 'من غير ضمان'),
-      CONDITION.new,
-    ],
-  },
 ];
 
 /** Every image file the catalogue and the home document name (the assets test checks each exists). */

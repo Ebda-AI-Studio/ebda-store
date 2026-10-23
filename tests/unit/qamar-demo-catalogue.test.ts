@@ -43,8 +43,8 @@ const KB = 1024;
 
 describe('qamar demo catalogue exercises every B0 feature', () => {
   const opts = PRODUCTS.flatMap(p => p.options ?? []);
-  it('18 products, unique slugs', () => {
-    expect(PRODUCTS).toHaveLength(18);
+  it('17 products, unique slugs', () => {
+    expect(PRODUCTS).toHaveLength(17);
     expect(new Set(PRODUCTS.map(p => p.slug)).size).toBe(PRODUCTS.length);
   });
   it('colour hex swatch', () => expect(opts.some(o => o.values.some(v => v.hex))).toBe(true));
@@ -98,7 +98,7 @@ describe('qamar demo catalogue exercises every B0 feature', () => {
   it('sale, backorder, no-image, long names', () => {
     expect(PRODUCTS.some(p => p.compareAtPrice && p.compareAtPrice > p.price)).toBe(true);
     expect(PRODUCTS.some(p => p.backorder)).toBe(true);
-    expect(PRODUCTS.some(p => p.images.length === 0)).toBe(true);
+    expect(PRODUCTS.some(p => p.images.length === 0)).toBe(false); // DQ-1: the no-photo case is a scenario store
     expect(PRODUCTS.some(p => p.nameAr.length >= 60)).toBe(true);
     expect(PRODUCTS.some(p => p.name.length >= 60)).toBe(true);
   });

@@ -42,9 +42,9 @@ const CATEGORIES = SOUQ_CATEGORIES as { slug: string; image?: string }[];
 const assets = path.resolve(__dirname, '../../scripts/souq-demo/assets');
 
 describe('souq demo catalogue: shape', () => {
-  it('20 products, unique slugs, 7 categories', () => {
-    expect(PRODUCTS).toHaveLength(20);
-    expect(new Set(PRODUCTS.map(p => p.slug)).size).toBe(20);
+  it('19 products, unique slugs, 7 categories', () => {
+    expect(PRODUCTS).toHaveLength(19);
+    expect(new Set(PRODUCTS.map(p => p.slug)).size).toBe(19);
     expect(CATEGORIES.map(c => c.slug)).toEqual([
       'phones',
       'laptops',
@@ -120,7 +120,7 @@ describe('souq demo catalogue: every feature, by count', () => {
       PRODUCTS.filter(p => p.facts.some(f => f.key === 'Condition' && f.valueAr === v));
     expect(cond('مجدّد')).toHaveLength(1);
     expect(cond('مستعمل بحالة ممتازة')).toHaveLength(1);
-    expect(cond('جديد')).toHaveLength(18);
+    expect(cond('جديد')).toHaveLength(17);
   });
   it('at least 6 sale prices, one at 40% off or more, every sale really lower', () => {
     const sales = PRODUCTS.filter(p => p.compareAtPrice);
@@ -136,8 +136,8 @@ describe('souq demo catalogue: every feature, by count', () => {
     for (const t of sold[0].soldOut!) expect(all).toContain(t.join('|'));
     expect(all.length).toBeGreaterThan(sold[0].soldOut!.length); // never everything
   });
-  it('one product with no photo', () => {
-    expect(PRODUCTS.filter(p => p.images.length === 0)).toHaveLength(1);
+  it('every showroom product has a photo (DQ-1; the no-photo case is the souq-noimg scenario store)', () => {
+    expect(PRODUCTS.filter(p => p.images.length === 0)).toHaveLength(0);
   });
   it('two very long names: one Arabic, one English (>= 90 characters)', () => {
     expect(PRODUCTS.filter(p => p.nameAr.length >= 90)).toHaveLength(1);

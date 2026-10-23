@@ -61,9 +61,9 @@ const withOptions = PRODUCTS.filter(p => p.options?.length);
 const shadeProducts = withOptions.filter(p => p.options!.some(o => o.name === 'Shade'));
 
 describe('jasmine demo catalogue: shape', () => {
-  it('22 products, unique slugs, 7 categories', () => {
-    expect(PRODUCTS).toHaveLength(22);
-    expect(new Set(PRODUCTS.map(p => p.slug)).size).toBe(22);
+  it('21 products, unique slugs, 7 categories', () => {
+    expect(PRODUCTS).toHaveLength(21);
+    expect(new Set(PRODUCTS.map(p => p.slug)).size).toBe(21);
     expect(CATEGORIES.map(c => c.slug)).toEqual([
       'cleansers',
       'serums',
@@ -198,8 +198,8 @@ describe('jasmine demo catalogue: every feature, by count', () => {
     for (const t of sold[0].soldOut!) expect(all).toContain(t.join('|'));
     expect(all.length).toBeGreaterThan(sold[0].soldOut!.length);
   });
-  it('one product with no photo', () => {
-    expect(PRODUCTS.filter(p => p.images.length === 0)).toHaveLength(1);
+  it('every showroom product has a photo (DQ-1; the no-photo case is the jasmine-noimg scenario store)', () => {
+    expect(PRODUCTS.filter(p => p.images.length === 0)).toHaveLength(0);
   });
   it('two very long names: one Arabic, one English (>= 90 characters)', () => {
     expect(PRODUCTS.filter(p => p.nameAr.length >= 90)).toHaveLength(1);

@@ -152,7 +152,7 @@ describe('storedemo seed: --template souq (Ruling B2-7)', () => {
   });
   it('describePlan names the Souq catalogue, instalments and NO archived placeholder families', () => {
     const plan = describePlan(pg('user:secretpw@localhost:5432/x'), souq);
-    expect(plan).toContain('souq: 20 products, 24 variants, 7 categories');
+    expect(plan).toContain('souq: 19 products, 24 variants, 7 categories');
     expect(plan).toContain('instalments enabled (no provider name)');
     expect(plan).toContain('storedemo-souq');
     expect(plan).not.toContain('archived:');
@@ -222,7 +222,7 @@ describe('storedemo seed: --template jasmine (Ruling B3-8)', () => {
   });
   it('describePlan names the catalogue, tags, bundle, reviews, the bundles feature and no archive', () => {
     const plan = describePlan(pg('user:secretpw@localhost:5432/x'), jasmine);
-    expect(plan).toContain('jasmine: 22 products, 23 variants, 7 categories');
+    expect(plan).toContain('jasmine: 21 products, 23 variants, 7 categories');
     expect(plan).toContain('6 skin-type / concern tags, 1 routine bundle(s), 13 approved reviews');
     expect(plan).toContain('features bundles');
     expect(plan).toContain('instalments enabled (no provider name)');
