@@ -36,7 +36,7 @@ export function PageSwitcher({
         aria-label={t('label')}
         value={pageKey}
         onChange={e => onChange(e.target.value as PageKind)}
-        className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-semibold"
+        className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-semibold max-lg:min-h-11"
         data-testid="page-switcher"
         data-setting-id="builder.page-switcher"
       >

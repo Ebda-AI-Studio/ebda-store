@@ -335,15 +335,22 @@ export function BuilderEditor({
         setTab('sections');
         setDrawer('start');
         const sel = selectionRef.current;
-        requestAnimationFrame(() => {
+        // Below lg the tree lives in a drawer that mounts and takes its own focus a frame or two
+        // later, so one rAF can lose the race (the tree row was still hidden): retry until the row
+        // actually holds focus (a11y: the Esc-from-canvas return must land on the tree row).
+        const focusRow = () => {
           const row =
             (sel &&
               document.querySelector<HTMLElement>(
                 `[data-testid="tree-select-${window.CSS.escape(sel.sectionId)}"]`
               )) ||
             document.querySelector<HTMLElement>('[data-testid^="tree-select-"]');
-          row?.focus();
-        });
+          // The drawer takes its own focus (close button) after it mounts, so this must run after
+          // it; the retries stop within 400 ms of the Esc.
+          if (row && document.activeElement !== row) row.focus();
+        };
+        requestAnimationFrame(focusRow);
+        for (const ms of [60, 180, 400]) setTimeout(focusRow, ms);
         return;
       }
       // Every other intent is re-validated against the CURRENT document and the registry
@@ -746,7 +753,7 @@ export function BuilderEditor({
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 lg:h-14 lg:flex-nowrap lg:py-0">
         <Link
           href={`/stores/${storeId}`}
-          className="flex items-center gap-2"
+          className="flex items-center justify-center gap-2 max-lg:min-h-11 max-lg:min-w-11"
           aria-label={t('back')}
         >
           {}
@@ -764,7 +771,7 @@ export function BuilderEditor({
           <button
             type="button"
             onClick={() => setDrawer(d => (d === 'start' ? null : 'start'))}
-            className="rounded px-2 py-1 text-xs hover:bg-muted"
+            className="rounded px-2 py-1 text-xs hover:bg-muted max-lg:min-h-11 max-lg:px-3"
             aria-expanded={drawer === 'start'}
           >
             {t('panes.start')}
@@ -772,7 +779,7 @@ export function BuilderEditor({
           <button
             type="button"
             onClick={() => setDrawer(d => (d === 'end' ? null : 'end'))}
-            className="rounded px-2 py-1 text-xs hover:bg-muted"
+            className="rounded px-2 py-1 text-xs hover:bg-muted max-lg:min-h-11 max-lg:px-3"
             aria-expanded={drawer === 'end'}
           >
             {t('panes.end')}
@@ -790,7 +797,7 @@ export function BuilderEditor({
               role="radio"
               aria-checked={viewport === v}
               onClick={() => setViewport(v)}
-              className={`rounded-md px-2.5 py-1 ${viewport === v ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'}`}
+              className={`rounded-md px-2.5 py-1 max-lg:min-h-11 ${viewport === v ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'}`}
               data-testid={`viewport-${v}`}
             >
               {t(`viewport.${v}`)}
@@ -803,7 +810,7 @@ export function BuilderEditor({
           disabled={!b.canUndo}
           aria-label={t('undo')}
           title={t('undo')}
-          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-lg:ms-auto"
+          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-lg:ms-auto max-lg:min-h-11 max-lg:min-w-11"
           data-testid="undo"
         >
           ↶
@@ -814,7 +821,7 @@ export function BuilderEditor({
           disabled={!b.canRedo}
           aria-label={t('redo')}
           title={t('redo')}
-          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30"
+          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-lg:min-h-11 max-lg:min-w-11"
           data-testid="redo"
         >
           ↷
@@ -836,7 +843,7 @@ export function BuilderEditor({
               setDrawer(d => (d === 'end' ? d : 'end'));
             }}
             aria-pressed={lookOpen}
-            className={`rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted ${lookOpen ? 'bg-muted' : 'bg-background'}`}
+            className={`rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted max-lg:min-h-11 ${lookOpen ? 'bg-muted' : 'bg-background'}`}
             data-testid="open-look-switch"
             data-setting-id="builder.look-switch"
           >
@@ -847,7 +854,7 @@ export function BuilderEditor({
           type="button"
           onClick={() => void publish()}
           disabled={b.publishing || b.saveState === 'conflict'}
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 max-lg:min-h-11"
           data-testid="publish"
         >
           {b.publishing ? t('publishing') : t('publish')}

@@ -109,7 +109,7 @@ function Row({
       >
         <button
           type="button"
-          className="cursor-grab touch-none rounded px-1 text-muted-foreground hover:text-foreground"
+          className="min-h-6 min-w-6 cursor-grab touch-none rounded px-1 text-muted-foreground hover:text-foreground"
           aria-label={t('drag', { name })}
           {...attributes}
           {...listeners}
@@ -307,7 +307,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30"
+      className="min-h-6 min-w-6 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30"
     >
       {children}
     </button>

@@ -137,7 +137,12 @@ export function Canvas({
   return (
     <div
       ref={wrap}
-      className="relative flex h-full w-full justify-center overflow-auto bg-muted/40 p-4"
+      // A scrollable region must be keyboard-reachable (axe scrollable-region-focusable): the
+      // phone header is two rows tall, so the preview can be taller than the pane.
+      tabIndex={0}
+      role="region"
+      aria-label={t('title')}
+      className="relative flex h-full w-full justify-center overflow-auto bg-muted/40 p-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
     >
       <div
         style={{ width, transform: `scale(${scale})`, transformOrigin: 'top center' }}
