@@ -33,5 +33,6 @@ Resume notes (append as you go). Worktree: ~/Desktop/projects/\_worktrees/ebda-s
 ## (a) STATUS: NOT ATTRIBUTED. Not reproduced; see evidence log. Unproven candidates, in order: (1) memory/ArrayBuffer pressure of an isolate carrying hundreds of queued requests (all 12 events in one 1 s window across different queries = isolate-wide and transient; 100% inside the 40-minute saturation storm; none before or after), (2) pg-protocol/Hyperdrive framing glitch (would not give this text in Node, workerd untested), (3) Prisma wasm glue. The new adapter hook settles it on the next occurrence.
 
 ## Review notes
+
 - request.signal abort path is best effort and UNVERIFIED in prod: a wrangler dev disconnect test never fires it (the dev proxy does not propagate the disconnect, with or without `enable_request_signal`). The age-based pruneDeadWaiters (maxWaitMs) is the proven defence; do not add the flag without a real-edge test.
 - Aborted waiters return 499 with no "shed" log (ClientPoolTimeout.reason = 'aborted').
