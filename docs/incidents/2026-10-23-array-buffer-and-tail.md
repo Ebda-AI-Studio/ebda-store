@@ -56,3 +56,5 @@ Pool now wraps every pooled client with a Prisma query extension: a Prisma-inter
 ### Open / next
 
 If clientUses is always 1: pre-build/warm clients at isolate start, sequentially, outside request bursts. If old clients: suspect the shared wasm instance (cannot be replaced from outside Prisma; next step is a repro under a real 128 MB cap with `wrangler deploy` of a stress Worker to a scratch name on the personal account, or upgrading @prisma/client).
+
+Review notes (PR #168): an adapter-raised RangeError fires both tags (site=prisma-adapter, then site=prisma-request); a Prisma-internal one fires only prisma-request, which is how to tell them apart. A batch $transaction([..]) of N ops reports N times. A client poisoned after release is dropped at the next take().

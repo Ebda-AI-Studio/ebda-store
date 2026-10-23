@@ -440,3 +440,28 @@ describe('a Prisma-internal "Invalid array buffer length"', () => {
     expect(pool.stats()).toMatchObject({ discarded: 0, idle: 1 });
   });
 });
+
+describe('a client poisoned after its release', () => {
+  it('is dropped when next taken from idle, not handed out', async () => {
+    const pool = new ClientPool({ connectionString: URL, max: 1 });
+    const lease = await pool.acquire();
+    const first = lease.client;
+    let fail!: (e: Error) => void;
+    let reached!: () => void;
+    const at = new Promise<void>(r => (reached = r));
+    lease.scope.get = () =>
+      new Promise((_, rej) => {
+        fail = rej;
+        reached();
+      });
+    const late = first.$queryRaw`SELECT 1`.catch(() => undefined);
+    await at; // the query is inside the adapter, waiting on its connection
+    await lease.release(); // released while the query is still in flight
+    fail(new RangeError('Invalid array buffer length'));
+    await late; // fails after release -> poisons an IDLE client
+    const next = await pool.acquire();
+    expect(next.client).not.toBe(first);
+    expect(pool.stats()).toMatchObject({ discarded: 1, created: 1 });
+    await next.release();
+  });
+});

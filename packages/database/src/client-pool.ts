@@ -396,6 +396,13 @@ export class ClientPool {
   /** An idle client, a new one under `max`, or (at capacity) one freed by reclaiming stale leases. */
   private take(): Slot | undefined {
     let slot = this.idle.pop();
+    // A client poisoned AFTER its release (a query still running when its request ended) is dropped here.
+    while (slot?.poisoned) {
+      this.discarded++;
+      this.created--;
+      void slot.client.$disconnect().catch(() => undefined);
+      slot = this.idle.pop();
+    }
     if (!slot && this.created >= this.max) this.reclaimStale();
     if (!slot && this.created < this.max) slot = this.build();
     if (slot) this.out.set(slot, this.now());
