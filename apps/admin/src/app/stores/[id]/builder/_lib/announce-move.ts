@@ -50,3 +50,61 @@ export function describeMove(
   }
   return null;
 }
+
+export interface StructureAnnouncement {
+  kind: 'added' | 'removed' | 'hidden' | 'shown';
+  node: SectionNode;
+  /** 1-based position (added) and the list length after the change. */
+  pos: number;
+  total: number;
+}
+
+/**
+ * The other silent edits a screen-reader user makes from the tree or the canvas toolbar: a section
+ * added, removed, hidden or shown (also what Undo / Redo of those does). Exactly one section may
+ * differ; anything bigger (a reload, a restore, a look switch) is not announced as one change.
+ */
+export function describeStructure(
+  prev: PageDefinition,
+  next: PageDefinition
+): StructureAnnouncement | null {
+  const a = lists(prev);
+  const b = lists(next);
+  for (let i = 0; i < a.length; i++) {
+    const before = a[i];
+    const after = b[i];
+    if (after.length === before.length + 1) {
+      const known = new Set(before.map(n => n.id));
+      const added = after.filter(n => !known.has(n.id));
+      if (added.length === 1 && before.every(n => after.some(m => m.id === n.id)))
+        return {
+          kind: 'added',
+          node: added[0],
+          pos: after.indexOf(added[0]) + 1,
+          total: after.length,
+        };
+    } else if (after.length === before.length - 1) {
+      const kept = new Set(after.map(n => n.id));
+      const gone = before.filter(n => !kept.has(n.id));
+      if (gone.length === 1 && after.every(n => before.some(m => m.id === n.id)))
+        return {
+          kind: 'removed',
+          node: gone[0],
+          pos: before.indexOf(gone[0]) + 1,
+          total: after.length,
+        };
+    } else if (after.length === before.length) {
+      const flipped = after.filter(
+        (n, k) => before[k]?.id === n.id && !!before[k].hidden !== !!n.hidden
+      );
+      if (flipped.length === 1 && before.map(n => n.id).join() === after.map(n => n.id).join())
+        return {
+          kind: flipped[0].hidden ? 'hidden' : 'shown',
+          node: flipped[0],
+          pos: after.indexOf(flipped[0]) + 1,
+          total: after.length,
+        };
+    }
+  }
+  return null;
+}

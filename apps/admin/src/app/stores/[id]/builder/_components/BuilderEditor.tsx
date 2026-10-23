@@ -54,7 +54,8 @@ import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
 import { setCanvasHover } from '../_lib/canvas-hover-store';
-import { describeMove } from '../_lib/announce-move';
+import { describeMove, describeStructure } from '../_lib/announce-move';
+import { rovingKeyDown } from '../_lib/roving';
 import { useDrawerA11y } from '../_lib/use-drawer-a11y';
 import { resolveDeepLink, type DeepLinkParams } from '../_lib/deeplink';
 import { locateAndHighlight } from '../../../../../lib/setting-highlight';
@@ -505,17 +506,35 @@ export function BuilderEditor({
     const prev = prevDoc.current;
     prevDoc.current = b.doc;
     if (!prev || !b.doc || prev === b.doc) return;
+    const nameOf = (type: string) => {
+      const def = getSectionDefinition(type);
+      return (locale === 'ar' ? def?.labelAr : def?.labelEn) ?? type;
+    };
+    // The same sentence twice in a row (two removals of the same kind of section) is not re-read
+    // when the text is unchanged, so every announcement alternates a trailing no-break space.
+    const say = (text: string) =>
+      setAnnouncement(a => (a.endsWith('\u00a0') ? text : `${text}\u00a0`));
     const move = describeMove(prev, b.doc, selectionRef.current?.sectionId);
-    if (!move) return;
-    const def = getSectionDefinition(move.node.type);
-    const name = (locale === 'ar' ? def?.labelAr : def?.labelEn) ?? move.node.type;
-    setAnnouncement(
-      t(move.direction === 'up' ? 'live.movedUp' : 'live.movedDown', {
-        name,
-        pos: move.pos,
-        total: move.total,
-      })
-    );
+    if (move) {
+      say(
+        t(move.direction === 'up' ? 'live.movedUp' : 'live.movedDown', {
+          name: nameOf(move.node.type),
+          pos: move.pos,
+          total: move.total,
+        })
+      );
+      return;
+    }
+    // Add / remove / hide / show, and what Undo and Redo do to them: silent otherwise.
+    const change = describeStructure(prev, b.doc);
+    if (change)
+      say(
+        t(`live.${change.kind}`, {
+          name: nameOf(change.node.type),
+          pos: change.pos,
+          total: change.total,
+        })
+      );
   }, [b.doc, locale, t]);
 
   if (b.loadError)
@@ -561,6 +580,7 @@ export function BuilderEditor({
       <div
         role="tablist"
         aria-label={t('panes.start')}
+        onKeyDown={e => rovingKeyDown(e, 'tab')}
         className="flex border-b border-border text-xs"
       >
         {(isHome
@@ -571,7 +591,10 @@ export function BuilderEditor({
             key={k}
             role="tab"
             type="button"
+            id={`builder-tab-${k}`}
             aria-selected={tab === k}
+            aria-controls="builder-tabpanel"
+            tabIndex={tab === k ? 0 : -1}
             onClick={() => setTab(k)}
             className={`flex-1 px-2 py-2.5 ${tab === k ? 'border-b-2 border-primary font-semibold text-foreground' : 'text-muted-foreground'}`}
           >
@@ -579,7 +602,12 @@ export function BuilderEditor({
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        role="tabpanel"
+        id="builder-tabpanel"
+        aria-labelledby={`builder-tab-${tab}`}
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
         {tab === 'sections' && (
           <button
             type="button"
@@ -750,6 +778,20 @@ export function BuilderEditor({
       >
         {announcement}
       </div>
+      <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:start-2 focus-within:top-2 focus-within:z-50 focus-within:flex focus-within:gap-2 focus-within:rounded-lg focus-within:bg-background focus-within:p-2 focus-within:shadow-lg">
+        <button
+          type="button"
+          onClick={() => {
+            setDrawer('end');
+            requestAnimationFrame(() => document.getElementById('builder-settings')?.focus());
+          }}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold"
+          data-testid="skip-to-settings"
+        >
+          {t('skip.settings')}
+        </button>
+      </div>
+      <h1 className="sr-only">{`${t('title')}: ${storeName}`}</h1>
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 lg:h-14 lg:flex-nowrap lg:py-0">
         <Link
           href={`/stores/${storeId}`}
@@ -788,6 +830,7 @@ export function BuilderEditor({
         <div
           role="radiogroup"
           aria-label={t('viewport.label')}
+          onKeyDown={e => rovingKeyDown(e, 'radio')}
           className="order-last mx-auto inline-flex rounded-lg bg-muted p-0.5 text-xs max-lg:max-w-full lg:order-none"
         >
           {(['desktop', 'tablet', 'mobile'] as const).map(v => (
@@ -796,6 +839,7 @@ export function BuilderEditor({
               type="button"
               role="radio"
               aria-checked={viewport === v}
+              tabIndex={viewport === v ? 0 : -1}
               onClick={() => setViewport(v)}
               className={`rounded-md px-2.5 py-1 max-lg:min-h-11 ${viewport === v ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'}`}
               data-testid={`viewport-${v}`}
@@ -940,7 +984,8 @@ export function BuilderEditor({
         >
           {startPane}
         </aside>
-        <main className="min-w-0 flex-1">
+        {/* the target of the admin shell's skip link ("skip to main content"): the preview */}
+        <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 outline-none">
           <Canvas
             storefrontUrl={getStoreHref(store)}
             path={canvasPath}
@@ -956,6 +1001,8 @@ export function BuilderEditor({
         </main>
         <aside
           ref={endRef}
+          id="builder-settings"
+          tabIndex={-1}
           aria-label={t('panes.end')}
           className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-s border-border bg-card lg:static lg:flex lg:w-80 lg:shadow-none`}
         >

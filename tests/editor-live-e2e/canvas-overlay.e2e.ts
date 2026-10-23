@@ -27,12 +27,16 @@ async function routeStorefront(context: BrowserContext) {
   const webPort = test.info().config.metadata.webPort as number;
   await context.route(new RegExp(`^${STORE_ORIGIN.replace(/\./g, '\\.')}/`), async route => {
     const u = new URL(route.request().url());
-    const response = await route.fetch({
-      url: `http://127.0.0.1:${webPort}${u.pathname}${u.search}`,
-      headers: { ...route.request().headers(), host: u.host },
-      maxRedirects: 0,
-    });
-    await route.fulfill({ response });
+    try {
+      const response = await route.fetch({
+        url: `http://127.0.0.1:${webPort}${u.pathname}${u.search}`,
+        headers: { ...route.request().headers(), host: u.host },
+        maxRedirects: 0,
+      });
+      await route.fulfill({ response });
+    } catch {
+      // the page closed while this fetch was in flight (end of a test): nothing left to serve
+    }
   });
 }
 

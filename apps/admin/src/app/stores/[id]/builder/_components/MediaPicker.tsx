@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 import { useImageUpload } from '../../../../../hooks/useImageUpload';
+import { useRestoreFocus } from '../_lib/use-restore-focus';
 
 interface MediaItem {
   key: string;
@@ -34,6 +35,7 @@ export function MediaPicker({
 }) {
   const t = useT('builder.media');
   const ref = useRef<HTMLDialogElement>(null);
+  useRestoreFocus();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -115,11 +117,13 @@ export function MediaPicker({
           <p className="text-sm text-muted-foreground">{t('empty')}</p>
         )}
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {items.map(it => (
+          {items.map((it, i) => (
             <li key={it.key}>
               <button
                 type="button"
                 onClick={() => onPick(it.url)}
+                // The thumbnail is decorative (alt=""), so without this the button has no name.
+                aria-label={t('pickImage', { n: i + 1, name: it.key.split('/').pop() ?? '' })}
                 className="block w-full overflow-hidden rounded-lg border border-border hover:border-primary"
               >
                 {}

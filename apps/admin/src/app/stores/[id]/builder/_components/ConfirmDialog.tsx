@@ -6,6 +6,7 @@
  * trapped, Escape cancels, and focus returns to what opened it.
  */
 import { useT } from '@/i18n/useT';
+import { useRestoreFocus } from '../_lib/use-restore-focus';
 
 export function ConfirmDialog({
   title,
@@ -24,6 +25,7 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   const t = useT('builder.canvasOps');
+  useRestoreFocus();
   return (
     <dialog
       ref={el => {

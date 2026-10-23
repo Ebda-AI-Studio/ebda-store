@@ -173,6 +173,8 @@ export function ColorField({
       <span className="text-sm text-foreground">{label}</span>
       <div className="flex flex-wrap items-center gap-2">
         <select
+          // the visible label is a sibling span, not a <label>: name the control for AT
+          aria-label={label}
           value={selectValue}
           onChange={e => handleSelectChange(e.target.value)}
           className="rounded border border-border bg-background px-2 py-1 text-sm"

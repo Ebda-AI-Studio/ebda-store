@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { MediaPicker } from './MediaPicker';
+import { useRestoreFocus } from '../_lib/use-restore-focus';
 
 export interface SwapRequest {
   alt?: { en: string; ar?: string };
@@ -28,6 +29,7 @@ export function ImageSwapDialog({
   onClose: () => void;
 }) {
   const t = useT('builder.media');
+  useRestoreFocus();
   const [picked, setPicked] = useState<string | null>(null);
   const [en, setEn] = useState(request.alt?.en ?? '');
   const [ar, setAr] = useState(request.alt?.ar ?? '');
