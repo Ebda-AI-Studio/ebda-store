@@ -1376,7 +1376,7 @@ export default function ProductDetailClient({
                 )}
 
                 {/* Price */}
-                <div className="mt-4 flex items-baseline gap-3">
+                <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span
                     // one price never splits from its currency; only an English "A to B" range may wrap
                     className={`font-bold text-primary${pricing.mode !== 'range' || language === 'ar' ? ' whitespace-nowrap' : ''}`}
