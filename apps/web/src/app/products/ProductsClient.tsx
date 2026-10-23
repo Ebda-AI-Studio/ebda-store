@@ -746,7 +746,7 @@ export default function ProductsClient({
                     }
                   />
                   {/* View Mode */}
-                  <div className="hidden items-center gap-1 rounded-lg border border-input bg-background p-1 sm:flex">
+                  <div className="hidden w-fit items-center gap-1 self-start rounded-lg border border-input bg-background p-1 sm:flex">
                     <button
                       type="button"
                       aria-pressed={viewMode === 'grid'}

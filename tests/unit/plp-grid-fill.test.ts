@@ -13,3 +13,12 @@ describe('PLP grid at lg+', () => {
     expect(src).toContain('repeat(auto-fit,minmax(11.5rem,20rem))');
   });
 });
+
+// PLP-3: below lg the sidebar column is a flex column, so the grid/list toggle stretched into a
+// full-width bordered bar with two small icons and a dead strip (820px tablet).
+describe('PLP view toggle', () => {
+  it('hugs its buttons instead of stretching', () => {
+    const src = readFileSync('apps/web/src/app/products/ProductsClient.tsx', 'utf8');
+    expect(src).toMatch(/hidden w-fit items-center gap-1 self-start rounded-lg border/);
+  });
+});
