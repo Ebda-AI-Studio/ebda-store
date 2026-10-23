@@ -40,16 +40,16 @@ there is one per isolate regardless of the client count. What a client adds, and
 
 ## What shipped instead: leased, reused clients (`packages/database/src/client-pool.ts`)
 
-- `ClientPool` per isolate: at most `max` clients (default 4, `DB_CLIENT_CONCURRENCY`), built lazily, **kept and reused**.
+- `ClientPool` per isolate: at most `max` clients (default 6 since 2026-10-23, was 4; `DB_CLIENT_CONCURRENCY`), built lazily, **kept and reused**.
   A request leases one for its whole life (including its post-commit work) and returns it. A client therefore serves one
   request at a time: no shared DataLoader across concurrent requests, no cross-context execution. Requests beyond `max`
-  wait (FIFO) up to `DB_CLIENT_WAIT_MS` (20 s), then `ClientPoolTimeout` becomes a `503 OVERLOADED` with `Retry-After`.
+  wait (FIFO) up to `DB_CLIENT_WAIT_MS` (6 s since 2026-10-23, was 20 s) and at most `DB_CLIENT_QUEUE` (default `5 * max`) at a time; past either, `ClientPoolTimeout` becomes a `503 OVERLOADED` with `Retry-After` at once. See `docs/incidents/2026-10-23-array-buffer-and-tail.md` for why.
 - **Cancelled requests (2026-10-07).** workerd cancels a request whose client disconnects; its pending promises never
   settle, so the `finally` that returns its lease never runs. Measured on the preview API: six probes cut off by the
   client left `leased: 3` with nothing in flight, and once all `max` clients were held by dead requests the isolate
   answered EVERY request `503 OVERLOADED` after 20 s, for the life of the isolate (the builder canvas's server render
   landed on such an isolate: no draft, no products, no editor overlay). The pool now records when each client was handed
-  out; at capacity, a lease older than `staleLeaseMs` (30 s, the request transaction's own limit) is **abandoned** — no
+  out; at capacity, a lease older than `staleLeaseMs` (30 s, the request transaction's own limit; kept after review: a shorter limit lets live-but-reclaimed requests push real engines over `max`) is **abandoned** — no
   longer counted, its client never reused, a late release drops it — and a waiter older than `DB_CLIENT_WAIT_MS` is
   skipped as dead. `stats().abandoned` counts them. `tests/unit/cf-client-pool.test.ts` ("cancelled").
 - The pg connection stays per request and lazy: each lease gets a `ConnectionScope` (a pg pool of at most
