@@ -2,7 +2,7 @@
  * The leased Prisma client pool of a Worker isolate (packages/database/src/client-pool.ts).
  * No database: a PrismaClient connects lazily, and these tests never run a query that would.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ClientPool, ClientPoolTimeout } from '../../packages/database/src/client-pool';
 import { createIsolateDb, baseClient } from '../../packages/database/src/request-db';
 
@@ -464,4 +464,87 @@ describe('a client poisoned after its release', () => {
     expect(pool.stats()).toMatchObject({ discarded: 1, created: 1 });
     await next.release();
   });
+});
+
+/**
+ * Incident 2026-10-23, third round (release aaaafb3): the raw stack of "Invalid array buffer
+ * length" was `new QueryCompiler` -> wasm -> Uint8Array.subarray, with pool stats `abandoned: 27`.
+ * All clients of an isolate share ONE wasm instance; each client's QueryCompiler takes ~4.5 MB of
+ * its linear memory (measured, node: 60 clients never disconnected = 316 MB RSS, the same 60
+ * disconnected = 80 MB) and only `$disconnect()` (ClientEngine.stop -> queryCompiler.free())
+ * returns it. A lease abandoned as stale (its request was cancelled) was never disconnected, so
+ * every cancelled request leaked one compiler until the wasm memory hit the isolate's limit.
+ */
+describe('an abandoned (stale) lease frees its QueryCompiler', () => {
+  const stubScope = (lease: { scope: { get: () => Promise<never> } }) => {
+    const result = { columnNames: [], columnTypes: [], rows: [] };
+    lease.scope.get = () =>
+      Promise.resolve({
+        queryRaw: () => Promise.resolve(result),
+        executeRaw: () => Promise.resolve(0),
+      } as never);
+  };
+
+  it('disconnects the abandoned client as it is replaced', async () => {
+    let t = 1_000;
+    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, now: () => t });
+    const dead = await pool.acquire();
+    const spy = vi.spyOn(dead.client, '$disconnect');
+    t += 60;
+    const next = await pool.acquire();
+    expect(spy).toHaveBeenCalledTimes(1);
+    await next.release();
+  });
+
+  it('does not grow process memory by one compiler per cancelled request', async () => {
+    let t = 1_000;
+    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, now: () => t });
+    const cycle = async () => {
+      const lease = await pool.acquire(); // never released: its request was cancelled
+      stubScope(lease);
+      await lease.client.$queryRaw`SELECT 1`;
+      t += 60;
+    };
+    await cycle(); // first client pays for the wasm module itself
+    const before = process.memoryUsage().rss;
+    for (let i = 0; i < 25; i++) await cycle();
+    const grown = (process.memoryUsage().rss - before) / 1e6;
+    // Leaked: 25 x ~4.5 MB = ~110 MB. Freed: a few MB.
+    expect(grown).toBeLessThan(50);
+    expect(pool.stats().abandoned).toBe(25);
+  }, 60_000);
+
+  it('frees the compiler even when the cancelled request has an open transaction whose rollback never answers', async () => {
+    let t = 1_000;
+    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, now: () => t });
+    const dead = await pool.acquire();
+    const never = new Promise<never>(() => undefined);
+    const result = { columnNames: [], columnTypes: [], rows: [] };
+    const tx = {
+      provider: 'postgres',
+      adapterName: 'fake',
+      options: { usePhantomQuery: false },
+      queryRaw: () => Promise.resolve(result),
+      executeRaw: () => Promise.resolve(0),
+      commit: () => never,
+      rollback: () => never, // the socket belongs to a dead request context
+    };
+    dead.scope.get = () =>
+      Promise.resolve({ startTransaction: () => Promise.resolve(tx) } as never);
+    void dead.client.$transaction(async c => {
+      await c.$queryRaw`SELECT 1`;
+      await never; // the request is cancelled mid-transaction
+    });
+    await tick();
+    await new Promise(r => setTimeout(r, 50));
+    let done = false;
+    const orig = dead.client.$disconnect.bind(dead.client);
+    vi.spyOn(dead.client, '$disconnect').mockImplementation(() =>
+      orig().finally(() => (done = true))
+    );
+    t += 60;
+    const next = await pool.acquire();
+    await vi.waitFor(() => expect(done).toBe(true), { timeout: 5_000 });
+    await next.release();
+  }, 20_000);
 });
