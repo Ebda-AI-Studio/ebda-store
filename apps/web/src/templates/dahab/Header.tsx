@@ -117,7 +117,7 @@ export default function DahabHeader({
                 <li key={`${item.href}-${item.label}`}>
                   <Link
                     href={item.href}
-                    className="relative inline-flex min-h-11 items-center py-2 text-[15px] text-foreground/85 transition-colors hover:text-primary after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:scale-x-100 rtl:after:origin-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    className="relative inline-flex min-h-11 min-w-11 items-center justify-center py-2 text-[15px] text-foreground/85 transition-colors hover:text-primary after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:scale-x-100 rtl:after:origin-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}
                   </Link>
@@ -151,7 +151,7 @@ export default function DahabHeader({
           <button
             type="button"
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className={cx(ICON_BTN, 'hidden w-auto px-2 text-sm lg:flex')}
+            className={cx(ICON_BTN, 'hidden w-auto min-w-11 px-2 text-sm lg:flex')}
             aria-label={t('التبديل إلى العربية', 'Switch to English')}
             lang={language === 'ar' ? 'en' : 'ar'}
           >
