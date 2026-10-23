@@ -305,6 +305,7 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
     );
   } catch (err) {
     if (err instanceof ClientPoolTimeout) {
+      if (err.reason === 'aborted') return new Response(null, { status: 499 }); // client already gone
       logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
       // Shed load instead of letting the isolate hit its memory limit.
       return Response.json(

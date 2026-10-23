@@ -193,9 +193,16 @@ export function hasStuckDispatch(client: unknown): boolean {
 
 /** Thrown by `acquire` when no client freed up within `maxWaitMs` or the queue is full: shed load, do not queue forever. */
 export class ClientPoolTimeout extends Error {
-  constructor(ms: number) {
+  constructor(
+    ms: number,
+    readonly reason: 'timeout' | 'queue-full' | 'aborted' = 'timeout'
+  ) {
     super(
-      ms > 0 ? `no database client available within ${ms} ms` : 'database client queue is full'
+      reason === 'queue-full'
+        ? 'database client queue is full'
+        : reason === 'aborted'
+          ? 'request aborted while waiting for a database client'
+          : `no database client available within ${ms} ms`
     );
     this.name = 'ClientPoolTimeout';
   }
@@ -378,10 +385,10 @@ export class ClientPool {
     let slot = this.take();
     if (!slot) {
       this.pruneDeadWaiters();
-      if (signal?.aborted) throw new ClientPoolTimeout(0, true);
+      if (signal?.aborted) throw new ClientPoolTimeout(0, 'aborted');
       if (this.waiters.length >= this.maxQueue) {
         this.shed++;
-        throw new ClientPoolTimeout(0, true);
+        throw new ClientPoolTimeout(0, 'queue-full');
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
       let waiter: Waiter | undefined;
@@ -395,7 +402,7 @@ export class ClientPool {
               if (waiter) waiter.dead = true;
               const i = waiter ? this.waiters.indexOf(waiter) : -1;
               if (i >= 0) this.waiters.splice(i, 1);
-              reject(new ClientPoolTimeout(0, true));
+              reject(new ClientPoolTimeout(0, 'aborted'));
             };
             signal.addEventListener('abort', onAbort, { once: true });
           }

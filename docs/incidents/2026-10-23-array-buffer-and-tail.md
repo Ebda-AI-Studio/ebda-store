@@ -31,3 +31,7 @@ Resume notes (append as you go). Worktree: ~/Desktop/projects/\_worktrees/ebda-s
 ## Fix (this branch): bounded queue by count (5 x max) and time (6 s), max 4 -> 6, dead-waiter pruning + abort-signal removal, stats().shed (stale lease stays 30 s: review showed 15 s lets live reclaimed requests exceed max engines), and RangeError capture at the adapter (Sentry tag site=prisma-adapter, with pool stats) so the next "Invalid array buffer length" carries its own stack.
 
 ## (a) STATUS: NOT ATTRIBUTED. Not reproduced; see evidence log. Unproven candidates, in order: (1) memory/ArrayBuffer pressure of an isolate carrying hundreds of queued requests (all 12 events in one 1 s window across different queries = isolate-wide and transient; 100% inside the 40-minute saturation storm; none before or after), (2) pg-protocol/Hyperdrive framing glitch (would not give this text in Node, workerd untested), (3) Prisma wasm glue. The new adapter hook settles it on the next occurrence.
+
+## Review notes
+- request.signal abort path is best effort and UNVERIFIED in prod: a wrangler dev disconnect test never fires it (the dev proxy does not propagate the disconnect, with or without `enable_request_signal`). The age-based pruneDeadWaiters (maxWaitMs) is the proven defence; do not add the flag without a real-edge test.
+- Aborted waiters return 499 with no "shed" log (ClientPoolTimeout.reason = 'aborted').
