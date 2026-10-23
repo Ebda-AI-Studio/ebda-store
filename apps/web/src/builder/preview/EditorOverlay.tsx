@@ -26,6 +26,7 @@ import {
 } from '@ebda/shared';
 import { BRAND } from '@ebda/shared';
 import { startInlineEdit } from './inline-edit';
+import { installEditorInert } from './editor-inert';
 import { cycleIndex, cycleTargets, focusTarget } from './keyboard-logic';
 import { CanvasToolbar } from './CanvasToolbar';
 import { InsertLine, InsertLineStyles } from './InsertLine';
@@ -286,11 +287,6 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       // Inside the canvas a click selects; it never navigates or submits.
       if (target?.closest('a, button, form')) e.preventDefault();
       if (!hit || !target) return;
-      // The text of a control (a step's "add all" button, a link) is a text target, but the control
-      // itself stays inert in the canvas: its own handler would act (cart add) and, worse, disable
-      // the button and blur the inline editor the instant it opened.
-      if (target.closest('[data-builder-setting]')?.matches('button, a, summary, [role="button"]'))
-        e.stopPropagation();
       // A click on text inside the target that is ALREADY selected edits it (Shopify's
       // behaviour); the first click only selects.
       const cur = selectedRef.current;
@@ -401,6 +397,9 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
     // Capture: runs before the inline editor's own handler, so Esc while editing is still "editing".
     document.addEventListener('keydown', onKeyDown, true);
     const reflow = () => setTick(t => t + 1);
+    // BEFORE the click handler below (same node): it decides what is exempt (text about to be
+    // edited) from the DOM as the tap found it, and stopping propagation does not stop that handler.
+    const uninstallInert = installEditorInert();
     document.addEventListener('click', onClick, true);
     document.addEventListener('mouseover', onOver);
     document.addEventListener('mousemove', onMove);
@@ -418,6 +417,7 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
       document.removeEventListener('dblclick', onDblClick);
       document.removeEventListener('submit', onSubmit, true);
       document.removeEventListener('keydown', onKeyDown, true);
+      uninstallInert();
       ro?.disconnect();
       window.removeEventListener('resize', reflow);
       window.removeEventListener('scroll', reflow);
