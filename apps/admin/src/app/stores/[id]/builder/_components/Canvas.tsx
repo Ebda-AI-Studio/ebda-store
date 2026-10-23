@@ -139,6 +139,7 @@ export function Canvas({
       ref={wrap}
       // A scrollable region must be keyboard-reachable (axe scrollable-region-focusable): the
       // phone header is two rows tall, so the preview can be taller than the pane.
+      id="builder-canvas-region"
       tabIndex={0}
       role="region"
       aria-label={t('title')}

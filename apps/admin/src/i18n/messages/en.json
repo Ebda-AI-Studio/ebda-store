@@ -9606,6 +9606,10 @@
       "page": "This section does not belong on this page.",
       "setting": "This page does not have that setting."
     },
+    "title": "Store editor",
+    "skip": {
+      "settings": "Skip to edit options"
+    },
     "panes": {
       "start": "Structure",
       "end": "Settings"
@@ -9627,6 +9631,10 @@
       "keepMine": "Keep mine"
     },
     "live": {
+      "added": "Added {name}, now {pos} of {total}",
+      "removed": "Removed {name}, {total} sections left",
+      "hidden": "Hid {name}",
+      "shown": "Showed {name}",
       "movedUp": "Moved {name} up, now {pos} of {total}",
       "movedDown": "Moved {name} down, now {pos} of {total}"
     },
@@ -9669,6 +9677,7 @@
     },
     "media": {
       "title": "Media",
+      "pickImage": "Choose image {n}: {name}",
       "upload": "Upload image",
       "uploading": "Uploading…",
       "close": "Close",

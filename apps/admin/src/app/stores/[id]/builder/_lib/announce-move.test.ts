@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { layoutToDefinition, resolveLayoutSettings, reduceDocument } from '@ebda/shared';
-import { describeMove } from './announce-move';
+import { describeMove, describeStructure } from './announce-move';
 
 const doc = () => layoutToDefinition(resolveLayoutSettings({}, 'modern'));
 
@@ -29,5 +29,35 @@ describe('describeMove', () => {
     expect(describeMove(prev, prev)).toBeNull();
     const removed = reduceDocument(prev, { type: 'removeSection', id: prev.sections[3].id }).doc;
     expect(describeMove(prev, removed)).toBeNull();
+  });
+});
+
+describe('describeStructure', () => {
+  it('names a removed section, then the same section when Undo adds it back', () => {
+    const prev = doc();
+    const gone = prev.sections[3];
+    const next = reduceDocument(prev, { type: 'removeSection', id: gone.id }).doc;
+    expect(describeStructure(prev, next)).toMatchObject({
+      kind: 'removed',
+      node: { id: gone.id },
+      total: prev.sections.length - 1,
+    });
+    expect(describeStructure(next, prev)).toMatchObject({
+      kind: 'added',
+      node: { id: gone.id },
+      pos: 4,
+      total: prev.sections.length,
+    });
+  });
+
+  it('says hidden / shown for a visibility flip, and nothing for a move or an edit', () => {
+    const prev = doc();
+    const id = prev.sections[1].id;
+    const hid = reduceDocument(prev, { type: 'setSectionHidden', id, hidden: true }).doc;
+    expect(describeStructure(prev, hid)).toMatchObject({ kind: 'hidden', node: { id } });
+    expect(describeStructure(hid, prev)).toMatchObject({ kind: 'shown', node: { id } });
+    const moved = reduceDocument(prev, { type: 'moveSection', id, toIndex: 3 }).doc;
+    expect(describeStructure(prev, moved)).toBeNull();
+    expect(describeStructure(prev, prev)).toBeNull();
   });
 });

@@ -16,6 +16,7 @@
  *   merchant to the classic page (Ruling BUILDER2-ADVANCED-1, superseded by VE-6).
  */
 import { useEffect, useState } from 'react';
+import { rovingKeyDown } from '../_lib/roving';
 import { useLocale } from 'next-intl';
 import {
   AI_FILL_SECTIONS,
@@ -162,6 +163,7 @@ export function SettingsPanel({
         <div
           role="tablist"
           aria-label={t('modeLabel')}
+          onKeyDown={e => rovingKeyDown(e, 'tab')}
           className="mt-2 inline-flex rounded-lg bg-muted p-0.5 text-xs"
         >
           {(['content', 'design'] as const).map(m => (
@@ -169,7 +171,10 @@ export function SettingsPanel({
               key={m}
               role="tab"
               type="button"
+              id={`settings-mode-${m}`}
               aria-selected={mode === m}
+              aria-controls="settings-mode-panel"
+              tabIndex={mode === m ? 0 : -1}
               onClick={() => setMode(m)}
               className={`rounded-md px-3 py-1 ${mode === m ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'}`}
             >
@@ -178,7 +183,12 @@ export function SettingsPanel({
           ))}
         </div>
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div
+        role="tabpanel"
+        id="settings-mode-panel"
+        aria-labelledby={`settings-mode-${mode}`}
+        className="flex-1 space-y-4 overflow-y-auto p-4"
+      >
         {sectionErrors.length > 0 && (
           <ul
             role="alert"
@@ -414,6 +424,9 @@ export function Field({
                 <Input
                   id={`${id}-${key}`}
                   dir={dir}
+                  // The visible name is a sibling span (the field) plus the language tag, so a
+                  // screen reader would read "Arabic" alone, or nothing for a plain field.
+                  aria-label={tag ? `${label} - ${tag}` : label}
                   value={str(key)}
                   rows={def.type === 'textarea' ? 3 : undefined}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -464,6 +477,7 @@ export function Field({
               <ImageField
                 key={key}
                 storeId={storeId}
+                label={label}
                 tag={tag}
                 value={str(key)}
                 onChange={v => onChange(key, v)}
@@ -573,6 +587,7 @@ export function Field({
           {header}
           <CategoryPicker
             storeId={storeId}
+            label={label}
             value={str(def.id)}
             locale={locale}
             onChange={v => onChange(def.id, v)}
@@ -585,6 +600,7 @@ export function Field({
           {header}
           <ProductListPicker
             storeId={storeId}
+            label={label}
             value={Array.isArray(valueOf(def.id)) ? (valueOf(def.id) as string[]) : []}
             max={def.max ?? 50}
             locale={locale}
@@ -620,11 +636,14 @@ export function Field({
 
 function ImageField({
   storeId,
+  label,
   tag,
   value,
   onChange,
 }: {
   storeId: string;
+  /** The field's own name: several images on one section share the same button text. */
+  label: string;
   tag: string;
   value: string;
   onChange: (v: string | undefined) => void;
@@ -651,6 +670,7 @@ function ImageField({
           <button
             type="button"
             onClick={() => setOpen(true)}
+            aria-label={`${value ? t('changeImage') : t('chooseImage')}: ${tag ? `${label} - ${tag}` : label}`}
             className="text-xs font-medium text-primary hover:underline"
           >
             {value ? t('changeImage') : t('chooseImage')}
@@ -659,6 +679,7 @@ function ImageField({
             <button
               type="button"
               onClick={() => onChange(undefined)}
+              aria-label={`${t('removeImage')}: ${tag ? `${label} - ${tag}` : label}`}
               className="text-xs text-muted-foreground hover:underline"
             >
               {t('removeImage')}
@@ -689,11 +710,13 @@ interface NamedRow {
 
 function CategoryPicker({
   storeId,
+  label,
   value,
   locale,
   onChange,
 }: {
   storeId: string;
+  label: string;
   value: string;
   locale: string;
   onChange: (v: string | undefined) => void;
@@ -707,6 +730,7 @@ function CategoryPicker({
   }, [storeId]);
   return (
     <select
+      aria-label={label}
       value={value}
       onChange={e => onChange(e.target.value || undefined)}
       className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
@@ -723,12 +747,14 @@ function CategoryPicker({
 
 function ProductListPicker({
   storeId,
+  label,
   value,
   max,
   locale,
   onChange,
 }: {
   storeId: string;
+  label: string;
   value: string[];
   max: number;
   locale: string;
@@ -768,7 +794,7 @@ function ProductListPicker({
             {names[id] ?? id.slice(0, 8)}
             <button
               type="button"
-              aria-label={t('removeProduct')}
+              aria-label={`${t('removeProduct')}: ${names[id] ?? id.slice(0, 8)}`}
               onClick={() => onChange(value.filter(v => v !== id))}
               className="text-muted-foreground hover:text-foreground"
             >
@@ -778,6 +804,7 @@ function ProductListPicker({
         ))}
       </ul>
       <input
+        aria-label={`${label}: ${t('searchProducts')}`}
         value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder={t('searchProducts')}

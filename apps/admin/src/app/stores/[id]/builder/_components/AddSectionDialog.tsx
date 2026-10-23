@@ -17,6 +17,7 @@ import {
 import { useT } from '@/i18n/useT';
 import { flowOrder, orderByFlow } from '../../../../../lib/builder-flow-order';
 import { SectionThumb } from './SectionThumb';
+import { useRestoreFocus } from '../_lib/use-restore-focus';
 
 interface Props {
   list: SectionList;
@@ -32,6 +33,7 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
   const t = useT('builder.addSection');
   const locale = useLocale();
   const ref = useRef<HTMLDialogElement>(null);
+  useRestoreFocus();
   useEffect(() => {
     ref.current?.showModal();
   }, []);
