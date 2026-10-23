@@ -391,7 +391,7 @@ function StorefrontProductCardImpl({
         <div
           // a look store only: legacy stores keep byte-identical card markup
           {...(getLook(store.look) ? { 'data-part': 'card-image' } : {})}
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}${!img && getLook(store.look) ? ' !aspect-[2/1]' : ''}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls || (getLook(store.look) ? 'rounded-[var(--radius)]' : shape.radius)} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {img ? (
             <>
@@ -418,7 +418,10 @@ function StorefrontProductCardImpl({
               )}
             </>
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <div
+              data-part="card-no-photo"
+              className="flex h-full w-full items-center justify-center text-muted-foreground"
+            >
               <svg
                 className="h-10 w-10"
                 fill="none"
