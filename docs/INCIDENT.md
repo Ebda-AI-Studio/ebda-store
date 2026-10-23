@@ -50,7 +50,7 @@ railway logs --lines 100 | grep -i inngest
 ```
 
 - Stuck "queued" jobs older than 5 min → Inngest sync broken (see `feedback-inngest-deploy-sync-trap.md`)
-- Recovery: `curl -X PUT https://api.ebda.app/api/v1/inngest` to force re-sync
+- Recovery: `curl -X PUT https://api.ebda.app/api/v1/inngest` to force re-sync (since Ruling INNGEST-SYNC-1, `cf-api-deploy.yml` does this after every deploy and fails the job if it is refused)
 
 **4. Is Sentry showing a new error cluster?**
 
