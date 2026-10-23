@@ -571,7 +571,13 @@ export default function ProductsClient({
   const plpGridClass =
     templateId === 'dahab'
       ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
-      : `grid grid-cols-2 md:grid-cols-3 lg:justify-center lg:[grid-template-columns:repeat(auto-fit,minmax(11.5rem,20rem))] ${plpGap}`;
+      : products.length > 0 && products.length <= 3
+        ? // 1-3 products: centre them at up to 20rem (B4-21).
+          `grid grid-cols-2 md:grid-cols-3 lg:justify-center lg:[grid-template-columns:repeat(auto-fit,minmax(11.5rem,20rem))] ${plpGap}`
+        : // A real catalogue: fill the row edge to edge. `auto-fit` + a 20rem cap counts columns by the
+          // CAP, so 896px beside the filter rail gave 2 centred 320px columns and a 180px dead zone
+          // (PLP-2); `auto-fill` + `1fr` counts by the 12.5rem minimum (4 columns there).
+          `grid grid-cols-2 md:grid-cols-3 lg:[grid-template-columns:repeat(auto-fill,minmax(12.5rem,1fr))] ${plpGap}`;
 
   const handleClearAll = () => {
     setSearch('');

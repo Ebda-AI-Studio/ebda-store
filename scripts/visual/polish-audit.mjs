@@ -5,7 +5,7 @@
 //   node scripts/visual/polish-audit.mjs storedemo qamar qamar.atelier,qamar.lookbook,qamar.vitrine
 // Caveats: `small` measures the element box, so a control with a ::before hit-box extension
 // (cards' heart) over-reports; the PDP step needs a PDP link on the PLP and can time out on a cold start.
-// Env: PDP=/products/<slug> (recommended), LANGS=ar,en, WIDTHS=390,1280.
+// Env: RM=1 (prefers-reduced-motion), PDP=/products/<slug> (recommended), LANGS=ar,en, WIDTHS=390,1280.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 const W = process.cwd();
@@ -97,6 +97,7 @@ for (const look of looks)
         viewport: { width: w, height: w < 500 ? 844 : 800 },
         locale: lang === 'ar' ? 'ar-EG' : 'en-US',
         deviceScaleFactor: 1,
+        reducedMotion: process.env.RM ? 'reduce' : 'no-preference',
       });
       await ctx.addCookies([
         { name: 'force-language', value: lang, url: origin },
@@ -130,7 +131,16 @@ for (const look of looks)
             waitUntil: 'load',
             timeout: 120000,
           });
-          await page.waitForTimeout(2800);
+          await page.evaluate(async () => {
+            // trigger lazy images/reveals, then return to the top for the capture
+            for (let y = 0; y < document.documentElement.scrollHeight; y += 500) {
+              window.scrollTo({ top: y, behavior: 'instant' });
+              await new Promise(r => setTimeout(r, 120));
+            }
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          });
+          await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+          await page.waitForTimeout(1500);
           if (name === 'plp')
             await page
               .waitForSelector('main a[href^="/products/"]', { timeout: 30000 })
