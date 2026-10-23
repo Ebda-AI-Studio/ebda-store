@@ -58,3 +58,12 @@ Pool now wraps every pooled client with a Prisma query extension: a Prisma-inter
 If clientUses is always 1: pre-build/warm clients at isolate start, sequentially, outside request bursts. If old clients: suspect the shared wasm instance (cannot be replaced from outside Prisma; next step is a repro under a real 128 MB cap with `wrangler deploy` of a stress Worker to a scratch name on the personal account, or upgrading @prisma/client).
 
 Review notes (PR #168): an adapter-raised RangeError fires both tags (site=prisma-adapter, then site=prisma-request); a Prisma-internal one fires only prisma-request, which is how to tell them apart. A batch $transaction([..]) of N ops reports N times. A client poisoned after release is dropped at the next take().
+
+## ROOT CAUSE FOUND (round 3, release aaaafb3, issue EBDA-API-F raw stack)
+
+Stack (innermost first): Uint8Array.subarray <- wasm-bindgen glue <- wasm <- `new QueryCompiler` (client construction), pool stats at the failure: `abandoned: 27, discarded: 5, shed: 20`. Other events (clientUses 3-8, age 32-388 s) are warm clients failing after the shared wasm memory was exhausted.
+
+- All pooled clients share ONE wasm instance (Prisma caches it per provider). Each client's QueryCompiler takes ~4.5 MB of its linear memory, which never shrinks; only `$disconnect()` (ClientEngine.stop -> queryCompiler.free()) returns it.
+- MEASURED (node, stub adapter, mem.mjs): 60 clients never disconnected = RSS 316 MB; the same 60 disconnected = 80 MB flat. Test: 25 abandon cycles grew RSS 115 MB before the fix, < 50 MB after.
+- A lease abandoned as stale (its request was cancelled, ~5-15% of audit traffic) was never disconnected (nothing releases a cancelled request), so each leaked one compiler. 27 abandoned + 5 discarded in one isolate = >140 MB of wasm memory against a 128 MB isolate: construction/growth then fails inside the glue with RangeError "Invalid array buffer length". Explains why it was isolate-wide, bursty (cancellations come with the headless-audit bursts) and only after the isolate had lived a while. #161 (6 clients) raised the ceiling slightly; #168's drop-and-rebuild did not leak (it disconnects).
+- Fix: reclaimStale() now `$disconnect()`s the abandoned client at once. Live engines per isolate are bounded by `max` again.
