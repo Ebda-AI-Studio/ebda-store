@@ -36,3 +36,23 @@ Resume notes (append as you go). Worktree: ~/Desktop/projects/\_worktrees/ebda-s
 
 - request.signal abort path is best effort and UNVERIFIED in prod: a wrangler dev disconnect test never fires it (the dev proxy does not propagate the disconnect, with or without `enable_request_signal`). The age-based pruneDeadWaiters (maxWaitMs) is the proven defence; do not add the flag without a real-edge test.
 - Aborted waiters return 499 with no "shed" log (ClientPoolTimeout.reason = 'aborted').
+
+## RECURRENCE 2026-10-23 09:24:14-15Z and 09:32:41-42Z (release b0ce749, i.e. WITH #161): 13 events, issues 7, 9, B, C, D
+
+Hypothesis tested: isolate memory pressure (6 clients x ~3.3 MB compiler).
+
+- CF analytics, hour 09Z and per minute 09:20-09:36 (measured): statuses are ONLY success and clientDisconnected. No exceededMemory/exceededResources/exceededCpu. Load ~75-140 req/min, success wall p99 2.6-7.4 s (no 20 s tail, no 503 storm). So it is neither queue saturation nor a memory kill.
+- Error text: V8 raises "Invalid array buffer length" for a bad LENGTH argument; an allocation failure reads "Array buffer allocation failed" (both strings are in the workerd binary). Not an OOM message.
+- Site: `site=prisma-adapter` EMPTY on all events => not raised under LeasedAdapter.queryRaw/executeRaw/executeScript/startTransaction or the Transaction methods (all guarded). Prisma 6.19.3 ClientEngine.request: errors from queryCompiler.compile and from #ensureStarted (QueryCompiler construction) are turned into PrismaClientUnknownRequestError(message) with the stack dropped (#transformCompileError / handleRequestError). Failing ops: product.findMany/count, productOption.findMany, bundle.findMany, store.findUnique, cart.findFirst, $queryRaw: any model, so not data-dependent.
+- Prisma source (srcof @prisma/client@6.19.3): no `new ArrayBuffer(n)` with a computed length in client/, client-engine-runtime/ or adapter-pg/; only `new Uint8Array(buffer, off, len)` (would read "Invalid typed array length"). The wasm-bindgen glue (query_compiler_bg.js) is the remaining JS that touches memory.buffer / TextDecoder / TextEncoder. Loader caches the wasm instance as a promise per provider, so a double-instantiation race is ruled out.
+- Memory cost per client (node, measured): +4.5 MB RSS each (wasm linear memory), +33 MB for the first (module). 4 vs 6 clients = +9 MB. Pre-#161 (4 clients) also failed, so #161 is not the cause.
+- Local repro NOT achieved: wrangler dev workerd has no 128 MB cap (wasm Memory 64 x 1 GB, 200 x 256 MB ArrayBuffers all succeeded) and its proxy dies under 150-way bursts.
+- Wasm-in-workerd quirk checked: ArrayBuffer(-1) gives exactly "Invalid array buffer length"; Buffer.alloc(-1) gives "Invalid typed array length"; Buffer.allocUnsafe(>=2^31) gives ERR_OUT_OF_RANGE.
+
+### Change (fix/array-buffer-recurrence)
+
+Pool now wraps every pooled client with a Prisma query extension: a Prisma-internal "Invalid array buffer length" is reported to Sentry (tag site=prisma-request, model, op, extra: clientUses, clientAgeMs, pool stats) and the failing client is DROPPED on release (fresh client + QueryCompiler for the next request). This does not fix the unknown origin; it (1) tells us whether failures hit freshly built clients (clientUses=1 => QueryCompiler construction) or old ones (compile on a long-lived shared wasm instance), and (2) stops one bad client from serving more requests.
+
+### Open / next
+
+If clientUses is always 1: pre-build/warm clients at isolate start, sequentially, outside request bursts. If old clients: suspect the shared wasm instance (cannot be replaced from outside Prisma; next step is a repro under a real 128 MB cap with `wrangler deploy` of a stress Worker to a scratch name on the personal account, or upgrading @prisma/client).

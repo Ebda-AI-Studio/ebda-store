@@ -391,3 +391,52 @@ describe('dead waiters never fill the queue', () => {
     await lease.release();
   });
 });
+
+/**
+ * Incident 2026-10-23 recurrence (release b0ce749): "Invalid array buffer length" came back with
+ * `site=prisma-adapter` EMPTY on all 13 events, so it is raised inside Prisma (query compiler /
+ * interpreter), not by the driver adapter. The original stack is dropped by Prisma, so the pool
+ * reports it one layer up, where the model, operation and the client's history are known, and
+ * drops the client afterwards (it is the only one that saw the failure).
+ */
+describe('a Prisma-internal "Invalid array buffer length"', () => {
+  it('is reported with model/operation/client history and the client is dropped on release, not reused', async () => {
+    const seen: Array<{ model?: string; operation: string; uses: number; leased: number }> = [];
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      onClientRangeError: (_err, ctx) =>
+        seen.push({
+          model: ctx.model,
+          operation: ctx.operation,
+          uses: ctx.clientUses,
+          leased: ctx.pool.leased,
+        }),
+    });
+    const lease = await pool.acquire();
+    const first = lease.client;
+    lease.scope.get = () => Promise.reject(new RangeError('Invalid array buffer length'));
+    await expect(lease.client.$queryRaw`SELECT 1`).rejects.toThrow(/Invalid array buffer length/);
+    expect(seen).toEqual([{ model: undefined, operation: '$queryRaw', uses: 1, leased: 1 }]);
+    await lease.release();
+    expect(pool.stats()).toMatchObject({ discarded: 1, idle: 0, created: 0 });
+    const next = await pool.acquire();
+    expect(next.client).not.toBe(first);
+    await next.release();
+  });
+
+  it('an ordinary error neither reports nor drops the client', async () => {
+    const seen: unknown[] = [];
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      onClientRangeError: e => seen.push(e),
+    });
+    const lease = await pool.acquire();
+    lease.scope.get = () => Promise.reject(new Error('connection terminated'));
+    await expect(lease.client.$queryRaw`SELECT 1`).rejects.toThrow();
+    await lease.release();
+    expect(seen).toEqual([]);
+    expect(pool.stats()).toMatchObject({ discarded: 0, idle: 1 });
+  });
+});

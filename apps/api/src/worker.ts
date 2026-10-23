@@ -142,6 +142,11 @@ async function withWorkerContext<T>(
     maxQueue: Number(env.DB_CLIENT_QUEUE) > 0 ? Number(env.DB_CLIENT_QUEUE) : undefined,
     // Prisma drops the stack of an adapter error; a RangeError ("Invalid array buffer length",
     // incident 2026-10-22) is captured here with its own stack and the pool state.
+    onClientRangeError: (err, ctx) =>
+      Sentry.captureException(err, {
+        tags: { site: 'prisma-request', op: ctx.operation, model: ctx.model ?? 'raw' },
+        extra: { ...ctx },
+      }),
     onAdapterError: (err, op, stats) =>
       Sentry.captureException(err, {
         tags: { site: 'prisma-adapter', op },
