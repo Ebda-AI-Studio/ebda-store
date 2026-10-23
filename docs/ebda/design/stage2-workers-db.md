@@ -49,7 +49,7 @@ there is one per isolate regardless of the client count. What a client adds, and
   client left `leased: 3` with nothing in flight, and once all `max` clients were held by dead requests the isolate
   answered EVERY request `503 OVERLOADED` after 20 s, for the life of the isolate (the builder canvas's server render
   landed on such an isolate: no draft, no products, no editor overlay). The pool now records when each client was handed
-  out; at capacity, a lease older than `staleLeaseMs` (15 s since 2026-10-23, was 30 s) is **abandoned** — no
+  out; at capacity, a lease older than `staleLeaseMs` (30 s, the request transaction's own limit; kept after review: a shorter limit lets live-but-reclaimed requests push real engines over `max`) is **abandoned** — no
   longer counted, its client never reused, a late release drops it — and a waiter older than `DB_CLIENT_WAIT_MS` is
   skipped as dead. `stats().abandoned` counts them. `tests/unit/cf-client-pool.test.ts` ("cancelled").
 - The pg connection stays per request and lazy: each lease gets a `ConnectionScope` (a pg pool of at most

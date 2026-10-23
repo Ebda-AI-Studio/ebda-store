@@ -268,7 +268,7 @@ describe('load shedding bounds the queue by count and by time', () => {
   it('defaults: a short wait, a queue bounded relative to max, a stale lease well under the 30 s tx limit', () => {
     const pool = new ClientPool({ connectionString: URL });
     expect(pool.maxWaitMs).toBe(6_000);
-    expect(pool.staleLeaseMs).toBe(15_000);
+    expect(pool.staleLeaseMs).toBe(30_000);
     expect(pool.max).toBe(6);
     expect(pool.maxQueue).toBe(pool.max * 5);
   });
@@ -306,6 +306,88 @@ describe('load shedding bounds the queue by count and by time', () => {
     lease.scope.get = () => Promise.reject(new Error('connection terminated'));
     await expect(lease.client.$queryRaw`SELECT 1`).rejects.toThrow();
     expect(seen).toHaveLength(1);
+    await lease.release();
+  });
+});
+
+describe('dead waiters never fill the queue', () => {
+  it('waiters of cancelled requests (older than maxWaitMs, timer never fired) are pruned before the cap check', async () => {
+    let t = 1_000;
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      maxQueue: 2,
+      maxWaitMs: 100,
+      staleLeaseMs: 10_000,
+      now: () => t,
+    });
+    const a = await pool.acquire();
+    const w1 = pool.acquire().catch(() => 'x');
+    const w2 = pool.acquire().catch(() => 'x');
+    await tick();
+    expect(pool.stats().waiting).toBe(2);
+    // Their requests were cancelled: simulate by ageing them without their timers firing.
+    t += 150;
+    const w3 = pool.acquire(); // would be shed if dead waiters counted
+    await tick();
+    expect(pool.stats().shed).toBe(0);
+    await a.release();
+    const l3 = await w3;
+    await l3.release();
+    void w1;
+    void w2;
+  });
+
+  it('an aborted waiter leaves the queue at once and is never handed a slot', async () => {
+    const pool = new ClientPool({ connectionString: URL, max: 1, maxQueue: 2, maxWaitMs: 60_000 });
+    const a = await pool.acquire();
+    const ac = new AbortController();
+    const dead = pool.acquire(ac.signal);
+    const live = pool.acquire();
+    await tick();
+    expect(pool.stats().waiting).toBe(2);
+    ac.abort();
+    await expect(dead).rejects.toBeInstanceOf(ClientPoolTimeout);
+    expect(pool.stats().waiting).toBe(1);
+    await a.release();
+    const l = await live; // the freed slot went to the live waiter
+    expect(pool.stats()).toMatchObject({ leased: 1, waiting: 0 });
+    await l.release();
+  });
+
+  it('a request already aborted when it asks is refused without queueing', async () => {
+    const pool = new ClientPool({ connectionString: URL, max: 1 });
+    const a = await pool.acquire();
+    const ac = new AbortController();
+    ac.abort();
+    await expect(pool.acquire(ac.signal)).rejects.toBeInstanceOf(ClientPoolTimeout);
+    expect(pool.stats().waiting).toBe(0);
+    await a.release();
+  });
+
+  it('a RangeError inside an interactive transaction is reported too', async () => {
+    const seen: string[] = [];
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      onAdapterError: (_e, op) => seen.push(op),
+    });
+    const lease = await pool.acquire();
+    const fakeTx = {
+      provider: 'postgres',
+      adapterName: 'fake',
+      options: { usePhantomQuery: false },
+      queryRaw: () => Promise.reject(new RangeError('Invalid array buffer length')),
+      executeRaw: () => Promise.resolve(0),
+      commit: () => Promise.resolve(),
+      rollback: () => Promise.resolve(),
+    };
+    lease.scope.get = () =>
+      Promise.resolve({ startTransaction: () => Promise.resolve(fakeTx) } as never);
+    await expect(lease.client.$transaction(async tx => tx.$queryRaw`SELECT 1`)).rejects.toThrow(
+      /Invalid array buffer length/
+    );
+    expect(seen).toContain('tx.queryRaw');
     await lease.release();
   });
 });

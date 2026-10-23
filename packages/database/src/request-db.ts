@@ -66,6 +66,8 @@ export interface RunWithRequestDbOptions {
    * awaited before `runWithRequestDb` resolves (tests, scripts).
    */
   waitUntil?: (p: Promise<unknown>) => void;
+  /** The request's abort signal: a request still queued for a client leaves the queue when it aborts. */
+  signal?: AbortSignal;
   /**
    * Awaited before the disconnect, inside the same promise. The Worker shell
    * passes the deferred-work drain here: post-commit tasks
@@ -130,7 +132,7 @@ export function createIsolateDb(opts: IsolateDbOptions): IsolateDb {
     stats: () => pool.stats(),
     currentLease: () => leases.getStore(),
     run: async (fn, runOpts = {}) => {
-      const lease = await pool.acquire();
+      const lease = await pool.acquire(runOpts.signal);
       try {
         // The exported `prisma` resolves its client through this store on EVERY call. Once the lease
         // is released the client belongs to the next request, so a floating promise of this one that

@@ -28,6 +28,6 @@ Resume notes (append as you go). Worktree: ~/Desktop/projects/\_worktrees/ebda-s
 - No client-side 20 s timeout exists: the only abort in apps/web/src/lib/api.ts is 45 s. So 20 s is the pool.
 - Cancelled requests keep their lease until staleLeaseMs (30 s): at 15% cancellations that removes slots from an already small pool (the 2026-10-07 measurement in client-pool.ts is the same failure).
 
-## Fix (this branch): bounded queue by count (5 x max) and time (6 s), max 4 -> 6, stale lease 30 -> 15 s, stats().shed, and RangeError capture at the adapter (Sentry tag site=prisma-adapter, with pool stats) so the next "Invalid array buffer length" carries its own stack.
+## Fix (this branch): bounded queue by count (5 x max) and time (6 s), max 4 -> 6, dead-waiter pruning + abort-signal removal, stats().shed (stale lease stays 30 s: review showed 15 s lets live reclaimed requests exceed max engines), and RangeError capture at the adapter (Sentry tag site=prisma-adapter, with pool stats) so the next "Invalid array buffer length" carries its own stack.
 
 ## (a) STATUS: NOT ATTRIBUTED. Not reproduced; see evidence log. Unproven candidates, in order: (1) memory/ArrayBuffer pressure of an isolate carrying hundreds of queued requests (all 12 events in one 1 s window across different queries = isolate-wide and transient; 100% inside the 40-minute saturation storm; none before or after), (2) pg-protocol/Hyperdrive framing glitch (would not give this text in Node, workerd untested), (3) Prisma wasm glue. The new adapter hook settles it on the next occurrence.

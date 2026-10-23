@@ -126,7 +126,12 @@ function prepare(env: CfBindings): void {
  * (returned, and the connection closed, after the deferred work drains). Used by fetch, queue and
  * scheduled alike: a queue consumer or a cron touches the database exactly as a request does.
  */
-async function withWorkerContext<T>(env: CfBindings, ctx: Ctx, fn: () => Promise<T>): Promise<T> {
+async function withWorkerContext<T>(
+  env: CfBindings,
+  ctx: Ctx,
+  fn: () => Promise<T>,
+  signal?: AbortSignal
+): Promise<T> {
   prepare(env);
   isolateDb ??= createIsolateDb({
     connectionString: env.HYPERDRIVE.connectionString,
@@ -180,6 +185,7 @@ async function withWorkerContext<T>(env: CfBindings, ctx: Ctx, fn: () => Promise
       },
       {
         waitUntil: p => ctx.waitUntil(p),
+        signal,
         // Post-commit work runs on this request's connection and must finish before it closes.
         beforeDisconnect: () =>
           awaitDeferredWork(DRAIN_BUDGET_MS)
@@ -291,7 +297,12 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
   }
   const forwarded = withTrustedClientIp(request);
   try {
-    return await withWorkerContext(env, ctx, () => handleAsNodeRequest(PORT, forwarded, env, ctx));
+    return await withWorkerContext(
+      env,
+      ctx,
+      () => handleAsNodeRequest(PORT, forwarded, env, ctx),
+      request.signal
+    );
   } catch (err) {
     if (err instanceof ClientPoolTimeout) {
       logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
