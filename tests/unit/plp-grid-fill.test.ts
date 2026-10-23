@@ -22,3 +22,13 @@ describe('PLP view toggle', () => {
     expect(src).toMatch(/hidden w-fit items-center gap-1 self-start rounded-lg border/);
   });
 });
+
+// PLP-4 / hero edge: the stacked hero copy (below xl) must share the page container's text edge
+// (`px-4 sm:px-6 lg:px-8`), not its own `px-5 sm:px-8` (4px off at 390, 8px off at 820).
+describe('hero copy edge', () => {
+  it('stacked copy uses the container padding', () => {
+    const src = readFileSync('apps/web/src/templates/shared/HeroBanner.tsx', 'utf8');
+    expect(src).toContain("'px-4 sm:px-6 lg:px-8'");
+    expect(src).not.toContain("'px-5 sm:px-8'");
+  });
+});
