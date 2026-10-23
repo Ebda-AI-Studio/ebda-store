@@ -15,6 +15,8 @@ export const DEMO_STORES = {
   qamar: { host: 'storedemo', looks: ['atelier', 'lookbook', 'vitrine'] },
   souq: { host: 'storedemo-souq', looks: ['catalogue', 'night', 'showroom'] },
   jasmine: { host: 'storedemo-jasmine', looks: ['apothecary', 'bloom', 'clinic'] },
+  lamma: { host: 'storedemo-lamma', looks: ['table', 'notebook', 'market'] },
+  dahab: { host: 'storedemo-dahab', looks: ['worn', 'workshop', 'giftbox'] },
 } as const;
 export type DemoTemplate = keyof typeof DEMO_STORES;
 export const isDemoTemplate = (id: string): id is DemoTemplate => id in DEMO_STORES;

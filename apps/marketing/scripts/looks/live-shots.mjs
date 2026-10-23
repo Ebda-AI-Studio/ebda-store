@@ -1,6 +1,6 @@
-// Real captures of the live demo stores (storedemo, storedemo-souq, storedemo-jasmine) for the #looks
+// Real captures of the live demo stores (all five demo stores) for the #looks
 // section (Ruling TPL-4).
-//   node scripts/looks/live-shots.mjs [qamar,souq,jasmine]     (default: all; DEMO_APEX overrides ebda.app)
+//   node scripts/looks/live-shots.mjs [qamar,souq,jasmine,lamma,dahab]     (default: all; DEMO_APEX overrides ebda.app)
 // Writes public/looks/live/<template>-<look>-<ar|en>-780.{webp,avif}: the first screen
 // at 390x844 @2x, kept at 780 px wide (2x). Needs Google Chrome + network. Nothing is clicked or typed:
 // the demo bar and the cookie banner are hidden with a style rule (display only), so no consent is
@@ -16,6 +16,8 @@ const STORES = {
   qamar: { host: 'storedemo', looks: ['atelier', 'lookbook', 'vitrine'] },
   souq: { host: 'storedemo-souq', looks: ['catalogue', 'night', 'showroom'] },
   jasmine: { host: 'storedemo-jasmine', looks: ['apothecary', 'bloom', 'clinic'] },
+  lamma: { host: 'storedemo-lamma', looks: ['table', 'notebook', 'market'] },
+  dahab: { host: 'storedemo-dahab', looks: ['worn', 'workshop', 'giftbox'] },
 };
 const only = process.argv[2] ? process.argv[2].split(',') : Object.keys(STORES);
 const apex = process.env.DEMO_APEX ?? 'ebda.app';
