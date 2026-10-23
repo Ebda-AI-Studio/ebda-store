@@ -4,7 +4,9 @@ import path from 'node:path';
 const AXE = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 const PORT = process.env.QAMAR_PORT ?? '3100';
 
-export const hostOf = (store: string) => `http://${store}.localhost:${PORT}`;
+const HOST_BASE = process.env.QAMAR_HOST_BASE ?? 'localhost';
+
+export const hostOf = (store: string) => `http://${store}.${HOST_BASE}:${PORT}`;
 
 /** Open `p` on `store` in `lang` with the consent banner already accepted. */
 export async function open(page: Page, store: string, lang: 'ar' | 'en', p: string) {
@@ -45,4 +47,10 @@ export async function runAxe(page: Page): Promise<AxeViolation[]> {
       })
     );
   });
+}
+
+/** GET a URL through the browser (page.request is Node-side and ignores the host-resolver rule used for custom-domain hosts). */
+export async function fetchVia(page: Page, url: string) {
+  const res = await page.goto(url, { waitUntil: 'domcontentloaded' });
+  return { status: res!.status(), text: await res!.text() };
 }
