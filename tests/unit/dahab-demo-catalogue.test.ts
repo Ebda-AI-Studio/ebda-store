@@ -184,8 +184,8 @@ describe('dahab demo catalogue: gold-rate pieces (Rulings B5-12, B5-13)', () => 
       expect(Math.abs(r - (r24 * k) / 24) / r, `${k}k`).toBeLessThan(0.005);
     }
   });
-  it('the seed turns the automatic rate OFF and shows the breakdown (judged with the split visible)', () => {
-    expect(TEMPLATE_SPECS.dahab.gold.feed).toBe(false);
+  it('the seed turns the automatic rate ON (Ruling DEMO-GOLD-1) and shows the breakdown (judged with the split visible)', () => {
+    expect(TEMPLATE_SPECS.dahab.gold.feed).toBe(true);
     expect(TEMPLATE_SPECS.dahab.gold.showBreakdown).toBe(true);
   });
 });

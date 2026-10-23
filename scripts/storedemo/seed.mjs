@@ -386,11 +386,10 @@ export const TEMPLATE_SPECS = {
     deliveryDays: { min: 2, max: 4 },
     instalments: null,
     reviews: DAHAB_REVIEWS,
-    // Phase B5 (Rulings B5-12, B5-15): the demo prices its gold pieces from a MANUAL rate that the seed
-    // re-stamps on every run, so a fresh seed is never stale. A production demo's rate goes stale after
-    // 26 hours by design; whether the production run turns the automatic rate on (feed: true) is Ahmad's
-    // call at the production step, never the seed's default (docs/ebda/templates/demo-store.md).
-    gold: { rates: DAHAB_GOLD_RATES, showBreakdown: true, feed: false },
+    // Phase B5 (Rulings B5-12, B5-15, DEMO-GOLD-1): the seed still re-stamps a MANUAL rate on every run so a
+    // fresh seed is never stale, but the production Dahab demo runs on the AUTOMATIC gold rate (feed: true,
+    // Ahmad 2026-10-23): a manual rate goes stale after 26 hours and would pause gold selling.
+    gold: { rates: DAHAB_GOLD_RATES, showBreakdown: true, feed: true },
   },
 };
 /** `--template <name>` (default qamar); an unknown name is refused by the caller. */
