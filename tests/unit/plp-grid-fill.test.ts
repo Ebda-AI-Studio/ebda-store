@@ -32,3 +32,15 @@ describe('hero copy edge', () => {
     expect(src).not.toContain("'px-5 sm:px-8'");
   });
 });
+
+// PDP price row: the instalment note used to share the price's flex row and wrap into a 2-line
+// fragment beside the price at 390; the row wraps and the note takes its own line below sm.
+describe('PDP price row', () => {
+  it('wraps and gives the instalment note its own line on phones', () => {
+    const pdp = readFileSync('apps/web/src/app/products/[slug]/ProductDetailClient.tsx', 'utf8');
+    expect(pdp).toContain('mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1');
+    const line = readFileSync('apps/web/src/components/commerce/InstalmentLine.tsx', 'utf8');
+    expect(line).toContain('w-full max-w-full text-balance');
+    expect(line).toContain('sm:w-auto');
+  });
+});
