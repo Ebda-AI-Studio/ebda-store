@@ -134,6 +134,14 @@ async function withWorkerContext<T>(env: CfBindings, ctx: Ctx, fn: () => Promise
     // with the DB_CLIENT_CONCURRENCY / DB_CLIENT_WAIT_MS vars.
     max: Number(env.DB_CLIENT_CONCURRENCY) > 0 ? Number(env.DB_CLIENT_CONCURRENCY) : undefined,
     maxWaitMs: Number(env.DB_CLIENT_WAIT_MS) > 0 ? Number(env.DB_CLIENT_WAIT_MS) : undefined,
+    maxQueue: Number(env.DB_CLIENT_QUEUE) > 0 ? Number(env.DB_CLIENT_QUEUE) : undefined,
+    // Prisma drops the stack of an adapter error; a RangeError ("Invalid array buffer length",
+    // incident 2026-10-22) is captured here with its own stack and the pool state.
+    onAdapterError: (err, op, stats) =>
+      Sentry.captureException(err, {
+        tags: { site: 'prisma-adapter', op },
+        extra: { pool: stats },
+      }),
     // The API opens a second transaction while the request's tenant transaction is open.
     connectionsPerRequest:
       Number(env.DB_REQUEST_CONNECTIONS) > 0 ? Number(env.DB_REQUEST_CONNECTIONS) : undefined,
@@ -286,6 +294,7 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
     return await withWorkerContext(env, ctx, () => handleAsNodeRequest(PORT, forwarded, env, ctx));
   } catch (err) {
     if (err instanceof ClientPoolTimeout) {
+      logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
       // Shed load instead of letting the isolate hit its memory limit.
       return Response.json(
         { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },

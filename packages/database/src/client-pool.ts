@@ -91,6 +91,28 @@ class LeasedAdapter implements SqlDriverAdapter {
   readonly adapterName = '@prisma/adapter-pg (leased)';
   scope: ConnectionScope | undefined;
 
+  constructor(private readonly onError?: (err: Error, op: string) => void) {}
+
+  /**
+   * Prisma replaces an adapter's error with `PrismaClientUnknownRequestError(message)` and drops
+   * the stack. A RangeError (`Invalid array buffer length`, incident 2026-10-22) is therefore
+   * reported here, where the original stack still exists, then rethrown unchanged.
+   */
+  private async guard<T>(op: string, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (err) {
+      if (err instanceof RangeError) {
+        try {
+          this.onError?.(err, op);
+        } catch {
+          // reporting must never change the query's outcome
+        }
+      }
+      throw err;
+    }
+  }
+
   private current(): Promise<SqlDriverAdapter> {
     if (!this.scope) {
       return Promise.reject(
@@ -102,18 +124,20 @@ class LeasedAdapter implements SqlDriverAdapter {
     }
     return this.scope.get();
   }
-  async queryRaw(q: SqlQuery): Promise<SqlResultSet> {
-    return (await this.current()).queryRaw(q);
+  queryRaw(q: SqlQuery): Promise<SqlResultSet> {
+    return this.guard('queryRaw', async () => (await this.current()).queryRaw(q));
   }
-  async executeRaw(q: SqlQuery): Promise<number> {
-    return (await this.current()).executeRaw(q);
+  executeRaw(q: SqlQuery): Promise<number> {
+    return this.guard('executeRaw', async () => (await this.current()).executeRaw(q));
   }
-  async executeScript(script: string): Promise<void> {
-    return (await this.current()).executeScript(script);
+  executeScript(script: string): Promise<void> {
+    return this.guard('executeScript', async () => (await this.current()).executeScript(script));
   }
   // The pg adapter's Transaction is bound to the scope's single connection for its whole life.
-  async startTransaction(level?: IsolationLevel): Promise<Transaction> {
-    return (await this.current()).startTransaction(level);
+  startTransaction(level?: IsolationLevel): Promise<Transaction> {
+    return this.guard('startTransaction', async () =>
+      (await this.current()).startTransaction(level)
+    );
   }
   getConnectionInfo(): ConnectionInfo {
     return { supportsRelationJoins: true };
@@ -154,10 +178,12 @@ export function hasStuckDispatch(client: unknown): boolean {
   }
 }
 
-/** Thrown by `acquire` when no client freed up within `maxWaitMs`: shed load, do not queue forever. */
+/** Thrown by `acquire` when no client freed up within `maxWaitMs` or the queue is full: shed load, do not queue forever. */
 export class ClientPoolTimeout extends Error {
   constructor(ms: number) {
-    super(`no database client available within ${ms} ms`);
+    super(
+      ms > 0 ? `no database client available within ${ms} ms` : 'database client queue is full'
+    );
     this.name = 'ClientPoolTimeout';
   }
 }
@@ -170,12 +196,22 @@ interface Slot {
 export interface ClientPoolOptions {
   connectionString: string;
   /**
-   * Clients (engines, ~3.3 MB each) per isolate; concurrent requests beyond this wait. Default 4:
-   * CPU-bound, an isolate gains nothing from more (measured: 4 and 8 drain a 200-request burst in
-   * the same time), and each request can hold two server connections (below), so 4 clients need
-   * 8 pooler connections at worst.
+   * Clients (engines, ~3.3 MB each) per isolate; concurrent requests beyond this wait. Default 6.
+   * Locally (no network latency) 4 and 8 drain a burst in the same time because the isolate is CPU
+   * bound; in production it is not: median CPU is 9 ms of a 720 ms request (measured 2026-10-22,
+   * workersInvocationsAdaptive), so the pool, not the CPU, capped an isolate at ~5 requests/s. 6
+   * clients cost ~6.6 MB of the 128 MB isolate and hold at most 18 pooler connections.
    */
   max?: number;
+  /**
+   * Requests that may wait for a client at once; the next is refused immediately (`ClientPoolTimeout`).
+   * Default `5 * max`. Why: a client is held ~0.7 s per request (a request is ~9 ms of CPU, the
+   * rest is waiting on Hyperdrive and Durable Objects), so the queue drains at ~`max` requests per
+   * second per isolate and `5 * max` waiters is already a ~5 s wait. Beyond that the caller has
+   * gone (incident 2026-10-22: 15% of requests were abandoned while waiting) and every waiter
+   * keeps its request's memory alive in a 128 MB isolate.
+   */
+  maxQueue?: number;
   /**
    * pg connections one request may hold at once. Default 3. NOT 1: the API deliberately opens a
    * second, separate transaction while the request's tenant transaction is open (`withMoneyTx`
@@ -186,11 +222,13 @@ export interface ClientPoolOptions {
    * connections: Hyperdrive / pgbouncer only assign one while a transaction is open.
    */
   connectionsPerRequest?: number;
-  /** How long a request waits for a client before `ClientPoolTimeout`. Default 20 000 ms. */
+  /** How long a request waits for a client before `ClientPoolTimeout`. Default 6 000 ms (was 20 000: p99 sat on exactly that). */
   maxWaitMs?: number;
   /**
    * A lease held longer than this is presumed to belong to a CANCELLED request and stops counting
-   * against `max` when a client is needed. Default 30 000 ms (the request transaction's own limit).
+   * against `max` when a client is needed. Default 15 000 ms. Half the 30 s request-transaction limit: a
+   * cancelled request (15% of traffic in the 2026-10-22 audit burst) holds its slot for this long,
+   * and a live request that outlives it only costs an engine rebuild (see below).
    *
    * Why: workerd cancels a request whose client disconnects, and a cancelled request's pending
    * promises never settle, so the `finally` that releases its lease never runs. Measured on the
@@ -204,12 +242,15 @@ export interface ClientPoolOptions {
   now?: () => number;
   log?: CreatePrismaClientOptions['log'];
   onPoolError?: (err: Error) => void;
+  /** A RangeError thrown under a lease, with the operation and the pool state (diagnostics). */
+  onAdapterError?: (err: Error, op: string, stats: ReturnType<ClientPool['stats']>) => void;
 }
 
 export class ClientPool {
   readonly max: number;
   readonly maxWaitMs: number;
   readonly staleLeaseMs: number;
+  readonly maxQueue: number;
   private readonly now: () => number;
   private readonly idle: Slot[] = [];
   private readonly waiters: Array<{ resolve: (slot: Slot) => void; since: number }> = [];
@@ -218,11 +259,13 @@ export class ClientPool {
   private created = 0;
   private discarded = 0;
   private abandoned = 0;
+  private shed = 0;
 
   constructor(private readonly opts: ClientPoolOptions) {
-    this.max = Math.max(1, opts.max ?? 4);
-    this.maxWaitMs = opts.maxWaitMs ?? 20_000;
-    this.staleLeaseMs = opts.staleLeaseMs ?? 30_000;
+    this.max = Math.max(1, opts.max ?? 6);
+    this.maxWaitMs = opts.maxWaitMs ?? 6_000;
+    this.staleLeaseMs = opts.staleLeaseMs ?? 15_000;
+    this.maxQueue = Math.max(0, opts.maxQueue ?? this.max * 5);
     this.now = opts.now ?? Date.now;
   }
 
@@ -238,8 +281,10 @@ export class ClientPool {
     max: number;
     discarded: number;
     abandoned: number;
+    shed: number;
   } {
     return {
+      shed: this.shed,
       discarded: this.discarded,
       abandoned: this.abandoned,
       created: this.created,
@@ -251,7 +296,9 @@ export class ClientPool {
   }
 
   private build(): Slot {
-    const adapter = new LeasedAdapter();
+    const adapter = new LeasedAdapter((err, op) =>
+      this.opts.onAdapterError?.(err, op, this.stats())
+    );
     const factory: SqlDriverAdapterFactory = {
       provider: 'postgres',
       adapterName: adapter.adapterName,
@@ -307,6 +354,10 @@ export class ClientPool {
   async acquire(): Promise<ClientLease> {
     let slot = this.take();
     if (!slot) {
+      if (this.waiters.length >= this.maxQueue) {
+        this.shed++;
+        throw new ClientPoolTimeout(0);
+      }
       let timer: ReturnType<typeof setTimeout> | undefined;
       let waiter: { resolve: (s: Slot) => void; since: number } | undefined;
       try {
@@ -319,7 +370,10 @@ export class ClientPool {
             // The lease we waited on may have gone stale meanwhile (a cancelled request).
             const late = this.take();
             if (late) resolve(late);
-            else reject(new ClientPoolTimeout(this.maxWaitMs));
+            else {
+              this.shed++;
+              reject(new ClientPoolTimeout(this.maxWaitMs));
+            }
           }, this.maxWaitMs);
         });
       } finally {

@@ -256,3 +256,56 @@ describe('createIsolateDb', () => {
     expect(db.currentLease()).toBeUndefined();
   });
 });
+
+/**
+ * Incident 2026-10-22/23 (docs/incidents/2026-10-23-array-buffer-and-tail.md): a burst held every
+ * client of an isolate for ~1 s each (CPU 9 ms of 720 ms wall), requests queued up to 20 s, p99
+ * sat on exactly `maxWaitMs`, and 557 of 3,625 requests were abandoned by their clients while
+ * waiting. A wait that long is never useful (the caller is gone) and an unbounded-by-count queue
+ * holds one request's memory per waiter.
+ */
+describe('load shedding bounds the queue by count and by time', () => {
+  it('defaults: a short wait, a queue bounded relative to max, a stale lease well under the 30 s tx limit', () => {
+    const pool = new ClientPool({ connectionString: URL });
+    expect(pool.maxWaitMs).toBe(6_000);
+    expect(pool.staleLeaseMs).toBe(15_000);
+    expect(pool.max).toBe(6);
+    expect(pool.maxQueue).toBe(pool.max * 5);
+  });
+
+  it('refuses a request at once (no wait) when the queue is full, as a ClientPoolTimeout', async () => {
+    const pool = new ClientPool({ connectionString: URL, max: 1, maxQueue: 2, maxWaitMs: 60_000 });
+    const a = await pool.acquire();
+    const w1 = pool.acquire();
+    const w2 = pool.acquire();
+    await tick();
+    expect(pool.stats().waiting).toBe(2);
+    await expect(pool.acquire()).rejects.toBeInstanceOf(ClientPoolTimeout);
+    expect(pool.stats()).toMatchObject({ waiting: 2, shed: 1 });
+    await a.release();
+    const l1 = await w1;
+    await l1.release();
+    const l2 = await w2;
+    await l2.release();
+    expect(pool.stats()).toMatchObject({ leased: 0, waiting: 0 });
+  });
+
+  it('reports a RangeError raised under a lease (with the operation and the pool state) before Prisma wraps it', async () => {
+    const seen: Array<{ op: string; msg: string; waiting: number }> = [];
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      onAdapterError: (err, op, stats) =>
+        seen.push({ op, msg: err.message, waiting: stats.waiting }),
+    });
+    const lease = await pool.acquire();
+    lease.scope.get = () => Promise.reject(new RangeError('Invalid array buffer length'));
+    await expect(lease.client.$queryRaw`SELECT 1`).rejects.toThrow(/Invalid array buffer length/);
+    expect(seen).toEqual([{ op: 'queryRaw', msg: 'Invalid array buffer length', waiting: 0 }]);
+    // an ordinary driver error is not this hook's business
+    lease.scope.get = () => Promise.reject(new Error('connection terminated'));
+    await expect(lease.client.$queryRaw`SELECT 1`).rejects.toThrow();
+    expect(seen).toHaveLength(1);
+    await lease.release();
+  });
+});
