@@ -1,8 +1,9 @@
-// Deployable spike worker `ebda-store-do-spike` (personal Whisky 11 Cloudflare account). NOT ebda-api.
-// Phase 0 only: workers.dev preview URL, no custom domain, no production data besides one demo store.
+// LOCAL ONLY (vitest-pool-workers + `wrangler dev --local`). NEVER deployed: Ruling INFRA-PREVIEW-1 forbids
+// preview/staging workers, DOs, D1s, queues or buckets before launch. The same StoreDO code ships inside
+// the production `ebda-api` worker (apps/api/src/cf/store-do), reachable only for one flagged demo store.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ebda-store-do-spike",
+  "name": "ebda-store-do-local",
   "main": "src/worker.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
