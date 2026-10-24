@@ -90,6 +90,10 @@ export interface DurableStepOptions {
   /** Runs a step body inside a Worker context (bindings, leased database client). */
   withContext: <T>(fn: () => Promise<T>) => Promise<T>;
   dispatch: (payload: JobEvent | JobEvent[]) => Promise<unknown>;
+  /** Runs before every step body (inside the step): renews the concurrency lease, throws if lost. */
+  beforeStep?: () => Promise<void>;
+  /** Called around sleeps: release the gates before, re-acquire after. */
+  aroundSleep?: { before: () => Promise<void>; after: () => Promise<void> };
   /** Cloudflare's `NonRetryableError` constructor (from `cloudflare:workflows`). */
   NonRetryable: new (message: string) => Error;
 }
@@ -108,6 +112,7 @@ export function durableStep(wf: WorkflowStepLike, o: DurableStepOptions): JobSte
     wf.do(name(id), config, () =>
       o.withContext(async () => {
         try {
+          await o.beforeStep?.();
           return normaliseResult(await fn());
         } catch (err) {
           // Inngest's NonRetriableError = Workflows' NonRetryableError.
@@ -119,10 +124,14 @@ export function durableStep(wf: WorkflowStepLike, o: DurableStepOptions): JobSte
   return {
     run,
     async sleep(id, duration) {
+      await o.aroundSleep?.before();
       await wf.sleep(name(id), parseDurationMs(duration));
+      await o.aroundSleep?.after();
     },
     async sleepUntil(id, until) {
+      await o.aroundSleep?.before();
       await wf.sleepUntil(name(id), until instanceof Date ? until : new Date(until));
+      await o.aroundSleep?.after();
     },
     // Dispatch must not repeat on replay: it is its own durable step.
     sendEvent: (id, payload) =>

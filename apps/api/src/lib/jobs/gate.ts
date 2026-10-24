@@ -6,6 +6,7 @@ import { parseDurationMs } from './step-adapter';
 
 interface GateStub {
   acquire(limit: number, ttlMs: number): Promise<string | null>;
+  renew(token: string, ttlMs: number): Promise<boolean>;
   release(token: string): Promise<void>;
   touch(timeoutMs: number): Promise<string>;
   isLatest(token: string, timeoutMs: number): Promise<boolean>;
@@ -24,6 +25,13 @@ function stub(gateId: string): GateStub {
  */
 export const MAX_ENFORCED_CONCURRENCY = 3;
 
+/**
+ * Lease length. A lease is renewed before EVERY step body (a step is capped at 15 minutes), and
+ * released while the run sleeps (Inngest's concurrency also counts running steps, not sleeping
+ * runs). So a live run always holds an unexpired lease, and a dead one frees the gate within 20 min.
+ */
+export const GATE_LEASE_TTL_MS = 20 * 60_000;
+
 export interface Gate {
   gateId: string;
   limit: number;
@@ -41,6 +49,7 @@ export function gatesFor(def: JobDef, event: JobEvent): Gate[] {
 
 export const gateClient = {
   acquire: (g: Gate, ttlMs: number) => stub(g.gateId).acquire(g.limit, ttlMs),
+  renew: (g: Gate, token: string, ttlMs: number) => stub(g.gateId).renew(token, ttlMs),
   release: (g: Gate, token: string) => stub(g.gateId).release(token),
 };
 
