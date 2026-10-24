@@ -79,6 +79,7 @@ describe('request element ORDER follows the WSDL sequences', () => {
       'ShippingDateTime',
       'DueDate',
       'Details',
+      'ForeignHAWB',
     ]);
     expect(names(first(shipment, 'Details'))).toEqual([
       'Dimensions',
@@ -696,5 +697,39 @@ describe('Aramex needs a shipper and a customer email (manual: REQ24)', () => {
     const body = JSON.stringify(stub.log);
     expect(body).toContain('owner@shop.eg');
     expect(body).toContain('buyer@mail.com');
+  });
+});
+
+/**
+ * Manual Table 18: "ForeignHAWB ... If filled this field must be unique for each shipment"
+ * (Appendix F ERR30 "Another shipment with the same Foreign AWB Number already exists"). The
+ * official PHP sample (createShipmentsPHP.txt) sends it. It is Aramex's only server-side
+ * duplicate guard, so the merchant reference rides in it.
+ */
+describe('ForeignHAWB duplicate guard (manual Table 18, ERR30)', () => {
+  it('sends the merchant reference as ForeignHAWB, after Details (schema order)', async () => {
+    const { stub, xml } = await bookOne({ merchantReference: 'EBDA-REF-77' });
+    const shipment = first(wrapperOf(xml), 'Shipment');
+    const n = names(shipment);
+    expect(first(shipment, 'ForeignHAWB').textContent).toBe('EBDA-REF-77');
+    expect(n.indexOf('ForeignHAWB')).toBe(n.indexOf('Details') + 1);
+    expect(stub.violations).toEqual([]);
+  });
+
+  it('omits ForeignHAWB when the reference exceeds the documented 50 chars (never truncates: uniqueness)', async () => {
+    const { xml } = await bookOne({ merchantReference: 'R'.repeat(51) });
+    expect(xml).not.toContain('ForeignHAWB');
+  });
+
+  it('ERR30 is a non-retryable CARRIER_REJECTED that says the shipment already exists', async () => {
+    const reply = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ShipmentCreationResponse xmlns="${ARAMEX_NS}"><Transaction><Reference1/><Reference2/><Reference3/><Reference4/><Reference5/></Transaction><Notifications><Notification><Code>ERR30</Code><Message>Another shipment with the same Foreign AWB Number already exists</Message></Notification></Notifications><HasErrors>true</HasErrors></ShipmentCreationResponse></s:Body></s:Envelope>`;
+    const { carrier } = mk(
+      async () =>
+        new Response(reply, { status: 200, headers: { 'Content-Type': 'text/xml; charset=utf-8' } })
+    );
+    const err = await carrier.createShipment(creds, shipmentRequest(), ctx).catch(e => e);
+    expect(err).toMatchObject({ code: 'CARRIER_REJECTED' });
+    expect(err.retryable).toBeFalsy();
+    expect(err.message).toMatch(/already exists/i);
   });
 });

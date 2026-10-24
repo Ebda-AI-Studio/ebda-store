@@ -9,8 +9,9 @@
 // "Shipping Services API Manual" (aramex.com/docs/default-source/resourses/resourcesdata/
 // shipping-services-api-manual.pdf, readable in a browser, 403 to plain HTTP clients): Source 24,
 // units KG / CM, PaymentType P, service code CODS, ReportID 9201 + URL, EGP currency code, test host
-// and Pickup.Status are now DOCUMENTED. Still `UNVERIFIED:` (the manual is silent): domestic
-// product types, the tracking UpdateCode table, EGP COD enablement, Reference1 uniqueness.
+// and Pickup.Status are now DOCUMENTED, as is the duplicate guard (ForeignHAWB, ERR30). Still
+// `UNVERIFIED:` (no manual/WSDL/sample we hold says): domestic product types, the tracking
+// UpdateCode table, EGP COD enablement.
 
 import logger from '../../lib/logger';
 import {
@@ -427,8 +428,8 @@ export class AramexCarrier implements ShippingCarrierProvider {
   };
 
   // Aramex documents no idempotency key and has no search-by-reference operation, so a lost
-  // response after a successful CreateShipments CANNOT be detected here. UNVERIFIED: whether
-  // Aramex rejects a repeated Reference1. This per-process cache (credential-scoped, keyed on the
+  // response after a successful CreateShipments CANNOT be looked up here; the retry is refused by
+  // Aramex itself with ERR30 because the reference rides in ForeignHAWB (manual Table 18). This per-process cache (credential-scoped, keyed on the
   // merchant reference) only stops in-process repeats; the service keeps one shipment row per
   // order, and retrying after an ambiguous failure is the merchant's / ops' decision.
   private readonly created = new IdempotencyCache<CarrierShipmentResponse>();
@@ -633,7 +634,11 @@ export class AramexCarrier implements ShippingCarrierProvider {
             dims: data.dimensions,
             cod,
           })
-        )
+        ) +
+        // Manual Table 18: ForeignHAWB (max 50) "must be unique for each shipment", else ERR30 "Another
+        // shipment with the same Foreign AWB Number already exists": Aramex's only server-side
+        // duplicate guard. Never truncated (a cut reference would stop being unique): over 50 = omitted.
+        (reference.length <= 50 ? t('ForeignHAWB', reference) : '')
     );
     const response = await this.call(
       'Shipping',
