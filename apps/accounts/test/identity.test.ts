@@ -64,8 +64,14 @@ describe('login and the access token contract', () => {
 
   it('a super admin carries pa, an unknown audience is refused', async () => {
     const u = await seedUser({ role: 'super_admin' });
-    const { body } = await login(u);
-    expect((decodeJwt(body.access_token) as { pa?: string }).pa).toBe('super_admin');
+    const { body, cookie } = await login(u);
+    // password alone never carries pa (Ruling ID-15); a session created with a second factor does
+    expect((decodeJwt(body.access_token) as { pa?: string }).pa).toBeUndefined();
+    await env.DB.prepare(`UPDATE sessions SET amr = 'pwd,otp' WHERE user_id = ?1`).bind(u.id).run();
+    const minted = (await (await call('/token?aud=store', { cookie })).json()) as {
+      data: { access_token: string };
+    };
+    expect((decodeJwt(minted.data.access_token) as { pa?: string }).pa).toBe('super_admin');
     const bad = await call('/login', {
       json: { email: u.email, password: u.password, aud: 'evil' },
     });

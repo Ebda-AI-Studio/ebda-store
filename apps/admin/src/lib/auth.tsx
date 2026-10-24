@@ -239,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   /** Exchange an identity-service access token for the Store session and finish signing in. */
-  async function finishSignIn(accessToken: string): Promise<void> {
+  async function finishSignIn(accessToken: string, enrollSecondFactor = false): Promise<void> {
     const user = await establishApiSession<User>(accessToken);
     // Check if user is admin or staff
     const adminRoles = ['super_admin', 'store_admin', 'staff'];
@@ -247,7 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(t('accessDenied'));
     }
     storeSession({ user });
-    router.push(postLoginDestination());
+    // A platform admin without a second factor has no admin power yet (Ruling ID-15): send them to enrol one.
+    router.push(enrollSecondFactor ? '/account/security' : postLoginDestination());
   }
 
   /** Map an identity-service refusal to the page's existing messages. */
@@ -272,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result.mfaRequired) {
       return { mfaRequired: true, challengeToken: result.challenge } as MfaChallenge;
     }
-    await finishSignIn(result.access_token);
+    await finishSignIn(result.access_token, result.mfaEnrollmentRequired === true);
   }
 
   async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {

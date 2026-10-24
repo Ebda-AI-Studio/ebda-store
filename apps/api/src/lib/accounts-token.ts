@@ -29,6 +29,8 @@ export interface AccountsClaims {
   jti: string;
   stores: StoreClaim[];
   pa?: 'super_admin';
+  /** Seconds since epoch of the interactive login behind the session. */
+  authTime?: number;
   email?: string;
   emailVerified?: boolean;
   exp: number;
@@ -105,7 +107,7 @@ export async function verifyAccountsToken(
     if (opts.ignoreExpiration && e instanceof joseErrors.JWTExpired) payload = e.payload;
     else throw e;
   }
-  const { sub, sid, jti, stores, pa, email, email_verified, exp } = payload as Record<
+  const { sub, sid, jti, stores, pa, auth_time, email, email_verified, exp } = payload as Record<
     string,
     unknown
   >;
@@ -123,6 +125,7 @@ export async function verifyAccountsToken(
         ['owner', 'staff'].includes((s as { role?: string }).role ?? '')
     ),
     ...(pa === 'super_admin' ? { pa: 'super_admin' as const } : {}),
+    ...(typeof auth_time === 'number' ? { authTime: auth_time } : {}),
     ...(typeof email === 'string' ? { email } : {}),
     ...(typeof email_verified === 'boolean' ? { emailVerified: email_verified } : {}),
     exp: typeof exp === 'number' ? exp : 0,

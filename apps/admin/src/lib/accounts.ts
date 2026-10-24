@@ -55,7 +55,7 @@ export interface AccessGrant {
   expires_at: number;
 }
 export type LoginResult =
-  | ({ mfaRequired?: false } & AccessGrant)
+  | ({ mfaRequired?: false; mfaEnrollmentRequired?: boolean } & AccessGrant)
   | { mfaRequired: true; challenge: string };
 
 export const accountsLogin = (email: string, password: string): Promise<LoginResult> =>

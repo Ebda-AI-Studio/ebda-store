@@ -96,13 +96,34 @@ async function storesFor(env: Env, userId: string): Promise<StoreClaim[]> {
   }
 }
 
-async function mintFor(env: Env, user: UserRow, sid: string, aud: string) {
+/** A platform admin must have logged in within this window for `pa` to be minted or honoured (Ruling ID-15). */
+export const SUPER_ADMIN_MAX_AUTH_AGE_MS = 12 * 3600_000;
+
+/** A second factor was used to create the session: TOTP (`otp`) or a passkey (`hwk`). */
+const hasSecondFactor = (amr: string) => /(^|,)(otp|hwk)(,|$)/.test(amr);
+
+/**
+ * `pa: super_admin` is minted only for a session that (a) was created by a login that used a SECOND FACTOR (TOTP or passkey),
+ * and (b) is at most 12 h old. A platform admin whose session is older must sign in again (401 REAUTH_REQUIRED); one that has
+ * no second factor yet gets an ordinary token without `pa` and is told to enrol (see /login).
+ */
+async function mintFor(
+  env: Env,
+  user: UserRow,
+  sid: string,
+  aud: string,
+  session: { created_at: number; amr: string }
+) {
+  const admin = user.role === 'super_admin';
+  if (admin && nowMs() - session.created_at > SUPER_ADMIN_MAX_AUTH_AGE_MS)
+    throw err(401, 'REAUTH_REQUIRED', 'Sign in again to continue as a platform administrator');
   const { token, expiresAt } = await mintAccessToken(env, {
     sub: user.id,
     sid,
     aud,
     stores: await storesFor(env, user.id),
-    ...(user.role === 'super_admin' ? { pa: 'super_admin' as const } : {}),
+    ...(admin && hasSecondFactor(session.amr) ? { pa: 'super_admin' as const } : {}),
+    auth_time: Math.floor(session.created_at / 1000),
     email: user.email,
     email_verified: !!user.email_verified,
   });
@@ -125,10 +146,26 @@ const publicUser = (u: UserRow) => ({
   mfaEnabled: !!u.mfa_enabled,
 });
 
+async function hasAnyFactor(db: D1Database, user: UserRow): Promise<boolean> {
+  if (user.mfa_enabled && user.mfa_secret) return true;
+  const p = await db
+    .prepare(`SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`)
+    .bind(user.id)
+    .first<{ n: number }>();
+  return (p?.n ?? 0) > 0;
+}
+
 async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
   const s = await createSession(c.env.DB, user, amr, sessionCtx(c));
   setRefreshCookie(c, s.refreshToken);
-  return { user: publicUser(user), ...(await mintFor(c.env, user, s.sid, aud)) };
+  return {
+    user: publicUser(user),
+    ...(await mintFor(c.env, user, s.sid, aud, { created_at: nowMs(), amr })),
+    // A platform admin without a second factor gets no admin power: the client must send them to enrol one.
+    ...(user.role === 'super_admin' && !hasSecondFactor(amr)
+      ? { mfaEnrollmentRequired: !(await hasAnyFactor(c.env.DB, user)) }
+      : {}),
+  };
 }
 
 /**
@@ -579,13 +616,19 @@ export function createApp() {
   app.get('/token', async c => {
     const aud = audOf(c.env, c.req.query('aud'));
     const r = await cookieSession(c);
-    return c.json({ success: true, data: await mintFor(c.env, r.user, r.session.sid, aud) });
+    return c.json({
+      success: true,
+      data: await mintFor(c.env, r.user, r.session.sid, aud, r.session),
+    });
   });
 
   app.post('/refresh', async c => {
     const aud = audOf(c.env, c.req.query('aud'));
     const r = await cookieSession(c, true);
-    return c.json({ success: true, data: await mintFor(c.env, r.user, r.session.sid, aud) });
+    return c.json({
+      success: true,
+      data: await mintFor(c.env, r.user, r.session.sid, aud, r.session),
+    });
   });
 
   app.post('/logout', async c => {

@@ -127,6 +127,9 @@ async function resolveTokenVersionAndStatus(
  * store_admin; only staff memberships -> staff. Store ACCESS is still decided from the database (requireStoreAccess:
  * ownerId / StoreStaff), not from the claim: the claim is up to 15 minutes old, the database is not (Ruling ID-9).
  */
+/** Maximum age of the login behind a platform-admin token. */
+export const SUPER_ADMIN_MAX_AUTH_AGE_SECONDS = 12 * 3600;
+
 export function accountsUser(c: AccountsClaims, profileRole?: string): AuthPayload {
   // The identity-managed profile row's role is authoritative for store_admin vs staff (the stores[] claim cannot express a
   // mixed owner+staff user); a platform admin is only ever what the token's `pa` claim says.
@@ -151,6 +154,19 @@ export async function authenticateAccounts(
     claims = await verifyAccountsToken(token);
   } catch {
     throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token');
+  }
+  // A platform admin's power needs a FRESH login (Ruling ID-15): at most 12 h since the interactive login that created the
+  // session. A token without `auth_time` cannot prove it, so it is refused too. (The identity service stops minting `pa` for an
+  // older session as well; this is the Store's own check.)
+  if (claims.pa === 'super_admin') {
+    const age = Date.now() / 1000 - (claims.authTime ?? 0);
+    if (!claims.authTime || age > SUPER_ADMIN_MAX_AUTH_AGE_SECONDS) {
+      throw new AppError(
+        401,
+        'REAUTH_REQUIRED',
+        'Sign in again to continue as a platform administrator'
+      );
+    }
   }
   let revoked: boolean;
   try {

@@ -112,6 +112,43 @@ async function run(fn: typeof authenticate, token?: string) {
   return { req, err };
 }
 
+describe('platform admin (pa) needs a fresh login (Ruling ID-15)', () => {
+  const nowS = () => Math.floor(Date.now() / 1000);
+  const admin = (authTime?: number) =>
+    mint({
+      claims: { pa: 'super_admin', ...(authTime === undefined ? {} : { auth_time: authTime }) },
+    });
+
+  it('a pa token whose login is at most 12 h old is a super_admin', async () => {
+    const { req, err } = await run(authenticate, await admin(nowS() - 3600));
+    expect(err).toBeUndefined();
+    expect(req.user?.role).toBe('super_admin');
+  });
+
+  it('a pa token whose login is older than 12 h is 401 REAUTH_REQUIRED', async () => {
+    const { req, err } = await run(authenticate, await admin(nowS() - 13 * 3600));
+    expect(err).toMatchObject({ statusCode: 401, code: 'REAUTH_REQUIRED' });
+    expect(req.user).toBeUndefined();
+  });
+
+  it('a pa token with no auth_time cannot prove freshness and is refused the same way', async () => {
+    const { err } = await run(authenticate, await admin(undefined));
+    expect(err).toMatchObject({ statusCode: 401, code: 'REAUTH_REQUIRED' });
+  });
+
+  it('only aud=store carries the platform role: a pa token for another product is refused', async () => {
+    const t = await mint({ aud: 'whatsapp', claims: { pa: 'super_admin', auth_time: nowS() } });
+    expect((await run(authenticate, t)).err?.statusCode).toBe(401);
+  });
+
+  it('a merchant token with an old auth_time is unaffected (the limit is for platform admins only)', async () => {
+    const t = await mint({ claims: { auth_time: nowS() - 90 * 24 * 3600 } });
+    const { req, err } = await run(authenticate, t);
+    expect(err).toBeUndefined();
+    expect(req.user?.role).toBe('store_admin');
+  });
+});
+
 describe('authenticate: identity-service tokens', () => {
   it('accepts a valid ES256 aud=store token and builds the request identity', async () => {
     const { req, err } = await run(authenticate, await mint());
