@@ -43,7 +43,7 @@ done
 # orders carry BOTH a custom_domain (DNS + edge cert) AND a more-specific
 # `<host>/*` zone route: zone routes run BEFORE custom domains, so without the
 # specific route the storefront wildcard would answer admin/orders. Route table
-# + the media./preview. exclusions: scripts/cf-routes.cjs, docs/DEPLOYMENT.md.
+# + the media. exclusion: scripts/cf-routes.cjs, docs/DEPLOYMENT.md.
 for app in "${APPS[@]}"; do
   dir="$ROOT/apps/$app"
   [ -d "$dir" ] || { echo "skip config: no apps/$app"; continue; }

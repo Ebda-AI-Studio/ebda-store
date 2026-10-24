@@ -9,7 +9,7 @@
 //                            storefront wildcard, which runs BEFORE custom domains)
 //   <slug>.ebda.app        → ebda-web via the `*.ebda.app/*` zone route
 // A `*.ebda.app/*` route does not match the bare apex. Hosts served by something
-// else that the wildcard WOULD catch (media. = R2, preview. = marketing preview)
+// else that the wildcard WOULD catch (media. = R2)
 // get a Worker-less exclusion route — see docs/DEPLOYMENT.md "Storefront wildcard".
 // The inherited Ebda Store `*/*` + apex custom domain is deliberately gone: on Ebda it
 // would steal the marketing apex.
