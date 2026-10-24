@@ -403,7 +403,7 @@ export class ResendService {
         headers?: Record<string, string>;
       }>;
     }
-  ): Promise<{ ids: string[] }> {
+  ): Promise<{ ids: string[]; error?: string }> {
     if (opts.messages.length === 0) return { ids: [] };
     if (opts.messages.length > 100) throw new Error('A branded batch accepts at most 100 emails');
     const store = await withStore(storeId, tx =>
@@ -422,20 +422,24 @@ export class ResendService {
     if (!store) throw new Error(`Store ${storeId} not found`);
 
     const sender = resolveSender(store);
-    // One message per address, sent in order. A failure stops the batch and throws (the caller
-    // counts the chunk as failed); addresses already sent are not re-sent by this method.
+    // One message per address, sent in order. A failure stops the batch; the addresses already
+    // sent are reported (`ids`) so the caller never counts them as failed or re-sends them.
     const ids: string[] = [];
     for (const m of opts.messages) {
-      const { id } = await sendMail({
-        from: sender.from,
-        to: m.to,
-        subject: opts.subject,
-        html: m.html,
-        ...(m.text ? { text: m.text } : {}),
-        ...(m.headers ? { headers: m.headers } : {}),
-        ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
-      });
-      ids.push(id);
+      try {
+        const { id } = await sendMail({
+          from: sender.from,
+          to: m.to,
+          subject: opts.subject,
+          html: m.html,
+          ...(m.text ? { text: m.text } : {}),
+          ...(m.headers ? { headers: m.headers } : {}),
+          ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
+        });
+        ids.push(id);
+      } catch (err) {
+        return { ids, error: err instanceof EmailSendError ? err.code : 'send_failed' };
+      }
     }
     return { ids };
   }

@@ -29,7 +29,46 @@ export interface ResolvedSender {
 // the SDK; we only sanitize control-chars + trim.
 function sanitizeDisplayName(name: string): string {
   // eslint-disable-next-line no-control-regex
-  return name.replace(/[\r\n\x00-\x1f\x7f]/g, ' ').trim();
+  // Also drop `"`, `<`, `>` and `\`: they break the `Name <addr>` form, and a rejected From is a
+  // permanent failure for every message of the store (Cloudflare E_VALIDATION_ERROR).
+  return name
+    .replace(/[\r\n\x00-\x1f\x7f"<>\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Mailboxes that must never be a merchant's choice on our own DKIM-signed domain (phishing as
+// the platform) plus the RFC role mailboxes. A merchant who picked one falls back to the default.
+const RESERVED_LOCAL_PARTS: ReadonlySet<string> = new Set([
+  'security',
+  'admin',
+  'administrator',
+  'billing',
+  'postmaster',
+  'abuse',
+  'hostmaster',
+  'webmaster',
+  'root',
+  'support',
+  'help',
+  'ahlan',
+  'legal',
+  'privacy',
+  'payments',
+  'noc',
+  'ebda',
+  'team',
+]);
+
+/** A valid dot-atom local part a merchant may use (no leading/trailing/double dot, not reserved). */
+function usableLocalPart(lp: string): boolean {
+  return (
+    lp.length > 0 &&
+    !lp.startsWith('.') &&
+    !lp.endsWith('.') &&
+    !lp.includes('..') &&
+    !RESERVED_LOCAL_PARTS.has(lp.toLowerCase())
+  );
 }
 
 export function resolveSender(store: StoreSenderShape): ResolvedSender {
@@ -43,10 +82,9 @@ export function resolveSender(store: StoreSenderShape): ResolvedSender {
   // Merchant domains keep the conventional `noreply`; the platform domain
   // uses the brand's own no-reply mailbox (no-reply@ebda.app).
   const defaultLocalPart = useCustomDomain ? 'noreply' : BRAND.noReplyEmail.split('@')[0];
+  const chosen = store.emailSenderLocalPart?.trim() ?? '';
   const localPart =
-    store.emailSenderLocalPart && store.emailSenderLocalPart.trim().length > 0
-      ? store.emailSenderLocalPart.trim()
-      : defaultLocalPart;
+    chosen && (useCustomDomain || usableLocalPart(chosen)) ? chosen : defaultLocalPart;
 
   const host = useCustomDomain ? (store.domain as string) : PLATFORM_EMAIL_DOMAIN;
 

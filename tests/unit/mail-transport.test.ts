@@ -38,6 +38,13 @@ describe('parseAddress', () => {
       name: 'Souq, Shop',
     });
     expect(parseAddress('<no-reply@ebda.app>')).toBe('no-reply@ebda.app');
+    expect(parseAddress('متجر القمر <no-reply@ebda.app>')).toEqual({
+      email: 'no-reply@ebda.app',
+      name: 'متجر القمر',
+    });
+    // CR/LF never survive: no header injection through a name.
+    const inj = parseAddress('Evil\r\nBcc: x@y.z <no-reply@ebda.app>');
+    expect(JSON.stringify(inj)).not.toMatch(/\\r|\\n/);
     expect(parseAddress('no-reply@ebda.app')).toBe('no-reply@ebda.app');
   });
 });
@@ -128,5 +135,27 @@ describe('resolveSender', () => {
   it('keeps the verified merchant domain on the legacy provider only', () => {
     h.cfg.emailProvider = 'resend';
     expect(resolveSender(store).from).toBe('Shop <noreply@shop.test>');
+  });
+});
+
+describe('resolveSender hardening', () => {
+  const base = { name: 'Shop', email: null, domain: null, emailDomainStatus: null };
+  it('quotes, angle brackets and backslashes in a store name cannot break the From', () => {
+    const r = resolveSender({ ...base, name: 'Ahmad "Best" <Shop>\\' });
+    expect(r.from).toBe('Ahmad Best Shop <no-reply@ebda.app>');
+    expect(parseAddress(r.from)).toEqual({ email: 'no-reply@ebda.app', name: 'Ahmad Best Shop' });
+  });
+  it.each(['security', 'Admin', 'billing', 'postmaster', 'ahlan', '.a', 'a.', 'a..b'])(
+    'a merchant cannot pick %s on the platform domain',
+    lp => {
+      expect(resolveSender({ ...base, emailSenderLocalPart: lp }).from).toBe(
+        'Shop <no-reply@ebda.app>'
+      );
+    }
+  );
+  it('an ordinary prefix still works', () => {
+    expect(resolveSender({ ...base, emailSenderLocalPart: 'orders' }).from).toBe(
+      'Shop <orders@ebda.app>'
+    );
   });
 });
