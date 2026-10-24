@@ -225,7 +225,7 @@
     "EMAIL_PROVIDER": "cloudflare",
     // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
     // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
-    "JOBS_CF_GROUPS": "",
+    "JOBS_CF_GROUPS": "1",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
