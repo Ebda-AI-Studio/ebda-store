@@ -1,0 +1,1178 @@
+{
+  "store-do:store_credentials": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["meta_access_token"],
+    "subjectKeys": [],
+    "note": "secret, destroyed on store close"
+  },
+  "store-do:blog_posts": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:store_locations": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["address", "address_ar", "phone", "whatsapp"],
+    "subjectKeys": [],
+    "note": "merchant erase only"
+  },
+  "store-do:store_pages": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:customers": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["email", "first_name", "last_name", "phone", "user_id", "buyer_key"],
+    "subjectKeys": ["email", "phone", "userId", "buyerKey", "customerId"],
+    "note": "the customer row; children cascade"
+  },
+  "store-do:customer_groups": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:customer_addresses": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["*"],
+    "subjectKeys": ["customerId"],
+    "note": "cascades with the customer"
+  },
+  "store-do:categories": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:products": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:inventory_history": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_images": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_categories": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:tags": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:product_tags": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_options": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:product_option_values": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_variants": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_models": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_price_tiers": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:wholesale_applications": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["user_id", "phone"],
+    "subjectKeys": ["userId", "phone"],
+    "note": ""
+  },
+  "store-do:size_charts": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:product_model_bindings": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_variant_options": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:carts": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["customer_id", "guest_email", "session_id"],
+    "subjectKeys": ["email", "customerId"],
+    "note": "scrub guest_email/customer_id; the cart itself is transient",
+    "reviewedNotPii": ["guest_email_consent_at"]
+  },
+  "store-do:cart_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:bundles": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:bundle_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:cart_bundles": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:orders": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": [
+      "customer_id",
+      "shipping_address",
+      "billing_address",
+      "checkout_ip",
+      "buyer_key",
+      "customer_notes"
+    ],
+    "subjectKeys": ["email", "phone", "customerId", "buyerKey"],
+    "note": "orders stay (money history); identity and addresses are overwritten",
+    "reviewedNotPii": ["seller_tax_registration_number"]
+  },
+  "store-do:order_events": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:order_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:payments": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:payment_events": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["triggered_by_user_id"]
+  },
+  "store-do:returns": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": "money history stays"
+  },
+  "store-do:return_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:payment_configs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["api_key_last4", "merchant_id_last4"]
+  },
+  "store-do:notification_configs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:notification_event_configs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["whatsapp"]
+  },
+  "store-do:push_subscriptions": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["customer_id", "endpoint", "p256dh"],
+    "subjectKeys": ["customerId"],
+    "note": ""
+  },
+  "store-do:onesignal_subscriptions": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["user_id", "player_id"],
+    "subjectKeys": ["userId"],
+    "note": ""
+  },
+  "store-do:abandoned_carts": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["customer_email", "customer_phone", "customer_id", "session_id", "email_detail"],
+    "subjectKeys": ["email", "phone", "customerId"],
+    "note": "",
+    "reviewedNotPii": ["email_status", "email_sent_at"]
+  },
+  "store-do:abandoned_cart_configs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["email_enabled", "email_delay_minutes"]
+  },
+  "store-do:product_relations": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:frequently_bought_together": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:ai_recommendation": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:shipping_carrier_configs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:shipments": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["delivery_address", "pickup_address"],
+    "subjectKeys": ["customerId"],
+    "note": "tracking and outcome stay; the address JSON is overwritten"
+  },
+  "store-do:shipment_pickups": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["address"],
+    "subjectKeys": [],
+    "note": "merchant pickup address"
+  },
+  "store-do:cod_remittances": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:affiliates": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["name", "email", "phone"],
+    "subjectKeys": ["email", "phone"],
+    "note": "third-party referrer, not a shopper"
+  },
+  "store-do:affiliate_referrals": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["session_id"],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:affiliate_payouts": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:affiliate_configs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:affiliate_events": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["triggered_by_user_id"]
+  },
+  "store-do:audit_logs": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["user_id", "ip_address", "user_agent"],
+    "subjectKeys": ["userId"],
+    "note": "actor link and network identifiers removed"
+  },
+  "store-do:addresses": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["first_name", "last_name", "address1", "address2", "phone", "user_id"],
+    "subjectKeys": ["userId"],
+    "note": "user-keyed address book"
+  },
+  "store-do:wishlists": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["user_id"],
+    "subjectKeys": ["userId"],
+    "note": "items cascade",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:wishlist_items": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["*"],
+    "subjectKeys": [],
+    "note": "cascades with the wishlist"
+  },
+  "store-do:coupons": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:promotions": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:shipping_zones": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:shipping_area_rates": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:tax_rates": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name"]
+  },
+  "store-do:loyalty_points": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": ""
+  },
+  "store-do:loyalty_transactions": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": "keep amounts for the ledger, drop the customer link"
+  },
+  "store-do:customer_wallets": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": "balance written off first (wallet-erasure-write-off flag)"
+  },
+  "store-do:wallet_transactions": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": "ledger rows kept without the customer link"
+  },
+  "store-do:newsletter_subscribers": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["email", "first_name", "last_name"],
+    "subjectKeys": ["email"],
+    "note": ""
+  },
+  "store-do:sms_marketing_consents": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["user_id", "phone", "phone_key"],
+    "subjectKeys": ["phone", "userId"],
+    "note": "consent proof kept only as an anonymised count elsewhere"
+  },
+  "store-do:campaigns": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["name", "recipient_count"]
+  },
+  "store-do:campaign_recipients": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["email", "customer_id"],
+    "subjectKeys": ["email", "customerId"],
+    "note": ""
+  },
+  "store-do:reviews": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": "keep the rating and text for the product, remove authorship"
+  },
+  "store-do:bulk_import_jobs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["user_id"]
+  },
+  "store-do:bulk_ai_jobs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["user_id"]
+  },
+  "store-do:store_faqs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:store_howtos": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:product_faqs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:sequences": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:accounts": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:journal_entries": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:journal_lines": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:fx_rate_entries": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:suppliers": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["contact_name", "phone", "email", "address"],
+    "subjectKeys": [],
+    "note": "merchant erase only"
+  },
+  "store-do:purchase_orders": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:purchase_order_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:stock_adjustments": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:stock_adjustment_items": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:reorder_rules": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:backorder_lines": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:expenses": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:reorder_suggestions": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:deadstock_flags": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:profit_anomalies": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:customer_cohort_snapshots": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:funnel_snapshots": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:customer_rfm_snapshots": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["customer_id"],
+    "subjectKeys": ["customerId"],
+    "note": ""
+  },
+  "store-do:count_sessions": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:count_lines": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["session_id"]
+  },
+  "store-do:whatsapp_templates": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:bank_statements": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:bank_transactions": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:warehouses": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["address"],
+    "subjectKeys": [],
+    "note": "merchant erase only"
+  },
+  "store-do:warehouse_stock": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:answer_engine_checks": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:store_page_revisions": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:store_tax_profiles": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["tax_registration_number"],
+    "subjectKeys": [],
+    "note": "merchant tax identity"
+  },
+  "store-do:store_tax_documents": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:fiscal_documents": {
+    "db": "store-do",
+    "class": "legal-retention",
+    "action": "retain",
+    "piiColumns": ["payload", "seller_trn"],
+    "subjectKeys": ["orderId"],
+    "note": "UTPL 206/2020 Art. 37: numbered documents are immutable and retained until retain_until; buyer name inside the payload is kept, purged after retain_until"
+  },
+  "store-do:fiscal_document_counters": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:webhook_endpoints": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:webhook_deliveries": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["endpoint_id"]
+  },
+  "store-do:gold_rates": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:gold_rates_current": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:gold_rate_settings": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:store_profile": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["email", "phone", "phone_ar", "whatsapp", "address", "address_ar"],
+    "subjectKeys": [],
+    "note": "merchant business contact; goes with deleteAll()"
+  },
+  "store-do:store_config": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:commerce_outcomes": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "scrub",
+    "piiColumns": ["buyer_key"],
+    "subjectKeys": ["buyerKey"],
+    "note": "CI-1 hashed key; set to NULL on erasure (trigger allows it only while do_flags.erasure = 1); area/reason/amount are not personal"
+  },
+  "store-do:do_flags": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "store-do:d1_outbox": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:store_staff": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["user_id"],
+    "subjectKeys": ["userId"],
+    "note": "membership link; identity data lives in ebda-identity"
+  },
+  "d1:SlugRedirect": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:webhook_events": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:system_settings": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:legal_acceptances": {
+    "db": "d1",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["user_id", "ip", "user_agent"],
+    "subjectKeys": ["userId"],
+    "note": "policy acceptance proof per user"
+  },
+  "d1:legal_notice_sends": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["recipient_count"]
+  },
+  "d1:legal_notice_deliveries": {
+    "db": "d1",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["user_id"],
+    "subjectKeys": ["userId"],
+    "note": ""
+  },
+  "d1:store_features": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:store_usage_snapshots": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "",
+    "reviewedNotPii": ["ai_tokens_in", "ai_tokens_out"]
+  },
+  "d1:answer_engine_provider_configs": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:merchant_api_keys": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["user_id", "name"],
+    "subjectKeys": ["userId"],
+    "note": "key hash only; revoked on erase"
+  },
+  "d1:plans": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:store_subscriptions": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["provider_customer_id", "payment_method_last4"],
+    "subjectKeys": [],
+    "note": "billing record kept; card reference removed on close"
+  },
+  "d1:billing_events": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:instapay_receipts": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["payer_name", "payer_address", "payer_mobile", "payer_bank"],
+    "subjectKeys": [],
+    "note": "payer details of a merchant subscription payment; kept for accounting without the payer fields after the retention window"
+  },
+  "d1:manual_payment_claims": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["payer_reference"],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:billing_reminders": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:store_lifecycle_emails": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:billing_webhook_events": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:provider_activation_requests": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:stores": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "directory row: business name, slug, domain; contact details live only in the StoreDO store_profile",
+    "reviewedNotPii": [
+      "email_sender_local_part",
+      "email_domain_id",
+      "email_domain_status",
+      "email_domain_verified_at"
+    ]
+  },
+  "d1:entity_index": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": ""
+  },
+  "d1:platform_audit_log": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["actor_id"],
+    "subjectKeys": ["userId"],
+    "note": "actor id nulled on user erasure"
+  }
+}
