@@ -61,13 +61,65 @@ describe('Accounts RPC for the Store', () => {
     ).toMatchObject({ n: 0 });
   });
 
-  it('setRole changes the grant and ends sessions', async () => {
+  it('setRole changes the grant and ends sessions; super_admin is not grantable over RPC', async () => {
     const u = await seedUser();
     const s = await login(u);
-    await rpc().setRole(u.id, 'super_admin', 'test');
+    await expect(rpc().setRole(u.id, 'super_admin' as never, 'test')).rejects.toThrow();
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(200);
+    await rpc().setRole(u.id, 'staff', 'test');
     expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
-    const again = await login(u);
-    expect((await import('jose')).decodeJwt(again.body.access_token).pa).toBe('super_admin');
+    expect(
+      await env.DB.prepare(`SELECT role FROM users WHERE id = ?1`).bind(u.id).first()
+    ).toMatchObject({ role: 'staff' });
+  });
+
+  it('inviteUser creates an unverified, credential-less account and mails a 24h staff_invite code', async () => {
+    const id = crypto.randomUUID();
+    const email = `invitee-${id.slice(0, 8)}@example.com`;
+    const r = await rpc().inviteUser({
+      id,
+      email,
+      firstName: 'Sam',
+      lastName: 'Lee',
+      role: 'staff',
+      storeName: 'Demo',
+    });
+    expect(r).toEqual({ id });
+    expect(
+      await env.DB.prepare(`SELECT password_hash, email_verified FROM users WHERE id = ?1`)
+        .bind(id)
+        .first()
+    ).toMatchObject({ password_hash: '!pending', email_verified: 0 });
+    expect(fakes.mails.at(-1)).toMatchObject({
+      to: email,
+      kind: 'staff_invite',
+      ttlMinutes: 1440,
+      storeName: 'Demo',
+    });
+    // the invitee cannot sign in with any password until they set one
+    expect(
+      (await call('/login', { method: 'POST', json: { email, password: '!pending' } })).status
+    ).toBeGreaterThanOrEqual(400);
+    // a VERIFIED account is never touched
+    const v = await seedUser();
+    expect(
+      await rpc().inviteUser({
+        id: crypto.randomUUID(),
+        email: v.email,
+        firstName: 'X',
+        lastName: 'Y',
+        role: 'staff',
+      })
+    ).toBeNull();
+  });
+
+  it('forgotPassword mails a reset code for an active account and is silent for an unknown address', async () => {
+    const u = await seedUser();
+    const before = fakes.mails.length;
+    await rpc().forgotPassword('nobody@example.com');
+    expect(fakes.mails.length).toBe(before);
+    await rpc().forgotPassword(u.email);
+    expect(fakes.mails.at(-1)).toMatchObject({ to: u.email, kind: 'password_reset' });
   });
 
   it('resendVerification mails a code only for an existing unverified account', async () => {

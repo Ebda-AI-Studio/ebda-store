@@ -11,7 +11,11 @@ import {
   rejectImpersonated,
 } from '../middleware/auth';
 import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
-import { isIdentityManagedUser, revokeIdentitySession, setAccountStatus } from '../lib/identity-client';
+import {
+  isIdentityManagedUser,
+  revokeIdentitySession,
+  setAccountStatus,
+} from '../lib/identity-client';
 import { reconcileShadowUser } from '../services/identity-shadow';
 import {
   AuthService,
@@ -457,26 +461,35 @@ const refreshGuards = [refreshIpLimiter, refreshLimiter];
 // Exchanges an identity-service access token (Authorization: Bearer <ES256>, aud=store) for the Store's HttpOnly `token`
 // cookie, after reconciling the Store's profile row from the identity service. The browser calls it after every
 // sign-in and every silent refresh (the token lives 15 minutes). No token is accepted from the body or the URL.
-router.post('/session', refreshIpLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const header = req.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-    if (!token || !isAccountsToken(token)) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
-    const origin = req.headers.origin as string | undefined;
-    if (
-      origin &&
-      !isPlatformOrigin(origin, { webUrl: config.webUrl, adminUrl: config.adminUrl, nodeEnv: config.nodeEnv })
-    )
-      throw new AppError(403, 'CORS_ORIGIN_NOT_ALLOWED', 'Origin not allowed');
-    const { claims } = await authenticateAccounts(token, { allowMissingProfile: true });
-    await reconcileShadowUser(claims.sub);
-    setTokenCookie(res, token);
-    const user = await AuthService.getProfile(claims.sub);
-    res.json({ success: true, data: { user, sessionExpiresAt: claims.exp * 1000 } });
-  } catch (error) {
-    next(error);
+router.post(
+  '/session',
+  refreshIpLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const header = req.headers.authorization ?? '';
+      const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+      if (!token || !isAccountsToken(token))
+        throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+      const origin = req.headers.origin as string | undefined;
+      if (
+        origin &&
+        !isPlatformOrigin(origin, {
+          webUrl: config.webUrl,
+          adminUrl: config.adminUrl,
+          nodeEnv: config.nodeEnv,
+        })
+      )
+        throw new AppError(403, 'CORS_ORIGIN_NOT_ALLOWED', 'Origin not allowed');
+      const { claims } = await authenticateAccounts(token, { allowMissingProfile: true });
+      await reconcileShadowUser(claims.sub);
+      setTokenCookie(res, token);
+      const user = await AuthService.getProfile(claims.sub);
+      res.json({ success: true, data: { user, sessionExpiresAt: claims.exp * 1000 } });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /auth/refresh
 router.post('/refresh', refreshGuards, async (req: Request, res: Response, next: NextFunction) => {
@@ -833,7 +846,8 @@ router.delete(
 
       // An identity-service account is deactivated THERE first (every session and refresh dies, sign-in is refused); if that
       // fails nothing has changed and the request fails.
-      if (await isIdentityManagedUser(userId)) await setAccountStatus(userId, 'inactive', 'self-delete');
+      if (await isIdentityManagedUser(userId))
+        await setAccountStatus(userId, 'inactive', 'self-delete');
 
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
       await withUser(userId, tx =>

@@ -196,11 +196,12 @@ async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<
 export async function issueAndMail(
   env: Env,
   user: UserRow,
-  kind: 'email_verify' | 'password_reset',
+  kind: 'email_verify' | 'password_reset' | 'staff_invite',
   type: OtpType,
-  pending?: PendingSignup
+  pending?: PendingSignup,
+  opts: { ttlMinutes?: number; storeName?: string } = {}
 ): Promise<void> {
-  const code = await issueOtp(env.DB, user, type, pending);
+  const code = await issueOtp(env.DB, user, type, pending, opts.ttlMinutes);
   if (!code || !env.MAILER) return;
   try {
     await env.MAILER.sendCode({
@@ -209,7 +210,8 @@ export async function issueAndMail(
       code,
       language: (pending?.language ?? user.language) === 'ar' ? 'ar' : 'en',
       firstName: pending?.first_name ?? user.first_name,
-      ttlMinutes: OTP_TTL_MINUTES[type],
+      ttlMinutes: opts.ttlMinutes ?? OTP_TTL_MINUTES[type],
+      ...(opts.storeName ? { storeName: opts.storeName } : {}),
     });
   } catch (e) {
     console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
@@ -223,6 +225,68 @@ function queueMail(c: C, job: Promise<unknown>): void {
       console.error(JSON.stringify({ msg: 'background job failed', error: (e as Error).message }))
     )
   );
+}
+
+/** Mail a password-reset code to an existing active account (generic: silent for an unknown address). */
+export async function forgotPasswordFor(env: Env, email: string): Promise<void> {
+  const user = await findUserByEmail(env.DB, email);
+  if (user && user.status === 'active')
+    await issueAndMail(env, user, 'password_reset', 'password_reset');
+}
+
+/**
+ * Invite a merchant or staff member: creates an UNVERIFIED identity with no credential and mails a one-time code that
+ * lets the invitee set their own password (the reset flow; it also verifies the address). Never touches an existing row.
+ * Returns null when the address already belongs to a VERIFIED account.
+ */
+export async function inviteFor(
+  env: Env,
+  input: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'store_admin' | 'staff';
+    language: 'en' | 'ar';
+    storeName?: string;
+  }
+): Promise<{ id: string } | null> {
+  let user = await findUserByEmail(env.DB, input.email);
+  if (user?.email_verified) return null;
+  if (!user) {
+    try {
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, email_verified, language, created_at, updated_at)
+         VALUES (?1,?2,'!pending',?3,?4,?5,'active',0,?6,?7,?7)`
+      )
+        .bind(
+          input.id,
+          input.email,
+          input.firstName,
+          input.lastName,
+          input.role,
+          input.language,
+          iso()
+        )
+        .run();
+    } catch (e) {
+      if (!/UNIQUE.*users\.email|users_email_lower/i.test((e as Error).message)) throw e;
+    }
+    user = await findUserByEmail(env.DB, input.email);
+  }
+  if (!user) return null;
+  await issueAndMail(
+    env,
+    user,
+    input.storeName ? 'staff_invite' : 'password_reset',
+    'password_reset',
+    undefined,
+    {
+      ttlMinutes: 24 * 60,
+      storeName: input.storeName,
+    }
+  );
+  return { id: user.id };
 }
 
 /** Mail a fresh code to an existing UNVERIFIED account; carries the credential of the latest signup (see verify). */
@@ -657,14 +721,7 @@ export function createApp() {
       throw err(429, 'TOO_MANY_ATTEMPTS');
     if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('forgot-email', 3))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    queueMail(
-      c,
-      (async () => {
-        const user = await findUserByEmail(c.env.DB, body.email);
-        if (user && user.status === 'active')
-          await issueAndMail(c.env, user, 'password_reset', 'password_reset');
-      })()
-    );
+    queueMail(c, forgotPasswordFor(c.env, body.email));
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 

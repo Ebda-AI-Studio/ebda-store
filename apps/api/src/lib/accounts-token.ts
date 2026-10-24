@@ -105,7 +105,10 @@ export async function verifyAccountsToken(
     if (opts.ignoreExpiration && e instanceof joseErrors.JWTExpired) payload = e.payload;
     else throw e;
   }
-  const { sub, sid, jti, stores, pa, email, email_verified, exp } = payload as Record<string, unknown>;
+  const { sub, sid, jti, stores, pa, email, email_verified, exp } = payload as Record<
+    string,
+    unknown
+  >;
   if (typeof sub !== 'string' || typeof sid !== 'string' || typeof jti !== 'string')
     throw new Error('token has no sub/sid/jti');
   if (!Array.isArray(stores)) throw new Error('token has no stores claim');
@@ -115,7 +118,9 @@ export async function verifyAccountsToken(
     jti,
     stores: stores.filter(
       (s): s is StoreClaim =>
-        !!s && typeof (s as { id?: unknown }).id === 'string' && ['owner', 'staff'].includes((s as { role?: string }).role ?? '')
+        !!s &&
+        typeof (s as { id?: unknown }).id === 'string' &&
+        ['owner', 'staff'].includes((s as { role?: string }).role ?? '')
     ),
     ...(pa === 'super_admin' ? { pa: 'super_admin' as const } : {}),
     ...(typeof email === 'string' ? { email } : {}),
@@ -126,7 +131,9 @@ export async function verifyAccountsToken(
 
 /** Session revocation: ask the identity service (Service Binding RPC). Fails CLOSED when it cannot answer. */
 export async function isAccountsSessionRevoked(sid: string): Promise<boolean> {
-  const b = cfBindings()?.ACCOUNTS as unknown as { isRevoked?(sid: string): Promise<boolean> } | undefined;
+  const b = cfBindings()?.ACCOUNTS as unknown as
+    | { isRevoked?(sid: string): Promise<boolean> }
+    | undefined;
   if (!b?.isRevoked) throw new Error('ACCOUNTS service binding is not configured');
   return b.isRevoked(sid);
 }

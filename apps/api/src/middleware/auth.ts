@@ -120,7 +120,6 @@ async function resolveTokenVersionAndStatus(
   return { tokenVersion: currentTv, blocked: u ? u.status !== 'active' : false };
 }
 
-
 /**
  * Map an identity-service token (Rulings ID-1/ID-2) onto the Store's request identity.
  *
@@ -128,13 +127,17 @@ async function resolveTokenVersionAndStatus(
  * store_admin; only staff memberships -> staff. Store ACCESS is still decided from the database (requireStoreAccess:
  * ownerId / StoreStaff), not from the claim: the claim is up to 15 minutes old, the database is not (Ruling ID-9).
  */
-export function accountsUser(c: AccountsClaims): AuthPayload {
+export function accountsUser(c: AccountsClaims, profileRole?: string): AuthPayload {
+  // The identity-managed profile row's role is authoritative for store_admin vs staff (the stores[] claim cannot express a
+  // mixed owner+staff user); a platform admin is only ever what the token's `pa` claim says.
   const role =
     c.pa === 'super_admin'
       ? 'super_admin'
-      : c.stores.length > 0 && !c.stores.some(s => s.role === 'owner')
-        ? 'staff'
-        : 'store_admin';
+      : profileRole === 'staff' || profileRole === 'store_admin'
+        ? profileRole
+        : c.stores.length > 0 && !c.stores.some(s => s.role === 'owner')
+          ? 'staff'
+          : 'store_admin';
   return { userId: c.sub, email: c.email ?? '', role, storeId: null };
 }
 
@@ -171,7 +174,7 @@ export async function authenticateAccounts(
   } else if (st.status !== 'active') {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
   }
-  return { user: accountsUser(claims), claims };
+  return { user: accountsUser(claims, st?.role), claims };
 }
 
 export async function authenticate(
@@ -195,7 +198,11 @@ export async function authenticate(
       (req as any).accountsStores = claims.stores;
       return next();
     } catch (err) {
-      return next(err instanceof AppError ? err : new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
+      return next(
+        err instanceof AppError
+          ? err
+          : new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token')
+      );
     }
   }
 
@@ -477,9 +484,17 @@ export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: N
  */
 export async function rejectIdentityManaged(req: Request, _res: Response, next: NextFunction) {
   try {
-    if (req.user && req.user.role !== 'customer' && (await isIdentityManagedUser(req.user.userId))) {
+    if (
+      req.user &&
+      req.user.role !== 'customer' &&
+      (await isIdentityManagedUser(req.user.userId))
+    ) {
       return next(
-        new AppError(409, 'USE_IDENTITY_SERVICE', 'Manage sign-in settings in your Ebda account settings')
+        new AppError(
+          409,
+          'USE_IDENTITY_SERVICE',
+          'Manage sign-in settings in your Ebda account settings'
+        )
       );
     }
     next();

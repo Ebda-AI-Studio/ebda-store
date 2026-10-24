@@ -1,7 +1,7 @@
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { revokeIdentityIfManaged } from '../lib/identity-client';
+import { forgotIdentityPassword, revokeIdentityIfManaged } from '../lib/identity-client';
 import crypto from 'crypto';
 import {
   prisma,
@@ -1687,6 +1687,17 @@ export class AuthService {
       return null;
     }
 
+    if (user.storeId === null) {
+      // Admin namespace (merchant / staff / operator): the credential lives in the identity service, which issues and mails
+      // its own one-time code. The Store issues no password token for these accounts (Ruling ID-2).
+      cfWaitUntil(
+        forgotIdentityPassword(user.email).catch(err =>
+          logger.error({ err, userId: user.id }, 'identity password-reset request failed')
+        )
+      );
+      return { userId: user.id };
+    }
+
     const resetToken = await this.issuePasswordSetToken(user.id);
 
     const name = `${user.firstName} ${user.lastName}`.trim() || user.email;
@@ -1704,23 +1715,6 @@ export class AuthService {
           },
           language
         ).catch(err => logger.error({ err, userId: user.id }, 'password-reset mail failed'))
-      );
-    } else {
-      // Admin namespace (merchant / staff / operator on Ebda Store): no store
-      // context, so the platform sender. Until 2026-10-07 this branch sent
-      // NOTHING — a merchant who forgot their password had no way back in.
-      cfWaitUntil(
-        sendMerchantPasswordResetEmail(
-          {
-            email: user.email,
-            name,
-            resetUrl: `${storeAppOrigin()}/reset-password?token=${resetToken}`,
-            expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
-          },
-          language
-        ).catch(err =>
-          logger.error({ err, userId: user.id }, 'merchant password-reset mail failed')
-        )
       );
     }
     return { userId: user.id };

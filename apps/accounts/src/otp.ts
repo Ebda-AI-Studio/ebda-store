@@ -31,7 +31,9 @@ export async function issueOtp(
   db: D1Database,
   user: Pick<UserRow, 'id'>,
   type: OtpType,
-  pending?: PendingSignup
+  pending?: PendingSignup,
+  /** Override the code lifetime (an invitation outlives a password-reset code). */
+  ttlMinutes: number = OTP_TTL_MINUTES[type]
 ): Promise<string | null> {
   const code = randomCode();
   const now = nowMs();
@@ -47,7 +49,7 @@ export async function issueOtp(
         await hashCode(user.id, type, code),
         user.id,
         type,
-        iso(now + OTP_TTL_MINUTES[type] * 60_000),
+        iso(now + ttlMinutes * 60_000),
         iso(now),
         pending ? JSON.stringify(pending) : null
       ),

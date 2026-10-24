@@ -4,7 +4,13 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
-import { eraseIdentityUser, setAccountRole, setAccountStatus } from '../lib/identity-client';
+import {
+  eraseIdentityUser,
+  getAccountState,
+  inviteIdentity,
+  setAccountRole,
+  setAccountStatus,
+} from '../lib/identity-client';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
@@ -930,8 +936,10 @@ router.post(
         email: z.string().email().max(255),
         firstName: z.string().min(1).max(100),
         lastName: z.string().min(1).max(100),
-        password: z.string().min(8).max(255),
-        role: z.enum(['super_admin', 'store_admin']),
+        /** Ignored: the invitee sets their own password from the mailed link (kept so older clients still validate). */
+        password: z.string().min(8).max(255).optional(),
+        // Platform administrators are operator-only (Ruling ID-12): this endpoint can only invite merchants.
+        role: z.literal('store_admin'),
       });
       const data = schema.parse(req.body);
       const email = data.email.toLowerCase();
@@ -950,17 +958,34 @@ router.post(
         return;
       }
 
-      const newPasswordHash = await bcrypt.hash(data.password, 12);
+      // The identity service owns the credential: it creates an unverified account and mails the invitee a one-time code
+      // to set their own password (Ruling ID-2). The Store keeps the profile row under the same id.
+      const invited = await inviteIdentity({
+        id: crypto.randomUUID(),
+        email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: 'store_admin',
+        language: 'en',
+      });
+      if (!invited) {
+        res.status(409).json({
+          success: false,
+          error: { code: 'EMAIL_TAKEN', message: 'An admin user with this email already exists' },
+        });
+        return;
+      }
       const user = await asPlatformOperator(req.user!.userId, () =>
         prisma.user.create({
           data: {
+            id: invited.id,
             email,
             firstName: data.firstName,
             lastName: data.lastName,
-            passwordHash: newPasswordHash,
-            role: data.role as UserRole,
+            passwordHash: '!pending',
+            role: UserRole.store_admin,
             status: 'active',
-            emailVerified: true,
+            emailVerified: false,
             language: 'en',
           },
           select: {
@@ -1098,11 +1123,22 @@ router.put(
         });
         return;
       }
+      if (data.role === 'super_admin' && existing.role !== 'super_admin') {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'OPERATOR_ONLY',
+            message:
+              'Platform administrators are granted by the platform operator, not through this endpoint.',
+          },
+        });
+        return;
+      }
       if (identityManaged && data.status !== undefined && data.status !== existing.status) {
         await setAccountStatus(id, data.status, 'admin-update');
       }
       if (identityManaged && data.role !== undefined && data.role !== existing.role) {
-        await setAccountRole(id, data.role as 'store_admin' | 'super_admin', 'admin-update');
+        await setAccountRole(id, data.role as 'store_admin', 'admin-update');
       }
 
       // Email collision: if changing email, ensure no other user has it.
@@ -2435,6 +2471,7 @@ router.post(
             storeId: true,
             deletedAt: true,
             tokenVersion: true,
+            status: true,
           },
         })
       );
@@ -2451,6 +2488,21 @@ router.post(
         res.status(410).json({
           success: false,
           error: { code: 'USER_DELETED', message: 'Cannot impersonate a deleted user' },
+        });
+        return;
+      }
+
+      // A suspended or deactivated account must not be re-entered through an impersonation token (the Store row, and for an
+      // identity-managed account also the identity service, which is the source of truth for status).
+      let targetStatus: string = target.status;
+      if (target.storeId === null && target.role !== 'customer') {
+        const acc = await getAccountState(target.id);
+        if (acc) targetStatus = acc.status === 'active' ? targetStatus : acc.status;
+      }
+      if (targetStatus !== 'active') {
+        res.status(403).json({
+          success: false,
+          error: { code: 'ACCOUNT_SUSPENDED', message: 'Cannot impersonate an inactive account' },
         });
         return;
       }

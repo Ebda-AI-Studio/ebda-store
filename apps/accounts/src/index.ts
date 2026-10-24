@@ -1,5 +1,11 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { createApp, registerPending, resendVerificationFor } from './app';
+import {
+  createApp,
+  forgotPasswordFor,
+  inviteFor,
+  registerPending,
+  resendVerificationFor,
+} from './app';
 import { isSessionRevoked, revokeAllForUser, revokeSession, type UserRow } from './data';
 import { z } from 'zod';
 import { hashPassword, passwordPolicy } from './password';
@@ -94,17 +100,47 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   }
 
   /** Change an admin-namespace role (promote/demote). Ends every session so tokens are re-issued with the new grant. */
-  async setRole(
-    userId: string,
-    role: 'store_admin' | 'staff' | 'super_admin',
-    reason: string
-  ): Promise<void> {
+  async setRole(userId: string, role: 'store_admin' | 'staff', reason: string): Promise<void> {
     z.string().uuid().parse(userId);
-    z.enum(['store_admin', 'staff', 'super_admin']).parse(role);
+    // super_admin is deliberately NOT grantable over RPC: any Worker in the account can call this binding, so platform
+    // operators are created only by an operator-run D1 statement (Ruling ID-12).
+    z.enum(['store_admin', 'staff']).parse(role);
     await this.env.DB.prepare(`UPDATE users SET role = ?2, updated_at = ?3 WHERE id = ?1`)
       .bind(userId, role, new Date().toISOString())
       .run();
     await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+  }
+
+  /** Invite a merchant or staff member: an unverified identity plus a one-time code to set their own password. */
+  async inviteUser(input: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'store_admin' | 'staff';
+    language?: 'en' | 'ar';
+    storeName?: string;
+  }): Promise<{ id: string } | null> {
+    const v = z
+      .object({
+        id: z.string().uuid(),
+        email: z.string().trim().toLowerCase().email().max(254),
+        firstName: z.string().trim().min(1).max(100),
+        lastName: z.string().trim().max(100),
+        role: z.enum(['store_admin', 'staff']),
+        language: z.enum(['en', 'ar']).default('ar'),
+        storeName: z.string().trim().max(200).optional(),
+      })
+      .parse(input);
+    return inviteFor(this.env, v);
+  }
+
+  /** Mail a password-reset code (generic: silent for an unknown or inactive address). */
+  async forgotPassword(email: string): Promise<void> {
+    await forgotPasswordFor(
+      this.env,
+      z.string().trim().toLowerCase().email().max(254).parse(email)
+    );
   }
 
   /** Re-send the verification code (generic: does nothing for an unknown or already verified address). */

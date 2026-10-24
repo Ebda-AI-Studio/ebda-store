@@ -270,6 +270,21 @@ describe('role mapping and optionalAuthenticate', () => {
     expect(accountsUser({ ...base, stores: [] }).role).toBe('store_admin');
   });
 
+  it('the Store profile role decides store_admin vs staff (a mixed owner+staff user), but never grants super_admin', () => {
+    const base = { sub: 'u', sid: 's', jti: 'j', exp: 1 };
+    const mixed = [
+      { id: 'a', role: 'staff' as const },
+      { id: 'b', role: 'owner' as const },
+    ];
+    expect(accountsUser({ ...base, stores: mixed }, 'staff').role).toBe('staff');
+    expect(accountsUser({ ...base, stores: [] }, 'store_admin').role).toBe('store_admin');
+    // a profile row that says super_admin does NOT elevate: only the token's pa claim can
+    expect(accountsUser({ ...base, stores: mixed }, 'super_admin').role).toBe('store_admin');
+    expect(accountsUser({ ...base, stores: [], pa: 'super_admin' }, 'staff').role).toBe(
+      'super_admin'
+    );
+  });
+
   it('optionalAuthenticate continues as a guest for a bad, revoked or unconfirmable token, and identifies a good one', async () => {
     const good = await run(optionalAuthenticate, await mint());
     expect(good.req.user?.userId).toBe('user-1');

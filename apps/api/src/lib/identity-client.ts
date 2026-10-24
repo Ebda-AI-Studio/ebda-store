@@ -18,7 +18,10 @@ function rpc(): AccountsRpc {
   return b;
 }
 
-async function call<T>(name: keyof AccountsRpc, fn: (r: AccountsRpc) => Promise<T> | undefined): Promise<T> {
+async function call<T>(
+  name: keyof AccountsRpc,
+  fn: (r: AccountsRpc) => Promise<T> | undefined
+): Promise<T> {
   try {
     const p = fn(rpc());
     if (!p) throw new Error(`ACCOUNTS.${String(name)} is not available`);
@@ -31,8 +34,11 @@ async function call<T>(name: keyof AccountsRpc, fn: (r: AccountsRpc) => Promise<
 
 export const getAccountState = (userId: string): Promise<AccountState | null> =>
   call('getAccountState', r => r.getAccountState?.(userId));
-export const setAccountStatus = (userId: string, status: 'active' | 'inactive' | 'suspended', reason: string) =>
-  call('setStatus', r => r.setStatus?.(userId, status, reason));
+export const setAccountStatus = (
+  userId: string,
+  status: 'active' | 'inactive' | 'suspended',
+  reason: string
+) => call('setStatus', r => r.setStatus?.(userId, status, reason));
 export const revokeIdentitySession = (sid: string, reason: string) =>
   call('revokeSession', r => r.revokeSession?.(sid, reason));
 export const revokeIdentityUser = (userId: string, reason: string) =>
@@ -41,7 +47,11 @@ export const createIdentity = (input: Parameters<NonNullable<AccountsRpc['create
   call('createUser', r => r.createUser?.(input));
 export const resendIdentityVerification = (email: string) =>
   call('resendVerification', r => r.resendVerification?.(email));
-export const setAccountRole = (userId: string, role: 'store_admin' | 'staff' | 'super_admin', reason: string) =>
+export const inviteIdentity = (input: Parameters<NonNullable<AccountsRpc['inviteUser']>>[0]) =>
+  call('inviteUser', r => r.inviteUser?.(input));
+export const forgotIdentityPassword = (email: string) =>
+  call('forgotPassword', r => r.forgotPassword?.(email));
+export const setAccountRole = (userId: string, role: 'store_admin' | 'staff', reason: string) =>
   call('setRole', r => r.setRole?.(userId, role, reason));
 export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
 

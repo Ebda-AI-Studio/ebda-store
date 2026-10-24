@@ -10,9 +10,7 @@
  *   DELETE /stores/:storeId/staff/:userId    — remove a staff member
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { randomBytes } from 'crypto';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
 import { withStore, withUser, UserRole } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -20,8 +18,9 @@ import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
+import { inviteIdentity } from '../lib/identity-client';
 import { assertWithinLimit } from '../services/plan-limit.service';
-import { AuthService, RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
+import { RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
 import { sendStaffInviteEmail } from '../services/platform-mailer';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
@@ -106,19 +105,60 @@ router.post(
       // definer: it returns the existing account untouched, or creates a staff
       // account. The password is only hashed when no account exists yet.
       const exists = await findUserIdByEmail(input.email, null, { includeDeleted: true });
-      let passwordHash = '';
+      const storeNameForInvite = req.store?.name ?? 'your store';
+      let staffUser: Awaited<ReturnType<typeof ensureAdminUser>>;
       if (!exists) {
-        // Cryptographically-strong fallback password (never Math.random for secrets).
-        const password = input.password ?? randomBytes(18).toString('base64url') + 'A1!';
-        passwordHash = await bcrypt.hash(password, 12);
+        // A brand-new account is created in the identity service (it owns the credential): unverified, no password, and a
+        // one-time code mailed to the invitee to set their own (Ruling ID-2). The Store keeps the profile row, same id.
+        const invited = await inviteIdentity({
+          id: crypto.randomUUID(),
+          email: input.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          role: 'staff',
+          language: 'ar',
+          storeName: storeNameForInvite,
+        });
+        if (!invited) {
+          throw new AppError(
+            409,
+            'ROLE_CONFLICT',
+            'This email already belongs to an account that cannot be invited as staff.'
+          );
+        }
+        await withUser(invited.id, tx =>
+          tx.user.create({
+            data: {
+              id: invited.id,
+              storeId: null,
+              email: input.email,
+              passwordHash: '!pending',
+              firstName: input.firstName,
+              lastName: input.lastName,
+              role: UserRole.staff,
+              emailVerified: false,
+              language: 'ar',
+            },
+          })
+        );
+        staffUser = {
+          id: invited.id,
+          created: true,
+          role: 'staff',
+          status: 'active',
+          email: input.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+        };
+      } else {
+        staffUser = await ensureAdminUser({
+          email: input.email,
+          passwordHash: '',
+          firstName: input.firstName,
+          lastName: input.lastName,
+          role: UserRole.staff,
+        });
       }
-      const staffUser = await ensureAdminUser({
-        email: input.email,
-        passwordHash,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        role: UserRole.staff,
-      });
 
       // User exists — must already be a staff or store_admin role
       if (staffUser.role === UserRole.customer || staffUser.role === UserRole.super_admin) {
@@ -171,7 +211,7 @@ router.post(
       // nested-transaction shape `r2-cleanup.service.ts` already declares
       // `connections: 2` for; the global deferred-work cap needs both counted.
       const staffName = `${staffUser.firstName} ${staffUser.lastName}`.trim() || staffUser.email;
-      const storeName = req.store?.name ?? 'your store';
+      const storeName = storeNameForInvite;
       void deferAfterTenantCommit(
         'staff.invite.notify',
         async () => {
@@ -179,9 +219,9 @@ router.post(
             tx.user.findUnique({ where: { id: staffUser.id }, select: { language: true } })
           );
           const language = (existingUser?.language as 'en' | 'ar' | undefined) ?? undefined;
-          const setPasswordUrl = staffUser.created
-            ? `${storeAppOrigin()}/reset-password?token=${await AuthService.issueStaffInviteToken(staffUser.id)}`
-            : null;
+          // A brand-new account already received its invitation (with the set-password code) from the identity service.
+          if (staffUser.created) return;
+          const setPasswordUrl = null;
           await sendStaffInviteEmail(
             {
               email: staffUser.email,

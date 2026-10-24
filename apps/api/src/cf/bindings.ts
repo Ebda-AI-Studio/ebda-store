@@ -69,11 +69,25 @@ export interface AccountsRpc {
   isRevoked?(sid: string): Promise<boolean>;
   revokeSession?(sid: string, reason: string): Promise<void>;
   revokeUser?(userId: string, reason: string): Promise<void>;
-  setStatus?(userId: string, status: 'active' | 'inactive' | 'suspended', reason: string): Promise<void>;
+  setStatus?(
+    userId: string,
+    status: 'active' | 'inactive' | 'suspended',
+    reason: string
+  ): Promise<void>;
   getAccountState?(userId: string): Promise<AccountState | null>;
   resendVerification?(email: string): Promise<void>;
   eraseUser?(userId: string): Promise<void>;
-  setRole?(userId: string, role: 'store_admin' | 'staff' | 'super_admin', reason: string): Promise<void>;
+  setRole?(userId: string, role: 'store_admin' | 'staff', reason: string): Promise<void>;
+  inviteUser?(input: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'store_admin' | 'staff';
+    language?: 'en' | 'ar';
+    storeName?: string;
+  }): Promise<{ id: string } | null>;
+  forgotPassword?(email: string): Promise<void>;
   createUser?(input: {
     id?: string;
     email: string;

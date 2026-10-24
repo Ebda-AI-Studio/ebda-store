@@ -8,7 +8,7 @@ const app = createApp();
 
 export interface Fakes {
   stores: Array<{ id: string; role: 'owner' | 'staff' }>;
-  mails: Array<{ to: string; kind: string; code: string }>;
+  mails: Array<{ to: string; kind: string; code: string; ttlMinutes?: number; storeName?: string }>;
   directoryDown: boolean;
 }
 export const fakes: Fakes = { stores: [], mails: [], directoryDown: false };
@@ -26,8 +26,20 @@ export const testEnv = (): Cloudflare.Env =>
       },
     },
     MAILER: {
-      sendCode: async (m: { to: string; kind: string; code: string }) => {
-        fakes.mails.push({ to: m.to, kind: m.kind, code: m.code });
+      sendCode: async (m: {
+        to: string;
+        kind: string;
+        code: string;
+        ttlMinutes?: number;
+        storeName?: string;
+      }) => {
+        fakes.mails.push({
+          to: m.to,
+          kind: m.kind,
+          code: m.code,
+          ttlMinutes: m.ttlMinutes,
+          storeName: m.storeName,
+        });
       },
     },
   }) as unknown as Cloudflare.Env;
