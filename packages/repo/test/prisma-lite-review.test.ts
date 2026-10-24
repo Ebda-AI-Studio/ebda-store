@@ -377,3 +377,214 @@ describe('writes are atomic outside an explicit transaction', () => {
     });
   });
 });
+
+describe('round 2 review (writes)', () => {
+  it('HIGH 1: a nested write cannot attach a child to another parent (FK in data, back-relation, updateMany)', async () => {
+    const { db, lite } = setup();
+    const before = imgs(db, 'p1').concat(imgs(db, 'p2'));
+    await expect(
+      lite.product.update({
+        where: { id: 'p1' },
+        data: { images: { create: { id: 'x1', url: 'u', productId: 'p2' } } },
+      })
+    ).rejects.toThrow(/relation key/);
+    await expect(
+      lite.product.update({
+        where: { id: 'p1' },
+        data: { images: { create: { id: 'x2', url: 'u', product: { connect: { id: 'p2' } } } } },
+      })
+    ).rejects.toThrow(/back-relation/);
+    await expect(
+      lite.product.update({
+        where: { id: 'p1' },
+        data: { images: { updateMany: { where: {}, data: { productId: 'p2' } } } },
+      })
+    ).rejects.toThrow(/relation key/);
+    await expect(
+      lite.product.update({
+        where: { id: 'p1' },
+        data: { images: { createMany: { data: [{ id: 'x3', url: 'u', productId: 'p2' }] } } },
+      })
+    ).rejects.toThrow(/relation key/);
+    await expect(
+      lite.product.create({
+        data: {
+          id: 'n9',
+          storeId: 's1',
+          name: 'n',
+          slug: 'n9',
+          price: 1,
+          images: { create: [{ id: 'x4', url: 'u', productId: 'p2' }] },
+        },
+      })
+    ).rejects.toThrow(/relation key/);
+    expect(imgs(db, 'p1').concat(imgs(db, 'p2'))).toEqual(before);
+    expect(db.prepare(`SELECT count(*) c FROM products WHERE id = 'n9'`).get()).toEqual({ c: 0 });
+    // the legitimate nested create still lands under the parent
+    await lite.product.update({
+      where: { id: 'p1' },
+      data: { images: { create: { id: 'ok1', url: 'u' } } },
+    });
+    expect(imgs(db, 'p1')).toContain('ok1:u');
+  });
+
+  it('HIGH 2: an error caught INSIDE an interactive $transaction leaves no half-applied nested write', async () => {
+    const { db, lite } = setup();
+    await lite.$transaction(async (tx: any) => {
+      try {
+        await tx.product.create({
+          data: {
+            id: 'half',
+            storeId: 's1',
+            name: 'n',
+            slug: 'half',
+            price: 1,
+            images: {
+              create: [
+                { id: 'dup', url: 'a' },
+                { id: 'dup', url: 'b' },
+              ],
+            },
+          },
+        });
+      } catch {
+        /* the caller swallows it */
+      }
+      await tx.product.create({
+        data: { id: 'after', storeId: 's1', name: 'n', slug: 'after', price: 1 },
+      });
+    });
+    expect(db.prepare(`SELECT count(*) c FROM products WHERE id = 'half'`).get()).toEqual({ c: 0 });
+    expect(db.prepare(`SELECT count(*) c FROM product_images WHERE id = 'dup'`).get()).toEqual({
+      c: 0,
+    });
+    expect(db.prepare(`SELECT count(*) c FROM products WHERE id = 'after'`).get()).toEqual({
+      c: 1,
+    });
+  });
+
+  it('MEDIUM 3: Int/Float/String fields reject the wrong JS type', async () => {
+    const { lite } = setup();
+    for (const price of ['9abc', 1.5, NaN, 2 ** 31, null])
+      await expect(
+        lite.product.create({ data: { id: 't', storeId: 's1', name: 'n', slug: 't', price } })
+      ).rejects.toThrow();
+    await expect(
+      lite.product.create({ data: { id: 't', storeId: 's1', name: 5, slug: 't', price: 1 } })
+    ).rejects.toThrow(/String/);
+  });
+
+  it('MEDIUM 4: *OrThrow raises a real PrismaClientKnownRequestError (404, not 500)', async () => {
+    const { lite } = setup();
+    for (const call of [
+      () => lite.product.findUniqueOrThrow({ where: { id: 'nope' } }),
+      () => lite.product.findFirstOrThrow({ where: { id: 'nope' } }),
+    ]) {
+      const e = await call().then(
+        () => null,
+        (x: unknown) => x
+      );
+      expect(e).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      expect((e as { code: string }).code).toBe('P2025');
+    }
+  });
+
+  it('MEDIUM 5: workerd-style `: SQLITE_CONSTRAINT` suffixes do not leak into the P2002 target', async () => {
+    const { mapDbError } = await import('../src/prisma-lite/writes');
+    const e = mapDbError(
+      new Error('UNIQUE constraint failed: products.store_id, products.slug: SQLITE_CONSTRAINT')
+    ) as any;
+    expect(e.code).toBe('P2002');
+    expect(e.meta.target).toEqual(['store_id', 'slug']);
+    expect(
+      (mapDbError(new Error('NOT NULL constraint failed: products.name: SQLITE_CONSTRAINT')) as any)
+        .meta.constraint
+    ).toEqual(['name']);
+  });
+
+  it('MEDIUM 6: aggregate/groupBy refuse arguments they cannot honour', async () => {
+    const { lite } = setup();
+    await expect(lite.product.aggregate({ _count: true, take: 1 })).rejects.toThrow(
+      /unsupported aggregate argument/
+    );
+    await expect(
+      lite.product.aggregate({ _sum: { price: true }, orderBy: { id: 'asc' } })
+    ).rejects.toThrow(/unsupported/);
+    await expect(lite.product.groupBy({ by: ['status'], take: 0 })).rejects.toThrow(/unsupported/);
+  });
+
+  it('MEDIUM 7: no transaction support means writes and $transaction THROW, never run unprotected', async () => {
+    const db = openSqlite();
+    const base = nodeSqlRunner(db);
+    const lite = createPrismaLite(META, { all: base.all, run: base.run }) as any;
+    await expect(
+      lite.product.create({ data: { id: 'x', storeId: 's1', name: 'n', slug: 'x', price: 1 } })
+    ).rejects.toThrow(/no transaction/);
+    await expect(lite.$transaction(async () => 1)).rejects.toThrow(/no transaction/);
+    expect(await lite.product.count()).toBe(0); // reads still work
+  });
+
+  it('MEDIUM 8: with the DO store id configured, a write carries that storeId or is refused', async () => {
+    const db = openSqlite();
+    const lite = createPrismaLite(META, nodeSqlRunner(db), 'store-do', { storeId: 's1' }) as any;
+    await lite.product.create({ data: { id: 'a', name: 'n', slug: 'a', price: 1 } });
+    expect(db.prepare(`SELECT store_id FROM products WHERE id = 'a'`).get()).toEqual({
+      store_id: 's1',
+    });
+    await expect(
+      lite.product.create({ data: { id: 'b', storeId: 'OTHER', name: 'n', slug: 'b', price: 1 } })
+    ).rejects.toThrow(/this store/);
+    await expect(
+      lite.product.update({ where: { id: 'a' }, data: { storeId: 'OTHER' } })
+    ).rejects.toThrow(/this store/);
+    await expect(
+      lite.product.update({ where: { id: 'a' }, data: { store: { connect: { id: 'OTHER' } } } })
+    ).rejects.toThrow(/this store/);
+  });
+
+  it('LOW: increment on NULL stays NULL, divide by zero and bad operands throw, push appends each element, nested deleteMany list is a union', async () => {
+    const { db, lite } = setup();
+    await lite.product.update({ where: { id: 'p1' }, data: { moq: { increment: 5 } } });
+    expect(db.prepare(`SELECT moq FROM products WHERE id = 'p1'`).get()).toEqual({ moq: null });
+    await expect(
+      lite.product.update({ where: { id: 'p1' }, data: { price: { divide: 0 } } })
+    ).rejects.toThrow(/non-zero/);
+    await expect(
+      lite.product.update({ where: { id: 'p1' }, data: { price: { multiply: '2' } } })
+    ).rejects.toThrow(/finite number/);
+    await lite.product.update({
+      where: { id: 'p1' },
+      data: { images: { deleteMany: [{ id: 'i1' }, { id: 'i3' }] } },
+    });
+    expect(imgs(db, 'p1')).toEqual(['i2:u-i2']);
+    await expect(
+      lite.product.update({ where: { id: 'p1' }, data: { images: { deleteMany: [{ id: 'i4' }] } } })
+    ).resolves.toBeTruthy(); // other parent's row: untouched
+    expect(imgs(db, 'p2').length).toBe(2);
+  });
+
+  it('LOW: a primary-key update re-reads by the new key; createMany takes one object and refuses relation fields', async () => {
+    const { lite } = setup();
+    await lite.product.createMany({
+      data: { id: 'cm0', storeId: 's1', name: 'n', slug: 'cm0', price: 1 },
+    });
+    const r = await lite.product.update({ where: { id: 'cm0' }, data: { id: 'p1-new' } });
+    expect(r.id).toBe('p1-new');
+    await lite.product.update({ where: { id: 'p2' }, data: { id: 'p2-new' } });
+    expect((await lite.productImage.findMany({ where: { productId: 'p2-new' } })).length).toBe(2); // ON UPDATE CASCADE
+    expect(
+      (
+        await lite.product.createMany({
+          data: { id: 'cm1', storeId: 's1', name: 'n', slug: 'cm1', price: 1 },
+        })
+      ).count
+    ).toBe(1);
+    await expect(
+      lite.product.createMany({
+        data: [
+          { id: 'cm2', storeId: 's1', name: 'n', slug: 'cm2', price: 1, images: { create: [] } },
+        ],
+      })
+    ).rejects.toThrow(/relation fields/);
+  });
+});

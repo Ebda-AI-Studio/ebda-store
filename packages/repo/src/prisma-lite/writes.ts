@@ -24,7 +24,8 @@ export function knownError(code: string, message: string, meta?: Record<string, 
 
 /** SQLite/DO constraint errors -> Prisma codes (P2002 unique, P2003 foreign key, P2011 null, P2004 check). */
 export function mapDbError(e: unknown): unknown {
-  const msg = e instanceof Error ? e.message : String(e);
+  // workerd/D1 append `: SQLITE_CONSTRAINT...` to the engine message; the column list must not carry it
+  const msg = (e instanceof Error ? e.message : String(e)).replace(/: SQLITE_[A-Z_]+.*$/s, '');
   let m = msg.match(/UNIQUE constraint failed: (.+?)(?:$|\s*\()/);
   if (m) {
     const cols = m[1].startsWith('index ')
@@ -51,6 +52,46 @@ export function mapDbError(e: unknown): unknown {
 
 /** Prisma write operations over the DO's synchronous SQLite. Transactions are the caller's (client.ts). */
 export class WriteEngine extends Engine {
+  /** The StoreDO's own store id: when set, no row may be written with any other `storeId` (no RLS inside a DO). */
+  private readonly ownStoreId: string | undefined;
+  constructor(
+    meta: ConstructorParameters<typeof Engine>[0],
+    sql: ConstructorParameters<typeof Engine>[1],
+    opts: { storeId?: string } = {}
+  ) {
+    super(meta, sql);
+    this.ownStoreId = opts.storeId;
+  }
+
+  private assertStore(m: ModelMeta, values: Row): void {
+    if (this.ownStoreId === undefined || !own(m.fields, 'storeId')) return;
+    if (values.storeId === undefined) values.storeId = this.ownStoreId;
+    else if (values.storeId !== this.ownStoreId)
+      throw new Error("prisma-lite: a write may only carry this store's storeId");
+  }
+
+  private externalValue(m: ModelMeta, prop: string, v: unknown): unknown {
+    if (prop === 'storeId' && this.ownStoreId !== undefined && v !== this.ownStoreId)
+      throw new Error("prisma-lite: a write may only carry this store's storeId");
+    return encode(this.scalar(m, prop), v);
+  }
+
+  /** A nested write may not set the parent's key, nor re-point the child through the back-relation. */
+  private assertNoFkInData(m: ModelMeta, data: Row, fkProps: string[]): void {
+    for (const [k, v] of Object.entries(data)) {
+      if (v === undefined) continue;
+      if (fkProps.includes(k))
+        throw new Error(
+          `prisma-lite: a nested write must not set the relation key ${JSON.stringify(k)}`
+        );
+      const f = own(m.fields, k) ? m.fields[k] : undefined;
+      if (f && f.kind === 'relation' && f.fromProps?.some(p => fkProps.includes(p)))
+        throw new Error(
+          `prisma-lite: a nested write must not re-point ${JSON.stringify(k)} (the back-relation)`
+        );
+    }
+  }
+
   // ------------------------------------------------------------- helpers
   private run(sql: string, params: unknown[]): number {
     try {
@@ -60,11 +101,11 @@ export class WriteEngine extends Engine {
     }
   }
 
-  private defaultValue(f: ScalarField): { has: boolean; value?: unknown } {
+  private defaultValue(f: ScalarField, now: Date): { has: boolean; value?: unknown } {
     const d = f.default;
     if (d === undefined) return { has: false };
     if (d === 'uuid()' || d === 'cuid()') return { has: true, value: crypto.randomUUID() };
-    if (d === 'now()') return { has: true, value: new Date() };
+    if (d === 'now()') return { has: true, value: now };
     if (d === 'autoincrement()') return { has: false };
     if (d === 'true' || d === 'false') return { has: true, value: d === 'true' };
     if (/^-?\d+(\.\d+)?$/.test(d)) return { has: true, value: Number(d) };
@@ -109,6 +150,7 @@ export class WriteEngine extends Engine {
       where,
       select: args.select,
       include: args.include,
+      omit: args.omit,
       take: 1,
     })[0];
     if (!out)
@@ -129,7 +171,9 @@ export class WriteEngine extends Engine {
 
   /** Insert one row (and its nested creates). `parentFk` pre-fills the foreign key of a nested child. */
   private insert(model: string, m: ModelMeta, data: Row, parentFk: Row | undefined): Row {
-    const values: Row = { ...(parentFk ?? {}) };
+    if (parentFk) this.assertNoFkInData(m, data, Object.keys(parentFk));
+    const now = new Date();
+    const values: Row = {};
     const afterRel: [string, RelationField, any][] = [];
     for (const [k, v] of Object.entries(data)) {
       if (v === undefined) continue;
@@ -167,6 +211,8 @@ export class WriteEngine extends Engine {
         f.fromProps!.forEach((fp, i) => (values[fp] = readProp(tm, target!, f.toProps![i], this)));
       } else afterRel.push([k, f, v]);
     }
+    if (parentFk) Object.assign(values, parentFk); // the parent's key is applied LAST: nothing in `data` can override it
+    this.assertStore(m, values);
     const cols: string[] = [];
     const binds: unknown[] = [];
     let autoId = false;
@@ -174,9 +220,9 @@ export class WriteEngine extends Engine {
       if (f.kind === 'relation') continue;
       let v = values[name];
       if (v === undefined) {
-        if (f.updatedAt) v = new Date();
+        if (f.updatedAt) v = now;
         else {
-          const d = this.defaultValue(f);
+          const d = this.defaultValue(f, now);
           if (d.has) v = d.value;
           else if (f.default === 'autoincrement()') {
             autoId = true;
@@ -213,8 +259,14 @@ export class WriteEngine extends Engine {
   ): void {
     const tm = this.model(f.type);
     // child FK props <- parent referenced props
-    const fk = (): Row =>
-      Object.fromEntries(f.toProps!.map((tp, i) => [tp, parentValues[f.fromProps![i]]]));
+    const fk = (): Row => {
+      const out = Object.fromEntries(
+        f.toProps!.map((tp, i) => [tp, parentValues[f.fromProps![i]]])
+      );
+      if (Object.values(out).some(v => v === undefined || v === null))
+        throw new Error('prisma-lite: the parent key is not set; refusing a nested write');
+      return out;
+    };
     for (const [name, arg] of Object.entries(op)) {
       switch (name) {
         case 'create':
@@ -222,7 +274,7 @@ export class WriteEngine extends Engine {
           break;
         case 'createMany': {
           const { data, skipDuplicates } = arg as { data: Row[]; skipDuplicates?: boolean };
-          this.createMany(f.type, { data: data.map(d => ({ ...d, ...fk() })), skipDuplicates });
+          this.createMany(f.type, { data, skipDuplicates }, fk());
           break;
         }
         case 'connect':
@@ -235,12 +287,18 @@ export class WriteEngine extends Engine {
     void parent;
   }
 
-  createMany(model: string, args: Args): { count: number } {
+  createMany(model: string, args: Args, parentFk?: Row): { count: number } {
     const m = this.model(model);
     let count = 0;
-    for (const d of args.data as Row[]) {
+    const rows = Array.isArray(args.data) ? (args.data as Row[]) : [args.data as Row];
+    for (const d of rows) {
+      if (!d || typeof d !== 'object')
+        throw new Error('prisma-lite: createMany data must be objects');
+      for (const k of Object.keys(d))
+        if (own(m.fields, k) && m.fields[k].kind === 'relation')
+          throw new Error('prisma-lite: createMany cannot carry relation fields');
       try {
-        this.insert(model, m, d, undefined);
+        this.insert(model, m, d, parentFk);
         count++;
       } catch (e) {
         if (args.skipDuplicates && (e as { code?: string })?.code === 'P2002') continue;
@@ -294,7 +352,15 @@ export class WriteEngine extends Engine {
         { cause: 'Record to update not found.' }
       );
     this.applyUpdate(model, m, this.pkWhere(m, hit), args.data ?? {});
-    return this.reread(model, hit, args);
+    // a primary-key update moves the row: re-read by the NEW key
+    const data = (args.data ?? {}) as Row;
+    const moved: Row = { ...hit };
+    for (const p of m.pk) {
+      const nv = data[p];
+      if (nv !== undefined && (typeof nv !== 'object' || nv instanceof Date))
+        moved[p] = valueToRaw(this.scalar(m, p), nv);
+    }
+    return this.reread(model, moved, args);
   }
 
   updateMany(model: string, args: Args): { count: number } {
@@ -313,6 +379,12 @@ export class WriteEngine extends Engine {
 
   /** `where` here is a full primary-key selector of one row; the SET list is built from `data`. */
   private applyUpdate(model: string, m: ModelMeta, pkSel: Row, data: Row): void {
+    if (
+      this.ownStoreId !== undefined &&
+      data.storeId !== undefined &&
+      data.storeId !== this.ownStoreId
+    )
+      throw new Error("prisma-lite: a write may only carry this store's storeId");
     const sets: string[] = [];
     const binds: unknown[] = [];
     const values: Row = {};
@@ -346,23 +418,34 @@ export class WriteEngine extends Engine {
               break;
             case 'increment':
             case 'decrement':
-              sets.push(`${col} = COALESCE(${col}, 0) ${op === 'increment' ? '+' : '-'} ?`);
+              sets.push(`${col} = ${col} ${op === 'increment' ? '+' : '-'} ?`); // NULL stays NULL, like SQL / Postgres
               binds.push(encode(f, arg));
               break;
             case 'multiply':
               if (f.scale) throw new Error('prisma-lite: multiply on Decimal is not supported');
+              if (typeof arg !== 'number' || !Number.isFinite(arg))
+                throw new Error('prisma-lite: multiply needs a finite number');
               sets.push(`${col} = ${col} * ?`);
               binds.push(arg);
               break;
             case 'divide':
               if (f.scale) throw new Error('prisma-lite: divide on Decimal is not supported');
+              if (typeof arg !== 'number' || !Number.isFinite(arg) || arg === 0)
+                throw new Error('prisma-lite: divide needs a finite non-zero number');
               sets.push(`${col} = ${col} / ?`);
               binds.push(arg);
               break;
             case 'push': {
               if (!f.list) throw new Error('prisma-lite: push needs a list field');
-              sets.push(`${col} = json_insert(${col}, '$[#]', json(?))`);
-              binds.push(JSON.stringify(arg));
+              const items = Array.isArray(arg) ? arg : [arg]; // Prisma appends each element of an array
+              if (items.length === 0 || items.length > 20)
+                throw new Error('prisma-lite: push takes 1 to 20 elements');
+              let expr = col;
+              for (const it of items) {
+                expr = `json_insert(${expr}, '$[#]', json(?))`;
+                binds.push(JSON.stringify(it));
+              }
+              sets.push(`${col} = ${expr}`);
               break;
             }
             default:
@@ -382,7 +465,7 @@ export class WriteEngine extends Engine {
           f.fromProps!.forEach(
             (fp, i) => (
               sets.push(`${q(this.scalar(m, fp).column)} = ?`),
-              binds.push((op.connect as Row)[f.toProps![i]])
+              binds.push(this.externalValue(m, fp, (op.connect as Row)[f.toProps![i]]))
             )
           );
         else
@@ -398,7 +481,7 @@ export class WriteEngine extends Engine {
           f.fromProps!.forEach(
             (fp, i) => (
               sets.push(`${q(this.scalar(m, fp).column)} = ?`),
-              binds.push(rawOf(this, tm, t, f.toProps![i]))
+              binds.push(encode(this.scalar(m, fp), readProp(tm, t, f.toProps![i], this)))
             )
           );
         } else if (op.disconnect)
@@ -409,7 +492,11 @@ export class WriteEngine extends Engine {
     const hasUpdatedAt = Object.entries(m.fields).find(
       ([, f]) => f.kind !== 'relation' && f.updatedAt
     );
-    if (hasUpdatedAt && !(hasUpdatedAt[0] in data) && (sets.length > 0 || nested.length > 0)) {
+    if (
+      hasUpdatedAt &&
+      data[hasUpdatedAt[0]] === undefined &&
+      (sets.length > 0 || nested.length > 0)
+    ) {
       sets.push(`${q((hasUpdatedAt[1] as ScalarField).column)} = ?`);
       binds.push(encode(hasUpdatedAt[1] as ScalarField, new Date()));
     }
@@ -439,8 +526,19 @@ export class WriteEngine extends Engine {
     op: Row
   ): void {
     const tm = this.model(f.type);
-    const fkVals = (): Row =>
-      Object.fromEntries(f.toProps!.map((tp, i) => [tp, parent[f.fromProps![i]]]));
+    const fkVals = (): Row => {
+      const out = Object.fromEntries(f.toProps!.map((tp, i) => [tp, parent[f.fromProps![i]]]));
+      // compileWhere skips `undefined`, so an unset parent key would silently widen the scope to every row
+      if (Object.values(out).some(v => v === undefined || v === null))
+        throw new Error('prisma-lite: the parent key is not set; refusing a nested write');
+      return out;
+    };
+    const noFk = (data: unknown): Row => {
+      if (!data || typeof data !== 'object')
+        throw new Error('prisma-lite: nested data must be an object');
+      this.assertNoFkInData(tm, data as Row, f.toProps!);
+      return data as Row;
+    };
     // The parent FK scope is ANDed, never spread: a caller selector cannot override it, and a selector that names an
     // FK property is refused outright.
     const scoped = (extra?: Row): Row => {
@@ -469,10 +567,11 @@ export class WriteEngine extends Engine {
             this.insert(f.type, tm, d as Row, fkVals());
           break;
         case 'createMany':
-          this.createMany(f.type, {
-            data: ((arg as Row).data as Row[]).map(d => ({ ...d, ...fkVals() })),
-            skipDuplicates: (arg as Row).skipDuplicates,
-          });
+          this.createMany(
+            f.type,
+            { data: (arg as Row).data, skipDuplicates: (arg as Row).skipDuplicates },
+            fkVals()
+          );
           break;
         case 'connect':
           for (const w of Array.isArray(arg) ? arg : [arg])
@@ -498,7 +597,8 @@ export class WriteEngine extends Engine {
         }
         case 'deleteMany':
           this.deleteMany(f.type, {
-            where: { AND: [childWhere(), ...(Array.isArray(arg) ? arg : arg ? [arg] : [])] },
+            // a list of filters is a UNION in Prisma (each entry deletes its own matches)
+            where: { AND: [childWhere(), { OR: Array.isArray(arg) ? arg : [arg ?? {}] }] },
           });
           break;
         case 'delete':
@@ -509,14 +609,14 @@ export class WriteEngine extends Engine {
           this.updateWhere(
             f.type,
             { AND: [childWhere(), (arg as Row).where ?? {}] },
-            (arg as Row).data as Row
+            noFk((arg as Row).data)
           );
           break;
         case 'update': {
           const a = arg as Row;
           const list = Array.isArray(a) ? a : [a];
           for (const u of list)
-            countOrThrow(this.updateWhere(f.type, uniqueScoped(u.where as Row), u.data as Row));
+            countOrThrow(this.updateWhere(f.type, uniqueScoped(u.where as Row), noFk(u.data)));
           break;
         }
         default:
@@ -568,6 +668,7 @@ export class WriteEngine extends Engine {
 
   // ------------------------------------------------------------- aggregates
   aggregate(model: string, args: Args): Row {
+    onlyArgs(args, ['where', '_count', '_sum', '_avg', '_min', '_max']);
     const m = this.model(model);
     const params: unknown[] = [];
     const where = this.compileWhere(model, args.where, 't0', params);
@@ -619,6 +720,7 @@ export class WriteEngine extends Engine {
   }
 
   groupBy(model: string, args: Args): Row[] {
+    onlyArgs(args, ['by', 'where', '_count', '_sum', '_avg', '_min', '_max', 'orderBy', 'having']);
     const m = this.model(model);
     const by = (Array.isArray(args.by) ? args.by : [args.by]) as string[];
     const params: unknown[] = [];
@@ -683,6 +785,12 @@ export class WriteEngine extends Engine {
   }
 }
 
+function onlyArgs(args: Args, allowed: string[]): void {
+  for (const k of Object.keys(args))
+    if (!allowed.includes(k))
+      throw new Error(`prisma-lite: unsupported aggregate argument ${JSON.stringify(k)}`);
+}
+
 function dirOf(v: unknown): 'ASC' | 'DESC' {
   const d = typeof v === 'string' ? v.toLowerCase() : '';
   if (d === 'asc') return 'ASC';
@@ -708,11 +816,6 @@ function valueToRaw(f: ScalarField, v: unknown): unknown {
 }
 function rawToBind(_f: ScalarField, raw: unknown): unknown {
   return raw;
-}
-function rawOf(engine: Engine, tm: ModelMeta, row: Row, prop: string): unknown {
-  void engine;
-  void tm;
-  return row[prop];
 }
 function readProp(tm: ModelMeta, row: Row, prop: string, engine: Engine): unknown {
   // `row` holds raw pk values only; a referenced non-pk unique column needs a read

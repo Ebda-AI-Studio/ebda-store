@@ -48,6 +48,17 @@ export function encode(f: ScalarField, v: unknown, exact = false): unknown {
         throw new Error('prisma-lite: BigInt value outside the safe integer range');
       return n;
     }
+    case 'Int':
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < -2147483648 || v > 2147483647)
+        throw new Error('prisma-lite: an Int field needs an integer in the int4 range');
+      return v;
+    case 'Float':
+      if (typeof v !== 'number' || !Number.isFinite(v))
+        throw new Error('prisma-lite: a Float field needs a finite number');
+      return v;
+    case 'String':
+      if (typeof v !== 'string') throw new Error('prisma-lite: a String field needs a string');
+      return v;
     default:
       return v;
   }

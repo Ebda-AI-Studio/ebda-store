@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS "billing_events" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "billing_events_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "billing_events_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "billing_events_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "billing_events_raw_chk" CHECK ("raw" IS NULL OR (json_valid("raw"))),
   CONSTRAINT "billing_events_vat_chk" CHECK ("vat" IS NULL OR (json_valid("vat"))),
   CONSTRAINT "billing_events_amount_check" CHECK ("amount_minor" >= 0),
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS "billing_reminders" (
   "kind" TEXT NOT NULL,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "billing_reminders_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "billing_reminders_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "billing_reminders_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "billing_reminders_kind_check" CHECK ("kind" IN ('d7', 'd3', 'd1', 'd0', 'suspended'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "billing_reminders_subscription_id_due_at_kind_key" ON "billing_reminders" ("subscription_id", "due_at", "kind");
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS "instapay_receipts" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "instapay_receipts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "instapay_receipts_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "instapay_receipts_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "instapay_receipts_extracted_chk" CHECK ("extracted" IS NULL OR (json_valid("extracted"))),
   CONSTRAINT "instapay_receipts_flags_chk" CHECK (json_valid("flags") AND json_type("flags") = 'array'),
   CONSTRAINT "instapay_receipts_kind_check" CHECK ("kind" IN ('subscription', 'order')),
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS "manual_payment_claims" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "manual_payment_claims_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "manual_payment_claims_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "manual_payment_claims_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "manual_payment_claims_amount_check" CHECK ("amount_minor" > 0),
   CONSTRAINT "manual_payment_claims_status_check" CHECK ("status" IN ('pending', 'confirmed', 'rejected')),
   CONSTRAINT "manual_payment_claims_method_check" CHECK ("method" IN ('instapay', 'bank', 'cash'))
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS "merchant_api_keys" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "merchant_api_keys_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "merchant_api_keys_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "merchant_api_keys_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "merchant_api_keys_scopes_chk" CHECK (json_valid("scopes") AND json_type("scopes") = 'array')
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "merchant_api_keys_key_hash_key" ON "merchant_api_keys" ("key_hash");
@@ -277,7 +277,7 @@ CREATE TABLE IF NOT EXISTS "provider_activation_requests" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "provider_activation_requests_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "provider_activation_requests_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "provider_activation_requests_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "provider_activation_requests_status_check" CHECK ("status" IN ('requested', 'activated', 'rejected'))
 );
 CREATE INDEX IF NOT EXISTS "provider_activation_requests_store_id_idx" ON "provider_activation_requests" ("store_id");
@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS "SlugRedirect" (
   "createdAt" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updatedAt" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "SlugRedirect_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "SlugRedirect_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "SlugRedirect_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "SlugRedirect_entityType_chk" CHECK ("entityType" IN ('PRODUCT', 'CATEGORY', 'PAGE', 'BLOG'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "SlugRedirect_storeId_entityType_fromSlug_key" ON "SlugRedirect" ("storeId", "entityType", "fromSlug");
@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS "store_features" (
   "enabled_by" TEXT,
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "store_features_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "store_features_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "store_features_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "store_features_enabled_chk" CHECK ("enabled" IN (0, 1))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "store_features_store_id_feature_key_key" ON "store_features" ("store_id", "feature_key");
@@ -355,7 +355,7 @@ CREATE TABLE IF NOT EXISTS "store_lifecycle_emails" (
   "reason" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "store_lifecycle_emails_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "store_lifecycle_emails_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
+  CONSTRAINT "store_lifecycle_emails_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "store_lifecycle_emails_kind_check" CHECK ("kind" IN ('add_products', 'payment_shipping', 'test_order', 'share_link', 'trial_recap', 'first_order', 'optout')),
   CONSTRAINT "store_lifecycle_emails_status_check" CHECK ("status" IN ('sent', 'skipped', 'failed'))
 );
@@ -368,7 +368,7 @@ CREATE TABLE IF NOT EXISTS "store_staff" (
   "user_id" TEXT NOT NULL,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "store_staff_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "store_staff_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE
+  CONSTRAINT "store_staff_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "store_staff_user_id_store_id_key" ON "store_staff" ("user_id", "store_id");
 CREATE INDEX IF NOT EXISTS "store_staff_store_id_idx" ON "store_staff" ("store_id");
@@ -401,8 +401,8 @@ CREATE TABLE IF NOT EXISTS "store_subscriptions" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "store_subscriptions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "store_subscriptions_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE,
-  CONSTRAINT "store_subscriptions_plan_code_fkey" FOREIGN KEY ("plan_code") REFERENCES "plans" ("code") ON DELETE RESTRICT,
+  CONSTRAINT "store_subscriptions_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "store_subscriptions_plan_code_fkey" FOREIGN KEY ("plan_code") REFERENCES "plans" ("code") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "store_subscriptions_status_chk" CHECK ("status" IN ('trialing', 'active', 'past_due', 'canceled', 'comped')),
   CONSTRAINT "store_subscriptions_cancel_at_period_end_chk" CHECK ("cancel_at_period_end" IN (0, 1)),
   CONSTRAINT "store_subscriptions_billing_interval_check" CHECK ("billing_interval" IN ('monthly', 'yearly')),
@@ -439,7 +439,7 @@ CREATE TABLE IF NOT EXISTS "store_usage_snapshots" (
   "ai_cost_micros" INTEGER NOT NULL DEFAULT 0,
   "ai_unpriced_calls" INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT "store_usage_snapshots_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "store_usage_snapshots_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE
+  CONSTRAINT "store_usage_snapshots_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "store_usage_snapshots_store_id_period_start_key" ON "store_usage_snapshots" ("store_id", "period_start");
 CREATE INDEX IF NOT EXISTS "store_usage_snapshots_period_start_idx" ON "store_usage_snapshots" ("period_start" DESC);
@@ -527,7 +527,7 @@ CREATE TABLE IF NOT EXISTS "webhook_events" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "webhook_events_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "webhook_events_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE SET NULL,
+  CONSTRAINT "webhook_events_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "webhook_events_payload_chk" CHECK (json_valid("payload"))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_events_idempotency_key_key" ON "webhook_events" ("idempotency_key");

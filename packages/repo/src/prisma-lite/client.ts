@@ -1,4 +1,4 @@
-import { WriteEngine, mapDbError } from './writes';
+import { WriteEngine, mapDbError, knownError } from './writes';
 import type { Meta, SqlRunner } from './types';
 import { expandUnique } from './unique';
 
@@ -36,13 +36,18 @@ class LazyQuery<T> implements PromiseLike<T> {
  * promises resolve immediately, so a Durable Object cannot interleave another request between two awaited
  * queries of one handler. `$transaction` maps to the runner's transaction (DO: `ctx.storage.transaction`).
  */
-export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd1' = 'store-do') {
+export function createPrismaLite(
+  meta: Meta,
+  sql: SqlRunner,
+  db: 'store-do' | 'd1' = 'store-do',
+  opts: { storeId?: string } = {}
+) {
   // only the models of THIS database get a delegate (the StoreDO has no D1 tables)
   const scoped: Meta = {
     ...meta,
     models: Object.fromEntries(Object.entries(meta.models).filter(([, m]) => m.db === db)),
   };
-  const engine = new WriteEngine(scoped, sql);
+  const engine = new WriteEngine(scoped, sql, opts);
   const byDelegate = new Map(
     Object.keys(scoped.models).map(m => [m[0].toLowerCase() + m.slice(1), m])
   );
@@ -50,7 +55,7 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd
   // A write (create with nested creates, update with nested writes, deleteMany, ...) is ONE atomic unit, like Prisma:
   // a failure midway must not leave the earlier statements applied. Inside `$transaction` the runner joins the open one.
   const atomic = <T>(fn: () => T): Promise<T> =>
-    sql.transaction ? sql.transaction(async () => fn()) : Promise.resolve().then(fn);
+    sql.transaction ? sql.transaction(async () => fn()) : Promise.reject(noTransaction());
   const write = <T>(fn: () => T) => lazy(() => atomic(fn));
   const delegate = (model: string) => ({
     findMany: (args?: Record<string, unknown>) => lazy(() => engine.findMany(model, args)),
@@ -123,7 +128,7 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd
       }
       return arg(client);
     };
-    if (!sql.transaction) return body() as Promise<T>;
+    if (!sql.transaction) throw noTransaction(); // never run a $transaction body without a real transaction
     return sql.transaction(body) as Promise<T>;
   }
 
@@ -147,9 +152,17 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd
 }
 
 function notFound(model: string): Error {
-  const e = new Error(`No ${model} found`);
-  (e as { code?: string }).code = 'P2025';
-  return e;
+  // a real PrismaClientKnownRequestError: the API's error handler checks `instanceof` to answer 404, not 500
+  return knownError('P2025', `No ${model} found`, {
+    modelName: model,
+    cause: 'Expected a record, found none.',
+  });
+}
+
+function noTransaction(): Error {
+  return new Error(
+    'prisma-lite: the SqlRunner has no transaction(); writes and $transaction need one (DO: ctx.storage.transaction)'
+  );
 }
 
 export { expandUnique };
