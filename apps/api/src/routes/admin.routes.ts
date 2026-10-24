@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
+import { setAccountRole, setAccountStatus } from '../lib/identity-client';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
@@ -1075,6 +1076,33 @@ router.put(
           error: { code: 'NOT_FOUND', message: 'User not found' },
         });
         return;
+      }
+
+      // Merchant, staff and super-admin accounts (users.store_id NULL) keep their credentials, email, role and status in the
+      // shared identity service (Rulings ID-1/ID-2). The Store refuses to edit a credential or an email here (it would only
+      // change a profile row the identity service ignores); status and role go to the identity service first.
+      const identityManaged = existing.storeId === null && existing.role !== 'customer';
+      if (
+        identityManaged &&
+        (data.password ||
+          data.role === 'customer' ||
+          (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
+      ) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'MANAGED_BY_IDENTITY',
+            message:
+              'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password and email.',
+          },
+        });
+        return;
+      }
+      if (identityManaged && data.status !== undefined && data.status !== existing.status) {
+        await setAccountStatus(id, data.status, 'admin-update');
+      }
+      if (identityManaged && data.role !== undefined && data.role !== existing.role) {
+        await setAccountRole(id, data.role as 'store_admin' | 'super_admin', 'admin-update');
       }
 
       // Email collision: if changing email, ensure no other user has it.

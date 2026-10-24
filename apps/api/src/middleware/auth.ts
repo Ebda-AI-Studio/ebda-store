@@ -7,6 +7,12 @@ import { getUserState } from '../lib/definer';
 import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
+import {
+  isAccountsToken,
+  sessionRevoked,
+  verifyAccountsToken,
+  type AccountsClaims,
+} from '../lib/accounts-token';
 
 import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 export interface AuthPayload {
@@ -113,6 +119,44 @@ async function resolveTokenVersionAndStatus(
   return { tokenVersion: currentTv, blocked: u ? u.status !== 'active' : false };
 }
 
+
+/**
+ * Map an identity-service token (Rulings ID-1/ID-2) onto the Store's request identity.
+ *
+ * role: `pa: super_admin` -> super_admin; owning at least one store (or none yet: a merchant who has not created a store) ->
+ * store_admin; only staff memberships -> staff. Store ACCESS is still decided from the database (requireStoreAccess:
+ * ownerId / StoreStaff), not from the claim: the claim is up to 15 minutes old, the database is not (Ruling ID-9).
+ */
+export function accountsUser(c: AccountsClaims): AuthPayload {
+  const role =
+    c.pa === 'super_admin'
+      ? 'super_admin'
+      : c.stores.length > 0 && !c.stores.some(s => s.role === 'owner')
+        ? 'staff'
+        : 'store_admin';
+  return { userId: c.sub, email: c.email ?? '', role, storeId: null };
+}
+
+/** Verify an identity-service token and its session. Throws AppError on any failure. */
+export async function authenticateAccounts(token: string): Promise<{ user: AuthPayload; claims: AccountsClaims }> {
+  let claims: AccountsClaims;
+  try {
+    claims = await verifyAccountsToken(token);
+  } catch {
+    throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token');
+  }
+  let revoked: boolean;
+  try {
+    revoked = await sessionRevoked(claims.sid);
+  } catch (err) {
+    // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
+    logger.error({ err: (err as Error).message }, '[auth] identity revocation check failed');
+    throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
+  }
+  if (revoked) throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
+  return { user: accountsUser(claims), claims };
+}
+
 export async function authenticate(
   req: Request,
   _res: Response,
@@ -122,6 +166,20 @@ export async function authenticate(
 
   if (!token) {
     return next(new AppError(401, 'UNAUTHORIZED', 'Authentication required'));
+  }
+
+  // Identity-service (ES256) token: merchants, staff and super admins. Customer and impersonation tokens stay HS256.
+  if (isAccountsToken(token)) {
+    try {
+      const { user, claims } = await authenticateAccounts(token);
+      req.user = user;
+      (req as any).tokenJti = claims.jti;
+      (req as any).accountsSid = claims.sid;
+      (req as any).accountsStores = claims.stores;
+      return next();
+    } catch (err) {
+      return next(err instanceof AppError ? err : new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
+    }
   }
 
   try {
@@ -231,6 +289,19 @@ export async function optionalAuthenticate(
   // are observable separately; the I/O branch still fails toward guest (the
   // safe default — we do not want to grant an identity we could not confirm
   // is unrevoked), but now logs loudly instead of silently.
+  if (isAccountsToken(token)) {
+    try {
+      const { user, claims } = await authenticateAccounts(token);
+      req.user = user;
+      (req as any).tokenJti = claims.jti;
+      (req as any).accountsSid = claims.sid;
+      (req as any).accountsStores = claims.stores;
+    } catch {
+      /* invalid, revoked or unconfirmable: continue as a guest, like every other failure on this path */
+    }
+    return next();
+  }
+
   let payload: (AuthPayload & { type?: string; purpose?: string }) | null = null;
   try {
     payload = jwt.verify(token, config.jwtSecret, {

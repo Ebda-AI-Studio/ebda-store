@@ -21,7 +21,7 @@ vi.mock('@ebda/database', () => {
       return fn({
         user: {
           findUnique: async () => state.existing,
-          update: async (args: unknown) => (txLog.push({ tx, op: 'user.update', args }), {}),
+          create: async (args: unknown) => (txLog.push({ tx, op: 'user.create', args }), {}),
         },
         verificationToken: { findFirst: async () => null },
         legalAcceptance: {
@@ -44,6 +44,13 @@ vi.mock('@api/lib/definer', () => ({
     lastName: 'B',
   }),
 }));
+const identity = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
+vi.mock('@api/lib/identity-client', () => ({
+  createIdentity: async (input: Record<string, unknown>) => {
+    identity.calls.push(input);
+    return { id: (input.id as string) === 'u-existing' ? 'u-existing' : 'u1' };
+  },
+}));
 vi.mock('@api/services/auth.service', () => ({
   AuthService: { sendVerificationEmail: async () => undefined },
 }));
@@ -64,6 +71,7 @@ const base = {
 };
 
 beforeEach(() => {
+  identity.calls.length = 0;
   txLog.length = 0;
   state.existing = null;
 });
@@ -81,7 +89,7 @@ describe('signup click-wrap', () => {
       merchantSignupSchema.parse({ ...base, acceptedLegal: true }),
       { ip: '203.0.113.9', userAgent: 'UA/1' }
     );
-    const update = txLog.find(l => l.op === 'user.update')!;
+    const update = txLog.find(l => l.op === 'user.create')!;
     const create = txLog.find(l => l.op === 'legalAcceptance.createMany')!;
     expect(create.tx).toBe(update.tx);
     expect(create.args.skipDuplicates).toBe(true);
@@ -115,7 +123,9 @@ describe('signup click-wrap', () => {
     // Neither the new-account profile write nor ANY legal_acceptances operation ran, so the
     // owner's original rows are untouched.
     expect(txLog.filter(l => l.op.startsWith('legalAcceptance'))).toEqual([]);
-    expect(txLog.some(l => l.op === 'user.update')).toBe(false);
+    expect(txLog.some(l => l.op === 'user.create')).toBe(false);
+    // ...but the identity service WAS asked to re-register the address, with the id of the existing row
+    expect(identity.calls.at(-1)).toMatchObject({ id: 'u-existing', password: 'Str0ng!Passw0rd' });
   });
 
   it('never splits a surrogate pair when truncating the user-agent', () => {

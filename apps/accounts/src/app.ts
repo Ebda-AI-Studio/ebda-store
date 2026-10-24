@@ -225,6 +225,24 @@ function queueMail(c: C, job: Promise<unknown>): void {
   );
 }
 
+/** Mail a fresh code to an existing UNVERIFIED account; carries the credential of the latest signup (see verify). */
+export async function resendVerificationFor(env: Env, email: string): Promise<void> {
+  const user = await findUserByEmail(env.DB, email);
+  if (!user || user.status !== 'active' || user.email_verified) return;
+  const last = await env.DB.prepare(
+    `SELECT pending FROM verification_tokens WHERE user_id = ?1 AND type = 'email' AND pending IS NOT NULL ORDER BY created_at DESC LIMIT 1`
+  )
+    .bind(user.id)
+    .first<{ pending: string }>();
+  await issueAndMail(
+    env,
+    user,
+    'email_verify',
+    'email',
+    last ? (JSON.parse(last.pending) as PendingSignup) : undefined
+  );
+}
+
 /**
  * Register (or re-register) an UNVERIFIED merchant. The credential is bound to the verification CODE, not written to the
  * user row: verifying code X activates only the password submitted with the signup that produced X, and an unauthenticated
@@ -629,26 +647,7 @@ export function createApp() {
       throw err(429, 'TOO_MANY_ATTEMPTS');
     if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('resend-email', 3))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    queueMail(
-      c,
-      (async () => {
-        const user = await findUserByEmail(c.env.DB, body.email);
-        if (!user || user.status !== 'active' || user.email_verified) return;
-        // Re-send carries the credential of the LATEST signup, so the new code activates the same password as before.
-        const last = await c.env.DB.prepare(
-          `SELECT pending FROM verification_tokens WHERE user_id = ?1 AND type = 'email' AND pending IS NOT NULL ORDER BY created_at DESC LIMIT 1`
-        )
-          .bind(user.id)
-          .first<{ pending: string }>();
-        await issueAndMail(
-          c.env,
-          user,
-          'email_verify',
-          'email',
-          last ? (JSON.parse(last.pending) as PendingSignup) : undefined
-        );
-      })()
-    );
+    queueMail(c, resendVerificationFor(c.env, body.email));
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 

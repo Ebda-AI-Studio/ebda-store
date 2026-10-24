@@ -1,6 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { createApp, registerPending } from './app';
-import { isSessionRevoked, revokeAllForUser, revokeSession } from './data';
+import { createApp, registerPending, resendVerificationFor } from './app';
+import { isSessionRevoked, revokeAllForUser, revokeSession, type UserRow } from './data';
 import { z } from 'zod';
 import { hashPassword, passwordPolicy } from './password';
 
@@ -15,6 +15,11 @@ export default {
  * A Service Binding is wired in wrangler config of the CALLING Worker, so only Workers we deploy can reach this.
  */
 export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
+  /** The same HTTP app, so a Service Binding to this entrypoint can fetch the public JWKS and RPC in one binding. */
+  fetch(request: Request): Response | Promise<Response> {
+    return app.fetch(request, this.env, this.ctx as unknown as ExecutionContext);
+  }
+
   async isRevoked(sid: string): Promise<boolean> {
     return isSessionRevoked(this.env.DB, sid);
   }
@@ -26,6 +31,75 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   /** Revoke every session of a user (suspension, password change by an admin, erasure). */
   async revokeUser(userId: string, reason: string): Promise<void> {
     await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+  }
+
+  /** Identity facts the Store mirrors into its profile row at every sign-in (credentials never leave this service). */
+  async getAccountState(userId: string): Promise<{
+    id: string;
+    email: string;
+    emailVerified: boolean;
+    mfaEnabled: boolean;
+    mfaEnrolledAt: string | null;
+    status: 'active' | 'inactive' | 'suspended';
+    role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    language: string;
+  } | null> {
+    const u = await this.env.DB.prepare(`SELECT * FROM users WHERE id = ?1 AND deleted_at IS NULL`)
+      .bind(userId)
+      .first<UserRow & { mfa_enrolled_at: string | null }>();
+    if (!u) return null;
+    return {
+      id: u.id,
+      email: u.email,
+      emailVerified: !!u.email_verified,
+      mfaEnabled: !!u.mfa_enabled,
+      mfaEnrolledAt: u.mfa_enrolled_at,
+      status: u.status,
+      role: u.role,
+      firstName: u.first_name,
+      lastName: u.last_name,
+      phone: u.phone,
+      language: u.language,
+    };
+  }
+
+  /** Suspend / reactivate an account (a Store super-admin action). Leaving 'active' ends every session. */
+  async setStatus(
+    userId: string,
+    status: 'active' | 'inactive' | 'suspended',
+    reason: string
+  ): Promise<void> {
+    z.string().uuid().parse(userId);
+    z.enum(['active', 'inactive', 'suspended']).parse(status);
+    await this.env.DB.prepare(`UPDATE users SET status = ?2, updated_at = ?3 WHERE id = ?1`)
+      .bind(userId, status, new Date().toISOString())
+      .run();
+    if (status !== 'active') await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+  }
+
+  /** Change an admin-namespace role (promote/demote). Ends every session so tokens are re-issued with the new grant. */
+  async setRole(
+    userId: string,
+    role: 'store_admin' | 'staff' | 'super_admin',
+    reason: string
+  ): Promise<void> {
+    z.string().uuid().parse(userId);
+    z.enum(['store_admin', 'staff', 'super_admin']).parse(role);
+    await this.env.DB.prepare(`UPDATE users SET role = ?2, updated_at = ?3 WHERE id = ?1`)
+      .bind(userId, role, new Date().toISOString())
+      .run();
+    await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+  }
+
+  /** Re-send the verification code (generic: does nothing for an unknown or already verified address). */
+  async resendVerification(email: string): Promise<void> {
+    await resendVerificationFor(
+      this.env,
+      z.string().trim().toLowerCase().email().max(254).parse(email)
+    );
   }
 
   async revokeSession(sid: string, reason: string): Promise<void> {

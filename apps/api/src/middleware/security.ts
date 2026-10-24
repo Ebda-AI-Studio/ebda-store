@@ -9,6 +9,7 @@ import rateLimit, {
 import { RedisStore } from 'rate-limit-redis';
 import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
@@ -134,9 +135,18 @@ export async function generateCsrfToken(
  * never reach this code (they return early — a header the browser never
  * attaches by itself cannot be ridden).
  */
-function csrfPrincipal(req: Request): string {
+async function csrfPrincipal(req: Request): Promise<string> {
   const cookieToken = req.cookies?.token as string | undefined;
   if (!cookieToken) return ANONYMOUS_CSRF_PRINCIPAL;
+
+  // Identity-service (ES256) cookie: same rule, signature verified, expiry ignored.
+  if (isAccountsToken(cookieToken)) {
+    try {
+      return (await verifyAccountsToken(cookieToken, { ignoreExpiration: true })).sub;
+    } catch {
+      return ANONYMOUS_CSRF_PRINCIPAL;
+    }
+  }
 
   try {
     const payload = jwt.verify(cookieToken, config.jwtSecret, {
@@ -676,7 +686,8 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // Always verify the CSRF token for state-changing requests (POST/PUT/PATCH/DELETE).
   // Previously this check was only applied when an Authorization header was present,
   // which left unauthenticated state-changing endpoints unprotected.
-  verifyCsrfToken(sessionId, csrfToken, csrfPrincipal(req))
+  csrfPrincipal(req)
+    .then(principal => verifyCsrfToken(sessionId, csrfToken, principal))
     .then(valid => {
       if (!valid) {
         res.status(403).json({

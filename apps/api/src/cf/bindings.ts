@@ -64,6 +64,40 @@ export interface EmailBindingLike {
   }): Promise<{ messageId: string }>;
 }
 
+/** RPC surface of the shared identity service (apps/accounts/src/index.ts `Accounts`). */
+export interface AccountsRpc {
+  isRevoked?(sid: string): Promise<boolean>;
+  revokeSession?(sid: string, reason: string): Promise<void>;
+  revokeUser?(userId: string, reason: string): Promise<void>;
+  setStatus?(userId: string, status: 'active' | 'inactive' | 'suspended', reason: string): Promise<void>;
+  getAccountState?(userId: string): Promise<AccountState | null>;
+  resendVerification?(email: string): Promise<void>;
+  setRole?(userId: string, role: 'store_admin' | 'staff' | 'super_admin', reason: string): Promise<void>;
+  createUser?(input: {
+    id?: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    language?: 'en' | 'ar';
+  }): Promise<{ id: string } | null>;
+}
+
+export interface AccountState {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  mfaEnabled: boolean;
+  mfaEnrolledAt: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  language: string;
+}
+
 export interface CfBindings {
   HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
@@ -93,6 +127,8 @@ export interface CfBindings {
   CF_VERSION_METADATA?: { id?: string; tag?: string };
   /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
   STOREFRONT?: ServiceBindingLike;
+  /** Service Binding to the shared identity service (ebda-accounts): JWKS over fetch, `isRevoked`/`revokeUser` over RPC. */
+  ACCOUNTS?: ServiceBindingLike & AccountsRpc;
   /** Workers AI (search embeddings, bge-m3). Always remote, also in `wrangler dev`. */
   AI?: AiBindingLike;
   [name: string]: unknown;
