@@ -1,7 +1,7 @@
 name: Looks drift (home phones vs live demo stores)
 # Ruling MKT-PHONES-1: the phones on ebda.app are snapshots of the real demo storefronts. Weekly, re-snapshot
 # into a temp dir and compare visible text + class set per template and look with the committed fragments.
-# Needs the network (the demo stores) so it runs on a hosted runner; it deploys nothing.
+# Needs the network (the demo stores) and Google Chrome on whichever runner EBDA_RUNS_ON selects; deploys nothing.
 on:
   schedule:
     - cron: '17 5 * * 1'

@@ -46,6 +46,34 @@ describe('looks snapshot helpers (MKT-PHONES-1)', () => {
     expect(css).toBe(':is(#a,#b) .p{x:1}#a .q{y:1}');
   });
 
+  it("keeps each phone's own rule order when it hoists shared rules", () => {
+    const css = lib.mergeRules([
+      { id: 'a', rules: ['@@ .x{c:1}', '@@ .s{k:1}', '@@ .y{c:2}'] },
+      { id: 'b', rules: ['@@ .s{k:1}', '@@ .z{c:3}'] },
+    ]);
+    expect(css).toBe('#a .x{c:1}:is(#a,#b) .s{k:1}#a .y{c:2}#b .z{c:3}');
+    // a shared rule that sits in a different order in another phone is not hoisted
+    const swapped = lib.mergeRules([
+      { id: 'a', rules: ['@@ .p{a:1}', '@@ .q{a:2}'] },
+      { id: 'b', rules: ['@@ .q{a:2}', '@@ .p{a:1}'] },
+    ]);
+    expect(swapped).toContain(':is(#a,#b) .p{a:1}');
+    expect(swapped).toContain('#b .q{a:2}'); // q stayed per phone: b keeps q before p
+  });
+
+  it('prefixes keyframes names in the rule and in animation declarations only', () => {
+    const names = lib.keyframeNames(['@keyframes spin{to{transform:rotate(1turn)}}']);
+    expect([...names]).toEqual(['spin']);
+    expect(lib.prefixKeyframes('@keyframes spin{to{x:1}}', names, 'ph-q-')).toBe(
+      '@keyframes ph-q-spin{to{x:1}}'
+    );
+    expect(
+      lib.prefixKeyframes('@@ .a{animation: spin 1s linear infinite;color:red}', names, 'ph-q-')
+    ).toBe('@@ .a{animation: ph-q-spin 1s linear infinite;color:red}');
+    // a class called spin is not an animation
+    expect(lib.prefixKeyframes('@@ .spin{color:red}', names, 'ph-q-')).toBe('@@ .spin{color:red}');
+  });
+
   it('reads Google Fonts families from a stylesheet URL', () => {
     expect(
       lib.googleFamilies(

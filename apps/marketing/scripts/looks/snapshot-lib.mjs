@@ -92,26 +92,63 @@ export function classNamesIn(css) {
 export function mergeRules(phones) {
   const all = `:is(${phones.map(p => '#' + p.id).join(',')})`;
   const sets = phones.map(p => new Set(p.rules));
-  const shared = new Set(phones[0].rules.filter(r => sets.every(s => s.has(r))));
-  const out = [];
-  const emitted = new Set();
+  // A rule is shared only if it sits in the same relative order in every phone, so hoisting it never
+  // changes the cascade between same-specificity rules of one phone.
+  const shared = [];
+  const last = phones.map(() => -1);
   for (const r of phones[0].rules) {
-    if (shared.has(r) && !emitted.has(r)) {
-      emitted.add(r);
-      out.push(r.replaceAll(SCOPE, all));
-    }
+    if (!sets.every(s => s.has(r)) || shared.includes(r)) continue;
+    const pos = phones.map(p => p.rules.indexOf(r));
+    if (pos.some((x, i) => x <= last[i])) continue;
+    pos.forEach((x, i) => (last[i] = x));
+    shared.push(r);
   }
-  for (const p of phones) {
-    const own = [];
+  const isShared = new Set(shared);
+  const ptr = phones.map(() => 0);
+  const out = [];
+  const flush = (i, upTo) => {
+    const p = phones[i];
     const seen = new Set();
-    for (const r of p.rules) {
-      if (shared.has(r) || seen.has(r)) continue;
+    for (; ptr[i] < upTo; ptr[i]++) {
+      const r = p.rules[ptr[i]];
+      if (isShared.has(r) || seen.has(r)) continue;
       seen.add(r);
-      own.push(r.replaceAll(SCOPE, '#' + p.id));
+      out.push(r.replaceAll(SCOPE, '#' + p.id));
     }
-    out.push(...own);
+  };
+  for (const r of shared) {
+    phones.forEach((p, i) => flush(i, p.rules.indexOf(r)));
+    phones.forEach((p, i) => (ptr[i] = p.rules.indexOf(r) + 1));
+    out.push(r.replaceAll(SCOPE, all));
   }
+  phones.forEach((p, i) => flush(i, p.rules.length));
   return out.join('');
+}
+
+/** Names declared by @keyframes in the given CSS texts. */
+export function keyframeNames(texts) {
+  const out = new Set();
+  for (const t of texts) for (const m of t.matchAll(/@keyframes\s+([\w-]+)/g)) out.add(m[1]);
+  return out;
+}
+
+/**
+ * Keyframe names are global to the whole document: give the phones' own a prefix, in the @keyframes rule and in
+ * every `animation` / `animation-name` declaration that uses them.
+ */
+export function prefixKeyframes(css, names, prefix) {
+  if (!names.size) return css;
+  const alt = [...names].map(n => n.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+  const word = new RegExp(`(?<![\\w-])(${alt})(?![\\w-])`, 'g');
+  return css
+    .replace(
+      new RegExp(`@keyframes\\s+(${alt})(?![\\w-])`, 'g'),
+      (m, n) => `@keyframes ${prefix}${n}`
+    )
+    .replace(
+      /(animation(?:-name)?\s*:)([^;}]*)/g,
+      (m, head, val) => head + val.replace(word, `${prefix}$1`)
+    );
 }
 
 /** Google Fonts `family=` values (Name+Of+Font:wght@400;700) from a stylesheet URL. */

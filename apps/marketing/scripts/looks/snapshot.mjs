@@ -22,7 +22,9 @@ import {
   SCOPE,
   classNamesIn,
   googleFamilies,
+  keyframeNames,
   mergeRules,
+  prefixKeyframes,
   phoneUnits,
   renameClassesCss,
   renameClassesHtml,
@@ -302,6 +304,7 @@ function extractInPage({ phoneId, cats, pdp }) {
   for (const i of root.querySelectorAll('input,select,textarea')) {
     i.setAttribute('tabindex', '-1');
     if (i.tagName === 'INPUT') i.setAttribute('readonly', '');
+    if (i.getAttribute('type') === 'hidden') i.removeAttribute('value');
     i.removeAttribute('name');
   }
 
@@ -406,6 +409,7 @@ function extractInPage({ phoneId, cats, pdp }) {
     globals,
     images: [...imgUrls],
     fontHrefs,
+    tabbar: !!root.querySelector('[data-bottom-tab-bar]'),
     cards: productCards.length,
     classes: [...classes],
   };
@@ -555,9 +559,8 @@ function scopeRules(rules, renamed) {
   for (const r of rules) {
     let sel = scopeSelectorList(r.sel);
     if (!sel) continue;
-    let css = `${sel}${r.body}`;
-    css = renameClassesCss(css, renamed);
-    css = phoneUnits(css);
+    // units are converted in the declarations only: a selector's escaped class (w-\\[44vw\\]) must keep matching the DOM
+    let css = renameClassesCss(`${sel}${phoneUnits(r.body)}`, renamed);
     for (const w of [...r.wrap].reverse()) css = `${w}{${css}}`;
     out.push(css.replace(/\s*\n\s*/g, ' '));
   }
@@ -631,7 +634,7 @@ async function main() {
             pdp: catalog.pdp,
           });
           await page.close();
-          if (got.inner.includes('data-open-cart') && got.cards) x = got;
+          if (got.tabbar && got.cards) x = got;
           else
             console.warn(
               `${tpl}.${look}: attempt ${attempt} incomplete (cart/cards missing), retrying`
@@ -665,9 +668,10 @@ async function main() {
           writeFileSync(file, buf);
         }
       }
+      const byLength = [...urlMap].sort((a, b) => b[0].length - a[0].length);
       const swapUrls = s => {
         let out = s;
-        for (const [u, local] of urlMap) out = out.split(u).join(local);
+        for (const [u, local] of byLength) out = out.split(u).join(local);
         return out;
       };
 
@@ -679,7 +683,14 @@ async function main() {
         rules: scopeRules(p.x.rules, renamed).map(swapUrls),
       }));
       for (const pr of phoneRules) pr.rules.push(BASE_CSS);
-      const globals = [...new Set(phones.flatMap(p => p.x.globals))].map(phoneUnits).map(swapUrls);
+      const globalsRaw = [...new Set(phones.flatMap(p => p.x.globals))]
+        .map(phoneUnits)
+        .map(swapUrls);
+      // @keyframes are document-global: prefix them per template (@property rules are identical Tailwind internals)
+      const kf = keyframeNames(globalsRaw);
+      const kfPrefix = `ph-${tpl}-`;
+      for (const pr of phoneRules) pr.rules = pr.rules.map(r => prefixKeyframes(r, kf, kfPrefix));
+      const globals = globalsRaw.map(g => prefixKeyframes(g, kf, kfPrefix));
       const all = `:is(${phones.map(p => '#' + p.id).join(',')})`;
       const css = mergeRules(phoneRules) + globals.join('') + engineCss(all);
 

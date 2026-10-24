@@ -17,7 +17,7 @@ for (const tpl of TEMPLATES) {
       const r = await page.evaluate(async i => {
         const scr = document.querySelectorAll('.look-screen .scr')[i] as HTMLElement;
         const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-        const cat = scr.querySelector<HTMLElement>('[data-cat]');
+        const cat = scr.querySelector<HTMLElement>('[data-cat]:not([data-cat="all"])');
         let filtered = -1;
         if (cat) {
           cat.click();
