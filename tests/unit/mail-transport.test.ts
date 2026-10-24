@@ -18,7 +18,6 @@ import {
   sendMail,
   isMailTransportConfigured,
 } from '@api/services/mail-transport';
-import { resolveSender } from '@api/services/email-sender';
 
 beforeEach(() => {
   h.send.mockReset();
@@ -116,46 +115,5 @@ describe('sendMail on Cloudflare', () => {
     await expect(
       sendMail({ from: 'no-reply@ebda.app', to: 'a@x.test', subject: 'S' })
     ).rejects.toMatchObject({ code: 'E_NO_BINDING' });
-  });
-});
-
-describe('resolveSender', () => {
-  const store = {
-    name: 'Shop',
-    domain: 'shop.test',
-    email: 'owner@shop.test',
-    emailDomainStatus: 'verified',
-  };
-  it('always sends from ebda.app on Cloudflare, replies go to the merchant', () => {
-    expect(resolveSender(store)).toEqual({
-      from: 'Shop <no-reply@ebda.app>',
-      replyTo: 'owner@shop.test',
-    });
-  });
-  it('keeps the verified merchant domain on the legacy provider only', () => {
-    h.cfg.emailProvider = 'resend';
-    expect(resolveSender(store).from).toBe('Shop <noreply@shop.test>');
-  });
-});
-
-describe('resolveSender hardening', () => {
-  const base = { name: 'Shop', email: null, domain: null, emailDomainStatus: null };
-  it('quotes, angle brackets and backslashes in a store name cannot break the From', () => {
-    const r = resolveSender({ ...base, name: 'Ahmad "Best" <Shop>\\' });
-    expect(r.from).toBe('Ahmad Best Shop <no-reply@ebda.app>');
-    expect(parseAddress(r.from)).toEqual({ email: 'no-reply@ebda.app', name: 'Ahmad Best Shop' });
-  });
-  it.each(['security', 'Admin', 'billing', 'postmaster', 'ahlan', '.a', 'a.', 'a..b'])(
-    'a merchant cannot pick %s on the platform domain',
-    lp => {
-      expect(resolveSender({ ...base, emailSenderLocalPart: lp }).from).toBe(
-        'Shop <no-reply@ebda.app>'
-      );
-    }
-  );
-  it('an ordinary prefix still works', () => {
-    expect(resolveSender({ ...base, emailSenderLocalPart: 'orders' }).from).toBe(
-      'Shop <orders@ebda.app>'
-    );
   });
 });

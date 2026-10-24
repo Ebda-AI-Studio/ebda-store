@@ -136,8 +136,12 @@ const DEFAULT_SETTINGS: SeoSettings = {
   ogImage: '',
   twitterHandle: '',
   googleSiteVerification: '',
-  emailSenderLocalPart: 'noreply',
+  emailSenderLocalPart: 'orders',
 };
+
+// Approved sender prefixes (mirrors MERCHANT_SENDER_PREFIXES in apps/api/src/services/email-sender.ts;
+// the API rejects anything else). The address is <prefix>.<your-store-slug>@ebda.app.
+const SENDER_PREFIXES: string[] = ['orders', 'receipts', 'hello', 'info', 'support'];
 
 // Character limits for SEO best practices
 const TITLE_MAX = 60;
@@ -226,7 +230,9 @@ export default function StoreSeoPage() {
           ogImage: seo.ogImage || '',
           twitterHandle: seo.twitterHandle || '',
           googleSiteVerification: seo.googleSiteVerification || '',
-          emailSenderLocalPart: seo.emailSenderLocalPart || 'noreply',
+          emailSenderLocalPart: SENDER_PREFIXES.includes(seo.emailSenderLocalPart ?? '')
+            ? (seo.emailSenderLocalPart as string)
+            : 'orders',
         });
       }
 
@@ -801,21 +807,22 @@ export default function StoreSeoPage() {
                 {t('senderPrefix')}
               </label>
               <div className="flex items-center rounded-lg border border-border overflow-hidden">
-                <input
-                  type="text"
+                <select
                   value={settings.emailSenderLocalPart}
                   onChange={e =>
-                    setSettings(prev => ({
-                      ...prev,
-                      emailSenderLocalPart: e.target.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9._-]/g, ''),
-                    }))
+                    setSettings(prev => ({ ...prev, emailSenderLocalPart: e.target.value }))
                   }
-                  placeholder={t('senderPrefixPlaceholder')}
-                  className="flex-1 px-3 py-2 text-sm focus:outline-none"
-                />
-                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground">@ebda.app</span>
+                  className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none"
+                >
+                  {SENDER_PREFIXES.map(p => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground" dir="ltr">
+                  .{'{store}'}@ebda.app
+                </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{t('senderPrefixHint')}</p>
             </div>
