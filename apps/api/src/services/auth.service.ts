@@ -1676,6 +1676,7 @@ export class AuthService {
           firstName: true,
           lastName: true,
           storeId: true,
+          role: true,
           language: true,
         },
       },
@@ -1687,7 +1688,7 @@ export class AuthService {
       return null;
     }
 
-    if (user.storeId === null) {
+    if (user.storeId === null && user.role !== 'customer') {
       // Admin namespace (merchant / staff / operator): the credential lives in the identity service, which issues and mails
       // its own one-time code. The Store issues no password token for these accounts (Ruling ID-2).
       cfWaitUntil(

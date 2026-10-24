@@ -86,4 +86,22 @@ describe('POST /auth/forgot-password for the admin namespace', () => {
     expect(await AuthService.requestPasswordReset('x@example.com', null)).toBeNull();
     expect(h.forgot).not.toHaveBeenCalled();
   });
+
+  it('a platform customer (storeId null, role customer) keeps the Store reset flow', async () => {
+    h.user = {
+      id: 'c1',
+      email: 'c@example.com',
+      firstName: 'C',
+      lastName: 'U',
+      storeId: null,
+      role: 'customer',
+      language: 'en',
+    };
+    const issue = vi
+      .spyOn(AuthService, 'issuePasswordSetToken' as never)
+      .mockResolvedValue('tok' as never);
+    await AuthService.requestPasswordReset('c@example.com', null);
+    expect(h.forgot).not.toHaveBeenCalled();
+    expect(issue).toHaveBeenCalledWith('c1');
+  });
 });
