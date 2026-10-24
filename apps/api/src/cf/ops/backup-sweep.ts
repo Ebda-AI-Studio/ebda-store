@@ -8,7 +8,7 @@
  *  3. exports every bound D1 database (platform, identity) to R2 as NDJSON + a manifest, asserting row
  *     counts (rule N11: a backup that is not read back is not a backup).
  *
- * The Mac pull (force-ai-foundation/ops/backup-ebda-cloudflare.sh) re-verifies the same manifests off
+ * The Mac pull (ops/backup-ebda-cloudflare.sh in the ops repo) re-verifies the same manifests off
  * Cloudflare. Pure functions over structural types so it runs on local workerd with miniflare bindings.
  */
 import { buildBackup, sha256Hex, type BackupManifest } from '../store-do/backup';
