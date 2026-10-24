@@ -1,0 +1,33 @@
+{
+  "measured_at": "2026-10-24T15:13:06.457Z",
+  "base": "https://api.ebda.app",
+  "storeId": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
+  "mode": "warm",
+  "n": 200,
+  "concurrency": 4,
+  "endpoints": {
+    "GET products?limit=24": {
+      "n": 190,
+      "errors": 0,
+      "statuses": {
+        "200": 200
+      },
+      "p50_ms": 436.2,
+      "p95_ms": 546.63,
+      "p99_ms": 2293.97,
+      "max_ms": 2391.86
+    },
+    "POST cart/items": {
+      "n": 159,
+      "errors": 31,
+      "statuses": {
+        "200": 169,
+        "429": 31
+      },
+      "p50_ms": 5336.7,
+      "p95_ms": 6795.18,
+      "p99_ms": 11037.5,
+      "max_ms": 11436.13
+    }
+  }
+}
