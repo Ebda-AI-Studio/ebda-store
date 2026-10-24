@@ -546,6 +546,14 @@ function buildTable(m, ctx) {
       refTable: target.dbName,
       refCols: rel.references.map(tField),
       action,
+      // Prisma's default referential action on update is Cascade (a primary-key change reaches the children)
+      onUpdate: {
+        Cascade: 'CASCADE',
+        SetNull: 'SET NULL',
+        Restrict: 'RESTRICT',
+        NoAction: 'NO ACTION',
+        SetDefault: 'SET DEFAULT',
+      }[rel.onUpdate ?? 'Cascade'],
     });
   }
 
@@ -622,7 +630,7 @@ export function emitSql(db, title) {
       body.push(`  CONSTRAINT ${qid(`${t.name}_pkey`)} PRIMARY KEY (${t.pk.map(qid).join(', ')})`);
     t.fks.forEach((fk, i) => {
       body.push(
-        `  CONSTRAINT ${qid(uniq(`${t.name}_${fk.cols.join('_')}_fkey`))} FOREIGN KEY (${fk.cols.map(qid).join(', ')}) REFERENCES ${qid(fk.refTable)} (${fk.refCols.map(qid).join(', ')}) ON DELETE ${fk.action}`
+        `  CONSTRAINT ${qid(uniq(`${t.name}_${fk.cols.join('_')}_fkey`))} FOREIGN KEY (${fk.cols.map(qid).join(', ')}) REFERENCES ${qid(fk.refTable)} (${fk.refCols.map(qid).join(', ')}) ON DELETE ${fk.action} ON UPDATE ${fk.onUpdate}`
       );
     });
     for (const c of t.columns)
