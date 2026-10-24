@@ -40,4 +40,9 @@ export type FieldMeta = ScalarField | RelationField;
 export interface SqlRunner {
   all(sql: string, params: unknown[]): Record<string, unknown>[];
   run(sql: string, params: unknown[]): { changes: number };
+  /**
+   * Run an async closure as ONE transaction (DO: `ctx.storage.transaction`; tests: BEGIN/COMMIT). The closure may
+   * await only prisma-lite calls (storage ops); awaiting network I/O inside it forfeits the single-writer guarantee.
+   */
+  transaction?<T>(fn: () => Promise<T>): Promise<T>;
 }
