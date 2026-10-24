@@ -1,3 +1,4 @@
+import { BRAND, BRAND_MARKETING_URL } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
 import { probeAll, type Fetcher } from './probe';
 import { renderStatusPage } from './render';
@@ -12,6 +13,20 @@ const SECURITY_HEADERS = {
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
 };
+
+const text = (body: string, type = 'text/plain'): Response =>
+  new Response(body, {
+    headers: {
+      'content-type': `${type}; charset=utf-8`,
+      'cache-control': 'public, max-age=3600',
+      ...SECURITY_HEADERS,
+    },
+  });
+
+/** RFC 9116. Expires is a year past the last review of this file: bump it in the same PR as any change. */
+const SECURITY_EXPIRES = '2027-09-30T00:00:00.000Z';
+export const securityTxt = (origin: string): string =>
+  `Contact: mailto:security@${BRAND.domains.marketing}\nExpires: ${SECURITY_EXPIRES}\nPreferred-Languages: ar, en\nCanonical: ${origin}/.well-known/security.txt\nPolicy: ${BRAND_MARKETING_URL}/legal\n`;
 
 const intEnv = (v: string | undefined, d: number): number => {
   const n = Number(v);
@@ -144,6 +159,24 @@ export default {
         allow: 'GET, HEAD, POST',
       });
     }
+
+    // Discovery files (site trust standard): this host's own robots, sitemap and security.txt
+    if (path === '/robots.txt')
+      return text(`User-agent: *\nAllow: /\nSitemap: ${url.origin}/sitemap.xml\n`);
+    if (path === '/sitemap.xml')
+      return text(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${[
+          '/',
+          '/en',
+        ]
+          .map(
+            p =>
+              `<url><loc>${url.origin}${p}</loc><xhtml:link rel="alternate" hreflang="ar" href="${url.origin}/"/><xhtml:link rel="alternate" hreflang="en" href="${url.origin}/en"/><xhtml:link rel="alternate" hreflang="x-default" href="${url.origin}/"/></url>`
+          )
+          .join('\n')}\n</urlset>\n`,
+        'application/xml'
+      );
+    if (path === '/.well-known/security.txt') return text(securityTxt(url.origin));
 
     if (path === '/healthz')
       return new Response('ok', { headers: { 'content-type': 'text/plain', ...SECURITY_HEADERS } });

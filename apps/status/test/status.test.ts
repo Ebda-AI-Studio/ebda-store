@@ -321,3 +321,34 @@ describe('thresholdsFrom', () => {
     });
   });
 });
+
+describe('master brand, products and discovery files (BRAND-ARCH-1, 6c)', () => {
+  it('is titled "Ebda AI Studio Status" and lists components per product', async () => {
+    const en = await (await get('/en')).text();
+    expect(en).toContain('<title>Ebda AI Studio Status</title>');
+    expect(en).toMatch(/<h3 id="prod-store">Ebda Store<\/h3>/);
+    expect(en).toMatch(/<h3 id="prod-studio">Ebda AI Studio<\/h3>/);
+    const ar = await (await get('/')).text();
+    expect(ar).toContain('حالة خدمات ابدأ استوديو للذكاء الاصطناعي');
+    expect(ar).toContain('ابدأ ستور</h3>');
+    expect(ar).not.toMatch(/قريب|coming soon/i);
+  });
+
+  it('every component belongs to a listed product', async () => {
+    const { PRODUCTS } = await import('../src/config');
+    for (const c of COMPONENTS) expect(PRODUCTS.map(p => p.id)).toContain(c.product);
+  });
+
+  it('serves its own robots, sitemap and security.txt', async () => {
+    const robots = await (await get('/robots.txt')).text();
+    expect(robots).toContain('Sitemap: https://status.ebda.app/sitemap.xml');
+    const map = await (await get('/sitemap.xml')).text();
+    expect(map).toContain('<loc>https://status.ebda.app/</loc>');
+    expect(map).toContain('<loc>https://status.ebda.app/en</loc>');
+    const sec = await (await get('/.well-known/security.txt')).text();
+    expect(sec).toMatch(/^Contact: mailto:security@ebda\.app$/m);
+    expect(sec).toContain('Canonical: https://status.ebda.app/.well-known/security.txt');
+    const exp = new Date(/^Expires: (.+)$/m.exec(sec)![1]).getTime();
+    expect(exp - Date.now()).toBeGreaterThan(90 * 86_400_000);
+  });
+});

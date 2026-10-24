@@ -6,6 +6,8 @@ export interface Localized {
 export interface ComponentConfig {
   id: string;
   name: Localized;
+  /** Which product the component belongs to (PRODUCTS in config.ts); `studio` = the company's own surfaces. */
+  product: string;
   url: string;
   /** Exact HTTP status the probe must see. */
   expectStatus: number;
