@@ -48,6 +48,25 @@ async function checkIdempotency(idempotencyKey: string): Promise<{
 }
 
 /**
+ * The ONE dedupe check every payment-webhook entry path uses (provider route, per-store route and
+ * the auto-detect route): the current key, then any earlier key shape the same delivery may have
+ * been stored under (`legacyIdempotencyKeys`), so a replay cannot slip past on a changed format.
+ */
+async function checkWebhookIdempotency(
+  provider: string,
+  payload: Record<string, unknown>,
+  idempotencyKey: string
+): Promise<{ alreadyProcessed: boolean; orderId?: string }> {
+  const first = await checkIdempotency(idempotencyKey);
+  if (first.alreadyProcessed) return first;
+  for (const legacy of webhookRefs(provider, payload).legacyIdempotencyKeys ?? []) {
+    const hit = await checkIdempotency(legacy);
+    if (hit.alreadyProcessed) return hit;
+  }
+  return first;
+}
+
+/**
  * Mark a webhook as processed.
  *
  * storeId is required so the write runs inside runInTenantContext and the
@@ -398,17 +417,11 @@ async function handleGatewayWebhook(
     }
 
     // Check for duplicate webhook
-    let { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
-    if (!alreadyProcessed) {
-      // Rows stored under an earlier key shape still count as the same delivery.
-      for (const legacy of webhookRefs(provider, payload).legacyIdempotencyKeys ?? []) {
-        const hit = await checkIdempotency(legacy);
-        if (hit.alreadyProcessed) {
-          ({ alreadyProcessed, orderId } = hit);
-          break;
-        }
-      }
-    }
+    const { alreadyProcessed, orderId } = await checkWebhookIdempotency(
+      provider,
+      payload,
+      idempotencyKey
+    );
 
     if (alreadyProcessed) {
       logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate webhook detected');
@@ -569,7 +582,11 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       });
       return;
     }
-    const { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
+    const { alreadyProcessed, orderId } = await checkWebhookIdempotency(
+      provider,
+      payload,
+      idempotencyKey
+    );
 
     if (alreadyProcessed) {
       logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate auto-detected webhook detected');

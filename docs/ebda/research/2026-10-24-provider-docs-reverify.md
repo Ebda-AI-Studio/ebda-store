@@ -79,3 +79,5 @@ Review finding (HIGH): Paymob `is_refund` / `is_void` are not in the documented 
 - Freshness: callbacks whose signed `created_at` is older than 7 days or more than 24 h ahead are rejected (zone-less timestamp read as UTC; the margins absorb the offset). UNCONFIRMED: Paymob's documented retry horizon and timestamp zone.
 
 Ruling PROVIDERS-3a - Paymob callback window is 7 d past / 24 h future. Docs do not state the retry horizon; a genuine delivery older than 7 d would be dropped and recovered by the status poll. Cost if wrong: a very late genuine callback is ignored until reconciliation.
+
+Parity sweep (webhook entry paths): dedupe now goes through one helper, `checkWebhookIdempotency`, used by `POST /payment/:provider`, `/payment/:provider/s/:storeId` and the auto-detect `POST /payment`; a test replays a legacy-keyed Paymob refund through all three. Kashier and Fawry key shapes are unchanged by this PR (no legacy keys to look up). The Bosta carrier webhook route and billing/alert webhooks have no `webhookRefs` keying and are untouched.
