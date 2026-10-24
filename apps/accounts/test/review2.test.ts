@@ -252,27 +252,172 @@ describe('L7: sessions have an absolute lifetime', () => {
 });
 
 describe('RPC createUser', () => {
-  it('validates input, reports a taken email as null and does not mislabel an id collision', async () => {
+  it('validates input, binds the credential to a code, and reports only a VERIFIED address as taken', async () => {
     const { Accounts } = await import('../src/index');
     const rpc = new Accounts({} as never, testEnv());
     const base = { password: 'Str0ng!Passw0rd', firstName: 'A', lastName: 'B' };
-    const a = await rpc.createUser({
-      ...base,
-      email: `rpc-${crypto.randomUUID().slice(0, 6)}@example.com`,
-    });
+    const email = `rpc-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    const a = await rpc.createUser({ ...base, email });
     expect(a?.id).toBeTruthy();
+    expect(fakes.mails.at(-1)).toMatchObject({ to: email, kind: 'email_verify' });
     expect(
-      await rpc.createUser({
-        ...base,
-        email: (await env.DB.prepare(`SELECT email FROM users WHERE id = ?1`)
-          .bind(a!.id)
-          .first<{ email: string }>())!.email.toUpperCase(),
-      })
-    ).toBeNull();
+      (await env.DB.prepare(`SELECT password_hash FROM users WHERE id = ?1`)
+        .bind(a!.id)
+        .first<{ password_hash: string }>())!.password_hash
+    ).toBe('!pending');
+    expect((await rpc.createUser({ ...base, email: email.toUpperCase() }))?.id).toBe(a!.id); // still unverified: re-registered, same row
+    await env.DB.prepare(`UPDATE users SET email_verified = 1 WHERE id = ?1`).bind(a!.id).run();
+    expect(await rpc.createUser({ ...base, email })).toBeNull();
     await expect(rpc.createUser({ ...base, email: 'not-an-email' })).rejects.toThrow();
     await expect(
       rpc.createUser({ ...base, email: 'x@example.com', id: 'not-a-uuid' })
     ).rejects.toThrow();
     await expect(rpc.createUser({ ...base, email: 'y@example.com', id: a!.id })).rejects.toThrow(); // id collision: an error, not "email taken"
+  });
+});
+
+describe('every TOTP-checking endpoint is throttled per user (sweep)', () => {
+  it('mfa/disable and mfa/enroll/verify stop guessing after 5 tries, even with token and password', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    const enroll = (await (
+      await call('/mfa/enroll', { json: { password: u.password }, bearer: s.body.access_token })
+    ).json()) as { data: { secret: string } };
+    const verifyCodes: number[] = [];
+    for (let i = 0; i < 7; i++)
+      verifyCodes.push(
+        (
+          await call('/mfa/enroll/verify', {
+            json: { code: '000000' },
+            bearer: s.body.access_token,
+          })
+        ).status
+      );
+    expect(verifyCodes.slice(0, 5)).toEqual([400, 400, 400, 400, 400]);
+    expect(verifyCodes.slice(5)).toEqual([429, 429]);
+    // a fresh user: enrolled, then hammer disable
+    const v = await seedUser();
+    const t = await withMfa(v);
+    const disable: number[] = [];
+    for (let i = 0; i < 7; i++)
+      disable.push(
+        (
+          await call('/mfa/disable', {
+            json: { password: v.password, code: '000000' },
+            bearer: t.s.body.access_token,
+          })
+        ).status
+      );
+    expect(disable.filter(x => x === 429).length).toBeGreaterThanOrEqual(2);
+    expect(
+      (
+        await call('/mfa/disable', {
+          json: { password: v.password, code: await totpAt(t.secret, Date.now() + 60_000) },
+          bearer: t.s.body.access_token,
+        })
+      ).status
+    ).toBe(429);
+    void enroll;
+  });
+});
+
+describe("OTP send cap: spamming resend/forgot beyond the cap cannot kill the owner's live code", () => {
+  it('over-cap requests are refused per email and never invalidate the code the owner holds', async () => {
+    const u = await seedUser();
+    await call('/password/forgot', { json: { email: u.email } });
+    const live = fakes.mails.at(-1)!.code;
+    // an attacker hammers forgot for the victim's address from many IPs
+    for (let i = 0; i < 6; i++)
+      await call('/password/forgot', {
+        json: { email: u.email },
+        headers: { 'cf-connecting-ip': `203.0.113.${i + 1}` },
+      });
+    const sent = fakes.mails.length;
+    expect(sent).toBeLessThanOrEqual(3); // the cap, however many requests
+    // the newest code that WAS mailed still works
+    const newest = fakes.mails.at(-1)!.code;
+    expect(
+      (
+        await call('/password/reset', {
+          json: { email: u.email, code: newest, newPassword: 'N3w!Passw0rdXY' },
+        })
+      ).status
+    ).toBe(200);
+    void live;
+  });
+
+  it('the cap is checked before older codes are invalidated (issueOtp)', async () => {
+    const u = await seedUser({ emailVerified: 0 });
+    const first = await issueOtp(env.DB, { id: u.id }, 'email');
+    await issueOtp(env.DB, { id: u.id }, 'email');
+    const third = await issueOtp(env.DB, { id: u.id }, 'email');
+    expect(third).not.toBeNull();
+    const over = await issueOtp(env.DB, { id: u.id }, 'email'); // 4th within the window
+    expect(over).toBeNull();
+    // the third code (newest sent) is still live: the over-cap request invalidated nothing
+    const live = await env.DB.prepare(
+      `SELECT count(*) AS n FROM verification_tokens WHERE user_id = ?1 AND used_at IS NULL AND sent = 1`
+    )
+      .bind(u.id)
+      .first<{ n: number }>();
+    expect(live!.n).toBe(1);
+    void first;
+  });
+});
+
+describe('throttle: namespaced IP budgets, no inserts over budget, successes refunded', () => {
+  it('a refused request writes no row; the IP budget of one flow does not drain another', async () => {
+    const ip = '198.18.77.7';
+    const u = await seedUser();
+    for (let i = 0; i < 5; i++)
+      await call('/login', {
+        json: { email: u.email, password: 'bad' },
+        headers: { 'cf-connecting-ip': ip },
+      });
+    const rows = async () =>
+      (await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key LIKE ?1`)
+        .bind(`%${u.email}`)
+        .first<{ n: number }>())!.n;
+    expect(await rows()).toBe(5);
+    for (let i = 0; i < 5; i++)
+      await call('/login', {
+        json: { email: u.email, password: 'bad' },
+        headers: { 'cf-connecting-ip': ip },
+      });
+    expect(await rows()).toBe(5); // 5 more refused attempts inserted nothing
+    expect(
+      await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
+        .bind(`i:login:${ip}`)
+        .first()
+    ).toMatchObject({ n: 5 });
+    // a different flow from the same IP has its own counter
+    expect(
+      (
+        await call('/passkey/login/options', {
+          method: 'POST',
+          headers: { 'cf-connecting-ip': ip, origin: 'https://store.ebda.app' },
+        })
+      ).status
+    ).toBe(200);
+  });
+
+  it('honest successes behind one IP do not exhaust the IP budget (refunded)', async () => {
+    const ip = '198.18.88.8';
+    const users = await Promise.all(Array.from({ length: 3 }, () => seedUser()));
+    for (let round = 0; round < 25; round++)
+      for (const u of users)
+        expect(
+          (
+            await call('/login', {
+              json: { email: u.email, password: u.password },
+              headers: { 'cf-connecting-ip': ip },
+            })
+          ).status
+        ).toBe(200);
+    expect(
+      await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
+        .bind(`i:login:${ip}`)
+        .first()
+    ).toMatchObject({ n: 0 });
   });
 });

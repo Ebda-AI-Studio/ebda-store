@@ -68,7 +68,12 @@ CREATE TABLE verification_tokens (
   expires_at TEXT NOT NULL,
   used_at TEXT,
   created_at TEXT NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0
+  attempts INTEGER NOT NULL DEFAULT 0,
+  -- 1 once the code is within the send cap and will be mailed; a code that is not sent never becomes valid.
+  sent INTEGER NOT NULL DEFAULT 1,
+  -- Signup data bound to THIS code (JSON: password_hash, first_name, last_name, phone, language). Verifying the code
+  -- activates exactly this credential; an unauthenticated request never writes the user row's credential.
+  pending TEXT
 );
 CREATE INDEX verification_tokens_user_type ON verification_tokens (user_id, type);
 

@@ -18,8 +18,8 @@ import {
 import { ACCESS_TTL_SECONDS, mintAccessToken, verifyOwnAccessToken, type StoreClaim } from './jwt';
 import { jwks } from './keys';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
-import { clear, CODE_GUESS, hit, LOGIN, PER_IP_ONLY, SECOND_FACTOR } from './throttle';
-import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType } from './otp';
+import { CODE_GUESS, hit, LOGIN, PER_EMAIL, PER_IP_ONLY, SECOND_FACTOR } from './throttle';
+import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType, type PendingSignup } from './otp';
 import * as passkeys from './passkeys';
 import { newSecret, seal, totpUri, unseal, verifyTotp } from './totp';
 import { csv, iso, nowMs, randomCode, sha256Hex } from './util';
@@ -158,59 +158,120 @@ async function bearerAuth(c: C, anyAud = false): Promise<{ user: UserRow; sid: s
 
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
 async function requirePassword(c: C, user: UserRow, password: unknown): Promise<void> {
-  if (!(await hit(c.env.DB, `pw:${user.id}`, clientIp(c), LOGIN)))
-    throw err(429, 'TOO_MANY_ATTEMPTS');
+  const a = await hit(c.env.DB, user.id, clientIp(c), { ...LOGIN, name: 'pw' });
+  if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
   if (typeof password !== 'string' || !(await verifyPassword(password, user.password_hash)))
     throw err(403, 'STEP_UP_REQUIRED');
-  await clear(c.env.DB, `pw:${user.id}`);
+  await a.succeeded();
 }
 
-/** Second factor for a sensitive change when the account has one (a stolen token + password is not enough). */
-async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<void> {
-  if (!user.mfa_enabled) return;
-  if (!(await hit(c.env.DB, `mfa:${user.id}`, clientIp(c), SECOND_FACTOR)))
-    throw err(429, 'TOO_MANY_ATTEMPTS');
-  if (typeof code !== 'string' || !user.mfa_secret || !c.env.MFA_KEY)
-    throw err(403, 'MFA_REQUIRED');
+/**
+ * EVERY endpoint that checks a TOTP code goes through here (or /login/mfa, which does the same): counted first against a
+ * per-user budget, the matched time step is claimed single-use, a success clears the counter.
+ */
+async function checkTotp(c: C, user: UserRow, code: unknown): Promise<boolean> {
+  const a = await hit(c.env.DB, user.id, clientIp(c), SECOND_FACTOR);
+  if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
+  if (typeof code !== 'string' || !user.mfa_secret || !c.env.MFA_KEY) return false;
   const step = await verifyTotp(
     await unseal(c.env.MFA_KEY, user.mfa_secret),
     code,
     Date.now(),
     user.mfa_last_step
   );
-  if (step === null || !(await claimTotpStep(c.env.DB, user.id, step)))
-    throw err(403, 'MFA_REQUIRED');
-  await clear(c.env.DB, `mfa:${user.id}`);
+  if (step === null || !(await claimTotpStep(c.env.DB, user.id, step))) return false;
+  await a.succeeded();
+  return true;
+}
+
+/** Second factor for a sensitive change when the account has one (a stolen token + password is not enough). */
+async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<void> {
+  if (!user.mfa_enabled) return;
+  if (!(await checkTotp(c, user, code))) throw err(403, 'MFA_REQUIRED');
 }
 
 /**
- * Issue a code and mail it OFF the request path (waitUntil). Every branch of the caller answers after the same amount of
- * work, so response time does not reveal whether an address is registered.
+ * Issue a code (optionally carrying the signup data it activates) and mail it. Never touches an existing user row's credential.
  */
-function queueMail(
-  c: C,
-  user: UserRow | null,
+export async function issueAndMail(
+  env: Env,
+  user: UserRow,
   kind: 'email_verify' | 'password_reset',
-  type: OtpType
-): void {
-  const job = async () => {
-    if (!user) return;
-    const code = await issueOtp(c.env.DB, user, type);
-    if (!code || !c.env.MAILER) return;
+  type: OtpType,
+  pending?: PendingSignup
+): Promise<void> {
+  const code = await issueOtp(env.DB, user, type, pending);
+  if (!code || !env.MAILER) return;
+  try {
+    await env.MAILER.sendCode({
+      to: user.email,
+      kind,
+      code,
+      language: (pending?.language ?? user.language) === 'ar' ? 'ar' : 'en',
+      firstName: pending?.first_name ?? user.first_name,
+      ttlMinutes: OTP_TTL_MINUTES[type],
+    });
+  } catch (e) {
+    console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
+  }
+}
+
+/** Mail work runs after the response, so every branch of the caller answers in the same time (no registered-address oracle). */
+function queueMail(c: C, job: Promise<unknown>): void {
+  c.executionCtx.waitUntil(
+    job.catch(e =>
+      console.error(JSON.stringify({ msg: 'background job failed', error: (e as Error).message }))
+    )
+  );
+}
+
+/**
+ * Register (or re-register) an UNVERIFIED merchant. The credential is bound to the verification CODE, not written to the
+ * user row: verifying code X activates only the password submitted with the signup that produced X, and an unauthenticated
+ * request never changes a stored credential. A verified account is never touched. Shared by POST /signup and the Store's
+ * provisioning (Accounts.createUser).
+ */
+export async function registerPending(
+  env: Env,
+  input: {
+    email: string;
+    passwordHash: string;
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    language: 'en' | 'ar';
+    id?: string;
+  }
+): Promise<{ id: string; created: boolean } | null> {
+  const existing = await findUserByEmail(env.DB, input.email);
+  if (existing?.email_verified) return null;
+  let user = existing;
+  let created = false;
+  if (!user) {
+    const id = input.id ?? crypto.randomUUID();
     try {
-      await c.env.MAILER.sendCode({
-        to: user.email,
-        kind,
-        code,
-        language: user.language === 'ar' ? 'ar' : 'en',
-        firstName: user.first_name,
-        ttlMinutes: OTP_TTL_MINUTES[type],
-      });
+      // '!pending' is not a bcrypt hash: nobody can sign in with it until a code activates a credential.
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, first_name, last_name, phone, role, status, email_verified, language, created_at, updated_at)
+         VALUES (?1,?2,'!pending',?3,?4,?5,'store_admin','active',0,?6,?7,?7)`
+      )
+        .bind(id, input.email, input.firstName, input.lastName, input.phone, input.language, iso())
+        .run();
+      created = true;
     } catch (e) {
-      console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
+      if (!/UNIQUE.*users\.email|users_email_lower/i.test((e as Error).message)) throw e; // lost a race: it exists now
     }
-  };
-  c.executionCtx.waitUntil(job());
+    user = await findUserByEmail(env.DB, input.email);
+  }
+  if (!user) return null;
+  await issueAndMail(env, user, 'email_verify', 'email', {
+    password_hash: input.passwordHash,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    phone: input.phone,
+    language: input.language,
+  });
+  return { id: user.id, created };
 }
 
 // ----------------------------------------------------------------------------------------------------------------
@@ -306,8 +367,8 @@ export function createApp() {
     const aud = audOf(c.env, body.aud);
     const ip = clientIp(c);
     // Counted BEFORE the password is checked (see throttle.ts): a parallel burst cannot out-run the budget.
-    if (!(await hit(c.env.DB, `login:${body.email}`, ip, LOGIN)))
-      throw err(429, 'ACCOUNT_LOCKED', 'Too many attempts. Try again later.');
+    const attempt = await hit(c.env.DB, body.email, ip, LOGIN);
+    if (!attempt.ok) throw err(429, 'ACCOUNT_LOCKED', 'Too many attempts. Try again later.');
     const user = await findUserByEmail(c.env.DB, body.email);
     if (!user) {
       await bcrypt.compare(body.password, DUMMY_HASH); // same cost as a wrong password: no stopwatch oracle
@@ -321,7 +382,7 @@ export function createApp() {
     // Only the holder of the mailbox may sign in: an account created by someone who merely typed the address is
     // unusable until the code mailed to that address is entered (pre-hijacking). Reached only with the right password.
     if (!user.email_verified) throw err(403, 'EMAIL_NOT_VERIFIED', 'Verify your email first');
-    await clear(c.env.DB, `login:${body.email}`);
+    await attempt.succeeded();
 
     if (user.mfa_enabled && user.mfa_secret) {
       const challenge = randomCode() + crypto.randomUUID().replaceAll('-', '') + randomCode();
@@ -369,8 +430,8 @@ export function createApp() {
     )
       throw err(401, 'INVALID_CHALLENGE');
     // A per-USER budget a fresh challenge does not reset, counted before the code is checked.
-    if (!(await hit(c.env.DB, `mfa:${user.id}`, ip, SECOND_FACTOR)))
-      throw err(429, 'TOO_MANY_ATTEMPTS');
+    const attempt = await hit(c.env.DB, user.id, ip, SECOND_FACTOR);
+    if (!attempt.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
     let ok = false;
     let spentBackup: { old: string; next: string } | null = null;
     if (body.code) {
@@ -406,7 +467,7 @@ export function createApp() {
     // Consume the challenge: one verification, one session.
     const del = await c.env.DB.prepare(`DELETE FROM challenges WHERE id = ?1`).bind(id).run();
     if ((del.meta.changes ?? 0) !== 1) throw err(401, 'INVALID_CHALLENGE');
-    await clear(c.env.DB, `mfa:${user.id}`);
+    await attempt.succeeded();
     return c.json({ success: true, data: await sessionResponse(c, user, 'pwd,otp', data.aud) });
   });
 
@@ -495,54 +556,23 @@ export function createApp() {
 
   app.post('/signup', async c => {
     const body = await json(c, signupBody);
-    if (!(await hit(c.env.DB, 'signup', clientIp(c), PER_IP_ONLY(10))))
+    if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('signup', 10))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    const hash = await hashPassword(body.password); // always paid, so "exists" and "new" take the same time
-    const existing = await findUserByEmail(c.env.DB, body.email);
-    let target: UserRow | null = null;
-    if (!existing) {
-      const id = crypto.randomUUID();
-      try {
-        await c.env.DB.prepare(
-          `INSERT INTO users (id, email, password_hash, first_name, last_name, phone, role, status, email_verified, language, created_at, updated_at)
-           VALUES (?1,?2,?3,?4,?5,?6,'store_admin','active',0,?7,?8,?8)`
-        )
-          .bind(
-            id,
-            body.email,
-            hash,
-            body.firstName,
-            body.lastName,
-            body.phone ?? null,
-            body.language,
-            iso()
-          )
-          .run();
-        target = await findUserById(c.env.DB, id);
-      } catch (e) {
-        if (!/UNIQUE/i.test((e as Error).message)) throw e; // lost a race: it exists now
-      }
-    } else if (!existing.email_verified) {
-      // Someone registered this address but never proved the mailbox. The newest signup wins: overwrite the credential
-      // (so a pre-registered attacker password dies) and mail a fresh code. A verified account is never touched.
-      await c.env.DB.prepare(
-        `UPDATE users SET password_hash = ?2, first_name = ?3, last_name = ?4, phone = ?5, language = ?6, updated_at = ?7 WHERE id = ?1 AND email_verified = 0`
-      )
-        .bind(
-          existing.id,
-          hash,
-          body.firstName,
-          body.lastName,
-          body.phone ?? null,
-          body.language,
-          iso()
-        )
-        .run();
-      await purgeCredentials(c.env.DB, existing.id, 'signup-overwrite');
-      target = await findUserById(c.env.DB, existing.id);
-    }
-    queueMail(c, target, 'email_verify', 'email');
-    // Same answer whether or not the address was already registered.
+    if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('signup-email', 3))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
+    const passwordHash = await hashPassword(body.password); // always paid, so every branch costs the same
+    // Everything else runs after the response: "new", "pending" and "already verified" answer identically and in the same time.
+    queueMail(
+      c,
+      registerPending(c.env, {
+        email: body.email,
+        passwordHash,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        phone: body.phone ?? null,
+        language: body.language,
+      })
+    );
     return c.json({ success: true, data: { status: 'verification_sent' } }, 202);
   });
 
@@ -550,45 +580,82 @@ export function createApp() {
 
   app.post('/otp/verify', async c => {
     const body = await json(c, otpBody);
-    const key = `otp:${body.email}`;
-    if (!(await hit(c.env.DB, key, clientIp(c), CODE_GUESS))) throw err(429, 'TOO_MANY_ATTEMPTS');
+    const attempt = await hit(c.env.DB, body.email, clientIp(c), CODE_GUESS);
+    if (!attempt.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
-    const ok = user ? await verifyOtp(c.env.DB, user, 'email', body.code) : false;
-    if (!ok || !user) throw err(400, 'INVALID_CODE');
+    const res = user
+      ? await verifyOtp(c.env.DB, user, 'email', body.code)
+      : { ok: false, pending: null };
+    if (!res.ok || !user) throw err(400, 'INVALID_CODE');
     const wasUnverified = !user.email_verified;
-    await c.env.DB.prepare(`UPDATE users SET email_verified = 1, updated_at = ?2 WHERE id = ?1`)
-      .bind(user.id, iso())
-      .run();
+    if (res.pending && wasUnverified) {
+      // Activate exactly the credential that was submitted with the signup that produced THIS code.
+      await c.env.DB.prepare(
+        `UPDATE users SET password_hash = ?2, first_name = ?3, last_name = ?4, phone = ?5, language = ?6, email_verified = 1, updated_at = ?7 WHERE id = ?1`
+      )
+        .bind(
+          user.id,
+          res.pending.password_hash,
+          res.pending.first_name,
+          res.pending.last_name,
+          res.pending.phone,
+          res.pending.language,
+          iso()
+        )
+        .run();
+    } else {
+      await c.env.DB.prepare(`UPDATE users SET email_verified = 1, updated_at = ?2 WHERE id = ?1`)
+        .bind(user.id, iso())
+        .run();
+    }
     // Anything attached to the account before its mailbox owner proved control is untrusted: drop it all and end sessions.
     if (wasUnverified) await purgeCredentials(c.env.DB, user.id, 'first-verification');
-    await clear(c.env.DB, key);
+    await attempt.succeeded();
     return c.json({ success: true, data: { verified: true } });
   });
 
   app.post('/otp/resend', async c => {
     const body = await json(c, z.object({ email: emailSchema }));
-    if (!(await hit(c.env.DB, 'resend', clientIp(c), PER_IP_ONLY(10))))
+    if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('resend', 10))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    const user = await findUserByEmail(c.env.DB, body.email);
+    if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('resend-email', 3))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     queueMail(
       c,
-      user && user.status === 'active' && !user.email_verified ? user : null,
-      'email_verify',
-      'email'
+      (async () => {
+        const user = await findUserByEmail(c.env.DB, body.email);
+        if (!user || user.status !== 'active' || user.email_verified) return;
+        // Re-send carries the credential of the LATEST signup, so the new code activates the same password as before.
+        const last = await c.env.DB.prepare(
+          `SELECT pending FROM verification_tokens WHERE user_id = ?1 AND type = 'email' AND pending IS NOT NULL ORDER BY created_at DESC LIMIT 1`
+        )
+          .bind(user.id)
+          .first<{ pending: string }>();
+        await issueAndMail(
+          c.env,
+          user,
+          'email_verify',
+          'email',
+          last ? (JSON.parse(last.pending) as PendingSignup) : undefined
+        );
+      })()
     );
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 
   app.post('/password/forgot', async c => {
     const body = await json(c, z.object({ email: emailSchema }));
-    if (!(await hit(c.env.DB, 'forgot', clientIp(c), PER_IP_ONLY(10))))
+    if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('forgot', 10))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    const user = await findUserByEmail(c.env.DB, body.email);
+    if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('forgot-email', 3))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     queueMail(
       c,
-      user && user.status === 'active' ? user : null,
-      'password_reset',
-      'password_reset'
+      (async () => {
+        const user = await findUserByEmail(c.env.DB, body.email);
+        if (user && user.status === 'active')
+          await issueAndMail(c.env, user, 'password_reset', 'password_reset');
+      })()
     );
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
@@ -602,11 +669,13 @@ export function createApp() {
         newPassword: passwordPolicy,
       })
     );
-    const key = `otp:${body.email}`;
-    if (!(await hit(c.env.DB, key, clientIp(c), CODE_GUESS))) throw err(429, 'TOO_MANY_ATTEMPTS');
+    const attempt = await hit(c.env.DB, body.email, clientIp(c), CODE_GUESS);
+    if (!attempt.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
-    const ok = user ? await verifyOtp(c.env.DB, user, 'password_reset', body.code) : false;
-    if (!ok || !user) throw err(400, 'INVALID_CODE');
+    const res = user
+      ? await verifyOtp(c.env.DB, user, 'password_reset', body.code)
+      : { ok: false, pending: null };
+    if (!res.ok || !user) throw err(400, 'INVALID_CODE');
     const wasUnverified = !user.email_verified;
     await c.env.DB.prepare(
       `UPDATE users SET password_hash = ?2, email_verified = 1, updated_at = ?3 WHERE id = ?1`
@@ -617,8 +686,7 @@ export function createApp() {
     // only the mailbox, so stripping a verified owner's MFA/passkeys here would turn a mailbox compromise into an MFA bypass.
     if (wasUnverified) await purgeCredentials(c.env.DB, user.id, 'password-reset-unverified');
     else await revokeAllForUser(c.env.DB, user.id, 'password-reset');
-    await clear(c.env.DB, key);
-    await clear(c.env.DB, `login:${body.email}`);
+    await attempt.succeeded();
     return c.json({ success: true, data: { reset: true } });
   });
 
@@ -644,14 +712,7 @@ export function createApp() {
     const { user } = await bearerAuth(c);
     const body = await json(c, z.object({ code: z.string() }));
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
-    const step = await verifyTotp(
-      await unseal(c.env.MFA_KEY, user.mfa_secret),
-      body.code,
-      Date.now(),
-      user.mfa_last_step
-    );
-    if (step === null || !(await claimTotpStep(c.env.DB, user.id, step)))
-      throw err(400, 'INVALID_CODE');
+    if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const plain = Array.from({ length: 10 }, () =>
       [...crypto.getRandomValues(new Uint8Array(5))]
         .map(b => b.toString(16).padStart(2, '0'))
@@ -671,14 +732,7 @@ export function createApp() {
     const body = await json(c, z.object({ password: z.string(), code: z.string() }));
     await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
-    const step = await verifyTotp(
-      await unseal(c.env.MFA_KEY, user.mfa_secret),
-      body.code,
-      Date.now(),
-      user.mfa_last_step
-    );
-    if (step === null || !(await claimTotpStep(c.env.DB, user.id, step)))
-      throw err(400, 'INVALID_CODE');
+    if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL WHERE id = ?1`
     )
@@ -691,7 +745,7 @@ export function createApp() {
   const originHeader = (c: C) => c.req.header('origin') ?? null;
 
   app.post('/passkey/login/options', async c => {
-    if (!(await hit(c.env.DB, 'pk-options', clientIp(c), PER_IP_ONLY(60))))
+    if (!(await hit(c.env.DB, 'all', clientIp(c), PER_IP_ONLY('pk-options', 60))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
     return c.json({
       success: true,
@@ -704,7 +758,8 @@ export function createApp() {
     const aud = audOf(c.env, body.aud);
     const ip = clientIp(c);
     // per client: a global key would let anyone lock every passkey sign-in
-    if (!(await hit(c.env.DB, `passkey:${ip}`, ip, LOGIN))) throw err(429, 'TOO_MANY_ATTEMPTS');
+    const attempt = await hit(c.env.DB, ip, ip, { ...LOGIN, name: 'passkey' });
+    if (!attempt.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
     const res = await passkeys.finishAuthentication(
       c.env.DB,
       c.env,
@@ -715,6 +770,7 @@ export function createApp() {
       console.log(JSON.stringify({ msg: 'passkey auth failed', reason: res.fail }));
       throw err(401, 'PASSKEY_AUTH_FAILED', 'Passkey sign-in failed');
     }
+    await attempt.succeeded();
     // A passkey (possession + user verification) satisfies MFA: no code step follows (Ruling PASSKEY-4).
     return c.json({ success: true, data: await sessionResponse(c, res.user, 'hwk', aud) });
   });

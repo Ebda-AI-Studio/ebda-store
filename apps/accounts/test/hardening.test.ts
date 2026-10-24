@@ -38,23 +38,26 @@ const startChallenge = async (u: { email: string; password: string }, ip = '203.
 };
 
 describe('1. pre-hijacking: an unverified account is unusable and is stripped on verification', () => {
-  it('login is refused until the email is verified, even with the right password; wrong password stays a plain 401', async () => {
+  it('a signed-up but unverified account cannot sign in: the credential does not exist until a code activates it', async () => {
     const email = `pre-${crypto.randomUUID().slice(0, 6)}@example.com`;
     await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'Mallory' } });
     const right = await call('/login', { json: { email, password: 'Attacker!Pass1' } });
-    expect(right.status).toBe(403);
-    expect(((await right.json()) as { error: { code: string } }).error.code).toBe(
-      'EMAIL_NOT_VERIFIED'
-    );
+    expect(right.status).toBe(401); // indistinguishable from a wrong password
     expect(cookieOf(right)).toBe('');
-    expect(
-      (
-        await call('/login', {
-          json: { email, password: 'wrong' },
-          headers: { 'cf-connecting-ip': '198.51.100.40' },
-        })
-      ).status
-    ).toBe(401);
+    const stored = await env.DB.prepare(`SELECT password_hash FROM users WHERE lower(email) = ?1`)
+      .bind(email)
+      .first<{ password_hash: string }>();
+    expect(stored!.password_hash).toBe('!pending'); // never the submitted password
+  });
+
+  it('a verified-flag gate still refuses an unverified account that does hold a password hash', async () => {
+    const u = await seedUser({ emailVerified: 0 });
+    const r = await call('/login', { json: { email: u.email, password: u.password } });
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe('EMAIL_NOT_VERIFIED');
+    expect((await call('/login', { json: { email: u.email, password: 'wrong' } })).status).toBe(
+      401
+    );
   });
 
   it('passkey registration and MFA enrolment need a verified address', async () => {
@@ -194,22 +197,68 @@ describe('1. pre-hijacking: an unverified account is unusable and is stripped on
     ).toMatchObject({ mfa_enabled: 0 });
   });
 
-  it('signing up again over an unverified address replaces the pre-registered credential; a verified account is never touched', async () => {
+  it('verifying code X activates ONLY the password submitted with the signup that produced X (attacker first, victim second)', async () => {
     const email = `pre2-${crypto.randomUUID().slice(0, 6)}@example.com`;
     await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'Mallory' } });
+    const attackerCode = fakes.mails.at(-1)!.code;
     await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'Victoria' } });
-    const code = fakes.mails.at(-1)!.code;
-    expect((await call('/otp/verify', { json: { email, code } })).status).toBe(200);
+    const victimCode = fakes.mails.at(-1)!.code;
+    expect(victimCode).not.toBe(attackerCode);
+    // the attacker's earlier code was superseded: it does nothing
+    expect((await call('/otp/verify', { json: { email, code: attackerCode } })).status).toBe(400);
+    expect((await call('/otp/verify', { json: { email, code: victimCode } })).status).toBe(200);
     expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
       401
     );
     expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
       200
     );
-    // a third signup over the now-verified account changes nothing and mails nothing
-    fakes.mails.length = 0;
-    await call('/signup', { json: { email, password: 'Third!Pass12345', firstName: 'X' } });
+  });
+
+  it("...and the reverse order: victim first, attacker second, the newest code activates the attacker's password only", async () => {
+    const email = `pre3-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'Victoria' } });
+    await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'Mallory' } });
+    const newest = fakes.mails.at(-1)!.code;
+    expect((await call('/otp/verify', { json: { email, code: newest } })).status).toBe(200);
+    expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
+      401
+    );
+    expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
+      200
+    );
+  });
+
+  it('an unauthenticated signup never changes a stored credential, and a verified account is never touched', async () => {
+    const u = await seedUser();
+    const before = await env.DB.prepare(`SELECT password_hash, first_name FROM users WHERE id = ?1`)
+      .bind(u.id)
+      .first();
+    await call('/signup', {
+      json: { email: u.email, password: 'Third!Pass12345', firstName: 'X' },
+    });
     expect(fakes.mails).toHaveLength(0);
+    expect(
+      await env.DB.prepare(`SELECT password_hash, first_name FROM users WHERE id = ?1`)
+        .bind(u.id)
+        .first()
+    ).toEqual(before);
+    // an UNVERIFIED row keeps its stored (unusable) credential too; the signup only adds a pending code
+    const email = `pre4-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'A' } });
+    await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'V' } });
+    const row = await env.DB.prepare(`SELECT password_hash FROM users WHERE lower(email) = ?1`)
+      .bind(email)
+      .first<{ password_hash: string }>();
+    expect(row!.password_hash).toBe('!pending');
+  });
+
+  it('a resend carries the credential of the latest signup', async () => {
+    const email = `pre5-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'V' } });
+    await call('/otp/resend', { json: { email } });
+    const code = fakes.mails.at(-1)!.code;
+    expect((await call('/otp/verify', { json: { email, code } })).status).toBe(200);
     expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
       200
     );
