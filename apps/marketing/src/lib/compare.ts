@@ -2,7 +2,7 @@ import { isLive, type CapabilityId } from './capability-registry';
 import type { CompareSlug, Locale } from './site';
 
 /**
- * /compare/salla, /compare/zid, /compare/shopify. Balanced on purpose: assistants quote pages that
+ * /compare/zid, /compare/shopify. Balanced on purpose: assistants quote pages that
  * say where the other product is stronger. Ebda cells are proven by code (see capabilities.ts and
  * .superpowers/marketing-report.md); competitor cells are general, publicly known facts, dated
  * COMPARE_AS_OF, with no invented numbers. Where we are unsure what a competitor offers today the cell
@@ -255,7 +255,7 @@ interface Them {
 const same = (en: string, ar: string): Pair => ({ en, ar });
 
 /**
- * Per-vendor cells for Salla and Zid. Only facts we can stand behind (both started in Saudi Arabia, both are
+ * Per-vendor cells for Zid. Only facts we can stand behind (it started in Saudi Arabia, it is
  * Arabic-first); everything else says to check the vendor's own site, and its verdict is "even".
  */
 const vendorCells = (nameEn: string, nameAr: string) =>
@@ -409,7 +409,6 @@ const gulfCopy = (nameEn: string, nameAr: string): Record<Locale, CompareCopy> =
 });
 
 export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
-  const salla = gulfCopy('Salla', 'سلة');
   const zid = gulfCopy('Zid', 'زد');
   const shopify: Record<Locale, CompareCopy> = {
     ar: {
@@ -802,7 +801,6 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
   );
 
   return {
-    salla: { ...salla, cells: them(vendorCells('Salla', 'سلة')) },
     zid: { ...zid, cells: them(vendorCells('Zid', 'زد')) },
     shopify: { ...shopify, cells: shopifyCells },
     wuilt: {

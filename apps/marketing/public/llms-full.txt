@@ -151,31 +151,10 @@ Q: Is there a commission on orders?
 A: No. It is 0% on every plan. You pay the subscription, and the payment gateway charges its own fee when a customer pays online.
 
 Q: What is not there yet?
-A: There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Salla, Zid and Shopify go through the details, and what is coming soon.
+A: There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details, and what is coming soon.
 
 ## Comparisons (as of October 2026)
 Competitor facts come from their public pages (Wuilt, YouCan, EasyOrders and ExpandCart were read on 22 October 2026; the others are general and say to check their sites). Check their sites before deciding.
-
-### Ebda Store vs Salla — https://ebda.app/en/compare/salla/
-Both Ebda Store and Salla let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while Salla started in Saudi Arabia. This page says where each is stronger, including what Ebda Store does not have yet.
-- Home market: Ebda Store — Egypt first: Egyptian pounds, InstaPay and Egyptian carriers. Salla — Salla started in Saudi Arabia.
-- Subscription currency: Ebda Store — In pounds: EGP 1,490, 3,490 and 9,990 a month. Salla — Check Salla's site for current pricing and billing currency.
-- Commission on orders: Ebda Store — 0% on every order on every plan. Payment gateway fees are separate. Salla — Check Salla's current plan terms. Payment gateway fees apply on any platform.
-- Arabic: Ebda Store — Store and dashboard are Arabic-first, with Egyptian Arabic copy. Salla — Salla is Arabic-first.
-- Egyptian and Franco search: Ebda Store — Search understands Egyptian Arabic, Franco, English and letter variants, and every product gets AI search words you can edit. You also see what shoppers searched for and did not find. Salla — Check Salla's site for its current search features.
-- AI tools: Ebda Store — Descriptions, translation, SEO and search words, plus receipt-to-expense drafts, reorder suggestions and plain-language explanations of your numbers, included in the paid plans. Salla — Check Salla's site for its AI features and which plan includes them.
-- Payments and shipping in Egypt: Ebda Store — Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex. Salla — Check which Egyptian gateways and carriers Salla supports for your account.
-- Templates and design: Ebda Store — Five templates with three looks each, and a page builder. Salla — Check Salla's site for its themes and editor.
-- Cart recovery and loyalty: Ebda Store — Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan. Plus reminder emails when the shopper opted in at checkout, guests included. Salla — Check Salla's site for cart recovery and loyalty options.
-- Connecting other tools (webhooks): Ebda Store — The store notifies the tool you choose when something happens, such as a new order, on Growth and Business. Salla — Check Salla's site for webhooks and integrations.
-- Wholesale (B2B) pricing: Ebda Store — Quantity price breaks, customer groups, minimum orders and wholesale-buyer approval, on the Business plan. Salla — Check Salla's site for wholesale pricing.
-- Marketing email campaigns: Ebda Store — Write a message in Arabic and English and send it to subscribers who agreed, on Growth and Business. Order emails work on every plan. Salla — Check Salla's site for email marketing options.
-- Search by meaning: Ebda Store — Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue. Salla — Check Salla's site for how its search handles meaning.
-- App marketplace: Ebda Store — There is no app marketplace. Salla — Check Salla's site for its app store.
-- Custom code: Ebda Store — You edit in the page builder without code, and there is no custom code editor. Salla — Check Salla's site for developer and theme customisation tools.
-- Point of sale (POS): Ebda Store — There is no in-store point of sale. Salla — Check Salla's site for in-store selling options.
-- Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. Salla — Check Salla's site for multi-currency support.
-- Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. Salla — Check Salla's site for its merchant base and partners.
 
 ### Ebda Store vs Zid — https://ebda.app/en/compare/zid/
 Both Ebda Store and Zid let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while Zid started in Saudi Arabia. This page says where each is stronger, including what Ebda Store does not have yet.
