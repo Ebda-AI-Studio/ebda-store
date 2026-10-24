@@ -112,3 +112,7 @@ Local review: copy `scripts/dahab-demo/assets/*` into an untracked `apps/web/pub
 ## DQ-1: showrooms never show a no-photo product (2026-10-23)
 
 A demo store's showcase PDPs must have photos. The one no-photo product in `storedemo` (`modal-scarf-no-image`), `storedemo-souq` (`phone-case-set`) and `storedemo-jasmine` (`makeup-brush-set`) is dropped from the catalogues (the no-photo case lives in the `*-noimg` scenario stores, as for Lamma and Dahab). `spec.retiredSlugs` in `scripts/storedemo/seed.mjs` archives them in an already-seeded store on a re-seed (archived, never deleted: cart lines may point at them). Counts: Qamar 17, Souq 19, Jasmine 21 products.
+
+## Demo store names (BRAND-NAME-1)
+
+Each showroom is named after its template, never "Ebda ... Demo": storedemo = Qamar / «قمر», storedemo-souq = Souq / «سوق», storedemo-jasmine = Jasmine / «ياسمين», storedemo-lamma = Lamma / «لمّة», storedemo-dahab = Dahab / «دهب» (the registry names in `packages/shared/src/types/store-theme.ts`). Set in `TEMPLATE_SPECS` in `scripts/storedemo/seed.mjs`. Applied on prod on 2026-10-25 by re-running the seed per template (`--yes-production`); re-running the seed keeps them.
