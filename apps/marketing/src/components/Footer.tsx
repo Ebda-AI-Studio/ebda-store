@@ -2,14 +2,7 @@ import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { CookieSettingsButton } from './CookieSettingsButton';
-import { COMPARE } from '../lib/compare';
-import {
-  COMPARE_PAGES,
-  SECURITY_EMAIL,
-  pagePath,
-  type CompareSlug,
-  type Locale,
-} from '../lib/site';
+import { SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
 
 export function Footer({ locale }: { locale: Locale }) {
   const c = COPY[locale].footer;
@@ -20,7 +13,7 @@ export function Footer({ locale }: { locale: Locale }) {
         <div>
           <p className="footer-brand">
             <img src="/icon.svg" alt="" className="footer-mark" width={28} height={28} />
-            <span>{locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}</span>
+            <span>{locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}</span>
           </p>
           <p className="footer-credit">{c.product}</p>
           <p className="footer-h">{k.title}</p>
@@ -44,13 +37,6 @@ export function Footer({ locale }: { locale: Locale }) {
             <li>
               <Link href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</Link>
             </li>
-            {COMPARE_PAGES.map(page => (
-              <li key={page}>
-                <Link href={pagePath(locale, page)}>
-                  {COMPARE[page.split('/')[1] as CompareSlug][locale].linkText}
-                </Link>
-              </li>
-            ))}
             <li>
               <Link href={pagePath(locale, 'about')}>{c.about}</Link>
             </li>

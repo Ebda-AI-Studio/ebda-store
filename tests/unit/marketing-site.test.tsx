@@ -71,14 +71,24 @@ describe('marketing nav', () => {
     expect(pos.every(p => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   });
-  it('names the product, not the studio, in the header wordmark (MKT-1)', () => {
-    for (const [html, name] of [
-      [ar, 'ابدأ ستور'],
-      [en, 'Ebda Store'],
+  it('header: the master brand lockup plus a Products menu naming only the live product (BRAND-ARCH-1)', () => {
+    for (const [html, studio, store, soon] of [
+      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', /قريب/],
+      [en, 'Ebda AI Studio', 'Ebda Store', /coming soon/i],
     ] as const) {
       const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
-      expect(wm).toContain(`>${name}</span>`);
-      expect(wm).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
+      expect(wm).toContain(`>${studio}</span>`);
+      const menu = html.match(/<li class="nav-products">.*?<\/details>/s)![0];
+      expect(menu).toContain(`<b>${store}</b>`);
+      expect(menu.match(/<a /g)).toHaveLength(1);
+      expect(menu).not.toMatch(soon);
+      expect(menu).not.toMatch(/WhatsApp|CRM|ERP/);
+    }
+  });
+  it('footer: no competitor compare links (Ahmad 2026-10-23)', () => {
+    for (const html of [ar, en]) {
+      const footer = html.match(/<footer class="site-footer.*?<\/footer>/s)![0];
+      expect(footer).not.toMatch(/href="[^"]*\/compare\//);
     }
   });
   it('Log in -> app login, Start now -> app signup, in both locales', () => {
@@ -110,18 +120,16 @@ describe('marketing hero and structure', () => {
     // No English sentence on the Arabic hero any more (R-EBDA-COPY-1).
     expect(ar).not.toContain('Your business, your store');
   });
-  it('hero = h1 + sub naming the product + ONE signup CTA + a link to #looks, and no phone (MKT-1, MKT-10)', () => {
-    for (const [html, name, secondary] of [
-      [ar, 'ابدأ ستور بيديك', 'شوف القوالب'],
-      [en, 'Ebda Store gives you', 'See the templates'],
+  it('hero = one promise + sub naming the product + ONE button, no second link, no phone (MKT-1, MKT-10, 6b)', () => {
+    for (const [html, name] of [
+      [ar, 'ابدأ ستور بيديك'],
+      [en, 'Ebda Store gives you'],
     ] as const) {
       const hero = html.match(/<section class="hero".*?<\/section>/s)![0];
       expect(hero).toContain(name);
       expect(hero.match(/class="btn btn-primary btn-lg"/g)).toHaveLength(1);
       expect(hero).toContain(`href="${SIGNUP_URL}"`);
-      expect(hero).toMatch(
-        new RegExp(`<a href="#looks" class="btn btn-ghost btn-lg">${secondary}<`)
-      );
+      expect(hero.match(/<a /g)).toHaveLength(1); // one promise, one button
       // MKT-10: the hero phone is gone; the phones live in the looks section, where visitors use them
       expect(hero).not.toMatch(/look-phone|hero-phone|class="scr"|id="hp-/);
       // the retired hero furniture is gone: particles, poster, studio kicker, slug pill
