@@ -86,9 +86,9 @@ describe('verify-email page', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.verify.verifyButton' }));
     expect(await screen.findByText('onboarding.verify.wrongPassword')).toBeTruthy();
-    expect(screen.getByText('onboarding.verify.forgotPassword').closest('a')?.getAttribute('href')).toBe(
-      '/forgot-password'
-    );
+    expect(
+      screen.getByText('onboarding.verify.forgotPassword').closest('a')?.getAttribute('href')
+    ).toBe('/forgot-password');
   });
 
   it.each([[''], ['?email=a%40b.test'], ['#code=123456'], ['?email=a%40b.test#code=12']])(
