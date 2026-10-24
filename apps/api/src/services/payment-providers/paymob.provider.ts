@@ -146,8 +146,13 @@ const PAYMOB_SIGNED_BOOLEANS = [
   'success',
 ] as const;
 
-/** Accept a callback whose signed `created_at` is at most this old (retries stay well inside). */
-export const PAYMOB_CALLBACK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Accept a callback whose signed `created_at` (the transaction's CREATION time) is at most this
+ * old: the longest checkout expiry we ever request (36 d, so a late kiosk/Aman payment still
+ * lands) plus 2 d slack.
+ */
+export const PAYMOB_CALLBACK_MAX_AGE_MS =
+  PAYMOB_MAX_EXPIRATION_SECONDS * 1000 + 2 * 24 * 60 * 60 * 1000;
 /** ...and at most this far ahead (covers the zone-less timestamp's offset plus clock skew). */
 export const PAYMOB_CALLBACK_MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
 

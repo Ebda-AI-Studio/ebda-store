@@ -508,7 +508,7 @@ describe('Paymob re-verification 2026-10-24 (docs: create-intention, Postman col
   it('a callback whose signed created_at is outside the window is rejected', () => {
     const old = {
       ...fixture('callback.official.json').obj,
-      created_at: '2024-05-01T00:00:00.000000',
+      created_at: '2024-03-01T00:00:00.000000',
     };
     expect(() => verify(old, old)).toThrowError(/created_at/);
     const future = {
@@ -523,6 +523,14 @@ describe('Paymob re-verification 2026-10-24 (docs: create-intention, Postman col
       ...fixture('callback.official.json').obj,
       has_parent_transaction: true,
       is_capture: true,
+    };
+    expect(verify(obj, obj).kind).toBe('payment');
+  });
+
+  it('a kiosk payment completed 20 days after creation is still accepted', () => {
+    const obj = {
+      ...fixture('callback.official.json').obj,
+      created_at: '2024-05-25T00:00:00.000000',
     };
     expect(verify(obj, obj).kind).toBe('payment');
   });
