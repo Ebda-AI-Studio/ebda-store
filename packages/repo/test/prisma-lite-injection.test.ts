@@ -31,7 +31,7 @@ function setup() {
     all: (sql: string, p: unknown[]) => (seen.push(sql), base.all(sql, p)),
     run: base.run,
   };
-  const lite = createPrismaLite(META, runner) as any;
+  const lite = createPrismaLite(META, runner, 'store-do', { unscoped: true }) as any;
   return { db, lite, seen };
 }
 const tablesIntact = (db: ReturnType<typeof openSqlite>) =>

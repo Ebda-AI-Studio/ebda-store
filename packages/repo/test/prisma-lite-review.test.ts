@@ -7,7 +7,7 @@ import { nodeSqlRunner } from './node-sql';
 
 function setup() {
   const db = openSqlite();
-  const lite = createPrismaLite(META, nodeSqlRunner(db)) as any;
+  const lite = createPrismaLite(META, nodeSqlRunner(db), 'store-do', { unscoped: true }) as any;
   const P = db.prepare(
     `INSERT INTO products (id, store_id, name, slug, price, compare_at_price) VALUES (?, ?, ?, ?, ?, ?)`
   );
@@ -516,7 +516,9 @@ describe('round 2 review (writes)', () => {
   it('MEDIUM 7: no transaction support means writes and $transaction THROW, never run unprotected', async () => {
     const db = openSqlite();
     const base = nodeSqlRunner(db);
-    const lite = createPrismaLite(META, { all: base.all, run: base.run }) as any;
+    const lite = createPrismaLite(META, { all: base.all, run: base.run }, 'store-do', {
+      unscoped: true,
+    }) as any;
     await expect(
       lite.product.create({ data: { id: 'x', storeId: 's1', name: 'n', slug: 'x', price: 1 } })
     ).rejects.toThrow(/no transaction/);
@@ -586,5 +588,53 @@ describe('round 2 review (writes)', () => {
         ],
       })
     ).rejects.toThrow(/relation fields/);
+  });
+});
+
+describe('round 3 review', () => {
+  it('MEDIUM 3: an unrelated write that runs while a transaction is open is neither rolled back with it nor poisoned by it', async () => {
+    const { db, lite } = setup();
+    const a = lite.$transaction(async (tx: any) => {
+      await tx.product.update({ where: { id: 'p1' }, data: { name: 'IN-TX' } });
+      await new Promise(r => setTimeout(r, 20));
+      throw new Error('A fails');
+    });
+    const b = lite.product.update({ where: { id: 'p2' }, data: { name: 'OUTSIDE' } });
+    await expect(a).rejects.toThrow('A fails');
+    await expect(b).resolves.toMatchObject({ name: 'OUTSIDE' });
+    expect(db.prepare(`SELECT name FROM products WHERE id = 'p1'`).get()).toEqual({
+      name: 'Alpha',
+    });
+    expect(db.prepare(`SELECT name FROM products WHERE id = 'p2'`).get()).toEqual({
+      name: 'OUTSIDE',
+    });
+  });
+
+  it('MEDIUM 1: list fields check the array and every element (create and push)', async () => {
+    const { lite } = setup();
+    await expect(
+      lite.paymentConfig.create({
+        data: { id: 'pc', storeId: 's1', provider: 'paymob', supportedMethods: [1, { x: 1 }] },
+      })
+    ).rejects.toThrow(/String/);
+    await expect(
+      lite.paymentConfig.create({
+        data: { id: 'pc', storeId: 's1', provider: 'paymob', supportedMethods: 'card' },
+      })
+    ).rejects.toThrow(/array/);
+  });
+
+  it('MEDIUM 2: a StoreDO client without a store id is refused unless explicitly unscoped', () => {
+    const db = openSqlite();
+    expect(() => createPrismaLite(META, nodeSqlRunner(db))).toThrow(/needs \{ storeId \}/);
+    expect(() =>
+      createPrismaLite(META, nodeSqlRunner(db), 'store-do', { storeId: 's1' })
+    ).not.toThrow();
+  });
+
+  it('LOW: groupBy needs a field, _sum needs a numeric field', async () => {
+    const { lite } = setup();
+    await expect(lite.product.groupBy({ by: [] })).rejects.toThrow(/at least one field/);
+    await expect(lite.product.aggregate({ _sum: { name: true } })).rejects.toThrow(/numeric/);
   });
 });

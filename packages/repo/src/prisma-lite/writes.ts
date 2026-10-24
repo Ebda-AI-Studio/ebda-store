@@ -443,7 +443,7 @@ export class WriteEngine extends Engine {
               let expr = col;
               for (const it of items) {
                 expr = `json_insert(${expr}, '$[#]', json(?))`;
-                binds.push(JSON.stringify(it));
+                binds.push(JSON.stringify(encode({ ...f, list: false }, it)));
               }
               sets.push(`${col} = ${expr}`);
               break;
@@ -694,6 +694,11 @@ export class WriteEngine extends Engine {
       for (const [f, on] of Object.entries((args[fn] as Row) ?? {})) {
         if (!on) continue;
         const sf = this.scalar(m, f);
+        if (
+          (fn === '_sum' || fn === '_avg') &&
+          !['Int', 'Float', 'Decimal', 'BigInt'].includes(sf.type)
+        )
+          throw new Error(`prisma-lite: ${fn} needs a numeric field`);
         const sqlFn = fn.slice(1).toUpperCase();
         parts.push(`${sqlFn}(t0.${q(sf.column)}) AS ${q(`${fn}__${f}`)}`);
         shape.push([fn, f, `${fn}__${f}`]);
@@ -723,6 +728,8 @@ export class WriteEngine extends Engine {
     onlyArgs(args, ['by', 'where', '_count', '_sum', '_avg', '_min', '_max', 'orderBy', 'having']);
     const m = this.model(model);
     const by = (Array.isArray(args.by) ? args.by : [args.by]) as string[];
+    if (by.length === 0 || by.some(b => typeof b !== 'string'))
+      throw new Error('prisma-lite: groupBy needs at least one field in `by`');
     const params: unknown[] = [];
     const where = this.compileWhere(model, args.where, 't0', params);
     const byCols = by.map(b => `t0.${q(this.scalar(m, b).column)}`);

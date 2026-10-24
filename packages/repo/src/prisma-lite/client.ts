@@ -40,14 +40,19 @@ export function createPrismaLite(
   meta: Meta,
   sql: SqlRunner,
   db: 'store-do' | 'd1' = 'store-do',
-  opts: { storeId?: string } = {}
+  opts: { storeId?: string; unscoped?: boolean } = {}
 ) {
+  // No RLS inside a DO: a client that is not told which store it serves would let a write carry any store id.
+  if (db === 'store-do' && opts.storeId === undefined && opts.unscoped !== true)
+    throw new Error(
+      'prisma-lite: a StoreDO client needs { storeId } (or { unscoped: true } for tools and tests)'
+    );
   // only the models of THIS database get a delegate (the StoreDO has no D1 tables)
   const scoped: Meta = {
     ...meta,
     models: Object.fromEntries(Object.entries(meta.models).filter(([, m]) => m.db === db)),
   };
-  const engine = new WriteEngine(scoped, sql, opts);
+  const engine = new WriteEngine(scoped, sql, { storeId: opts.storeId });
   const byDelegate = new Map(
     Object.keys(scoped.models).map(m => [m[0].toLowerCase() + m.slice(1), m])
   );

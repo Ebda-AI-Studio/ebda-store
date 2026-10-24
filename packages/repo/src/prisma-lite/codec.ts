@@ -5,7 +5,10 @@ import type { ScalarField } from './types';
 /** `exact`: filter operands must be representable without rounding (a rounded bound changes which rows match). */
 export function encode(f: ScalarField, v: unknown, exact = false): unknown {
   if (v === null || v === undefined) return null;
-  if (f.list) return JSON.stringify(v);
+  if (f.list) {
+    if (!Array.isArray(v)) throw new Error('prisma-lite: a list field needs an array');
+    return JSON.stringify(v.map(el => encode({ ...f, list: false }, el, exact)));
+  }
   if (f.kind === 'enum') return v;
   switch (f.type) {
     case 'Boolean':
@@ -14,11 +17,7 @@ export function encode(f: ScalarField, v: unknown, exact = false): unknown {
       return v ? 1 : 0;
     case 'DateTime': {
       const t =
-        v instanceof Date
-          ? v.getTime()
-          : typeof v === 'string' || typeof v === 'number'
-            ? new Date(v).getTime()
-            : NaN;
+        v instanceof Date ? v.getTime() : typeof v === 'string' ? new Date(v).getTime() : NaN;
       if (!Number.isFinite(t)) throw new Error('prisma-lite: invalid DateTime');
       return t;
     }
