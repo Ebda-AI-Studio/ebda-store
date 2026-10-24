@@ -38,7 +38,12 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
-import { eraseIdentityUser, isIdentityManagedUser, setAccountStatus } from '../lib/identity-client';
+import {
+  eraseIdentityUser,
+  getAccountState,
+  isIdentityManagedUser,
+  setAccountStatus,
+} from '../lib/identity-client';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { sendAlert } from './alerts.service';
 import { StorageService } from './storage.service';
@@ -777,12 +782,17 @@ export class StoreService {
                 // User-keyed rows: deleted through the guarded definer (the acting user is
                 // the super_admin, not the owner).
                 await deleteUserTokens(owner.id);
-                if (await isIdentityManagedUser(owner.id)) {
-                  await setAccountStatus(owner.id, 'inactive', 'store-deleted');
-                  deactivatedOwnerId = owner.id;
+                // Only an ACTIVE owner is flipped (and restored on rollback): a suspended owner stays suspended either way.
+                const managed = await isIdentityManagedUser(owner.id);
+                if (managed) {
+                  const acc = await getAccountState(owner.id);
+                  if (acc?.status === 'active') {
+                    await setAccountStatus(owner.id, 'inactive', 'store-deleted');
+                    deactivatedOwnerId = owner.id;
+                  }
                 }
                 await tx.user.delete({ where: { id: owner.id } });
-                erasedOwnerId = owner.id;
+                if (managed) erasedOwnerId = owner.id;
               }
             });
           }
@@ -799,10 +809,10 @@ export class StoreService {
       }
       throw err;
     }
-    if (deactivatedOwnerId && erasedOwnerId === deactivatedOwnerId) {
-      await eraseIdentityUser(deactivatedOwnerId).catch(e =>
+    if (erasedOwnerId) {
+      await eraseIdentityUser(erasedOwnerId).catch(e =>
         logger.error(
-          { err: e, userId: deactivatedOwnerId },
+          { err: e, userId: erasedOwnerId },
           '[STORE_DELETE] identity erase failed (account stays inactive)'
         )
       );
