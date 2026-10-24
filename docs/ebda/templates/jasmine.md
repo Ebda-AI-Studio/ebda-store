@@ -32,7 +32,7 @@ Fix wave 1 (Ruling B3-13): Bloom's hero is `{ presentation:'framed', frame:'line
 
 ## Chrome
 
-`apps/web/src/templates/jasmine/Header.tsx` wraps the minimal header, logo-forward (`chrome.header: { logoPlacement: 'start', search: 'icon' }` on every look): the store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'`). `PACK_STYLES.jasmine` is a rounded, photo-led card in the look's radius (`var(--radius)` only), one always-visible >= 44px quick add, with the shade dots and two fact chips from the shared card (Ruling B3-1: no card path was added). The `[data-pack='jasmine']` CSS sets the type voice only (no colour of its own, pinned by `jasmine-pack.test.tsx`).
+`apps/web/src/templates/jasmine/Header.tsx` wraps the shared base header (`templates/base/Header.tsx`), logo-forward (`chrome.header: { logoPlacement: 'start', search: 'icon' }` on every look): the store name is the sized, untracked display wordmark (`wordmarkSize: 'lg'`). `PACK_STYLES.jasmine` is a rounded, photo-led card in the look's radius (`var(--radius)` only), one always-visible >= 44px quick add, with the shade dots and two fact chips from the shared card (Ruling B3-1: no card path was added). The `[data-pack='jasmine']` CSS sets the type voice only (no colour of its own, pinned by `jasmine-pack.test.tsx`).
 
 ## Section mixes (Task 4)
 
