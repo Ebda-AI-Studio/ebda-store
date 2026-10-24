@@ -151,7 +151,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: false,
     verification: {
       sandboxVerifiedAt: null,
-      note: 'Built from the official Intention API, refund/void and HMAC pages; not yet run against a Paymob test account (scripts/provider-sandbox-check.mjs paymob).',
+      note: 'Built from the official Intention API, refund/void and HMAC pages; not yet run against a Paymob test account (scripts/provider-sandbox-check.mjs paymob). Re-verified 2026-10-24 against developers.paymob.com (create-intention, unified-checkout-redirection, HMAC transaction callback incl. the worked example) and the official Postman collections (github.com/PaymobAccept/API-Postman-Collections): fixed billing_data.country (EGY), expiration cap (3110400 s), items sum rule, 50-char name cap, refund-callback detection via is_refund/is_void. UNCONFIRMED (docs silent or conflicting): transaction-inquiry auth (Postman: Bearer header + body order_id; older docs: auth_token in body, both are sent), what inquiry answers for an unknown order, whether items[].amount is per unit or per line, how a null HMAC field is stringified, the source_data.type of BNPL/installment (docs: not refundable), the exact void cut-off, callback retry policy and rate limits.',
     },
     capabilities: {
       methods: ['card', 'wallet', 'valu', 'kiosk', 'applepay'],
@@ -264,7 +264,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: true,
     verification: {
       sandboxVerifiedAt: '2026-10-08',
-      note: 'Verified 2026-10-08 against a real Kashier test account: test connection, guest payment session, paid status, partial + full refund, and a real signed webhook delivery (tampered body rejected). Order-search status does not report refunds; refund state comes from the refund response and the webhook.',
+      note: 'Verified 2026-10-08 against a real Kashier test account: test connection, guest payment session, paid status, partial + full refund, and a real signed webhook delivery (tampered body rejected). Order-search status does not report refunds; refund state comes from the refund response and the webhook. Re-read 2026-10-24 against developers.kashier.io (payment-sessions, refunds, webhooks guide + payloads, api-keys, rate-limits, openapi.yaml): no discrepancy, nothing changed; the docs signature example still reproduces the documented HMAC. UNCONFIRMED: the allowedMethods token for BNPL (docs only show card,wallet), whether a webhook data.status can be INITIATED/UNKNOWN/EXPIRED/CANCEL/REVOKED (payloads page says SUCCESS|FAILURE|PENDING; the OpenAPI enum is wider).',
     },
     capabilities: {
       methods: ['card', 'wallet', 'bnpl'],
@@ -350,7 +350,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: false,
     verification: {
       sandboxVerifiedAt: null,
-      note: 'Built from developer.fawrystaging.com; not yet run against FawryPay staging (scripts/provider-sandbox-check.mjs fawry). Status v2 answering 9938 for an unknown order is unconfirmed.',
+      note: 'Built from developer.fawrystaging.com; not yet run against FawryPay staging (scripts/provider-sandbox-check.mjs fawry). Re-verified 2026-10-24 against the charge (PayAtFawry), hosted checkout link, refund, cancel, status v2 and server notification v2 pages: endpoints, hosts, signature formulas and field names match; nothing changed. Status v2 answering 9938 for an unknown order is STILL unconfirmed: the status v2 page documents only the 9946 error sample (9938 is listed on the charge, refund and cancel pages). Also UNCONFIRMED: the production host of status v2, whether paymentAmount includes fawryFees (the status v2 sample shows paymentAmount 152.00 beside orderAmount 150.00 and fawryFees 2.00, so the paid-amount check against the order total may differ by the fee), the charge page types merchantRefNum as Integer while the hosted page says String, duplicate merchantRefNum behaviour, rate limits.',
     },
     capabilities: {
       methods: ['payatfawry', 'card'],

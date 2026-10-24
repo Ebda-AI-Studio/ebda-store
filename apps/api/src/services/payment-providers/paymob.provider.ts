@@ -70,6 +70,9 @@ import {
 /** The header the webhook route copies Paymob's `?hmac=` query parameter into. */
 export const PAYMOB_HMAC_HEADER = 'x-paymob-hmac';
 
+/** Docs (create-intention `expiration`): maximum and default, 36 days. */
+export const PAYMOB_MAX_EXPIRATION_SECONDS = 3_110_400;
+
 export const PAYMOB_BASE_URLS = {
   // Docs: "Test and live use the same regional base URL ... The mode is controlled by the keys
   // and integration IDs you use." (Egypt: accept.paymob.com)
@@ -165,6 +168,7 @@ interface PaymobTransaction {
   parent_transaction?: number | string | null;
   has_parent_transaction?: boolean;
   is_refund?: boolean;
+  is_void?: boolean;
   source_data?: { sub_type?: string; type?: string };
   order?: { id?: number | string; amount_cents?: number | string; merchant_order_id?: string };
 }
@@ -268,8 +272,8 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
 
   /**
    * The LAST transaction of an Accept order (docs: transaction inquiry by order id): auth token
-   * first, then POST /api/ecommerce/orders/transaction_inquiry {auth_token, order_id} with no
-   * Authorization header.
+   * first, then POST /api/ecommerce/orders/transaction_inquiry (Bearer token + order_id; see
+   * the note on the request below).
    */
   const inquire = async (creds: ProviderCredentials, providerRef: string) => {
     const token = await authToken(creds);
@@ -279,7 +283,10 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
       `${base(creds)}/api/ecommerce/orders/transaction_inquiry`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // 2026-10-24: Paymob's Postman collection (Transaction Inquiry API) sends the token as
+        // `Authorization: Bearer <token>` with body {order_id}; the 2026-10-07 docs extract had
+        // `auth_token` in the body. Both are sent until a live account settles which is current.
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ auth_token: token, order_id: providerRef }),
       },
       options.timeoutMs
@@ -523,12 +530,17 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
         // Paymob checks that the items add up to the amount, so the customer's lines are
         // sent only when they do; otherwise (shipping, a coupon, the COD-free fee, the wallet
         // part) one line carries the whole amount.
+        // Docs: "Sum of all items[].amount must exactly equal the total amount". Whether `amount`
+        // is per unit or per line is not stated (the docs' own example has a quantity-2 line), so
+        // only quantity-1 lines are sent as they are: they are valid under both readings.
         const lines = (req.items ?? []).filter(
-          i => Number.isSafeInteger(i.unitPrice) && i.quantity > 0
+          i => Number.isSafeInteger(i.unitPrice) && i.quantity === 1
         );
         const linesTotal = lines.reduce((n, i) => n + i.unitPrice * i.quantity, 0);
         const items =
-          lines.length > 0 && linesTotal === req.amountMinor
+          lines.length > 0 &&
+          lines.length === (req.items ?? []).length &&
+          linesTotal === req.amountMinor
             ? lines.map(i => ({
                 name: i.name.slice(0, 50),
                 amount: i.unitPrice,
@@ -553,8 +565,9 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
           // 400). UNVERIFIED: that "NA" is accepted as a filler for values the shop did not
           // collect (it is what Paymob itself stores for them in its order records).
           billing_data: {
-            first_name: first || 'NA',
-            last_name: rest.join(' ') || 'NA',
+            // Docs: first_name / last_name are at most 50 characters.
+            first_name: (first || 'NA').slice(0, 50),
+            last_name: (rest.join(' ') || 'NA').slice(0, 50),
             email: req.customer.email || 'NA',
             phone_number: req.customer.phone || 'NA',
             apartment: 'NA',
@@ -563,16 +576,23 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
             building: 'NA',
             city: 'NA',
             state: 'NA',
-            country: 'EG',
+            country: 'EGY', // docs example: 3-letter code
           },
           special_reference: specialReference,
-          // Docs: notification_url applies to card integrations only; still sent.
+          // Docs (create-intention): notification_url overrides the Transaction Processed Callback
+          // URL and is supported with ALL payment methods.
           notification_url: req.webhookUrl,
           redirection_url: req.returnUrls.success,
           extras: { order_id: req.orderId },
           // Docs: `expiration` is in seconds.
+          // Docs: maximum (and default) 3110400 seconds.
           ...(req.expiresAt
-            ? { expiration: Math.max(1, Math.ceil((req.expiresAt.getTime() - Date.now()) / 1000)) }
+            ? {
+                expiration: Math.min(
+                  PAYMOB_MAX_EXPIRATION_SECONDS,
+                  Math.max(1, Math.ceil((req.expiresAt.getTime() - Date.now()) / 1000))
+                ),
+              }
             : {}),
         };
         const res = await post<{
@@ -651,7 +671,13 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
 
       // A refund / void is its own transaction with a parent: the payment event is about the
       // PARENT, so these are reported as refund events (the refund id is this transaction's).
-      if (hasParent && (txn.is_refunded === true || txn.is_voided === true)) {
+      // `is_refund` / `is_void` are documented on the callback object (they are not in the HMAC
+      // list); the refund transaction itself is read by either pair of flags.
+      const refundLike =
+        txn.is_refund === true ||
+        txn.is_void === true ||
+        (hasParent && (txn.is_refunded === true || txn.is_voided === true));
+      if (refundLike) {
         const status: 'pending' | 'completed' | 'failed' =
           txn.pending === true ? 'pending' : txn.success === true ? 'completed' : 'failed';
         return {

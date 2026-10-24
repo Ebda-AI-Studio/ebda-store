@@ -233,8 +233,11 @@ describe('Paymob inquiry and refund follow the documented flow', () => {
     ]);
     expect(seen[0].body).toEqual({ api_key: PAYMOB_STUB.apiKey });
     expect(header(seen[0], 'authorization')).toBeUndefined();
+    // 2026-10-24: Paymob's Postman collection (PaymobAccept/API-Postman-Collections, Transaction
+    // Inquiry API) sends the token as a Bearer header with body {order_id}; the 2026-10-07 docs
+    // extract had it in the body. Both are sent until a live account settles which is current.
     expect(seen[1].body).toEqual({ auth_token: PAYMOB_STUB.authToken, order_id: ref });
-    expect(header(seen[1], 'authorization')).toBeUndefined();
+    expect(header(seen[1], 'authorization')).toBe(`Bearer ${PAYMOB_STUB.authToken}`);
   });
 
   it('status without the API key is PROVIDER_MISCONFIGURED and nothing is sent', async () => {
@@ -383,5 +386,62 @@ describe('Paymob testConnection', () => {
     expect(await fiveHundred.provider.testConnection!(creds)).toMatchObject({
       code: 'unreachable',
     });
+  });
+});
+
+describe('Paymob re-verification 2026-10-24 (docs: create-intention, Postman collections)', () => {
+  const intentionBody = async (over: Parameters<typeof baseRequest>[0], credsOver = creds) => {
+    const { provider, seen } = rig();
+    await provider.createPayment(baseRequest(over), credsOver);
+    return seen.find(s => s.url.endsWith('/v1/intention/'))!.body as Record<string, any>;
+  };
+
+  it('billing_data.country is the 3-letter ISO code the docs show (EGY)', async () => {
+    const b = await intentionBody({});
+    expect(b.billing_data.country).toBe('EGY');
+  });
+
+  it('expiration never exceeds the documented maximum of 3110400 seconds', async () => {
+    const b = await intentionBody({ expiresAt: new Date(Date.now() + 90 * 86_400_000) });
+    expect(b.expiration).toBe(3_110_400);
+  });
+
+  it('items: docs say sum(items[].amount) must equal amount, so a quantity > 1 line is not sent per unit', async () => {
+    const b = await intentionBody({
+      amountMinor: 15_000,
+      items: [
+        { name: 'A', quantity: 1, unitPrice: 5_000 },
+        { name: 'B', quantity: 2, unitPrice: 5_000 },
+      ],
+    });
+    const sum = b.items.reduce((n: number, i: any) => n + i.amount, 0);
+    expect(sum).toBe(b.amount);
+  });
+
+  it('billing_data names are capped at the documented 50 characters', async () => {
+    const long = 'x'.repeat(80);
+    const b = await intentionBody({
+      customer: { name: `${long} ${long}`, email: 'a@b.co', phone: '+201012345678' },
+    });
+    expect(b.billing_data.first_name.length).toBeLessThanOrEqual(50);
+    expect(b.billing_data.last_name.length).toBeLessThanOrEqual(50);
+  });
+
+  it('a callback whose obj.is_refund is true is a refund event even when is_refunded is false', () => {
+    const callback = fixture('callback.official.json');
+    const obj = {
+      ...callback.obj,
+      is_refund: true,
+      has_parent_transaction: true,
+      parent_transaction: 192036465,
+      is_refunded: false,
+      is_voided: false,
+    };
+    const ev = createPaymobProvider().verifyWebhook(
+      JSON.stringify({ ...callback, obj }),
+      { [PAYMOB_HMAC_HEADER]: paymobHmac(obj, SECRET) },
+      { ...creds, webhookSecret: SECRET }
+    );
+    expect(ev.kind).toBe('refund');
   });
 });
