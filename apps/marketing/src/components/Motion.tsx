@@ -32,7 +32,14 @@ export function StoryScroll({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || reducedMotion()) return;
+    // The pin and the scrub exist only where the CSS applies them: (scripting: enabled) + no-preference. Anywhere
+    // else the page is the static finished store and --p must stay at its CSS default.
+    if (
+      !el ||
+      reducedMotion() ||
+      !window.matchMedia('(scripting: enabled) and (prefers-reduced-motion: no-preference)').matches
+    )
+      return;
     // Scroll-linked, not time-triggered: one number (--p, 0..1 across the pinned stretch) is the whole state;
     // CSS turns it into opacity/transform only. Geometry is measured once (and on resize), never per frame,
     // so a scroll tick does one write and no layout read.
@@ -71,7 +78,13 @@ export function StoryScroll({
     let lastT = 0;
     const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
     const glide = (t: number) => {
-      const dt = Math.min(64, t - lastT || 16);
+      // a scroll we did not make (anchor, history, scrollbar) ends the glide instead of fighting it
+      if (Math.abs(window.scrollY - cur) > 3) {
+        glideRaf = 0;
+        target = cur = window.scrollY;
+        return;
+      }
+      const dt = lastT ? Math.min(64, t - lastT) : 16;
       lastT = t;
       cur += (target - cur) * (1 - Math.exp(-dt / 110));
       if (Math.abs(target - cur) < 0.4) cur = target;
@@ -80,6 +93,11 @@ export function StoryScroll({
     };
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.defaultPrevented || e.deltaY === 0) return; // pinch-zoom / handled elsewhere
+      // a nested vertical scroller (menu, dialog, textarea) keeps its own wheel
+      for (let n = e.target as Element | null; n && n !== document.body; n = n.parentElement) {
+        const oy = getComputedStyle(n).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return;
+      }
       e.preventDefault();
       const dy =
         e.deltaMode === 1
@@ -129,6 +147,7 @@ export function StoryScroll({
         window.removeEventListener('scroll', resync);
         window.removeEventListener('keydown', stopGlide);
         window.removeEventListener('pointerdown', stopGlide);
+        stopGlide();
       }
     });
     // anything above the story that changes the page height (font swap, lazy image) moves `top`: watch the body too
