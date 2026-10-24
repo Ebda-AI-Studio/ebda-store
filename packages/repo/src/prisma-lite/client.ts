@@ -47,6 +47,11 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd
     Object.keys(scoped.models).map(m => [m[0].toLowerCase() + m.slice(1), m])
   );
   const lazy = <T>(fn: () => T) => new LazyQuery(fn);
+  // A write (create with nested creates, update with nested writes, deleteMany, ...) is ONE atomic unit, like Prisma:
+  // a failure midway must not leave the earlier statements applied. Inside `$transaction` the runner joins the open one.
+  const atomic = <T>(fn: () => T): Promise<T> =>
+    sql.transaction ? sql.transaction(async () => fn()) : Promise.resolve().then(fn);
+  const write = <T>(fn: () => T) => lazy(() => atomic(fn));
   const delegate = (model: string) => ({
     findMany: (args?: Record<string, unknown>) => lazy(() => engine.findMany(model, args)),
     findFirst: (args?: Record<string, unknown>) =>
@@ -77,31 +82,31 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd
         return r;
       }),
     count: (args?: Record<string, unknown>) => lazy(() => engine.count(model, args)),
-    create: (args: Record<string, unknown>) => lazy(() => engine.create(model, args)),
-    createMany: (args: Record<string, unknown>) => lazy(() => engine.createMany(model, args)),
+    create: (args: Record<string, unknown>) => write(() => engine.create(model, args)),
+    createMany: (args: Record<string, unknown>) => write(() => engine.createMany(model, args)),
     update: (args: Record<string, unknown>) =>
-      lazy(() =>
+      write(() =>
         engine.update(model, {
           ...args,
           where: expandUnique(scoped, model, args.where as Record<string, unknown>),
         })
       ),
-    updateMany: (args: Record<string, unknown>) => lazy(() => engine.updateMany(model, args)),
+    updateMany: (args: Record<string, unknown>) => write(() => engine.updateMany(model, args)),
     upsert: (args: Record<string, unknown>) =>
-      lazy(() =>
+      write(() =>
         engine.upsert(model, {
           ...args,
           where: expandUnique(scoped, model, args.where as Record<string, unknown>),
         })
       ),
     delete: (args: Record<string, unknown>) =>
-      lazy(() =>
+      write(() =>
         engine.delete(model, {
           ...args,
           where: expandUnique(scoped, model, args.where as Record<string, unknown>),
         })
       ),
-    deleteMany: (args?: Record<string, unknown>) => lazy(() => engine.deleteMany(model, args)),
+    deleteMany: (args?: Record<string, unknown>) => write(() => engine.deleteMany(model, args)),
     aggregate: (args: Record<string, unknown>) => lazy(() => engine.aggregate(model, args)),
     groupBy: (args: Record<string, unknown>) => lazy(() => engine.groupBy(model, args)),
   });
