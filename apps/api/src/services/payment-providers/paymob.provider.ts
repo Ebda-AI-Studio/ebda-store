@@ -87,6 +87,8 @@ export const PAYMOB_CHECKOUT_URLS = {
 };
 
 export interface PaymobAdapterOptions extends GatewayAdapterOptions {
+  /** Clock for the callback freshness window (tests). Defaults to Date.now. */
+  now?: () => number;
   /** Explicit checkout host (tests); beats `PAYMOB_CHECKOUT_URL` (non-production only) and the default. */
   checkoutBaseUrls?: Partial<Record<'sandbox' | 'live', string>>;
 }
@@ -128,6 +130,53 @@ function pick(obj: Record<string, unknown>, path: string): unknown {
 function hmacText(v: unknown): string {
   if (v === undefined || v === null) return '';
   return typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v);
+}
+
+/** Signed callback booleans: when present they must be real JSON booleans (type-confusion guard). */
+const PAYMOB_SIGNED_BOOLEANS = [
+  'error_occured',
+  'has_parent_transaction',
+  'is_3d_secure',
+  'is_auth',
+  'is_capture',
+  'is_refunded',
+  'is_standalone_payment',
+  'is_voided',
+  'pending',
+  'success',
+] as const;
+
+/** Accept a callback whose signed `created_at` is at most this old (retries stay well inside). */
+export const PAYMOB_CALLBACK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/** ...and at most this far ahead (covers the zone-less timestamp's offset plus clock skew). */
+export const PAYMOB_CALLBACK_MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The first non-boolean among the signed boolean fields, or null. `hmacText` stringifies, so
+ * "true" / 1 would pass the HMAC yet fail a `=== true` classifier; such a callback is refused.
+ */
+export function paymobNonBooleanField(obj: Record<string, unknown>): string | null {
+  for (const f of PAYMOB_SIGNED_BOOLEANS) {
+    const v = obj[f];
+    if (v !== undefined && v !== null && typeof v !== 'boolean') return f;
+  }
+  return null;
+}
+
+/**
+ * Canonical idempotency key shared by the adapter event id and the route dedupe: txn id plus the
+ * SIGNED state, read exactly as `hmacText` does. Keeps the legacy `<id>_<4 flags>` shape when the
+ * callback has no parent (so already-stored keys still match) and adds `p` for a child transaction.
+ */
+export function paymobCanonicalState(obj: Record<string, unknown>): {
+  flags: string;
+  parent: boolean;
+} {
+  const t = (v: unknown) => (hmacText(v) === 'true' ? 1 : 0);
+  return {
+    flags: [obj.pending, obj.success, obj.is_voided, obj.is_refunded].map(t).join(''),
+    parent: hmacText(obj.has_parent_transaction) === 'true',
+  };
 }
 
 /**
@@ -648,6 +697,10 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
         throw new PaymentProviderError('WEBHOOK_MALFORMED', 'not a transaction callback');
       }
       const tx = obj as Record<string, unknown>;
+      const badField = paymobNonBooleanField(tx);
+      if (badField) {
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', `${badField} is not a boolean`);
+      }
       if (!safeEqual(paymobHmac(tx, creds.webhookSecret), given.toLowerCase())) {
         throw new PaymentProviderError('WEBHOOK_BAD_SIGNATURE', 'signature mismatch');
       }
@@ -662,11 +715,27 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
       }
       const amountMinor = integerPiastres(txn.amount_cents, 'amount_cents');
       const providerRef = String(order.id);
-      const flags = [txn.pending, txn.success, txn.is_voided, txn.is_refunded]
-        .map(b => (b === true ? 1 : 0))
-        .join('');
-      const hasParent =
-        (tx as { has_parent_transaction?: unknown }).has_parent_transaction === true;
+      // Freshness: the signed created_at bounds how long a captured delivery stays replayable.
+      const createdMs = Date.parse(
+        typeof txn.created_at === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(txn.created_at)
+          ? `${txn.created_at}Z`
+          : String(txn.created_at)
+      );
+      const nowMs = (options.now ?? Date.now)();
+      if (
+        !Number.isFinite(createdMs) ||
+        nowMs - createdMs > PAYMOB_CALLBACK_MAX_AGE_MS ||
+        createdMs - nowMs > PAYMOB_CALLBACK_MAX_FUTURE_MS
+      ) {
+        throw new PaymentProviderError(
+          'WEBHOOK_MALFORMED',
+          'callback created_at is outside the accepted window'
+        );
+      }
+      const state = paymobCanonicalState(tx);
+      const hasParent = state.parent;
+      // Identity = txn id + canonical SIGNED state; never an unsigned or attacker-chosen label.
+      const eventId = `paymob:${String(txn.id)}:${state.flags}${hasParent ? ':p' : ''}`;
 
       // A refund / void is its own transaction with a parent: the payment event is about the
       // PARENT, so these are reported as refund events (the refund id is this transaction's).
@@ -675,9 +744,6 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
       // them on a captured signed payload; they are deliberately ignored. A capture of an auth
       // also has a parent, so it is excluded via the signed is_capture.
       const refundLike = hasParent && txn.is_capture !== true;
-      // The classification is part of the idempotency key, so a replay that is read
-      // differently can never collide with or override the original event.
-      const eventId = `paymob:${String(txn.id)}:${refundLike ? 'refund' : 'payment'}:${flags}`;
       if (refundLike) {
         const status: 'pending' | 'completed' | 'failed' =
           txn.pending === true ? 'pending' : txn.success === true ? 'completed' : 'failed';

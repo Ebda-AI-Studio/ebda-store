@@ -12,12 +12,14 @@
  * adapter's `verifyWebhook` is what decides whether the delivery is believed.
  */
 import { KASHIER_SIGNATURE_HEADER } from './kashier.provider';
-import { PAYMOB_HMAC_HEADER } from './paymob.provider';
+import { PAYMOB_HMAC_HEADER, paymobCanonicalState } from './paymob.provider';
 import type { WebhookHeaders } from './types';
 
 export interface WebhookRefs {
   /** Inbox dedupe key; null when the body does not carry what is needed to build one. */
   idempotencyKey: string | null;
+  /** Earlier key shapes for the same delivery, checked when deduping (already-stored rows). */
+  legacyIdempotencyKeys?: string[];
   /** Matches `Payment.transactionId` (the provider reference). */
   transactionId: string | null;
   /** Matches `Payment.invoiceId`. */
@@ -82,11 +84,13 @@ export function webhookRefs(provider: string, payload: Record<string, unknown>):
       const o = obj(payload.obj);
       const order = obj(o.order);
       const id = str(o.id);
-      const flags = [o.pending, o.success, o.is_voided, o.is_refunded, o.has_parent_transaction]
-        .map(b => (b === true ? 1 : 0))
-        .join('');
+      // Canonical signed state, read as the HMAC text reads it (a string "true" == true).
+      const st = paymobCanonicalState(o);
+      const base = id ? `paymob_${id}_${st.flags}` : null;
       return {
-        idempotencyKey: id ? `paymob_${id}_${flags}` : null,
+        idempotencyKey: base ? `${base}${st.parent ? '_p' : ''}` : null,
+        // A child (refund/void) callback used to share the parent-less key: still dedupe on it.
+        legacyIdempotencyKeys: base && st.parent ? [base] : [],
         transactionId: str(order.id),
         invoiceId: str(order.merchant_order_id),
       };

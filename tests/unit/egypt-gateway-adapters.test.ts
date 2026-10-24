@@ -10,7 +10,7 @@
  *   - the adapters never put a secret in an error message.
  */
 import crypto from 'node:crypto';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import {
   PaymentProviderError,
   type ProviderCredentials,
@@ -242,6 +242,13 @@ describe('amount conversion at the gateway edge', () => {
 // ---------------------------------------------------------------------------------------------
 // PAYMOB
 // ---------------------------------------------------------------------------------------------
+// Paymob callback fixtures below are dated 2026-10-04: pin the clock inside the freshness window.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-05T00:00:00Z'));
+});
+afterAll(() => vi.useRealTimers());
+
 describe('Paymob', () => {
   const sample = () => {
     const { stub } = paymob();
@@ -414,9 +421,9 @@ describe('Paymob', () => {
     const { stub, provider } = paymob();
     await provider.createPayment(
       baseRequest({
-        amountMinor: 9_000,
+        amountMinor: 6_000,
         items: [
-          { name: 'A', quantity: 2, unitPrice: 3_000 },
+          { name: 'A', quantity: 1, unitPrice: 3_000 },
           { name: 'B', quantity: 1, unitPrice: 3_000 },
         ],
       }),

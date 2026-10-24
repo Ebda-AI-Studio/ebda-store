@@ -600,7 +600,10 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
       // `data.amount` is a decimal NUMBER (the docs' example shows 11334 beside card.amount 11334).
       // UNVERIFIED: that it is major units (EGP) rather than piastres; read as EGP decimal here.
       const amountMinor = moneyFromGateway(d.amount, 'amount');
-      const rawStatus = String(d.status ?? '').toUpperCase();
+      if (typeof d.status !== 'string') {
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', 'status is not a string');
+      }
+      const rawStatus = d.status.toUpperCase();
       const txnStatus = WEBHOOK_STATUS_MAP[rawStatus];
       if (!txnStatus) throw new PaymentProviderError('WEBHOOK_MALFORMED', 'unknown status');
 

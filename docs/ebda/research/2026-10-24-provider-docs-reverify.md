@@ -70,3 +70,12 @@ Ruling PROVIDERS-3. Payment adapters (Paymob, Kashier, FawryPay) re-checked agai
 ## Security follow-up: signed-fields-only classification (Paymob, Kashier, Fawry)
 
 Review finding (HIGH): Paymob `is_refund` / `is_void` are not in the documented HMAC field list, so they must not drive money classification. FIXED: refund-vs-payment is decided only from signed `has_parent_transaction` (and signed `is_capture` to exclude auth captures); the classification is part of the `eventId` and of the inbox idempotency key. Tests: tampered unsigned `is_refund`/`is_void` stays a payment; a differently classified replay has a different eventId. Kashier: `event` is unsigned by design, the applied kind comes from Kashier's own transaction record (`confirmWebhookEvent`), eventId deliberately omits `event`: OK. Fawry: kind comes from signed `orderStatus`, eventId only signed fields: OK.
+
+### Second security pass (type confusion, replay window, legacy keys)
+
+- FIXED: the Paymob HMAC text stringifies, so `"true"` or `1` could verify yet classify differently. Any present signed boolean that is not a JSON boolean is now refused (`WEBHOOK_MALFORMED`) before the HMAC check; the route dedupe key reads values exactly as the HMAC text does, so a type-flipped replay maps to the same key.
+- FIXED: Kashier `data.status` must be a JSON string (was stringified from anything).
+- Key shape: parent-less Paymob keys are byte-identical to the legacy `paymob_<id>_<4flags>`; a child (refund/void) delivery gets `_p` and the route also dedupes on the legacy key (`legacyIdempotencyKeys`). Adapter eventId: `paymob:<id>:<4flags>[:p]`.
+- Freshness: callbacks whose signed `created_at` is older than 7 days or more than 24 h ahead are rejected (zone-less timestamp read as UTC; the margins absorb the offset). UNCONFIRMED: Paymob's documented retry horizon and timestamp zone.
+
+Ruling PROVIDERS-3a - Paymob callback window is 7 d past / 24 h future. Docs do not state the retry horizon; a genuine delivery older than 7 d would be dropped and recovered by the status poll. Cost if wrong: a very late genuine callback is ignored until reconciliation.

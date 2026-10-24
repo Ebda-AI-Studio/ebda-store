@@ -3,7 +3,7 @@
  * Fixtures under tests/contracts/paymob/ are the docs' verbatim JSON examples. Everything the
  * docs do not state stays `UNVERIFIED:` in the adapter and is not asserted here.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -11,6 +11,7 @@ import {
   createPaymobProvider,
   paymobHmac,
   paymobHmacMessage,
+  paymobNonBooleanField,
   PAYMOB_HMAC_HEADER,
 } from '@api/services/payment-providers/paymob.provider';
 import {
@@ -18,8 +19,16 @@ import {
   type PaymentProviderErrorCode,
   type ProviderCredentials,
 } from '@api/services/payment-providers/types';
+import { webhookRefs } from '@api/services/payment-providers/webhook-signature';
 import { PaymobStub, PAYMOB_STUB } from '../stubs/paymob-stub';
 import { baseRequest } from '../contract/payment-provider.contract';
+
+// The docs' callback fixtures are dated 2024-06-13: pin the clock inside the accepted window.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2024-06-14T00:00:00Z'));
+});
+afterAll(() => vi.useRealTimers());
 
 const fixture = (name: string) =>
   JSON.parse(fs.readFileSync(path.join(__dirname, '../contracts/paymob', name), 'utf8'));
@@ -458,5 +467,63 @@ describe('Paymob re-verification 2026-10-24 (docs: create-intention, Postman col
     const base = { ...fixture('callback.official.json').obj, has_parent_transaction: false };
     const asRefund = { ...base, has_parent_transaction: true };
     expect(verify(base, base).eventId).not.toBe(verify(asRefund, asRefund).eventId);
+  });
+
+  it('a signed callback with a string/number where a boolean belongs is refused as malformed', () => {
+    const base = { ...fixture('callback.official.json').obj };
+    for (const [f, v] of [
+      ['has_parent_transaction', 'true'],
+      ['is_capture', 1],
+      ['success', 'true'],
+    ] as const) {
+      const obj = { ...base, [f]: v }; // HMAC over hmacText() still verifies
+      expect(paymobNonBooleanField(obj)).toBe(f);
+      expect(() => verify(obj, obj)).toThrowError(/not a boolean/);
+    }
+  });
+
+  it('a type-flipped replay maps to the same dedupe key (route + adapter)', () => {
+    const real = { ...fixture('callback.official.json').obj, has_parent_transaction: true };
+    const flipped = { ...real, has_parent_transaction: 'true' };
+    expect(webhookRefs('paymob', { type: 'TRANSACTION', obj: flipped }).idempotencyKey).toBe(
+      webhookRefs('paymob', { type: 'TRANSACTION', obj: real }).idempotencyKey
+    );
+  });
+
+  it('a child (refund/void) delivery also offers the legacy key shape for dedupe', () => {
+    const obj = { ...fixture('callback.official.json').obj, has_parent_transaction: true };
+    const refs = webhookRefs('paymob', { type: 'TRANSACTION', obj });
+    const flags = [obj.pending, obj.success, obj.is_voided, obj.is_refunded]
+      .map(b => (b === true ? 1 : 0))
+      .join('');
+    expect(refs.legacyIdempotencyKeys).toEqual([`paymob_${obj.id}_${flags}`]);
+    // a parent-less payment keeps EXACTLY the legacy key, so stored rows already match
+    const plain = webhookRefs('paymob', {
+      type: 'TRANSACTION',
+      obj: { ...obj, has_parent_transaction: false },
+    });
+    expect(plain.idempotencyKey).toBe(`paymob_${obj.id}_${flags}`);
+  });
+
+  it('a callback whose signed created_at is outside the window is rejected', () => {
+    const old = {
+      ...fixture('callback.official.json').obj,
+      created_at: '2024-05-01T00:00:00.000000',
+    };
+    expect(() => verify(old, old)).toThrowError(/created_at/);
+    const future = {
+      ...fixture('callback.official.json').obj,
+      created_at: '2024-07-01T00:00:00.000000',
+    };
+    expect(() => verify(future, future)).toThrowError(/created_at/);
+  });
+
+  it('a child transaction that is a capture (signed is_capture) stays a payment', () => {
+    const obj = {
+      ...fixture('callback.official.json').obj,
+      has_parent_transaction: true,
+      is_capture: true,
+    };
+    expect(verify(obj, obj).kind).toBe('payment');
   });
 });

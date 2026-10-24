@@ -398,7 +398,17 @@ async function handleGatewayWebhook(
     }
 
     // Check for duplicate webhook
-    const { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
+    let { alreadyProcessed, orderId } = await checkIdempotency(idempotencyKey);
+    if (!alreadyProcessed) {
+      // Rows stored under an earlier key shape still count as the same delivery.
+      for (const legacy of webhookRefs(provider, payload).legacyIdempotencyKeys ?? []) {
+        const hit = await checkIdempotency(legacy);
+        if (hit.alreadyProcessed) {
+          ({ alreadyProcessed, orderId } = hit);
+          break;
+        }
+      }
+    }
 
     if (alreadyProcessed) {
       logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate webhook detected');
