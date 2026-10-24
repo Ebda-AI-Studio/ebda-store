@@ -20,6 +20,17 @@ const H = (doPath, extra = {}) => ({
   ...(doPath ? { 'x-ebda-backend': 'do' } : {}),
   ...extra,
 });
+// Minimal valid createOrderSchema body (routes/public.routes.ts): the DO path ignores it, the validator does not.
+const ORDER_BODY = JSON.stringify({
+  shippingAddress: {
+    firstName: 'Parity',
+    lastName: 'Check',
+    address1: '1 Test St',
+    country: 'EG',
+    phone: '01000000000',
+  },
+  paymentMethod: 'cod',
+});
 const results = [];
 const check = (name, ok, detail = '') => {
   results.push(ok);
@@ -71,7 +82,7 @@ check(
 const ordPg = await fetch(`${api}/orders`, {
   method: 'POST',
   headers: H(false, { 'x-session-id': sidA }),
-  body: '{}',
+  body: ORDER_BODY,
 });
 check(
   'order: Postgres path refuses an order on a demo store (LOOKS-4, unchanged)',
@@ -81,7 +92,7 @@ check(
 const ordDo = await fetch(`${api}/orders`, {
   method: 'POST',
   headers: H(true, { 'x-session-id': sidB }),
-  body: '{}',
+  body: ORDER_BODY,
 });
 const ob = await ordDo.json();
 check(
