@@ -99,11 +99,12 @@ export function customSenderDomainsSupported(): boolean {
   return emailProvider() === 'resend';
 }
 
-/** `Name <a@b.c>` -> { email, name }; a bare address stays a string. */
+/** `Name <a@b.c>` -> { email, name }; a bare address stays a string. CR/LF never survive. */
 export function parseAddress(from: string): string | { email: string; name: string } {
-  const m = /^\s*(?:"?([^"<]*?)"?\s*)?<([^<>\s]+)>\s*$/.exec(from);
-  if (!m) return from.trim();
-  const name = (m[1] ?? '').trim();
+  const clean = from.replace(/[\r\n]+/g, ' ').trim();
+  const m = /^(.*)<([^<>\s]+)>\s*$/.exec(clean);
+  if (!m) return clean;
+  const name = m[1].replace(/^\s*"?|"?\s*$/g, '').trim();
   return name ? { email: m[2], name } : m[2];
 }
 

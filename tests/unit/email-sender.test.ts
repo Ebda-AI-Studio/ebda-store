@@ -63,7 +63,7 @@ describe('resolveSender', () => {
 
   it('strips CRLF from store name to prevent header injection', () => {
     const result = resolveSender(baseStore({ name: 'Demo Shop\r\nBcc: attacker@example.com' }));
-    expect(result.from).toBe('Demo Shop  Bcc: attacker@example.com <noreply@ebda.app>');
+    expect(result.from).toBe('Demo Shop Bcc: attacker@example.com <noreply@ebda.app>');
   });
 
   it('strips ASCII control chars from store name', () => {
