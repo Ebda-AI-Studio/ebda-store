@@ -21,6 +21,11 @@ const h = vi.hoisted(() => ({
   setRole: vi.fn(async (..._a: unknown[]) => {}),
   existingId: null as string | null,
   owned: [] as string[],
+  ownedSeq: [] as string[][],
+  featureOn: true,
+  seatPre: false,
+  seatLocked: false,
+  order: [] as string[],
   actor: { userId: 'owner-a', role: 'store_admin' } as any,
   ensure: vi.fn(),
 }));
@@ -34,7 +39,11 @@ vi.mock('@ebda/database', () => {
       findMany: async () => h.invites.filter(i => i.status === 'pending'),
       findFirst: async ({ where }: any) =>
         h.invites.find(
-          i => i.id === where.id && i.status === where.status && i.acceptedBy === where.acceptedBy
+          i =>
+            i.id === where.id &&
+            (where.status === undefined || i.status === where.status) &&
+            (where.acceptedBy === undefined || i.acceptedBy === where.acceptedBy) &&
+            (where.email === undefined || i.email === where.email)
         ) ?? null,
       updateMany: async ({ where, data }: any) => {
         const hit = h.invites.filter(
@@ -52,6 +61,7 @@ vi.mock('@ebda/database', () => {
       findUnique: async ({ where }: any) =>
         h.members.has(where.userId_storeId.userId) ? { id: 'ss', user: { email: EMAIL } } : null,
       create: async (a: any) => {
+        h.order.push('create-membership');
         h.staffCreates.push(a.data);
         h.members.add(a.data.userId);
         return { id: 'ss-new' };
@@ -93,14 +103,26 @@ vi.mock('@api/middleware/security', () => ({ auditLog: async () => undefined }))
 vi.mock('@api/lib/definer', () => ({
   ensureAdminUser: (...a: unknown[]) => h.ensure(...a),
   findUserIdByEmail: async () => h.existingId,
-  ownedStoreIds: async () => h.owned,
+  ownedStoreIds: async () => (h.ownedSeq.length ? h.ownedSeq.shift()! : h.owned),
 }));
 vi.mock('@api/lib/identity-client', () => ({
   inviteIdentity: (...a: unknown[]) => h.invite(...a),
   getAccountState: (...a: unknown[]) => h.account(...a),
   setAccountRole: (...a: unknown[]) => h.setRole(...a),
 }));
-vi.mock('@api/services/plan-limit.service', () => ({ assertWithinLimit: vi.fn() }));
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertWithinLimit: async (_s: string, _k: string, opts?: { tx?: unknown }) => {
+    h.order.push(opts?.tx ? 'seat-locked' : 'seat-pre');
+    const full = opts?.tx ? h.seatLocked : h.seatPre;
+    if (full) {
+      const { AppError } = await import('@api/middleware/error-handler');
+      throw new AppError(402, 'PLAN_LIMIT_REACHED', 'full');
+    }
+  },
+}));
+vi.mock('@api/services/feature.service', () => ({
+  featureService: { isFeatureEnabled: async () => h.featureOn },
+}));
 vi.mock('@api/services/platform-mailer', () => ({
   sendStaffInviteEmail: async (d: any) => void h.mails.push(d),
 }));
@@ -137,6 +159,11 @@ beforeEach(() => {
   h.mails = [];
   h.existingId = null;
   h.owned = [];
+  h.ownedSeq = [];
+  h.featureOn = true;
+  h.seatPre = false;
+  h.seatLocked = false;
+  h.order = [];
   h.actor = { userId: 'owner-a', role: 'store_admin' };
 });
 
@@ -344,15 +371,76 @@ describe('POST /staff-invites/accept: the explicit accept step', () => {
     expect(h.staffCreates).toEqual([]);
   });
 
-  it('the account that accepted may repeat while its membership stands (finishing a half-done role switch)', async () => {
+  it('a failed role switch changes nothing (no membership, invite still pending) and a retry succeeds', async () => {
     const token = await issue();
     h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
     h.setRole.mockRejectedValueOnce(new Error('identity down'));
     expect((await accept(token)).status).toBeGreaterThanOrEqual(500);
-    expect(h.members.has('me')).toBe(true);
+    expect(h.members.has('me')).toBe(false);
+    expect(h.invites[0].status).toBe('pending');
     expect((await accept(token)).status).toBe(200);
-    expect(h.setRole).toHaveBeenCalledTimes(2);
     expect(h.staffCreates).toHaveLength(1);
+  });
+
+  it('the account that already accepted may repeat while its membership stands (finishing a role switch)', async () => {
+    const token = await issue();
+    h.account.mockResolvedValue(goodAccount());
+    expect((await accept(token)).status).toBe(200);
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    expect((await accept(token)).status).toBe(200);
+    expect(h.setRole).toHaveBeenCalledWith('me', 'staff', 'staff-invite-accepted');
+    expect(h.staffCreates).toHaveLength(1);
+  });
+
+  it('SEAT RACE: the seat check runs LOCKED, inside the same transaction and BEFORE the membership insert', async () => {
+    const token = await issue();
+    h.order = [];
+    h.account.mockResolvedValue(goodAccount());
+    expect((await accept(token)).status).toBe(200);
+    expect(h.order).toEqual(['seat-pre', 'seat-locked', 'create-membership']);
+  });
+
+  it('SEAT RACE: losing the last seat under the lock refuses the accept, creates nothing and restores a merchant role switch', async () => {
+    const token = await issue();
+    h.seatLocked = true; // the pre-check passed, a concurrent accept took the seat before the lock was granted
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    const res = await accept(token);
+    expect(res.status).toBe(402);
+    expect(h.staffCreates).toEqual([]);
+    expect(h.setRole.mock.calls.map(c => c[1])).toEqual(['staff', 'store_admin']);
+  });
+
+  it('DOWNGRADE: a plan that no longer has seats refuses the accept before the account is touched', async () => {
+    const token = await issue();
+    h.seatPre = true;
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    const res = await accept(token);
+    expect(res.status).toBe(402);
+    expect(h.setRole).not.toHaveBeenCalled();
+    expect(h.staffCreates).toEqual([]);
+  });
+
+  it('DOWNGRADE: a store whose staff feature is off takes no new member through an old link', async () => {
+    const token = await issue();
+    h.featureOn = false;
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    const res = await accept(token);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FEATURE_DISABLED');
+    expect(h.setRole).not.toHaveBeenCalled();
+    expect(h.staffCreates).toEqual([]);
+  });
+
+  it('LOCKOUT WINDOW: a store created between the ownership check and the role switch is detected; the switch is undone and the account stays an owner', async () => {
+    const token = await issue();
+    h.ownedSeq = [[], ['store-new']]; // owns nothing at the first check, owns a store at the re-check
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    const res = await accept(token);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('OWNS_STORE');
+    expect(h.setRole.mock.calls.map(c => c[1])).toEqual(['staff', 'store_admin']);
+    expect(h.staffCreates).toEqual([]);
+    expect(h.invites[0].status).toBe('pending'); // nothing consumed
   });
 
   it('an account that OWNS a store is refused and the invite stays pending', async () => {

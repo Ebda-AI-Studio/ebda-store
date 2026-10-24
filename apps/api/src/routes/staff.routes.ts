@@ -262,11 +262,14 @@ router.post(
         );
       }
 
-      const membership = await withStore(storeId, tx =>
-        tx.storeStaff.create({
+      // The seat check and the insert are ONE atomic step (store row locked FOR UPDATE), so two simultaneous adds or
+      // accepts cannot both take the last seat.
+      const membership = await withStore(storeId, async tx => {
+        await assertWithinLimit(storeId, 'maxStaff', { tx });
+        return tx.storeStaff.create({
           data: { storeId, userId: staffUser.id },
-        })
-      );
+        });
+      });
 
       // Consent/notice (lens-2, 2026-09-22 audit): every staff add now mails the
       // invitee, instead of leaving it to the owner to tell them out of band. A

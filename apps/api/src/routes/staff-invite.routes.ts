@@ -18,6 +18,8 @@ import { ownedStoreIds } from '../lib/definer';
 import { getAccountState, setAccountRole } from '../lib/identity-client';
 import { verifyStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
+import { featureService } from '../services/feature.service';
+import logger from '../lib/logger';
 
 const router = Router();
 
@@ -61,68 +63,100 @@ router.post(
       }
 
       const { storeId } = claims;
+      // A store whose staff feature is off (plan downgrade, toggle) takes no new members through an old link.
+      if (!(await featureService.isFeatureEnabled(storeId, 'staff_accounts'))) {
+        throw new AppError(
+          403,
+          'FEATURE_DISABLED',
+          'This store does not use staff accounts at the moment.'
+        );
+      }
       const store = await withStore(storeId, tx =>
         tx.store.findUnique({ where: { id: storeId }, select: { id: true, deletedAt: true } })
       );
-      if (!store || store.deletedAt) {
-        throw new AppError(
-          400,
-          'INVITE_INVALID',
-          'This invitation link is invalid or has expired.'
-        );
-      }
+      const invalid = () =>
+        new AppError(400, 'INVITE_INVALID', 'This invitation link is invalid, used or revoked.');
+      if (!store || store.deletedAt) throw invalid();
 
-      // Consume the invitation and create the membership in ONE transaction. The link works only while its row is pending,
-      // unexpired and addressed to this store and address; a revoked, superseded, expired, already-used or post-removal link
-      // finds no pending row and creates nothing. The one repeat allowed is the account that already accepted it, while its
-      // membership still stands (finishing a half-done role switch).
-      let alreadyMember = false;
-      let seatCheck: unknown = null;
-      try {
-        await assertWithinLimit(storeId, 'maxStaff');
-      } catch (e) {
-        seatCheck = e;
-      }
-      await withStore(storeId, async tx => {
-        const membership = await tx.storeStaff.findUnique({
+      // Read-only pre-validation, BEFORE anything about the account changes. The link must be pending and unexpired, or be
+      // this very account's earlier accept whose membership still stands (finishing a half-done role switch).
+      const pre = await withStore(storeId, async tx => {
+        const row = await tx.staffInvite.findFirst({
+          where: { id: claims.jti, storeId, email: claims.email },
+          select: { status: true, expiresAt: true, acceptedBy: true },
+        });
+        const member = await tx.storeStaff.findUnique({
           where: { userId_storeId: { userId, storeId } },
         });
-        // A full store only blocks a NEW member; an existing one may still finish a role switch.
-        if (seatCheck && !membership) throw seatCheck;
-        const consumed = await tx.staffInvite.updateMany({
-          where: {
-            id: claims.jti,
-            storeId,
-            email: claims.email,
-            status: 'pending',
-            expiresAt: { gt: new Date() },
-          },
-          data: { status: 'accepted', acceptedBy: userId, decidedAt: new Date() },
-        });
-        if (consumed.count === 1) {
-          if (!membership) await tx.storeStaff.create({ data: { storeId, userId } });
-          else alreadyMember = true;
-          return;
-        }
-        const prior = await tx.staffInvite.findFirst({
-          where: { id: claims.jti, storeId, status: 'accepted', acceptedBy: userId },
-          select: { id: true },
-        });
-        if (!prior || !membership) {
-          throw new AppError(
-            400,
-            'INVITE_INVALID',
-            'This invitation link is invalid, used or revoked.'
-          );
-        }
-        alreadyMember = true;
+        return { row, member };
       });
+      const pending = pre.row?.status === 'pending' && pre.row.expiresAt > new Date();
+      const repeat =
+        pre.row?.status === 'accepted' && pre.row.acceptedBy === userId && !!pre.member;
+      if (!pending && !repeat) throw invalid();
+      if (pending && !pre.member) await assertWithinLimit(storeId, 'maxStaff'); // early, cheap refusal; the locked check below decides
 
-      // Idempotent on purpose: if a previous attempt added the membership but failed here, a retry finishes the switch.
+      // Switch the sign-in role FIRST (it ends the account's sessions, so it can no longer create a store), then re-check
+      // ownership: a store created in the window between the first check and now is detected here and the switch is undone,
+      // so the account is never left as staff while owning a store.
       let requiresSignIn = false;
+      const undoRoleSwitch = async () => {
+        await setAccountRole(userId, 'store_admin', 'staff-invite-rolled-back').catch(e =>
+          logger.error(
+            { err: e, userId },
+            '[staff-invite] could not restore store_admin after a failed accept'
+          )
+        );
+      };
       if (acc.role === 'store_admin') {
         await setAccountRole(userId, 'staff', 'staff-invite-accepted');
         requiresSignIn = true;
+        if ((await ownedStoreIds(userId)).length > 0) {
+          await undoRoleSwitch();
+          throw new AppError(
+            409,
+            'OWNS_STORE',
+            'A store was created on this account while accepting, so it stays a store owner. Ask the store to invite a different email address.'
+          );
+        }
+      }
+
+      // Consume the invitation and create the membership in ONE transaction, with the seat check locked on the store row.
+      let alreadyMember = false;
+      try {
+        await withStore(storeId, async tx => {
+          const consumed = await tx.staffInvite.updateMany({
+            where: {
+              id: claims.jti,
+              storeId,
+              email: claims.email,
+              status: 'pending',
+              expiresAt: { gt: new Date() },
+            },
+            data: { status: 'accepted', acceptedBy: userId, decidedAt: new Date() },
+          });
+          const membership = await tx.storeStaff.findUnique({
+            where: { userId_storeId: { userId, storeId } },
+          });
+          if (consumed.count === 1) {
+            if (membership) {
+              alreadyMember = true;
+              return;
+            }
+            await assertWithinLimit(storeId, 'maxStaff', { tx });
+            await tx.storeStaff.create({ data: { storeId, userId } });
+            return;
+          }
+          const prior = await tx.staffInvite.findFirst({
+            where: { id: claims.jti, storeId, status: 'accepted', acceptedBy: userId },
+            select: { id: true },
+          });
+          if (!prior || !membership) throw invalid();
+          alreadyMember = true;
+        });
+      } catch (e) {
+        if (requiresSignIn) await undoRoleSwitch();
+        throw e;
       }
 
       await auditLog({
