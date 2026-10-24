@@ -55,6 +55,7 @@ export const GLOBAL_WORKSPACES = ['packages/shared', 'packages/database'];
 export const UNIT_PATHS = {
   'packages/shared': ['packages/shared/src'],
   'packages/database': ['packages/database/src'],
+  'packages/cf-schema': ['packages/cf-schema'],
   'apps/web': ['apps/web'],
   'apps/admin': ['apps/admin/src'],
   'apps/orders': ['apps/orders'],
