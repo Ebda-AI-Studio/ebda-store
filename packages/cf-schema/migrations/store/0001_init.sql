@@ -793,7 +793,7 @@ CREATE TABLE IF NOT EXISTS "customer_groups" (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "customer_groups_store_id_name_key" ON "customer_groups" ("store_id", "name");
 CREATE INDEX IF NOT EXISTS "customer_groups_store_id_is_active_idx" ON "customer_groups" ("store_id", "is_active");
-CREATE UNIQUE INDEX IF NOT EXISTS "customer_groups_one_default_per_store" ON "customer_groups" ("store_id" = 1) WHERE "is_default" = 1;
+CREATE UNIQUE INDEX IF NOT EXISTS "customer_groups_one_default_per_store" ON "customer_groups" ("store_id") WHERE "is_default" = 1;
 
 CREATE TABLE IF NOT EXISTS "customer_rfm_snapshots" (
   "id" TEXT NOT NULL,
@@ -1418,9 +1418,9 @@ CREATE INDEX IF NOT EXISTS "orders_payment_confirmation_expires_at_idx" ON "orde
 CREATE INDEX IF NOT EXISTS "orders_applied_promotion_id_idx" ON "orders" ("applied_promotion_id");
 CREATE INDEX IF NOT EXISTS "orders_buyer_key_idx" ON "orders" ("buyer_key");
 CREATE INDEX IF NOT EXISTS "orders_payment_gateway_abandoned_at_idx" ON "orders" ("store_id", "payment_gateway_abandoned_at") WHERE "payment_gateway_abandoned_at" IS NOT NULL;
-CREATE INDEX IF NOT EXISTS "orders_refund_reversal_pending_idx" ON "orders" ("updated_at" = 1) WHERE "refund_reversed_at" IS NULL AND "status" IN ('cancelled', 'refunded');
-CREATE INDEX IF NOT EXISTS "orders_refund_reversal_requested_idx" ON "orders" ("refund_reversal_requested_at" = 1) WHERE "refund_reversed_at" IS NULL AND "refund_reversal_requested_at" IS NOT NULL;
-CREATE INDEX IF NOT EXISTS "orders_status_fanout_pending_idx" ON "orders" ("status_fanout_requested_at" = 1) WHERE "status_fanout_claimed_at" IS NULL AND "status_fanout_requested_at" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "orders_refund_reversal_pending_idx" ON "orders" ("updated_at") WHERE "refund_reversed_at" IS NULL AND "status" IN ('cancelled', 'refunded');
+CREATE INDEX IF NOT EXISTS "orders_refund_reversal_requested_idx" ON "orders" ("refund_reversal_requested_at") WHERE "refund_reversed_at" IS NULL AND "refund_reversal_requested_at" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "orders_status_fanout_pending_idx" ON "orders" ("status_fanout_requested_at") WHERE "status_fanout_claimed_at" IS NULL AND "status_fanout_requested_at" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_phone_idx" ON "orders" ("store_id", (json_extract(shipping_address, '$.phone'))) WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_email_idx" ON "orders" ("store_id", (lower(trim(json_extract(shipping_address, '$.email'))))) WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_ip_idx" ON "orders" ("store_id", "checkout_ip") WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
@@ -2101,7 +2101,7 @@ CREATE INDEX IF NOT EXISTS "returns_order_id_idx" ON "returns" ("order_id");
 CREATE INDEX IF NOT EXISTS "returns_customer_id_idx" ON "returns" ("customer_id");
 CREATE INDEX IF NOT EXISTS "returns_status_idx" ON "returns" ("status");
 CREATE INDEX IF NOT EXISTS "returns_created_at_idx" ON "returns" ("created_at");
-CREATE INDEX IF NOT EXISTS "returns_reversal_pending_idx" ON "returns" ("reversal_requested_at" = 1) WHERE "reversal_applied_at" IS NULL AND "reversal_requested_at" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "returns_reversal_pending_idx" ON "returns" ("reversal_requested_at") WHERE "reversal_applied_at" IS NULL AND "reversal_requested_at" IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "reviews" (
   "id" TEXT NOT NULL,
@@ -2176,7 +2176,7 @@ CREATE TABLE IF NOT EXISTS "shipment_pickups" (
 CREATE UNIQUE INDEX IF NOT EXISTS "shipment_pickups_store_id_idempotency_key_key" ON "shipment_pickups" ("store_id", "idempotency_key");
 CREATE INDEX IF NOT EXISTS "shipment_pickups_store_id_idx" ON "shipment_pickups" ("store_id");
 CREATE INDEX IF NOT EXISTS "shipment_pickups_shipment_id_idx" ON "shipment_pickups" ("shipment_id");
-CREATE UNIQUE INDEX IF NOT EXISTS "shipment_pickups_one_active" ON "shipment_pickups" ("shipment_id" = 1) WHERE "status" IN ('requesting', 'requested');
+CREATE UNIQUE INDEX IF NOT EXISTS "shipment_pickups_one_active" ON "shipment_pickups" ("shipment_id") WHERE "status" IN ('requesting', 'requested');
 
 CREATE TABLE IF NOT EXISTS "shipments" (
   "id" TEXT NOT NULL,

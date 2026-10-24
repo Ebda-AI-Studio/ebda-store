@@ -185,7 +185,6 @@ export function pgExprToSqlite(expr) {
   e = e.replace(/=\s*true\b/gi, '= 1').replace(/=\s*false\b/gi, '= 0');
   e = e.replace(/\bchar_length\(/gi, 'length(');
   e = e.replace(/\bjsonb_typeof\(/gi, 'json_type(');
-  if (/^"?\w+"?$/.test(e.trim()) && !/^(true|false)$/i.test(e.trim())) e = `${e.trim()} = 1`;
   e = e.replace(/\bIS DISTINCT FROM\b/gi, 'IS NOT');
   e = e.replace(/::\w+(\[\])?/g, '');
   if (
@@ -195,4 +194,11 @@ export function pgExprToSqlite(expr) {
     throw new Error(`untranslatable Postgres expression: ${expr}`);
   }
   return e;
+}
+
+// Predicates (CHECK bodies, partial-index WHERE): a bare boolean column means `col = 1` in SQLite.
+// NEVER apply this to an index column list: `(shipment_id)` must stay a column, not become `shipment_id = 1`.
+export function pgPredicateToSqlite(expr) {
+  const e = pgExprToSqlite(expr);
+  return /^"?\w+"?$/.test(e.trim()) && !/^(true|false)$/i.test(e.trim()) ? `${e.trim()} = 1` : e;
 }
