@@ -7,7 +7,14 @@ import {
   resendVerificationFor,
   type InviteResult,
 } from './app';
-import { isSessionRevoked, revokeAllForUser, revokeSession, type UserRow } from './data';
+import {
+  eraseIdentity,
+  exportIdentity,
+  isSessionRevoked,
+  revokeAllForUser,
+  revokeSession,
+  type UserRow,
+} from './data';
 import { z } from 'zod';
 import { hashPassword, passwordPolicy } from './password';
 
@@ -92,12 +99,23 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
    * keys), so no token or refresh cookie of this user can ever be honoured again, and the Store cannot re-create its profile
    * row from a deleted identity (it reconciles only from an identity that still exists).
    */
-  async eraseUser(userId: string): Promise<void> {
+  async eraseUser(
+    userId: string,
+    requestId?: string
+  ): Promise<{ erased: boolean; remaining: number }> {
     z.string().uuid().parse(userId);
-    await this.env.DB.batch([
-      this.env.DB.prepare(`DELETE FROM challenges WHERE user_id = ?1`).bind(userId),
-      this.env.DB.prepare(`DELETE FROM users WHERE id = ?1`).bind(userId),
-    ]);
+    if (requestId !== undefined) z.string().min(1).max(100).parse(requestId);
+    return eraseIdentity(this.env.DB, userId, requestId);
+  }
+
+  /**
+   * PDPL data export (G10): the user's identity data as JSON, one array per table. Credentials and secrets (password hash,
+   * MFA secret and backup codes, token hashes, passkey public keys, pending signup data) are never exported: they are not
+   * the person's data to take and exporting them would be a risk. Unknown user = every array empty.
+   */
+  async exportUser(userId: string): Promise<Record<string, unknown[]>> {
+    z.string().uuid().parse(userId);
+    return exportIdentity(this.env.DB, userId);
   }
 
   /** Change an admin-namespace role (promote/demote). Ends every session so tokens are re-issued with the new grant. */

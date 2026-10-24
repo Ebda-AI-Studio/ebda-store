@@ -174,6 +174,119 @@ describe('Accounts RPC for the Store', () => {
     expect(fakes.mails.length).toBe(n + 1);
   });
 
+  async function withEveryKindOfData() {
+    const u = await seedUser();
+    const s = await login(u); // a session + a refresh token
+    await env.DB.prepare(
+      `UPDATE users SET mfa_enabled = 1, mfa_secret = 'sealed-secret', mfa_backup_codes = '["x"]', phone = '+201001234567' WHERE id = ?1`
+    )
+      .bind(u.id)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO passkey_credentials (id, user_id, credential_id, public_key, device_type, rp_id, name, created_at)
+       VALUES (?1,?2,?3,'pk','singleDevice','store.ebda.app','My key',?4)`
+    )
+      .bind(crypto.randomUUID(), u.id, `cred-${u.id}`, new Date().toISOString())
+      .run();
+    await rpc().forgotPassword(u.email); // a verification token
+    await env.DB.prepare(
+      `INSERT INTO challenges (id, kind, user_id, data, expires_at) VALUES (?1,'mfa',?2,'{}',?3)`
+    )
+      .bind(crypto.randomUUID(), u.id, Date.now() + 60_000)
+      .run();
+    await env.DB.prepare(`INSERT INTO login_attempts (key, at) VALUES (?1, ?2)`)
+      .bind(`e:${u.email.toLowerCase()}`, Date.now())
+      .run();
+    const sid = (await import('jose')).decodeJwt(s.body.access_token).sid as string;
+    return { u, s, sid };
+  }
+  const rowsFor = async (id: string, email: string) => {
+    const n = async (sql: string, ...b: unknown[]) =>
+      ((
+        await env.DB.prepare(sql)
+          .bind(...b)
+          .first<{ n: number }>()
+      )?.n ?? 0) as number;
+    return {
+      users: await n(`SELECT count(*) AS n FROM users WHERE id = ?1`, id),
+      sessions: await n(`SELECT count(*) AS n FROM sessions WHERE user_id = ?1`, id),
+      refresh: await n(`SELECT count(*) AS n FROM refresh_tokens WHERE user_id = ?1`, id),
+      verification: await n(`SELECT count(*) AS n FROM verification_tokens WHERE user_id = ?1`, id),
+      passkeys: await n(`SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`, id),
+      challenges: await n(`SELECT count(*) AS n FROM challenges WHERE user_id = ?1`, id),
+      attempts: await n(
+        `SELECT count(*) AS n FROM login_attempts WHERE key = ?1`,
+        `e:${email.toLowerCase()}`
+      ),
+    };
+  };
+
+  it('eraseUser (G10) deletes the user, sessions, refresh + verification tokens, passkeys, MFA, challenges and throttle rows, and revokes every sid', async () => {
+    const { u, s, sid } = await withEveryKindOfData();
+    const other = await seedUser();
+    await login(other);
+    const before = await rowsFor(u.id, u.email);
+    expect(Object.values(before).every(n => n >= 1)).toBe(true); // the fixture really has every kind
+    expect(await rpc().eraseUser(u.id, 'req-1')).toEqual({ erased: true, remaining: 0 });
+    expect(Object.values(await rowsFor(u.id, u.email)).every(n => n === 0)).toBe(true);
+    expect(await rpc().isRevoked(sid)).toBe(true);
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
+    expect(
+      await env.DB.prepare(`SELECT 1 FROM users WHERE id = ?1`).bind(other.id).first()
+    ).toBeTruthy();
+    expect((await rowsFor(other.id, other.email)).sessions).toBeGreaterThan(0); // untouched
+  });
+
+  it('eraseUser is idempotent per request id, and the address can be registered again afterwards', async () => {
+    const { u } = await withEveryKindOfData();
+    await rpc().eraseUser(u.id, 'req-2');
+    expect(await rpc().eraseUser(u.id, 'req-2')).toEqual({ erased: false, remaining: 0 });
+    const again = await seedUser({ email: u.email });
+    expect(again.email).toBe(u.email);
+  });
+
+  it('exportUser (G10) returns the identity data as JSON and never a secret or credential material', async () => {
+    const { u } = await withEveryKindOfData();
+    const out = await rpc().exportUser(u.id);
+    expect(Object.keys(out).sort()).toEqual([
+      'passkey_credentials',
+      'refresh_tokens',
+      'sessions',
+      'users',
+      'verification_tokens',
+    ]);
+    expect(out.users).toHaveLength(1);
+    expect(out.users[0]).toMatchObject({
+      id: u.id,
+      email: u.email,
+      phone: '+201001234567',
+      mfa_enabled: 1,
+    });
+    expect(out.sessions.length).toBeGreaterThan(0);
+    expect(out.passkey_credentials).toHaveLength(1);
+    const text = JSON.stringify(out);
+    for (const secret of [
+      'password_hash',
+      'mfa_secret',
+      'sealed-secret',
+      'mfa_backup_codes',
+      'public_key',
+      '"token"',
+      'pending',
+    ]) {
+      expect(text).not.toContain(secret);
+    }
+    expect(() => JSON.parse(text)).not.toThrow();
+  });
+
+  it('exportUser for an unknown user is every table empty, and erase then export returns nothing', async () => {
+    const empty = await rpc().exportUser(crypto.randomUUID());
+    expect(Object.values(empty).every(a => a.length === 0)).toBe(true);
+    const { u } = await withEveryKindOfData();
+    await rpc().eraseUser(u.id);
+    expect(Object.values(await rpc().exportUser(u.id)).every(a => a.length === 0)).toBe(true);
+  });
+
   it('forgotPassword mails a reset code for an active account and is silent for an unknown address', async () => {
     const u = await seedUser();
     const before = fakes.mails.length;

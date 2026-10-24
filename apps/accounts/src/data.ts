@@ -276,3 +276,100 @@ export async function claimTotpStep(
     .run();
   return (r.meta.changes ?? 0) === 1;
 }
+
+const USER_TABLES = [
+  'sessions',
+  'refresh_tokens',
+  'verification_tokens',
+  'passkey_credentials',
+] as const;
+
+async function remainingFor(db: D1Database, userId: string, email: string | null): Promise<number> {
+  let n = 0;
+  for (const t of ['users', ...USER_TABLES]) {
+    const col = t === 'users' ? 'id' : 'user_id';
+    const r = await db
+      .prepare(`SELECT count(*) AS n FROM ${t} WHERE ${col} = ?1`)
+      .bind(userId)
+      .first<{ n: number }>();
+    n += r?.n ?? 0;
+  }
+  const c = await db
+    .prepare(`SELECT count(*) AS n FROM challenges WHERE user_id = ?1`)
+    .bind(userId)
+    .first<{ n: number }>();
+  n += c?.n ?? 0;
+  if (email) {
+    const a = await db
+      .prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
+      .bind(`e:${email.toLowerCase()}`)
+      .first<{ n: number }>();
+    n += a?.n ?? 0;
+  }
+  return n;
+}
+
+/**
+ * PDPL erasure (G10): deletes the user, every session, refresh token, verification token and passkey (FK cascade), the MFA
+ * secret and backup codes (they live on the user row), open challenges and the login-throttle rows keyed by the address.
+ * Deleting the sessions revokes every sid: isSessionRevoked treats an unknown sid as revoked. Idempotent: a repeat finds
+ * nothing and reports erased=false. `remaining` is re-counted AFTER the delete and must be 0.
+ */
+export async function eraseIdentity(
+  db: D1Database,
+  userId: string,
+  requestId?: string
+): Promise<{ erased: boolean; remaining: number }> {
+  const user = await db
+    .prepare(`SELECT email FROM users WHERE id = ?1`)
+    .bind(userId)
+    .first<{ email: string }>();
+  const email = user?.email ?? null;
+  const statements = [
+    db.prepare(`DELETE FROM challenges WHERE user_id = ?1`).bind(userId),
+    db.prepare(`DELETE FROM users WHERE id = ?1`).bind(userId),
+  ];
+  if (email)
+    statements.push(
+      db.prepare(`DELETE FROM login_attempts WHERE key = ?1`).bind(`e:${email.toLowerCase()}`)
+    );
+  await db.batch(statements);
+  const remaining = await remainingFor(db, userId, email);
+  // Audit line without personal data: the request id and counts only.
+  console.log(
+    JSON.stringify({
+      msg: 'identity erased',
+      requestId: requestId ?? null,
+      erased: !!user,
+      remaining,
+    })
+  );
+  return { erased: !!user, remaining };
+}
+
+/** PDPL export (G10): the user's identity data, secrets and credential material excluded. */
+export async function exportIdentity(
+  db: D1Database,
+  userId: string
+): Promise<Record<string, unknown[]>> {
+  const all = async (sql: string) =>
+    (await db.prepare(sql).bind(userId).all()).results as unknown[];
+  return {
+    users: await all(
+      `SELECT id, email, first_name, last_name, phone, role, status, email_verified, avatar, language, last_login_at,
+              created_at, updated_at, deleted_at, mfa_enabled, mfa_enrolled_at FROM users WHERE id = ?1`
+    ),
+    sessions: await all(
+      `SELECT sid, created_at, expires_at, revoked_at, revoked_reason, ip, user_agent, amr FROM sessions WHERE user_id = ?1 ORDER BY created_at`
+    ),
+    refresh_tokens: await all(
+      `SELECT id, sid, expires_at, created_at, revoked_at, revoked_reason FROM refresh_tokens WHERE user_id = ?1 ORDER BY created_at`
+    ),
+    verification_tokens: await all(
+      `SELECT id, type, expires_at, used_at, created_at FROM verification_tokens WHERE user_id = ?1 ORDER BY created_at`
+    ),
+    passkey_credentials: await all(
+      `SELECT id, credential_id, transports, device_type, backed_up, rp_id, name, created_at, last_used_at FROM passkey_credentials WHERE user_id = ?1 ORDER BY created_at`
+    ),
+  };
+}

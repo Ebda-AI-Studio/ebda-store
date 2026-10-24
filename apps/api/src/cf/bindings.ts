@@ -76,7 +76,8 @@ export interface AccountsRpc {
   ): Promise<void>;
   getAccountState?(userId: string): Promise<AccountState | null>;
   resendVerification?(email: string): Promise<void>;
-  eraseUser?(userId: string): Promise<void>;
+  eraseUser?(userId: string, requestId?: string): Promise<{ erased: boolean; remaining: number }>;
+  exportUser?(userId: string): Promise<Record<string, unknown[]>>;
   setRole?(
     userId: string,
     role: 'store_admin' | 'staff',
