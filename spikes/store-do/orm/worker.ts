@@ -2,7 +2,7 @@
 //   /orm/drizzle/{seed,products,cart,order}   -> OrmDO (SQLite DO, drizzle durable-sqlite)
 //   /orm/prisma/{seed,products,cart}          -> Prisma 6.19.3 client built PER REQUEST over D1
 import { DurableObject } from 'cloudflare:workers';
-import { makeDrizzle, listProducts, addCartItem, createOrder } from './drizzle-do';
+import { makeDrizzle, listProducts, addCartItem, createOrder } from '../src/repo';
 import * as schema from '../src/schema';
 import * as P from './rejected/prisma-d1';
 import core from '../migrations/0001_core.sql';
