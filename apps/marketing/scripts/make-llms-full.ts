@@ -29,7 +29,7 @@ brief.push('');
 brief.push('## Not there yet (stated plainly)');
 const rows = compareRows();
 for (const r of rows.gap) brief.push(`- ${r.label.en}: ${r.ebda.en}`);
-brief.push('Ebda Store is a newer platform than Salla, Zid or Shopify, with fewer integrations.');
+brief.push('Ebda Store is a newer platform than Zid or Shopify, with fewer integrations.');
 brief.push('');
 
 const llms = readFileSync('public/llms.txt', 'utf8');

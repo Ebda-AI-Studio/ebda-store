@@ -140,6 +140,7 @@ export interface Copy {
     /** The Products menu (BRAND-ARCH-1): one entry per LIVE product; the others are added when they ship. */
     products: string;
     storeBlurb: string;
+    contact: string;
   };
   hero: {
     h1: string;
@@ -173,6 +174,23 @@ export interface Copy {
     storyH: string;
     contactH: string;
     desc: string;
+  };
+  /** The /contact page (6c): every way to reach Ebda AI Studio, one line each. */
+  contactPage: {
+    title: string;
+    desc: string;
+    lead: string;
+    emailH: string;
+    emailP: string;
+    whatsappH: string;
+    whatsappP: string;
+    helpH: string;
+    helpP: string;
+    helpLink: string;
+    statusLink: string;
+    securityH: string;
+    securityP: string;
+    company: string;
   };
   /** «حكاية ابدأ»: why the name and the open-door mark (shown on /about). */
   about: { title: string; paras: string[]; close: string };
@@ -283,6 +301,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
       products: 'المنتجات',
       storeBlurb: 'متجرك أونلاين في دقايق',
+      contact: 'تواصل معنا',
     },
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
@@ -594,6 +613,22 @@ export const COPY: Record<Locale, Copy> = {
       storyH: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
       contactH: 'تواصل معنا',
     },
+    contactPage: {
+      title: 'تواصل مع ابدأ استوديو للذكاء الاصطناعي',
+      desc: 'إيميل وواتساب ومركز المساعدة والإبلاغ عن ثغرة أمنية، كل طرق التواصل مع ابدأ استوديو للذكاء الاصطناعي في مكان واحد.',
+      lead: 'اكتب لنا بالطريقة اللي تريّحك، وهنرد عليك.',
+      emailH: 'إيميل',
+      emailP: 'للأسئلة والاستفسارات والشراكات.',
+      whatsappH: 'واتساب',
+      whatsappP: 'لأسئلة قبل ما تبدأ متجرك.',
+      helpH: 'محتاج مساعدة في متجرك؟',
+      helpP: 'الإجابات المكتوبة وحالة الخدمة أسرع من أي رد.',
+      helpLink: 'مركز المساعدة',
+      statusLink: 'حالة الخدمة',
+      securityH: 'الإبلاغ عن ثغرة أمنية',
+      securityP: 'راسلنا على الإيميل ده وهنتعامل معاه بجدية. التفاصيل في ملف security.txt.',
+      company: `ابدأ ستور منتج من ${CO.legalNameAr}.`,
+    },
     about: {
       title: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
       paras: [
@@ -659,6 +694,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
       products: 'Products',
       storeBlurb: 'Your online store in minutes',
+      contact: 'Contact',
     },
     hero: {
       h1: 'Open your online store in minutes.',
@@ -974,6 +1010,23 @@ export const COPY: Record<Locale, Copy> = {
       company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
       storyH: 'The Ebda AI Studio story',
       contactH: 'Contact',
+    },
+    contactPage: {
+      title: 'Contact Ebda AI Studio',
+      desc: 'Email, WhatsApp, the help centre and security reports: every way to reach Ebda AI Studio in one place.',
+      lead: 'Write to us the way that suits you, and we will reply.',
+      emailH: 'Email',
+      emailP: 'Questions, enquiries and partnerships.',
+      whatsappH: 'WhatsApp',
+      whatsappP: 'Questions before you start your store.',
+      helpH: 'Need help with your store?',
+      helpP: 'The written answers and the service status are faster than any reply.',
+      helpLink: 'Help centre',
+      statusLink: 'Service status',
+      securityH: 'Report a security issue',
+      securityP:
+        'Write to this address and we will treat it seriously. Details are in our security.txt.',
+      company: `Ebda Store is a product of ${CO.legalNameEn}.`,
     },
     about: {
       title: 'The Ebda AI Studio story',

@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AboutPage } from '../components/AboutPage';
 import { ComparePage } from '../components/ComparePage';
+import { ContactPage } from '../components/ContactPage';
 import { CreditsPage } from '../components/CreditsPage';
 import { FeaturesPage } from '../components/FeaturesPage';
 import { Home } from '../components/Home';
@@ -19,6 +20,7 @@ export const DATED_PAGES: readonly PageSlug[] = [
   'features',
   ...COMPARE_PAGES,
   'about',
+  'contact',
   'credits',
 ];
 
@@ -26,6 +28,7 @@ const render = (page: PageSlug, locale: Locale): ReactElement => {
   if (page === '') return <Home locale={locale} />;
   if (page === 'features') return <FeaturesPage locale={locale} />;
   if (page === 'about') return <AboutPage locale={locale} />;
+  if (page === 'contact') return <ContactPage locale={locale} />;
   if (page === 'credits') return <CreditsPage locale={locale} />;
   if (page.startsWith('compare/'))
     return <ComparePage locale={locale} slug={page.split('/')[1] as CompareSlug} />;
