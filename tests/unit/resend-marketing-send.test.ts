@@ -36,6 +36,7 @@ import { EmailSendError as ResendSendError } from '@api/services/mail-transport'
 const STORE = {
   id: 's1',
   name: 'Shop',
+  slug: 'shop',
   domain: null,
   email: 'owner@shop.test',
   emailSenderLocalPart: null,
@@ -98,7 +99,7 @@ describe('sendMarketingEmail', () => {
     const [payload, options] = emailsSend.mock.calls[0];
     expect(payload.to).toEqual(['a@x.test']);
     expect(payload.headers).toEqual(headers);
-    expect(payload.from).toBe('Shop <no-reply@ebda.app>');
+    expect(payload.from).toBe('Shop <orders.shop@ebda.app>');
     expect(options).toEqual({ idempotencyKey: 'campaign-recipient/r1' });
   });
 

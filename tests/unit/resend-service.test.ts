@@ -41,7 +41,7 @@ vi.mock('@ebda/database', () => {
 });
 
 vi.mock('@api/config', () => ({
-  config: { resendApiKey: 're_test_key' },
+  config: { resendApiKey: 're_test_key', emailProvider: 'resend' },
 }));
 
 import { ResendService } from '@api/services/resend.service';
@@ -237,6 +237,7 @@ describe('ResendService.sendBrandedEmail', () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
       name: 'Demo Shop',
+      slug: 'demo-shop',
       domain: 'demo-shop.example',
       email: 'hi@demo-shop.example',
       emailSenderLocalPart: 'noreply',
@@ -264,6 +265,7 @@ describe('ResendService.sendBrandedEmail', () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
       name: 'Demo Boutique',
+      slug: 'demo-boutique',
       domain: null,
       email: null,
       emailSenderLocalPart: 'noreply',
@@ -278,7 +280,7 @@ describe('ResendService.sendBrandedEmail', () => {
     });
 
     expect(mockEmailsSend).toHaveBeenCalledWith(
-      expect.objectContaining({ from: 'Demo Boutique <noreply@ebda.app>' })
+      expect.objectContaining({ from: 'Demo Boutique <orders.demo-boutique@ebda.app>' })
     );
   });
 
@@ -286,6 +288,7 @@ describe('ResendService.sendBrandedEmail', () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
       name: 'Demo Boutique',
+      slug: 'demo-shop',
       domain: null,
       email: null,
       emailSenderLocalPart: 'noreply',

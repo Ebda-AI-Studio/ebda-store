@@ -150,10 +150,9 @@ async function sendViaResend(msg: OutboundMail): Promise<{ id: string }> {
     ...(msg.replyTo ? { replyTo: msg.replyTo } : {}),
     ...(msg.headers ? { headers: msg.headers } : {}),
   } as unknown as Payload;
-  const { data, error } = await client.emails.send(
-    payload,
-    msg.idempotencyKey ? { idempotencyKey: msg.idempotencyKey } : undefined
-  );
+  const { data, error } = msg.idempotencyKey
+    ? await client.emails.send(payload, { idempotencyKey: msg.idempotencyKey })
+    : await client.emails.send(payload);
   if (error || !data)
     throw new EmailSendError(error?.name ?? 'unknown', error?.message ?? 'unknown');
   return { id: data.id };

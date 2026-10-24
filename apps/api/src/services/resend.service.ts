@@ -328,6 +328,7 @@ export class ResendService {
         select: {
           id: true,
           name: true,
+          slug: true,
           domain: true,
           email: true,
           emailSenderLocalPart: true,
@@ -412,6 +413,7 @@ export class ResendService {
         select: {
           id: true,
           name: true,
+          slug: true,
           domain: true,
           email: true,
           emailSenderLocalPart: true,
