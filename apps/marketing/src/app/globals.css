@@ -867,6 +867,10 @@ html[lang='ar'] .story h2 {
   border-radius: 24px;
   overflow: hidden;
   background: #fff;
+  /* The phones hold real storefront CSS (scripts/looks/snapshot.mjs): vh/vw there are cqh/cqw of this box and
+     position:fixed (the tab bar) is fixed to the phone, not to the browser window. */
+  container-type: size;
+  contain: layout;
 }
 .looks-item figcaption .look-live {
   margin-top: 10px;

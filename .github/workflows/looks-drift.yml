@@ -1,0 +1,26 @@
+name: Looks drift (home phones vs live demo stores)
+# Ruling MKT-PHONES-1: the phones on ebda.app are snapshots of the real demo storefronts. Weekly, re-snapshot
+# into a temp dir and compare visible text + class set per template and look with the committed fragments.
+# Needs the network (the demo stores) so it runs on a hosted runner; it deploys nothing.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ebda-looks-drift
+  cancel-in-progress: true
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Compare the committed phones with the live demo stores
+        run: node apps/marketing/scripts/looks/drift.mjs

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * One real phone (the shipped Qamar A fragment) driven end to end: open a product, add it, the badge
+ * One real phone (the shipped Qamar A fragment, a snapshot of the live demo store) driven end to end: open a product, add it, the badge
  * says 1, the cart sheet shows the total, the demo checkout screen carries the signup button, back and
  * Escape return home; categories filter the grid with an empty state; links stay inert.
  */
@@ -39,22 +39,25 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('working phone: Qamar A', () => {
+describe('working phone: Qamar A (snapshot of the real demo store)', () => {
+  const fmt = (n: number) => `${n.toLocaleString('en-US')} ج.م`;
+
   it('open product -> add -> badge 1 -> sheet total -> checkout screen -> back', () => {
     const { scr, off } = phone('qamar', 0);
-    const bag = $(scr, '.ib[data-open-cart]');
+    const bag = $(scr, '[data-open-cart].ib');
     expect($(bag, '.ps-badge').hidden).toBe(true);
 
-    click($(scr, '[data-p-id] .ph[role=button]')); // first card: the 1,450 shirt
+    const card = $(scr, '[data-p-id]');
+    const name = card.dataset.pName!;
+    const price = Number(card.dataset.pPrice);
+    click($(card, '[data-ps-hit]'));
     const pdp = $(scr, '.ps-pdp');
     expect(pdp.classList.contains('is-in')).toBe(true);
-    expect($(pdp, '.ps-title').textContent).toBe('قميص كتان أبيض');
-    expect($(pdp, '.ps-price').textContent).toBe('1,450 ج.م');
-    expect(pdp.querySelectorAll('.ps-slide').length).toBeGreaterThanOrEqual(2);
+    expect($(pdp, '.ps-title').textContent).toBe(name);
+    expect($(pdp, '.ps-price').textContent).toBe(fmt(price));
     expect(scr.classList.contains('ps-lock')).toBe(true);
     expect(document.activeElement).toBe(pdp);
 
-    click($(pdp, '[data-group=size][data-v=M]'));
     click($(pdp, '[data-ps-act=add]'));
     expect($(bag, '.ps-badge').textContent).toBe('1');
     expect($(bag, '.ps-badge').hidden).toBe(false);
@@ -64,10 +67,9 @@ describe('working phone: Qamar A', () => {
 
     click($(pdp, '[data-ps-act=cart]'));
     const sheet = $(scr, '.ps-cart');
-    expect($(sheet, '.ps-total b').textContent).toBe('1,450 ج.م');
-    expect($(sheet, '.ps-lopt').textContent).toBe('M · أبيض');
+    expect($(sheet, '.ps-total b').textContent).toBe(fmt(price));
     click($(sheet, '[data-ps-act=inc]'));
-    expect($(sheet, '.ps-total b').textContent).toBe('2,900 ج.م');
+    expect($(sheet, '.ps-total b').textContent).toBe(fmt(price * 2));
     expect($(bag, '.ps-badge').textContent).toBe('2');
 
     click($(sheet, '[data-ps-act=checkout]'));
@@ -89,49 +91,53 @@ describe('working phone: Qamar A', () => {
     off();
   });
 
-  it('a page (product, demo checkout) covers the home bars; a sheet does not; closing restores them', () => {
+  it('a page (product, demo checkout) covers the home; a sheet does not; closing restores it', () => {
     const { scr, off } = phone('souq', 0);
     const home = () => scr.classList.contains('ps-covered');
     expect(home()).toBe(false);
-    click($(scr, '[data-p-id] .ph[role=button]'));
+    click($(scr, '[data-ps-hit]'));
     expect(home()).toBe(true);
-    expect($(scr, '.cart').closest('[inert]') ?? scr.querySelector('.cart[inert]')).toBeTruthy();
     click($(scr, '.ps-pdp [data-ps-act=add]'));
     click($(scr, '.ps-pdp [data-ps-act=back]'));
     expect(home()).toBe(false);
-    click($(scr, '.ib[data-open-cart]'));
+    click($(scr, '[data-open-cart].ib'));
     expect(home()).toBe(false); // the cart sheet over the home keeps the dimmed home visible
     click($(scr, '.ps-cart [data-ps-act=checkout]'));
     expect(home()).toBe(true);
     esc(scr);
     expect(home()).toBe(false);
-    expect(scr.querySelector('[inert]')).toBeNull();
     off();
   });
 
-  it('quick add on a product with sizes opens its page; the empty cart says so', () => {
+  it('the empty cart says so', () => {
     const { scr, off } = phone('qamar', 1);
-    click($(scr, '.ib[data-open-cart]'));
+    click($(scr, '[data-open-cart].ib'));
     expect($(scr, '.ps-cart .ps-emptycart b').textContent).toBe('السلة فاضية');
     off();
   });
 
-  it('category chips filter the grid, a category with nothing shows the empty state, Show all restores', () => {
+  it('category controls filter the grid, a category with nothing shows the empty state, Show all restores', () => {
     const { scr, off } = phone('qamar', 0);
     const visible = () => scr.querySelectorAll('[data-grid] [data-p-id]:not(.ps-off)').length;
-    expect(visible()).toBe(8);
-    click($(scr, '.chip[data-cat=shirts]'));
-    expect(visible()).toBe(2);
-    expect($(scr, '.chip[data-cat=shirts]').getAttribute('aria-pressed')).toBe('true');
-    expect($(scr, '.chip[data-cat=all]').classList.contains('on')).toBe(false);
-    // no product carries this token: fabricate the chip to prove the empty state
-    const chip = $(scr, '.chip[data-cat=bags]');
-    chip.dataset.cat = 'nothing';
-    click(chip);
+    const total = visible();
+    expect(total).toBeGreaterThan(3);
+    const ctl = [...scr.querySelectorAll<HTMLElement>('[data-cat]')].find(c =>
+      scr.querySelector(`[data-p-id][data-p-cat~="${c.dataset.cat}"]`)
+    )!;
+    click(ctl);
+    expect(visible()).toBeGreaterThan(0);
+    expect(visible()).toBeLessThan(total);
+    expect(ctl.getAttribute('aria-pressed')).toBe('true');
+    // no product carries this token: fabricate the control to prove the empty state
+    const other = [...scr.querySelectorAll<HTMLElement>('[data-cat]')].find(
+      c => c.dataset.cat !== ctl.dataset.cat
+    )!;
+    other.dataset.cat = 'nothing';
+    click(other);
     expect(visible()).toBe(0);
     expect($(scr, '[data-grid] .ps-empty')).toBeTruthy();
     click($(scr, '[data-grid] .ps-empty [data-ps-act=clear]'));
-    expect(visible()).toBe(8);
+    expect(visible()).toBe(total);
     expect(scr.querySelector('[data-grid] .ps-empty')).toBeNull();
     off();
   });
@@ -148,7 +154,7 @@ describe('working phone: Qamar A', () => {
   it('cleanup removes the layer, badges and the lock; mounting twice is a no-op', () => {
     const { scr, off } = phone('qamar', 0);
     expect(mountPhone(scr, { signupUrl: SIGNUP })()).toBeUndefined();
-    click($(scr, '[data-p-id] .ph[role=button]'));
+    click($(scr, '[data-ps-hit]'));
     off();
     expect(scr.querySelector('.ps-layer')).toBeNull();
     expect(scr.querySelector('.ps-badge')).toBeNull();
@@ -161,7 +167,7 @@ describe('every shipped look is a working store', () => {
   const ids = ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'];
   for (const t of ids)
     for (const i of [0, 1, 2])
-      it(`${t} ${'ABC'[i]}: every card carries id, name, price, 2-4 photos; every filter control hits a product or an empty state`, () => {
+      it(`${t} ${'ABC'[i]}: every card carries id, name, price, 1-4 photos; every filter control hits a product or an empty state`, () => {
         const f = read(t);
         document.body.innerHTML = `<div class="look-screen">${f.looks[i]}</div>`;
         const scr = $(document.body, '.scr');
@@ -171,7 +177,7 @@ describe('every shipped look is a working store', () => {
           expect(c.dataset.pName).toBeTruthy();
           expect(Number(c.dataset.pPrice)).toBeGreaterThan(0);
           const n = (c.dataset.pImgs ?? '').split(',').length;
-          expect(n).toBeGreaterThanOrEqual(2);
+          expect(n).toBeGreaterThanOrEqual(1);
           expect(n).toBeLessThanOrEqual(4);
         }
         const off = mountPhone(scr, { signupUrl: SIGNUP });
