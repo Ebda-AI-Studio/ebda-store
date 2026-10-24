@@ -1,0 +1,69 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+
+/**
+ * help.ebda.app, docs.ebda.app and status.ebda.app are each their own live host (6c): master-brand titles
+ * (BRAND-ARCH-1), product sections, and their own sitemap, robots and security.txt. The deploy workflows ship
+ * PRODUCTION only (Ruling INFRA-PREVIEW-1).
+ */
+const ROOT = path.resolve(__dirname, '../..');
+const read = (...p: string[]) => readFileSync(path.join(ROOT, ...p), 'utf8');
+
+describe.each([
+  ['help', 'Ebda AI Studio Help', 'مركز مساعدة ابدأ استوديو للذكاء الاصطناعي'],
+  ['docs', 'Ebda AI Studio Docs', 'وثائق ابدأ استوديو للذكاء الاصطناعي'],
+] as const)('%s.ebda.app', (app, titleEn, titleAr) => {
+  const out = (...p: string[]) => path.join(ROOT, 'apps', app, 'out', ...p);
+  beforeAll(() => {
+    execFileSync('npm', ['run', 'build', '-w', `apps/${app}`], { cwd: ROOT, stdio: 'pipe' });
+  }, 120_000);
+
+  it('is titled with the master brand, per product', () => {
+    expect(read('apps', app, 'out', 'index.html')).toMatch(
+      app === 'help' ? new RegExp(`<title>${titleAr}`) : new RegExp(`<title>${titleEn}`)
+    );
+    if (app === 'help') expect(read('apps/help/out/en/index.html')).toContain(`<title>${titleEn}`);
+    if (app === 'docs') expect(read('apps/docs/out/ar/index.html')).toContain(titleAr);
+    const home = read('apps', app, 'out', app === 'help' ? 'en/index.html' : 'index.html');
+    expect(home).toContain('Ebda Store');
+    expect(home).not.toMatch(/Ebda (WhatsApp|CRM|ERP)/); // a product gets its section the day it ships
+  });
+
+  it('has its own sitemap, robots and a security.txt with its own canonical', () => {
+    expect(read('apps', app, 'out', 'sitemap.xml')).toContain(`https://${app}.ebda.app/`);
+    expect(read('apps', app, 'out', 'robots.txt')).toContain(
+      `Sitemap: https://${app}.ebda.app/sitemap.xml`
+    );
+    const sec = read('apps', app, 'out', '.well-known', 'security.txt');
+    expect(sec).toContain(`Canonical: https://${app}.ebda.app/.well-known/security.txt`);
+    expect(sec).toMatch(/^Contact: mailto:security@ebda\.app$/m);
+    const exp = new Date(/^Expires: (.+)$/m.exec(sec)![1]).getTime();
+    expect(exp - Date.now()).toBeGreaterThan(90 * 86_400_000);
+    expect(existsSync(out('_headers'))).toBe(true);
+  });
+
+  it('deploys as its own Worker on its own custom domain, production only', () => {
+    const w = read('apps', app, 'wrangler.jsonc');
+    expect(w).toContain(`"name": "ebda-${app}"`);
+    expect(w).toContain(`"pattern": "${app}.ebda.app", "custom_domain": true`);
+    expect(w).not.toMatch(/"env"|-preview|staging/i);
+  });
+});
+
+describe('deploy workflows (production only, verified after deploy)', () => {
+  for (const app of ['help', 'docs', 'status']) {
+    it(`cf-${app}-deploy.yml: main/dispatch only, guard probes the live host, no preview`, () => {
+      const y = read('.github', 'workflows', `cf-${app}-deploy.yml`);
+      expect(y).toContain(`ebda-${app}-production`);
+      expect(y).toContain('environment: production');
+      expect(y).toContain("github.ref == 'refs/heads/main'");
+      expect(y).toContain('deploy-guard.mjs previous');
+      expect(y).toContain(`--name ebda-${app}`);
+      expect(y).toContain(`https://${app}.ebda.app/`);
+      expect(y).toContain('--rollback-probe');
+      expect(y).not.toMatch(/preview|staging|--env/i);
+    });
+  }
+});

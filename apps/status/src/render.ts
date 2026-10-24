@@ -1,13 +1,13 @@
 // Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
 import { BRAND, brandMarkSvg, brandAppIconSvg } from '../../../packages/shared/src/brand/index';
-import { COMPONENTS, HISTORY_DAYS } from './config';
+import { COMPONENTS, HISTORY_DAYS, PRODUCTS } from './config';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
 export type Lang = 'ar' | 'en';
 
 const T = {
   ar: {
-    title: `حالة خدمات ${BRAND.nameAr}`,
+    title: `حالة خدمات ${BRAND.company.shortNameAr}`,
     site: 'حالة الخدمة',
     skip: 'تخطَّ إلى المحتوى',
     overall: {
@@ -45,7 +45,7 @@ const T = {
     footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}`,
   },
   en: {
-    title: `${BRAND.name} service status`,
+    title: `${BRAND.company.shortNameEn} Status`,
     site: 'Status',
     skip: 'Skip to content',
     overall: {
@@ -163,7 +163,7 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--muted)}
 .operational .dot{background:var(--ok)}.degraded .dot{background:var(--warn)}.outage .dot{background:var(--bad)}
 .muted{color:var(--muted)}.small{font-size:.875rem}
-.comps,.incs,.upd{list-style:none;padding:0;margin:0}
+.prod h3{font-size:.95rem;margin:1.2em 0 .5em;color:var(--muted)}.comps,.incs,.upd{list-style:none;padding:0;margin:0}
 .comp{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--panel)}
 .comp-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:.875rem;font-weight:600}
@@ -215,7 +215,12 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <h2>${esc(t.activeIncidents)}</h2>
 ${active}
 <h2>${esc(t.components)}</h2>
-<ul class="comps">${s.components.map(c => component(c, lang)).join('')}</ul>
+${PRODUCTS.map(prod => {
+  const list = s.components.filter(c => COMPONENTS.find(x => x.id === c.id)?.product === prod.id);
+  return list.length
+    ? `<section class="prod" aria-labelledby="prod-${prod.id}"><h3 id="prod-${prod.id}">${esc(prod.name[lang])}</h3><ul class="comps">${list.map(c => component(c, lang)).join('')}</ul></section>`
+    : '';
+}).join('')}
 <h2>${esc(t.recentIncidents)}</h2>
 ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>

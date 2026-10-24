@@ -25,8 +25,10 @@ const ORIGIN = `https://${BRAND.domains.docs}`;
 const url = slug => (slug === 'index' ? '/' : `/${slug}/`);
 
 const SECTIONS = ['Start', 'Concepts', 'Reference'];
+/** The products this site documents (BRAND-ARCH-1). A product is added when it ships; never a placeholder. */
+const PRODUCT = BRAND.product.nameEn;
 const EN = {
-  site: 'Docs',
+  site: `${BRAND.company.shortNameEn} Docs`,
   skip: 'Skip to content',
   nav: [
     { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameEn },
@@ -84,7 +86,7 @@ const allNav = [
 const sidebarFor = current =>
   renderSidebar(
     SECTIONS.map(section => ({
-      title: section,
+      title: `${PRODUCT} · ${section}`,
       items: allNav
         .filter(p => p.section === section)
         .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
@@ -111,8 +113,8 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
     lang: 'en',
     title:
       slug === 'index'
-        ? `${BRAND.product.nameEn} developer docs`
-        : `${title} | ${BRAND.product.nameEn} Docs`,
+        ? `${BRAND.company.shortNameEn} Docs`
+        : `${title} | ${BRAND.company.shortNameEn} Docs`,
     description,
     canonical: ORIGIN + url(slug),
     alternates: [
@@ -194,7 +196,7 @@ for (const p of pages) {
     .join('')}</ul>`;
   const page = renderPage({
     lang: 'ar',
-    title: `وثائق المطوّرين | ${BRAND.product.nameAr}`,
+    title: `وثائق ${BRAND.company.shortNameAr}`,
     description: arIndex.data.description,
     canonical: ORIGIN + '/ar/',
     alternates: [
@@ -227,7 +229,7 @@ writePage(
   '/search/',
   renderPage({
     lang: 'en',
-    title: `Search | ${BRAND.product.nameEn} Docs`,
+    title: `Search | ${BRAND.company.shortNameEn} Docs`,
     description: 'Search the Ebda Store developer documentation.',
     canonical: ORIGIN + '/search/',
     siteLabel: EN.site,
@@ -261,7 +263,7 @@ writeFileSync(
   path.join(out, '404.html'),
   renderPage({
     lang: 'en',
-    title: `Not found | ${BRAND.product.nameEn} Docs`,
+    title: `Not found | ${BRAND.company.shortNameEn} Docs`,
     description: 'Page not found.',
     canonical: ORIGIN + '/',
     siteLabel: EN.site,
@@ -275,7 +277,7 @@ writeFileSync(
 );
 writeFileSync(
   path.join(out, 'llms.txt'),
-  `# ${BRAND.product.nameEn} developer docs\n\n> API and developer documentation for ${BRAND.product.nameEn} (${BRAND.company.shortNameEn}).\n\n${pages
+  `# ${BRAND.company.shortNameEn} Docs\n\n> Developer documentation for ${BRAND.product.nameEn}, from ${BRAND.company.shortNameEn}. Products are added here as they ship.\n\n${pages
     .map(p => `- [${p.data.title}](${ORIGIN}${url(p.slug)}): ${p.data.description}`)
     .join('\n')}\n- [OpenAPI document](${ORIGIN}/openapi.json)\n`
 );

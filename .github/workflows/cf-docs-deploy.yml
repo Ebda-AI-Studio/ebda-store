@@ -1,0 +1,62 @@
+name: Deploy Ebda developer docs to Cloudflare
+# Production only.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/docs/**'
+      - 'packages/shared/**'
+      - 'packages/site-kit/**'
+      - '.github/workflows/cf-docs-deploy.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ebda-docs-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+      - name: Require deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - run: npm ci
+      - run: npm run build -w packages/shared
+      - name: Build docs (static site to apps/docs/out)
+        run: npm run build -w apps/docs
+      - name: Require the built site
+        run: |
+          for f in out/index.html out/404.html out/sitemap.xml out/robots.txt out/.well-known/security.txt; do
+            test -s "apps/docs/$f" || { echo "::error::missing build output $f"; exit 1; }
+          done
+      - name: Record the version serving production (rollback target)
+        id: previous
+        working-directory: apps/docs
+        run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-docs
+      - name: Deploy docs Worker
+        working-directory: apps/docs
+        run: npx wrangler deploy
+      - name: Verify the live host, roll back automatically if it is unhealthy
+        # Ruling DEPLOY-SAFETY-2: poll 90s; any non-200 or 5xx -> wrangler rollback to the recorded
+        # version, confirm it serves, fail the job.
+        env:
+          PREVIOUS_VERSION: ${{ steps.previous.outputs.previous }}
+        run: |
+          node scripts/ci/deploy-guard.mjs verify --name ebda-docs --cwd apps/docs \
+            --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" \
+            --probe "https://docs.ebda.app/|200" --probe "https://docs.ebda.app/sitemap.xml|200" \
+            --probe "https://docs.ebda.app/robots.txt|200" --probe "https://docs.ebda.app/.well-known/security.txt|200" \
+            --rollback-probe "https://docs.ebda.app/|200"
