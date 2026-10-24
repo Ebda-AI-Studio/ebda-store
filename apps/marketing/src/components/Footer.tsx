@@ -55,6 +55,12 @@ export function Footer({ locale }: { locale: Locale }) {
               <Link href={pagePath(locale, 'about')}>{c.about}</Link>
             </li>
             <li>
+              <Link href={pagePath(locale, 'contact')}>{COPY[locale].nav.contact}</Link>
+            </li>
+            <li>
+              <Link href={pagePath(locale, 'contact')}>{COPY[locale].nav.contact}</Link>
+            </li>
+            <li>
               <Link href={pagePath(locale, 'legal')}>{c.legal}</Link>
             </li>
             <li>

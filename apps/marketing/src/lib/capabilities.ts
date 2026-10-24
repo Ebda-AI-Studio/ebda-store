@@ -476,7 +476,7 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
     },
     {
       q: 'What is not there yet?',
-      a: 'There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Salla, Zid and Shopify go through the details, and what is coming soon.',
+      a: 'There is no app marketplace, no custom code editor, no point-of-sale and no multi-currency store. The comparison pages for Zid and Shopify go through the details, and what is coming soon.',
     },
   ],
 };
