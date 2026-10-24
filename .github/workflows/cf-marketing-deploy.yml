@@ -42,7 +42,7 @@ jobs:
         run: npm run build -w apps/marketing
       - name: Require the built SEO surface
         run: |
-          for f in out/index.html out/en/index.html out/sitemap.xml out/robots.txt out/llms.txt out/.well-known/security.txt; do
+          for f in out/index.html out/en/index.html out/sitemap.xml out/robots.txt out/llms.txt out/_redirects out/.well-known/security.txt; do
             test -s "apps/marketing/$f" || { echo "::error::missing build output $f"; exit 1; }
           done
       - name: Record the version serving production (rollback target)
@@ -61,4 +61,5 @@ jobs:
           node scripts/ci/deploy-guard.mjs verify --name ebda-marketing --cwd apps/marketing \
             --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" \
             --probe "https://ebda.app/|200" --probe "https://ebda.app/sitemap.xml|200" \
+            --probe "https://ebda.app/llms.txt|200" --probe "https://ebda.app/.well-known/security.txt|200" \
             --rollback-probe "https://ebda.app/|200" --rollback-probe "https://ebda.app/sitemap.xml|200"

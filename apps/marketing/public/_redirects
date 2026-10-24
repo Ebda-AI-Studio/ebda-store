@@ -1,0 +1,3 @@
+# Workers Static Assets redirects (the static export has no server). First match wins.
+# /llm.txt is an alias of the canonical /llms.txt (llmstxt.org); crawlers that drop the "s" land on the real file.
+/llm.txt /llms.txt 301
