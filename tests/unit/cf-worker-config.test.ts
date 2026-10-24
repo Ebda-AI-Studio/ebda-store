@@ -51,10 +51,10 @@ describe('wrangler.jsonc', () => {
 
   it('declares every binding the code reads', () => {
     const doNames = config.durable_objects.bindings.map((b: any) => b.name);
-    expect(doNames).toEqual(expect.arrayContaining(['AUTH_STATE', 'STORE_REALTIME']));
+    expect(doNames).toEqual(expect.arrayContaining(['AUTH_STATE', 'STORE_REALTIME', 'JOB_GATE']));
     expect(config.kv_namespaces.map((k: any) => k.binding)).toContain('KV_CACHE');
     expect(config.queues.producers.map((p: any) => p.binding)).toEqual(
-      expect.arrayContaining(['EMAIL_QUEUE', 'SMS_QUEUE'])
+      expect.arrayContaining(['EMAIL_QUEUE', 'SMS_QUEUE', 'JOBS_QUEUE'])
     );
     expect(config.ratelimits.map((r: any) => r.name)).toContain('RATE_LIMITER');
     expect(config.version_metadata.binding).toBe('CF_VERSION_METADATA');
@@ -70,7 +70,7 @@ describe('wrangler.jsonc', () => {
 
   it('every queue has a consumer with retries and a dead-letter queue, and the DLQs are consumed', () => {
     const consumers = config.queues.consumers as Array<Record<string, any>>;
-    for (const q of ['ebda-email', 'ebda-sms']) {
+    for (const q of ['ebda-email', 'ebda-sms', 'ebda-jobs']) {
       const c = consumers.find(x => x.queue === q)!;
       expect(c.max_retries).toBeGreaterThan(0);
       expect(c.dead_letter_queue).toBe(`${q}-dlq`);
@@ -121,7 +121,9 @@ describe('Hyperdrive caching stays OFF', () => {
 describe('Cron Triggers', () => {
   it('every schedule the code handles is declared in wrangler.jsonc, and every declared one has jobs', () => {
     const declared: string[] = [...config.triggers.crons].sort();
-    expect(Object.keys(CRON_SCHEDULE).sort()).toEqual(declared);
+    // The legacy loops are a subset of the declared schedules; the rest are Inngest schedules ported
+    // to Cloudflare, pinned by tests/unit/jobs-schedule.test.ts.
+    expect(declared).toEqual(expect.arrayContaining(Object.keys(CRON_SCHEDULE)));
     for (const jobs of Object.values(CRON_SCHEDULE)) expect(jobs.length).toBeGreaterThan(0);
   });
 });
