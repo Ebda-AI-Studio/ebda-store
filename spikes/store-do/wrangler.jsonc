@@ -1,0 +1,15 @@
+// Deployable spike worker `ebda-store-do-spike` (personal Whisky 11 Cloudflare account). NOT ebda-api.
+// Phase 0 only: workers.dev preview URL, no custom domain, no production data besides one demo store.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ebda-store-do-spike",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "durable_objects": { "bindings": [{ "name": "STORE_DO", "class_name": "StoreDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StoreDO"] }],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  // Flag: empty = the DO backend serves nobody. The demo store id is set at deploy time (Task 0.4).
+  "vars": { "STORE_DO_ENABLED_IDS": "" },
+}
