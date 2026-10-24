@@ -1,6 +1,7 @@
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { revokeIdentityIfManaged } from '../lib/identity-client';
 import crypto from 'crypto';
 import {
   prisma,
@@ -813,6 +814,13 @@ export class AuthService {
     // still log in with its password — `status` was recorded but never read.
     loginGate.assertActive(user);
 
+    // Merchants, staff and super admins sign in at the shared identity service (Rulings ID-1/ID-2). This legacy path would
+    // accept a password hash the identity service no longer controls (a reset there would not reach it), so it is closed for
+    // them: the right password here proves nothing and issues nothing.
+    if (user.storeId === null && user.role !== 'customer') {
+      throw new AppError(409, 'USE_IDENTITY_SERVICE', 'Sign in through the Ebda account service');
+    }
+
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
     // TOTP code via /auth/mfa/verify to exchange it for a real session.
@@ -886,6 +894,11 @@ export class AuthService {
     // (`deletedAt: null`), and this path must not either.
     if (user.status !== 'active' || user.deletedAt) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+    }
+    // The only place a legacy (HS256) session is minted for a login: closed for identity-managed accounts, which sign in at
+    // the identity service. Covers the passkey and MFA completions that reach here.
+    if (user.storeId === null && user.role !== 'customer') {
+      throw new AppError(409, 'USE_IDENTITY_SERVICE', 'Sign in through the Ebda account service');
     }
 
     const tokens = await this.generateTokens({
@@ -1122,6 +1135,11 @@ export class AuthService {
       })
     );
     if (!tokenOwner) {
+      throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
+    }
+    // A legacy refresh token of an identity-managed account is dead: the session now lives at the identity service
+    // (Ruling ID-5: one re-login). Nothing here can mint a Store token for it.
+    if (tokenOwner.storeId === null && tokenOwner.role !== 'customer') {
       throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
     }
     const storedToken = { ...storedRow, user: tokenOwner };
@@ -1561,6 +1579,11 @@ export class AuthService {
     ).catch(err =>
       logger.error({ err, userId }, '[auth.revokeAllSessions] tokenVersion push failed')
     );
+
+    // Merchant / staff / super-admin sessions live in the identity service (Rulings ID-1/ID-2): end them THERE too, or the
+    // user's 15 minute token and the refresh behind it keep working after every revocation reason handled here (password
+    // change, logout everywhere, admin suspension). Fails loud: a revocation that did not reach the source is not a revocation.
+    await revokeIdentityIfManaged(userId, reason);
 
     // Revoke all live refresh tokens — prevents session resumption via
     // token rotation even before the access token's tv is checked.

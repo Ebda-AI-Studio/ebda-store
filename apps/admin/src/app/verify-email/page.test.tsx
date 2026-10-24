@@ -1,14 +1,26 @@
 // @vitest-environment jsdom
 /**
- * Verify-email page (SP5 task 2): the emailed token is single-use, so the page
- * must POST it exactly once, and each failure reads distinctly.
+ * Verify-email page (identity service): the emailed link carries the address in the query and a one-time code in the
+ * fragment; verifying also needs the password chosen at signup, so the page asks for it and POSTs once per submit.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 
-const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
+const { accountsFetch, apiPost } = vi.hoisted(() => ({ accountsFetch: vi.fn(), apiPost: vi.fn() }));
 vi.mock('../../lib/api', () => ({ apiPost }));
+vi.mock('../../lib/accounts', () => ({
+  accountsFetch,
+  AccountsError: class AccountsError extends Error {
+    constructor(
+      public status: number,
+      public code: string,
+      message: string
+    ) {
+      super(message);
+    }
+  },
+}));
 vi.mock('../../lib/auth', () => ({ useAuth: () => ({ isAuthenticated: false }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('next/link', () => ({
@@ -26,8 +38,19 @@ vi.mock('@/i18n/useT', () => {
 
 import VerifyEmailPage from './page';
 
+const EMAIL = 'owner@shop.test';
+const LINK = `?email=${encodeURIComponent(EMAIL)}#code=123456`;
+
 function visit(search: string) {
   window.history.pushState({}, '', `/verify-email${search}`);
+}
+
+function renderPage() {
+  return render(
+    <NextIntlClientProvider locale="en" messages={{}}>
+      <VerifyEmailPage />
+    </NextIntlClientProvider>
+  );
 }
 
 afterEach(() => {
@@ -36,43 +59,45 @@ afterEach(() => {
 });
 
 describe('verify-email page', () => {
-  it('posts the token once and shows success', async () => {
-    visit('?token=abc123');
-    apiPost.mockResolvedValue({ data: { success: true }, error: null });
-    render(
-      <NextIntlClientProvider locale="en" messages={{}}>
-        <VerifyEmailPage />
-      </NextIntlClientProvider>
-    );
+  it('strips the address and code from the address bar, asks for the password, then verifies once', async () => {
+    visit(LINK);
+    accountsFetch.mockResolvedValue({ verified: true });
+    renderPage();
+    const pw = await screen.findByLabelText('onboarding.verify.password');
+    expect(window.location.search).toBe('');
+    expect(window.location.hash).toBe('');
+    expect(accountsFetch).not.toHaveBeenCalled(); // nothing is sent until the visitor types the password
+    fireEvent.change(pw, { target: { value: 'Str0ng!Passw0rd' } });
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.verify.verifyButton' }));
     expect(await screen.findByText('onboarding.verify.successTitle')).toBeTruthy();
-    expect(apiPost).toHaveBeenCalledTimes(1);
-    expect(apiPost).toHaveBeenCalledWith('/api/v1/auth/verify-email', { token: 'abc123' });
+    expect(accountsFetch).toHaveBeenCalledTimes(1);
+    expect(accountsFetch).toHaveBeenCalledWith('/otp/verify', {
+      json: { email: EMAIL, code: '123456', password: 'Str0ng!Passw0rd' },
+    });
   });
 
-  it.each([
-    ['TOKEN_EXPIRED', 'onboarding.verify.expired'],
-    ['TOKEN_INVALID', 'onboarding.verify.invalid'],
-    ['SERVER_ERROR', 'onboarding.verify.generic'],
-  ])('maps %s to its own message and offers a resend form', async (code, text) => {
-    visit('?token=abc123');
-    apiPost.mockResolvedValue({ data: null, error: { code, message: 'x', status: 400 } });
-    render(
-      <NextIntlClientProvider locale="en" messages={{}}>
-        <VerifyEmailPage />
-      </NextIntlClientProvider>
+  it('a wrong password keeps the form with a message and offers forgot-password', async () => {
+    visit(LINK);
+    const { AccountsError } = await import('../../lib/accounts');
+    accountsFetch.mockRejectedValue(new AccountsError(400, 'INVALID_CODE', 'x'));
+    renderPage();
+    fireEvent.change(await screen.findByLabelText('onboarding.verify.password'), {
+      target: { value: 'nope' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.verify.verifyButton' }));
+    expect(await screen.findByText('onboarding.verify.wrongPassword')).toBeTruthy();
+    expect(screen.getByText('onboarding.verify.forgotPassword').closest('a')?.getAttribute('href')).toBe(
+      '/forgot-password'
     );
-    expect(await screen.findByText(text)).toBeTruthy();
-    expect(screen.getByLabelText('onboarding.verify.email')).toBeTruthy();
   });
 
-  it('a link with no token never calls the API', async () => {
-    visit('');
-    render(
-      <NextIntlClientProvider locale="en" messages={{}}>
-        <VerifyEmailPage />
-      </NextIntlClientProvider>
-    );
-    expect(await screen.findByText('onboarding.verify.missing')).toBeTruthy();
-    await waitFor(() => expect(apiPost).not.toHaveBeenCalled());
-  });
+  it.each([[''], ['?email=a%40b.test'], ['#code=123456'], ['?email=a%40b.test#code=12']])(
+    'an incomplete link (%s) never calls the identity service',
+    async search => {
+      visit(search);
+      renderPage();
+      expect(await screen.findByText('onboarding.verify.missing')).toBeTruthy();
+      await waitFor(() => expect(accountsFetch).not.toHaveBeenCalled());
+    }
+  );
 });

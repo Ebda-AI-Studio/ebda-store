@@ -16,6 +16,7 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 import { cfBindings } from '../cf/bindings';
+import type { StoreClaim } from './identity-directory';
 
 export const ACCOUNTS_ISSUER = 'https://accounts.ebda.app';
 export const ACCOUNTS_AUDIENCE = 'store';
@@ -26,7 +27,7 @@ export interface AccountsClaims {
   sub: string;
   sid: string;
   jti: string;
-  stores: Array<{ id: string; role: 'owner' | 'staff' }>;
+  stores: StoreClaim[];
   pa?: 'super_admin';
   email?: string;
   emailVerified?: boolean;
@@ -113,7 +114,7 @@ export async function verifyAccountsToken(
     sid,
     jti,
     stores: stores.filter(
-      (s): s is { id: string; role: 'owner' | 'staff' } =>
+      (s): s is StoreClaim =>
         !!s && typeof (s as { id?: unknown }).id === 'string' && ['owner', 'staff'].includes((s as { role?: string }).role ?? '')
     ),
     ...(pa === 'super_admin' ? { pa: 'super_admin' as const } : {}),

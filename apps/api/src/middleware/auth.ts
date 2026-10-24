@@ -7,6 +7,7 @@ import { getUserState } from '../lib/definer';
 import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
+import { isIdentityManagedUser } from '../lib/identity-client';
 import {
   isAccountsToken,
   sessionRevoked,
@@ -138,7 +139,10 @@ export function accountsUser(c: AccountsClaims): AuthPayload {
 }
 
 /** Verify an identity-service token and its session. Throws AppError on any failure. */
-export async function authenticateAccounts(token: string): Promise<{ user: AuthPayload; claims: AccountsClaims }> {
+export async function authenticateAccounts(
+  token: string,
+  opts: { allowMissingProfile?: boolean } = {}
+): Promise<{ user: AuthPayload; claims: AccountsClaims }> {
   let claims: AccountsClaims;
   try {
     claims = await verifyAccountsToken(token);
@@ -154,6 +158,19 @@ export async function authenticateAccounts(token: string): Promise<{ user: AuthP
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
   if (revoked) throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
+
+  // Defence in depth (NEVER-stale class: account status / existence, no cache): the Store's own profile row must also exist, be
+  // live and be active. Every Store path that suspends, deletes or revokes a user also calls the identity service, but a path
+  // that missed it must not leave a valid 15 minute token working. A missing row is refused here; only `POST /auth/session`
+  // (allowMissingProfile) may create one, and only from an identity that still exists.
+  const st = await getUserState(claims.sub);
+  if (!st) {
+    if (!opts.allowMissingProfile) throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
+  } else if (st.deletedAt) {
+    throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
+  } else if (st.status !== 'active') {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+  }
   return { user: accountsUser(claims), claims };
 }
 
@@ -451,4 +468,22 @@ export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: N
       message: 'This endpoint is not available from this origin',
     },
   });
+}
+
+/**
+ * Credential management (password, MFA, passkeys) of a merchant, staff or super-admin account belongs to the identity service
+ * (Rulings ID-1/ID-2). A change made here would only touch a profile row the identity service ignores, so it would LOOK
+ * enrolled while protecting nothing. Mount AFTER `authenticate`. Customers are unaffected.
+ */
+export async function rejectIdentityManaged(req: Request, _res: Response, next: NextFunction) {
+  try {
+    if (req.user && req.user.role !== 'customer' && (await isIdentityManagedUser(req.user.userId))) {
+      return next(
+        new AppError(409, 'USE_IDENTITY_SERVICE', 'Manage sign-in settings in your Ebda account settings')
+      );
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 }

@@ -5409,6 +5409,8 @@
       "serverError": "Server returned an invalid response. Please try again.",
       "accessDenied": "Access denied. Admin or staff privileges required.",
       "mfaVerifyFailed": "Verification failed",
+      "emailNotVerified": "Please verify your email first. We sent you a code.",
+      "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
       "forgotPassword": "Forgot password?",
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
@@ -7425,7 +7427,8 @@
         "removed": "Passkey removed",
         "errorLoad": "Could not load your passkeys",
         "errorGeneric": "Something went wrong. Nothing was changed."
-      }
+      },
+      "passwordLabel": "Confirm your password"
     }
   },
   "answerEngine": {
@@ -8434,7 +8437,13 @@
       "resend": "Send a new link",
       "resending": "Sending…",
       "resent": "If the address is eligible, a new link is on its way.",
-      "backToLogin": "Back to sign in"
+      "backToLogin": "Back to sign in",
+      "passwordTitle": "Confirm your password",
+      "passwordBody": "Enter the password you chose when you signed up to finish verifying your email.",
+      "password": "Password",
+      "verifyButton": "Verify my email",
+      "wrongPassword": "That is not the password this verification was created with.",
+      "forgotPassword": "Forgot your password?"
     },
     "flow": {
       "title": "Set up your store",

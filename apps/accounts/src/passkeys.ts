@@ -285,3 +285,18 @@ export async function removePasskey(db: D1Database, userId: string, id: string):
     .run();
   return (r.meta.changes ?? 0) === 1;
 }
+
+export async function renamePasskey(
+  db: D1Database,
+  userId: string,
+  id: string,
+  name: string
+): Promise<boolean> {
+  const clean = name.replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!clean) return false;
+  const r = await db
+    .prepare(`UPDATE passkey_credentials SET name = ?3 WHERE id = ?1 AND user_id = ?2`)
+    .bind(id, userId, clean)
+    .run();
+  return (r.meta.changes ?? 0) === 1;
+}

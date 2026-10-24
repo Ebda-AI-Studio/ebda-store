@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Input, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
-import { apiPost, apiGet } from '../../../lib/api';
+import { apiGet } from '../../../lib/api';
+import {
+  AccountsError,
+  accountsFetch,
+  accountsToken,
+  establishApiSession,
+} from '../../../lib/accounts';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
@@ -28,6 +34,30 @@ interface EnrollBeginData {
   qr: string;
 }
 
+// ── Identity-service calls ────────────────────────────────────────────────────
+
+/**
+ * MFA lives in the shared identity service (Rulings ID-1/ID-2). Each call gets a fresh 15 minute token, sends it as a Bearer
+ * header, and returns the page's existing `{ data, error }` shape. After a change, the Store's own profile row is
+ * reconciled at once (`/auth/session`), so the super-admin MFA gate sees it without waiting for the next refresh.
+ */
+async function acct<T>(
+  path: string,
+  json: unknown,
+  syncStore = false
+): Promise<{ data?: T; error?: { message: string; code: string } }> {
+  try {
+    const grant = await accountsToken();
+    const data = await accountsFetch<T>(path, { json, bearer: grant.access_token });
+    if (syncStore)
+      await establishApiSession((await accountsToken()).access_token).catch(() => undefined);
+    return { data };
+  } catch (e) {
+    if (e instanceof AccountsError) return { error: { message: e.message, code: e.code } };
+    return { error: { message: String(e), code: 'REQUEST_FAILED' } };
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function SecurityPage() {
@@ -44,7 +74,7 @@ export default function SecurityPage() {
   const [step, setStep] = useState<Step>('idle');
   const [enrollData, setEnrollData] = useState<EnrollBeginData | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
-  const [currentCode, setCurrentCode] = useState(''); // required when re-enrolling (already enabled)
+  const [password, setPassword] = useState(''); // step-up: the identity service asks for the password again
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enrollError, setEnrollError] = useState('');
 
@@ -82,18 +112,19 @@ export default function SecurityPage() {
     setEnrollError('');
     setIsSubmitting(true);
     try {
-      // If already enabled, we need the current TOTP code (re-enroll)
-      const body = status?.mfaEnabled ? { code: currentCode } : undefined;
-      const { data, error } = await apiPost<EnrollBeginData>('/api/v1/auth/mfa/enroll/begin', body);
+      const { data, error } = await acct<{ secret: string; otpauthUrl: string }>('/mfa/enroll', {
+        password,
+      });
       if (error) {
         setEnrollError(error.message || t('errorBegin'));
         return;
       }
       if (data) {
-        setEnrollData(data);
+        const QRCode = (await import('qrcode')).default;
+        setEnrollData({ secret: data.secret, qr: await QRCode.toDataURL(data.otpauthUrl) });
         setStep('enrolling');
         setVerifyCode('');
-        setCurrentCode('');
+        setPassword('');
       }
     } finally {
       setIsSubmitting(false);
@@ -106,9 +137,10 @@ export default function SecurityPage() {
     setEnrollError('');
     setIsSubmitting(true);
     try {
-      const { data, error } = await apiPost<{ backupCodes: string[] }>(
-        '/api/v1/auth/mfa/enroll/verify',
-        { code: verifyCode.trim() }
+      const { data, error } = await acct<{ backupCodes: string[] }>(
+        '/mfa/enroll/verify',
+        { code: verifyCode.trim() },
+        true
       );
       if (error) {
         setEnrollError(error.message || t('errorVerify'));
@@ -140,7 +172,7 @@ export default function SecurityPage() {
     setDisableError('');
     setIsSubmitting(true);
     try {
-      const { error } = await apiPost('/api/v1/auth/mfa/disable', { code: disableCode.trim() });
+      const { error } = await acct('/mfa/disable', { password, code: disableCode.trim() }, true);
       if (error) {
         setDisableError(error.message || t('errorDisable'));
         setDisableCode('');
@@ -149,6 +181,7 @@ export default function SecurityPage() {
       setStatus(prev => (prev ? { ...prev, mfaEnabled: false, mfaEnrolledAt: null } : prev));
       setStep('idle');
       setDisableCode('');
+      setPassword('');
       toastSuccess(t('successDisabled'), undefined);
     } finally {
       setIsSubmitting(false);
@@ -346,6 +379,23 @@ export default function SecurityPage() {
                   )}
                   <div>
                     <label
+                      htmlFor="disable-password"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      {t('passwordLabel')}
+                    </label>
+                    <Input
+                      id="disable-password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label
                       htmlFor="disable-code"
                       className="block text-sm font-medium text-foreground"
                     >
@@ -382,7 +432,7 @@ export default function SecurityPage() {
                       type="submit"
                       variant="destructive"
                       className="flex-1"
-                      disabled={isSubmitting || disableCode.length !== 6}
+                      disabled={isSubmitting || disableCode.length !== 6 || !password}
                     >
                       {isSubmitting ? t('disabling') : t('disableButton')}
                     </Button>
@@ -454,52 +504,28 @@ export default function SecurityPage() {
                         {t('enableDescription')}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={handleBeginEnroll}
-                      disabled={isSubmitting}
-                      className="shrink-0"
-                    >
-                      {t('beginButton')}
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Input
+                        id="enroll-password"
+                        type="password"
+                        autoComplete="current-password"
+                        aria-label={t('passwordLabel')}
+                        placeholder={t('passwordLabel')}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleBeginEnroll}
+                        disabled={isSubmitting || !password}
+                        className="shrink-0"
+                      >
+                        {t('beginButton')}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
-                    {/* Re-enroll while enabled: need current TOTP code first */}
-                    <div className="p-5 space-y-3">
-                      <div>
-                        <p className="font-medium text-foreground">{t('reEnrollButton')}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                          {t('currentCodeLabel')}
-                        </p>
-                      </div>
-                      {enrollError && step === 'idle' && (
-                        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
-                          {enrollError}
-                        </div>
-                      )}
-                      <div className="flex gap-3">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          value={currentCode}
-                          onChange={e => setCurrentCode(e.target.value)}
-                          className="text-center tracking-widest"
-                          placeholder={t('codePlaceholder')}
-                          maxLength={6}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleBeginEnroll}
-                          disabled={isSubmitting || currentCode.length !== 6}
-                        >
-                          {isSubmitting ? '…' : t('continueButton')}
-                        </Button>
-                      </div>
-                    </div>
-
                     {/* Disable row */}
                     <div className="flex items-center justify-between gap-4 p-5">
                       <div className="min-w-0">

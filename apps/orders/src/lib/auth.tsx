@@ -21,6 +21,7 @@ import {
   markSessionEvidence,
   clearStoredSession,
 } from './api';
+import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
 
 /**
  * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
@@ -167,12 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoading, user, pathname, router]);
 
-  function storeSession(data: {
-    user: AuthUser;
-    accessToken?: string;
-    refreshToken: string;
-    csrfToken?: string;
-  }) {
+  function storeSession(data: { user: AuthUser; csrfToken?: string }) {
     // A fresh session: any check still in flight is about the old one and
     // must not clear these tokens when it lands (#2161). An explicit login is
     // also what lifts a pending (unconfirmed) logout.
@@ -180,14 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPendingLogout();
     // The anonymous-mount gate's evidence that a session exists here (#2163).
     markSessionEvidence();
-    // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
-    // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
-    // purges it). On all other browsers auth rides the httpOnly cookie and
-    // writing tokens to localStorage would expose them to XSS unnecessarily.
-    if (isIosWebkit()) {
-      if (data.accessToken) localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-    }
+    // No token is persisted in JS: the session is the identity service's HttpOnly cookie plus the Store API's own.
     // The CSRF token is stored on EVERY platform, not just iOS: it is a
     // double-submit token, meant to be JS-readable, and a session without it
     // cannot make a state-changing request. Admin and orders are safe today
@@ -198,65 +187,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  async function login(email: string, password: string): Promise<void | MfaChallenge> {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error('Server returned an invalid response. Please try again.');
-    }
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || 'Login failed');
-    }
-
-    // MFA challenge: API returns { mfaRequired: true, challengeToken } instead of
-    // tokens. Surface it to the login page so it can show the code-entry step.
-    // (Staff enroll 2FA in the full admin; here we only complete the challenge.)
-    if (data.data?.mfaRequired) {
-      return { mfaRequired: true, challengeToken: data.data.challengeToken };
-    }
-
-    if (!ADMIN_ROLES.includes(data.data.user.role)) {
+  /** Exchange an identity-service access token for the Store session and finish signing in. */
+  async function finishSignIn(accessToken: string): Promise<void> {
+    const user = await establishApiSession<AuthUser>(accessToken);
+    if (!ADMIN_ROLES.includes(user.role)) {
       throw new Error('ADMIN_ONLY');
     }
-
-    storeSession(data.data);
+    storeSession({ user });
     router.push('/orders');
   }
 
-  async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {
-    const response = await fetch(`${API_URL}/auth/mfa/verify`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challengeToken, code }),
-    });
+  function signInError(e: unknown, fallback: string): Error {
+    if (e instanceof AccountsError) {
+      if (e.code === 'EMAIL_NOT_VERIFIED') return new Error('Please verify your email first.');
+      if (e.status === 429)
+        return new Error('Too many attempts. Please wait a few minutes and try again.');
+      return new Error(e.message || fallback);
+    }
+    return e instanceof Error ? e : new Error(fallback);
+  }
 
-    let data;
+  async function login(email: string, password: string): Promise<void | MfaChallenge> {
+    let result;
     try {
-      data = await response.json();
-    } catch {
-      throw new Error('Server returned an invalid response. Please try again.');
+      result = await accountsLogin(email, password);
+    } catch (e) {
+      throw signInError(e, 'Login failed');
     }
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || 'Verification failed');
+    // MFA challenge: surface it to the login page so it can show the code-entry step.
+    // (Staff enroll 2FA in the full admin; here we only complete the challenge.)
+    if (result.mfaRequired) {
+      return { mfaRequired: true, challengeToken: result.challenge };
     }
+    await finishSignIn(result.access_token);
+  }
 
-    if (!ADMIN_ROLES.includes(data.data.user.role)) {
-      throw new Error('ADMIN_ONLY');
+  async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {
+    let grant;
+    try {
+      grant = await accountsLoginMfa(challengeToken, code);
+    } catch (e) {
+      throw signInError(e, 'Verification failed');
     }
-
-    storeSession(data.data);
-    router.push('/orders');
+    await finishSignIn(grant.access_token);
   }
 
   async function logout() {

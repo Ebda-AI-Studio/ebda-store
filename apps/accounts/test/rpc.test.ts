@@ -41,6 +41,35 @@ describe('Accounts RPC for the Store', () => {
     await expect(rpc().setStatus(u.id, 'bogus' as never, 'x')).rejects.toThrow();
   });
 
+  it('eraseUser removes the identity and every session with it; a stale token and cookie are dead; idempotent', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    await rpc().eraseUser(u.id);
+    await rpc().eraseUser(u.id);
+    expect(await rpc().getAccountState(u.id)).toBeNull();
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
+    expect((await call('/me', { bearer: s.body.access_token })).status).toBe(401);
+    expect((await call('/login', { json: { email: u.email, password: u.password } })).status).toBe(
+      401
+    );
+    const sid = (await import('jose')).decodeJwt(s.body.access_token).sid as string;
+    expect(await rpc().isRevoked(sid)).toBe(true);
+    expect(
+      await env.DB.prepare(`SELECT count(*) AS n FROM refresh_tokens WHERE user_id = ?1`)
+        .bind(u.id)
+        .first()
+    ).toMatchObject({ n: 0 });
+  });
+
+  it('setRole changes the grant and ends sessions', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    await rpc().setRole(u.id, 'super_admin', 'test');
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
+    const again = await login(u);
+    expect((await import('jose')).decodeJwt(again.body.access_token).pa).toBe('super_admin');
+  });
+
   it('resendVerification mails a code only for an existing unverified account', async () => {
     const unverified = await seedUser({ emailVerified: 0 });
     const verified = await seedUser();

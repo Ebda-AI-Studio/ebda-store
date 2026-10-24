@@ -6,11 +6,12 @@ import { config } from '../config';
 import {
   authenticate,
   authenticateAccounts,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
 } from '../middleware/auth';
 import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
-import { revokeIdentitySession } from '../lib/identity-client';
+import { isIdentityManagedUser, revokeIdentitySession, setAccountStatus } from '../lib/identity-client';
 import { reconcileShadowUser } from '../services/identity-shadow';
 import {
   AuthService,
@@ -467,7 +468,7 @@ router.post('/session', refreshIpLimiter, async (req: Request, res: Response, ne
       !isPlatformOrigin(origin, { webUrl: config.webUrl, adminUrl: config.adminUrl, nodeEnv: config.nodeEnv })
     )
       throw new AppError(403, 'CORS_ORIGIN_NOT_ALLOWED', 'Origin not allowed');
-    const { claims } = await authenticateAccounts(token);
+    const { claims } = await authenticateAccounts(token, { allowMissingProfile: true });
     await reconcileShadowUser(claims.sub);
     setTokenCookie(res, token);
     const user = await AuthService.getProfile(claims.sub);
@@ -830,6 +831,10 @@ router.delete(
     try {
       const userId = req.user!.userId;
 
+      // An identity-service account is deactivated THERE first (every session and refresh dies, sign-in is refused); if that
+      // fails nothing has changed and the request fails.
+      if (await isIdentityManagedUser(userId)) await setAccountStatus(userId, 'inactive', 'self-delete');
+
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
       await withUser(userId, tx =>
         tx.user.update({
@@ -990,6 +995,7 @@ router.post(
   '/change-password',
   authLimiter,
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {

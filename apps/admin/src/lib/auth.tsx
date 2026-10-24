@@ -30,6 +30,7 @@ import {
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { passkeyAssertion, type PasskeyMode } from './passkeys';
+import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
 
 interface User {
   id: string;
@@ -211,12 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoading, user, pathname, router]);
 
   /** Shared token-storage logic used by both normal login and MFA completion. */
-  function storeSession(data: {
-    user: User;
-    accessToken?: string;
-    refreshToken: string;
-    csrfToken?: string;
-  }) {
+  function storeSession(data: { user: User; csrfToken?: string }) {
     // A fresh session: any check still in flight is about the old one and
     // must not clear these tokens when it lands (#2161). An explicit login is
     // also what lifts a pending (unconfirmed) logout.
@@ -224,17 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPendingLogout();
     // The anonymous-mount gate's evidence that a session exists here (#2163).
     markSessionEvidence();
-    // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
-    // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
-    // purges it). On all other browsers (desktop Chrome/Firefox, Android
-    // Chrome) auth rides the httpOnly cookie and we must NOT write tokens
-    // to localStorage — they are JS-readable and expose them to XSS.
-    if (isIosWebkit()) {
-      if (data.accessToken) {
-        localStorage.setItem('accessToken', data.accessToken);
-      }
-      localStorage.setItem('refreshToken', data.refreshToken);
-    }
+    // No token is persisted in JS: the session is the identity service's HttpOnly cookie plus the Store API's own.
     // The CSRF token is stored on EVERY platform, not just iOS: it is a
     // double-submit token, meant to be JS-readable, and a session without it
     // cannot make a state-changing request. Admin and orders are safe today
@@ -252,88 +238,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  async function login(email: string, password: string): Promise<void | MfaChallenge> {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error(t('serverError'));
-    }
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || t('loginFailed'));
-    }
-
-    // MFA challenge: API returns { mfaRequired: true, challengeToken } instead
-    // of tokens. Surface this to the login page so it can show the code-entry step.
-    if (data.data?.mfaRequired) {
-      return { mfaRequired: true, challengeToken: data.data.challengeToken } as MfaChallenge;
-    }
-
+  /** Exchange an identity-service access token for the Store session and finish signing in. */
+  async function finishSignIn(accessToken: string): Promise<void> {
+    const user = await establishApiSession<User>(accessToken);
     // Check if user is admin or staff
     const adminRoles = ['super_admin', 'store_admin', 'staff'];
-    if (!adminRoles.includes(data.data.user.role)) {
+    if (!adminRoles.includes(user.role)) {
       throw new Error(t('accessDenied'));
     }
-
-    // Mirror the access token into localStorage for the iOS PWA path —
-    // Safari/WebKit purges third-party cookies (the API is on a
-    // different parent domain than the admin) so cookie-only auth
-    // doesn't survive PWA backgrounding. lib/api.ts sends this token
-    // as `Authorization: Bearer` on every request.
-    storeSession(data.data);
+    storeSession({ user });
     router.push(postLoginDestination());
+  }
+
+  /** Map an identity-service refusal to the page's existing messages. */
+  function signInError(e: unknown, fallback: string): Error {
+    if (e instanceof AccountsError) {
+      if (e.code === 'EMAIL_NOT_VERIFIED') return new Error(t('emailNotVerified'));
+      if (e.status === 429) return new Error(t('tooManyAttempts'));
+      if (e.status === 401 || e.status === 403) return new Error(e.message || fallback);
+      return new Error(t('serverError'));
+    }
+    return e instanceof Error ? e : new Error(fallback);
+  }
+
+  async function login(email: string, password: string): Promise<void | MfaChallenge> {
+    let result;
+    try {
+      result = await accountsLogin(email, password);
+    } catch (e) {
+      throw signInError(e, t('loginFailed'));
+    }
+    // MFA challenge: surface it to the login page so it can show the code-entry step.
+    if (result.mfaRequired) {
+      return { mfaRequired: true, challengeToken: result.challenge } as MfaChallenge;
+    }
+    await finishSignIn(result.access_token);
   }
 
   async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {
-    const response = await fetch(`${API_URL}/auth/mfa/verify`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challengeToken, code }),
-    });
-
-    let data;
+    let grant;
     try {
-      data = await response.json();
-    } catch {
-      throw new Error(t('serverError'));
+      grant = await accountsLoginMfa(challengeToken, code);
+    } catch (e) {
+      throw signInError(e, t('mfaVerifyFailed'));
     }
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || t('mfaVerifyFailed'));
-    }
-
-    const adminRolesMfa = ['super_admin', 'store_admin', 'staff'];
-    if (!adminRolesMfa.includes(data.data.user.role)) {
-      throw new Error(t('accessDenied'));
-    }
-
-    storeSession(data.data);
-    router.push(postLoginDestination());
+    await finishSignIn(grant.access_token);
   }
 
   async function loginWithPasskey(mode: PasskeyMode): Promise<void> {
-    const { data } = await passkeyAssertion(API_URL, mode);
-    const session = data as {
-      user: User;
-      accessToken?: string;
-      refreshToken: string;
-      csrfToken?: string;
-    };
-    const adminRolesPasskey = ['super_admin', 'store_admin', 'staff'];
-    if (!adminRolesPasskey.includes(session.user.role)) {
-      throw new Error(t('accessDenied'));
-    }
-    storeSession(session);
-    router.push(postLoginDestination());
+    const { access_token } = await passkeyAssertion(mode);
+    await finishSignIn(access_token);
   }
 
   async function logout() {

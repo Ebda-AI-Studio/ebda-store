@@ -4,6 +4,7 @@
  */
 import { cfBindings, type AccountsRpc, type AccountState } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
+import { getUserState } from './definer';
 
 let override: AccountsRpc | undefined;
 /** Test seam. */
@@ -42,3 +43,18 @@ export const resendIdentityVerification = (email: string) =>
   call('resendVerification', r => r.resendVerification?.(email));
 export const setAccountRole = (userId: string, role: 'store_admin' | 'staff' | 'super_admin', reason: string) =>
   call('setRole', r => r.setRole?.(userId, role, reason));
+export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
+
+/**
+ * Merchant, staff and super-admin accounts (users.store_id NULL, role not customer) have their credentials and sessions in the
+ * identity service; customers do not. Reads the user's state through the definer, so it works under any tenant scope.
+ */
+export async function isIdentityManagedUser(userId: string): Promise<boolean> {
+  const st = await getUserState(userId);
+  return !!st && st.storeId === null && st.role !== 'customer';
+}
+
+/** Every Store path that ends a user's sessions must end them at the identity service too, or refresh keeps working. */
+export async function revokeIdentityIfManaged(userId: string, reason: string): Promise<void> {
+  if (await isIdentityManagedUser(userId)) await revokeIdentityUser(userId, reason);
+}

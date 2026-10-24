@@ -15,6 +15,21 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   },
 }));
 vi.mock('@ebda/database', () => ({ prisma: {} }));
+// The Store's own profile row (ebda_user_state definer), per user id.
+const rows = new Map<
+  string,
+  {
+    id: string;
+    role: string;
+    status: string;
+    tokenVersion: number;
+    storeId: string | null;
+    deletedAt: Date | null;
+  }
+>();
+vi.mock('../../apps/api/src/lib/definer', () => ({
+  getUserState: async (id: string) => rows.get(id) ?? null,
+}));
 
 const { authenticate, optionalAuthenticate, accountsUser } =
   await import('../../apps/api/src/middleware/auth');
@@ -32,6 +47,15 @@ let revoked = new Set<string>();
 let revocationDown = false;
 
 beforeEach(() => {
+  rows.clear();
+  rows.set('user-1', {
+    id: 'user-1',
+    role: 'store_admin',
+    status: 'active',
+    tokenVersion: 0,
+    storeId: null,
+    deletedAt: null,
+  });
   jwksFetches = 0;
   publishedKeys = [pub];
   revoked = new Set();
@@ -154,6 +178,49 @@ describe('authenticate: identity-service tokens', () => {
   it('refuses a JWKS that carries a private member', async () => {
     configureAccountsVerifier(async () => ({ keys: [{ ...pub, d: 'secret' } as JWK] }));
     expect((await run(authenticate, await mint())).err?.statusCode).toBe(401);
+  });
+});
+
+describe('the Store profile row is checked on every request (defence in depth for revocations the identity service missed)', () => {
+  it('a deleted user: the very next request with the still-valid token is 401 and nothing re-creates the row', async () => {
+    const token = await mint();
+    expect((await run(authenticate, token)).err).toBeUndefined();
+    rows.delete('user-1'); // hard-deleted in the Store
+    const { err, req } = await run(authenticate, token);
+    expect(err).toMatchObject({ statusCode: 401, code: 'TOKEN_REVOKED' });
+    expect(req.user).toBeUndefined();
+    expect(rows.has('user-1')).toBe(false); // authenticate never creates a profile row
+  });
+
+  it('a soft-deleted user is 401', async () => {
+    rows.get('user-1')!.deletedAt = new Date();
+    expect((await run(authenticate, await mint())).err).toMatchObject({ statusCode: 401 });
+  });
+
+  it.each(['suspended', 'inactive'])('a %s user is 403 on the next request', async status => {
+    const token = await mint();
+    expect((await run(authenticate, token)).err).toBeUndefined();
+    rows.get('user-1')!.status = status;
+    expect((await run(authenticate, token)).err).toMatchObject({
+      statusCode: 403,
+      code: 'ACCOUNT_SUSPENDED',
+    });
+  });
+
+  it('optionalAuthenticate treats a suspended, deleted or unknown profile as a guest', async () => {
+    rows.get('user-1')!.status = 'suspended';
+    expect((await run(optionalAuthenticate, await mint())).req.user).toBeUndefined();
+    rows.delete('user-1');
+    expect((await run(optionalAuthenticate, await mint())).req.user).toBeUndefined();
+  });
+
+  it('only the session exchange may proceed without a profile row (it creates it from a live identity)', async () => {
+    rows.delete('user-1');
+    const { authenticateAccounts } = await import('../../apps/api/src/middleware/auth');
+    await expect(authenticateAccounts(await mint())).rejects.toMatchObject({ statusCode: 401 });
+    await expect(
+      authenticateAccounts(await mint(), { allowMissingProfile: true })
+    ).resolves.toBeTruthy();
   });
 });
 

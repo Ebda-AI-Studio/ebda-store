@@ -171,6 +171,38 @@ describe('passkeys', () => {
     expect((await passkeyLogin(auth, u.id, 'https://orders.ebda.app')).status).toBe(200);
   });
 
+  it('rename touches only your own passkey', async () => {
+    const u = await seedUser();
+    const other = await seedUser();
+    const { s, done } = await enroll(u);
+    expect(done.status).toBe(201);
+    const list = (await (await call('/passkeys', { bearer: s.body.access_token })).json()) as {
+      data: { passkeys: Array<{ id: string }> };
+    };
+    const id = list.data.passkeys[0].id;
+    expect(
+      (
+        await call(`/passkeys/${id}/rename`, {
+          json: { name: '  My   phone ' },
+          bearer: s.body.access_token,
+        })
+      ).status
+    ).toBe(200);
+    const after = (await (await call('/passkeys', { bearer: s.body.access_token })).json()) as {
+      data: { passkeys: Array<{ name: string }> };
+    };
+    expect(after.data.passkeys[0].name).toBe('My phone');
+    const o = await login(other);
+    expect(
+      (
+        await call(`/passkeys/${id}/rename`, {
+          json: { name: 'stolen' },
+          bearer: o.body.access_token,
+        })
+      ).status
+    ).toBe(404);
+  });
+
   it('a suspended account cannot sign in with a passkey; list and delete need the bearer and the password', async () => {
     const u = await seedUser();
     const { auth, s } = await enroll(u);

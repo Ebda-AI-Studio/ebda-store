@@ -80,6 +80,19 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     if (status !== 'active') await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
   }
 
+  /**
+   * Delete an identity (erasure, hard delete). Idempotent. Sessions, refresh tokens, codes and passkeys go with it (foreign
+   * keys), so no token or refresh cookie of this user can ever be honoured again, and the Store cannot re-create its profile
+   * row from a deleted identity (it reconciles only from an identity that still exists).
+   */
+  async eraseUser(userId: string): Promise<void> {
+    z.string().uuid().parse(userId);
+    await this.env.DB.batch([
+      this.env.DB.prepare(`DELETE FROM challenges WHERE user_id = ?1`).bind(userId),
+      this.env.DB.prepare(`DELETE FROM users WHERE id = ?1`).bind(userId),
+    ]);
+  }
+
   /** Change an admin-namespace role (promote/demote). Ends every session so tokens are re-issued with the new grant. */
   async setRole(
     userId: string,

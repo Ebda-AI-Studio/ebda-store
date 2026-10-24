@@ -815,6 +815,14 @@ export function createApp() {
     });
   });
 
+  app.post('/passkeys/:id/rename', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ name: z.string().min(1).max(100) }));
+    if (!(await passkeys.renamePasskey(c.env.DB, user.id, c.req.param('id'), body.name)))
+      throw err(404, 'NOT_FOUND');
+    return c.json({ success: true, data: { renamed: true } });
+  });
+
   app.post('/passkeys/:id/delete', async c => {
     const { user } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));

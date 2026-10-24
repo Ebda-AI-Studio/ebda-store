@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
-import { setAccountRole, setAccountStatus } from '../lib/identity-client';
+import { eraseIdentityUser, setAccountRole, setAccountStatus } from '../lib/identity-client';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
@@ -1252,6 +1252,7 @@ router.delete(
             id: true,
             email: true,
             role: true,
+            storeId: true,
             stores: { select: { id: true, name: true } },
           },
         })
@@ -1297,6 +1298,10 @@ router.delete(
         });
         return;
       }
+
+      // The identity is erased FIRST: its sessions, refresh tokens and passkeys go with it, so no token of this user can be
+      // honoured again and the Store cannot re-create the profile row from it. If this fails the user still exists everywhere.
+      if (target.storeId === null && target.role !== 'customer') await eraseIdentityUser(id);
 
       try {
         await asPlatformOperator(req.user!.userId, () => prisma.user.delete({ where: { id } }));
