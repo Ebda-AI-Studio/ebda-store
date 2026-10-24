@@ -17,11 +17,11 @@ import CategoryCard from './CategoryCard';
 
 // 2026-05-17 night: heading rendering moved to the shared SectionHeading
 // so the editorial hairline toggles (showKickerLines / showSubtitleLines)
-// wired through SectionTitleOverride actually apply. Pack='bold' picks
-// font-black uppercase tracking-tight title from pack-styles. Bold persona
-// suits HARD lines — defaults render hairlines + the brutalist staggered
-// grid layout below (every other card translates down lg:translate-y-8).
-export default function BoldCategoryGrid({
+// wired through SectionTitleOverride actually apply. Pack='base' picks
+// font-extralight uppercase-tracked title from pack-styles. Note that
+// the base persona is "silence" — merchants who want zero lines can set
+// showKickerLines=false + showSubtitleLines=false in admin.
+export default function MinimalCategoryGrid({
   categories,
   isRtl: isRtlProp,
   title,
@@ -71,15 +71,8 @@ export default function BoldCategoryGrid({
   ) as 1 | 2 | 3 | undefined;
 
   return (
-    <section
-      className="relative overflow-hidden"
-      dir={isRtl ? 'rtl' : 'ltr'}
-      data-zone="categories"
-    >
-      {/* Background accent */}
-      <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-
-      <div className="container mx-auto px-4 relative z-10">
+    <section dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
+      <div className="container mx-auto px-4">
         <SectionHeading
           title={title}
           titleAr={titleAr}
@@ -91,7 +84,7 @@ export default function BoldCategoryGrid({
           showSubtitleLines={showSubtitleLines}
           dividers={dividers}
           isRtl={isRtl}
-          pack="bold"
+          pack="base"
           seeAllHref={seeAllHref}
           headingZone={headingZone}
           kickerZone={kickerZone}
@@ -99,32 +92,42 @@ export default function BoldCategoryGrid({
           seeAllZone={seeAllZone}
           sectionBgColor={sectionBgColor}
         />
-        {/* Grid - Staggered layout for dynamism */}
+        {/* Grid - Simple 4 columns */}
         <div
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
         >
-          {categories.map((category, index) => {
-            const stagger = index % 2 === 1 ? 'lg:translate-y-8' : '';
+          {categories.map((category, i) => {
             const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);
-            // Item 3 (2026-07-12): first-render stagger FADE (distinct from
-            // the `stagger` layout offset above), 40ms step, motion-safe
-            // only — no layout shift (opacity/transform only).
-            const enterStaggerCls = '';
-            return (
+            // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
+            // motion-safe only — no layout shift (opacity/transform only).
+            const staggerCls = '';
+            const staggerStyle = { ['--i' as string]: i } as React.CSSProperties;
+            return frame ? (
               <div
                 key={category.id}
-                className={`${enterStaggerCls} ${stagger} ${frame} ${frame ? cardFrameWidthClass(cardFrameWidth) : ''} ${frame ? cardFrameSizeClass(cardFrameSize) : ''} ${frame ? `${categorySizeClass(cardSize)} mx-auto w-full` : ''}`.trim()}
-                style={
-                  {
-                    ['--i' as string]: index,
-                    ...(frame && store.theme
-                      ? {
-                          borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme),
-                        }
-                      : undefined),
-                  } as React.CSSProperties
-                }
+                className={`${staggerCls} ${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)} ${categorySizeClass(cardSize)} mx-auto w-full`}
+                style={{
+                  ...staggerStyle,
+                  ...(store.theme
+                    ? { borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme) }
+                    : undefined),
+                }}
               >
+                <CategoryCard
+                  cardSize={cardSize}
+                  cardAspect={cardAspect}
+                  cardShape={cardShape}
+                  captionPosition={captionPosition}
+                  showLabel={showLabel}
+                  showHover={showHover}
+                  category={category}
+                  isRtl={isRtl}
+                  urlPrefix={urlPrefix}
+                  categoryLabelZone={categoryLabelZone}
+                />
+              </div>
+            ) : (
+              <div key={category.id} className={staggerCls} style={staggerStyle}>
                 <CategoryCard
                   cardSize={cardSize}
                   cardAspect={cardAspect}

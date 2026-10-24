@@ -219,8 +219,7 @@ describe('PDP markup is unchanged when neither line applies', () => {
     for (const f of [
       'apps/web/src/templates/shared/StorefrontProductCard.tsx',
       'apps/web/src/templates/shared/ProductCarousel.tsx',
-      'apps/web/src/templates/minimal/ProductCard.tsx',
-      'apps/web/src/templates/modern/ProductCard.tsx',
+      'apps/web/src/templates/base/ProductCard.tsx',
       'apps/web/src/templates/dahab/ProductCard.tsx',
     ])
       expect(readFileSync(path.join(root, f), 'utf8'), f).not.toMatch(/RatingSummary|ratingStats/);

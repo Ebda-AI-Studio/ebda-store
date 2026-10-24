@@ -38,7 +38,7 @@ describe('bandTextOverride changes only a pair that fails', () => {
     // The shipped skins no longer carry orange (Ruling D1016-ORANGE-1), but a merchant theme saved
     // before that still carries an orange primary with white ink, the pair this guards.
     const t = {
-      ...getTemplateTheme('modern'),
+      ...getTemplateTheme('qamar'),
       primaryColor: '26 100% 50%',
       primaryForeground: '0 0% 100%',
     };

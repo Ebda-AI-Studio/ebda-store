@@ -59,7 +59,7 @@ const FRESH_STORE = {
   id: 'fresh',
   name: 'Fresh Store',
   nameAr: 'متجر جديد',
-  template: 'modern',
+  template: 'qamar',
   theme: {},
   currency: 'EGP',
   blogEnabled: false,
@@ -82,7 +82,7 @@ const withDividers = () =>
       // merchant opts in, so the empty-hint / render paths need it on here.
       testimonials: { enabled: true, dividers: { above: { enabled: true } } },
     } as never,
-    'modern'
+    'qamar'
   );
 
 function render(opts: {
@@ -97,7 +97,7 @@ function render(opts: {
   return renderToStaticMarkup(
     <PageRenderer
       definition={layoutToDefinition(withDividers())}
-      templateId="modern"
+      templateId="qamar"
       featuredProducts={(full ? PRODUCTS : []) as never}
       newArrivals={(full ? PRODUCTS.slice(0, 2) : []) as never}
       bestSellers={(full ? [PRODUCTS[2], PRODUCTS[0]] : []) as never}
@@ -209,7 +209,7 @@ describe('provisioning defaults', () => {
   });
 
   it('every section of the default document is either data-driven (hidden when empty) or the name-built hero', () => {
-    const types = layoutToDefinition(resolveLayoutSettings({}, 'modern')).sections.map(s => s.type);
+    const types = layoutToDefinition(resolveLayoutSettings({}, 'qamar')).sections.map(s => s.type);
     expect(types).not.toContain('image-text');
     expect(types).not.toContain('newsletter');
     expect(types).not.toContain('product-spotlight');

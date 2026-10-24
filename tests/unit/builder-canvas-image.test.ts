@@ -24,7 +24,7 @@ const doc = (): PageDefinition =>
           slides: [{ image: '/a.jpg', alt: 'old alt' }, { image: '/b.jpg' }],
         },
       } as never,
-      'modern'
+      'qamar'
     )
   );
 const heroId = (d: PageDefinition) => d.sections.find(n => n.type === 'hero')!.id;

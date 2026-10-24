@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import path from 'node:path';
 
 const ctx = vi.hoisted(() => ({
-  store: { id: 'store-m', name: 'Demo', template: 'minimal', look: null, theme: {} } as Record<
+  store: { id: 'store-m', name: 'Demo', template: 'qamar', look: null, theme: {} } as Record<
     string,
     unknown
   >,
@@ -47,7 +47,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const { default: MinimalHeader } = await import('../../apps/web/src/templates/minimal/Header');
+const { default: MinimalHeader } = await import('../../apps/web/src/templates/base/Header');
 
 const branding = { name: 'Qamar Demo', nameAr: 'قمر', logo: null };
 const nav = [

@@ -21,7 +21,7 @@ afterEach(() => {
   cleanup();
   setCanvasHover(null);
 });
-const doc = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const doc = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const id = doc.sections[1].id;
 
 function mount(over: Partial<React.ComponentProps<typeof SectionTree>> = {}) {

@@ -63,7 +63,7 @@ async function seedStore(slug: string) {
       data: {
         name: `promo-preview ${slug}`,
         slug: `promo-preview-${slug}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

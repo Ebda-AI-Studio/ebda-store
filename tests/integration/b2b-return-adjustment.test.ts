@@ -52,7 +52,7 @@ describe.skipIf(!hasDb)('B2B Task 8b: tier-aware partial returns', () => {
         data: {
           name: 'b2brt',
           slug: `b2brt-${SUF}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

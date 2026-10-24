@@ -11,11 +11,7 @@ import { join } from 'node:path';
 const R = join(__dirname, '../..');
 const SURFACES = [
   'apps/web/src/app/cart/CartClient.tsx',
-  'apps/web/src/templates/minimal/CartTable.tsx',
-  'apps/web/src/templates/modern/CartTable.tsx',
-  'apps/web/src/templates/classic/CartTable.tsx',
-  'apps/web/src/templates/elegant/CartTable.tsx',
-  'apps/web/src/templates/bold/CartTable.tsx',
+  'apps/web/src/templates/base/CartTable.tsx',
   'apps/web/src/templates/dahab/CartTable.tsx',
   'apps/web/src/templates/dahab/CartDrawer.tsx',
   'apps/web/src/components/commerce/ReceiptPrinter.tsx',

@@ -66,7 +66,7 @@ describe('rule 4 — same edge, different corners', () => {
   });
 
   it('does not stack on surfaces whose discount is not a corner chip', () => {
-    // `minimal` renders its discount as inline text; the PDP uses a flex row.
+    // the base card renders its discount as inline text; the PDP uses a flex row.
     const r = resolveCardBadges({ ...base, discountVisible: true, discountOccupiesCorner: false });
     expect(r.customBadgePositionCls).toBe('bottom-3 right-3');
   });
@@ -133,11 +133,7 @@ describe('no card may compute its own badge corner', () => {
   // calls getCustomBadgePosition itself gets the un-stacked class and silently
   // reintroduces the overlap on that one surface.
   const CARD_FILES = [
-    'apps/web/src/templates/modern/ProductCard.tsx',
-    'apps/web/src/templates/classic/ProductCard.tsx',
-    'apps/web/src/templates/bold/ProductCard.tsx',
-    'apps/web/src/templates/elegant/ProductCard.tsx',
-    'apps/web/src/templates/minimal/ProductCard.tsx',
+    'apps/web/src/templates/base/ProductCard.tsx',
     'apps/web/src/app/products/ProductListItem.tsx',
     'apps/web/src/templates/shared/StorefrontProductCard.tsx',
     'apps/web/src/templates/shared/ProductCarousel.tsx',
@@ -154,13 +150,13 @@ describe('no card may compute its own badge corner', () => {
     expect(src).toContain('discountVisible:');
   });
 
-  // `minimal` is the one surface whose discount indicator is inline text,
+  // the base card is the one surface whose discount indicator is inline text,
   // not a corner chip (`discountOccupiesCorner: false`) — it has no use for
   // `discountBadgePositionCls`. Every OTHER card file renders the discount
   // chip as a corner overlay and must take that corner from the same single
   // owner as the custom chip.
   const CARD_FILES_WITH_DISCOUNT_CORNER = CARD_FILES.filter(
-    f => !f.includes('/minimal/ProductCard.tsx')
+    f => !f.includes('/base/ProductCard.tsx')
   );
 
   it.each(CARD_FILES_WITH_DISCOUNT_CORNER)(

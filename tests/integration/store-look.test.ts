@@ -14,7 +14,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
-import { definitionToLayout, getLook } from '@ebda/shared';
+import { RETIRED_TEMPLATES, definitionToLayout, getLook } from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import storeRoutes from '@api/routes/store.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
@@ -164,7 +164,7 @@ async function seedMerchant(
       data: {
         name: `look-${tag}-${call}`,
         slug: `look-${tag}-${call}`,
-        template: 'modern',
+        template: 'dahab',
         currency: 'EGP',
         ownerId: user.id,
         status: 'active',
@@ -312,7 +312,7 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('INVALID_LOOK');
     const s = await row(m.storeId);
-    expect(s).toMatchObject({ look: null, template: 'modern', theme: { primaryColor: 'X' } });
+    expect(s).toMatchObject({ look: null, template: 'dahab', theme: { primaryColor: 'X' } });
   });
 
   it('empty store: the look family is PUBLISHED as the home page', async () => {
@@ -324,7 +324,7 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(revs.filter(r => r.status === 'published')).toHaveLength(1);
     expect(revs.filter(r => r.status === 'draft')).toHaveLength(0);
     // LOOKS-15: the published page is derived for the NEW skin + look (the seeded store is on
-    // `modern`, whose baseline sets a rounded-square product card), so no skin card shape or
+    // `dahab`, whose baseline sets a square product card), so no skin card shape or
     // aspect is baked into the document and the look's image ratio is the default.
     const doc = (
       await prisma.storePageRevision.findFirstOrThrow({
@@ -583,7 +583,7 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     }
     expect(await row(m.storeId)).toMatchObject({
       look: null,
-      template: 'modern',
+      template: 'dahab',
       theme: { primaryColor: 'X' },
     });
   });
@@ -644,9 +644,9 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     const res = await request(app)
       .put(`/api/v1/stores/${m.storeId}/template`)
       .set({ Authorization: `Bearer ${m.token}` })
-      .send({ template: 'classic' });
+      .send({ template: RETIRED_TEMPLATES[1] });
     expect(res.status, JSON.stringify(res.body)).toBe(400);
-    expect(res.body.error.code).toBe('INVALID_TEMPLATE');
+    expect(res.body.error.code).toBe('TEMPLATE_RETIRED');
     const s = await row(m.storeId);
     expect(s.look).toBe(LOOK_ID);
     expect(s.template).toBe(getLook(LOOK_ID)!.skin);

@@ -69,7 +69,7 @@ describe('PUT /stores/:storeId/layout purges the storefront caches', () => {
     vi.clearAllMocks();
     m.findUnique.mockResolvedValue({
       layoutSettings: {},
-      template: 'modern',
+      template: 'qamar',
       slug: 'acme',
       domain: 'acme.example.com',
     });
@@ -116,7 +116,7 @@ describe('PUT /stores/:storeId/layout refuses the settings the visual editor own
     vi.clearAllMocks();
     m.findUnique.mockResolvedValue({
       layoutSettings: {},
-      template: 'modern',
+      template: 'qamar',
       slug: 'a',
       domain: null,
     });

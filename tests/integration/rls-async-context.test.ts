@@ -110,7 +110,7 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
         data: {
           name: 'rls-test-store',
           slug: `rls-test-${uniqueSuffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

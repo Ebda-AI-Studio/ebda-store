@@ -8,12 +8,12 @@
  *
  * A source scan rather than a render, on purpose. The rendering tests in
  * apps/web/src/templates/shared/product-card-badge-render.test.tsx prove the
- * eight CARD paths behave; what a render test cannot catch is a NINTH surface
+ * core CARD paths behave; what a render test cannot catch is a FIFTH surface
  * being added later, or someone deleting the call from the PDP — whose
  * component is too entangled (cart, features, pixels, dynamic imports) to
  * render in a unit test. The failure this gate exists to prevent is silent
  * and shaped exactly like the one CLAUDE.md warns about: the badge works on
- * seven surfaces and quietly does not exist on the eighth, which is the one
+ * three surfaces and quietly does not exist on the fourth, which is the one
  * the merchant happens to look at.
  *
  * It also pins the two data hops the badge has to survive on its way to a
@@ -27,14 +27,10 @@ import path from 'node:path';
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
-/** The eight product-card render paths, exactly as CLAUDE.md enumerates them. */
+/** The four core product-card render paths, exactly as CLAUDE.md enumerates them. */
 const CARD_RENDER_PATHS = [
   'apps/web/src/templates/shared/StorefrontProductCard.tsx',
-  'apps/web/src/templates/modern/ProductCard.tsx',
-  'apps/web/src/templates/elegant/ProductCard.tsx',
-  'apps/web/src/templates/classic/ProductCard.tsx',
-  'apps/web/src/templates/minimal/ProductCard.tsx',
-  'apps/web/src/templates/bold/ProductCard.tsx',
+  'apps/web/src/templates/base/ProductCard.tsx',
   'apps/web/src/templates/shared/ProductCarousel.tsx',
   'apps/web/src/app/products/ProductListItem.tsx',
 ] as const;
@@ -44,10 +40,10 @@ const CARD_RENDER_PATHS = [
 const PDP = 'apps/web/src/app/products/[slug]/ProductDetailClient.tsx';
 
 describe('custom badge — every product-card render path resolves it', () => {
-  it('there are exactly eight card render paths (adding one is a deliberate act)', () => {
+  it('there are exactly four core card render paths (adding one is a deliberate act)', () => {
     // If this number changes, the new path needs the badge too — that is the
     // whole point of pinning it.
-    expect(CARD_RENDER_PATHS).toHaveLength(8);
+    expect(CARD_RENDER_PATHS).toHaveLength(4);
     for (const file of CARD_RENDER_PATHS) {
       expect(fs.existsSync(path.join(ROOT, file))).toBe(true);
     }
@@ -65,7 +61,7 @@ describe('custom badge — every product-card render path resolves it', () => {
   it('the PDP resolves and renders it too', () => {
     // Source-level, and deliberately EXACT. `ProductDetailClient` drags in the
     // cart, feature flags, marketing pixels and half a dozen dynamic imports,
-    // so it is not unit-renderable the way the eight cards are — which means
+    // so it is not unit-renderable the way the cards are — which means
     // this gate is the only thing standing between the PDP and a badge that
     // silently stops rendering. A `toContain('pdpCustomBadgeText')` would have
     // been satisfied by `{false && pdpCustomBadgeText && (`, a dead branch

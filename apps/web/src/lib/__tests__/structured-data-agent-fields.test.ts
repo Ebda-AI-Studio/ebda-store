@@ -21,7 +21,7 @@ const store = {
   currency: 'EGP',
   status: 'active',
   timezone: 'Africa/Cairo',
-  template: 'modern',
+  template: 'qamar',
   theme: {},
   socialLinks: {},
 } as never;

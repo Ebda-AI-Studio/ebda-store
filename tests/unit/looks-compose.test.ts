@@ -11,7 +11,7 @@ import {
 describe('composeStoreTheme', () => {
   const atelier = getLook('qamar.atelier')!;
   it('look tokens sit over the skin theme', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme: {} });
+    const t = composeStoreTheme({ template: 'qamar', look: 'qamar.atelier', theme: {} });
     expect(t.backgroundColor).toBe(hexToHsl('#FFFFFF'));
     expect(t.accentColor).toBe(hexToHsl(atelier.tokens.accent));
     expect(t.headingFont).toBe('Noto Naskh Arabic');
@@ -19,20 +19,20 @@ describe('composeStoreTheme', () => {
   });
   it('stored merchant values win over the look', () => {
     const t = composeStoreTheme({
-      template: 'minimal',
+      template: 'qamar',
       look: 'qamar.atelier',
       theme: { primaryColor: '1 2% 3%' },
     });
     expect(t.primaryColor).toBe('1 2% 3%');
   });
   it('unknown look id falls back to the skin theme, never throws', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: 'qamar.deleted', theme: {} });
-    expect(t.primaryColor).toBe(getTemplateTheme('minimal').primaryColor);
+    const t = composeStoreTheme({ template: 'qamar', look: 'qamar.deleted', theme: {} });
+    expect(t.primaryColor).toBe(getTemplateTheme('qamar').primaryColor);
   });
   it('null look = legacy store, unchanged except the input floor (Ruling B1-90)', async () => {
     const { boundaryColorFloor } = await import('@ebda/shared');
-    const skin = getTemplateTheme('modern');
-    expect(composeStoreTheme({ template: 'modern', look: null, theme: { x: 1 } as any })).toEqual({
+    const skin = getTemplateTheme('qamar');
+    expect(composeStoreTheme({ template: 'qamar', look: null, theme: { x: 1 } as any })).toEqual({
       ...skin,
       // taste re-audit no-look regression: --input reads >= 3:1 against the page
       inputColor: boundaryColorFloor(skin.inputColor, skin.backgroundColor),
@@ -82,24 +82,14 @@ describe('look UI tokens (W2a token plumbing): merchant > look > skin', () => {
     expect(t.receiptStyle).toBe('framed');
   });
   it('a look that does not declare a token leaves the skin behaviour (undefined)', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: 'lamma.table', theme: {} });
+    const t = composeStoreTheme({ template: 'qamar', look: 'lamma.table', theme: {} });
     expect(t.wordmarkSize).toBeUndefined();
     expect(t.overPhotoChrome).toBeUndefined();
     expect(t.receiptStyle).toBeUndefined();
   });
   it('no look: the composed theme is the skin theme byte-for-byte but the input floor (no UI token appears)', async () => {
     const { LOOK_UI_TOKEN_KEYS, boundaryColorFloor } = await import('@ebda/shared');
-    const skins = [
-      'modern',
-      'classic',
-      'minimal',
-      'bold',
-      'elegant',
-      'dahab',
-      'qamar',
-      'souq',
-      'jasmine',
-    ] as const;
+    const skins = ['dahab', 'qamar', 'souq', 'jasmine', 'lamma'] as const;
     for (const template of skins) {
       const t = composeStoreTheme({ template, look: null, theme: {} });
       const skin = getTemplateTheme(template);

@@ -81,7 +81,7 @@ async function layoutOf(storeId: string) {
 }
 
 const docFor = (raw: unknown): PageDefinition =>
-  layoutToDefinition(resolveLayoutSettings(raw, 'modern'));
+  layoutToDefinition(resolveLayoutSettings(raw, 'qamar'));
 
 /**
  * The Add-section / template-family presets seed image-text with INSTRUCTIONAL
@@ -104,7 +104,7 @@ const withRealCopy = (doc: PageDefinition): PageDefinition => ({
   ),
 });
 
-async function freshStore(tag: string, template = 'modern'): Promise<string> {
+async function freshStore(tag: string, template = 'qamar'): Promise<string> {
   const u = await owner.user.create({
     data: {
       email: `${PREFIX}${tag}-${crypto.randomUUID().slice(0, 6)}@test.com`,
@@ -173,11 +173,7 @@ describe('draft -> publish -> revisions -> rollback (one store, in order)', { re
     );
     expect(r).toMatchObject({ ok: true, value: { rev: 1 } });
     expect(await layoutOf(storeId)).toEqual({});
-    const pub = await getPublishedDefinition(
-      storeId,
-      resolveLayoutSettings({}, 'modern'),
-      'modern'
-    );
+    const pub = await getPublishedDefinition(storeId, resolveLayoutSettings({}, 'qamar'), 'qamar');
     expect(pub.rev).toBeNull();
     expect(pub.definition.sections.find(s => s.type === 'new-arrivals')!.hidden).toBe(false);
     const st = await inStore(storeId, () => getPageState(storeId, HOME));
@@ -220,8 +216,8 @@ describe('draft -> publish -> revisions -> rollback (one store, in order)', { re
     expect(r).toMatchObject({ ok: true, value: { rev: 1 } });
     const stored = await layoutOf(storeId);
     expect((stored.newArrivals as { enabled: boolean }).enabled).toBe(false);
-    const layout = resolveLayoutSettings(stored, 'modern');
-    const pub = await getPublishedDefinition(storeId, layout, 'modern');
+    const layout = resolveLayoutSettings(stored, 'qamar');
+    const pub = await getPublishedDefinition(storeId, layout, 'qamar');
     expect(pub.rev).toBe(1);
     expect(pub.definition.sections.find(s => s.type === 'new-arrivals')!.hidden).toBe(true);
   });
@@ -357,7 +353,7 @@ describe('optimistic concurrency under real parallel transactions', { retry: 0 }
         storeId,
         layout: resolveLayoutSettings(
           { hero: { enabled: false, mode: 'single', autoplayMs: 5000, slides: [] } },
-          'modern'
+          'qamar'
         ),
         userId: null,
       })
@@ -517,8 +513,8 @@ describe('integrity guards', { retry: 0 }, () => {
     await owner.store.update({ where: { id: storeId }, data: { layoutSettings: drifted } });
     const pub = await getPublishedDefinition(
       storeId,
-      resolveLayoutSettings(drifted, 'modern'),
-      'modern'
+      resolveLayoutSettings(drifted, 'qamar'),
+      'qamar'
     );
     expect(pub.definition.sections.find(s => s.type === 'best-sellers')!.hidden).toBe(true);
   });
@@ -563,7 +559,7 @@ describe('document-only sections survive the legacy save paths', { retry: 0 }, (
       saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: withImage, userId: null })
     );
     await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
-    const legacy = resolveLayoutSettings({ bestSellers: { enabled: false, limit: 2 } }, 'modern');
+    const legacy = resolveLayoutSettings({ bestSellers: { enabled: false, limit: 2 } }, 'qamar');
     expect(
       await inStore(storeId, () => publishLegacyLayout({ storeId, layout: legacy, userId: null }))
     ).toBe('ok');
@@ -578,8 +574,8 @@ describe('document-only sections survive the legacy save paths', { retry: 0 }, (
     const ids = (pub!.document as unknown as PageDefinition).sections.map(s => s.id);
     expect(ids[1]).toBe('image-text-1');
     // and the public read serves it (projection still agrees with layout_settings)
-    const layout = resolveLayoutSettings(await layoutOf(storeId), 'modern');
-    const served = await getPublishedDefinition(storeId, layout, 'modern');
+    const layout = resolveLayoutSettings(await layoutOf(storeId), 'qamar');
+    const served = await getPublishedDefinition(storeId, layout, 'qamar');
     expect(served.definition.sections.some(s => s.type === 'image-text')).toBe(true);
   });
 });
@@ -657,7 +653,7 @@ describe(
       const storeId = await freshStore('noimg-legacy');
       const legacy = resolveLayoutSettings(
         { hero: { enabled: true, mode: 'single', autoplayMs: 5000, slides: [{ image: '' }] } },
-        'modern'
+        'qamar'
       );
       const outcome = await inStore(storeId, () =>
         publishLegacyLayout({ storeId, layout: legacy, userId: null })
@@ -887,7 +883,7 @@ describe('builder publish -> storefront route serves the published document', { 
     return { storeId, res, published: row!.document as unknown as PageDefinition };
   }
 
-  for (const template of ['modern', 'elegant', 'bold']) {
+  for (const template of ['qamar', 'souq', 'dahab']) {
     for (const family of TEMPLATE_FAMILIES) {
       it(`${template} store, ${family.id} family: the storefront renders the published document`, async () => {
         const { res, published } = await publishAndRead(template, d =>
@@ -905,8 +901,8 @@ describe('builder publish -> storefront route serves the published document', { 
     }
   }
 
-  it('an editor-removed section stays removed on the storefront (classic store)', async () => {
-    const { res, published } = await publishAndRead('classic', d => {
+  it('an editor-removed section stays removed on the storefront (jasmine store)', async () => {
+    const { res, published } = await publishAndRead('jasmine', d => {
       const r = reduceDocument(d, { type: 'removeSection', id: 'new-arrivals' });
       expect(r.rejected).toBeUndefined();
       return r.doc;
@@ -916,7 +912,7 @@ describe('builder publish -> storefront route serves the published document', { 
   });
 
   it('a ported product-card switch (showNewBadge; the five share one draft-theme path) goes draft -> publish -> live store theme', async () => {
-    const storeId = await freshStore('cardsw', 'modern');
+    const storeId = await freshStore('cardsw', 'qamar');
     const st = await inStore(storeId, () => getPageState(storeId, HOME));
     const doc = withRealCopy({
       ...st!.definition,
@@ -945,7 +941,7 @@ describe('builder publish -> storefront route serves the published document', { 
   });
 
   it('an out-of-band layout_settings write still falls back (the guard still guards)', async () => {
-    const { storeId } = await publishAndRead('minimal', d => applyTemplateFamily(d, 'lamma'));
+    const { storeId } = await publishAndRead('souq', d => applyTemplateFamily(d, 'lamma'));
     const raw = await layoutOf(storeId);
     await owner.store.update({
       where: { id: storeId },
@@ -963,7 +959,7 @@ describe('builder publish -> storefront route serves the published document', { 
     ).toBe(true);
     expect(res.body.data.definition.sections.map((s: { type: string }) => s.type)).not.toEqual(
       applyTemplateFamily(
-        layoutToDefinition(resolveLayoutSettings({}, 'minimal')),
+        layoutToDefinition(resolveLayoutSettings({}, 'souq')),
         'lamma'
       ).sections.map(s => s.type)
     );
@@ -995,8 +991,8 @@ describe('hero slide video survives draft -> publish -> public read', () => {
     });
     const read = await getPublishedDefinition(
       storeId,
-      resolveLayoutSettings(stored, 'modern'),
-      'modern'
+      resolveLayoutSettings(stored, 'qamar'),
+      'qamar'
     );
     const heroNode = read.definition.sections.find(s => s.type === 'hero')!;
     expect(heroNode.blocks![0].settings).toMatchObject({

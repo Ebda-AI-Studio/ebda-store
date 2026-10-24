@@ -2,7 +2,7 @@
 
 /**
  * The footer's WhatsApp contact line (S-02, quality-bar § 8): "واتساب 010…",
- * a labelled wa.me link in each footer's contact column (5 skins + Dahab), so the
+ * a labelled wa.me link in each footer's contact column (the shared base and Dahab), so the
  * channel Egyptian shoppers use most is named, not only an unlabelled icon in the
  * social row. The number is the store's own `contact.whatsapp`, normalised by
  * `waMeLink` (local 01x → 201x); no valid number = nothing renders.

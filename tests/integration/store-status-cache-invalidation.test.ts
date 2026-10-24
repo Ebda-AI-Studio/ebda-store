@@ -70,7 +70,7 @@ describe.skipIf(!hasDb)('store status PATCH — cache invalidation', () => {
           name: 'ssc-test-store',
           slug,
           domain,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
           status: 'active',

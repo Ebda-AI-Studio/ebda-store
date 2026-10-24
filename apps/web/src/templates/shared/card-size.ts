@@ -1,6 +1,6 @@
 /**
  * Shared per-store card-size + aspect-ratio helpers used across the
- * 5 themes. Map admin-picked size enum → tailwind classes that drive
+ * every template. Map admin-picked size enum → tailwind classes that drive
  * the `max-w-*` cap on each card wrapper, and aspect override →
  * `aspect-*` class that overrides the per-theme default.
  *

@@ -64,7 +64,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
         data: {
           name: 'pci-test-store',
           slug: `pci-test-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

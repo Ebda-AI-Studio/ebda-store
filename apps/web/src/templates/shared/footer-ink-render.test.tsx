@@ -33,11 +33,7 @@ vi.mock('../../contexts/StoreContext', () => ({
 vi.mock('../../lib/api', () => ({ api: { subscribeNewsletter: vi.fn() } }));
 
 const FOOTERS = [
-  ['classic', (await import('../classic/Footer')).default],
-  ['modern', (await import('../modern/Footer')).default],
-  ['minimal', (await import('../minimal/Footer')).default],
-  ['bold', (await import('../bold/Footer')).default],
-  ['elegant', (await import('../elegant/Footer')).default],
+  ['base', (await import('../base/Footer')).default],
   ['dahab', (await import('../dahab/Footer')).default],
 ] as const;
 

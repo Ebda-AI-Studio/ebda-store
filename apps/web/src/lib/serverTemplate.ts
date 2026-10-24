@@ -1,4 +1,4 @@
-import type { TemplateId } from '@ebda/shared';
+import { normalizeLegacyTemplate, type TemplateId } from '@ebda/shared';
 import type {
   HeroProps,
   HeroBannerProps,
@@ -18,25 +18,9 @@ import type {
 // on the server — `useTemplateComponents` is a client-only hook (it runs
 // inside useEffect via dynamic()) and forces the homepage to ship a JS
 // loading state for the LCP element.
-import ModernHero from '../templates/modern/Hero';
-import ModernProductGrid from '../templates/modern/ProductGrid';
-import ModernCategoryGrid from '../templates/modern/CategoryGrid';
-
-import ClassicHero from '../templates/classic/Hero';
-import ClassicProductGrid from '../templates/classic/ProductGrid';
-import ClassicCategoryGrid from '../templates/classic/CategoryGrid';
-
-import MinimalHero from '../templates/minimal/Hero';
-import MinimalProductGrid from '../templates/minimal/ProductGrid';
-import MinimalCategoryGrid from '../templates/minimal/CategoryGrid';
-
-import BoldHero from '../templates/bold/Hero';
-import BoldProductGrid from '../templates/bold/ProductGrid';
-import BoldCategoryGrid from '../templates/bold/CategoryGrid';
-
-import ElegantHero from '../templates/elegant/Hero';
-import ElegantProductGrid from '../templates/elegant/ProductGrid';
-import ElegantCategoryGrid from '../templates/elegant/CategoryGrid';
+import BaseHero from '../templates/base/Hero';
+import BaseProductGrid from '../templates/base/ProductGrid';
+import BaseCategoryGrid from '../templates/base/CategoryGrid';
 
 import DahabHero, { DahabHeroBanner, DahabHeroSlider } from '../templates/dahab/Hero';
 import DahabProductGrid from '../templates/dahab/ProductGrid';
@@ -44,7 +28,7 @@ import DahabCategoryGrid, { DahabCategoryStrip } from '../templates/dahab/Catego
 import { DahabProductCarousel } from '../templates/dahab/ProductCarousel';
 import { DahabTestimonialRow } from '../templates/dahab/TestimonialRow';
 
-// Storefront-flow shared sections — same component for all 5 packs because
+// Storefront-flow shared sections — same component for every pack because
 // they're styled with theme tokens. Per-pack overrides can replace these
 // later by exporting a same-named component from the pack's index.ts.
 import { HeroBanner } from '../templates/shared/HeroBanner';
@@ -79,36 +63,6 @@ const shared = {
 };
 
 const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
-  modern: {
-    Hero: ModernHero,
-    ProductGrid: ModernProductGrid,
-    CategoryGrid: ModernCategoryGrid,
-    ...shared,
-  },
-  classic: {
-    Hero: ClassicHero,
-    ProductGrid: ClassicProductGrid,
-    CategoryGrid: ClassicCategoryGrid,
-    ...shared,
-  },
-  minimal: {
-    Hero: MinimalHero,
-    ProductGrid: MinimalProductGrid,
-    CategoryGrid: MinimalCategoryGrid,
-    ...shared,
-  },
-  bold: {
-    Hero: BoldHero,
-    ProductGrid: BoldProductGrid,
-    CategoryGrid: BoldCategoryGrid,
-    ...shared,
-  },
-  elegant: {
-    Hero: ElegantHero,
-    ProductGrid: ElegantProductGrid,
-    CategoryGrid: ElegantCategoryGrid,
-    ...shared,
-  },
   // Dahab owns every homepage section (builder Phase 3 pilot).
   dahab: {
     Hero: DahabHero,
@@ -120,32 +74,32 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
     CategoryStrip: DahabCategoryStrip,
     TestimonialRow: DahabTestimonialRow,
   },
-  // Qamar re-uses the minimal statics plus the shared sections (Ruling B1-1).
+  // Qamar re-uses the shared base statics plus the shared sections (Ruling B1-1).
   qamar: {
-    Hero: MinimalHero,
-    ProductGrid: MinimalProductGrid,
-    CategoryGrid: MinimalCategoryGrid,
+    Hero: BaseHero,
+    ProductGrid: BaseProductGrid,
+    CategoryGrid: BaseCategoryGrid,
     ...shared,
   },
-  // Souq re-uses the minimal statics plus the shared sections (Ruling B2-1).
+  // Souq re-uses the shared base statics plus the shared sections (Ruling B2-1).
   souq: {
-    Hero: MinimalHero,
-    ProductGrid: MinimalProductGrid,
-    CategoryGrid: MinimalCategoryGrid,
+    Hero: BaseHero,
+    ProductGrid: BaseProductGrid,
+    CategoryGrid: BaseCategoryGrid,
     ...shared,
   },
-  // Jasmine re-uses the minimal statics plus the shared sections (Ruling B3-1).
+  // Jasmine re-uses the shared base statics plus the shared sections (Ruling B3-1).
   jasmine: {
-    Hero: MinimalHero,
-    ProductGrid: MinimalProductGrid,
-    CategoryGrid: MinimalCategoryGrid,
+    Hero: BaseHero,
+    ProductGrid: BaseProductGrid,
+    CategoryGrid: BaseCategoryGrid,
     ...shared,
   },
-  // Lamma re-uses the minimal statics plus the shared sections (Ruling B4-1).
+  // Lamma re-uses the shared base statics plus the shared sections (Ruling B4-1).
   lamma: {
-    Hero: MinimalHero,
-    ProductGrid: MinimalProductGrid,
-    CategoryGrid: MinimalCategoryGrid,
+    Hero: BaseHero,
+    ProductGrid: BaseProductGrid,
+    CategoryGrid: BaseCategoryGrid,
     ...shared,
   },
 };
@@ -156,7 +110,9 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
  * for client hydration.
  */
 export function getHomepageTemplate(
-  templateId: TemplateId | undefined
+  templateId: TemplateId | string | null | undefined
 ): HomepageTemplateComponents {
-  return homepageTemplates[templateId ?? 'modern'] ?? homepageTemplates.modern;
+  // A retired Force skin name (a store row not yet re-looked, SKIN-DEL-8) maps to its Ebda
+  // template at read time; an unknown or missing id gets the default Ebda template.
+  return homepageTemplates[normalizeLegacyTemplate(templateId)];
 }

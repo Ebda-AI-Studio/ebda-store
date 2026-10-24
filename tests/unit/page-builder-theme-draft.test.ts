@@ -13,7 +13,7 @@ import express from 'express';
 import request from 'supertest';
 import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
 
-const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const BASE = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const LIVE_THEME = { primaryColor: '1 1% 1%', fontFamily: 'serif', showBranchesInFooter: true };
 const DRAFT_DOC = { ...BASE, theme: { primaryColor: '200 50% 40%' } };
 
@@ -83,7 +83,7 @@ function app() {
 
 const STORE = {
   layoutSettings: {},
-  template: 'modern',
+  template: 'qamar',
   slug: 'acme',
   domain: 'acme.example.com',
   theme: LIVE_THEME,
