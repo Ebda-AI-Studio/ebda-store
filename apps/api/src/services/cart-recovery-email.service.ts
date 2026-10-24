@@ -26,7 +26,8 @@ import { signSubscriberUnsubscribeToken } from '../lib/campaign-unsubscribe-toke
 import { storeBrandTheme } from '../lib/store-brand-theme';
 import { config } from '../config';
 import logger from '../lib/logger';
-import { ResendService, ResendSendError } from './resend.service';
+import { ResendService } from './resend.service';
+import { EmailSendError } from './mail-transport';
 import { featureService } from './feature.service';
 import { renderBrandedShell, storeHidesPoweredBy } from './email.service';
 import {
@@ -63,22 +64,10 @@ export function cartEmailDailyCap(): number {
   return Number.isFinite(n) && n > 0 ? n : 200;
 }
 
-/**
- * Resend errors that are the REQUEST's fault (4xx): retrying cannot help, so the cart is marked
- * failed. Everything else (5xx `application_error`, rate limits, unknown codes, network errors)
- * is transient and is rethrown so Inngest retries it; the idempotency key makes the retry safe
- * and `onFailure` marks the cart failed once the retries are exhausted.
- */
-const PERMANENT_SEND_CODES: ReadonlySet<string> = new Set([
-  'validation_error',
-  'missing_required_field',
-  'invalid_from_address',
-  'invalid_to',
-  'invalid_parameter',
-  'invalid_access',
-  'restricted_api_key',
-  'not_found',
-]);
+// Send errors that are the REQUEST's fault (`EmailSendError.permanent`: bad payload, suppressed
+// recipient): retrying cannot help, so the cart is marked failed. Everything else (provider 5xx,
+// rate limits, unknown codes, network errors) is transient and is rethrown so the job retries it;
+// `onFailure` marks the cart failed once the retries are exhausted.
 
 export const CART_RECOVERY_EMAIL_EVENT = 'cart-recovery/email-requested';
 
@@ -381,14 +370,14 @@ export async function deliverCartRecoveryEmail(
       idempotencyKey: `cart-recovery-email/${ac.id}`,
     });
   } catch (err) {
-    if (!(err instanceof ResendSendError && PERMANENT_SEND_CODES.has(err.code))) throw err;
+    if (!(err instanceof EmailSendError && err.permanent)) throw err;
     const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
     await finish(storeId, ac.id, { emailStatus: 'failed', emailDetail: message });
     logger.warn(
       {
         storeId,
         abandonedCartId: ac.id,
-        code: err instanceof ResendSendError ? err.code : 'unknown',
+        code: err instanceof EmailSendError ? err.code : 'unknown',
       },
       '[CartEmail] send failed'
     );

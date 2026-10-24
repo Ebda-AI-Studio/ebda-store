@@ -1,0 +1,132 @@
+/**
+ * G6: the Cloudflare Email Service transport (services/mail-transport.ts).
+ * Pins the binding payload, RFC 8058 header pass-through, error classification and the
+ * "sender is always ebda.app" rule that replaces per-store Resend domains.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const h = vi.hoisted(() => ({
+  send: vi.fn(),
+  cfg: { emailProvider: 'cloudflare', resendApiKey: '' },
+}));
+vi.mock('@api/config', () => ({ config: h.cfg }));
+
+import { setCfBindings, clearCfBindings } from '@api/cf/bindings';
+import {
+  EmailSendError,
+  parseAddress,
+  sendMail,
+  isMailTransportConfigured,
+} from '@api/services/mail-transport';
+import { resolveSender } from '@api/services/email-sender';
+
+beforeEach(() => {
+  h.send.mockReset();
+  h.cfg.emailProvider = 'cloudflare';
+  clearCfBindings();
+  setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, EMAIL: { send: h.send } });
+});
+
+describe('parseAddress', () => {
+  it('splits "Name <addr>" and leaves a bare address alone', () => {
+    expect(parseAddress('Ebda <no-reply@ebda.app>')).toEqual({
+      email: 'no-reply@ebda.app',
+      name: 'Ebda',
+    });
+    expect(parseAddress('"Souq, Shop" <no-reply@ebda.app>')).toEqual({
+      email: 'no-reply@ebda.app',
+      name: 'Souq, Shop',
+    });
+    expect(parseAddress('<no-reply@ebda.app>')).toBe('no-reply@ebda.app');
+    expect(parseAddress('no-reply@ebda.app')).toBe('no-reply@ebda.app');
+  });
+});
+
+describe('sendMail on Cloudflare', () => {
+  it('passes the message and the RFC 8058 headers to the binding', async () => {
+    h.send.mockResolvedValue({ messageId: 'cf-1' });
+    const headers = {
+      'List-Unsubscribe': '<https://api.ebda.app/u?t=1>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    };
+    const r = await sendMail({
+      from: 'Shop <no-reply@ebda.app>',
+      to: 'a@x.test',
+      subject: 'S',
+      html: '<p/>',
+      text: 't',
+      replyTo: 'owner@shop.test',
+      headers,
+      idempotencyKey: 'ignored-on-cloudflare',
+    });
+    expect(r).toEqual({ id: 'cf-1' });
+    expect(h.send).toHaveBeenCalledWith({
+      from: { email: 'no-reply@ebda.app', name: 'Shop' },
+      to: 'a@x.test',
+      subject: 'S',
+      html: '<p/>',
+      text: 't',
+      replyTo: 'owner@shop.test',
+      headers,
+    });
+  });
+
+  it('omits empty optional fields (an empty headers object is rejected upstream)', async () => {
+    h.send.mockResolvedValue({ messageId: 'cf-2' });
+    await sendMail({
+      from: 'no-reply@ebda.app',
+      to: ['a@x.test'],
+      subject: 'S',
+      html: '<p/>',
+      headers: {},
+    });
+    expect(h.send.mock.calls[0][0]).not.toHaveProperty('headers');
+    expect(h.send.mock.calls[0][0]).not.toHaveProperty('replyTo');
+  });
+
+  it.each([
+    ['E_RECIPIENT_SUPPRESSED', true, false],
+    ['E_HEADER_NOT_ALLOWED', true, false],
+    ['E_VALIDATION_ERROR', true, false],
+    ['E_RATE_LIMIT_EXCEEDED', false, true],
+    ['E_DAILY_LIMIT_EXCEEDED', false, true],
+    ['E_INTERNAL_SERVER_ERROR', false, false],
+    ['E_DELIVERY_FAILED', false, false],
+  ])('classifies %s (permanent=%s rateLimit=%s)', async (code, permanent, rateLimit) => {
+    h.send.mockRejectedValue(Object.assign(new Error('boom'), { code }));
+    const err = await sendMail({ from: 'no-reply@ebda.app', to: 'a@x.test', subject: 'S' }).catch(
+      e => e
+    );
+    expect(err).toBeInstanceOf(EmailSendError);
+    expect(err.code).toBe(code);
+    expect(err.permanent).toBe(permanent);
+    expect(err.isRateLimit).toBe(rateLimit);
+  });
+
+  it('fails loud, never silently, when the binding is missing', async () => {
+    clearCfBindings();
+    expect(isMailTransportConfigured()).toBe(false);
+    await expect(
+      sendMail({ from: 'no-reply@ebda.app', to: 'a@x.test', subject: 'S' })
+    ).rejects.toMatchObject({ code: 'E_NO_BINDING' });
+  });
+});
+
+describe('resolveSender', () => {
+  const store = {
+    name: 'Shop',
+    domain: 'shop.test',
+    email: 'owner@shop.test',
+    emailDomainStatus: 'verified',
+  };
+  it('always sends from ebda.app on Cloudflare, replies go to the merchant', () => {
+    expect(resolveSender(store)).toEqual({
+      from: 'Shop <no-reply@ebda.app>',
+      replyTo: 'owner@shop.test',
+    });
+  });
+  it('keeps the verified merchant domain on the legacy provider only', () => {
+    h.cfg.emailProvider = 'resend';
+    expect(resolveSender(store).from).toBe('Shop <noreply@shop.test>');
+  });
+});

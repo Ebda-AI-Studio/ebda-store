@@ -62,6 +62,10 @@
   // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
   "services": [{ "binding": "STOREFRONT", "service": "ebda-web" }],
 
+  // Outbound email (G6, Ruling INFRA-CF-1): Cloudflare Email Service, sender domain ebda.app
+  // (onboarded 2026-10-24; DKIM/SPF live on cf-bounce.ebda.app). No API key. services/mail-transport.ts.
+  "send_email": [{ "name": "EMAIL" }],
+
   // Workers AI: search embeddings only (@cf/baai/bge-m3, apps/api/src/lib/search/embedding-provider.ts).
   // No id; billed per input token to the account the Worker deploys to (Whisky, 69188202...). AI
   // bindings always run remotely, so the workerd smoke (wrangler dev --local) boots a copy WITHOUT
@@ -162,6 +166,8 @@
     "TRUST_PROXY_HOPS": "1",
     // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
+    // Outbound email provider. `cloudflare` = the EMAIL binding; `resend` = legacy rollback until the Resend decommission.
+    "EMAIL_PROVIDER": "cloudflare",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
