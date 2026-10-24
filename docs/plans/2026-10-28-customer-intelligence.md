@@ -107,8 +107,8 @@ One data point per event, `writeDataPoint` from the consumer (batched; stay unde
 ### 1.6 R2 layout (bucket `ebda-ci`, private, its own scoped token)
 
 ```
-outcomes/v1/dt=YYYY-MM-DD/store=<storeId>/<batch ULID>.ndjson.gz   # raw envelopes, one per line
-outcomes/v1/_compacted/dt=YYYY-MM-DD/store=<storeId>.ndjson.gz     # daily compaction of the batches
+outcomes/v1/store=<storeId>/dt=YYYY-MM-DD/<batch ULID>.ndjson.gz   # raw envelopes, one per line; store FIRST so a merchant erase is one prefix
+outcomes/v1/store=<storeId>/dt=YYYY-MM-DD/_compacted.ndjson.gz     # daily compaction of the batches
 index/buyer/<buyerKey[0:2]>/<buyerKey>.json                         # {"partitions": ["dt=…/store=…/<file>", …]} for erasure
 aggregates/v1/<metric>/dt=YYYY-MM-DD.json                           # CI-2 output, never contains buyerKey
 manifests/dt=YYYY-MM-DD.json                                        # per-day file list, row counts, sha256 (backup assert)
@@ -120,7 +120,7 @@ Retention: raw envelopes 24 months (lifecycle rule on `outcomes/`), aggregates i
 
 - Privacy policy and terms: Ahmad approved the update in advance (register 2026-10-24); the controller drafts, Ahmad signs off on the final text before publishing. Content: hashed buyer key, purpose (improving delivery and fraud signals), merchant opt-in for cross-store use, retention, PDPL 151/2020 rights, Cloudflare as the only processor.
 - **Customer erasure:** recompute `buyerKey` from the phone, read `index/buyer/...`, rewrite each listed partition without that buyer's rows, delete the index entry, drop the Store-side `buyerKey` columns. AE holds no buyer key, so nothing to erase there. Aggregates computed earlier stay (they are not personal data after the k-threshold, section 4).
-- **Merchant erasure:** delete every `store=<storeId>` partition and the store's index entries. Cross-store aggregates already published stay (k-anonymous).
+- **Merchant erasure:** delete the `outcomes/v1/store=<storeId>/` prefix (and drop that store from the buyer index entries lazily: an index entry pointing at a missing partition is skipped). Cross-store aggregates already published stay (k-anonymous).
 - Tests: one per surface (R2 rewrite drops exactly that buyer's rows and no others; index removed; merchant erase leaves other stores' partitions byte-identical).
 
 ### 1.8 CI-1 acceptance (the "done" for before-launch)
