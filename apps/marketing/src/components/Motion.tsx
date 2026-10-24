@@ -76,7 +76,8 @@ export function StoryScroll({
       onScroll();
     };
     let listening = false;
-    const io = new IntersectionObserver(([e]) => {
+    const io = new IntersectionObserver(entries => {
+      const e = entries[entries.length - 1];
       if (e.isIntersecting && !listening) {
         listening = true;
         measure();
@@ -89,8 +90,11 @@ export function StoryScroll({
         window.removeEventListener('resize', onResize);
       }
     });
+    // anything above the story that changes the page height (font swap, lazy image) moves `top`: watch the body too
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onResize);
     ro?.observe(el);
+    ro?.observe(document.body);
+    void document.fonts?.ready.then(onResize);
     el.dataset.live = '1';
     measure();
     update();

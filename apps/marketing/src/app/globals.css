@@ -612,15 +612,15 @@ html[lang='ar'] .story h2 {
   --e: 0.28;
 }
 .story-steps li:nth-child(2) {
-  --s: 0.28;
+  --s: 0.27;
   --e: 0.48;
 }
 .story-steps li:nth-child(3) {
-  --s: 0.48;
+  --s: 0.47;
   --e: 0.68;
 }
 .story-steps li:nth-child(4) {
-  --s: 0.68;
+  --s: 0.67;
   --e: 1.1;
 }
 .story[data-live] .story-steps li {
