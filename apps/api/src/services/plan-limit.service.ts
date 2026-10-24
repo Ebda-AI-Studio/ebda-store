@@ -180,10 +180,10 @@ export async function assertWithinLimit(
   opts: { delta?: number; tx?: Tx } = {}
 ): Promise<void> {
   const delta = opts.delta ?? 1;
-  // With a transaction the check is ATOMIC with the caller's insert: the store row is locked FOR UPDATE first, so concurrent
+  // With a transaction the check is ATOMIC with the caller's insert: the store row is locked FOR NO KEY UPDATE first (it serialises seat takers against each other but, unlike FOR UPDATE, does not block the FK inserts - orders, carts, products - that take FOR KEY SHARE on it), so concurrent
   // seat takers queue behind each other and each counts the previous one's row (no N-racers-one-seat overshoot).
   if (opts.tx)
-    await opts.tx.$queryRaw`SELECT id FROM public.stores WHERE id = ${storeId} FOR UPDATE`;
+    await opts.tx.$queryRaw`SELECT id FROM public.stores WHERE id = ${storeId} FOR NO KEY UPDATE`;
   const e = await getEntitlements(storeId, opts.tx);
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 

@@ -109,13 +109,12 @@ export const planService = {
     const storeIds = await storeIdsOnPlan(code);
     const newSeats = limits.maxStaff;
     if (typeof newSeats === 'number') {
-      await Promise.all(
-        storeIds.map(storeId =>
-          expireInvitesBeyondSeats(storeId).catch(err =>
-            logger.warn({ err, storeId }, '[plan] could not expire over-limit staff invites')
-          )
-        )
-      );
+      // Sequential on purpose: one transaction at a time, so a popular plan cannot exhaust the connection pool.
+      for (const storeId of storeIds) {
+        await expireInvitesBeyondSeats(storeId).catch(err =>
+          logger.warn({ err, storeId }, '[plan] could not expire over-limit staff invites')
+        );
+      }
     }
     await Promise.all(
       storeIds.map(storeId =>

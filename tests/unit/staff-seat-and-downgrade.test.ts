@@ -14,7 +14,7 @@ const h = vi.hoisted(() => ({
 
 const tx = {
   $queryRaw: async (strings: TemplateStringsArray) => {
-    h.calls.push(strings.join('?').includes('FOR UPDATE') ? 'lock-store' : 'query');
+    h.calls.push(strings.join('?').includes('FOR NO KEY UPDATE') ? 'lock-store' : 'query');
     return [];
   },
   storeStaff: {
