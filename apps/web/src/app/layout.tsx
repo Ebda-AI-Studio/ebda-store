@@ -635,9 +635,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     </FeatureProvider>
                   )}
                   {/* No store resolved (unknown/inactive host, platform host, transient
-                  fallback): the page is the generic Ebda 404 / retry body. It sets no
+                  fallback): the page is the generic Ebda Store 404 / retry body. It sets no
                   tracking, so there is nothing to consent to, and the banner's default-
-                  theme primary must not be the only colour on an Ebda-branded page
+                  theme primary must not be the only colour on an Ebda Store page
                   (Ruling SUBDOMAIN-404-1). */}
                   {store.id !== 'demo' && (
                     <>

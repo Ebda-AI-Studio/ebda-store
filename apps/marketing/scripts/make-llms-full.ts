@@ -47,7 +47,7 @@ const L: string[] = [];
 L.push('# Ebda Store (ابدأ ستور) — full capability list');
 L.push('');
 L.push(
-  '> Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). A self-serve online store builder for sellers in Egypt, Arabic-first with English. Not to be confused with any other site named Ebda. Generated from the same source as https://ebda.app/en/features/ and /en/compare/*; short version: https://ebda.app/llms.txt'
+  '> Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). A self-serve online store builder for sellers in Egypt, Arabic-first with English. Not to be confused with any unrelated site with a similar name. Generated from the same source as https://ebda.app/en/features/ and /en/compare/*; short version: https://ebda.app/llms.txt'
 );
 L.push('');
 L.push(

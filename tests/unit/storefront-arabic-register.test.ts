@@ -163,7 +163,7 @@ const NEUTRAL: Array<[string, string]> = [
   ['apps/web/src/app/checkout/success/InstapayReceiptUploader.tsx', "'أرسل الإيصال'"],
   ['apps/web/src/components/ProductModel3d.tsx', "'اعرضه 3D'"],
   ['apps/web/src/components/ProductModel3d.tsx', "'اعرضه في مكانك'"],
-  ['apps/web/src/components/UnknownHostNotFound.tsx', "'أنشئ متجرك على إبدأ'"],
+  ['apps/web/src/components/UnknownHostNotFound.tsx', "'أنشئ متجرك على ابدأ ستور'"],
   ['apps/web/src/components/UnknownHostNotFound.tsx', "'تواصل معنا عبر واتساب'"],
   ['apps/web/src/components/commerce/ReceiptPrinter.tsx', "'موعد الوصول'"],
   ['apps/web/src/contexts/LanguageContext.tsx', "'اختر شكلاً'"],
