@@ -2,10 +2,15 @@
  * The Inngest -> Cloudflare job map (G5, Ruling INFRA-CF-1): every registered function, the
  * rollout group it ports with, and the Cloudflare primitive that runs it.
  *
- *  - `workflow`: multi-step / sleeping / `step`-delegating handlers run as a Cloudflare Workflow
- *    instance (one durable step per `step.run`, per-step retries).
- *  - `queue`: handlers with at most one step run on the `ebda-jobs` Queue (whole-handler retries,
- *    then the DLQ + failure path). Their body is idempotent by the existing contract.
+ *  - `workflow`: sleeping, long-running or side-effecting multi-step handlers (emails, pushes,
+ *    money) run as a Cloudflare Workflow instance: one durable step per `step.run`, per-step
+ *    retries, so a retry never repeats an earlier step's side effect. Only code INSIDE `step.run`
+ *    has a database connection there, which is what the per-group handler audit checks.
+ *  - `queue`: handlers that are short and whole-run idempotent (sweeps, retention, one-step jobs) run
+ *    on the `ebda-jobs` Queue: the WHOLE handler runs inside one database context, so code outside
+ *    `step.run`, JSON-heavy step results and "now" computed once all just work; a failed attempt
+ *    re-runs the handler (backoff, the job's `retries`, then the failure path). `step.sleep` is not
+ *    available there.
  *  - `alarm`: a store-iterating schedule that becomes a per-store Durable Object alarm once StoreDO
  *    owns the data (phases 2-3, other agents). Until then it runs as a Cron Trigger -> Workflow.
  * Cron Triggers start every `cron` function (lib/jobs/schedule.ts); events start the `event` ones.
@@ -31,30 +36,30 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron' },
   'abandoned-cart-purge-weekly': {
     group: '2-housekeeping',
-    kind: 'workflow',
+    kind: 'queue',
     trigger: 'cron',
     alarm: true,
   },
   'account-erased-propagation': { group: '2-housekeeping', kind: 'workflow', trigger: 'event' },
   'audit-log-archive-weekly': {
     group: '2-housekeeping',
-    kind: 'workflow',
+    kind: 'queue',
     trigger: 'cron',
     alarm: true,
   },
   'bulk-import-orphan-cleanup': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
-  'domain-claim-sweep': { group: '2-housekeeping', kind: 'workflow', trigger: 'cron' },
-  'order-anonymize-5y-monthly': { group: '2-housekeeping', kind: 'workflow', trigger: 'cron' },
-  'r2-orphan-sweep': { group: '2-housekeeping', kind: 'workflow', trigger: 'cron' },
+  'domain-claim-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'order-anonymize-5y-monthly': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'r2-orphan-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'search-log-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'soft-deleted-user-anonymize-monthly': {
     group: '2-housekeeping',
-    kind: 'workflow',
+    kind: 'queue',
     trigger: 'cron',
   },
   'store-usage-snapshot': {
     group: '2-housekeeping',
-    kind: 'workflow',
+    kind: 'queue',
     trigger: 'cron',
     alarm: true,
   },

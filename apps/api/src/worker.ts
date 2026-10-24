@@ -18,7 +18,8 @@
  *     StoreRealtime), and the WebSocket upgrade for realtime (`/socket.io/`).
  */
 import { handleAsNodeRequest } from 'cloudflare:node';
-import { NonRetryableError, WorkflowEntrypoint } from 'cloudflare:workflows';
+import { WorkflowEntrypoint } from 'cloudflare:workers';
+import { NonRetryableError } from 'cloudflare:workflows';
 import { createServer } from 'node:http';
 import app from './app';
 import { ClientPoolTimeout, createIsolateDb, prisma, type IsolateDb } from '@ebda/database';
@@ -358,6 +359,8 @@ export class JobWorkflow extends WorkflowEntrypoint<CfBindings, JobParams> {
     event: { payload: Readonly<JobParams>; instanceId: string },
     step: Parameters<typeof runJobWorkflow>[0]['step']
   ): Promise<void> {
+    // Bindings for code that runs between steps (alerts, feature flags); step bodies get the full context.
+    setCfBindings(this.env);
     await runJobWorkflow({
       params: event.payload as JobParams,
       instanceId: event.instanceId,
