@@ -47,7 +47,7 @@ async function seedPlainStore(suffix: string): Promise<FixtureStore> {
       data: {
         name: `Staff Invite Fixture ${suffix}`,
         slug: `staff-invite-${suffix}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

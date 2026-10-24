@@ -20,7 +20,7 @@ function baseStore(overrides: Partial<ResolvedStore> = {}): ResolvedStore {
     status: 'active',
     currency: 'EGP',
     timezone: 'Africa/Cairo',
-    template: 'modern',
+    template: 'qamar',
     theme: {} as ResolvedStore['theme'],
     socialLinks: {} as ResolvedStore['socialLinks'],
     settings: {},

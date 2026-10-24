@@ -57,7 +57,7 @@ async function seedStore(): Promise<string> {
       data: {
         name: `campaign-it-${id}`,
         slug: `campaign-it-${id}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

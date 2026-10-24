@@ -32,6 +32,8 @@ import {
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
   LOOK_OWNED_THEME_KEYS,
+  isRetiredTemplate,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -443,17 +445,17 @@ export class StoreService {
             locale: 'ar-EG',
             defaultLanguage: REGION.defaultLocale,
           },
-          // 2026-07-12 design structural batch: new stores get the persona-chrome
-          // completion + card-frame dedup ON by default (Ahmad-approved for NEW
+          // 2026-07-12 design structural batch: new stores get the card-frame dedup
+          // ON by default (Ahmad-approved for NEW
           // stores only — every existing store keeps these flags undefined/false
           // and renders unchanged). Merchant can still toggle either off via
           // Branding → Theme.
           // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
           // OOS ribbon (harmonizes better than the platform's original fixed
           // terracotta). Existing stores keep it undefined and render unchanged.
-          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8).
+          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8); nor is
+          // `personaChromeV2`: only the deleted Force skins read it (Ruling SKIN-DEL-5).
           theme: {
-            personaChromeV2: true,
             frameChromeDedup: true,
             oosRibbonColor: '#6b7280',
           },
@@ -938,11 +940,16 @@ export class StoreService {
   }
 
   static async updateTemplate(storeId: string, template: string) {
+    // The five Force skins are deleted (Ruling SKIN-DEL-8): the strict writer refuses them, even
+    // as a re-save of a store that still holds one. Readers keep mapping them (no write).
+    if (isRetiredTemplate(template)) {
+      throw new AppError(400, 'TEMPLATE_RETIRED', 'That template has been retired; choose a look');
+    }
     const store = await this.getById(storeId);
 
-    // Existing stores keep their current skin (a re-save of it is allowed), but nobody can switch
-    // INTO a bare skin: the five legacy Force skins are closed to new choices and Qamar is only
-    // reachable through a look (Ruling B1-17). Switching is `applyLook`, gated on built looks.
+    // Existing stores keep their current template (a re-save of it is allowed), but nobody can
+    // switch INTO a bare template: Qamar and the rest are only reachable through a look (Ruling
+    // B1-17). Switching is `applyLook`, gated on built looks.
     if (template !== store.template) {
       throw new AppError(
         400,
@@ -994,7 +1001,10 @@ export class StoreService {
       ...preview,
       look: look.id,
       // the skin (header, cards, buttons) is not drawn in the preview: say when it will change
-      skinChange: store.template !== look.skin ? { from: store.template, to: look.skin } : null,
+      skinChange:
+        normalizeLegacyTemplate(store.template) !== look.skin
+          ? { from: normalizeLegacyTemplate(store.template), to: look.skin }
+          : null,
     };
   }
 

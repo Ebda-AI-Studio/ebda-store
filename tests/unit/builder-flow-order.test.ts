@@ -6,10 +6,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   LOOKS,
+  RETIRED_TEMPLATES,
   TEMPLATE_FAMILIES,
   applyTemplateFamily,
   getSectionDefinition,
   layoutToDefinition,
+  normalizeLegacyTemplate,
   resolveLayoutSettings,
 } from '@ebda/shared';
 import { flowOrder, orderByFlow } from '../../apps/admin/src/lib/builder-flow-order';
@@ -30,10 +32,15 @@ describe('flowOrder', () => {
   }
 
   it('a store with no look follows the skin default layout', () => {
-    for (const skin of ['modern', 'minimal', 'qamar'] as const) {
+    for (const skin of ['qamar', 'souq'] as const) {
       const doc = layoutToDefinition(resolveLayoutSettings({}, skin));
       expect(flowOrder(skin, null)).toEqual(unique(doc.sections.map(n => n.type)));
     }
+  });
+
+  it('a store still holding a retired Force skin follows the mapped template (SKIN-DEL-8)', () => {
+    for (const skin of RETIRED_TEMPLATES)
+      expect(flowOrder(skin, null)).toEqual(flowOrder(normalizeLegacyTemplate(skin), null));
   });
 
   it('an unknown look or template never throws and falls back to a layout', () => {

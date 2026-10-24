@@ -158,7 +158,7 @@ async function main(): Promise<number> {
       ownerId: user.id,
       status: 'active',
       currency: 'EGP',
-      template: 'modern',
+      template: 'qamar',
       theme: {},
       settings: { defaultLanguage: 'ar' },
     },

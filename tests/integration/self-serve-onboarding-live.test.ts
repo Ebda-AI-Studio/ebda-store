@@ -138,7 +138,8 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
     expect((await call('GET', '/public/products?limit=5', { host })).status).toBe(400); // not live yet
 
     expect(
-      (await call('PUT', `/stores/${storeId}/template`, { jwt, body: { template: 'bold' } })).status
+      (await call('PUT', `/stores/${storeId}/template`, { jwt, body: { template: 'qamar' } }))
+        .status
     ).toBe(200);
     const product = await call('POST', `/stores/${storeId}/products`, {
       jwt,

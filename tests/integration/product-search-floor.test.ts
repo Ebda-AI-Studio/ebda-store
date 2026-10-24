@@ -53,7 +53,7 @@ describe.skipIf(!hasDb)('public product search floor', () => {
         data: {
           name: 'psf-test-store',
           slug: `psf-test-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
           status: 'active',

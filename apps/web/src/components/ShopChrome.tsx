@@ -349,7 +349,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         {/* `data-zone` wrappers let the per-store typography rules in
           apps/web/src/app/layout.tsx target each storefront zone
           without having to rewrite the templates' internal markup.
-          Six zones, applied uniformly across all 5 packs. */}
+          Six zones, applied uniformly across every pack. */}
         {/* Announcement bar — gated by both content presence AND page-builder
           layout.announcement.enabled (when explicitly false, hides regardless
           of content). bgColor falls back: layout.announcement.bgColor wins
@@ -463,7 +463,6 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             hideFooterLogoMobile={store.theme?.hideFooterLogoMobile === true}
             footerLogoAutoFilter={footerLogoContrastFilter(
               resolveFooterAutoContrastBg(
-                store.template,
                 store.theme,
                 layout?.footer?.bgColor
                   ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)

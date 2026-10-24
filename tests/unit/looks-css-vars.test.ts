@@ -8,8 +8,8 @@ import { themeToCssVars as sharedVars } from '@ebda/shared';
 
 describe('themeToCssVars parity (SSR shared vs client mirror)', () => {
   for (const [name, input] of [
-    ['look theme', { template: 'minimal', look: 'souq.night', theme: {} }],
-    ['legacy theme', { template: 'minimal', theme: {} }],
+    ['look theme', { template: 'qamar', look: 'souq.night', theme: {} }],
+    ['legacy theme', { template: 'qamar', theme: {} }],
   ] as const) {
     it(`${name}: identical variable sets and values`, () => {
       const t = composeStoreTheme(input as Parameters<typeof composeStoreTheme>[0]);

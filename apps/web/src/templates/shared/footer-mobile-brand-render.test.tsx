@@ -30,13 +30,7 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('../../lib/api', () => ({ api: { subscribeNewsletter: vi.fn() } }));
 
-const FOOTERS = [
-  ['classic', (await import('../classic/Footer')).default],
-  ['modern', (await import('../modern/Footer')).default],
-  ['minimal', (await import('../minimal/Footer')).default],
-  ['bold', (await import('../bold/Footer')).default],
-  ['elegant', (await import('../elegant/Footer')).default],
-] as const;
+const FOOTERS = [['base', (await import('../base/Footer')).default]] as const;
 
 const BRANDING = { name: 'Test Store', nameAr: 'متجر تجريبي' };
 function render(Footer: (typeof FOOTERS)[number][1], props: Partial<FooterProps>, isRtl = false) {

@@ -26,8 +26,8 @@ describe('storefront "Powered by Ebda" mark', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('every template footer (5 themes + Dahab) renders this one badge', () => {
-    for (const t of ['bold', 'classic', 'dahab', 'elegant', 'minimal', 'modern']) {
+  it('every template footer (the shared base + Dahab) renders this one badge', () => {
+    for (const t of ['base', 'dahab']) {
       const src = readFileSync(join(root, `apps/web/src/templates/${t}/Footer.tsx`), 'utf8');
       expect(src, t).toContain('<PoweredByEbda');
     }

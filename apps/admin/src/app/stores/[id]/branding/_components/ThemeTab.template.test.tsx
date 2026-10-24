@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Task 10 (EP Task 4, Ruling EP-1): the Theme tab offers the persona-chrome switch only to the
- * skins that read it, and keeps it for a store whose template is unknown.
+ * The Theme tab no longer offers the persona-chrome switch: only the deleted Force skins read it
+ * (Ruling SKIN-DEL-5). The key stays in the theme schema, accepted and ignored.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
@@ -18,7 +18,7 @@ vi.mock('./BrandPreview', () => ({ BrandPreview: () => null }));
 vi.mock('../../../../../components/ImageUpload', () => ({ ImageUpload: () => null }));
 vi.mock('../../../../../components/ColorField', () => ({ ColorField: () => null }));
 
-import { ThemeTab, PERSONA_CHROME_SKINS } from './ThemeTab';
+import { ThemeTab } from './ThemeTab';
 import { DEFAULT_THEME, type StoreBranding } from './types';
 
 function tab(template: string | undefined) {
@@ -37,25 +37,14 @@ function tab(template: string | undefined) {
 afterEach(cleanup);
 
 describe('ThemeTab by template', () => {
-  it('Qamar, Souq, Jasmine, Lamma, Minimal, Modern and Dahab: no persona-chrome switch', () => {
-    for (const t of ['qamar', 'souq', 'jasmine', 'lamma', 'minimal', 'modern', 'dahab']) {
-      expect(tab(t), t).not.toContain('persona-chrome');
+  it('no template gets a persona-chrome switch (SKIN-DEL-5), including a store with no template', () => {
+    for (const t of ['qamar', 'souq', 'jasmine', 'lamma', 'dahab', undefined]) {
+      expect(tab(t), String(t)).not.toContain('persona-chrome');
       cleanup();
     }
-  });
-
-  it('Bold, Classic and Elegant read it, so they keep it', () => {
-    for (const t of PERSONA_CHROME_SKINS) {
-      expect(tab(t), t).toContain('persona-chrome');
-      cleanup();
-    }
-  });
-
-  it('an unknown template keeps it (never hide on missing evidence)', () => {
-    expect(tab(undefined)).toContain('persona-chrome');
   });
 
   it('never more than 7 toggle cards on screen', () => {
-    expect(tab('bold').length).toBeLessThanOrEqual(7);
+    expect(tab('qamar').length).toBeLessThanOrEqual(7);
   });
 });

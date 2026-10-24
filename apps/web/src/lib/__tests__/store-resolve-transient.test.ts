@@ -61,7 +61,7 @@ const malformed = (status = 200) => ({
 
 const storeBody = (slug: string) => ({
   success: true,
-  data: { store: { id: `id-${slug}`, slug, template: 'modern' } },
+  data: { store: { id: `id-${slug}`, slug, template: 'qamar' } },
 });
 
 beforeEach(() => {

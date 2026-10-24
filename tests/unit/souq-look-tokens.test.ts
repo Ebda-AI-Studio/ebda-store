@@ -180,9 +180,9 @@ describe('Souq replaces the platform amber warning', () => {
     expect(
       composeStoreTheme({ template: 'souq', look: 'souq.night', theme: null }).warningColor
     ).toBe(skin.warningColor);
-    expect(
-      isOrangeFamily(composeStoreTheme({ template: 'minimal', theme: null }).warningColor)
-    ).toBe(true);
+    expect(isOrangeFamily(composeStoreTheme({ template: 'qamar', theme: null }).warningColor)).toBe(
+      true
+    );
   });
 });
 
@@ -259,8 +259,8 @@ describe('souq skin id', () => {
       expect(json.template.page.skins.souq, f).toBe(label);
     }
     const svc = readFileSync(path.join(root, 'apps/api/src/services/store.service.ts'), 'utf8');
-    // Souq, like Qamar, is only reachable through a look: updateTemplate refuses a switch INTO a bare skin.
-    expect(svc).toMatch(/nobody can switch\s+\/\/ INTO a bare skin/);
+    // Souq, like Qamar, is only reachable through a look: updateTemplate refuses a switch INTO a bare template.
+    expect(svc).toMatch(/nobody can\s+\/\/ switch INTO a bare template/);
   });
   it('the souq template family renders on the souq skin', async () => {
     const { TEMPLATE_FAMILIES } = await import('@ebda/shared');
@@ -365,7 +365,7 @@ describe('Ruling B2-2: every CSS variable a Souq theme emits is outside the oran
       expect(bad).toEqual([]);
     });
   it('negative control: a legacy skin emits an orange --warning-ink, so the check can fail', () => {
-    const theme = composeStoreTheme({ template: 'minimal', look: null, theme: null });
+    const theme = composeStoreTheme({ template: 'qamar', look: null, theme: null });
     const vars = themeToCssVars(theme) as Record<string, string>;
     expect(isOrangeFamily(vars['--warning-ink'])).toBe(true);
   });

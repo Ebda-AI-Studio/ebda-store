@@ -103,7 +103,7 @@ async function freshStore(tag: string): Promise<string> {
     },
   });
   const s = await owner.store.create({
-    data: { slug: `${PREFIX}${tag}`, name: tag, ownerId: u.id, template: 'modern' },
+    data: { slug: `${PREFIX}${tag}`, name: tag, ownerId: u.id, template: 'qamar' },
   });
   return s.id;
 }

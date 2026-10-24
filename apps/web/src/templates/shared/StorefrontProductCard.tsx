@@ -441,7 +441,7 @@ function StorefrontProductCardImpl({
 
           {/* Sprint 2 (2026-05-17): replaced the inline OOS pill with the
               shared OutOfStockRibbon component — proper diagonal corner
-              ribbon at -45°, consumed by all 5 themes already. NEW
+              ribbon at -45°, consumed by every template already. NEW
               orange badge added below it (top-START) when product is
               flagged new OR was created in the last 14 days.
               Task 3 B4: OOS badge customization via productCardDefaults. */}

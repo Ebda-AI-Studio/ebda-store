@@ -1109,7 +1109,7 @@ export interface TemplateComponents {
   /**
    * Optional — templates that haven't implemented CartTable yet fall back
    * to the generic inline cart-row layout in CartClient.tsx. Remove the
-   * `?` once all 5 templates ship it.
+   * `?` once every template ships it.
    */
   CartTable?: React.ComponentType<CartTableProps>;
   /** Totals panel (cart + checkout). Optional during rollout. */

@@ -112,8 +112,6 @@ describe('R-04: one Sheet primitive, no ad-hoc dialogs in the storefront', () =>
       'apps/web/src/templates/dahab/Drawer.tsx',
       'apps/web/src/app/account/orders/[id]/OrderDetailClient.tsx',
       'apps/web/src/components/CookiePreferencesModal.tsx',
-      'apps/web/src/templates/bold/Header.tsx',
-      'apps/web/src/templates/modern/Header.tsx',
       'apps/web/src/app/account/addresses/AddressesClient.tsx',
     ]) {
       expect(readFileSync(join(ROOT, f), 'utf8'), f).toMatch(/<Sheet\b/);

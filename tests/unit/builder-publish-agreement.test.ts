@@ -27,7 +27,7 @@ import {
   type TemplateId,
 } from '@ebda/shared';
 
-const TEMPLATES: TemplateId[] = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
+const TEMPLATES: TemplateId[] = ['qamar', 'souq', 'jasmine', 'lamma'];
 
 /** What the public route serves after `doc` is published on a `t` store. */
 function servedAfterPublish(doc: PageDefinition, t: TemplateId) {
@@ -73,12 +73,10 @@ describe('published document agrees with the layout row it back-wrote', () => {
   }
 
   it('a template family changes the page (the case the old guard always rejected)', () => {
-    const base = layoutToDefinition(resolveLayoutSettings({}, 'elegant'));
+    const base = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     const dahab = applyTemplateFamily(base, 'dahab');
     expect(dahab.sections.map(s => s.type)).not.toEqual(base.sections.map(s => s.type));
-    expect(publishedDocumentAgrees(dahab, servedAfterPublish(dahab, 'elegant'), 'elegant')).toBe(
-      true
-    );
+    expect(publishedDocumentAgrees(dahab, servedAfterPublish(dahab, 'qamar'), 'qamar')).toBe(true);
   });
 
   it('an out-of-band write to layout_settings is still detected', () => {
@@ -91,7 +89,7 @@ describe('published document agrees with the layout row it back-wrote', () => {
   });
 
   it('the template matters: resolving against the wrong baseline is drift', () => {
-    const doc = applyTemplateFamily(layoutToDefinition(resolveLayoutSettings({}, 'bold')), 'qamar');
-    expect(publishedDocumentAgrees(doc, servedAfterPublish(doc, 'bold'), 'elegant')).toBe(false);
+    const doc = applyTemplateFamily(layoutToDefinition(resolveLayoutSettings({}, 'souq')), 'qamar');
+    expect(publishedDocumentAgrees(doc, servedAfterPublish(doc, 'souq'), 'qamar')).toBe(false);
   });
 });

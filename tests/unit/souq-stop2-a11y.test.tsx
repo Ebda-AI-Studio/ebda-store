@@ -185,7 +185,7 @@ describe('STOP-2 re-audit minors (R1, R2, M3, price, chip, stage)', () => {
   });
 
   it('M3: the prominent search form follows the logo link in the DOM, before the nav and the actions', () => {
-    const src = read('apps/web/src/templates/minimal/Header.tsx');
+    const src = read('apps/web/src/templates/base/Header.tsx');
     const logo = src.indexOf('data-zone="storeName"');
     const form = src.indexOf('data-zone="souq-search"');
     const nav = src.indexOf('Desktop nav');

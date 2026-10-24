@@ -18,7 +18,7 @@ import { cn } from '@ebda/ui';
 
 const state = {
   language: 'en' as 'en' | 'ar',
-  template: 'minimal',
+  template: 'qamar',
 };
 
 vi.mock('../../contexts/StoreContext', () => ({
@@ -60,11 +60,7 @@ vi.mock('next/link', () => ({
 }));
 
 const { StorefrontProductCard } = await import('./StorefrontProductCard');
-const { default: ModernProductCard } = await import('../modern/ProductCard');
-const { default: ElegantProductCard } = await import('../elegant/ProductCard');
-const { default: ClassicProductCard } = await import('../classic/ProductCard');
-const { default: BoldProductCard } = await import('../bold/ProductCard');
-const { default: MinimalProductCard } = await import('../minimal/ProductCard');
+const { default: BaseProductCard } = await import('../base/ProductCard');
 const { ProductCarousel } = await import('./ProductCarousel');
 const { ProductListItem } = await import('../../app/products/ProductListItem');
 const { getPackStyles } = await import('./pack-styles');
@@ -81,7 +77,7 @@ const LONG = {
   inStock: true,
 };
 
-const PACKS = ['modern', 'elegant', 'classic', 'minimal', 'bold', 'dahab'] as const;
+const PACKS = ['base', 'dahab'] as const;
 
 function dom(html: string): HTMLElement {
   const root = document.createElement('div');
@@ -144,11 +140,7 @@ const listItem = () =>
   );
 
 const NAME_PATHS: Array<[string, () => string]> = [
-  ['modern/ProductCard', direct(ModernProductCard)],
-  ['elegant/ProductCard', direct(ElegantProductCard)],
-  ['classic/ProductCard', direct(ClassicProductCard)],
-  ['minimal/ProductCard', direct(MinimalProductCard)],
-  ['bold/ProductCard', direct(BoldProductCard)],
+  ['base/ProductCard', direct(BaseProductCard)],
   ...PACKS.map(p => [`Storefront card, ${p} pack`, viaPack(p)] as [string, () => string]),
   ...PACKS.map(p => [`ProductCarousel, ${p} pack`, viaCarousel(p)] as [string, () => string]),
   ['app/products/ProductListItem', listItem],
@@ -188,11 +180,8 @@ describe('every pack: the CTA is bounded and uses phone-sized spacing', () => {
     }
   );
 
-  it('minimal + elegant template cards bound their own CTA', () => {
-    for (const [Card, maxEm] of [
-      [MinimalProductCard, 0.14],
-      [ElegantProductCard, 0.12],
-    ] as const) {
+  it('the base template card bounds its own CTA', () => {
+    for (const [Card, maxEm] of [[BaseProductCard, 0.14]] as const) {
       const cta = dom(direct(Card)()).querySelector('[data-zone="cta"]');
       const tokens = classes(cta);
       expect(tokens).toEqual(
@@ -202,8 +191,8 @@ describe('every pack: the CTA is bounded and uses phone-sized spacing', () => {
     }
   });
 
-  it('minimal quick-add overlay is padded off the card edge', () => {
-    const html = direct(MinimalProductCard)();
+  it('base quick-add overlay is padded off the card edge', () => {
+    const html = direct(BaseProductCard)();
     expect(dom(html).querySelector('.px-3.pb-4.pt-12')).not.toBeNull();
   });
 });
@@ -228,7 +217,7 @@ describe('merchant ctaSize does not undo the phone fix (tailwind-merge order)', 
         {
           productId: 'p1',
           inStock: true,
-          className: getPackStyles('elegant').productCardCta,
+          className: getPackStyles('qamar').productCardCta,
           ctaSize: 'lg',
         } as never
       )
@@ -379,7 +368,7 @@ describe('ProductCardCta swaps to the icon-only button when the label would elli
         AdaptiveAddButton as never,
         {
           label: 'Add to cart',
-          className: getPackStyles('elegant').productCardCta,
+          className: getPackStyles('qamar').productCardCta,
         } as never
       )
     );

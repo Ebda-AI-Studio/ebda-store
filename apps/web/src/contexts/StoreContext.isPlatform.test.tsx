@@ -42,7 +42,7 @@ const baseStore: StoreData = {
   status: 'active',
   currency: 'EGP',
   timezone: 'Africa/Cairo',
-  template: 'elegant',
+  template: 'qamar',
   theme: DEFAULT_THEME,
   socialLinks: {},
 };

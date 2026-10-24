@@ -304,7 +304,7 @@ async function seedDemoStore(ownerId: string) {
       description: 'A demo store showcasing the platform features',
       descriptionAr: 'متجر تجريبي يعرض ميزات المنصة',
       currency: REGION.currency,
-      template: 'modern',
+      template: 'qamar',
       theme: {
         primaryColor: '210 9% 4%', // Ebda night (Ruling D1016-ORANGE-1)
         primaryForeground: '0 0% 100%',

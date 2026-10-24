@@ -1,4 +1,5 @@
-// Classic template - Elegant serif fonts and timeless sophistication
+// Shared storefront base: the components Qamar, Souq, Jasmine and Lamma render (Ruling SKIN-DEL-7).
+// Not a skin and not a TemplateId.
 export { default as Header } from './Header';
 export { default as Footer } from './Footer';
 export { default as Hero } from './Hero';

@@ -29,7 +29,7 @@ vi.mock('../../apps/web/src/contexts/StoreContext', () => ({
 }));
 
 const T = '../../apps/web/src/templates';
-const SKINS = ['minimal', 'modern', 'classic', 'elegant', 'bold', 'dahab'];
+const SKINS = ['base', 'dahab'];
 afterEach(cleanup);
 
 describe.each(SKINS)('%s EmptyState CTA', skin => {
@@ -43,7 +43,6 @@ describe.each(SKINS)('%s EmptyState CTA', skin => {
         ctaLabelAr="ابدأ التسوق"
         ctaHref="/products"
         isRtl={isRtl}
-        rtlPolish
       />
     );
     expect(smallTargets(container, 44)).toEqual([]);

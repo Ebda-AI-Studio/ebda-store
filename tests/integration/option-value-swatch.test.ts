@@ -57,7 +57,7 @@ beforeAll(async () => {
     },
   });
   const s = await owner.store.create({
-    data: { slug: `${PREFIX}s`, name: 's', ownerId: u.id, template: 'modern' },
+    data: { slug: `${PREFIX}s`, name: 's', ownerId: u.id, template: 'qamar' },
   });
   ids.store = s.id;
   ids.slug = `${PREFIX}p`;

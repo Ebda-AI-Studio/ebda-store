@@ -22,7 +22,7 @@ function makeStore(overrides: Partial<ResolvedStore> = {}): ResolvedStore {
     status: 'active',
     currency: 'EGP',
     timezone: 'Africa/Cairo',
-    template: 'elegant',
+    template: 'qamar',
     theme: {},
     socialLinks: {},
     ...overrides,

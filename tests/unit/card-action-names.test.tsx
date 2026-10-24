@@ -41,20 +41,16 @@ describe('per-card actions are named with the product', () => {
     expect(r).toContain('aria-label="إزالة عباية من المفضلة"');
   });
 
-  it.each([
-    'shared/StorefrontProductCard.tsx',
-    'elegant/ProductCard.tsx',
-    'modern/ProductCard.tsx',
-    'classic/ProductCard.tsx',
-    'minimal/ProductCard.tsx',
-    'bold/ProductCard.tsx',
-  ])('%s passes the name to every card action', f => {
-    const src = readFileSync(join(T, f), 'utf8');
-    expect(src).not.toMatch(/aria-label=\{t\('Add to wishlist'/);
-    for (const m of src.matchAll(/<(CompareButton|RemoveFromWishlistButton)\b[^>]*>/g)) {
-      expect(m[0]).toMatch(/productName=/);
+  it.each(['shared/StorefrontProductCard.tsx', 'base/ProductCard.tsx'])(
+    '%s passes the name to every card action',
+    f => {
+      const src = readFileSync(join(T, f), 'utf8');
+      expect(src).not.toMatch(/aria-label=\{t\('Add to wishlist'/);
+      for (const m of src.matchAll(/<(CompareButton|RemoveFromWishlistButton)\b[^>]*>/g)) {
+        expect(m[0]).toMatch(/productName=/);
+      }
     }
-  });
+  );
 });
 
 /**
@@ -71,7 +67,7 @@ describe('card link names lead with the product (P2-14)', async () => {
     expect(cardLinkLabel('عباية', [])).toBe('عباية');
   });
 
-  it.each(['shared/StorefrontProductCard.tsx', 'minimal/ProductCard.tsx'])(
+  it.each(['shared/StorefrontProductCard.tsx', 'base/ProductCard.tsx'])(
     '%s hides its chips and names the link name-first',
     f => {
       const src = readFileSync(join(T, f), 'utf8');
@@ -84,7 +80,7 @@ describe('card link names lead with the product (P2-14)', async () => {
 // P2-5 class sweep (found shooting stop3): every skin's cart line named its stepper and
 // remove buttons "Increase", "Decrease", "Remove", identical on every line.
 describe('cart line actions carry the product name (P2-5 class)', () => {
-  it.each(['bold', 'classic', 'dahab', 'elegant', 'minimal', 'modern'])('%s CartTable', skin => {
+  it.each(['base', 'dahab'])('%s CartTable', skin => {
     const src = readFileSync(join(T, `${skin}/CartTable.tsx`), 'utf8');
     expect(
       [...src.matchAll(/cartLineLabel\('(remove|increase|decrease)'/g)].length

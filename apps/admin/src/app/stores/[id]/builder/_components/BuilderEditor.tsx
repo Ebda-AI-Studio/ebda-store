@@ -40,6 +40,7 @@ import {
   recommendedSizeTextForTemplateI18n,
   type MediaRequest,
   type TemplateId,
+  normalizeLegacyTemplate,
   type ChildToParent,
   type DraftTheme,
   type DocumentAction,
@@ -646,7 +647,7 @@ export function BuilderEditor({
           <ThemeSettingsPanel
             storeId={storeId}
             look={getLook(store.look) ?? null}
-            storeTemplate={(store.template as TemplateId | null | undefined) ?? undefined}
+            storeTemplate={store.template ? normalizeLegacyTemplate(store.template) : undefined}
             // A reset is a DRAFT edit: `null` in the draft theme removes the key at Publish.
             onResetKey={key => {
               b.patchDocument(d => ({
@@ -734,7 +735,7 @@ export function BuilderEditor({
         selection={selection}
         viewport={viewport}
         theme={effectiveTheme(store.theme, b.doc.theme)}
-        template={store.template}
+        template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
         look={store.look}
         errors={b.errors}
         dispatch={dispatch}
@@ -1050,7 +1051,7 @@ export function BuilderEditor({
         <AddSectionDialog
           list={addTo}
           doc={b.doc}
-          template={store.template}
+          template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
           look={store.look}
           onClose={() => {
             setAddTo(null);

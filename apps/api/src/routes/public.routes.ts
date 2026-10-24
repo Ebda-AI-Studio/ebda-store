@@ -62,6 +62,7 @@ import {
   storefrontOrigin,
   CONTACT_HONEYPOT_FIELD,
   normalizeArabicSearch,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import {
   assertScalarQuery,
@@ -2169,6 +2170,9 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // pixel IDs — the tokens must never be exposed to anonymous visitors.
       const publicStore = {
         ...store,
+        // A store still holding a retired Force skin renders as its mapped Ebda template, at
+        // read time, with no database write (Ruling SKIN-DEL-8).
+        template: normalizeLegacyTemplate(store.template),
         marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
         settings: publicStoreSettings(store.settings),
         // The checkout/cart tax line needs the rate, not just the
@@ -2400,6 +2404,7 @@ router.get(
         // public storefront + edge cache (browser pixels use public IDs only).
         const publicStore = {
           ...store,
+          template: normalizeLegacyTemplate(store.template),
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
           settings: publicStoreSettings(store.settings),
           // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).

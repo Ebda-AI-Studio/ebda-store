@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
 
-const DOC = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const DOC = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 
 const m = vi.hoisted(() => ({
   bustStoreCaches: vi.fn(),
@@ -90,7 +90,7 @@ function app() {
   return a;
 }
 
-const STORE = { layoutSettings: {}, template: 'modern', slug: 'acme', domain: 'acme.example.com' };
+const STORE = { layoutSettings: {}, template: 'qamar', slug: 'acme', domain: 'acme.example.com' };
 const draftRow = { id: 'd1', rev: 3, status: 'draft', document: DOC };
 
 describe('publish purges every cache layer, after the commit', () => {

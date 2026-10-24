@@ -112,7 +112,7 @@ export async function seedBundleStore(suffix: string): Promise<FixtureStore> {
       data: {
         name: `bundle-fixture-store-${suffix}`,
         slug: `bundle-fixture-${suffix}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
@@ -151,7 +151,7 @@ export async function seedStoreWithoutBundlesFeature(suffix: string): Promise<Fi
       data: {
         name: `bundle-fixture-nofeature-store-${suffix}`,
         slug: `bundle-fixture-nofeature-${suffix}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

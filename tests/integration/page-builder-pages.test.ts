@@ -56,7 +56,7 @@ async function freshStore(tag: string): Promise<string> {
       slug: `${PREFIX}${tag}-${crypto.randomUUID().slice(0, 6)}`,
       name: tag,
       ownerId: u.id,
-      template: 'modern',
+      template: 'qamar',
     },
   });
   return s.id;

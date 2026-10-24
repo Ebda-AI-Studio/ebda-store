@@ -389,7 +389,7 @@ export interface ResolveCardBadgesInput {
   discountVisible?: boolean;
   /**
    * Whether this surface renders the discount badge as an absolutely
-   * positioned corner chip. False on the `minimal` theme, whose discount
+   * positioned corner chip. False on the base card, whose discount
    * indicator is inline text under the price with no corner at all, and on
    * the PDP, where both badges sit in a flex row of `<Badge>`s. On those
    * surfaces the two can never collide, so the corner arm of the mutex must

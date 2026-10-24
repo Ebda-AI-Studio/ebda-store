@@ -290,7 +290,7 @@ describe('shop-the-look', () => {
     expect(html).not.toMatch(/rounded-(sm|md|lg|xl|2xl)\b/);
   });
 
-  for (const template of ['minimal', 'dahab', 'qamar'])
+  for (const template of ['dahab', 'qamar'])
     it(`renders on the ${template} skin (Review Focus 5)`, () => {
       setStore(template);
       const hero = renderToStaticMarkup(<HeroCollage slides={slides} isRtl urlPrefix="" />);
@@ -474,7 +474,7 @@ describe('one section-heading alignment per page on qamar (T-03)', async () => {
     ).match(/<h2 class="([^"]*)"/)?.[1] ?? '';
   it('qamar start-aligns by default; legacy skins stay centred; a merchant align wins', () => {
     expect(h2('qamar')).toMatch(/\btext-start\b/);
-    for (const p of ['minimal', 'modern', 'dahab']) expect(h2(p)).toMatch(/\btext-center\b/);
+    for (const p of ['base', 'dahab']) expect(h2(p)).toMatch(/\btext-center\b/);
     expect(h2('qamar', 'center')).toMatch(/\btext-center\b/);
   });
 });

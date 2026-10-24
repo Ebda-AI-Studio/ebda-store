@@ -55,19 +55,9 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...rest }, children),
 }));
 
-const { default: ModernOrderSummary } = await import('../modern/OrderSummary');
-const { default: ElegantOrderSummary } = await import('../elegant/OrderSummary');
-const { default: ClassicOrderSummary } = await import('../classic/OrderSummary');
-const { default: MinimalOrderSummary } = await import('../minimal/OrderSummary');
-const { default: BoldOrderSummary } = await import('../bold/OrderSummary');
+const { default: BaseOrderSummary } = await import('../base/OrderSummary');
 
-const THEMES = [
-  ['modern', ModernOrderSummary],
-  ['elegant', ElegantOrderSummary],
-  ['classic', ClassicOrderSummary],
-  ['minimal', MinimalOrderSummary],
-  ['bold', BoldOrderSummary],
-] as const;
+const THEMES = [['base', BaseOrderSummary]] as const;
 
 type Props = React.ComponentProps<(typeof THEMES)[number][1]>;
 

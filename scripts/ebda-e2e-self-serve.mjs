@@ -158,7 +158,7 @@ try {
   });
   await step('choose template', async () => {
     must(
-      await call('PUT', `/stores/${storeId}/template`, { jwt, body: { template: 'bold' } }),
+      await call('PUT', `/stores/${storeId}/template`, { jwt, body: { template: 'qamar' } }),
       200,
       'template'
     );

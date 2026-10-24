@@ -1,6 +1,6 @@
 'use client';
 import { getLook, resolveHeaderChrome } from '@ebda/shared';
-import MinimalHeader from '../minimal/Header';
+import MinimalHeader from '../base/Header';
 import type { HeaderProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
 
