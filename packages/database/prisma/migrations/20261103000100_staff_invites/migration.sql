@@ -28,3 +28,6 @@ ALTER TABLE staff_invites FORCE ROW LEVEL SECURITY;
 CREATE POLICY ebda_tenant_isolation ON staff_invites AS PERMISSIVE FOR ALL TO ebda_app
   USING (store_id = nullif(current_setting('app.current_store_id', true), ''))
   WITH CHECK (store_id = nullif(current_setting('app.current_store_id', true), ''));
+
+-- Explicit grant (belt and braces: the default privileges of 20261004000000 already cover a new table).
+GRANT SELECT, INSERT, UPDATE, DELETE ON staff_invites TO ebda_app;
