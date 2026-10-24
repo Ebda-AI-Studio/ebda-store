@@ -78,3 +78,30 @@ export function loadBackup(sql: SqlLike, files: Record<string, string>): void {
 
 export const backupKey = (storeId: string, day: string, file: string) =>
   `store-do-backups/${storeId}/${day}/${file}`;
+
+/**
+ * Read every object of a just-written backup back from R2 and compare to the manifest: the manifest exists,
+ * and each table file's sha256 and line count (minus the header) equal what was computed before the write.
+ * Throws on the first mismatch so the alarm's failure path (and the sweep's missing-manifest alert) fire.
+ */
+export async function verifyWritten(
+  r2: { get(key: string): Promise<{ text(): Promise<string> } | null> },
+  storeId: string,
+  day: string,
+  manifest: BackupManifest
+): Promise<void> {
+  const m = await r2.get(backupKey(storeId, day, 'manifest.json'));
+  if (!m) throw new Error('backup verify: manifest not readable after write');
+  const stored = JSON.parse(await m.text()) as BackupManifest;
+  for (const [t, want] of Object.entries(manifest.tables)) {
+    if (stored.tables[t]?.rows !== want.rows)
+      throw new Error(`backup verify: ${t} manifest rows differ`);
+    const f = await r2.get(backupKey(storeId, day, `${t}.ndjson`));
+    if (!f) throw new Error(`backup verify: ${t}.ndjson missing after write`);
+    const body = await f.text();
+    if ((await sha256Hex(body)) !== want.sha256)
+      throw new Error(`backup verify: ${t} checksum differs`);
+    if (body.split('\n').filter(Boolean).length - 1 !== want.rows)
+      throw new Error(`backup verify: ${t} line count differs from manifest rows`);
+  }
+}

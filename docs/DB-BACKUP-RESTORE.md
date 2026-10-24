@@ -257,6 +257,32 @@ to a dump when it isn't. Coordinate with the team before a production cutover.
 
 ---
 
+## Cloudflare storage (StoreDO + D1): the DR path after the Neon cutover (G8, INFRA-CF-1)
+
+Applies once a store is served from its StoreDO (flag `STORE_DO_ENABLED_IDS`); until then Layers 0 to 2 above are the DR. Three copies on two providers' worth of failure domains:
+
+| Copy               | What                                                                                                                                                    | When                                                                                                | Where                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 1. DO alarm export | every StoreDO table as NDJSON + `manifest.json` (rows, sha256), read back and re-verified after the write (`verifyWritten`)                             | nightly, per store (alarm armed by the sweep)                                                       | R2 `ebda-private/store-do-backups/<storeId>/<yyyy-mm-dd>/` |
+| 2. D1 export       | every table of each bound D1 (`PLATFORM_DB`, `IDENTITY_DB`) + `schema.sql` + manifest                                                                   | nightly 03:00 UTC Cron (`backup-sweep`, `apps/api/src/cf/ops/backup-sweep.ts`)                      | R2 `ebda-private/d1-backups/<db>/<day>/`                   |
+| 3. Mac pull        | rclone copy of all of the above, re-verified against the manifests (line counts and sha256), row-collapse check against the previous day, keeps 30 days | nightly, launchd `com.forceai.ebda-cf-backup` (`force-ai-foundation/ops/backup-ebda-cloudflare.sh`) | `~/Desktop/projects/_backups/ebda-cloudflare/<day>/`       |
+
+Native extras that are NOT a substitute: StoreDO point-in-time recovery (30 days, `getBookmarkForTime`) and D1 Time Travel (30 days). They die with the Cloudflare account; copy 3 is the one that survives an account loss.
+
+**Detection.** The sweep (a) re-arms every store's alarm, (b) alerts P1 when a store has no manifest for yesterday (an alarm that never fired cannot report itself), (c) alerts when any D1 export fails its count assert, and (d) writes `ops-reports/backup-sweep/<day>.json`. The Mac pull alerts through `backup_alert` on a missing or failed day and `os-selftest` flags it after 36 h.
+
+**Restore a store (StoreDO).** `stub.restoreFrom(<sourceStoreId>, <yyyy-mm-dd>)` on a fresh, empty StoreDO id: it loads the NDJSON, re-exports with the same canonical serialization and returns per-table `{rows, sha256, ok}`; all `ok` is the pass condition. From the Mac copy, upload the day folder back to R2 first (`rclone copy <local day> R2:ebda-private/store-do-backups/...`).
+
+**Restore a D1 database.** Create an empty D1, then `restoreD1FromBackup(name, day, r2, db)` (same module) which executes `schema.sql`, loads each NDJSON in batches of 50 and re-exports; pass = every table `ok: true`. For a point-in-time loss inside 30 days prefer `wrangler d1 time-travel restore <db> --timestamp=<iso>` (no data movement).
+
+**Drill log (Cloudflare storage)**
+
+| Date       | Path                                                                                                                                                                       | Result                                                                                                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-24 | StoreDO restore from R2 into a fresh DO (phase 0, live on `storedemo-souq`)                                                                                                | all 7 tables equal rows and checksums (`docs/plans/2026-10-24-cf-phase0-go-no-go.md`)                                                                                                                        |
+| 2026-10-24 | D1 export, then restore into an empty D1, then re-export (local workerd, `apps/api/workers-do/backup-sweep.test.ts` "RESTORE DRILL", runs in CI job `workerd-integration`) | users + passkeys (BLOB column included): rows and sha256 equal; second restore into the non-empty target refused                                                                                             |
+| NOT YET    | Live D1 databases and the Mac pull against real R2                                                                                                                         | `ebda-platform` / `ebda-identity` do not exist in production yet (phases 1 and 2), and the Mac pull needs the read-only R2 token described in `ops/backup-ebda-cloudflare.sh`. Drill both before the cutover |
+
 ## Erasure boundary — how long deleted PII survives in these backups
 
 A `POST /auth/me/erase` request (GDPR Art. 17 and applicable GCC

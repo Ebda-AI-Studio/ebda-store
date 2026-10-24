@@ -1,0 +1,347 @@
+import { describe, expect, it } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import type { StoreDO } from '../src/cf/store-do/store-do';
+import { STORE_TABLES } from '../src/cf/store-do/tables';
+import {
+  STORE_DO_REGISTRY,
+  unclassifiedTables,
+  classifiedTables,
+  mediaSurface,
+  ciSurface,
+  identitySurface,
+  suppressionSurface,
+  storeDoSurface,
+  ciBuyerIndexKey,
+  gzipText,
+  gunzipText,
+  ciStoresFor,
+  runErasure,
+  runExport,
+  ledgerKey,
+  ErasureDisabledError,
+  type CustomerSubject,
+  type MerchantSubject,
+  type IdentityPort,
+  type SuppressionPort,
+  type R2BucketLike,
+  type TableClass,
+} from '../src/cf/erasure';
+import {
+  eraseCustomerRows,
+  exportCustomerRows,
+  countCustomerRows,
+} from '../src/cf/erasure/store-do-sql';
+
+const e = env as unknown as {
+  STORE_DO: DurableObjectNamespace<StoreDO>;
+  STORE_BACKUPS: R2Bucket;
+  MEDIA_BUCKET: R2Bucket;
+  CI_BUCKET: R2Bucket;
+  PDPL_CF_ERASURE_ENABLED?: string;
+};
+const r2 = (b: R2Bucket) => b as unknown as R2BucketLike;
+const now = Date.now();
+const seed = (id: string) =>
+  e.STORE_DO.get(e.STORE_DO.idFromName(id)).seed({
+    store: { id, slug: id, name: id, currency: 'EGP', createdAt: now, updatedAt: now },
+    products: [
+      {
+        id: `${id}-p`,
+        storeId: id,
+        name: 'P',
+        slug: 'p',
+        price: 1,
+        inventory: 1,
+        status: 'active',
+        hasVariants: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+  });
+
+const BK = 'ab'.padEnd(64, '1');
+const OTHER = 'cd'.padEnd(64, '2');
+const customer = (over: Partial<CustomerSubject> = {}): CustomerSubject => ({
+  kind: 'customer',
+  requestId: 'req-c',
+  buyerKey: BK,
+  email: 'Buyer@Example.com',
+  userId: 'u-buyer',
+  ...over,
+});
+const merchant = (over: Partial<MerchantSubject> = {}): MerchantSubject => ({
+  kind: 'merchant',
+  requestId: 'req-m',
+  storeId: 'er-store',
+  ownerUserId: 'u-owner',
+  ...over,
+});
+
+describe('registry contract with the phase-1 schema', () => {
+  it('every StoreDO table is classified, and nothing classified is stale', () => {
+    expect(unclassifiedTables()).toEqual([]);
+    expect(classifiedTables().sort()).toEqual([...STORE_TABLES].sort());
+  });
+  it('a scrub entry overwrites every column it matches on (else the row would still identify the buyer)', () => {
+    for (const c of Object.values(STORE_DO_REGISTRY)) {
+      if (c.kind !== 'customer-pii' || c.action !== 'scrub') continue;
+      for (const col of Object.values(c.match)) expect(Object.keys(c.scrub ?? {})).toContain(col);
+    }
+  });
+});
+
+describe('surface: store-do (customer rows, registry driven)', () => {
+  const REG: Record<string, TableClass> = {
+    customers: {
+      kind: 'customer-pii',
+      match: { buyerKey: 'buyer_key', email: 'email', userId: 'user_id' },
+      action: 'delete',
+    },
+    ship_addr: {
+      kind: 'customer-pii',
+      match: { buyerKey: 'buyer_key' },
+      action: 'scrub',
+      scrub: { buyer_key: '[erased]', line1: '[erased]' },
+    },
+  };
+  it('exports, erases and verifies only the subject, keeps scrubbed rows, leaves other buyers', async () => {
+    const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-sql'));
+    await runInDurableObject(stub, async (_i, state) => {
+      const sql = state.storage.sql;
+      sql.exec(
+        'CREATE TABLE customers (id INTEGER PRIMARY KEY, buyer_key TEXT, email TEXT, user_id TEXT)'
+      );
+      sql.exec('CREATE TABLE ship_addr (id INTEGER PRIMARY KEY, buyer_key TEXT, line1 TEXT)');
+      sql.exec(
+        "INSERT INTO customers (buyer_key,email,user_id) VALUES (?, 'buyer@example.com', NULL), (?, 'o@x.eg', NULL), (NULL, NULL, 'u-buyer')",
+        BK,
+        OTHER
+      );
+      sql.exec(
+        "INSERT INTO ship_addr (buyer_key,line1) VALUES (?, '1 Nile St'), (?, '2 Nile St')",
+        BK,
+        OTHER
+      );
+      const s = customer();
+      expect(exportCustomerRows(sql, s, REG).customers).toHaveLength(2); // by key OR email OR user id
+      expect(countCustomerRows(sql, s, REG)).toBe(3);
+      const erased = state.storage.transactionSync(() => eraseCustomerRows(sql, s, REG));
+      expect(erased).toEqual({ customers: 2, ship_addr: 1 });
+      expect(countCustomerRows(sql, s, REG)).toBe(0);
+      expect(sql.exec('SELECT count(*) AS n FROM customers').one().n).toBe(1); // the other buyer
+      expect(sql.exec("SELECT line1 FROM ship_addr WHERE buyer_key = '[erased]'").one().line1).toBe(
+        '[erased]'
+      );
+      expect(sql.exec('SELECT line1 FROM ship_addr WHERE buyer_key = ?', OTHER).one().line1).toBe(
+        '2 Nile St'
+      );
+    });
+  });
+  it('merchant erase wipes the whole DO: rows, tables and alarm', async () => {
+    await seed('er-store');
+    const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-store'));
+    await stub.ensureBackupAlarm();
+    const r = await stub.eraseSubject(merchant());
+    expect(r.erased.products).toBe(1);
+    expect(r.remaining).toBe(0);
+    await runInDurableObject(stub, async (_i, state) =>
+      expect(await state.storage.getAlarm()).toBeNull()
+    );
+  });
+  it('the surface fans out over the subject stores and sums the stub results', async () => {
+    const calls: string[] = [];
+    const surf = storeDoSurface(
+      id => ({
+        exportSubject: async () => ({ tables: { t: [{ a: id }] } }),
+        eraseSubject: async () => (
+          calls.push(id),
+          { erased: { t: 2 }, remaining: id === 's2' ? 1 : 0 }
+        ),
+      }),
+      async () => ['s1', 's2']
+    );
+    const r = await surf.eraseSubject(customer());
+    expect(calls).toEqual(['s1', 's2']);
+    expect(r).toMatchObject({ erased: 4, remaining: 1 });
+    expect((await surf.exportSubject(customer())).records).toBe(2);
+  });
+});
+
+describe('surface: media (R2)', () => {
+  it('merchant erase deletes exactly stores/<id>/ (prefix exact), customers touch nothing', async () => {
+    for (const k of ['stores/m1/a.jpg', 'stores/m1/sub/b.jpg', 'stores/m10/c.jpg'])
+      await e.MEDIA_BUCKET.put(k, 'x');
+    const s = mediaSurface(r2(e.MEDIA_BUCKET));
+    expect((await s.eraseSubject(customer())).erased).toBe(0);
+    expect((await e.MEDIA_BUCKET.list({ prefix: 'stores/' })).objects).toHaveLength(3);
+    expect((await s.exportSubject(merchant({ storeId: 'm1' }))).records).toBe(2);
+    const r = await s.eraseSubject(merchant({ storeId: 'm1' }));
+    expect(r).toMatchObject({ erased: 2, remaining: 0 });
+    expect((await e.MEDIA_BUCKET.list({ prefix: 'stores/' })).objects.map(o => o.key)).toEqual([
+      'stores/m10/c.jpg',
+    ]);
+  });
+});
+
+describe('surface: customer intelligence (R2)', () => {
+  const ev = (buyerKey: string | null, n: number) =>
+    JSON.stringify({ type: 'order.placed', buyerKey, n });
+  async function fixture() {
+    const A = 'outcomes/v1/store=ci-1/dt=2026-11-01/a.ndjson.gz';
+    const B = 'outcomes/v1/store=ci-2/dt=2026-11-01/b.ndjson.gz';
+    const C = 'outcomes/v1/store=ci-3/dt=2026-11-01/c.ndjson.gz';
+    await e.CI_BUCKET.put(
+      A,
+      await gzipText([ev(BK, 1), ev(OTHER, 2), ev(null, 3)].join('\n') + '\n')
+    );
+    await e.CI_BUCKET.put(B, await gzipText(ev(BK, 4) + '\n')); // only this buyer: file goes away
+    await e.CI_BUCKET.put(C, await gzipText(ev(OTHER, 5) + '\n'));
+    await e.CI_BUCKET.put(ciBuyerIndexKey(BK), JSON.stringify({ partitions: [A, B] }));
+    return { A, B, C };
+  }
+  it('customer erase drops only that buyer rows, deletes empty files and the index, verifies by re-reading', async () => {
+    const { A, B, C } = await fixture();
+    const before = await (await e.CI_BUCKET.get(C))!.arrayBuffer();
+    const s = ciSurface(r2(e.CI_BUCKET));
+    expect((await s.exportSubject(customer())).records).toBe(2);
+    expect(await ciStoresFor(r2(e.CI_BUCKET), BK)).toEqual(['ci-1', 'ci-2']);
+    const r = await s.eraseSubject(customer());
+    expect(r).toMatchObject({ erased: 2, remaining: 0 });
+    const kept = (await gunzipText(await (await e.CI_BUCKET.get(A))!.arrayBuffer()))
+      .trim()
+      .split('\n')
+      .map(l => JSON.parse(l));
+    expect(kept.map(k => k.n)).toEqual([2, 3]);
+    expect(await e.CI_BUCKET.get(B)).toBeNull();
+    expect(await e.CI_BUCKET.get(ciBuyerIndexKey(BK))).toBeNull();
+    expect(new Uint8Array(await (await e.CI_BUCKET.get(C))!.arrayBuffer())).toEqual(
+      new Uint8Array(before)
+    );
+  });
+  it('merchant erase removes that store only, other stores byte-identical', async () => {
+    await e.CI_BUCKET.put(
+      'outcomes/v1/store=ci-m/dt=2026-11-01/x.ndjson.gz',
+      await gzipText(ev(BK, 1) + '\n')
+    );
+    await e.CI_BUCKET.put(
+      'outcomes/v1/store=ci-m2/dt=2026-11-01/x.ndjson.gz',
+      await gzipText(ev(BK, 2) + '\n')
+    );
+    const r = await ciSurface(r2(e.CI_BUCKET)).eraseSubject(merchant({ storeId: 'ci-m' }));
+    expect(r).toMatchObject({ erased: 1, remaining: 0 });
+    expect(
+      await e.CI_BUCKET.get('outcomes/v1/store=ci-m2/dt=2026-11-01/x.ndjson.gz')
+    ).not.toBeNull();
+  });
+  it('reports remaining > 0 when an erase did not take (the verify can go red)', async () => {
+    await fixture();
+    const real = r2(e.CI_BUCKET);
+    // A bucket whose writes and deletes are silently dropped: the post-erase re-read must catch it.
+    const wrapped: R2BucketLike = {
+      get: k => real.get(k),
+      list: o => real.list(o),
+      put: async () => undefined,
+      delete: async () => undefined,
+    };
+    const r = await ciSurface(wrapped).eraseSubject(customer());
+    expect(r.remaining).toBeGreaterThan(0);
+  });
+});
+
+describe('surfaces: identity + email suppression (ports)', () => {
+  it('identity: owner and staff erased through the port, idempotent by request id, remaining reported', async () => {
+    const seen: string[] = [];
+    const port: IdentityPort = {
+      eraseUser: async (u, req) => (
+        seen.push(`${u}:${req}`),
+        { erased: 3, remaining: u === 'bad' ? 1 : 0 }
+      ),
+      exportUser: async u => ({ users: [{ id: u }] }),
+    };
+    const s = identitySurface(port);
+    const r = await s.eraseSubject(merchant({ staffUserIds: ['st1', 'bad'] }));
+    expect(seen).toEqual(['u-owner:req-m', 'st1:req-m', 'bad:req-m']);
+    expect(r).toMatchObject({ erased: 9, remaining: 1 });
+    expect((await s.exportSubject(customer())).records).toBe(1);
+    expect((await s.exportSubject(customer({ userId: undefined }))).records).toBe(0);
+  });
+  it('suppression: tombstones the address (suppression stays) and verifies none is left in plain', async () => {
+    let plain = 2;
+    const port: SuppressionPort = {
+      tombstone: async () => ((plain = 0), { rows: 2 }),
+      exportFor: async email => [{ email }],
+      remainingPlain: async () => plain,
+    };
+    const s = suppressionSurface(port);
+    expect(await s.eraseSubject(customer())).toMatchObject({ erased: 2, remaining: 0 });
+    expect(await s.eraseSubject(customer({ email: undefined }))).toMatchObject({
+      erased: 0,
+      note: 'no email on subject',
+    });
+  });
+});
+
+describe('job: flag, ledger, idempotency, failure, export', () => {
+  const okSurface = (name: string, remaining = 0, boom = false) => ({
+    name,
+    exportSubject: async () => ({ surface: name, ndjson: '{"a":1}\n', records: 1 }),
+    eraseSubject: async () => {
+      if (boom) throw new Error('down');
+      return { surface: name, erased: 1, remaining };
+    },
+  });
+  const on = { PDPL_CF_ERASURE_ENABLED: 'true', STORE_BACKUPS: e.STORE_BACKUPS };
+
+  it('refuses to run while the flag is off', async () => {
+    await expect(
+      runErasure({ STORE_BACKUPS: e.STORE_BACKUPS }, [okSurface('a')], customer())
+    ).rejects.toBeInstanceOf(ErasureDisabledError);
+    await expect(
+      runExport({ STORE_BACKUPS: e.STORE_BACKUPS }, [okSurface('a')], customer())
+    ).rejects.toBeInstanceOf(ErasureDisabledError);
+  });
+  it('records a done ledger entry without the subject identifiers, and a replay short-circuits', async () => {
+    let calls = 0;
+    const s = {
+      ...okSurface('a'),
+      eraseSubject: async () => (calls++, { surface: 'a', erased: 1, remaining: 0 }),
+    };
+    const first = await runErasure(on, [s], customer({ requestId: 'req-done' }));
+    expect(first.status).toBe('done');
+    const raw = await (await e.STORE_BACKUPS.get(ledgerKey('req-done')))!.text();
+    expect(raw).not.toContain(BK);
+    expect(raw).not.toContain('example.com');
+    await runErasure(on, [s], customer({ requestId: 'req-done' }));
+    expect(calls).toBe(1);
+  });
+  it('one failing surface does not stop the rest, fails the job and alerts', async () => {
+    const alerts: string[] = [];
+    const entry = await runErasure(
+      on,
+      [okSurface('a', 0, true), okSurface('b'), okSurface('c', 2)],
+      customer({ requestId: 'req-bad' }),
+      {
+        alert: async t => void alerts.push(t),
+      }
+    );
+    expect(entry.status).toBe('failed');
+    expect(entry.surfaces.map(x => x.surface)).toEqual(['b', 'c']);
+    expect(entry.errors).toEqual(['a: down', 'c: 2 record(s) remain after erase']);
+    expect(alerts).toEqual(['PDPL erasure FAILED']);
+    // a failed entry is retried on replay, not skipped
+    const retry = await runErasure(on, [okSurface('a')], customer({ requestId: 'req-bad' }));
+    expect(retry.status).toBe('done');
+  });
+  it('export writes one NDJSON per surface plus a manifest', async () => {
+    const out = await runExport(
+      on,
+      [okSurface('a'), okSurface('b')],
+      merchant({ requestId: 'req-x' })
+    );
+    expect(out.parts.map(p => p.surface)).toEqual(['a', 'b']);
+    const m = JSON.parse(await (await e.STORE_BACKUPS.get('exports/req-x/manifest.json'))!.text());
+    expect(m.parts).toHaveLength(2);
+    expect(await (await e.STORE_BACKUPS.get('exports/req-x/a.ndjson'))!.text()).toBe('{"a":1}\n');
+  });
+});
