@@ -4,7 +4,7 @@ Plan: `docs/plans/2026-10-28-store-on-cloudflare.md` (tasks 0.1 to 0.7). Everyth
 `package.json` and Worker (`ebda-store-do-spike`), never the production `ebda-api` Worker. Demo store used for all
 live measurement: `storedemo-souq` (`09b5dbd1-1774-49b5-b781-e06d0ee7b0fe`), never `qa-walk-store-1010`.
 
-## Numbers to beat (Task 0.1, measured 2026-10-24 from a Kuwait edge, client network floor about 310 ms per cold curl)
+## Numbers to beat (Task 0.1, measured 2026-10-24 from the Gulf (cf-ray colo KWI), client network floor about 310 ms per cold curl)
 
 Source: `results/baseline-2026-10-24.json` (200 requests per endpoint, concurrency 4, first 10 discarded).
 
