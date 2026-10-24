@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useId } from 'react';
 import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
+import { StoreLockup } from '../shared/StoreLockup';
 import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
 
 /** a11y P2-10 / rule (d): header text links measured 16-20px; every one is a 44px target. */
@@ -26,6 +27,7 @@ export default function MinimalHeader({
   headerBgColor,
   logoPlacement,
   wordmarkSize,
+  lockup,
   searchPlacement,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
@@ -139,6 +141,13 @@ export default function MinimalHeader({
           >
             {displayLogo ? (
               <StoreLogo src={displayLogo} alt={displayName} priority />
+            ) : lockup ? (
+              <StoreLockup
+                lockup={lockup}
+                name={branding.name}
+                nameAr={branding.nameAr}
+                isRtl={!!isRtl}
+              />
             ) : (
               <span
                 className={
