@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { META, openSqlite } from './diff-harness';
 import { createPrismaLite } from '../src/prisma-lite/client';
 import { Engine } from '../src/prisma-lite/engine';
-import { nodeSqlRunner } from '../src/prisma-lite/node-sql';
+import { nodeSqlRunner } from './node-sql';
 
 const HOSTILE = [
   `"; DROP TABLE products; --`,
@@ -176,5 +176,46 @@ describe('prisma-lite injection fuzz', () => {
     bad.models.Product.fields.name.column = `name" ; DROP TABLE products; --`;
     const e = new Engine(bad, nodeSqlRunner(openSqlite()));
     expect(() => e.findMany('Product', { where: { name: 'x' } })).toThrow(/refusing identifier/);
+  });
+});
+
+describe('prisma-lite write paths: hostile arguments', () => {
+  it('data keys, update operators, nested ops, aggregate and groupBy fields are registry-checked', async () => {
+    const { db, lite, seen } = setup();
+    for (const h of HOSTILE) {
+      const cases: Array<() => Promise<unknown>> = [
+        () =>
+          lite.product.create({
+            data: { [h]: 1, id: 'x', storeId: 's', name: 'n', slug: 'x', price: 1 },
+          }),
+        () => lite.product.update({ where: { id: 'p1' }, data: { [h]: 1 } }),
+        () => lite.product.update({ where: { id: 'p1' }, data: { price: { [h]: 1 } } }),
+        () => lite.product.update({ where: { id: 'p1' }, data: { images: { [h]: [] } } }),
+        () => lite.product.update({ where: { id: 'p1' }, data: { [h]: { create: {} } } }),
+        () => lite.product.updateMany({ where: { [h]: 1 }, data: { name: 'x' } }),
+        () => lite.product.deleteMany({ where: { [h]: 1 } }),
+        () => lite.product.delete({ where: { [h]: 'x' } }),
+        () => lite.product.upsert({ where: { id: 'p1' }, create: { [h]: 1 }, update: { [h]: 1 } }),
+        () => lite.product.aggregate({ _sum: { [h]: true } }),
+        () => lite.product.aggregate({ _count: { [h]: true } }),
+        () => lite.product.groupBy({ by: [h] }),
+        () => lite.product.groupBy({ by: ['status'], orderBy: { [h]: 'asc' } }),
+        () => lite.product.groupBy({ by: ['status'], orderBy: { status: h } }),
+        () => lite.product.createMany({ data: [{ [h]: 1 }] }),
+      ];
+      for (const c of cases) await attempt(c);
+    }
+    tablesIntact(db);
+    for (const s of seen)
+      expect(s).not.toMatch(/DROP TABLE|DELETE FROM "?products"? WHERE 1|sqlite_master|OR 1=1/);
+    // a normal update still works and binds its values
+    await lite.product.update({
+      where: { id: 'p1' },
+      data: { name: `x'; DROP TABLE products; --` },
+    });
+    tablesIntact(db);
+    expect((await lite.product.findUnique({ where: { id: 'p1' } })).name).toBe(
+      `x'; DROP TABLE products; --`
+    );
   });
 });
