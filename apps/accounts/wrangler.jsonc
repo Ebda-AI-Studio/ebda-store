@@ -1,0 +1,31 @@
+// accounts.ebda.app: the shared Ebda AI Studio identity service (Ruling ID-1/ID-2). Its OWN Worker + D1.
+// Secrets (wrangler secret put): JWT_PRIVATE_JWK, MFA_KEY. No preview environment exists or will (INFRA-PREVIEW-1).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ebda-accounts",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "routes": [{ "pattern": "accounts.ebda.app", "custom_domain": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ebda-identity",
+      "database_id": "9119dcf4-2aad-435f-ae2c-31ebcba7eeb5",
+      "migrations_dir": "migrations",
+    },
+  ],
+  // ebda-api exports both entrypoints (apps/api/src/cf/identity-rpc.ts): mail goes through the Store pipeline and
+  // `stores[]` is computed from the Store directory at token time (so there is no second membership table to keep in step).
+  "services": [
+    { "binding": "STORE_DIRECTORY", "service": "ebda-api", "entrypoint": "StoreDirectory" },
+    { "binding": "MAILER", "service": "ebda-api", "entrypoint": "IdentityMailer" },
+  ],
+  "vars": {
+    "ISSUER": "https://accounts.ebda.app",
+    "ALLOWED_ORIGINS": "https://store.ebda.app,https://orders.ebda.app,https://ebda.app",
+    "PASSKEY_ORIGINS": "https://store.ebda.app,https://orders.ebda.app",
+    "PRODUCTS": "store,whatsapp,crm,erp",
+  },
+}
