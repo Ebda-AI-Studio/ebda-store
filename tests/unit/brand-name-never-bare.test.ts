@@ -55,6 +55,8 @@ const AR_CTX = [
     `${AR_BRAND}\\s+(?:بيعمل|بيبعت|بيدي|بيدعم|بيحجز|بيضيف|بيسأل|بيطلب|بيفحص|بيحاول|بيعرض|بيتأكد|بتدعم|بتتعرف|بتبعت|بتحدد|بتقدّم|ما\\s+بتقدّمش|لسه|هي\\b|نفسها|مش\\b|راح|أي\\s)`
   ),
   new RegExp(`(?:تأخذ|تلزقها|يلزم)\\s+${AR_BRAND}${AR_END}${AR_NEXT_OK}`),
+  // fused to a one-letter preposition: لابدأ, بابدأ, كابدأ (never و/ف: وابدأ متجرك is the verb)
+  new RegExp(`(?:^|[\\s«"'(])[لبك]ـ?${AR_BRAND}${AR_END}${AR_NEXT_OK}`),
   new RegExp(`"forceBrandPrefix": "${AR_BRAND}"`),
 ];
 /** Arabic lines allowed to match (verbs the heuristic cannot tell apart). */
@@ -73,6 +75,19 @@ function* files(dir: string): Generator<string> {
 const isComment = (line: string) => /^\s*(?:\/\/|\*|\/\*|\{\/\*|#)/.test(line);
 const stripTrailingComment = (line: string) => line.replace(/\s\/\/\s.*$/, '');
 
+/** Blank out the allowed spans only, so an allowlisted token never hides a bare brand elsewhere on the line. */
+const mask = (line: string, allow: RegExp[]) =>
+  allow.reduce((l, a) => l.replace(new RegExp(a.source, 'g'), m => ' '.repeat(m.length)), line);
+
+/** What is wrong with one line of UI text (empty = fine). The only place the rules are applied. */
+function scanLine(line: string): string[] {
+  const kinds: string[] = [];
+  if (EN_BARE_RE().test(mask(line, EN_ALLOW))) kinds.push('bare "Ebda"');
+  if (AR_CTX.some(r => r.test(mask(line, AR_ALLOW)))) kinds.push('bare Arabic brand');
+  return kinds;
+}
+const EN_BARE_RE = () => new RegExp(EN_BARE.source);
+
 function bare(file: string): string[] {
   const out: string[] = [];
   const rel = path.relative(ROOT, file);
@@ -82,13 +97,8 @@ function bare(file: string): string[] {
     if (jsLike && isComment(raw)) return;
     const line = jsLike ? stripTrailingComment(raw) : raw;
     if (/from '|import\(/.test(line)) return;
-    const en = [...line.matchAll(EN_BARE)].filter(m => {
-      const around = line.slice(Math.max(0, (m.index ?? 0) - 12), (m.index ?? 0) + 24);
-      return !EN_ALLOW.some(a => a.test(around) || a.test(line));
-    });
-    if (en.length) out.push(`${rel}:${i + 1}: bare "Ebda": ${line.trim().slice(0, 110)}`);
-    if (AR_CTX.some(r => r.test(line)) && !AR_ALLOW.some(a => a.test(line)))
-      out.push(`${rel}:${i + 1}: bare Arabic brand: ${line.trim().slice(0, 110)}`);
+    for (const kind of scanLine(line))
+      out.push(`${rel}:${i + 1}: ${kind}: ${line.trim().slice(0, 110)}`);
   });
   return out;
 }
@@ -100,12 +110,7 @@ describe('BRAND-NAME-1: the brand is never written alone', () => {
   });
 
   it('negative control: the scanner flags a bare brand and passes the full names and the verb', () => {
-    const probe = (s: string) => {
-      const line = s;
-      const en = [...line.matchAll(EN_BARE)].length > 0;
-      const ar = AR_CTX.some(r => r.test(line));
-      return en || ar;
-    };
+    const probe = (s: string) => scanLine(s).length > 0;
     expect(probe('Powered by Ebda')).toBe(true);
     expect(probe('Powered by Ebda Store')).toBe(false);
     expect(probe('Contact Ebda AI Studio')).toBe(false);
@@ -115,5 +120,13 @@ describe('BRAND-NAME-1: the brand is never written alone', () => {
     expect(probe('ابدأ متجرك أونلاين')).toBe(false);
     expect(probe('ابدأ دلوقتي')).toBe(false);
     expect(probe('تواصل مع ابدأ استوديو للذكاء الاصطناعي')).toBe(false);
+    // an allowlisted token must not hide a bare brand elsewhere on the same line
+    expect(probe('X-Ebda-Id header, Powered by Ebda')).toBe(true);
+    expect(probe('X-Ebda-Signature: t=1')).toBe(false);
+    expect(probe('ابدأ بـ كذا و مدعوم من ابدأ')).toBe(true);
+    // brand fused to a one-letter preposition
+    expect(probe('حساب بابدأ')).toBe(true);
+    expect(probe('من لابدأ')).toBe(true);
+    expect(probe('وابدأ متجرك')).toBe(false); // the verb with و
   });
 });
