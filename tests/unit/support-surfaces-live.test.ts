@@ -48,7 +48,17 @@ describe.each([
     const w = read('apps', app, 'wrangler.jsonc');
     expect(w).toContain(`"name": "ebda-${app}"`);
     expect(w).toContain(`"pattern": "${app}.ebda.app", "custom_domain": true`);
+    // the storefront wildcard runs before custom domains: only a specific zone route beats it (cf-routes.cjs)
+    expect(w).toContain(`"pattern": "${app}.ebda.app/*", "zone_name": "ebda.app"`);
     expect(w).not.toMatch(/"env"|-preview|staging/i);
+  });
+});
+
+describe('status Worker route', () => {
+  it('claims its host with a custom domain AND the specific zone route that beats the wildcard', () => {
+    const w = read('apps/status/wrangler.jsonc');
+    expect(w).toContain('"pattern": "status.ebda.app", "custom_domain": true');
+    expect(w).toContain('"pattern": "status.ebda.app/*", "zone_name": "ebda.app"');
   });
 });
 
