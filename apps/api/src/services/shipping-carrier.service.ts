@@ -505,10 +505,12 @@ class ShippingCarrierService {
     };
     if (resolvedCarrierCode === 'aramex') {
       // Aramex needs both emails: fall back to the owner / order email, else refuse (AR + EN).
-      const store = await prisma.store.findFirst({
-        where: { id: storeId },
-        select: { owner: { select: { email: true } } },
-      });
+      const store = await withStore(storeId, tx =>
+        tx.store.findFirst({
+          where: { id: storeId },
+          select: { owner: { select: { email: true } } },
+        })
+      );
       ({ pickupAddress, deliveryAddress } = withAramexEmails(pickupAddress, deliveryAddress, {
         ownerEmail: store?.owner?.email,
         orderEmail: typeof shippingAddr.email === 'string' ? shippingAddr.email : null,
