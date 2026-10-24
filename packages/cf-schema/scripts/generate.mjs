@@ -342,7 +342,34 @@ function buildMeta(schema, split) {
       fields,
     };
   }
-  return { models: out, enums };
+  return { models: out, enums, omit: globalOmit(out) };
+}
+
+// The real client's global `omit` (secrets that a full-row read must never return). Parsed from the one place it is
+// declared so prisma-lite cannot drift from it; keyed by Prisma model name and limited to models in this database.
+function globalOmit(models) {
+  const src = fs.readFileSync(path.join(repo, 'packages/database/src/client.ts'), 'utf8');
+  const m0 = /^ {2}omit: \{/m.exec(src);
+  const at = m0 ? m0.index : -1;
+  if (at < 0) throw new Error('packages/database/src/client.ts no longer declares a global omit');
+  let depth = 0;
+  let end = -1;
+  for (let i = src.indexOf('{', at); i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    if (src[i] === '}' && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  const body = src.slice(src.indexOf('{', at), end + 1).replace(/\/\/.*$/gm, '');
+  const literal = new Function(`return (${body})`)();
+  const out = {};
+  for (const [delegate, fields] of Object.entries(literal)) {
+    const model = delegate[0].toUpperCase() + delegate.slice(1);
+    if (!models[model]) continue; // e.g. user: identity, not in this database
+    out[model] = Object.keys(fields).filter(k => fields[k] === true);
+  }
+  return out;
 }
 
 function reasonFor(skippedAll, kind, name) {

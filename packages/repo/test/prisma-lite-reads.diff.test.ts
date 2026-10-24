@@ -198,6 +198,77 @@ run('prisma-lite reads == Prisma reads', () => {
     ],
   ];
 
+  cases.push(
+    [
+      'NULL ordering asc (default nulls)',
+      'product',
+      () => ({ where: { storeId }, orderBy: [{ compareAtPrice: 'asc' }, { id: 'asc' }] }),
+    ],
+    [
+      'NULL ordering desc (default nulls)',
+      'product',
+      () => ({ where: { storeId }, orderBy: [{ compareAtPrice: 'desc' }, { id: 'asc' }] }),
+    ],
+    [
+      'not scalar drops NULL like Prisma',
+      'product',
+      () => ({ where: { storeId, compareAtPrice: { not: 1234 } }, orderBy: { id: 'asc' } }),
+    ],
+    [
+      'not equals drops NULL like Prisma',
+      'product',
+      () => ({
+        where: { storeId, compareAtPrice: { not: { equals: 1234 } } },
+        orderBy: { id: 'asc' },
+      }),
+    ],
+    [
+      'not in drops NULL like Prisma',
+      'product',
+      () => ({
+        where: { storeId, compareAtPrice: { not: { in: [1234] } } },
+        orderBy: { id: 'asc' },
+      }),
+    ],
+    [
+      'notIn drops NULL like Prisma',
+      'product',
+      () => ({ where: { storeId, compareAtPrice: { notIn: [1234] } }, orderBy: { id: 'asc' } }),
+    ],
+    [
+      'insensitive equals',
+      'product',
+      () => ({ where: { storeId, name: { equals: 'PRODUCT 3', mode: 'insensitive' } } }),
+    ],
+    [
+      'insensitive in',
+      'product',
+      () => ({
+        where: { storeId, name: { in: ['PRODUCT 3', 'product 4'], mode: 'insensitive' } },
+        orderBy: { id: 'asc' },
+      }),
+    ],
+    [
+      'nested take/skip per parent',
+      'product',
+      () => ({
+        where: { storeId },
+        orderBy: { slug: 'asc' },
+        select: { slug: true, images: { orderBy: { position: 'asc' }, skip: 1, take: 1 } },
+      }),
+    ],
+    [
+      'cursor desc page',
+      'product',
+      () => ({
+        where: { storeId },
+        orderBy: { slug: 'desc' },
+        cursor: { storeId_slug: { storeId, slug: 'p-5' } },
+        take: 3,
+        skip: 1,
+      }),
+    ]
+  );
   for (const [name, model, build] of cases) {
     it(name, async () => {
       const args = build();
