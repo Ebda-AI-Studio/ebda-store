@@ -4,6 +4,7 @@ import { COPY } from '../lib/content';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { SiteLink } from './SiteLink';
 
 export function ContactPage({ locale }: { locale: Locale }) {
   const c = COPY[locale];
@@ -29,18 +30,22 @@ export function ContactPage({ locale }: { locale: Locale }) {
             <h2 id="contact-wa-h">{p.whatsappH}</h2>
             <p>{p.whatsappP}</p>
             <p>
-              <a href={whatsappUrl()} rel="noopener noreferrer" target="_blank">
+              <SiteLink href={whatsappUrl()} locale={locale}>
                 <bdi dir="ltr">{whatsappDisplay()}</bdi>
-              </a>
+              </SiteLink>
             </p>
           </section>
           <section aria-labelledby="contact-help-h">
             <h2 id="contact-help-h">{p.helpH}</h2>
             <p>{p.helpP}</p>
             <p>
-              <a href={`https://${BRAND.domains.help}${en ? '/en/' : '/'}`}>{p.helpLink}</a>
+              <SiteLink href={`https://${BRAND.domains.help}${en ? '/en/' : '/'}`} locale={locale}>
+                {p.helpLink}
+              </SiteLink>
               {' · '}
-              <a href={`https://${BRAND.domains.status}${en ? '/en' : ''}`}>{p.statusLink}</a>
+              <SiteLink href={`https://${BRAND.domains.status}${en ? '/en' : ''}`} locale={locale}>
+                {p.statusLink}
+              </SiteLink>
             </p>
           </section>
           <section aria-labelledby="contact-sec-h">
