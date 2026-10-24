@@ -250,20 +250,49 @@ describe('surface: customer intelligence (R2)', () => {
 });
 
 describe('surfaces: identity + email suppression (ports)', () => {
-  it('identity: owner and staff erased through the port, idempotent by request id, remaining reported', async () => {
+  it('identity (contract v1.1): erased is a boolean, remaining > 0 is a failed surface, a repeat is erased:false remaining:0', async () => {
     const seen: string[] = [];
+    const gone = new Set<string>();
     const port: IdentityPort = {
-      eraseUser: async (u, req) => (
-        seen.push(`${u}:${req}`),
-        { erased: 3, remaining: u === 'bad' ? 1 : 0 }
-      ),
-      exportUser: async u => ({ users: [{ id: u }] }),
+      eraseUser: async (u, req) => {
+        seen.push(`${u}:${req}`);
+        const had = !gone.has(u);
+        gone.add(u);
+        return { erased: had, remaining: u === 'bad' ? 1 : 0 };
+      },
+      // the v1.1 fixture shape: one array per table, no secrets
+      exportUser: async u => ({
+        users: u === 'nobody' ? [] : [{ id: u, email: 'a@x.eg', status: 'active' }],
+        sessions: [],
+        refresh_tokens: [],
+        verification_tokens: [],
+        passkey_credentials: [],
+      }),
     };
     const s = identitySurface(port);
     const r = await s.eraseSubject(merchant({ staffUserIds: ['st1', 'bad'] }));
     expect(seen).toEqual(['u-owner:req-m', 'st1:req-m', 'bad:req-m']);
-    expect(r).toMatchObject({ erased: 9, remaining: 1 });
-    expect((await s.exportSubject(customer())).records).toBe(1);
+    expect(r).toMatchObject({ erased: 3, remaining: 1 });
+    // the job turns remaining > 0 into a failed run
+    const failed = await runErasure(
+      { PDPL_CF_ERASURE_ENABLED: 'true', STORE_BACKUPS: e.STORE_BACKUPS },
+      [s],
+      merchant({ requestId: 'req-id-bad', staffUserIds: ['bad'] })
+    );
+    expect(failed.status).toBe('failed');
+    expect(failed.errors[0]).toMatch(/identity: 1 record/);
+    // idempotent repeat: nothing erased, nothing remaining, no error
+    const again = await s.eraseSubject(merchant({ requestId: 'req-m2' }));
+    expect(again).toMatchObject({ erased: 0, remaining: 0 });
+    const ex = await s.exportSubject(customer());
+    expect(ex.records).toBe(1);
+    expect(Object.keys(JSON.parse(ex.ndjson.trim()).data).sort()).toEqual([
+      'passkey_credentials',
+      'refresh_tokens',
+      'sessions',
+      'users',
+      'verification_tokens',
+    ]);
     expect((await s.exportSubject(customer({ userId: undefined }))).records).toBe(0);
   });
   it('suppression: tombstones the address (suppression stays) and verifies none is left in plain', async () => {

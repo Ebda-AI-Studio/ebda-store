@@ -162,7 +162,7 @@ export function identitySurface(id: IdentityPort): ErasureSurface {
     name: 'identity',
     async exportSubject(s): Promise<ExportPart> {
       const rows: unknown[] = [];
-      for (const u of userIds(s)) rows.push({ userId: u, data: await id.exportUser(u) });
+      for (const u of userIds(s)) rows.push({ userId: u, data: await id.exportUser(u) }); // already secret-free per the contract
       return { surface: 'identity', ndjson: ndjson(rows), records: rows.length };
     },
     async eraseSubject(s) {
@@ -170,7 +170,8 @@ export function identitySurface(id: IdentityPort): ErasureSurface {
       let remaining = 0;
       for (const u of userIds(s)) {
         const r = await id.eraseUser(u, s.requestId);
-        erased += r.erased;
+        // erased:false with remaining:0 is the idempotent repeat (already gone), not a failure.
+        if (r.erased) erased += 1;
         remaining += r.remaining;
       }
       return { surface: 'identity', erased, remaining };

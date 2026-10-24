@@ -64,11 +64,23 @@ export interface R2BucketLike {
   }): Promise<{ objects: Array<{ key: string }>; truncated: boolean; cursor?: string }>;
 }
 
-/** Service Binding RPC to accounts.ebda.app. NOT in identity contract v1 yet: see docs/privacy/erasure-export.md. */
+/** What `Accounts.exportUser` returns (identity contract addendum v1.1): one array per table, no secrets. */
+export interface IdentityExport {
+  users: unknown[];
+  sessions: unknown[];
+  refresh_tokens: unknown[];
+  verification_tokens: unknown[];
+  passkey_credentials: unknown[];
+}
+
+/**
+ * Service Binding RPC `Accounts` (accounts.ebda.app), EXACTLY the shape of identity contract addendum v1.1
+ * (business/ebda/plans/2026-10-24-ebda-identity-token-contract.md). `remaining` is re-counted by the identity
+ * service after the delete: anything above 0 is a failed surface. A repeat call is `{ erased: false, remaining: 0 }`.
+ */
 export interface IdentityPort {
-  /** Idempotent by requestId. Deletes users, refresh/verification tokens, passkeys and sessions. */
-  eraseUser(userId: string, requestId: string): Promise<{ erased: number; remaining: number }>;
-  exportUser(userId: string): Promise<Record<string, unknown[]>>;
+  eraseUser(userId: string, requestId?: string): Promise<{ erased: boolean; remaining: number }>;
+  exportUser(userId: string): Promise<IdentityExport>;
 }
 
 /** Email suppression entries (G6 owns the table). Erasure keeps the suppression, drops the address. */
