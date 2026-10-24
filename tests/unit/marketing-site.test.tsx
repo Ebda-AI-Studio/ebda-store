@@ -447,7 +447,7 @@ describe('marketing honesty', () => {
       expect(s.match(new RegExp(`<span class="look-badge">${badge}</span>`, 'g'))).toHaveLength(3);
       for (const l of ['a', 'b', 'c']) expect(s).toContain(`id="ph-qamar-${l}"`);
       // photos are files, never inlined
-      expect(s).toContain('/looks/img/qa__hero.webp');
+      expect(s).toMatch(/\/looks\/img\/[0-9a-f]{12}\.webp/);
       expect(s).not.toContain('base64');
       // one "open the live store" link per look (Qamar is the rendered tab), and #demo kept as an anchor here
       for (const l of ['atelier', 'lookbook', 'vitrine'])

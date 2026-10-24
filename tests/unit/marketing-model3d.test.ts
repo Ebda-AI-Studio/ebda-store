@@ -111,21 +111,38 @@ describe('desktop QR codes', () => {
 });
 
 describe('phone skins', () => {
-  it('mirror the custom properties of the look they claim (public/looks)', () => {
+  it('mirror the theme tokens of the real look they claim (public/looks, MKT-PHONES-1)', () => {
+    const hex = (triple: string) => {
+      const [h, s, l] = triple.split(/\s+/).map(x => parseFloat(x));
+      const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+      const f = (n: number) => {
+        const k = (n + h / 30) % 12;
+        const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+        return Math.round(c * 255)
+          .toString(16)
+          .padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+    };
     for (const id of MODEL3D_IDS) {
       const { skin } = MODEL3D[id];
-      const html = readFileSync(pub(`looks/${id}.html`), 'utf8');
-      const sel = `#ph-${skin.look}{`;
-      const block = html.slice(html.indexOf(sel), html.indexOf('}', html.indexOf(sel)));
-      for (const [k, v] of [
-        ['bg', skin.bg],
-        ['ink', skin.ink],
-        ['mut', skin.mut],
-        ['ac', skin.ac],
-        ['fd', `'${skin.fd}'`],
-        ['fb', `'${skin.fb}'`],
-      ])
-        expect(block, `${id} --${k}`).toContain(`--${k}:${v}`);
+      const [tpl, letter] = skin.look.split('-');
+      const looks = readFileSync(pub(`looks/${tpl}.html`), 'utf8')
+        .split('<!--look-->')
+        .slice(1);
+      const block = looks['abc'.indexOf(letter)];
+      const style = block
+        .match(/class="x-root[^"]*"[^>]*style="([^"]*)"/)![1]
+        .replace(/&quot;/g, '"');
+      const v = Object.fromEntries(
+        [...style.matchAll(/--([a-z-]+):\s*([^;]+);?/g)].map(m => [m[1], m[2]])
+      );
+      expect(skin.bg, `${id} bg`).toBe(hex(v.background));
+      expect(skin.ink, `${id} ink`).toBe(hex(v.foreground));
+      expect(skin.mut, `${id} mut`).toBe(hex(v['muted-foreground']));
+      expect([hex(v.accent), hex(v.primary)], `${id} ac`).toContain(skin.ac);
+      expect(v['font-display'], `${id} fd`).toContain(`"${skin.fd}"`);
+      expect(v['font-body'], `${id} fb`).toContain(`"${skin.fb}"`);
     }
   });
 });
