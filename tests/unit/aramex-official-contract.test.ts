@@ -569,3 +569,73 @@ describe('the tolerant XML reader', () => {
     expect(a.children[3].nil).toBe(true);
   });
 });
+
+/**
+ * Re-verified 2026-10-24 against Aramex's "Shipping Services API Manual" (aramex.com/docs/default-source/
+ * resourses/resourcesdata/shipping-services-api-manual.pdf): Table 31 (Pickup Details), Table 30
+ * (Volume), Appendix F (error codes).
+ */
+describe('manual re-verify 2026-10-24', () => {
+  const when = new Date('2026-10-08T10:00:00Z');
+  const pickupInput = () => ({
+    address: shipmentRequest().pickupAddress,
+    pickupDate: when,
+    readyTime: when,
+    lastPickupTime: when,
+    closingTime: when,
+    shipments: 1,
+  });
+
+  it('CreatePickup sends the manual-mandatory Status ("Ready") after PickupItems', async () => {
+    const { stub, carrier } = mk();
+    await carrier.createPickup(creds, pickupInput(), ctx);
+    const w = wrapperOf(stub.log.find(l => l.action?.endsWith('/CreatePickup'))!.xml);
+    const pickup = first(w, 'Pickup');
+    const n = names(pickup);
+    expect(n[n.length - 1]).toBe('Status');
+    expect(n.indexOf('Status')).toBeGreaterThan(n.indexOf('PickupItems'));
+    expect(first(pickup, 'Status').textContent).toBe('Ready');
+    expect(stub.violations).toEqual([]);
+  });
+
+  it('CreatePickup ShipmentVolume is > 0 (manual Table 30) and uses the documented unit "Cm3"', async () => {
+    const { stub, carrier } = mk();
+    await carrier.createPickup(creds, pickupInput(), ctx);
+    const w = wrapperOf(stub.log.find(l => l.action?.endsWith('/CreatePickup'))!.xml);
+    const vol = first(first(w, 'PickupItemDetail'), 'ShipmentVolume');
+    expect(Number(first(vol, 'Value').textContent)).toBeGreaterThan(0);
+    expect(first(vol, 'Unit').textContent).toBe('Cm3');
+  });
+
+  it.each([
+    ['ERR01', 'Invalid username or password'],
+    ['ERR02', 'Invalid account information'],
+    ['ERR03', 'Account is blocked'],
+  ])(
+    'Appendix F %s is a credentials/account problem (CARRIER_MISCONFIGURED)',
+    async (code, msg) => {
+      const reply = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ShipmentCreationResponse xmlns="${ARAMEX_NS}"><Transaction><Reference1/><Reference2/><Reference3/><Reference4/><Reference5/></Transaction><Notifications><Notification><Code>${code}</Code><Message>${msg}</Message></Notification></Notifications><HasErrors>true</HasErrors></ShipmentCreationResponse></s:Body></s:Envelope>`;
+      const { carrier } = mk(
+        async () =>
+          new Response(reply, {
+            status: 200,
+            headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+          })
+      );
+      await expect(carrier.createShipment(creds, shipmentRequest(), ctx)).rejects.toMatchObject({
+        code: 'CARRIER_MISCONFIGURED',
+      });
+    }
+  );
+
+  it('other Appendix F refusals stay CARRIER_REJECTED (ERR20 Invalid Product Type)', async () => {
+    const reply = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ShipmentCreationResponse xmlns="${ARAMEX_NS}"><Transaction><Reference1/><Reference2/><Reference3/><Reference4/><Reference5/></Transaction><Notifications><Notification><Code>ERR20</Code><Message>Invalid Product Type</Message></Notification></Notifications><HasErrors>true</HasErrors></ShipmentCreationResponse></s:Body></s:Envelope>`;
+    const { carrier } = mk(
+      async () =>
+        new Response(reply, { status: 200, headers: { 'Content-Type': 'text/xml; charset=utf-8' } })
+    );
+    await expect(carrier.createShipment(creds, shipmentRequest(), ctx)).rejects.toMatchObject({
+      code: 'CARRIER_REJECTED',
+    });
+  });
+});
