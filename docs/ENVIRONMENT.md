@@ -255,3 +255,10 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 - `tests/unit/inngest-cron-budget.test.ts` fails when all crons together exceed 12,000 executions per 30-day month (today 11,036). A new cron, or a faster one, must update that number and the ruling in the same PR.
 - The `*_STUCK_MINUTES` thresholds above are staleness thresholds, not poll intervals: with hourly sweeps a stuck row is acted on between the threshold and the threshold plus 60 minutes.
 - **Revisit at launch** (when real orders exist): see the register line in the architecture note.
+
+## StoreDO spike (Ruling INFRA-CF-1, Phase 0)
+
+| Name                   | Where                            | Meaning                                                                                                                                                                                                           |
+| ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORE_DO_ENABLED_IDS` | `apps/api/wrangler.jsonc` `vars` | Comma list of store ids the SQLite Durable Object may serve. Default empty = nobody. A listed store is served from the DO only for requests that also send `x-ebda-backend: do`. Never list `qa-walk-store-1010`. |
+| `STORE_DO_SEED_TOKEN`  | `wrangler secret put`            | Authorises `/api/v1/internal/store-do/:storeId/{seed,counts}`. Unset = those routes 404.                                                                                                                          |

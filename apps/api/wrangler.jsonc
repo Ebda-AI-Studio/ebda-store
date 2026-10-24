@@ -49,6 +49,9 @@
       { "name": "AUTH_STATE", "class_name": "AuthState" },
       // One per store: admin realtime over hibernating WebSockets.
       { "name": "STORE_REALTIME", "class_name": "StoreRealtime" },
+      // One per store: the SQLite store (Ruling INFRA-CF-1, Phase 0 spike). Reachable only for a store in
+      // STORE_DO_ENABLED_IDS that also sends `x-ebda-backend: do` (lib/store-backend.ts).
+      { "name": "STORE_DO", "class_name": "StoreDO" },
     ],
   },
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
@@ -63,7 +66,10 @@
   // until SEARCH_SEMANTIC_ENABLED=true (docs/ENVIRONMENT.md).
   "ai": { "binding": "AI" },
 
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] },
+    { "tag": "v2", "new_sqlite_classes": ["StoreDO"] },
+  ],
 
   "queues": {
     "producers": [
@@ -143,6 +149,8 @@
     "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
+    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody.
+    "STORE_DO_ENABLED_IDS": "",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
