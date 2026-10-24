@@ -12,8 +12,14 @@ const storeId = arg('store-id');
 const n = Number(arg('n', 200));
 const c = Number(arg('c', 4));
 const cold = process.argv.includes('--cold');
+const viaDo = process.argv.includes('--do'); // send x-ebda-backend: do (flagged demo store only)
+const withOrders = viaDo; // order create is exercised ONLY on the DO copy of the demo store
 if (!storeId) throw new Error('--store-id required');
-const H = { 'x-store-id': storeId, accept: 'application/json' };
+const H = {
+  'x-store-id': storeId,
+  accept: 'application/json',
+  ...(viaDo ? { 'x-ebda-backend': 'do' } : {}),
+};
 const api = `${base}/api/v1/public`;
 
 async function firstProduct() {
@@ -44,11 +50,29 @@ const endpoints = {
     }).then(async r => (await r.arrayBuffer(), r.status)),
 };
 
+if (withOrders) {
+  endpoints['POST orders (COD, DO copy)'] = async i => {
+    const sid = `bench-ord-${randomUUID()}`;
+    const h = { ...H, 'content-type': 'application/json', 'x-session-id': sid };
+    const a = await fetch(`${api}/cart/items`, {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    await a.arrayBuffer();
+    if (a.status !== 200) return a.status;
+    const t0 = performance.now();
+    const r = await fetch(`${api}/orders`, { method: 'POST', headers: h, body: '{}' });
+    await r.arrayBuffer();
+    return { status: r.status === 201 ? 200 : r.status, ms: performance.now() - t0 };
+  };
+}
 const out = {
   measured_at: new Date().toISOString(),
   base,
   storeId,
   mode: cold ? 'cold' : 'warm',
+  backend: viaDo ? 'do' : 'pg',
   n,
   concurrency: c,
   endpoints: {},
