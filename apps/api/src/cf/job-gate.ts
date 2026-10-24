@@ -36,6 +36,21 @@ export class JobGate extends DurableObject {
     });
   }
 
+  /**
+   * Fencing: extend a live lease. False means the lease is gone (expired and purged, released, or
+   * never held), and the run must stop before touching anything else. A lease that is merely past
+   * its expiry but not yet purged is still ours (acquire purges before it counts), so it renews.
+   */
+  async renew(token: string, ttlMs: number): Promise<boolean> {
+    this.init();
+    const r = this.ctx.storage.sql.exec(
+      `UPDATE leases SET expires_at = ? WHERE token = ?`,
+      Date.now() + ttlMs,
+      token
+    );
+    return r.rowsWritten > 0;
+  }
+
   async release(token: string): Promise<void> {
     this.init();
     this.ctx.storage.sql.exec(`DELETE FROM leases WHERE token = ?`, token);

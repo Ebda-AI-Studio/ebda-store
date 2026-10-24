@@ -8,13 +8,19 @@
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch-all';
 import { failedEvent, runOnFailure } from './failure';
-import { debounceClient, debounceFor, gateClient, gatesFor, type Gate } from './gate';
+import {
+  debounceClient,
+  debounceFor,
+  GATE_LEASE_TTL_MS,
+  gateClient,
+  gatesFor,
+  type Gate,
+} from './gate';
 import { getJob } from './registry';
 import { inlineStep, isNonRetriable } from './step-adapter';
 import { isJobQueueMessage, JOBS_DLQ_NAME, type JobQueueMessage } from './start';
 import { cfBindings } from '../../cf/bindings';
 
-const GATE_TTL_MS = 20 * 60_000;
 const GATE_MAX_WAITS = 120;
 
 export interface QueueMessageLike {
@@ -69,7 +75,7 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   const held: Array<{ gate: Gate; token: string }> = [];
   try {
     for (const gate of gatesFor(def, event)) {
-      const token = await gateClient.acquire(gate, GATE_TTL_MS);
+      const token = await gateClient.acquire(gate, GATE_LEASE_TTL_MS);
       if (!token) {
         await release(held);
         await parkForGate(msg, body, gate);
