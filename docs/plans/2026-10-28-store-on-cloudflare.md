@@ -593,7 +593,7 @@ Paths: new package `packages/cf-schema/` (`src/platform/*.ts` for D1, `src/store
 - **Done:** blast-radius swept across code, CI, wrangler, launchd, docs, `.env.example`, sibling repos (state the result in the PR).
 
 #### Task 7.2: Backups and monitoring
-- [ ] Steps: nightly alarm export confirmed in R2 for every store; D1 time travel plus export; row-count asserts (rule N11); replace the launchd `com.forceai.neon-backup` job for Ebda (Ebda stays out of the Force AI Neon backup list; remove only the Ebda project entry, verified by listing the script's project set first); alerting on missed backup.
+- [ ] Steps: nightly alarm export confirmed in R2 for every store; D1 time travel plus export; row-count asserts (rule N11); retire the host launchd Neon backup job's Ebda entry (remove only the Ebda project entry, verified by listing the script's project set first); alerting on missed backup.
 - **Verify:** `wrangler r2 object list ebda-backups --prefix backups/ | wc -l` equals stores x days; restore drill (0.6) rerun against production export.
 - **Done:** drill passes on production data.
 
