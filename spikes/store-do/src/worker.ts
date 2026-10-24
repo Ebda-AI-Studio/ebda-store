@@ -1,4 +1,11 @@
-import { StoreDO, type Env } from './store-do';
+import { StoreDO } from './store-do';
+
+export interface Env {
+  STORE_DO: DurableObjectNamespace<StoreDO>;
+  STORE_DO_ENABLED_IDS: string;
+  SEED_TOKEN?: string;
+  STORE_BACKUPS?: R2Bucket;
+}
 
 export { StoreDO };
 

@@ -6,7 +6,7 @@ declare global {
       STORE_DO: DurableObjectNamespace<StoreDO>;
       STORE_DO_ENABLED_IDS: string;
       SEED_TOKEN?: string;
-      SPIKE_BACKUPS?: R2Bucket;
+      STORE_BACKUPS: R2Bucket;
     }
   }
 }

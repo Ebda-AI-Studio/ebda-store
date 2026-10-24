@@ -21,7 +21,8 @@ export class StoreError extends Error {
 }
 
 export type Db = ReturnType<typeof makeDrizzle>;
-export const makeDrizzle = (storage: DurableObjectStorage) => drizzle(storage, { schema });
+// `storage` is a DurableObjectStorage; typed loosely because this package does not load workers-types globals.
+export const makeDrizzle = (storage: unknown) => drizzle(storage as never, { schema });
 
 export function listProducts(db: Db, storeId: string, limit: number) {
   return db

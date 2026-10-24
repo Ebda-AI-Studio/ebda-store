@@ -44,13 +44,20 @@ interface StoreDoStub {
   ): Promise<DoResult<{ orderId: string; orderNumber: number; total: number }>>;
   seed(rows: unknown): Promise<DoResult<{ products: number; variants: number }>>;
   rowCounts(): Promise<Record<string, number>>;
+  ensureBackupAlarm(): Promise<number>;
+  backupNow(storeId: string): Promise<unknown>;
+  restoreFrom(
+    sourceStoreId: string,
+    day: string
+  ): Promise<DoResult<Record<string, { rows: number; sha256: string; ok: boolean }>>>;
+  pitrBookmark(): Promise<string>;
 }
 
 /** The StoreDO stub for a store. Throws when the binding is absent (Node / tests): never silently falls back. */
-export function storeDo(storeId: string): StoreDoStub {
+export function storeDo(storeId: string, instanceName: string = storeId): StoreDoStub {
   const ns = cfBindings()?.STORE_DO;
   if (!ns) throw new AppError(503, 'STORE_DO_UNAVAILABLE', 'Store Durable Object is not bound');
-  return ns.get(ns.idFromName(storeId)) as unknown as StoreDoStub;
+  return ns.get(ns.idFromName(instanceName)) as unknown as StoreDoStub;
 }
 
 /** Map a DO result to the API envelope; a domain failure becomes an AppError with the DO's status. */

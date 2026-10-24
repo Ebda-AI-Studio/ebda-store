@@ -28,7 +28,10 @@ router.use('/:storeId', (req: Request, _res: Response, next: NextFunction) => {
 
 router.post('/:storeId/seed', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({ success: true, data: unwrapDo(await storeDo(req.params.storeId).seed(req.body)) });
+    const stub = storeDo(req.params.storeId);
+    const data = unwrapDo(await stub.seed(req.body));
+    await stub.ensureBackupAlarm(); // the nightly export is armed by the first load
+    res.json({ success: true, data });
   } catch (e) {
     next(e);
   }
@@ -37,6 +40,43 @@ router.post('/:storeId/seed', async (req: Request, res: Response, next: NextFunc
 router.get('/:storeId/counts', async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json({ success: true, data: await storeDo(req.params.storeId).rowCounts() });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/:storeId/backup', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      success: true,
+      data: await storeDo(req.params.storeId).backupNow(req.params.storeId),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Restore drill: load a backup day into a FRESH Durable Object instance (never the live one) and report equality.
+router.post('/:storeId/restore', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const day = String(req.body?.day ?? '');
+    const run = String(req.body?.run ?? '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^[a-z0-9]{4,24}$/.test(run))
+      throw new AppError(400, 'VALIDATION', 'day (YYYY-MM-DD) and run ([a-z0-9]{4,24}) required');
+    const target = storeDo(storeId, `${storeId}-restore-${run}`);
+    res.json({ success: true, data: unwrapDo(await target.restoreFrom(storeId, day)) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/:storeId/bookmark', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      success: true,
+      data: { bookmark: await storeDo(req.params.storeId).pitrBookmark() },
+    });
   } catch (e) {
     next(e);
   }
