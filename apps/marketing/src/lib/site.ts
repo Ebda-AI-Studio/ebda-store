@@ -36,7 +36,6 @@ export const LEGAL_SLUGS = [
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
 export const COMPARE_SLUGS = [
-  'salla',
   'zid',
   'shopify',
   'wuilt',
@@ -46,9 +45,9 @@ export const COMPARE_SLUGS = [
 ] as const;
 export type CompareSlug = (typeof COMPARE_SLUGS)[number];
 export type ComparePage = `compare/${CompareSlug}`;
-export type PageSlug = '' | 'about' | 'credits' | 'features' | ComparePage | LegalSlug;
+export type PageSlug = '' | 'about' | 'contact' | 'credits' | 'features' | ComparePage | LegalSlug;
 
-/** The comparison pages (/compare/{salla,zid,shopify,wuilt,youcan,easyorders,expandcart}), as page slugs. */
+/** The comparison pages (/compare/{zid,shopify,wuilt,youcan,easyorders,expandcart}), as page slugs. */
 export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
   s => `compare/${s}` as const
 );
@@ -59,6 +58,7 @@ export const SITE_PAGES = [
   'features',
   ...COMPARE_PAGES,
   'about',
+  'contact',
   'credits',
   ...LEGAL_SLUGS,
 ] as const satisfies readonly PageSlug[];

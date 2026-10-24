@@ -1,0 +1,68 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+  output     = "../prisma-gen"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./unused.db"
+}
+
+model Store {
+  id        String @id
+  slug      String
+  name      String
+  currency  String @default("EGP")
+  createdAt Int    @map("created_at")
+  updatedAt Int    @map("updated_at")
+
+  @@map("stores")
+}
+
+model Product {
+  id             String  @id
+  storeId        String  @map("store_id")
+  name           String
+  nameAr         String? @map("name_ar")
+  slug           String
+  price          Int
+  compareAtPrice Int?    @map("compare_at_price")
+  inventory      Int     @default(0)
+  status         String  @default("active")
+  hasVariants    Int     @default(0) @map("has_variants")
+  createdAt      Int     @map("created_at")
+  updatedAt      Int     @map("updated_at")
+
+  @@unique([storeId, slug], map: "products_store_slug")
+  @@index([storeId, status, createdAt(sort: Desc)], map: "products_store_status_created")
+  @@map("products")
+}
+
+model Cart {
+  id        String @id
+  storeId   String @map("store_id")
+  sessionId String @map("session_id")
+  status    String @default("active")
+  createdAt Int    @map("created_at")
+  updatedAt Int    @map("updated_at")
+  items     CartItem[]
+
+  @@unique([storeId, sessionId], map: "carts_store_session")
+  @@map("carts")
+}
+
+model CartItem {
+  id        String  @id
+  cartId    String  @map("cart_id")
+  storeId   String  @map("store_id")
+  productId String  @map("product_id")
+  variantId String? @map("variant_id")
+  quantity  Int
+  unitPrice Int     @map("unit_price")
+  createdAt Int     @map("created_at")
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@index([cartId], map: "cart_items_cart")
+  @@map("cart_items")
+}

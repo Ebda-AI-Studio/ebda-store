@@ -70,6 +70,9 @@ import {
 /** The header the webhook route copies Paymob's `?hmac=` query parameter into. */
 export const PAYMOB_HMAC_HEADER = 'x-paymob-hmac';
 
+/** Docs (create-intention `expiration`): maximum and default, 36 days. */
+export const PAYMOB_MAX_EXPIRATION_SECONDS = 3_110_400;
+
 export const PAYMOB_BASE_URLS = {
   // Docs: "Test and live use the same regional base URL ... The mode is controlled by the keys
   // and integration IDs you use." (Egypt: accept.paymob.com)
@@ -84,6 +87,8 @@ export const PAYMOB_CHECKOUT_URLS = {
 };
 
 export interface PaymobAdapterOptions extends GatewayAdapterOptions {
+  /** Clock for the callback freshness window (tests). Defaults to Date.now. */
+  now?: () => number;
   /** Explicit checkout host (tests); beats `PAYMOB_CHECKOUT_URL` (non-production only) and the default. */
   checkoutBaseUrls?: Partial<Record<'sandbox' | 'live', string>>;
 }
@@ -127,6 +132,58 @@ function hmacText(v: unknown): string {
   return typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v);
 }
 
+/** Signed callback booleans: when present they must be real JSON booleans (type-confusion guard). */
+const PAYMOB_SIGNED_BOOLEANS = [
+  'error_occured',
+  'has_parent_transaction',
+  'is_3d_secure',
+  'is_auth',
+  'is_capture',
+  'is_refunded',
+  'is_standalone_payment',
+  'is_voided',
+  'pending',
+  'success',
+] as const;
+
+/**
+ * Accept a callback whose signed `created_at` (the transaction's CREATION time) is at most this
+ * old: the longest checkout expiry we ever request (36 d, so a late kiosk/Aman payment still
+ * lands) plus 2 d slack.
+ */
+export const PAYMOB_CALLBACK_MAX_AGE_MS =
+  PAYMOB_MAX_EXPIRATION_SECONDS * 1000 + 2 * 24 * 60 * 60 * 1000;
+/** ...and at most this far ahead (covers the zone-less timestamp's offset plus clock skew). */
+export const PAYMOB_CALLBACK_MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The first non-boolean among the signed boolean fields, or null. `hmacText` stringifies, so
+ * "true" / 1 would pass the HMAC yet fail a `=== true` classifier; such a callback is refused.
+ */
+export function paymobNonBooleanField(obj: Record<string, unknown>): string | null {
+  for (const f of PAYMOB_SIGNED_BOOLEANS) {
+    const v = obj[f];
+    if (v !== undefined && v !== null && typeof v !== 'boolean') return f;
+  }
+  return null;
+}
+
+/**
+ * Canonical idempotency key shared by the adapter event id and the route dedupe: txn id plus the
+ * SIGNED state, read exactly as `hmacText` does. Keeps the legacy `<id>_<4 flags>` shape when the
+ * callback has no parent (so already-stored keys still match) and adds `p` for a child transaction.
+ */
+export function paymobCanonicalState(obj: Record<string, unknown>): {
+  flags: string;
+  parent: boolean;
+} {
+  const t = (v: unknown) => (hmacText(v) === 'true' ? 1 : 0);
+  return {
+    flags: [obj.pending, obj.success, obj.is_voided, obj.is_refunded].map(t).join(''),
+    parent: hmacText(obj.has_parent_transaction) === 'true',
+  };
+}
+
 /**
  * The string Paymob's HMAC is computed over: the 20 documented values of the callback `obj`
  * concatenated with no separator (booleans lowercase, a missing value empty).
@@ -165,6 +222,7 @@ interface PaymobTransaction {
   parent_transaction?: number | string | null;
   has_parent_transaction?: boolean;
   is_refund?: boolean;
+  is_void?: boolean;
   source_data?: { sub_type?: string; type?: string };
   order?: { id?: number | string; amount_cents?: number | string; merchant_order_id?: string };
 }
@@ -268,8 +326,8 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
 
   /**
    * The LAST transaction of an Accept order (docs: transaction inquiry by order id): auth token
-   * first, then POST /api/ecommerce/orders/transaction_inquiry {auth_token, order_id} with no
-   * Authorization header.
+   * first, then POST /api/ecommerce/orders/transaction_inquiry (Bearer token + order_id; see
+   * the note on the request below).
    */
   const inquire = async (creds: ProviderCredentials, providerRef: string) => {
     const token = await authToken(creds);
@@ -279,7 +337,10 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
       `${base(creds)}/api/ecommerce/orders/transaction_inquiry`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // 2026-10-24: Paymob's Postman collection (Transaction Inquiry API) sends the token as
+        // `Authorization: Bearer <token>` with body {order_id}; the 2026-10-07 docs extract had
+        // `auth_token` in the body. Both are sent until a live account settles which is current.
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ auth_token: token, order_id: providerRef }),
       },
       options.timeoutMs
@@ -523,12 +584,17 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
         // Paymob checks that the items add up to the amount, so the customer's lines are
         // sent only when they do; otherwise (shipping, a coupon, the COD-free fee, the wallet
         // part) one line carries the whole amount.
+        // Docs: "Sum of all items[].amount must exactly equal the total amount". Whether `amount`
+        // is per unit or per line is not stated (the docs' own example has a quantity-2 line), so
+        // only quantity-1 lines are sent as they are: they are valid under both readings.
         const lines = (req.items ?? []).filter(
-          i => Number.isSafeInteger(i.unitPrice) && i.quantity > 0
+          i => Number.isSafeInteger(i.unitPrice) && i.quantity === 1
         );
         const linesTotal = lines.reduce((n, i) => n + i.unitPrice * i.quantity, 0);
         const items =
-          lines.length > 0 && linesTotal === req.amountMinor
+          lines.length > 0 &&
+          lines.length === (req.items ?? []).length &&
+          linesTotal === req.amountMinor
             ? lines.map(i => ({
                 name: i.name.slice(0, 50),
                 amount: i.unitPrice,
@@ -553,8 +619,9 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
           // 400). UNVERIFIED: that "NA" is accepted as a filler for values the shop did not
           // collect (it is what Paymob itself stores for them in its order records).
           billing_data: {
-            first_name: first || 'NA',
-            last_name: rest.join(' ') || 'NA',
+            // Docs: first_name / last_name are at most 50 characters.
+            first_name: (first || 'NA').slice(0, 50),
+            last_name: (rest.join(' ') || 'NA').slice(0, 50),
             email: req.customer.email || 'NA',
             phone_number: req.customer.phone || 'NA',
             apartment: 'NA',
@@ -563,16 +630,23 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
             building: 'NA',
             city: 'NA',
             state: 'NA',
-            country: 'EG',
+            country: 'EGY', // docs example: 3-letter code
           },
           special_reference: specialReference,
-          // Docs: notification_url applies to card integrations only; still sent.
+          // Docs (create-intention): notification_url overrides the Transaction Processed Callback
+          // URL and is supported with ALL payment methods.
           notification_url: req.webhookUrl,
           redirection_url: req.returnUrls.success,
           extras: { order_id: req.orderId },
           // Docs: `expiration` is in seconds.
+          // Docs: maximum (and default) 3110400 seconds.
           ...(req.expiresAt
-            ? { expiration: Math.max(1, Math.ceil((req.expiresAt.getTime() - Date.now()) / 1000)) }
+            ? {
+                expiration: Math.min(
+                  PAYMOB_MAX_EXPIRATION_SECONDS,
+                  Math.max(1, Math.ceil((req.expiresAt.getTime() - Date.now()) / 1000))
+                ),
+              }
             : {}),
         };
         const res = await post<{
@@ -628,6 +702,10 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
         throw new PaymentProviderError('WEBHOOK_MALFORMED', 'not a transaction callback');
       }
       const tx = obj as Record<string, unknown>;
+      const badField = paymobNonBooleanField(tx);
+      if (badField) {
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', `${badField} is not a boolean`);
+      }
       if (!safeEqual(paymobHmac(tx, creds.webhookSecret), given.toLowerCase())) {
         throw new PaymentProviderError('WEBHOOK_BAD_SIGNATURE', 'signature mismatch');
       }
@@ -642,16 +720,36 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
       }
       const amountMinor = integerPiastres(txn.amount_cents, 'amount_cents');
       const providerRef = String(order.id);
-      const flags = [txn.pending, txn.success, txn.is_voided, txn.is_refunded]
-        .map(b => (b === true ? 1 : 0))
-        .join('');
-      const eventId = `paymob:${String(txn.id)}:${flags}`;
-      const hasParent =
-        (tx as { has_parent_transaction?: unknown }).has_parent_transaction === true;
+      // Freshness: the signed created_at bounds how long a captured delivery stays replayable.
+      const createdMs = Date.parse(
+        typeof txn.created_at === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(txn.created_at)
+          ? `${txn.created_at}Z`
+          : String(txn.created_at)
+      );
+      const nowMs = (options.now ?? Date.now)();
+      if (
+        !Number.isFinite(createdMs) ||
+        nowMs - createdMs > PAYMOB_CALLBACK_MAX_AGE_MS ||
+        createdMs - nowMs > PAYMOB_CALLBACK_MAX_FUTURE_MS
+      ) {
+        throw new PaymentProviderError(
+          'WEBHOOK_MALFORMED',
+          'callback created_at is outside the accepted window'
+        );
+      }
+      const state = paymobCanonicalState(tx);
+      const hasParent = state.parent;
+      // Identity = txn id + canonical SIGNED state; never an unsigned or attacker-chosen label.
+      const eventId = `paymob:${String(txn.id)}:${state.flags}${hasParent ? ':p' : ''}`;
 
       // A refund / void is its own transaction with a parent: the payment event is about the
       // PARENT, so these are reported as refund events (the refund id is this transaction's).
-      if (hasParent && (txn.is_refunded === true || txn.is_voided === true)) {
+      // SECURITY: classification uses ONLY HMAC-signed fields (has_parent_transaction,
+      // is_capture). `is_refund` / `is_void` are NOT in the HMAC list, so an attacker could flip
+      // them on a captured signed payload; they are deliberately ignored. A capture of an auth
+      // also has a parent, so it is excluded via the signed is_capture.
+      const refundLike = hasParent && txn.is_capture !== true;
+      if (refundLike) {
         const status: 'pending' | 'completed' | 'failed' =
           txn.pending === true ? 'pending' : txn.success === true ? 'completed' : 'failed';
         return {

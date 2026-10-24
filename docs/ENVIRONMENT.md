@@ -230,15 +230,6 @@ Wired into `cf-deploy.yml` 2026-09-25: the "Build for Cloudflare (OpenNext)" ste
 - `TEST_API_ALLOW_REMOTE` (default unset/off) — the suite writes real data (it POSTs `/auth/register`), so `tests/helpers/api-base.ts` refuses to run against anything but loopback or a private address, even when `TEST_API_URL`/`TEST_API_BASE` parses as a well-formed URL. Set `TEST_API_ALLOW_REMOTE=1` on the same command to explicitly opt into pointing the suite at a real, reachable host — this makes doing so a deliberate act on the command line rather than a naming-convention promise a stray `.env` value could silently break.
 - **The suite deliberately does NOT read `API_URL` or `API_HOST`** (2026-09-09). Both are server variables: `API_URL` is an ORIGIN (`config.apiUrl`) and `API_HOST` is a BARE HOSTNAME (`config.host`), and `apps/api/src/config/index.ts` runs `dotenv.config()` at import time — before any const in a test file — so a root `.env` copied from `.env.example` would silently win over the test's own default. Borrowing `API_URL` cost two ways: every request lost its `/api/v1` prefix and 404'd, and on a machine holding deployed values (`API_URL=https://api.ebda.app`) a local `npm run test:integration` would have POSTed `/auth/register` against production. Never point the suite at a variable whose production value is a real, reachable API.
 
-## Isolated preview stack (Dahab pilot, 2026-10-07)
-
-Only the `ebda-{api,web,admin}-preview` Workers carry these; production never sets them. Full stack + teardown: `docs/ebda/templates/dahab.md` → "Preview stack".
-
-- `PREVIEW_STACK` — `"true"` on `ebda-api-preview` (informational marker in the Worker vars; no code branches on it).
-- `CF_ENV_NAME` — `"preview"` on the preview web/admin Workers (Sentry environment name in `sentry-worker-entry.ts`).
-- `STOREFRONT_FRAME_ANCESTORS` — set to `https://admin-preview.ebda.app` for the preview storefront build and Worker, so the preview admin's builder canvas may frame it.
-- `NEXT_PUBLIC_API_URL` — the preview builds bake `https://api-preview.ebda.app/api/v1` (web) / `https://api-preview.ebda.app` (admin); the storefront CSP `connect-src` now admits a non-production API origin taken from this value (`apps/web/next.config.js`), production is unchanged.
-
 ## Demo showroom seed (`scripts/storedemo/seed.mjs`, B1)
 
 - `QAMAR_DEMO_ASSET_BASE` (default `https://media.ebda.app/demo/qamar`) — where the Qamar demo photos and hero clip are served from; every `product_images.url`, swatch image and home-document image is `<base>/<file>`. With `--yes-production` any other value is refused (Ruling B1-16). Locally use a relative base (`/__qamar-demo`, files copied into an untracked `apps/web/public/__qamar-demo/`); an `http://` base works for images but the hero clip is then omitted (the hero video schema takes only https or relative URLs). Docs: `docs/ebda/templates/demo-store.md`.
@@ -255,3 +246,10 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 - `tests/unit/inngest-cron-budget.test.ts` fails when all crons together exceed 12,000 executions per 30-day month (today 11,036). A new cron, or a faster one, must update that number and the ruling in the same PR.
 - The `*_STUCK_MINUTES` thresholds above are staleness thresholds, not poll intervals: with hourly sweeps a stuck row is acted on between the threshold and the threshold plus 60 minutes.
 - **Revisit at launch** (when real orders exist): see the register line in the architecture note.
+
+## StoreDO spike (Ruling INFRA-CF-1, Phase 0)
+
+| Name                   | Where                            | Meaning                                                                                                                                                                                                           |
+| ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORE_DO_ENABLED_IDS` | `apps/api/wrangler.jsonc` `vars` | Comma list of store ids the SQLite Durable Object may serve. Default empty = nobody. A listed store is served from the DO only for requests that also send `x-ebda-backend: do`. Never list `qa-walk-store-1010`. |
+| `STORE_DO_SEED_TOKEN`  | `wrangler secret put`            | Authorises `/api/v1/internal/store-do/:storeId/{seed,counts}`. Unset = those routes 404.                                                                                                                          |

@@ -39,6 +39,12 @@ interface AllowEntry {
 }
 
 const ALLOW: Record<string, AllowEntry> = {
+  'cf/store-do/repo.ts': {
+    category: 'unrelated',
+    reason:
+      'INFRA-CF-1 Phase 0 spike: the StoreDO copy of the demo store prices RETAIL only (no wholesale, no groups); reachable only for a flagged store plus x-ebda-backend: do. The PriceResolver port is Phase 3 (money correctness)',
+    reads: { addCartItem: 3, createOrder: 2 },
+  },
   'services/gold-rate/gate.ts': {
     category: 'catalog-read',
     reason:

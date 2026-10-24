@@ -165,7 +165,6 @@ Zone routes run BEFORE Workers custom domains, so the storefront's `*.ebda.app/*
 | `api.ebda.app`                       | `ebda-api`                   | `api.ebda.app/*` route + custom domain                                                                            |
 | `store.ebda.app` / `orders.ebda.app` | `ebda-admin` / `ebda-orders` | custom domain + `<host>/*` route (the route beats the wildcard)                                                   |
 | `admin.ebda.app` (retired)           | nothing (`ebda-web` 404)     | HOST-STORE-1: no custom domain, no route; the wildcard reaches `ebda-web`, `admin` is a reserved slug → plain 404 |
-| `preview.ebda.app`                   | `ebda-marketing-preview`     | custom domain + a **Worker-less** `preview.ebda.app/*` route (exclusion)                                          |
 | `media.ebda.app`                     | R2 `ebda-media`              | R2 custom domain + a **Worker-less** `media.ebda.app/*` route (exclusion)                                         |
 | `<slug>.ebda.app`                    | `ebda-web`                   | `*.ebda.app/*` route + a proxied wildcard DNS record `*`                                                          |
 

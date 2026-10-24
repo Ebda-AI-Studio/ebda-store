@@ -3,7 +3,7 @@
  * Fixtures under tests/contracts/paymob/ are the docs' verbatim JSON examples. Everything the
  * docs do not state stays `UNVERIFIED:` in the adapter and is not asserted here.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -11,6 +11,7 @@ import {
   createPaymobProvider,
   paymobHmac,
   paymobHmacMessage,
+  paymobNonBooleanField,
   PAYMOB_HMAC_HEADER,
 } from '@api/services/payment-providers/paymob.provider';
 import {
@@ -18,8 +19,16 @@ import {
   type PaymentProviderErrorCode,
   type ProviderCredentials,
 } from '@api/services/payment-providers/types';
+import { webhookRefs } from '@api/services/payment-providers/webhook-signature';
 import { PaymobStub, PAYMOB_STUB } from '../stubs/paymob-stub';
 import { baseRequest } from '../contract/payment-provider.contract';
+
+// The docs' callback fixtures are dated 2024-06-13: pin the clock inside the accepted window.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2024-06-14T00:00:00Z'));
+});
+afterAll(() => vi.useRealTimers());
 
 const fixture = (name: string) =>
   JSON.parse(fs.readFileSync(path.join(__dirname, '../contracts/paymob', name), 'utf8'));
@@ -233,8 +242,11 @@ describe('Paymob inquiry and refund follow the documented flow', () => {
     ]);
     expect(seen[0].body).toEqual({ api_key: PAYMOB_STUB.apiKey });
     expect(header(seen[0], 'authorization')).toBeUndefined();
+    // 2026-10-24: Paymob's Postman collection (PaymobAccept/API-Postman-Collections, Transaction
+    // Inquiry API) sends the token as a Bearer header with body {order_id}; the 2026-10-07 docs
+    // extract had it in the body. Both are sent until a live account settles which is current.
     expect(seen[1].body).toEqual({ auth_token: PAYMOB_STUB.authToken, order_id: ref });
-    expect(header(seen[1], 'authorization')).toBeUndefined();
+    expect(header(seen[1], 'authorization')).toBe(`Bearer ${PAYMOB_STUB.authToken}`);
   });
 
   it('status without the API key is PROVIDER_MISCONFIGURED and nothing is sent', async () => {
@@ -383,5 +395,143 @@ describe('Paymob testConnection', () => {
     expect(await fiveHundred.provider.testConnection!(creds)).toMatchObject({
       code: 'unreachable',
     });
+  });
+});
+
+describe('Paymob re-verification 2026-10-24 (docs: create-intention, Postman collections)', () => {
+  const intentionBody = async (over: Parameters<typeof baseRequest>[0], credsOver = creds) => {
+    const { provider, seen } = rig();
+    await provider.createPayment(baseRequest(over), credsOver);
+    return seen.find(s => s.url.endsWith('/v1/intention/'))!.body as Record<string, any>;
+  };
+
+  it('billing_data.country is the 3-letter ISO code the docs show (EGY)', async () => {
+    const b = await intentionBody({});
+    expect(b.billing_data.country).toBe('EGY');
+  });
+
+  it('expiration never exceeds the documented maximum of 3110400 seconds', async () => {
+    const b = await intentionBody({ expiresAt: new Date(Date.now() + 90 * 86_400_000) });
+    expect(b.expiration).toBe(3_110_400);
+  });
+
+  it('items: docs say sum(items[].amount) must equal amount, so a quantity > 1 line is not sent per unit', async () => {
+    const b = await intentionBody({
+      amountMinor: 15_000,
+      items: [
+        { name: 'A', quantity: 1, unitPrice: 5_000 },
+        { name: 'B', quantity: 2, unitPrice: 5_000 },
+      ],
+    });
+    const sum = b.items.reduce((n: number, i: any) => n + i.amount, 0);
+    expect(sum).toBe(b.amount);
+  });
+
+  it('billing_data names are capped at the documented 50 characters', async () => {
+    const long = 'x'.repeat(80);
+    const b = await intentionBody({
+      customer: { name: `${long} ${long}`, email: 'a@b.co', phone: '+201012345678' },
+    });
+    expect(b.billing_data.first_name.length).toBeLessThanOrEqual(50);
+    expect(b.billing_data.last_name.length).toBeLessThanOrEqual(50);
+  });
+
+  const verify = (obj: Record<string, unknown>, signedObj: Record<string, unknown>) => {
+    const callback = fixture('callback.official.json');
+    return createPaymobProvider().verifyWebhook(
+      JSON.stringify({ ...callback, obj }),
+      { [PAYMOB_HMAC_HEADER]: paymobHmac(signedObj, SECRET) },
+      { ...creds, webhookSecret: SECRET }
+    );
+  };
+
+  it('a refund transaction (signed has_parent_transaction) is a refund even when is_refunded is false', () => {
+    const obj = {
+      ...fixture('callback.official.json').obj,
+      has_parent_transaction: true,
+      parent_transaction: 192036465,
+      is_refunded: false,
+      is_voided: false,
+    };
+    expect(verify(obj, obj).kind).toBe('refund');
+  });
+
+  it('a tampered UNSIGNED is_refund / is_void on a signed payment does not make it a refund', () => {
+    const signed = { ...fixture('callback.official.json').obj, has_parent_transaction: false };
+    const tampered = { ...signed, is_refund: true, is_void: true };
+    const ev = verify(tampered, signed); // HMAC computed over signed fields only: still valid
+    expect(ev.kind).toBe('payment');
+  });
+
+  it('a replay classified differently gets a different eventId (cannot collide with the original)', () => {
+    const base = { ...fixture('callback.official.json').obj, has_parent_transaction: false };
+    const asRefund = { ...base, has_parent_transaction: true };
+    expect(verify(base, base).eventId).not.toBe(verify(asRefund, asRefund).eventId);
+  });
+
+  it('a signed callback with a string/number where a boolean belongs is refused as malformed', () => {
+    const base = { ...fixture('callback.official.json').obj };
+    for (const [f, v] of [
+      ['has_parent_transaction', 'true'],
+      ['is_capture', 1],
+      ['success', 'true'],
+    ] as const) {
+      const obj = { ...base, [f]: v }; // HMAC over hmacText() still verifies
+      expect(paymobNonBooleanField(obj)).toBe(f);
+      expect(() => verify(obj, obj)).toThrowError(/not a boolean/);
+    }
+  });
+
+  it('a type-flipped replay maps to the same dedupe key (route + adapter)', () => {
+    const real = { ...fixture('callback.official.json').obj, has_parent_transaction: true };
+    const flipped = { ...real, has_parent_transaction: 'true' };
+    expect(webhookRefs('paymob', { type: 'TRANSACTION', obj: flipped }).idempotencyKey).toBe(
+      webhookRefs('paymob', { type: 'TRANSACTION', obj: real }).idempotencyKey
+    );
+  });
+
+  it('a child (refund/void) delivery also offers the legacy key shape for dedupe', () => {
+    const obj = { ...fixture('callback.official.json').obj, has_parent_transaction: true };
+    const refs = webhookRefs('paymob', { type: 'TRANSACTION', obj });
+    const flags = [obj.pending, obj.success, obj.is_voided, obj.is_refunded]
+      .map(b => (b === true ? 1 : 0))
+      .join('');
+    expect(refs.legacyIdempotencyKeys).toEqual([`paymob_${obj.id}_${flags}`]);
+    // a parent-less payment keeps EXACTLY the legacy key, so stored rows already match
+    const plain = webhookRefs('paymob', {
+      type: 'TRANSACTION',
+      obj: { ...obj, has_parent_transaction: false },
+    });
+    expect(plain.idempotencyKey).toBe(`paymob_${obj.id}_${flags}`);
+  });
+
+  it('a callback whose signed created_at is outside the window is rejected', () => {
+    const old = {
+      ...fixture('callback.official.json').obj,
+      created_at: '2024-03-01T00:00:00.000000',
+    };
+    expect(() => verify(old, old)).toThrowError(/created_at/);
+    const future = {
+      ...fixture('callback.official.json').obj,
+      created_at: '2024-07-01T00:00:00.000000',
+    };
+    expect(() => verify(future, future)).toThrowError(/created_at/);
+  });
+
+  it('a child transaction that is a capture (signed is_capture) stays a payment', () => {
+    const obj = {
+      ...fixture('callback.official.json').obj,
+      has_parent_transaction: true,
+      is_capture: true,
+    };
+    expect(verify(obj, obj).kind).toBe('payment');
+  });
+
+  it('a kiosk payment completed 20 days after creation is still accepted', () => {
+    const obj = {
+      ...fixture('callback.official.json').obj,
+      created_at: '2024-05-25T00:00:00.000000',
+    };
+    expect(verify(obj, obj).kind).toBe('payment');
   });
 });

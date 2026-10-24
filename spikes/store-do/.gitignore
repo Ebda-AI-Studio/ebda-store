@@ -1,0 +1,5 @@
+node_modules
+.wrangler
+dist
+orm/rejected/prisma-gen
+.dev.vars
