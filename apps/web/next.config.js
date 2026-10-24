@@ -89,9 +89,8 @@ const nextConfig = {
   // Security headers
   async headers() {
     // The API origin the browser talks to. Production is api.ebda.app (already in
-    // the CSP below); an isolated preview stack (docs/ebda/templates/dahab.md,
-    // "Preview stack") builds with its own NEXT_PUBLIC_API_URL, which must be
-    // allowed too or every client-side fetch is refused by the CSP.
+    // the CSP below); a build with its own NEXT_PUBLIC_API_URL (local dev, an ad-hoc
+    // deploy) must be allowed too or every client-side fetch is refused by the CSP.
     const EXTRA_API_ORIGINS = (() => {
       try {
         const u = new URL(process.env.NEXT_PUBLIC_API_URL || 'https://api.ebda.app');
