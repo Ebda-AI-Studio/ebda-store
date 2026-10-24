@@ -77,8 +77,13 @@ export default defineConfig(async () => ({
           AUTH_STATE: { className: 'AuthState', scriptName: 'api', useSQLite: true },
           STORE_REALTIME: { className: 'StoreRealtime', scriptName: 'api', useSQLite: true },
           STORE_DO: { className: 'StoreDO', scriptName: 'api', useSQLite: true },
+          JOB_GATE: { className: 'JobGate', scriptName: 'api', useSQLite: true },
         },
         kvNamespaces: { KV_CACHE: 'kv-cache' },
+        // Background jobs (G5): the Workflow class and the gate DO live in the built `api` Worker.
+        workflows: {
+          JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow', scriptName: 'api' },
+        },
         queueProducers: {
           EMAIL_QUEUE: { queueName: 'ebda-email' },
           EMAIL_DLQ: { queueName: 'ebda-email-dlq' },
@@ -101,6 +106,10 @@ export default defineConfig(async () => ({
               AUTH_STATE: { className: 'AuthState', useSQLite: true },
               STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
               STORE_DO: { className: 'StoreDO', useSQLite: true },
+              JOB_GATE: { className: 'JobGate', useSQLite: true },
+            },
+            workflows: {
+              JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow' },
             },
             hyperdrives: {
               HYPERDRIVE: LOCAL_DB,
@@ -108,6 +117,7 @@ export default defineConfig(async () => ({
             queueProducers: {
               EMAIL_QUEUE: { queueName: 'ebda-email' },
               SMS_QUEUE: { queueName: 'ebda-sms' },
+              JOBS_QUEUE: { queueName: 'ebda-jobs' },
             },
             // The consumers of wrangler.jsonc, with the retry delay shortened so a test can watch a
             // message travel main queue -> retry -> dead-letter queue -> the replay list in seconds.
