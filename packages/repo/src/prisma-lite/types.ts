@@ -1,6 +1,8 @@
 export type Meta = {
   models: Record<string, ModelMeta>;
   enums: Record<string, string[]>;
+  /** Global omit of the real client (`packages/database/src/client.ts`): fields a query only returns when `select`ed or `omit: { f: false }`. */
+  omit?: Record<string, string[]>;
 };
 export type ModelMeta = {
   table: string;

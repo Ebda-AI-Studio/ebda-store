@@ -1,5 +1,6 @@
 import { WriteEngine, mapDbError } from './writes';
 import type { Meta, SqlRunner } from './types';
+import { expandUnique } from './unique';
 
 const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 
@@ -35,10 +36,15 @@ class LazyQuery<T> implements PromiseLike<T> {
  * promises resolve immediately, so a Durable Object cannot interleave another request between two awaited
  * queries of one handler. `$transaction` maps to the runner's transaction (DO: `ctx.storage.transaction`).
  */
-export function createPrismaLite(meta: Meta, sql: SqlRunner) {
-  const engine = new WriteEngine(meta, sql);
+export function createPrismaLite(meta: Meta, sql: SqlRunner, db: 'store-do' | 'd1' = 'store-do') {
+  // only the models of THIS database get a delegate (the StoreDO has no D1 tables)
+  const scoped: Meta = {
+    ...meta,
+    models: Object.fromEntries(Object.entries(meta.models).filter(([, m]) => m.db === db)),
+  };
+  const engine = new WriteEngine(scoped, sql);
   const byDelegate = new Map(
-    Object.keys(meta.models).map(m => [m[0].toLowerCase() + m.slice(1), m])
+    Object.keys(scoped.models).map(m => [m[0].toLowerCase() + m.slice(1), m])
   );
   const lazy = <T>(fn: () => T) => new LazyQuery(fn);
   const delegate = (model: string) => ({
@@ -56,7 +62,7 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner) {
         () =>
           engine.findMany(model, {
             ...args,
-            where: expandUnique(meta, model, args.where as Record<string, unknown>),
+            where: expandUnique(scoped, model, args.where as Record<string, unknown>),
             take: 1,
           })[0] ?? null
       ),
@@ -64,7 +70,7 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner) {
       lazy(() => {
         const r = engine.findMany(model, {
           ...args,
-          where: expandUnique(meta, model, args.where as Record<string, unknown>),
+          where: expandUnique(scoped, model, args.where as Record<string, unknown>),
           take: 1,
         })[0];
         if (!r) throw notFound(model);
@@ -77,7 +83,7 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner) {
       lazy(() =>
         engine.update(model, {
           ...args,
-          where: expandUnique(meta, model, args.where as Record<string, unknown>),
+          where: expandUnique(scoped, model, args.where as Record<string, unknown>),
         })
       ),
     updateMany: (args: Record<string, unknown>) => lazy(() => engine.updateMany(model, args)),
@@ -85,14 +91,14 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner) {
       lazy(() =>
         engine.upsert(model, {
           ...args,
-          where: expandUnique(meta, model, args.where as Record<string, unknown>),
+          where: expandUnique(scoped, model, args.where as Record<string, unknown>),
         })
       ),
     delete: (args: Record<string, unknown>) =>
       lazy(() =>
         engine.delete(model, {
           ...args,
-          where: expandUnique(meta, model, args.where as Record<string, unknown>),
+          where: expandUnique(scoped, model, args.where as Record<string, unknown>),
         })
       ),
     deleteMany: (args?: Record<string, unknown>) => lazy(() => engine.deleteMany(model, args)),
@@ -141,32 +147,4 @@ function notFound(model: string): Error {
   return e;
 }
 
-/**
- * `{ storeId_slug: { storeId, slug } }` -> `{ storeId, slug }` (Prisma's compound-unique selector), and, like
- * Prisma, REFUSES a selector that does not name a complete unique tuple: a missing or undefined field must
- * never degrade into "first row" (a cross-record / cross-tenant read).
- */
-export function expandUnique(
-  meta: Meta,
-  model: string,
-  where: Record<string, unknown>
-): Record<string, unknown> {
-  if (!where || typeof where !== 'object') throw new Error('prisma-lite: findUnique needs a where');
-  const out: Record<string, unknown> = {};
-  const uniques = meta.models[model].uniques.concat([meta.models[model].pk]);
-  for (const [k, v] of Object.entries(where)) {
-    const hit = uniques.find(u => u.length > 1 && u.join('_') === k);
-    if (hit) {
-      if (!v || typeof v !== 'object') throw new Error(`prisma-lite: ${k} needs an object`);
-      Object.assign(out, v);
-    } else out[k] = v;
-  }
-  const complete = uniques.some(
-    u => u.length > 0 && u.every(f => out[f] !== undefined && out[f] !== null)
-  );
-  if (!complete)
-    throw new Error(
-      `prisma-lite: findUnique on ${model} needs every field of a unique key, non-null`
-    );
-  return out;
-}
+export { expandUnique };

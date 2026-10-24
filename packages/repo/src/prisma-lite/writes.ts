@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { Engine, MAX_PARAMS } from './engine';
 import { encode } from './codec';
+import { expandUnique } from './unique';
 import type { ModelMeta, RelationField, ScalarField } from './types';
 
 type Args = Record<string, any>;
@@ -225,8 +226,7 @@ export class WriteEngine extends Engine {
           break;
         }
         case 'connect':
-          for (const w of Array.isArray(arg) ? arg : [arg])
-            this.updateWhere(f.type, this.uniqueWhere(f.type, w as Row), fk());
+          for (const w of Array.isArray(arg) ? arg : [arg]) this.connectOne(f.type, w as Row, fk());
           break;
         default:
           throw new Error(`prisma-lite: unsupported nested write ${name} on ${model}.${key}`);
@@ -251,12 +251,25 @@ export class WriteEngine extends Engine {
   }
 
   // ------------------------------------------------------------- reads used by writes
-  uniqueWhere(_model: string, where: Row): Row {
-    return where;
+  /** EVERY nested unique selector goes through here: a complete, non-null, plain-valued key or it throws. */
+  uniqueWhere(model: string, where: Row): Row {
+    return expandUnique(this.meta, model, where);
   }
 
   findUnique(model: string, where: Row): Row | undefined {
-    return this.pkRows(model, where, 1)[0];
+    return this.pkRows(model, this.uniqueWhere(model, where), 1)[0];
+  }
+
+  /** Re-parent exactly one row chosen by a unique selector (0 -> P2025, never more than 1). */
+  private connectOne(model: string, selector: Row, data: Row): void {
+    const rows = this.pkRows(model, this.uniqueWhere(model, selector), 2);
+    if (rows.length !== 1)
+      throw knownError(
+        'P2025',
+        'An operation failed because it depends on one or more records that were required but not found. No record was found for a nested connect.',
+        { cause: 'Record not found.' }
+      );
+    this.applyUpdate(model, this.model(model), this.pkWhere(this.model(model), rows[0]), data);
   }
 
   private requireUnique(model: string, where: Row): Row {
@@ -428,7 +441,27 @@ export class WriteEngine extends Engine {
     const tm = this.model(f.type);
     const fkVals = (): Row =>
       Object.fromEntries(f.toProps!.map((tp, i) => [tp, parent[f.fromProps![i]]]));
-    const childWhere = (extra?: Row): Row => ({ ...fkVals(), ...(extra ?? {}) });
+    // The parent FK scope is ANDed, never spread: a caller selector cannot override it, and a selector that names an
+    // FK property is refused outright.
+    const scoped = (extra?: Row): Row => {
+      if (extra === undefined) return fkVals();
+      for (const k of Object.keys(extra))
+        if (f.toProps!.includes(k))
+          throw new Error(
+            `prisma-lite: a nested selector must not set the relation key ${JSON.stringify(k)}`
+          );
+      return { AND: [fkVals(), extra] };
+    };
+    const childWhere = scoped;
+    const uniqueScoped = (sel: Row): Row => scoped(this.uniqueWhere(f.type, sel));
+    const countOrThrow = (n: number): void => {
+      if (n === 0)
+        throw knownError(
+          'P2025',
+          'An operation failed because it depends on one or more records that were required but not found. No record was found for a nested write.',
+          { cause: 'Record not found.' }
+        );
+    };
     for (const [name, arg] of Object.entries(op)) {
       switch (name) {
         case 'create':
@@ -443,23 +476,24 @@ export class WriteEngine extends Engine {
           break;
         case 'connect':
           for (const w of Array.isArray(arg) ? arg : [arg])
-            this.updateWhere(f.type, w as Row, fkVals());
+            this.connectOne(f.type, w as Row, fkVals());
           break;
         case 'disconnect':
           for (const w of Array.isArray(arg) ? arg : [arg])
             this.updateWhere(
               f.type,
-              childWhere(w as Row),
+              uniqueScoped(w as Row),
               Object.fromEntries(f.toProps!.map(tp => [tp, null]))
             );
           break;
         case 'set': {
+          const next = (arg as Row[]).map(w => this.uniqueWhere(f.type, w)); // validate every selector BEFORE clearing
           this.updateWhere(
             f.type,
             childWhere(),
             Object.fromEntries(f.toProps!.map(tp => [tp, null]))
           );
-          for (const w of arg as Row[]) this.updateWhere(f.type, w, fkVals());
+          for (const w of next) this.connectOne(f.type, w, fkVals());
           break;
         }
         case 'deleteMany':
@@ -469,7 +503,7 @@ export class WriteEngine extends Engine {
           break;
         case 'delete':
           for (const w of Array.isArray(arg) ? arg : [arg])
-            this.deleteMany(f.type, { where: childWhere(w as Row) });
+            countOrThrow(this.deleteMany(f.type, { where: uniqueScoped(w as Row) }).count);
           break;
         case 'updateMany':
           this.updateWhere(
@@ -481,7 +515,8 @@ export class WriteEngine extends Engine {
         case 'update': {
           const a = arg as Row;
           const list = Array.isArray(a) ? a : [a];
-          for (const u of list) this.updateWhere(f.type, childWhere(u.where as Row), u.data as Row);
+          for (const u of list)
+            countOrThrow(this.updateWhere(f.type, uniqueScoped(u.where as Row), u.data as Row));
           break;
         }
         default:
