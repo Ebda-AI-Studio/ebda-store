@@ -110,6 +110,7 @@ import {
   billingRouteContext,
 } from '../middleware/tenant-context';
 
+import storeDoSpikeRoutes from './store-do-spike.routes';
 const router = Router();
 
 // Public routes (no auth required)
@@ -124,6 +125,8 @@ router.use('/public', publicStoreLayoutRoutes);
 // Token + store-room authority for the Workers realtime Durable Object (no tenant scope:
 // it reads only the `stores` routing table).
 router.use('/realtime', realtimeRoutes);
+// Phase 0 StoreDO spike loader: 404 unless the flag AND the seed secret are set (routes/store-do-spike.routes.ts).
+router.use('/internal/store-do', storeDoSpikeRoutes);
 
 // Store-scoped MCP endpoint (agent checkout) — POST /api/v1/mcp/:storeSlug.
 // Resolves the store by slug + checks the `agent_checkout` feature gate

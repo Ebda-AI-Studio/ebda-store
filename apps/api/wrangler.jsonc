@@ -12,7 +12,7 @@
   "main": "src/worker.ts",
   "routes": [
     { "pattern": "api.ebda.app", "custom_domain": true },
-    { "pattern": "api.ebda.app/*", "zone_name": "ebda.app" }
+    { "pattern": "api.ebda.app/*", "zone_name": "ebda.app" },
   ],
   // Pinned to what the pinned wrangler's workerd supports (4.116.0 rejects 2026-09-01).
   "compatibility_date": "2026-08-01",
@@ -49,8 +49,15 @@
       { "name": "AUTH_STATE", "class_name": "AuthState" },
       // One per store: admin realtime over hibernating WebSockets.
       { "name": "STORE_REALTIME", "class_name": "StoreRealtime" },
+      // One per store: the SQLite store (Ruling INFRA-CF-1, Phase 0 spike). Reachable only for a store in
+      // STORE_DO_ENABLED_IDS that also sends `x-ebda-backend: do` (lib/store-backend.ts).
+      { "name": "STORE_DO", "class_name": "StoreDO" },
     ],
   },
+  // StoreDO nightly backups (Ruling INFRA-CF-1 Phase 0): the EXISTING private bucket, prefix store-do-backups/.
+  // No new bucket (Ruling INFRA-PREVIEW-1).
+  "r2_buckets": [{ "binding": "STORE_BACKUPS", "bucket_name": "ebda-private" }],
+
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop
   // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
@@ -63,7 +70,10 @@
   // until SEARCH_SEMANTIC_ENABLED=true (docs/ENVIRONMENT.md).
   "ai": { "binding": "AI" },
 
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] },
+    { "tag": "v2", "new_sqlite_classes": ["StoreDO"] },
+  ],
 
   "queues": {
     "producers": [
@@ -101,8 +111,16 @@
     // Anonymous public reads only (middleware/public-read-limit.ts): same numbers as the exact
     // Durable Object limiters (publicLimiter 300/min/IP, publicTenantLimiter 6000/min/tenant),
     // but counted per location. Authenticated requests and every write keep the exact DO limiters.
-    { "name": "PUBLIC_IP_LIMITER", "namespace_id": "1002", "simple": { "limit": 300, "period": 60 } },
-    { "name": "PUBLIC_TENANT_LIMITER", "namespace_id": "1003", "simple": { "limit": 6000, "period": 60 } },
+    {
+      "name": "PUBLIC_IP_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 300, "period": 60 },
+    },
+    {
+      "name": "PUBLIC_TENANT_LIMITER",
+      "namespace_id": "1003",
+      "simple": { "limit": 6000, "period": 60 },
+    },
   ],
 
   // Scheduled work that used to be setInterval loops (index.ts, Node only): see src/cf/cron.ts.
@@ -143,6 +161,8 @@
     "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
+    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
+    "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",

@@ -54,6 +54,9 @@ const apiVars = {
   TRUST_PROXY_HOPS: '1',
   // The dev-only /__dev/stats and /__dev/probe routes (src/cf/dev-stats.ts); never set in wrangler.jsonc.
   DEV_STATS: '1',
+  // StoreDO spike (lib/store-backend.ts): one flagged id + the operator seed secret.
+  STORE_DO_ENABLED_IDS: 'spike-store-1',
+  STORE_DO_SEED_TOKEN: 'workers-test-seed-token',
 };
 
 // Two workers in one Miniflare: the BUILT API Worker (`npm run cf:dry-run`: wrangler's esbuild bundle with
@@ -73,6 +76,7 @@ export default defineConfig(async () => ({
         durableObjects: {
           AUTH_STATE: { className: 'AuthState', scriptName: 'api', useSQLite: true },
           STORE_REALTIME: { className: 'StoreRealtime', scriptName: 'api', useSQLite: true },
+          STORE_DO: { className: 'StoreDO', scriptName: 'api', useSQLite: true },
         },
         kvNamespaces: { KV_CACHE: 'kv-cache' },
         queueProducers: {
@@ -96,6 +100,7 @@ export default defineConfig(async () => ({
             durableObjects: {
               AUTH_STATE: { className: 'AuthState', useSQLite: true },
               STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
+              STORE_DO: { className: 'StoreDO', useSQLite: true },
             },
             hyperdrives: {
               HYPERDRIVE: LOCAL_DB,

@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { makeDrizzle, listProducts, addCartItem, createOrder } from './drizzle-do';
+import { makeDrizzle, listProducts, addCartItem, createOrder } from '../src/repo';
 export class D extends DurableObject {
   fetch() {
     const db = makeDrizzle(this.ctx.storage);
