@@ -339,3 +339,41 @@ describe('nested-write selectors (coordinator findings 1 and 2)', () => {
     expect(imgs(db, 'p1')[0]).toBe('i1:ok');
   });
 });
+
+describe('writes are atomic outside an explicit transaction', () => {
+  it('a create whose nested child fails leaves nothing behind; an update with a failing nested step rolls the scalars back too', async () => {
+    const { db, lite } = setup();
+    await expect(
+      lite.product.create({
+        data: {
+          id: 'atomic1',
+          storeId: 's1',
+          name: 'n',
+          slug: 'atomic1',
+          price: 1,
+          images: {
+            create: [
+              { id: 'ai1', url: 'a' },
+              { id: 'ai1', url: 'dup id' },
+            ],
+          },
+        },
+      })
+    ).rejects.toMatchObject({ code: 'P2002' });
+    expect(db.prepare(`SELECT count(*) c FROM products WHERE id = 'atomic1'`).get()).toEqual({
+      c: 0,
+    });
+    expect(db.prepare(`SELECT count(*) c FROM product_images WHERE id = 'ai1'`).get()).toEqual({
+      c: 0,
+    });
+    await expect(
+      lite.product.update({
+        where: { id: 'p1' },
+        data: { name: 'CHANGED', images: { update: { where: { id: 'i4' }, data: { url: 'x' } } } },
+      })
+    ).rejects.toMatchObject({ code: 'P2025' });
+    expect(db.prepare(`SELECT name FROM products WHERE id = 'p1'`).get()).toEqual({
+      name: 'Alpha',
+    });
+  });
+});
