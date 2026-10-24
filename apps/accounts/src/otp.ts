@@ -16,18 +16,11 @@ export async function issueOtp(
   user: Pick<UserRow, 'id'>,
   type: OtpType
 ): Promise<string | null> {
-  const since = iso(nowMs() - 15 * 60_000);
-  const recent = await db
-    .prepare(
-      `SELECT count(*) AS n FROM verification_tokens WHERE user_id = ?1 AND type = ?2 AND created_at > ?3`
-    )
-    .bind(user.id, type, since)
-    .first<{ n: number }>();
-  if ((recent?.n ?? 0) >= MAX_SENDS_PER_15_MIN) return null;
   const code = randomCode();
   const now = nowMs();
-  await db.batch([
-    // Only the newest code is valid.
+  const id = crypto.randomUUID();
+  // Insert FIRST, then count in the same batch: a burst of requests cannot all pass a check-then-act cap.
+  const res = await db.batch([
     db
       .prepare(
         `UPDATE verification_tokens SET used_at = ?3 WHERE user_id = ?1 AND type = ?2 AND used_at IS NULL`
@@ -38,14 +31,27 @@ export async function issueOtp(
         `INSERT INTO verification_tokens (id, token, user_id, type, expires_at, created_at) VALUES (?1,?2,?3,?4,?5,?6)`
       )
       .bind(
-        crypto.randomUUID(),
+        id,
         await hashCode(user.id, type, code),
         user.id,
         type,
         iso(now + OTP_TTL_MINUTES[type] * 60_000),
         iso(now)
       ),
+    db
+      .prepare(
+        `SELECT count(*) AS n FROM verification_tokens WHERE user_id = ?1 AND type = ?2 AND created_at > ?3`
+      )
+      .bind(user.id, type, iso(now - 15 * 60_000)),
   ]);
+  if (((res[2].results[0] as { n: number }).n ?? 0) > MAX_SENDS_PER_15_MIN) {
+    // Over the cap: this code is never mailed, so it must not be valid either.
+    await db
+      .prepare(`UPDATE verification_tokens SET used_at = ?2 WHERE id = ?1`)
+      .bind(id, iso(now))
+      .run();
+    return null;
+  }
   return code;
 }
 

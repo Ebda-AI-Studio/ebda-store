@@ -47,7 +47,8 @@ export interface CodeMail {
 /** The code travels in the link the existing branded templates already render, so no new template is needed. */
 export async function sendCodeMail(m: CodeMail): Promise<void> {
   if (!/^\d{6}$/.test(m.code)) throw new Error('sendCodeMail: code must be 6 digits');
-  const q = `email=${encodeURIComponent(m.to)}&code=${m.code}`;
+  // The code rides in the URL FRAGMENT: it is never sent to a server, a Referer header, analytics or an access log.
+  const q = `email=${encodeURIComponent(m.to)}#code=${m.code}`;
   if (m.kind === 'email_verify') {
     await sendMerchantVerificationEmail(
       {

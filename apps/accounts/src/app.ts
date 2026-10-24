@@ -11,12 +11,14 @@ import {
   revokeSession,
   SESSION_TTL_MS,
   type Resolved,
+  claimTotpStep,
+  purgeCredentials,
   type UserRow,
 } from './data';
 import { ACCESS_TTL_SECONDS, mintAccessToken, verifyOwnAccessToken, type StoreClaim } from './jwt';
 import { jwks } from './keys';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
-import { clearEmail, isLocked, recordFailure } from './throttle';
+import { clear, CODE_GUESS, hit, LOGIN, PER_IP_ONLY, SECOND_FACTOR } from './throttle';
 import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType } from './otp';
 import * as passkeys from './passkeys';
 import { newSecret, seal, totpUri, unseal, verifyTotp } from './totp';
@@ -28,7 +30,7 @@ type C = Context<{ Bindings: Env }>;
 
 class HttpError extends Error {
   constructor(
-    public readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503,
+    public readonly status: 400 | 401 | 403 | 404 | 409 | 415 | 429 | 503,
     public readonly code: string,
     message?: string
   ) {
@@ -129,13 +131,17 @@ async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
   return { user: publicUser(user), ...(await mintFor(c.env, user, s.sid, aud)) };
 }
 
-/** Bearer access token (any product audience) -> live user + session. Used by management endpoints. */
-async function bearerAuth(c: C): Promise<{ user: UserRow; sid: string }> {
+/**
+ * Bearer access token -> live user + session. Credential MANAGEMENT (MFA, passkeys, step-up) accepts only a `store` token:
+ * a token minted for another product must not be able to change how the account signs in. Logout and revoke only
+ * ever END sessions, so they accept any product's token (`anyAud`).
+ */
+async function bearerAuth(c: C, anyAud = false): Promise<{ user: UserRow; sid: string }> {
   const h = c.req.header('authorization') ?? '';
   const m = /^Bearer (.+)$/.exec(h);
   if (!m) throw err(401, 'UNAUTHORIZED');
   let verified: Awaited<ReturnType<typeof verifyOwnAccessToken>> | undefined;
-  for (const aud of csv(c.env.PRODUCTS)) {
+  for (const aud of anyAud ? csv(c.env.PRODUCTS) : ['store']) {
     try {
       verified = await verifyOwnAccessToken(c.env, m[1], aud);
       break;
@@ -150,27 +156,61 @@ async function bearerAuth(c: C): Promise<{ user: UserRow; sid: string }> {
   return { user, sid: verified.sid };
 }
 
-/** Step-up for sensitive changes: the account password again. */
-async function requirePassword(user: UserRow, password: unknown): Promise<void> {
+/** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
+async function requirePassword(c: C, user: UserRow, password: unknown): Promise<void> {
+  if (!(await hit(c.env.DB, `pw:${user.id}`, clientIp(c), LOGIN)))
+    throw err(429, 'TOO_MANY_ATTEMPTS');
   if (typeof password !== 'string' || !(await verifyPassword(password, user.password_hash)))
     throw err(403, 'STEP_UP_REQUIRED');
+  await clear(c.env.DB, `pw:${user.id}`);
 }
 
-async function mail(c: C, user: UserRow, kind: 'email_verify' | 'password_reset', type: OtpType) {
-  const code = await issueOtp(c.env.DB, user, type);
-  if (!code || !c.env.MAILER) return;
-  try {
-    await c.env.MAILER.sendCode({
-      to: user.email,
-      kind,
-      code,
-      language: user.language === 'ar' ? 'ar' : 'en',
-      firstName: user.first_name,
-      ttlMinutes: OTP_TTL_MINUTES[type],
-    });
-  } catch (e) {
-    console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
-  }
+/** Second factor for a sensitive change when the account has one (a stolen token + password is not enough). */
+async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<void> {
+  if (!user.mfa_enabled) return;
+  if (!(await hit(c.env.DB, `mfa:${user.id}`, clientIp(c), SECOND_FACTOR)))
+    throw err(429, 'TOO_MANY_ATTEMPTS');
+  if (typeof code !== 'string' || !user.mfa_secret || !c.env.MFA_KEY)
+    throw err(403, 'MFA_REQUIRED');
+  const step = await verifyTotp(
+    await unseal(c.env.MFA_KEY, user.mfa_secret),
+    code,
+    Date.now(),
+    user.mfa_last_step
+  );
+  if (step === null || !(await claimTotpStep(c.env.DB, user.id, step)))
+    throw err(403, 'MFA_REQUIRED');
+  await clear(c.env.DB, `mfa:${user.id}`);
+}
+
+/**
+ * Issue a code and mail it OFF the request path (waitUntil). Every branch of the caller answers after the same amount of
+ * work, so response time does not reveal whether an address is registered.
+ */
+function queueMail(
+  c: C,
+  user: UserRow | null,
+  kind: 'email_verify' | 'password_reset',
+  type: OtpType
+): void {
+  const job = async () => {
+    if (!user) return;
+    const code = await issueOtp(c.env.DB, user, type);
+    if (!code || !c.env.MAILER) return;
+    try {
+      await c.env.MAILER.sendCode({
+        to: user.email,
+        kind,
+        code,
+        language: user.language === 'ar' ? 'ar' : 'en',
+        firstName: user.first_name,
+        ttlMinutes: OTP_TTL_MINUTES[type],
+      });
+    } catch (e) {
+      console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
+    }
+  };
+  c.executionCtx.waitUntil(job());
 }
 
 // ----------------------------------------------------------------------------------------------------------------
@@ -194,6 +234,9 @@ export function createApp() {
         Vary: 'Origin',
       });
     }
+    // Every state-changing request (login, MFA, passkey sign-in, refresh, logout, signup, ...) must come from an
+    // allow-listed origin or a non-browser caller: a cross-site page cannot log a victim into an attacker's account.
+    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') originGuard(c);
     await next();
     c.header('Vary', 'Origin', { append: true });
     if (allowed) {
@@ -228,6 +271,9 @@ export function createApp() {
   });
 
   const json = async <T extends z.ZodTypeAny>(c: C, schema: T): Promise<z.infer<T>> => {
+    // A form post (text/plain, urlencoded) can be sent cross-site without a CORS preflight: refuse anything not JSON.
+    if (!(c.req.header('content-type') ?? '').toLowerCase().startsWith('application/json'))
+      throw err(415, 'UNSUPPORTED_MEDIA_TYPE', 'application/json required');
     let body: unknown;
     try {
       body = await c.req.json();
@@ -245,13 +291,7 @@ export function createApp() {
   });
   app.get('/.well-known/openid-configuration', c => {
     c.header('Cache-Control', 'public, max-age=300');
-    return c.json({
-      issuer: c.env.ISSUER,
-      jwks_uri: `${c.env.ISSUER}/.well-known/jwks.json`,
-      token_endpoint: `${c.env.ISSUER}/token`,
-      id_token_signing_alg_values_supported: ['ES256'],
-      subject_types_supported: ['public'],
-    });
+    return c.json({ issuer: c.env.ISSUER, jwks_uri: `${c.env.ISSUER}/.well-known/jwks.json` });
   });
 
   // ---- password login ----
@@ -265,35 +305,35 @@ export function createApp() {
     const body = await json(c, loginBody);
     const aud = audOf(c.env, body.aud);
     const ip = clientIp(c);
-    if (await isLocked(c.env.DB, body.email, ip))
+    // Counted BEFORE the password is checked (see throttle.ts): a parallel burst cannot out-run the budget.
+    if (!(await hit(c.env.DB, `login:${body.email}`, ip, LOGIN)))
       throw err(429, 'ACCOUNT_LOCKED', 'Too many attempts. Try again later.');
     const user = await findUserByEmail(c.env.DB, body.email);
     if (!user) {
       await bcrypt.compare(body.password, DUMMY_HASH); // same cost as a wrong password: no stopwatch oracle
-      await recordFailure(c.env.DB, body.email, ip);
       throw err(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
-    if (!(await verifyPassword(body.password, user.password_hash))) {
-      await recordFailure(c.env.DB, body.email, ip);
+    if (!(await verifyPassword(body.password, user.password_hash)))
       throw err(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
-    }
     // Status is checked AFTER the password so "suspended" is not distinguishable from "wrong password" by shape.
     if (user.status !== 'active')
       throw err(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
-    await clearEmail(c.env.DB, body.email);
+    // Only the holder of the mailbox may sign in: an account created by someone who merely typed the address is
+    // unusable until the code mailed to that address is entered (pre-hijacking). Reached only with the right password.
+    if (!user.email_verified) throw err(403, 'EMAIL_NOT_VERIFIED', 'Verify your email first');
+    await clear(c.env.DB, `login:${body.email}`);
 
     if (user.mfa_enabled && user.mfa_secret) {
       const challenge = randomCode() + crypto.randomUUID().replaceAll('-', '') + randomCode();
-      await c.env.DB.prepare(
-        `INSERT INTO challenges (id, kind, user_id, data, expires_at) VALUES (?1,'mfa',?2,?3,?4)`
-      )
-        .bind(
-          await sha256Hex(challenge),
-          user.id,
-          JSON.stringify({ aud, attempts: 0 }),
-          nowMs() + 5 * 60_000
-        )
-        .run();
+      await c.env.DB.batch([
+        // ONE live challenge per user: a password holder cannot accumulate challenges to guess codes against in parallel.
+        c.env.DB.prepare(`DELETE FROM challenges WHERE user_id = ?1 AND kind = 'mfa'`).bind(
+          user.id
+        ),
+        c.env.DB.prepare(
+          `INSERT INTO challenges (id, kind, user_id, data, expires_at) VALUES (?1,'mfa',?2,?3,?4)`
+        ).bind(await sha256Hex(challenge), user.id, JSON.stringify({ aud }), nowMs() + 5 * 60_000),
+      ]);
       return c.json({ success: true, data: { mfaRequired: true, challenge } });
     }
     return c.json({ success: true, data: await sessionResponse(c, user, 'pwd', aud) });
@@ -308,48 +348,65 @@ export function createApp() {
         backupCode: z.string().max(40).optional(),
       })
     );
+    const ip = clientIp(c);
     const id = await sha256Hex(body.challenge);
+    // The attempt is COUNTED before anything is checked, in one guarded statement: parallel guesses cannot share a stale count.
     const row = await c.env.DB.prepare(
-      `SELECT * FROM challenges WHERE id = ?1 AND kind = 'mfa' AND expires_at > ?2`
+      `UPDATE challenges SET attempts = attempts + 1 WHERE id = ?1 AND kind = 'mfa' AND expires_at > ?2 AND attempts < 5
+       RETURNING user_id, data`
     )
       .bind(id, nowMs())
       .first<{ user_id: string; data: string }>();
     if (!row) throw err(401, 'INVALID_CHALLENGE');
-    const data = JSON.parse(row.data) as { aud: string; attempts: number };
-    if (data.attempts >= 5) {
-      await c.env.DB.prepare(`DELETE FROM challenges WHERE id = ?1`).bind(id).run();
-      throw err(401, 'INVALID_CHALLENGE');
-    }
+    const data = JSON.parse(row.data) as { aud: string };
     const user = await findUserById(c.env.DB, row.user_id);
-    if (!user || user.status !== 'active' || !user.mfa_secret || !c.env.MFA_KEY)
+    if (
+      !user ||
+      user.status !== 'active' ||
+      !user.email_verified ||
+      !user.mfa_secret ||
+      !c.env.MFA_KEY
+    )
       throw err(401, 'INVALID_CHALLENGE');
+    // A per-USER budget a fresh challenge does not reset, counted before the code is checked.
+    if (!(await hit(c.env.DB, `mfa:${user.id}`, ip, SECOND_FACTOR)))
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     let ok = false;
-    let remaining: string[] | null = null;
+    let spentBackup: { old: string; next: string } | null = null;
     if (body.code) {
-      ok = (await verifyTotp(await unseal(c.env.MFA_KEY, user.mfa_secret), body.code)) !== null;
+      const step = await verifyTotp(
+        await unseal(c.env.MFA_KEY, user.mfa_secret),
+        body.code,
+        Date.now(),
+        user.mfa_last_step
+      );
+      ok = step !== null && (await claimTotpStep(c.env.DB, user.id, step));
     } else if (body.backupCode) {
       const hashed = JSON.parse(user.mfa_backup_codes) as string[];
       for (let i = 0; i < hashed.length && !ok; i++) {
         if (await bcrypt.compare(body.backupCode, hashed[i])) {
           ok = true;
-          remaining = hashed.filter((_, j) => j !== i);
+          spentBackup = {
+            old: user.mfa_backup_codes,
+            next: JSON.stringify(hashed.filter((_, j) => j !== i)),
+          };
         }
       }
     }
-    if (!ok) {
-      data.attempts += 1;
-      await c.env.DB.prepare(`UPDATE challenges SET data = ?2 WHERE id = ?1`)
-        .bind(id, JSON.stringify(data))
+    if (ok && spentBackup) {
+      // Compare-and-set on the stored list: two parallel challenges cannot both spend the same backup code.
+      const r = await c.env.DB.prepare(
+        `UPDATE users SET mfa_backup_codes = ?3 WHERE id = ?1 AND mfa_backup_codes = ?2`
+      )
+        .bind(user.id, spentBackup.old, spentBackup.next)
         .run();
-      throw err(401, 'INVALID_CODE');
+      ok = (r.meta.changes ?? 0) === 1;
     }
+    if (!ok) throw err(401, 'INVALID_CODE');
     // Consume the challenge: one verification, one session.
     const del = await c.env.DB.prepare(`DELETE FROM challenges WHERE id = ?1`).bind(id).run();
     if ((del.meta.changes ?? 0) !== 1) throw err(401, 'INVALID_CHALLENGE');
-    if (remaining)
-      await c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`)
-        .bind(user.id, JSON.stringify(remaining))
-        .run();
+    await clear(c.env.DB, `mfa:${user.id}`);
     return c.json({ success: true, data: await sessionResponse(c, user, 'pwd,otp', data.aud) });
   });
 
@@ -378,12 +435,11 @@ export function createApp() {
   });
 
   app.post('/logout', async c => {
-    originGuard(c);
     // Cookie session and/or bearer: revoke whichever session(s) the caller proves. Always clears the cookie.
     const r = cookieValue(c) ? await resolveRefresh(c.env.DB, cookieValue(c)) : null;
     if (r) await revokeSession(c.env.DB, r.session.sid, 'logout');
     try {
-      const b = await bearerAuth(c);
+      const b = await bearerAuth(c, true);
       await revokeSession(c.env.DB, b.sid, 'logout');
     } catch {
       /* no/invalid bearer: the cookie path above is enough */
@@ -393,7 +449,7 @@ export function createApp() {
   });
 
   app.post('/revoke', async c => {
-    const b = await bearerAuth(c);
+    const b = await bearerAuth(c, true);
     const body = await json(
       c,
       z.object({ sid: z.string().uuid().optional(), all: z.boolean().optional() })
@@ -423,7 +479,7 @@ export function createApp() {
   });
 
   app.get('/me', async c => {
-    const b = await bearerAuth(c);
+    const b = await bearerAuth(c, true);
     return c.json({ success: true, data: { user: publicUser(b.user) } });
   });
 
@@ -439,8 +495,12 @@ export function createApp() {
 
   app.post('/signup', async c => {
     const body = await json(c, signupBody);
+    if (!(await hit(c.env.DB, 'signup', clientIp(c), PER_IP_ONLY(10))))
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     const hash = await hashPassword(body.password); // always paid, so "exists" and "new" take the same time
-    if (!(await findUserByEmail(c.env.DB, body.email))) {
+    const existing = await findUserByEmail(c.env.DB, body.email);
+    let target: UserRow | null = null;
+    if (!existing) {
       const id = crypto.randomUUID();
       try {
         await c.env.DB.prepare(
@@ -458,12 +518,30 @@ export function createApp() {
             iso()
           )
           .run();
-        const user = await findUserById(c.env.DB, id);
-        if (user) await mail(c, user, 'email_verify', 'email');
+        target = await findUserById(c.env.DB, id);
       } catch (e) {
         if (!/UNIQUE/i.test((e as Error).message)) throw e; // lost a race: it exists now
       }
+    } else if (!existing.email_verified) {
+      // Someone registered this address but never proved the mailbox. The newest signup wins: overwrite the credential
+      // (so a pre-registered attacker password dies) and mail a fresh code. A verified account is never touched.
+      await c.env.DB.prepare(
+        `UPDATE users SET password_hash = ?2, first_name = ?3, last_name = ?4, phone = ?5, language = ?6, updated_at = ?7 WHERE id = ?1 AND email_verified = 0`
+      )
+        .bind(
+          existing.id,
+          hash,
+          body.firstName,
+          body.lastName,
+          body.phone ?? null,
+          body.language,
+          iso()
+        )
+        .run();
+      await purgeCredentials(c.env.DB, existing.id, 'signup-overwrite');
+      target = await findUserById(c.env.DB, existing.id);
     }
+    queueMail(c, target, 'email_verify', 'email');
     // Same answer whether or not the address was already registered.
     return c.json({ success: true, data: { status: 'verification_sent' } }, 202);
   });
@@ -472,33 +550,46 @@ export function createApp() {
 
   app.post('/otp/verify', async c => {
     const body = await json(c, otpBody);
-    const ip = clientIp(c);
     const key = `otp:${body.email}`;
-    if (await isLocked(c.env.DB, key, ip)) throw err(429, 'TOO_MANY_ATTEMPTS');
+    if (!(await hit(c.env.DB, key, clientIp(c), CODE_GUESS))) throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
     const ok = user ? await verifyOtp(c.env.DB, user, 'email', body.code) : false;
-    if (!ok || !user) {
-      await recordFailure(c.env.DB, key, ip);
-      throw err(400, 'INVALID_CODE');
-    }
+    if (!ok || !user) throw err(400, 'INVALID_CODE');
+    const wasUnverified = !user.email_verified;
     await c.env.DB.prepare(`UPDATE users SET email_verified = 1, updated_at = ?2 WHERE id = ?1`)
       .bind(user.id, iso())
       .run();
+    // Anything attached to the account before its mailbox owner proved control is untrusted: drop it all and end sessions.
+    if (wasUnverified) await purgeCredentials(c.env.DB, user.id, 'first-verification');
+    await clear(c.env.DB, key);
     return c.json({ success: true, data: { verified: true } });
   });
 
   app.post('/otp/resend', async c => {
     const body = await json(c, z.object({ email: emailSchema }));
+    if (!(await hit(c.env.DB, 'resend', clientIp(c), PER_IP_ONLY(10))))
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
-    if (user && user.status === 'active' && !user.email_verified)
-      await mail(c, user, 'email_verify', 'email');
+    queueMail(
+      c,
+      user && user.status === 'active' && !user.email_verified ? user : null,
+      'email_verify',
+      'email'
+    );
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 
   app.post('/password/forgot', async c => {
     const body = await json(c, z.object({ email: emailSchema }));
+    if (!(await hit(c.env.DB, 'forgot', clientIp(c), PER_IP_ONLY(10))))
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
-    if (user && user.status === 'active') await mail(c, user, 'password_reset', 'password_reset');
+    queueMail(
+      c,
+      user && user.status === 'active' ? user : null,
+      'password_reset',
+      'password_reset'
+    );
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 
@@ -511,22 +602,23 @@ export function createApp() {
         newPassword: passwordPolicy,
       })
     );
-    const ip = clientIp(c);
     const key = `otp:${body.email}`;
-    if (await isLocked(c.env.DB, key, ip)) throw err(429, 'TOO_MANY_ATTEMPTS');
+    if (!(await hit(c.env.DB, key, clientIp(c), CODE_GUESS))) throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
     const ok = user ? await verifyOtp(c.env.DB, user, 'password_reset', body.code) : false;
-    if (!ok || !user) {
-      await recordFailure(c.env.DB, key, ip);
-      throw err(400, 'INVALID_CODE');
-    }
+    if (!ok || !user) throw err(400, 'INVALID_CODE');
+    const wasUnverified = !user.email_verified;
     await c.env.DB.prepare(
       `UPDATE users SET password_hash = ?2, email_verified = 1, updated_at = ?3 WHERE id = ?1`
     )
       .bind(user.id, await hashPassword(body.newPassword), iso())
       .run();
-    await revokeAllForUser(c.env.DB, user.id, 'password-reset'); // every session of the account dies
-    await clearEmail(c.env.DB, body.email);
+    // Every session dies. Factors are removed only when the account had never been verified (pre-hijacking): a reset needs
+    // only the mailbox, so stripping a verified owner's MFA/passkeys here would turn a mailbox compromise into an MFA bypass.
+    if (wasUnverified) await purgeCredentials(c.env.DB, user.id, 'password-reset-unverified');
+    else await revokeAllForUser(c.env.DB, user.id, 'password-reset');
+    await clear(c.env.DB, key);
+    await clear(c.env.DB, `login:${body.email}`);
     return c.json({ success: true, data: { reset: true } });
   });
 
@@ -534,7 +626,8 @@ export function createApp() {
   app.post('/mfa/enroll', async c => {
     const { user } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string() }));
-    await requirePassword(user, body.password);
+    await requirePassword(c, user, body.password);
+    if (!user.email_verified) throw err(403, 'EMAIL_NOT_VERIFIED');
     if (user.mfa_enabled) throw err(409, 'MFA_ALREADY_ENABLED');
     if (!c.env.MFA_KEY) throw err(503, 'MFA_UNAVAILABLE');
     const secret = newSecret();
@@ -551,7 +644,13 @@ export function createApp() {
     const { user } = await bearerAuth(c);
     const body = await json(c, z.object({ code: z.string() }));
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
-    if ((await verifyTotp(await unseal(c.env.MFA_KEY, user.mfa_secret), body.code)) === null)
+    const step = await verifyTotp(
+      await unseal(c.env.MFA_KEY, user.mfa_secret),
+      body.code,
+      Date.now(),
+      user.mfa_last_step
+    );
+    if (step === null || !(await claimTotpStep(c.env.DB, user.id, step)))
       throw err(400, 'INVALID_CODE');
     const plain = Array.from({ length: 10 }, () =>
       [...crypto.getRandomValues(new Uint8Array(5))]
@@ -570,9 +669,15 @@ export function createApp() {
   app.post('/mfa/disable', async c => {
     const { user } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string() }));
-    await requirePassword(user, body.password);
+    await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
-    if ((await verifyTotp(await unseal(c.env.MFA_KEY, user.mfa_secret), body.code)) === null)
+    const step = await verifyTotp(
+      await unseal(c.env.MFA_KEY, user.mfa_secret),
+      body.code,
+      Date.now(),
+      user.mfa_last_step
+    );
+    if (step === null || !(await claimTotpStep(c.env.DB, user.id, step)))
       throw err(400, 'INVALID_CODE');
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL WHERE id = ?1`
@@ -586,6 +691,8 @@ export function createApp() {
   const originHeader = (c: C) => c.req.header('origin') ?? null;
 
   app.post('/passkey/login/options', async c => {
+    if (!(await hit(c.env.DB, 'pk-options', clientIp(c), PER_IP_ONLY(60))))
+      throw err(429, 'TOO_MANY_ATTEMPTS');
     return c.json({
       success: true,
       data: await passkeys.beginAuthentication(c.env.DB, c.env, originHeader(c)),
@@ -596,8 +703,8 @@ export function createApp() {
     const body = await json(c, z.object({ response: z.any(), aud: z.string().optional() }));
     const aud = audOf(c.env, body.aud);
     const ip = clientIp(c);
-    const pkKey = `passkey:${ip}`; // per client: a global key would let anyone lock every passkey sign-in
-    if (await isLocked(c.env.DB, pkKey, ip)) throw err(429, 'TOO_MANY_ATTEMPTS');
+    // per client: a global key would let anyone lock every passkey sign-in
+    if (!(await hit(c.env.DB, `passkey:${ip}`, ip, LOGIN))) throw err(429, 'TOO_MANY_ATTEMPTS');
     const res = await passkeys.finishAuthentication(
       c.env.DB,
       c.env,
@@ -605,7 +712,6 @@ export function createApp() {
       body.response
     );
     if ('fail' in res) {
-      await recordFailure(c.env.DB, pkKey, ip);
       console.log(JSON.stringify({ msg: 'passkey auth failed', reason: res.fail }));
       throw err(401, 'PASSKEY_AUTH_FAILED', 'Passkey sign-in failed');
     }
@@ -615,8 +721,10 @@ export function createApp() {
 
   app.post('/passkey/register/options', async c => {
     const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ password: z.string() }));
-    await requirePassword(user, body.password);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));
+    await requirePassword(c, user, body.password);
+    // With MFA on, registering a passkey (which later signs in WITHOUT MFA) needs a fresh code: token + password is not enough.
+    await requireSecondFactor(c, user, body.code);
     return c.json({
       success: true,
       data: await passkeys.beginRegistration(c.env.DB, c.env, user, originHeader(c)),
@@ -645,8 +753,9 @@ export function createApp() {
 
   app.post('/passkeys/:id/delete', async c => {
     const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ password: z.string() }));
-    await requirePassword(user, body.password);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));
+    await requirePassword(c, user, body.password);
+    await requireSecondFactor(c, user, body.code);
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
     return c.json({ success: true, data: { deleted: true } });

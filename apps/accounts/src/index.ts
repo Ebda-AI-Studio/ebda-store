@@ -1,7 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { createApp } from './app';
-import { findUserById, isSessionRevoked, revokeAllForUser, revokeSession } from './data';
-import { mintAccessToken } from './jwt';
+import { isSessionRevoked, revokeAllForUser, revokeSession } from './data';
+import { z } from 'zod';
 import { hashPassword, passwordPolicy } from './password';
 import { iso } from './util';
 
@@ -20,32 +20,9 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     return isSessionRevoked(this.env.DB, sid);
   }
 
-  /** Mint an access token for a live session (server-side, no cookie involved). */
-  async issue(
-    sid: string,
-    aud: string
-  ): Promise<{ access_token: string; expires_at: number } | null> {
-    if (!this.env.PRODUCTS.split(',').includes(aud)) return null;
-    if (await isSessionRevoked(this.env.DB, sid)) return null;
-    const s = await this.env.DB.prepare(`SELECT user_id FROM sessions WHERE sid = ?1`)
-      .bind(sid)
-      .first<{ user_id: string }>();
-    const user = s ? await findUserById(this.env.DB, s.user_id) : null;
-    if (!user) return null;
-    const stores = this.env.STORE_DIRECTORY
-      ? await this.env.STORE_DIRECTORY.storesForUser(user.id)
-      : [];
-    const { token, expiresAt } = await mintAccessToken(this.env, {
-      sub: user.id,
-      sid,
-      aud,
-      stores,
-      ...(user.role === 'super_admin' ? { pa: 'super_admin' as const } : {}),
-      email: user.email,
-      email_verified: !!user.email_verified,
-    });
-    return { access_token: token, expires_at: expiresAt };
-  }
+  // NOTE: no `issue(sid, aud)`. A Service Binding does not authenticate the caller, so any Worker in the account holding
+  // the binding could mint a token for ANY product audience from a sid. Products get tokens over HTTP (`GET /token`, cookie
+  // + allow-listed origin). Bring `issue` back only with a proof of possession (a token for the same sid) and a review.
 
   /** Revoke every session of a user (suspension, password change by an admin, erasure). */
   async revokeUser(userId: string, reason: string): Promise<void> {
@@ -67,6 +44,8 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     role?: 'store_admin' | 'staff';
   }): Promise<{ id: string } | null> {
     passwordPolicy.parse(input.password);
+    const email = z.string().trim().toLowerCase().email().max(254).parse(input.email);
+    if (input.id !== undefined) z.string().uuid().parse(input.id);
     const id = input.id ?? crypto.randomUUID();
     try {
       await this.env.DB.prepare(
@@ -75,7 +54,7 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
       )
         .bind(
           id,
-          input.email.trim().toLowerCase(),
+          email,
           await hashPassword(input.password),
           input.firstName,
           input.lastName,
@@ -86,7 +65,8 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
         .run();
       return { id };
     } catch (e) {
-      if (/UNIQUE/i.test((e as Error).message)) return null;
+      // Only an email collision means "taken"; an id collision is a caller bug and must not be reported as one.
+      if (/UNIQUE.*users\.email|users_email_lower/i.test((e as Error).message)) return null;
       throw e;
     }
   }

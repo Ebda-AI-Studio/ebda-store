@@ -66,7 +66,7 @@ describe('sendCodeMail', () => {
       expect.objectContaining({
         email: 'a+b@example.com',
         verificationUrl:
-          'https://store.ebda.app/verify-email?email=a%2Bb%40example.com&code=123456',
+          'https://store.ebda.app/verify-email?email=a%2Bb%40example.com#code=123456',
       }),
       'ar'
     );
@@ -76,7 +76,7 @@ describe('sendCodeMail', () => {
     await sendCodeMail({ ...base, kind: 'password_reset', ttlMinutes: 15 });
     expect(sendReset).toHaveBeenCalledWith(
       expect.objectContaining({
-        resetUrl: 'https://store.ebda.app/reset-password?email=a%2Bb%40example.com&code=123456',
+        resetUrl: 'https://store.ebda.app/reset-password?email=a%2Bb%40example.com#code=123456',
         expiresInMinutes: 15,
       }),
       'ar'

@@ -15,6 +15,7 @@ export interface UserRow {
   mfa_enabled: number;
   mfa_secret: string | null;
   mfa_backup_codes: string;
+  mfa_last_step: number | null;
   token_version: number;
 }
 
@@ -28,6 +29,8 @@ export interface SessionRow {
 }
 
 export const SESSION_TTL_MS = 30 * 24 * 3600_000;
+/** A session never outlives this, however often it is rotated (sliding window is capped). */
+export const SESSION_MAX_MS = 180 * 24 * 3600_000;
 /** The refresh cookie rotates at most this often; a rotated token still answers for GRACE_MS (parallel tabs). */
 export const ROTATE_AFTER_MS = 24 * 3600_000;
 export const GRACE_MS = 60_000;
@@ -163,7 +166,13 @@ async function liveSession(
     .prepare(`SELECT * FROM sessions WHERE sid = ?1`)
     .bind(sid)
     .first<SessionRow>();
-  if (!session || session.revoked_at || session.expires_at <= nowMs() || session.user_id !== userId)
+  if (
+    !session ||
+    session.revoked_at ||
+    session.expires_at <= nowMs() ||
+    session.created_at + SESSION_MAX_MS <= nowMs() ||
+    session.user_id !== userId
+  )
     return null;
   const user = await findUserById(db, userId);
   if (!user || user.status !== 'active') return null;
@@ -203,7 +212,6 @@ export async function revokeAllForUser(
         `UPDATE refresh_tokens SET revoked_at = ?2, revoked_reason = COALESCE(revoked_reason, ?3) WHERE user_id = ?1 AND revoked_at IS NULL`
       )
       .bind(userId, iso(now), reason),
-    db.prepare(`UPDATE users SET token_version = token_version + 1 WHERE id = ?1`).bind(userId),
   ]);
 }
 
@@ -211,17 +219,60 @@ export async function revokeAllForUser(
 export async function isSessionRevoked(db: D1Database, sid: string): Promise<boolean> {
   const row = await db
     .prepare(
-      `SELECT s.revoked_at, s.expires_at, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.sid = ?1`
+      `SELECT s.revoked_at, s.expires_at, s.created_at, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.sid = ?1`
     )
     .bind(sid)
     .first<{
       revoked_at: number | null;
       expires_at: number;
+      created_at: number;
       status: string;
       deleted_at: string | null;
     }>();
   if (!row) return true;
+  const now = nowMs();
   return (
-    !!row.revoked_at || row.expires_at <= nowMs() || row.status !== 'active' || !!row.deleted_at
+    !!row.revoked_at ||
+    row.expires_at <= now ||
+    row.created_at + SESSION_MAX_MS <= now ||
+    row.status !== 'active' ||
+    !!row.deleted_at
   );
+}
+
+/**
+ * Strip every second factor and credential an attacker could have planted before the mailbox owner proved control of
+ * the address (pre-hijacking), and end every session. Run on the first email verification of a previously unverified
+ * account, on a password reset of such an account, and when a new signup overwrites it.
+ */
+export async function purgeCredentials(
+  db: D1Database,
+  userId: string,
+  reason: string
+): Promise<void> {
+  await db.batch([
+    db.prepare(`DELETE FROM passkey_credentials WHERE user_id = ?1`).bind(userId),
+    db
+      .prepare(
+        `UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL, mfa_last_step = NULL WHERE id = ?1`
+      )
+      .bind(userId),
+    db.prepare(`DELETE FROM challenges WHERE user_id = ?1`).bind(userId),
+  ]);
+  await revokeAllForUser(db, userId, reason);
+}
+
+/** Single-use TOTP step: true only for the first acceptance of a step newer than the last one accepted. */
+export async function claimTotpStep(
+  db: D1Database,
+  userId: string,
+  step: number
+): Promise<boolean> {
+  const r = await db
+    .prepare(
+      `UPDATE users SET mfa_last_step = ?2 WHERE id = ?1 AND (mfa_last_step IS NULL OR mfa_last_step < ?2)`
+    )
+    .bind(userId, step)
+    .run();
+  return (r.meta.changes ?? 0) === 1;
 }

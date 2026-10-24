@@ -158,7 +158,8 @@ describe('SSO: one login reaches every product, logout revokes everywhere', () =
     expect((await call('/token?aud=whatsapp', { cookie })).status).toBe(401);
     expect((await call('/token?aud=store', { cookie })).status).toBe(401);
     expect((await call('/me', { bearer: body.access_token })).status).toBe(401); // the still-unexpired access token is dead too
-    expect(await rpc.issue(sid, 'store')).toBeNull();
+    // the RPC surface offers no way to mint a token for another audience
+    expect((rpc as unknown as Record<string, unknown>).issue).toBeUndefined();
   });
 
   it('revoke all ends every session of the user, another user is untouched', async () => {
@@ -272,7 +273,9 @@ describe('signup, OTP and password reset', () => {
     expect(a.status).toBe(202);
     expect(b.status).toBe(202);
     expect(await a.json()).toEqual(await b.json());
-    expect(fakes.mails).toHaveLength(1); // the duplicate sent nothing
+    // the second signup over a still-UNVERIFIED address overwrote the credential and mailed a fresh code
+    expect(fakes.mails).toHaveLength(2);
+    fakes.mails.shift(); // the first code was superseded
     expect(fakes.mails[0]).toMatchObject({ to: email, kind: 'email_verify' });
     const code = fakes.mails[0].code;
     expect(code).toMatch(/^\d{6}$/);
@@ -364,6 +367,10 @@ describe('MFA (TOTP)', () => {
     const row = await env.DB.prepare(`SELECT mfa_secret FROM users WHERE id = ?1`)
       .bind(u.id)
       .first<{ mfa_secret: string }>();
+    // enrolment consumed this time step; a login in the SAME step would be a replay, so move the clock marker back
+    await env.DB.prepare(`UPDATE users SET mfa_last_step = mfa_last_step - 5 WHERE id = ?1`)
+      .bind(u.id)
+      .run();
     expect(row!.mfa_secret.startsWith('v1.')).toBe(true);
     expect(row!.mfa_secret).not.toContain(secret);
 

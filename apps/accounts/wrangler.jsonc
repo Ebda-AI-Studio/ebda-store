@@ -24,7 +24,7 @@
   ],
   "vars": {
     "ISSUER": "https://accounts.ebda.app",
-    "ALLOWED_ORIGINS": "https://store.ebda.app,https://orders.ebda.app,https://ebda.app",
+    "ALLOWED_ORIGINS": "https://store.ebda.app,https://orders.ebda.app",
     "PASSKEY_ORIGINS": "https://store.ebda.app,https://orders.ebda.app",
     "PRODUCTS": "store,whatsapp,crm,erp",
   },

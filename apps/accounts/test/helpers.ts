@@ -34,6 +34,8 @@ export const testEnv = (): Cloudflare.Env =>
 
 const BASE = 'https://accounts.ebda.app';
 
+const rnd = () => Math.floor(Math.random() * 250);
+
 export async function call(
   path: string,
   init: RequestInit & {
@@ -44,7 +46,8 @@ export async function call(
   } = {}
 ): Promise<Response> {
   const headers: Record<string, string> = {
-    'cf-connecting-ip': '203.0.113.7',
+    // a fresh client IP per call unless the test pins one: per-IP budgets are exercised explicitly in hardening.test.ts
+    'cf-connecting-ip': `10.${rnd()}.${rnd()}.${rnd()}`,
     ...(init.headers ?? {}),
   };
   if (init.json !== undefined) headers['content-type'] = 'application/json';
@@ -55,10 +58,14 @@ export async function call(
     headers,
     body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
   });
-  return app.fetch(req, testEnv(), {
-    waitUntil() {},
+  const pending: Promise<unknown>[] = [];
+  const res = await app.fetch(req, testEnv(), {
+    waitUntil: (p: Promise<unknown>) => pending.push(p),
     passThroughOnException() {},
   } as unknown as ExecutionContext);
+  // background work (mail) finishes before the test inspects it
+  await Promise.allSettled(pending);
+  return res;
 }
 
 export const cookieOf = (res: Response): string => {

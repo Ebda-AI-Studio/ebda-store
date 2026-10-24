@@ -43,15 +43,18 @@ async function hotp(secret: string, counter: number): Promise<string> {
   return String(code).padStart(6, '0');
 }
 
-/** Accepts the current step and one step either side (clock skew). Returns the matched step or null. */
+/** Accepts the current step and one step either side (clock skew). Returns the matched step or null; the caller must then claim the step atomically (data.claimTotpStep). */
 export async function verifyTotp(
   secret: string,
   code: string,
-  atMs = Date.now()
+  atMs = Date.now(),
+  lastAcceptedStep: number | null = null
 ): Promise<number | null> {
   if (!/^\d{6}$/.test(code ?? '')) return null;
   const step = Math.floor(atMs / 30_000);
   for (const s of [step, step - 1, step + 1]) {
+    // A step at or before the last accepted one was already used: a replayed code is refused.
+    if (lastAcceptedStep !== null && s <= lastAcceptedStep) continue;
     if (safeEqual(await hotp(secret, s), code)) return s;
   }
   return null;

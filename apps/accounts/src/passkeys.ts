@@ -44,6 +44,8 @@ async function putChallenge(
   data: object,
   userId?: string
 ) {
+  // opportunistic cleanup: expired ceremonies never accumulate
+  await db.prepare(`DELETE FROM challenges WHERE expires_at < ?1`).bind(nowMs()).run();
   await db
     .prepare(`INSERT INTO challenges (id, kind, user_id, data, expires_at) VALUES (?1,?2,?3,?4,?5)`)
     .bind(challenge, kind, userId ?? null, JSON.stringify(data), nowMs() + CHALLENGE_TTL_MS)
@@ -92,6 +94,7 @@ export async function beginRegistration(
     .prepare(`SELECT credential_id, transports, rp_id FROM passkey_credentials WHERE user_id = ?1`)
     .bind(user.id)
     .all<{ credential_id: string; transports: string; rp_id: string }>();
+  if (!user.email_verified) throw new PasskeyError(403, 'EMAIL_NOT_VERIFIED');
   if (existing.results.length >= MAX_PASSKEYS) throw new PasskeyError(409, 'PASSKEY_LIMIT');
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
@@ -122,6 +125,7 @@ export async function finishRegistration(
   origin: string | null,
   body: { response: RegistrationResponseJSON; name?: string }
 ) {
+  if (!user.email_verified) throw new PasskeyError(403, 'EMAIL_NOT_VERIFIED');
   const challenge = challengeOf(body.response as never);
   const rec = challenge
     ? await takeChallenge<{ origin: string; rpId: string }>(db, 'passkey-register', challenge)
@@ -224,7 +228,7 @@ export async function finishAuthentication(
     .prepare(`SELECT * FROM users WHERE id = ?1 AND deleted_at IS NULL`)
     .bind(stored.user_id)
     .first<UserRow>();
-  if (!user || user.status !== 'active') return { fail: 'account' };
+  if (!user || user.status !== 'active' || !user.email_verified) return { fail: 'account' };
   const handle = response.response?.userHandle;
   if (handle && new TextDecoder().decode(b64urlDecode(handle)) !== user.id)
     return { fail: 'user_handle' };

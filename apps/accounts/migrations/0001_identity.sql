@@ -21,7 +21,9 @@ CREATE TABLE users (
   mfa_secret TEXT,
   mfa_backup_codes TEXT NOT NULL DEFAULT '[]',
   mfa_enrolled_at TEXT,
-  token_version INTEGER NOT NULL DEFAULT 0
+  token_version INTEGER NOT NULL DEFAULT 0,
+  -- Last accepted TOTP time step: a code is single-use, a step <= this is refused (replay).
+  mfa_last_step INTEGER
 );
 -- Admin emails are one global namespace, case-folded: the same rule as users_admin_email_key in the Store DB.
 CREATE UNIQUE INDEX users_email_lower ON users (lower(email)) WHERE deleted_at IS NULL;
@@ -92,6 +94,7 @@ CREATE TABLE challenges (
   kind TEXT NOT NULL,
   user_id TEXT,
   data TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
   expires_at INTEGER NOT NULL
 );
 CREATE INDEX challenges_expires ON challenges (expires_at);

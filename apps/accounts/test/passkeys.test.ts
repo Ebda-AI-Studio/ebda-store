@@ -113,7 +113,7 @@ describe('passkeys', () => {
       bearer: s.body.access_token,
       headers: hdr('https://evil.example'),
     });
-    expect(evil.status).toBe(404);
+    expect(evil.status).toBe(403); // refused by the origin guard before it reaches the ceremony
     expect(
       (
         await call('/passkey/login/options', {
@@ -121,7 +121,7 @@ describe('passkeys', () => {
           headers: hdr('https://evil.example'),
         })
       ).status
-    ).toBe(404);
+    ).toBe(403);
   });
 
   it('a replayed assertion fails (challenge is single use) and a regressed counter fails (cloned authenticator)', async () => {
