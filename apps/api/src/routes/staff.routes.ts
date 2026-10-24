@@ -193,7 +193,27 @@ router.post(
       }
 
       if (pendingAcceptance || !staffUser) {
-        const token = signStaffInviteToken({ email: input.email, storeId });
+        // The link is honoured only while this pending row exists: any earlier pending invite to the same address is
+        // superseded, and the row is consumed by the accept in the same transaction that creates the membership.
+        const inviteEmail = input.email.toLowerCase();
+        const inviteId = crypto.randomUUID();
+        await withStore(storeId, async tx => {
+          await tx.staffInvite.updateMany({
+            where: { storeId, email: inviteEmail, status: 'pending' },
+            data: { status: 'revoked', decidedAt: new Date() },
+          });
+          await tx.staffInvite.create({
+            data: {
+              id: inviteId,
+              storeId,
+              email: inviteEmail,
+              role: 'staff',
+              invitedBy: req.user!.userId,
+              expiresAt: new Date(Date.now() + STAFF_INVITE_TTL_MINUTES * 60_000),
+            },
+          });
+        });
+        const token = signStaffInviteToken({ email: inviteEmail, storeId, jti: inviteId });
         await sendStaffInviteEmail(
           {
             email: input.email,
@@ -329,6 +349,64 @@ router.post(
   }
 );
 
+// ─── Pending invitations: list and revoke (Ruling ID-13) ──────────────────
+
+router.get(
+  '/invites',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('staff_accounts'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const invites = await withStore(storeId, tx =>
+        tx.staffInvite.findMany({
+          where: { storeId, status: 'pending', expiresAt: { gt: new Date() } },
+          select: { id: true, email: true, createdAt: true, expiresAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        })
+      );
+      res.json({ success: true, data: { invites } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.delete(
+  '/invites/:inviteId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('staff_accounts'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, inviteId } = req.params;
+      const { count } = await withStore(storeId, tx =>
+        tx.staffInvite.updateMany({
+          where: { id: inviteId, storeId, status: 'pending' },
+          data: { status: 'revoked', decidedAt: new Date() },
+        })
+      );
+      if (count === 0) throw new AppError(404, 'NOT_FOUND', 'No pending invitation with this id.');
+      await auditLog({
+        action: 'staff.invite_revoked',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: { storeId, inviteId },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { revoked: true } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Remove a staff member ────────────────────────────────────────────────
 
 router.delete(
@@ -344,6 +422,7 @@ router.delete(
       const membership = await withStore(storeId, tx =>
         tx.storeStaff.findUnique({
           where: { userId_storeId: { userId, storeId } },
+          include: { user: { select: { email: true } } },
         })
       );
 
@@ -358,6 +437,15 @@ router.delete(
       await withStore(storeId, tx =>
         tx.storeStaff.delete({
           where: { userId_storeId: { userId, storeId } },
+        })
+      );
+
+      // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
+      // cannot come back through an old link.
+      await withStore(storeId, tx =>
+        tx.staffInvite.updateMany({
+          where: { storeId, email: membership.user.email.toLowerCase(), status: 'pending' },
+          data: { status: 'expired', decidedAt: new Date() },
         })
       );
 

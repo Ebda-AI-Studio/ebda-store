@@ -181,6 +181,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       instapayReceipts: 'InstapayReceipt',
       billingReminders: 'BillingReminder',
       lifecycleEmails: 'StoreLifecycleEmail',
+      staffInvites: 'StaffInvite',
     },
   },
   {
@@ -198,6 +199,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
       user: 'User',
+    },
+  },
+  {
+    name: 'StaffInvite',
+    table: 'staff_invites',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {

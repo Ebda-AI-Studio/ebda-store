@@ -7572,6 +7572,19 @@
       "cancelButton": "Cancel",
       "removingButton": "Removing…",
       "removeButton": "Remove"
+    },
+    "invites": {
+      "title": "Pending invitations",
+      "description": "These people have an account already and have not accepted yet. Revoking a link makes it stop working at once.",
+      "expires": "Expires {date}",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke this invitation?",
+      "revokeBody": "The link sent to {email} will stop working. You can invite them again later.",
+      "revokedTitle": "Invitation revoked",
+      "revokedDesc": "The link sent to {email} no longer works.",
+      "revokeFailed": "Could not revoke the invitation",
+      "sentTitle": "Invitation sent",
+      "sentDesc": "{email} will get an email to accept. Nothing changes on their account until they do."
     }
   },
   "blog": {
