@@ -42,8 +42,16 @@ interface PasskeyItem {
 
 type Action = () => Promise<void>;
 
-export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
+export function PasskeysPanel({
+  mfaEnabled,
+  onCount,
+}: {
+  mfaEnabled: boolean;
+  /** Reports how many passkeys the account has (the page needs it to know whether a TOTP would be a FIRST factor). */
+  onCount?: (n: number) => void;
+}) {
   const t = useT('account.security.passkeys');
+  const ts = useT('account.security');
   const tc = useT('common');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const { success: toastSuccess, error: toastError } = useToast();
@@ -59,11 +67,14 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
   const pending = useRef<Action | null>(null);
   // The identity service asks for the password (and a TOTP code when TOTP is on) with EACH sensitive call; they are held only
   // for the one retry after the step-up form and then dropped.
-  const creds = useRef<{ password: string; code?: string } | null>(null);
+  const creds = useRef<{ password: string; code?: string; emailCode?: string } | null>(null);
   const [askStepUp, setAskStepUp] = useState(false);
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [stepUpError, setStepUpError] = useState('');
+  // The FIRST sign-in factor of an account (no TOTP, no passkey) also needs a code e-mailed to the account.
+  const [emailCode, setEmailCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
 
   const fmt = (iso: string) =>
     new Date(iso).toLocaleDateString(
@@ -83,6 +94,7 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
           last_used_at: string | null;
         }>;
       }>('/passkeys');
+      onCount?.(data.passkeys.length);
       setItems(
         data.passkeys.map(p => ({
           id: p.id,
@@ -98,7 +110,7 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
       toastError(t('errorLoad'), undefined);
       setItems([]);
     }
-  }, [t, toastError]);
+  }, [t, toastError, onCount]);
 
   useEffect(() => {
     setSupported(passkeysSupported());
@@ -112,7 +124,12 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
       await action();
     } catch (e) {
       const err = e as Partial<ApiError> & { name?: string };
-      if (err.code === 'STEP_UP_REQUIRED' || err.code === 'MFA_REQUIRED') {
+      if (
+        err.code === 'STEP_UP_REQUIRED' ||
+        err.code === 'MFA_REQUIRED' ||
+        err.code === 'EMAIL_CODE_REQUIRED' ||
+        err.code === 'EMAIL_CODE_INVALID'
+      ) {
         pending.current = action;
         setStepUpError('');
         setAskStepUp(true);
@@ -124,7 +141,7 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
     }
   }
 
-  const needCreds = (): { password: string; code?: string } => {
+  const needCreds = (): { password: string; code?: string; emailCode?: string } => {
     if (!creds.current) throw { code: 'STEP_UP_REQUIRED' } satisfies ApiError;
     return creds.current;
   };
@@ -135,7 +152,11 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
       const options = await acct<never>('/passkey/register/options', c);
       creds.current = null; // one use
       const response = await passkeyRegistration(options);
-      await acct('/passkey/register/verify', { response, name: name.trim() || undefined });
+      await acct('/passkey/register/verify', {
+        response,
+        name: name.trim() || undefined,
+        ...(c.emailCode ? { emailCode: c.emailCode } : {}),
+      });
     } catch (e) {
       creds.current = null;
       throw e;
@@ -170,9 +191,15 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
     setStepUpError('');
     setBusy(true);
     try {
-      creds.current = { password, ...(mfaEnabled ? { code: code.trim() } : {}) };
+      creds.current = {
+        password,
+        ...(mfaEnabled ? { code: code.trim() } : {}),
+        ...(emailCode.trim() ? { emailCode: emailCode.trim() } : {}),
+      };
       setPassword('');
       setCode('');
+      setEmailCode('');
+      setCodeSent(false);
       setAskStepUp(false);
       const next = pending.current;
       pending.current = null;
@@ -258,6 +285,49 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
               />
             </div>
           )}
+          {!mfaEnabled && (items?.length ?? 0) === 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{ts('firstFactorEmailHint')}</p>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label
+                    htmlFor="passkey-email-code"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    {ts('bootstrapCodeLabel')}
+                  </label>
+                  <Input
+                    id="passkey-email-code"
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    autoComplete="off"
+                    maxLength={6}
+                    value={emailCode}
+                    onChange={e => setEmailCode(e.target.value)}
+                    className="mt-1 text-center tracking-widest"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={busy || !password}
+                  onClick={async () => {
+                    setStepUpError('');
+                    try {
+                      await acct('/mfa/bootstrap/code', { password });
+                      setCodeSent(true);
+                    } catch (e) {
+                      setStepUpError((e as ApiError).message || t('errorGeneric'));
+                    }
+                  }}
+                >
+                  {codeSent ? ts('bootstrapResend') : ts('bootstrapSend')}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-3">
             <Button
               type="button"
@@ -272,7 +342,15 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
             >
               {tc('cancel')}
             </Button>
-            <Button type="submit" className="min-h-11 flex-1" disabled={busy || !password}>
+            <Button
+              type="submit"
+              className="min-h-11 flex-1"
+              disabled={
+                busy ||
+                !password ||
+                (!mfaEnabled && (items?.length ?? 0) === 0 && emailCode.trim().length !== 6)
+              }
+            >
               {t('stepUpConfirm')}
             </Button>
           </div>

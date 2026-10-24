@@ -75,6 +75,7 @@ export default function SecurityPage() {
   const [enrollData, setEnrollData] = useState<EnrollBeginData | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
   // Platform administrators: the first factor needs the operator's one-time token plus a code e-mailed to the account.
+  const [passkeyCount, setPasskeyCount] = useState<number | null>(null);
   const [bootToken, setBootToken] = useState('');
   const [bootCode, setBootCode] = useState('');
   const [bootPassword, setBootPassword] = useState('');
@@ -213,7 +214,8 @@ export default function SecurityPage() {
     }
   }
 
-  const isFirstFactor = !status?.mfaEnabled;
+  // A TOTP is a FIRST factor only when the account has neither a TOTP nor a passkey (super admins have no passkey panel).
+  const isFirstFactor = !status?.mfaEnabled && (user?.role === 'super_admin' || passkeyCount === 0);
   const isFirstAdminFactor = user?.role === 'super_admin' && isFirstFactor;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -657,7 +659,9 @@ export default function SecurityPage() {
             )}
           </>
         )}
-        {status && user?.role !== 'super_admin' && <PasskeysPanel mfaEnabled={status.mfaEnabled} />}
+        {status && user?.role !== 'super_admin' && (
+          <PasskeysPanel mfaEnabled={status.mfaEnabled} onCount={setPasskeyCount} />
+        )}
         <LegalAcceptancesPanel />
       </div>
     </AdminLayout>

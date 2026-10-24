@@ -7434,7 +7434,8 @@
       "bootstrapPasswordLabel": "كلمة المرور (عشان نبعت الكود على الإيميل)",
       "bootstrapSend": "ابعتلي الكود على الإيميل",
       "bootstrapResend": "ابعت تاني",
-      "bootstrapCodeLabel": "الكود اللي وصلك على الإيميل (6 أرقام)"
+      "bootstrapCodeLabel": "الكود اللي وصلك على الإيميل (6 أرقام)",
+      "firstFactorEmailHint": "عشان تضيف أول وسيلة تسجيل دخول بنبعت كود على إيميل الحساب (اكتب كلمة المرور وبعدين دوس على الزر)."
     }
   },
   "answerEngine": {
