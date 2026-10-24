@@ -256,9 +256,53 @@ export function build() {
   manifest.rawInvariants = accounted;
   delete manifest.placed;
   manifest.supersededUniques ??= [];
+  manifest.meta = buildMeta(schema, split);
   manifest.decimals = decimals;
   manifest.storeSplit = storeBuckets;
   return { out, manifest, schema, split };
+}
+
+// Runtime metadata for the Prisma-compatible query layer (packages/repo): per model, its table, columns,
+// scalar types, enum values, uniques and RESOLVED relations. Relations to models in another database
+// (every `store` relation: Store lives in D1) are marked external and are not traversable in the DO.
+function buildMeta(schema, split) {
+  const byName = new Map(schema.models.map(m => [m.name, m]));
+  const enums = Object.fromEntries(schema.enums.map(e => [e.name, e.values]));
+  const out = {};
+  for (const m of schema.models) {
+    const target = split[m.name].target;
+    if (target !== 'store-do' && target !== 'd1') continue;
+    const fields = {};
+    for (const f of m.fields) {
+      if (f.kind === 'unsupported') continue;
+      if (f.kind !== 'relation') {
+        const dec = (f.attrs.db ?? '').match(/Decimal\((\d+),\s*(\d+)\)/);
+        fields[f.name] = { kind: f.kind, type: f.type, column: f.column, list: f.list, optional: f.optional, ...(dec ? { scale: Number(dec[2]) } : {}), ...(f.kind === 'enum' ? { enum: f.type } : {}), ...(f.attrs.default !== undefined ? { default: f.attrs.default } : {}), ...(f.attrs.updatedAt ? { updatedAt: true } : {}), ...(f.attrs.id ? { id: true } : {}) };
+        continue;
+      }
+      const tm = byName.get(f.type);
+      const external = split[f.type].target !== target;
+      let rel = { kind: 'relation', type: f.type, list: f.list, optional: f.optional, external };
+      const r = f.attrs.relation;
+      if (r && r.fields.length) {
+        rel = { ...rel, owner: true, from: r.fields.map(n => m.fields.find(x => x.name === n).column), fromProps: r.fields, to: r.references.map(n => tm.fields.find(x => x.name === n).column), toProps: r.references, onDelete: r.onDelete };
+      } else if (!external) {
+        const back = tm.fields.filter(g => g.kind === 'relation' && g.type === m.name && g.attrs.relation?.fields.length && (!r?.name || g.attrs.relation.name === r.name));
+        if (back.length !== 1) throw new Error(`cannot resolve inverse of ${m.name}.${f.name} (${back.length} candidates)`);
+        const g = back[0].attrs.relation;
+        rel = { ...rel, owner: false, from: g.references.map(n => m.fields.find(x => x.name === n).column), fromProps: g.references, to: g.fields.map(n => tm.fields.find(x => x.name === n).column), toProps: g.fields };
+      }
+      fields[f.name] = rel;
+    }
+    out[m.name] = {
+      table: m.dbName,
+      db: target,
+      pk: (m.id ?? m.fields.filter(f => f.attrs.id).map(f => f.name)),
+      uniques: [...m.fields.filter(f => f.attrs.unique && f.kind !== 'relation').map(f => [f.name]), ...m.uniques.map(u => u.fields.map(x => x.field))],
+      fields,
+    };
+  }
+  return { models: out, enums };
 }
 
 function reasonFor(skippedAll, kind, name) {
@@ -605,7 +649,8 @@ function main() {
     ),
     'src/store/schema.generated.ts': emitTs(out['store-do'], 'store'),
     'src/platform/schema.generated.ts': emitTs(out.d1, 'platform'),
-    'generated/manifest.json': JSON.stringify(manifest, null, 2) + '\n',
+    'generated/manifest.json': JSON.stringify({ ...manifest, meta: undefined }, null, 2) + '\n',
+    'generated/prisma-meta.json': JSON.stringify(manifest.meta, null, 1) + '\n',
   };
   for (const [rel, content] of Object.entries(files)) {
     const p = path.join(pkg, rel);
