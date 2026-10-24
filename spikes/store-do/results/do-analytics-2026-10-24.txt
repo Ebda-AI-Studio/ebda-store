@@ -1,0 +1,2 @@
+INV [{"dimensions": {"type": "jsrpc"}, "sum": {"errors": 0, "requests": 436, "wallTime": 46600710}}]
+PER [{"dimensions": {"datetimeHour": "2026-10-24T17:00:00Z"}, "sum": {"activeTime": 8845720, "cpuTime": 289976, "duration": 1.13225216, "rowsRead": 560, "rowsWritten": 761, "storageReadUnits": 0, "storageWriteUnits": 0}}]

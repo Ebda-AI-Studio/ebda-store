@@ -1,0 +1,12 @@
+// Static-assets-only Worker for help.ebda.app. `npm run build -w apps/help` writes ./out; Cloudflare serves it
+// directly (no server code).
+{
+  "name": "ebda-help",
+  "compatibility_date": "2025-08-16",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash",
+  },
+  "routes": [{ "pattern": "help.ebda.app", "custom_domain": true }],
+}

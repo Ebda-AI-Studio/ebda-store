@@ -29,8 +29,10 @@ export async function bench(fn, { total = 200, concurrency = 4, warmup = 10 } = 
       const i = next++;
       const t0 = performance.now();
       try {
-        const status = await fn(i);
-        const dt = performance.now() - t0;
+        const res = await fn(i);
+        // A fn may time just the call it cares about: return { status, ms }.
+        const status = typeof res === 'object' ? res.status : res;
+        const dt = typeof res === 'object' && res.ms != null ? res.ms : performance.now() - t0;
         statuses[status] = (statuses[status] || 0) + 1;
         if (status >= 200 && status < 300) samples.push([i, dt]);
         else errors++;

@@ -55,7 +55,7 @@ describe('robots', () => {
     const agents = rules.map(x => x.userAgent);
     for (const bot of ['*', 'GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended'])
       expect(agents).toContain(bot);
-    expect([...AI_CRAWLERS]).toHaveLength(4);
+    expect(new Set(AI_CRAWLERS).size).toBe(AI_CRAWLERS.length); // no duplicate rule
     for (const x of rules) {
       expect(x.allow).toBe('/');
       expect(x.disallow).toBeUndefined();

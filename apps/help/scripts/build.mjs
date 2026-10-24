@@ -26,9 +26,9 @@ const ORIGIN = `https://${BRAND.domains.help}`;
 const L = {
   ar: {
     prefix: '',
-    site: 'مركز المساعدة',
+    site: `مركز مساعدة ${BRAND.company.shortNameAr}`,
     skip: 'تخطَّ إلى المحتوى',
-    homeTitle: `مركز مساعدة ${BRAND.product.nameAr}`,
+    homeTitle: `مركز مساعدة ${BRAND.company.shortNameAr}`,
     homeIntro:
       'إجابات واضحة وصادقة عن إنشاء متجرك وإدارته. اللي لسه مش جاهز في المنصة مكتوب عليه «قريباً».',
     homeCta: 'أنشئ متجرك',
@@ -59,9 +59,9 @@ const L = {
   },
   en: {
     prefix: '/en',
-    site: 'Help centre',
+    site: `${BRAND.company.shortNameEn} Help`,
     skip: 'Skip to content',
-    homeTitle: `${BRAND.product.nameEn} help centre`,
+    homeTitle: `${BRAND.company.shortNameEn} Help`,
     homeIntro:
       'Straight answers about creating and running your store. Anything not built yet is marked "Coming soon".',
     homeCta: 'Create your store',
@@ -172,7 +172,9 @@ for (const lang of ['ar', 'en']) {
         `<li><a href="${articleUrl(lang, a.slug)}">${esc(a.data.title)}</a>${a.data.status === 'soon' ? ` <span class="badge">${esc(c.soon)}</span>` : ''}<p class="muted">${esc(a.data.description)}</p></li>`
     )
     .join('');
-  const homeMain = `<div class="prose"><h1>${esc(c.homeTitle)}</h1><p>${esc(c.homeIntro)}</p><p><a class="btn" href="${BRAND_STORE_APP_URL}/signup">${esc(c.homeCta)}</a></p><h2 id="topics">${esc(c.cardsTitle)}</h2><ul class="cards">${cards}</ul></div>`;
+  // One section per product (BRAND-ARCH-1). Ebda Store is the only live product; the others get their own
+  // section the day they ship, never a "coming soon" card.
+  const homeMain = `<div class="prose"><h1>${esc(c.homeTitle)}</h1><p>${esc(c.homeIntro)}</p><p><a class="btn" href="${BRAND_STORE_APP_URL}/signup">${esc(c.homeCta)}</a></p><section aria-labelledby="p-store"><h2 id="p-store">${esc(lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn)}</h2><ul class="cards">${cards}</ul></section></div>`;
   writePage(
     out,
     homeUrl(lang),
@@ -195,7 +197,7 @@ for (const lang of ['ar', 'en']) {
     const appLink = a.data.appPath
       ? `<p><a class="btn btn-ghost" href="${esc(BRAND_STORE_APP_URL + a.data.appPath)}">${esc(c.openApp)}</a></p>`
       : '';
-    const main = `<article class="prose"><h1>${esc(a.data.title)}</h1>${soon}${renderToc(headings, c.tocLabel)}${html}${appLink}</article>`;
+    const main = `<article class="prose"><p class="muted small">${esc(lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn)}</p><h1>${esc(a.data.title)}</h1>${soon}${renderToc(headings, c.tocLabel)}${html}${appLink}</article>`;
     writePage(
       out,
       articleUrl(lang, a.slug),
@@ -259,7 +261,7 @@ writeFileSync(
 );
 writeFileSync(
   path.join(out, 'llms.txt'),
-  `# ${BRAND.product.nameEn} help centre\n\n> Merchant help for ${BRAND.product.nameEn}, in Arabic and English.\n\n${content.en
+  `# ${BRAND.company.shortNameEn} Help\n\n> Merchant help for ${BRAND.product.nameEn}, in Arabic and English. Products are added here as they ship.\n\n${content.en
     .map(a => `- [${a.data.title}](${ORIGIN}${articleUrl('en', a.slug)}): ${a.data.description}`)
     .join('\n')}\n`
 );

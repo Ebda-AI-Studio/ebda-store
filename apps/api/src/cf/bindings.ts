@@ -55,6 +55,10 @@ export interface CfBindings {
   AUTH_STATE?: DurableObjectNamespaceLike;
   /** One Durable Object per store (admin realtime, WebSocket hibernation). */
   STORE_REALTIME?: DurableObjectNamespaceLike;
+  /** One SQLite Durable Object per store (Phase 0 spike, flag-gated: lib/store-backend.ts). */
+  STORE_DO?: DurableObjectNamespaceLike;
+  /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
+  STORE_BACKUPS?: unknown;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */
