@@ -9,7 +9,6 @@ import { test, expect } from '@playwright/test';
 const PAGES = [
   '',
   'features',
-  'compare/salla',
   'compare/zid',
   'compare/shopify',
   'compare/wuilt',

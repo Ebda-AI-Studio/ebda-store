@@ -1,5 +1,5 @@
 /**
- * apps/marketing capability surface: /features and /compare/{salla,zid,shopify} exist in ar + en,
+ * apps/marketing capability surface: /features and /compare/{zid,shopify} exist in ar + en,
  * are in the sitemap with alternates, are named in robots' sitemap + llms.txt, carry the brand
  * line, stay honest (every compare page lists what Ebda does not have), and never leak the
  * inherited brands or the orange the Ebda palette forbids.
