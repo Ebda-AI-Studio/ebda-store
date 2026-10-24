@@ -155,6 +155,42 @@ async function hasAnyFactor(db: D1Database, user: UserRow): Promise<boolean> {
   return (p?.n ?? 0) > 0;
 }
 
+/**
+ * First-factor bootstrap for a platform administrator (Ruling ID-15). A password-only session must not be able to bind the
+ * FIRST factor to a super_admin (a phished or leaked password would hand over the account). So, in addition to the password
+ * and the session, it needs (1) the one-time enrolment token the operator's script printed to their terminal, and (2) a
+ * one-time code mailed to the account's mailbox. Both are single use; the token is hashed at rest and expires.
+ */
+async function needsBootstrapProof(db: D1Database, user: UserRow): Promise<boolean> {
+  return user.role === 'super_admin' && !(await hasAnyFactor(db, user));
+}
+
+async function requireBootstrapProof(
+  c: C,
+  user: UserRow,
+  proof: { enrolmentToken?: string; emailCode?: string }
+): Promise<void> {
+  const a = await hit(c.env.DB, user.id, clientIp(c), SECOND_FACTOR);
+  if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
+  if (!proof.enrolmentToken || !proof.emailCode) throw err(403, 'ENROLMENT_PROOF_REQUIRED');
+  const hash = await sha256Hex(proof.enrolmentToken);
+  const row = await c.env.DB.prepare(
+    `SELECT id FROM enrolment_tokens WHERE user_id = ?1 AND token_hash = ?2 AND used_at IS NULL AND expires_at > ?3`
+  )
+    .bind(user.id, hash, nowMs())
+    .first<{ id: string }>();
+  if (!row) throw err(403, 'ENROLMENT_PROOF_INVALID');
+  if (!(await verifyOtp(c.env.DB, user, 'two_factor', proof.emailCode)).ok)
+    throw err(403, 'ENROLMENT_PROOF_INVALID');
+  const used = await c.env.DB.prepare(
+    `UPDATE enrolment_tokens SET used_at = ?2 WHERE id = ?1 AND used_at IS NULL AND expires_at > ?2`
+  )
+    .bind(row.id, nowMs())
+    .run();
+  if ((used.meta.changes ?? 0) !== 1) throw err(403, 'ENROLMENT_PROOF_INVALID');
+  await a.succeeded();
+}
+
 async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
   const s = await createSession(c.env.DB, user, amr, sessionCtx(c));
   setRefreshCookie(c, s.refreshToken);
@@ -233,7 +269,7 @@ async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<
 export async function issueAndMail(
   env: Env,
   user: UserRow,
-  kind: 'email_verify' | 'password_reset' | 'staff_invite',
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol',
   type: OtpType,
   pending?: PendingSignup,
   opts: { ttlMinutes?: number; storeName?: string } = {}
@@ -827,11 +863,32 @@ export function createApp() {
     });
   });
 
+  // Mails the one-time code a platform administrator needs (with the operator's token) to enrol their FIRST factor.
+  app.post('/mfa/bootstrap/code', async c => {
+    const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ password: z.string() }));
+    await requirePassword(c, user, body.password);
+    if (!(await needsBootstrapProof(c.env.DB, user))) throw err(409, 'NOT_REQUIRED');
+    if (!(await hit(c.env.DB, user.id, 'n/a', PER_EMAIL('bootstrap-code', 3))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
+    await issueAndMail(c.env, user, 'factor_enrol', 'two_factor');
+    return c.json({ success: true, data: { sent: true } }, 202);
+  });
+
   app.post('/mfa/enroll/verify', async c => {
     const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ code: z.string() }));
+    const body = await json(
+      c,
+      z.object({
+        code: z.string(),
+        enrolmentToken: z.string().max(200).optional(),
+        emailCode: z.string().max(10).optional(),
+      })
+    );
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    if (await needsBootstrapProof(c.env.DB, { ...user, mfa_enabled: 0 }))
+      await requireBootstrapProof(c, user, body);
     const plain = Array.from({ length: 10 }, () =>
       [...crypto.getRandomValues(new Uint8Array(5))]
         .map(b => b.toString(16).padStart(2, '0'))
@@ -908,7 +965,16 @@ export function createApp() {
 
   app.post('/passkey/register/verify', async c => {
     const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ response: z.any(), name: z.string().optional() }));
+    const body = await json(
+      c,
+      z.object({
+        response: z.any(),
+        name: z.string().optional(),
+        enrolmentToken: z.string().max(200).optional(),
+        emailCode: z.string().max(10).optional(),
+      })
+    );
+    if (await needsBootstrapProof(c.env.DB, user)) await requireBootstrapProof(c, user, body);
     return c.json(
       {
         success: true,

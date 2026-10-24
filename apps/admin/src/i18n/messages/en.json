@@ -7428,7 +7428,13 @@
         "errorLoad": "Could not load your passkeys",
         "errorGeneric": "Something went wrong. Nothing was changed."
       },
-      "passwordLabel": "Confirm your password"
+      "passwordLabel": "Confirm your password",
+      "bootstrapIntro": "As a platform administrator you need two things to add your first sign-in factor: the one-time enrolment token your operator script printed, and a code we e-mail to this account.",
+      "bootstrapTokenLabel": "Enrolment token",
+      "bootstrapPasswordLabel": "Your password (to send the e-mailed code)",
+      "bootstrapSend": "E-mail me the code",
+      "bootstrapResend": "Send again",
+      "bootstrapCodeLabel": "E-mailed code (6 digits)"
     }
   },
   "answerEngine": {

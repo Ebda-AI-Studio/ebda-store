@@ -9,6 +9,7 @@ import { ownedStoreIds } from './definer';
 import {
   sendMerchantPasswordResetEmail,
   sendStaffInviteEmail,
+  sendFactorEnrolCodeEmail,
   sendMerchantVerificationEmail,
 } from '../services/platform-mailer';
 
@@ -41,7 +42,7 @@ export async function storesForUser(userId: string): Promise<StoreClaim[]> {
 
 export interface CodeMail {
   to: string;
-  kind: 'email_verify' | 'password_reset' | 'staff_invite';
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
   code: string;
   language: 'en' | 'ar';
   firstName: string;
@@ -62,6 +63,11 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
         verificationUrl: `${config.adminUrl}/verify-email?${q}`,
         expiresInHours: Math.max(1, Math.round(m.ttlMinutes / 60)),
       },
+      m.language
+    );
+  } else if (m.kind === 'factor_enrol') {
+    await sendFactorEnrolCodeEmail(
+      { email: m.to, name: m.firstName, code: m.code, expiresInMinutes: m.ttlMinutes },
       m.language
     );
   } else if (m.kind === 'staff_invite') {

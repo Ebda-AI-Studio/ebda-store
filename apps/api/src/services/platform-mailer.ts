@@ -22,6 +22,10 @@ import { EmailService, renderBrandedShell } from './email.service';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { passwordResetTemplate } from './email-templates/password-reset';
 import { staffInviteTemplate, type StaffInviteData } from './email-templates/staff-invite';
+import {
+  factorEnrolCodeTemplate,
+  type FactorEnrolCodeData,
+} from './email-templates/factor-enrol-code';
 import { legalNoticeTemplate, type LegalNoticeEmailData } from './email-templates/legal-notice';
 import { passkeyNoticeTemplate, type PasskeyNoticeData } from './email-templates/passkey-notice';
 import { escapeHtml } from './email-templates/_util';
@@ -241,6 +245,33 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
     {
       to: data.email,
       subject: staffInviteTemplate.subject[lang](data, ''),
+      html,
+      replyTo: BRAND.supportEmail,
+    },
+    { redactLinkInLog: true }
+  );
+}
+
+/** Platform-administrator first-factor enrolment code (Ruling ID-15). */
+export async function sendFactorEnrolCodeEmail(
+  data: FactorEnrolCodeData,
+  language?: Lang
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(factorEnrolCodeTemplate[lang](data), {
+    name: BRAND.product.nameEn,
+    nameAr: BRAND.product.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+  });
+  await deliver(
+    {
+      to: data.email,
+      subject: factorEnrolCodeTemplate.subject[lang](data),
       html,
       replyTo: BRAND.supportEmail,
     },

@@ -2,8 +2,12 @@
 import type { UserRow } from './data';
 import { iso, nowMs, randomCode, safeEqual, sha256Hex } from './util';
 
-export type OtpType = 'email' | 'password_reset';
-export const OTP_TTL_MINUTES: Record<OtpType, number> = { email: 30, password_reset: 15 };
+export type OtpType = 'email' | 'password_reset' | 'two_factor';
+export const OTP_TTL_MINUTES: Record<OtpType, number> = {
+  email: 30,
+  password_reset: 15,
+  two_factor: 10,
+};
 const MAX_ATTEMPTS = 5;
 export const MAX_SENDS_PER_15_MIN = 3;
 

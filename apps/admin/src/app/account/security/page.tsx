@@ -74,6 +74,11 @@ export default function SecurityPage() {
   const [step, setStep] = useState<Step>('idle');
   const [enrollData, setEnrollData] = useState<EnrollBeginData | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
+  // Platform administrators: the first factor needs the operator's one-time token plus a code e-mailed to the account.
+  const [bootToken, setBootToken] = useState('');
+  const [bootCode, setBootCode] = useState('');
+  const [bootPassword, setBootPassword] = useState('');
+  const [bootSent, setBootSent] = useState(false);
   const [password, setPassword] = useState(''); // step-up: the identity service asks for the password again
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enrollError, setEnrollError] = useState('');
@@ -131,6 +136,21 @@ export default function SecurityPage() {
     }
   }
 
+  async function handleSendBootstrapCode() {
+    setEnrollError('');
+    setIsSubmitting(true);
+    try {
+      const { error } = await acct('/mfa/bootstrap/code', { password: bootPassword });
+      if (error) {
+        setEnrollError(error.message || t('errorVerify'));
+        return;
+      }
+      setBootSent(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   // ── Enroll: verify ───────────────────────────────────────────────────────
   async function handleVerifyEnroll(e: React.FormEvent) {
     e.preventDefault();
@@ -139,7 +159,12 @@ export default function SecurityPage() {
     try {
       const { data, error } = await acct<{ backupCodes: string[] }>(
         '/mfa/enroll/verify',
-        { code: verifyCode.trim() },
+        {
+          code: verifyCode.trim(),
+          ...(isFirstAdminFactor
+            ? { enrolmentToken: bootToken.trim(), emailCode: bootCode.trim() }
+            : {}),
+        },
         true
       );
       if (error) {
@@ -187,6 +212,8 @@ export default function SecurityPage() {
       setIsSubmitting(false);
     }
   }
+
+  const isFirstAdminFactor = user?.role === 'super_admin' && !status?.mfaEnabled;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -309,6 +336,75 @@ export default function SecurityPage() {
                   </code>
                 </div>
 
+                {/* Platform administrator: first-factor proof (operator token + e-mailed code) */}
+                {isFirstAdminFactor && (
+                  <div className="space-y-3 rounded-xl border border-border p-4">
+                    <p className="text-sm text-muted-foreground">{t('bootstrapIntro')}</p>
+                    <div>
+                      <label
+                        htmlFor="boot-token"
+                        className="block text-sm font-medium text-foreground"
+                      >
+                        {t('bootstrapTokenLabel')}
+                      </label>
+                      <Input
+                        id="boot-token"
+                        type="text"
+                        dir="ltr"
+                        autoComplete="off"
+                        value={bootToken}
+                        onChange={e => setBootToken(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label
+                          htmlFor="boot-password"
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {t('bootstrapPasswordLabel')}
+                        </label>
+                        <Input
+                          id="boot-password"
+                          type="password"
+                          autoComplete="current-password"
+                          value={bootPassword}
+                          onChange={e => setBootPassword(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isSubmitting || !bootPassword}
+                        onClick={handleSendBootstrapCode}
+                      >
+                        {bootSent ? t('bootstrapResend') : t('bootstrapSend')}
+                      </Button>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="boot-code"
+                        className="block text-sm font-medium text-foreground"
+                      >
+                        {t('bootstrapCodeLabel')}
+                      </label>
+                      <Input
+                        id="boot-code"
+                        type="text"
+                        inputMode="numeric"
+                        dir="ltr"
+                        autoComplete="off"
+                        maxLength={6}
+                        value={bootCode}
+                        onChange={e => setBootCode(e.target.value)}
+                        className="mt-1 text-center tracking-widest"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Verify form */}
                 <form onSubmit={handleVerifyEnroll} className="space-y-4">
                   {enrollError && (
@@ -353,7 +449,11 @@ export default function SecurityPage() {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={isSubmitting || verifyCode.length !== 6}
+                      disabled={
+                        isSubmitting ||
+                        verifyCode.length !== 6 ||
+                        (isFirstAdminFactor && (!bootToken.trim() || bootCode.trim().length !== 6))
+                      }
                     >
                       {isSubmitting ? t('verifying') : t('verifyButton')}
                     </Button>

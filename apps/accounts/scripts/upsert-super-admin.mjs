@@ -5,6 +5,9 @@
 //
 //   node scripts/upsert-super-admin.mjs --email=you@example.com --remote            # dry run: shows the plan, writes nothing
 //   node scripts/upsert-super-admin.mjs --email=you@example.com --remote --apply     # asks for the password (hidden, twice), writes
+//   add --reset-factors to wipe the account's TOTP/passkeys even if it already is a super_admin
+// The first TOTP/passkey of a super_admin can only be enrolled with the one-time token this script prints PLUS a code e-mailed
+// to the account (a leaked or phished password alone cannot bind a factor). Promoting an existing account clears its old factors.
 //
 // YOU run this yourself, in your own terminal. The password is typed at a hidden prompt and never accepted as an argument
 // (the script refuses --password). It is hashed here (bcrypt cost 12); only the hash is written, through a 0600 temp file
@@ -16,9 +19,11 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import readline from 'node:readline';
+import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import {
   buildUpsertSql,
+  decide,
   describePlan,
   lookupSql,
   parseArgs,
@@ -58,7 +63,7 @@ const rows = JSON.parse(
   wrangler(['d1', 'execute', DB, target, '--json', '--command', lookupSql(args.email)])
 );
 const existing = rows?.[0]?.results?.[0] ?? null;
-for (const line of describePlan(existing, args.email)) console.log(line);
+for (const line of describePlan(existing, args.email, args.resetFactors)) console.log(line);
 
 if (!args.apply) {
   console.log(
@@ -85,6 +90,8 @@ if (p1 !== (await ask('Repeat password: '))) {
 }
 
 const now = new Date();
+const plan = decide(existing, args.resetFactors);
+const enrolmentToken = plan.issueToken ? randomBytes(32).toString('base64url') : null;
 const statements = buildUpsertSql({
   existingId: existing?.id ?? null,
   newId: crypto.randomUUID(),
@@ -94,6 +101,9 @@ const statements = buildUpsertSql({
   lastName: args.lastName,
   nowIso: now.toISOString(),
   nowMs: now.getTime(),
+  clearFactors: plan.clearFactors,
+  tokenHash: enrolmentToken ? createHash('sha256').update(enrolmentToken).digest('hex') : null,
+  tokenId: enrolmentToken ? crypto.randomUUID() : null,
 });
 const dir = mkdtempSync(join(tmpdir(), 'super-admin-'));
 const file = join(dir, 'upsert.sql');
@@ -111,6 +121,13 @@ if (!row || row.role !== 'super_admin') {
   console.error('Write did not verify: the identity is not a super_admin.');
   process.exit(1);
 }
-console.log(
-  `Done: ${args.email} is a super_admin (${row.id}). Sign in at the admin app and enrol TOTP or a passkey.`
-);
+console.log(`Done: ${args.email} is a super_admin (${row.id}).`);
+if (enrolmentToken) {
+  console.log(
+    '\nONE-TIME ENROLMENT TOKEN (shown once, valid 30 minutes, single use, stored only as a hash):'
+  );
+  console.log(`  ${enrolmentToken}`);
+  console.log(
+    'Sign in at the admin app, open Account > Security, request the e-mailed code, then enrol TOTP or a passkey with this token and that code.'
+  );
+}
