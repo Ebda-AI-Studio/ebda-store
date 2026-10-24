@@ -1,0 +1,17 @@
+// ORM comparison worker (Task 0.2), local only. The deployable spike worker is wrangler.jsonc (Task 0.3).
+{
+  "name": "ebda-store-do-orm-local",
+  "main": "orm/worker.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "ORM_DO", "class_name": "OrmDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrmDO"] }],
+  "d1_databases": [
+    {
+      "binding": "ORM_D1",
+      "database_name": "orm-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+}
