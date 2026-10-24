@@ -159,14 +159,15 @@ Two gates exist because a Worker that throws only on workerd (`Prisma.dmmf`, 202
 
 Zone routes run BEFORE Workers custom domains, so the storefront's `*.ebda.app/*` route would catch every subdomain that has no more-specific route. Current table (verify with `GET /zones/<zone>/workers/routes` + `GET /accounts/<acct>/workers/domains`):
 
-| Host                                 | Served by                    | How                                                                                                               |
-| ------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `ebda.app` (apex)                    | `ebda-marketing`             | custom domain; `*.ebda.app/*` does not match the bare apex                                                        |
-| `api.ebda.app`                       | `ebda-api`                   | `api.ebda.app/*` route + custom domain                                                                            |
-| `store.ebda.app` / `orders.ebda.app` | `ebda-admin` / `ebda-orders` | custom domain + `<host>/*` route (the route beats the wildcard)                                                   |
-| `admin.ebda.app` (retired)           | nothing (`ebda-web` 404)     | HOST-STORE-1: no custom domain, no route; the wildcard reaches `ebda-web`, `admin` is a reserved slug → plain 404 |
-| `media.ebda.app`                     | R2 `ebda-media`              | R2 custom domain + a **Worker-less** `media.ebda.app/*` route (exclusion)                                         |
-| `<slug>.ebda.app`                    | `ebda-web`                   | `*.ebda.app/*` route + a proxied wildcard DNS record `*`                                                          |
+| Host                                  | Served by                                 | How                                                                                                                                  |
+| ------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ebda.app` (apex)                     | `ebda-marketing`                          | custom domain; `*.ebda.app/*` does not match the bare apex                                                                           |
+| `api.ebda.app`                        | `ebda-api`                                | `api.ebda.app/*` route + custom domain                                                                                               |
+| `store.ebda.app` / `orders.ebda.app`  | `ebda-admin` / `ebda-orders`              | custom domain + `<host>/*` route (the route beats the wildcard)                                                                      |
+| `help.` / `docs.` / `status.ebda.app` | `ebda-help` / `ebda-docs` / `ebda-status` | custom domain + `<host>/*` route (the route beats the wildcard; a custom domain alone returns the storefront's 404, seen 2026-10-24) |
+| `admin.ebda.app` (retired)            | nothing (`ebda-web` 404)                  | HOST-STORE-1: no custom domain, no route; the wildcard reaches `ebda-web`, `admin` is a reserved slug → plain 404                    |
+| `media.ebda.app`                      | R2 `ebda-media`                           | R2 custom domain + a **Worker-less** `media.ebda.app/*` route (exclusion)                                                            |
+| `<slug>.ebda.app`                     | `ebda-web`                                | `*.ebda.app/*` route + a proxied wildcard DNS record `*`                                                                             |
 
 Any NEW subdomain served by something other than the storefront needs either its own Worker route or a Worker-less exclusion route (`POST /zones/<zone>/workers/routes {"pattern":"<host>/*"}` with no `script`) — otherwise the storefront answers it with store-not-found. Wildcard DNS: `A * 192.0.2.0 proxied` (originless; explicit records still win). The Cloudflare-for-SaaS `*/*` fallback route inherited from Ebda Store is deliberately NOT used — it would also capture the marketing apex; merchant custom domains need it (or a dedicated fallback-origin host) when that feature ships (Ruling EBDA-DEPLOY-1).
 

@@ -8,5 +8,9 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },
-  "routes": [{ "pattern": "help.ebda.app", "custom_domain": true }],
+  // The route is what beats the storefront wildcard (*.ebda.app/*), which runs BEFORE custom domains (cf-routes.cjs).
+  "routes": [
+    { "pattern": "help.ebda.app", "custom_domain": true },
+    { "pattern": "help.ebda.app/*", "zone_name": "ebda.app" },
+  ],
 }
