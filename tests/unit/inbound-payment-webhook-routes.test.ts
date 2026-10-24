@@ -163,3 +163,37 @@ describe.each(cases)('inbound $provider webhook route', c => {
     );
   });
 });
+
+describe('legacy-keyed Paymob replay is a no-op on EVERY entry path', () => {
+  const child = {
+    type: 'TRANSACTION',
+    obj: {
+      id: 88,
+      success: true,
+      pending: false,
+      is_refunded: false,
+      is_voided: false,
+      has_parent_transaction: true,
+      order: { id: 'po1', merchant_order_id: 'm1' },
+    },
+  };
+  const legacyKey = 'paymob_88_0100'; // pre-PR shape: paymob_<id>_<pending success voided refunded>
+
+  it.each(['/payment/paymob', `/payment/paymob/s/${STORE}`, '/payment'])(
+    'POST %s dedupes on the stored legacy key',
+    async path => {
+      m.findOrder.mockImplementation(async (k: string) =>
+        k === legacyKey ? { orderId: 'o1', webhookProcessedAt: new Date() } : null
+      );
+      const res = await request(app)
+        .post(`/api/v1/webhooks${path}`)
+        .set('content-type', 'application/json')
+        .query({ hmac: 'abc123' })
+        .send(JSON.stringify(child));
+      expect(res.status).toBe(200);
+      expect(res.body.data.message).toBe('Webhook already processed');
+      expect(m.inboxRecord).not.toHaveBeenCalled();
+      expect(m.handleWebhook).not.toHaveBeenCalled();
+    }
+  );
+});

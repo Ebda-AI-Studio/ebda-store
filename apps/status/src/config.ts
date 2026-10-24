@@ -1,13 +1,23 @@
 // The probe list. Edit this file to add or change a monitored component; nothing else is
 // needed. Hosts come from the shared brand constants (pure data) so a domain change is made once.
 import { BRAND } from '../../../packages/shared/src/brand/index';
-import type { ComponentConfig } from './types';
+import type { ComponentConfig, Localized } from './types';
 
 const d = BRAND.domains;
+
+/**
+ * The products the page groups components under (BRAND-ARCH-1: components per product). A product is listed here
+ * when it is LIVE; Ebda WhatsApp / CRM / ERP get a group (and their probes) the day they ship, never a placeholder.
+ */
+export const PRODUCTS: readonly { id: string; name: Localized }[] = [
+  { id: 'store', name: { en: BRAND.product.nameEn, ar: BRAND.product.nameAr } },
+  { id: 'studio', name: { en: BRAND.company.shortNameEn, ar: BRAND.company.shortNameAr } },
+];
 
 export const COMPONENTS: readonly ComponentConfig[] = [
   {
     id: 'marketing',
+    product: 'studio',
     name: { en: 'Marketing site', ar: 'الموقع الرئيسي' },
     url: `https://${d.marketing}/`,
     expectStatus: 200,
@@ -15,6 +25,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
   {
     id: 'admin',
+    product: 'store',
     name: { en: 'Merchant dashboard', ar: 'لوحة التحكم' },
     url: `https://${d.storeApp}/health`,
     expectStatus: 200,
@@ -22,6 +33,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
   {
     id: 'api',
+    product: 'store',
     name: { en: 'API', ar: 'واجهة البرمجة' },
     url: `https://${d.api}/health`,
     expectStatus: 200,
@@ -29,6 +41,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
   {
     id: 'storefront',
+    product: 'store',
     name: { en: 'Storefronts', ar: 'المتاجر' },
     // Merchant #1's store host stands in for every `<slug>.ebda.app` storefront.
     url: `https://amelia${d.storeSuffix}/`,
@@ -37,6 +50,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
   {
     id: 'docs',
+    product: 'studio',
     name: { en: 'Developer docs', ar: 'وثائق المطوّرين' },
     url: `https://${d.docs}/`,
     expectStatus: 200,
@@ -44,6 +58,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
   {
     id: 'help',
+    product: 'studio',
     name: { en: 'Help centre', ar: 'مركز المساعدة' },
     url: `https://${d.help}/`,
     expectStatus: 200,
