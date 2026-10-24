@@ -47,6 +47,18 @@ export interface AiBindingLike {
   ): Promise<unknown>;
 }
 
+export interface EmailBindingLike {
+  send(message: {
+    from: string | { email: string; name?: string };
+    to: string | string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    replyTo?: string;
+    headers?: Record<string, string>;
+  }): Promise<{ messageId: string }>;
+}
+
 export interface CfBindings {
   HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
@@ -59,6 +71,8 @@ export interface CfBindings {
   STORE_DO?: DurableObjectNamespaceLike;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
+  /** Cloudflare Email Service `send_email` binding (G6): every outbound email (services/mail-transport.ts). */
+  EMAIL?: EmailBindingLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */

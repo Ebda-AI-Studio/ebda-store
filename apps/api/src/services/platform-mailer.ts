@@ -5,7 +5,7 @@
  * be used.
  *
  * Delivery policy:
- *  - production + Resend configured  -> real mail via the platform sender.
+ *  - production + a mail transport configured  -> real mail via the platform sender.
  *  - everything else (dev, test, CI) -> NEVER sent. The message is captured in
  *    a bounded in-process outbox (read by tests and the scripted E2E) and the
  *    verification link is logged at info level for local dev.
@@ -17,7 +17,7 @@ import { BRAND, BRAND_EMAIL_LOGO_URL, productName, resolveDefaultLanguage } from
 import { config } from '../config';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { ResendService } from './resend.service';
+import { isMailTransportConfigured } from './mail-transport';
 import { EmailService, renderBrandedShell } from './email.service';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { passwordResetTemplate } from './email-templates/password-reset';
@@ -67,7 +67,7 @@ export function tokenFromCapturedMail(mail: CapturedMail | undefined): string | 
 }
 
 function shouldReallySend(): boolean {
-  return config.nodeEnv === 'production' && ResendService.isConfigured();
+  return config.nodeEnv === 'production' && isMailTransportConfigured();
 }
 
 /**
@@ -107,7 +107,7 @@ async function deliver(
     // Production without a Resend key must be loud, never silently "sent".
     logger.error(
       { to: maskEmail(msg.to), subject: msg.subject },
-      '[PLATFORM-MAIL] RESEND_API_KEY missing in production - mail NOT delivered'
+      '[PLATFORM-MAIL] no mail transport (EMAIL binding) in production - mail NOT delivered'
     );
   } else {
     logger.info(
@@ -274,12 +274,12 @@ export async function sendPasskeyNoticeEmail(
 }
 
 /**
- * False when a legal notice could not really be delivered (production without Resend). The
+ * False when a legal notice could not really be delivered (production without a mail transport). The
  * fan-out checks it ONCE at the start of a run (Ruling LEGAL-5, I2), so an unconfigured mailer
  * fails the run fast instead of burning a pacer slot per recipient.
  */
 export function legalNoticeMailerReady(): boolean {
-  return !(config.nodeEnv === 'production' && !ResendService.isConfigured());
+  return !(config.nodeEnv === 'production' && !isMailTransportConfigured());
 }
 
 /**

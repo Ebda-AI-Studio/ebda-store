@@ -4,6 +4,12 @@ import { config } from '../config';
 import logger from '../lib/logger';
 import { deliverableOnly } from '../lib/undeliverable-email';
 import { resolveSender, type StoreSenderShape } from './email-sender';
+import {
+  EmailSendError,
+  customSenderDomainsSupported,
+  isMailTransportConfigured,
+  sendMail,
+} from './mail-transport';
 
 // Resend SDK wrapper — single platform-wide account. Merchant domains
 // live under it as verified senders. See spec at
@@ -35,20 +41,8 @@ function isResendNotFound(error: unknown): boolean {
   );
 }
 
-/**
- * A failed Resend send, carrying the provider's machine-readable error name
- * (`rate_limit_exceeded`, `validation_error`, …) so a caller can tell a
- * transient throttle from a permanent per-recipient rejection.
- */
-export class ResendSendError extends Error {
-  constructor(
-    readonly code: string,
-    message: string
-  ) {
-    super(`Resend send failed: ${message}`);
-    this.name = 'ResendSendError';
-  }
-}
+/** Kept as an alias while callers move to `EmailSendError` (mail-transport.ts). */
+export { EmailSendError as ResendSendError };
 
 let _client: Resend | null = null;
 function getClient(): Resend | null {
@@ -67,7 +61,7 @@ function ensureClient(): Resend {
 
 export class ResendService {
   static isConfigured(): boolean {
-    return !!config.resendApiKey;
+    return isMailTransportConfigured();
   }
 
   /**
@@ -77,6 +71,9 @@ export class ResendService {
    * Idempotent — safe to call repeatedly.
    */
   static async provisionStoreDomain(storeId: string): Promise<DomainDnsRecord[]> {
+    // Cloudflare Email Service sends from ebda.app only (a merchant domain is not a zone in our
+    // account), so there is nothing to provision: replies reach the merchant via Reply-To.
+    if (!customSenderDomainsSupported()) return [];
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
@@ -166,6 +163,7 @@ export class ResendService {
     status: string;
     records: DomainDnsRecord[];
   }> {
+    if (!customSenderDomainsSupported()) return { status: 'unsupported', records: [] };
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
@@ -214,6 +212,7 @@ export class ResendService {
     status: string;
     records: DomainDnsRecord[];
   }> {
+    if (!customSenderDomainsSupported()) return { status: 'unsupported', records: [] };
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
@@ -339,25 +338,16 @@ export class ResendService {
     if (!store) throw new Error(`Store ${storeId} not found`);
 
     const sender = resolveSender(store);
-    const client = ensureClient();
-
-    type SendPayload = Parameters<typeof client.emails.send>[0];
-    const sdkPayload: SendPayload = {
-      from: sender.from,
-      to: recipients,
-      subject: opts.subject,
-      html: opts.html,
-    };
     // A per-message reply-to (a shopper's contact message, FU46-1) outranks the store's default.
     const replyTo = opts.replyTo ?? sender.replyTo;
-    if (replyTo) sdkPayload.replyTo = replyTo;
-    if (opts.text) sdkPayload.text = opts.text;
-
-    const { data, error } = await client.emails.send(sdkPayload);
-    if (error || !data) {
-      throw new Error(`Resend send failed: ${error?.message ?? 'unknown'}`);
-    }
-    return { id: data.id };
+    return sendMail({
+      from: sender.from,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      ...(opts.text ? { text: opts.text } : {}),
+      ...(replyTo ? { replyTo } : {}),
+    });
   }
 
   /**
@@ -384,26 +374,15 @@ export class ResendService {
   ): Promise<{ id: string }> {
     if (deliverableOnly(opts.to).length === 0) return { id: 'skipped-undeliverable' };
     const sender = resolveSender(store);
-    const client = ensureClient();
-
-    type SendPayload = Parameters<typeof client.emails.send>[0];
-    const sdkPayload: SendPayload = {
+    return sendMail({
       from: sender.from,
-      to: [opts.to],
+      to: opts.to,
       subject: opts.subject,
       html: opts.html,
-    };
-    if (sender.replyTo) sdkPayload.replyTo = sender.replyTo;
-    if (opts.headers) sdkPayload.headers = opts.headers;
-
-    const { data, error } = await client.emails.send(
-      sdkPayload,
-      opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined
-    );
-    if (error || !data) {
-      throw new ResendSendError(error?.name ?? 'unknown', error?.message ?? 'unknown');
-    }
-    return { id: data.id };
+      ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
+      ...(opts.headers ? { headers: opts.headers } : {}),
+      ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
+    });
   }
 
   /**
@@ -425,9 +404,8 @@ export class ResendService {
       }>;
     }
   ): Promise<{ ids: string[] }> {
-    if (opts.messages.length > 100) throw new Error('Resend batch accepts at most 100 emails');
-    const messages = opts.messages.filter(m => deliverableOnly(m.to).length > 0);
-    if (messages.length === 0) return { ids: [] };
+    if (opts.messages.length === 0) return { ids: [] };
+    if (opts.messages.length > 100) throw new Error('A branded batch accepts at most 100 emails');
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
@@ -444,22 +422,22 @@ export class ResendService {
     if (!store) throw new Error(`Store ${storeId} not found`);
 
     const sender = resolveSender(store);
-    const client = ensureClient();
-    type BatchPayload = Parameters<typeof client.batch.send>[0];
-    const payload: BatchPayload = messages.map(m => ({
-      from: sender.from,
-      to: [m.to],
-      subject: opts.subject,
-      html: m.html,
-      ...(m.text ? { text: m.text } : {}),
-      ...(m.headers ? { headers: m.headers } : {}),
-      ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
-    }));
-    const { data, error } = await client.batch.send(payload);
-    if (error || !data) {
-      throw new Error(`Resend batch send failed: ${error?.message ?? 'unknown'}`);
+    // One message per address, sent in order. A failure stops the batch and throws (the caller
+    // counts the chunk as failed); addresses already sent are not re-sent by this method.
+    const ids: string[] = [];
+    for (const m of opts.messages) {
+      const { id } = await sendMail({
+        from: sender.from,
+        to: m.to,
+        subject: opts.subject,
+        html: m.html,
+        ...(m.text ? { text: m.text } : {}),
+        ...(m.headers ? { headers: m.headers } : {}),
+        ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
+      });
+      ids.push(id);
     }
-    return { ids: (data.data ?? []).map(d => d.id) };
+    return { ids };
   }
 }
 

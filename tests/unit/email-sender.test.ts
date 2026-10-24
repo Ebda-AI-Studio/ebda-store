@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Per-store sender domains exist only on the legacy provider (G6); this suite pins that path.
+vi.mock('@api/config', () => ({ config: { emailProvider: 'resend', resendApiKey: '' } }));
+
 import { resolveSender, type StoreSenderShape } from '@api/services/email-sender';
 
 const baseStore = (overrides: Partial<StoreSenderShape> = {}): StoreSenderShape => ({

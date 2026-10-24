@@ -5,6 +5,7 @@
 // gets the cheapest possible unit tests — feed it a plain object, assert
 // the from-line. The full ResendService composes this helper.
 import { BRAND } from '@ebda/shared';
+import { customSenderDomainsSupported } from './mail-transport';
 
 const PLATFORM_EMAIL_DOMAIN: string = BRAND.domains.marketing;
 
@@ -34,7 +35,10 @@ function sanitizeDisplayName(name: string): string {
 export function resolveSender(store: StoreSenderShape): ResolvedSender {
   const displayName = sanitizeDisplayName(store.name);
   const useCustomDomain =
-    store.emailDomainStatus === 'verified' && !!store.domain && store.domain.length > 0;
+    customSenderDomainsSupported() &&
+    store.emailDomainStatus === 'verified' &&
+    !!store.domain &&
+    store.domain.length > 0;
 
   // Merchant domains keep the conventional `noreply`; the platform domain
   // uses the brand's own no-reply mailbox (no-reply@ebda.app).
