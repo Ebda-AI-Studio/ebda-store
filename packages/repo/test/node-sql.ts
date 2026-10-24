@@ -1,19 +1,25 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { DatabaseSync } from 'node:sqlite';
 import type { SqlRunner } from '../src/prisma-lite/types';
 
-/** node:sqlite adapter used by tests and local tools; the DO uses `ctx.storage.sql` with the same interface. */
+/**
+ * node:sqlite adapter used by tests and local tools; the DO uses `ctx.storage.sql` with the same interface.
+ *
+ * Models the contract a DO runner must honour: top-level transactions run ONE AT A TIME (an unrelated request's
+ * write waits for the open transaction and can never be rolled back with it), and work started INSIDE a
+ * transaction body (tracked through AsyncLocalStorage) runs in a SAVEPOINT of that transaction.
+ */
 export function nodeSqlRunner(db: DatabaseSync): SqlRunner {
-  let depth = 0;
+  const inTx = new AsyncLocalStorage<boolean>();
   let spSeq = 0;
+  let queue: Promise<unknown> = Promise.resolve();
   return {
     all: (sql, params) => db.prepare(sql).all(...(params as never[])) as Record<string, unknown>[],
     run: (sql, params) => ({
       changes: Number(db.prepare(sql).run(...(params as never[])).changes),
     }),
     async transaction(fn) {
-      if (depth > 0) {
-        // inside an open transaction every unit of work gets a SAVEPOINT: an error caught by the caller leaves no
-        // half-applied nested write behind (a DO runner must give the same guarantee)
+      if (inTx.getStore()) {
         const sp = `sp_${++spSeq}`;
         db.exec(`SAVEPOINT ${sp}`);
         try {
@@ -26,18 +32,21 @@ export function nodeSqlRunner(db: DatabaseSync): SqlRunner {
           throw e;
         }
       }
-      depth++;
-      db.exec('BEGIN');
-      try {
-        const out = await fn();
-        db.exec('COMMIT');
-        return out;
-      } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
-      } finally {
-        depth--;
-      }
+      const run = async () =>
+        inTx.run(true, async () => {
+          db.exec('BEGIN');
+          try {
+            const out = await fn();
+            db.exec('COMMIT');
+            return out;
+          } catch (e) {
+            db.exec('ROLLBACK');
+            throw e;
+          }
+        });
+      const next = queue.then(run, run);
+      queue = next.catch(() => undefined);
+      return next;
     },
   };
 }

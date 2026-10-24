@@ -53,7 +53,7 @@ export function insertSqlite(
 export async function makePair() {
   const prisma = createPrismaClient({ role: 'owner', connectionString: PG_URL!, max: 2 });
   const db = openSqlite();
-  const lite = createPrismaLite(META, nodeSqlRunner(db));
+  const lite = createPrismaLite(META, nodeSqlRunner(db), 'store-do', { unscoped: true });
   return { prisma, db, lite, close: () => prisma.$disconnect() };
 }
 
