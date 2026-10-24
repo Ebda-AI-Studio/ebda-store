@@ -960,15 +960,16 @@ router.post(
 
       // The identity service owns the credential: it creates an unverified account and mails the invitee a one-time code
       // to set their own password (Ruling ID-2). The Store keeps the profile row under the same id.
+      const requestedInviteId = crypto.randomUUID();
       const invited = await inviteIdentity({
-        id: crypto.randomUUID(),
+        id: requestedInviteId,
         email,
         firstName: data.firstName,
         lastName: data.lastName,
         role: 'store_admin',
         language: 'en',
       });
-      if (!invited) {
+      if (!invited.created || invited.id !== requestedInviteId) {
         res.status(409).json({
           success: false,
           error: { code: 'EMAIL_TAKEN', message: 'An admin user with this email already exists' },

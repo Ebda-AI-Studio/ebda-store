@@ -84,7 +84,7 @@ describe('Accounts RPC for the Store', () => {
       role: 'staff',
       storeName: 'Demo',
     });
-    expect(r).toEqual({ id });
+    expect(r).toEqual({ id, created: true });
     expect(
       await env.DB.prepare(`SELECT password_hash, email_verified FROM users WHERE id = ?1`)
         .bind(id)
@@ -100,8 +100,9 @@ describe('Accounts RPC for the Store', () => {
     expect(
       (await call('/login', { method: 'POST', json: { email, password: '!pending' } })).status
     ).toBeGreaterThanOrEqual(400);
-    // a VERIFIED account is never touched
+    // a VERIFIED account is reported, never touched, and nothing is mailed
     const v = await seedUser();
+    const mails = fakes.mails.length;
     expect(
       await rpc().inviteUser({
         id: crypto.randomUUID(),
@@ -110,7 +111,49 @@ describe('Accounts RPC for the Store', () => {
         lastName: 'Y',
         role: 'staff',
       })
-    ).toBeNull();
+    ).toMatchObject({ id: v.id, created: false, emailVerified: true });
+    expect(fakes.mails.length).toBe(mails);
+  });
+
+  it('inviteUser never binds to an existing unverified row (cross-tenant takeover): it reports the REAL id, role and flag', async () => {
+    const victim = await seedUser({ emailVerified: 0 });
+    await env.DB.prepare(`UPDATE users SET role = 'store_admin' WHERE id = ?1`)
+      .bind(victim.id)
+      .run();
+    const before = await env.DB.prepare(`SELECT * FROM users WHERE id = ?1`)
+      .bind(victim.id)
+      .first();
+    const mails = fakes.mails.length;
+    const r = await rpc().inviteUser({
+      id: crypto.randomUUID(),
+      email: victim.email,
+      firstName: 'Mallory',
+      lastName: 'M',
+      role: 'staff',
+      storeName: 'Evil Store',
+    });
+    expect(r).toEqual({ id: victim.id, created: false, emailVerified: false, role: 'store_admin' });
+    expect(fakes.mails.length).toBe(mails); // no code mailed on the attacker's behalf
+    expect(
+      await env.DB.prepare(`SELECT * FROM users WHERE id = ?1`).bind(victim.id).first()
+    ).toEqual(before);
+  });
+
+  it('inviteUser retried with the same id and role re-mails the code (idempotent retry)', async () => {
+    const id = crypto.randomUUID();
+    const email = `retry-${id.slice(0, 8)}@example.com`;
+    const input = {
+      id,
+      email,
+      firstName: 'Sam',
+      lastName: 'Lee',
+      role: 'staff' as const,
+      storeName: 'Demo',
+    };
+    await rpc().inviteUser(input);
+    const n = fakes.mails.length;
+    expect(await rpc().inviteUser(input)).toEqual({ id, created: true });
+    expect(fakes.mails.length).toBe(n + 1);
   });
 
   it('forgotPassword mails a reset code for an active account and is silent for an unknown address', async () => {

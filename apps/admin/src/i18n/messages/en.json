@@ -8660,6 +8660,23 @@
       "support": "Need help?",
       "footer": "Your store. Your brand.",
       "back": "Back to Ebda Store"
+    },
+    "acceptInvite": {
+      "title": "Staff invitation",
+      "working": "Accepting your invitation…",
+      "successTitle": "You now have access",
+      "successBody": "You were added as staff. Open the dashboard to start.",
+      "signInAgainTitle": "Sign in again to continue",
+      "signInAgainBody": "Your account is now a staff account. Sign in again to open the store.",
+      "continue": "Continue",
+      "signIn": "Sign in",
+      "missing": "This invitation link is incomplete. Open the link from the email again.",
+      "invalid": "This invitation link is invalid or has expired. Ask the store owner to send it again.",
+      "mismatch": "You are signed in with a different email address from the one invited. Sign out and sign in with the invited address.",
+      "notVerified": "Verify your email address first (use the verification email we sent you), then open this invitation link again.",
+      "ownsStore": "This account owns a store, so it cannot become a staff account. Ask the store to invite a different email address.",
+      "limit": "This store has reached its staff limit. Ask the owner to make room or upgrade.",
+      "generic": "We could not accept the invitation. Try again in a moment."
     }
   },
   "legalNotice": {

@@ -18,7 +18,8 @@ import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
-import { inviteIdentity } from '../lib/identity-client';
+import { getAccountState, inviteIdentity } from '../lib/identity-client';
+import { STAFF_INVITE_TTL_MINUTES, signStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
 import { RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
 import { sendStaffInviteEmail } from '../services/platform-mailer';
@@ -26,6 +27,17 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
+
+/** A customer or platform-admin account can never be staff; the identity's REAL role decides, not a literal. */
+function assertInvitableRole(role: string): void {
+  if (role === 'customer' || role === 'super_admin') {
+    throw new AppError(
+      409,
+      'ROLE_CONFLICT',
+      'This email belongs to a customer or platform admin account and cannot be used for store staff.'
+    );
+  }
+}
 
 const inviteStaffSchema = z.object({
   email: z.string().email(),
@@ -106,12 +118,17 @@ router.post(
       // account. The password is only hashed when no account exists yet.
       const exists = await findUserIdByEmail(input.email, null, { includeDeleted: true });
       const storeNameForInvite = req.store?.name ?? 'your store';
-      let staffUser: Awaited<ReturnType<typeof ensureAdminUser>>;
+      const requestedId = crypto.randomUUID();
+      // ONE rule for an address that already has an account (Ruling ID-13): a store is never attached to someone else's
+      // account silently. A brand-new address gets a fresh identity and an emailed code. An address whose account is
+      // unverified, mid-signup, has no Store profile yet, or is a merchant (store_admin) gets an invitation e-mail with an
+      // explicit ACCEPT step (POST /staff-invites/accept, signed in as that very address). Only an already-verified staff
+      // account is added at once (it already is staff; the notice mail below tells them).
+      let pendingAcceptance = false;
+      let staffUser: Awaited<ReturnType<typeof ensureAdminUser>> | undefined;
       if (!exists) {
-        // A brand-new account is created in the identity service (it owns the credential): unverified, no password, and a
-        // one-time code mailed to the invitee to set their own (Ruling ID-2). The Store keeps the profile row, same id.
         const invited = await inviteIdentity({
-          id: crypto.randomUUID(),
+          id: requestedId,
           email: input.email,
           firstName: input.firstName,
           lastName: input.lastName,
@@ -119,45 +136,87 @@ router.post(
           language: 'ar',
           storeName: storeNameForInvite,
         });
-        if (!invited) {
-          throw new AppError(
-            409,
-            'ROLE_CONFLICT',
-            'This email already belongs to an account that cannot be invited as staff.'
+        if (invited.created) {
+          // The profile row must carry the id THIS request generated: an identity that answers with another id is someone
+          // else's account and is never bound (cross-tenant takeover).
+          if (invited.id !== requestedId) {
+            throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
+          }
+          await withUser(invited.id, tx =>
+            tx.user.create({
+              data: {
+                id: invited.id,
+                storeId: null,
+                email: input.email,
+                passwordHash: '!pending',
+                firstName: input.firstName,
+                lastName: input.lastName,
+                role: UserRole.staff,
+                emailVerified: false,
+                language: 'ar',
+              },
+            })
           );
+          staffUser = {
+            id: invited.id,
+            created: true,
+            role: 'staff',
+            status: 'active',
+            email: input.email,
+            firstName: input.firstName,
+            lastName: input.lastName,
+          };
+        } else {
+          assertInvitableRole(invited.role);
+          pendingAcceptance = true;
         }
-        await withUser(invited.id, tx =>
-          tx.user.create({
-            data: {
-              id: invited.id,
-              storeId: null,
-              email: input.email,
-              passwordHash: '!pending',
-              firstName: input.firstName,
-              lastName: input.lastName,
-              role: UserRole.staff,
-              emailVerified: false,
-              language: 'ar',
-            },
-          })
-        );
-        staffUser = {
-          id: invited.id,
-          created: true,
-          role: 'staff',
-          status: 'active',
-          email: input.email,
-          firstName: input.firstName,
-          lastName: input.lastName,
-        };
       } else {
-        staffUser = await ensureAdminUser({
-          email: input.email,
-          passwordHash: '',
-          firstName: input.firstName,
-          lastName: input.lastName,
-          role: UserRole.staff,
+        const acc = await getAccountState(exists);
+        if (!acc) {
+          throw new AppError(409, 'ROLE_CONFLICT', 'This account cannot be invited as staff.');
+        }
+        assertInvitableRole(acc.role);
+        if (!acc.emailVerified || acc.role !== 'staff') {
+          pendingAcceptance = true;
+        } else {
+          staffUser = await ensureAdminUser({
+            email: input.email,
+            passwordHash: '',
+            firstName: input.firstName,
+            lastName: input.lastName,
+            role: UserRole.staff,
+          });
+          if (staffUser.id !== exists) {
+            throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
+          }
+        }
+      }
+
+      if (pendingAcceptance || !staffUser) {
+        const token = signStaffInviteToken({ email: input.email, storeId });
+        await sendStaffInviteEmail(
+          {
+            email: input.email,
+            name: `${input.firstName} ${input.lastName}`.trim() || input.email,
+            storeName: storeNameForInvite,
+            loginUrl: `${storeAppOrigin()}/login`,
+            setPasswordUrl: null,
+            acceptUrl: `${storeAppOrigin()}/accept-invite#token=${token}`,
+            expiresInMinutes: STAFF_INVITE_TTL_MINUTES,
+          },
+          'ar'
+        ).catch(err => logger.error({ err }, 'staff-invite acceptance mail failed'));
+        await auditLog({
+          action: 'staff.invited',
+          userId: req.user!.userId,
+          resourceType: 'store',
+          resourceId: storeId,
+          details: { storeId, staffEmail: input.email },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
         });
+        res.status(202).json({ success: true, data: { status: 'invitation_sent' } });
+        return;
       }
 
       // User exists — must already be a staff or store_admin role

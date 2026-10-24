@@ -86,7 +86,10 @@ export interface AccountsRpc {
     role: 'store_admin' | 'staff';
     language?: 'en' | 'ar';
     storeName?: string;
-  }): Promise<{ id: string } | null>;
+  }): Promise<
+    | { id: string; created: true }
+    | { id: string; created: false; emailVerified: boolean; role: AccountState['role'] }
+  >;
   forgotPassword?(email: string): Promise<void>;
   createUser?(input: {
     id?: string;

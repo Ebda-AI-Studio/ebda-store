@@ -5,6 +5,7 @@ import {
   inviteFor,
   registerPending,
   resendVerificationFor,
+  type InviteResult,
 } from './app';
 import { isSessionRevoked, revokeAllForUser, revokeSession, type UserRow } from './data';
 import { z } from 'zod';
@@ -120,7 +121,7 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     role: 'store_admin' | 'staff';
     language?: 'en' | 'ar';
     storeName?: string;
-  }): Promise<{ id: string } | null> {
+  }): Promise<InviteResult> {
     const v = z
       .object({
         id: z.string().uuid(),

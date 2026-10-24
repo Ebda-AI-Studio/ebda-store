@@ -234,10 +234,18 @@ export async function forgotPasswordFor(env: Env, email: string): Promise<void> 
     await issueAndMail(env, user, 'password_reset', 'password_reset');
 }
 
+export type InviteResult =
+  | { id: string; created: true }
+  | { id: string; created: false; emailVerified: boolean; role: UserRow['role'] };
+
 /**
  * Invite a merchant or staff member: creates an UNVERIFIED identity with no credential and mails a one-time code that
- * lets the invitee set their own password (the reset flow; it also verifies the address). Never touches an existing row.
- * Returns null when the address already belongs to a VERIFIED account.
+ * lets the invitee set their own password (the reset flow; it also verifies the address).
+ *
+ * An invitation may only ever bind to a row IT created. If ANY identity already exists for the address it is reported back
+ * (`created: false`, with its real id, role and verified flag) and nothing is mailed or changed: the caller must use the
+ * explicit accept flow. The one exception is a retry of the same invitation (same id, same role, still unverified), which
+ * re-mails the code. This closes the cross-tenant takeover where an invite attached a store to someone else's row.
  */
 export async function inviteFor(
   env: Env,
@@ -250,9 +258,8 @@ export async function inviteFor(
     language: 'en' | 'ar';
     storeName?: string;
   }
-): Promise<{ id: string } | null> {
+): Promise<InviteResult> {
   let user = await findUserByEmail(env.DB, input.email);
-  if (user?.email_verified) return null;
   if (!user) {
     try {
       await env.DB.prepare(
@@ -274,7 +281,11 @@ export async function inviteFor(
     }
     user = await findUserByEmail(env.DB, input.email);
   }
-  if (!user) return null;
+  if (!user) throw new Error('invite: identity row missing after insert');
+  const retry = user.id === input.id && user.role === input.role && !user.email_verified;
+  if (!retry) {
+    return { id: user.id, created: false, emailVerified: !!user.email_verified, role: user.role };
+  }
   await issueAndMail(
     env,
     user,
@@ -286,7 +297,7 @@ export async function inviteFor(
       storeName: input.storeName,
     }
   );
-  return { id: user.id };
+  return { id: user.id, created: true };
 }
 
 /** Mail a fresh code to an existing UNVERIFIED account; carries the credential of the latest signup (see verify). */
