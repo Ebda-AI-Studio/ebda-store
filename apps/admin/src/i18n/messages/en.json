@@ -7429,7 +7429,7 @@
         "errorGeneric": "Something went wrong. Nothing was changed."
       },
       "passwordLabel": "Confirm your password",
-      "bootstrapIntro": "As a platform administrator you need two things to add your first sign-in factor: the one-time enrolment token your operator script printed, and a code we e-mail to this account.",
+      "bootstrapIntro": "To add your first sign-in method we e-mail a code to this account, so a stolen password alone cannot add one. Platform administrators also need the one-time enrolment token their operator script printed.",
       "bootstrapTokenLabel": "Enrolment token",
       "bootstrapPasswordLabel": "Your password (to send the e-mailed code)",
       "bootstrapSend": "E-mail me the code",

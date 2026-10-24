@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { env } from 'cloudflare:test';
-import { call, cookieOf, login, seedUser } from './helpers';
+import { call, emailCodeFor, cookieOf, login, seedUser } from './helpers';
 import { SoftAuthenticator } from './authenticator';
 
 const ADMIN = 'https://store.ebda.app';
@@ -37,7 +37,7 @@ async function enroll(u: { email: string; password: string }, origin = ADMIN) {
     origin
   );
   const done = await call('/passkey/register/verify', {
-    json: { response: reg, name: 'Laptop' },
+    json: { response: reg, name: 'Laptop', emailCode: await emailCodeFor(u, s.body.access_token) },
     bearer: s.body.access_token,
     headers: hdr(origin),
   });

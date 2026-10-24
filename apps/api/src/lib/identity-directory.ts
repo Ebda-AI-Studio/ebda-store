@@ -10,6 +10,7 @@ import {
   sendMerchantPasswordResetEmail,
   sendStaffInviteEmail,
   sendFactorEnrolCodeEmail,
+  sendFactorAddedNoticeEmail,
   sendMerchantVerificationEmail,
 } from '../services/platform-mailer';
 
@@ -93,4 +94,21 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
       m.language
     );
   }
+}
+
+export interface NoticeMail {
+  to: string;
+  kind: 'factor_added';
+  factor: 'totp' | 'passkey';
+  language: 'en' | 'ar';
+  firstName: string;
+}
+
+/** Security notices from the identity service that carry no code. */
+export async function sendNoticeMail(m: NoticeMail): Promise<void> {
+  if (m.kind !== 'factor_added') throw new Error('sendNoticeMail: unknown kind');
+  await sendFactorAddedNoticeEmail(
+    { email: m.to, name: m.firstName, factor: m.factor },
+    m.language
+  );
 }

@@ -142,12 +142,14 @@ export function buildUpsertSql({
           `UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL, mfa_last_step = NULL WHERE id = '${existingId}'`,
         ]
       : [];
+    // Factor clears and the token come BEFORE the promotion: if a remote run stops half-way the account is never a
+    // super_admin that still holds factors planted earlier.
     return [
+      ...clearSql,
+      ...tokenSql,
       `UPDATE users SET role = 'super_admin', password_hash = '${passwordHash}', status = 'active', email_verified = 1, deleted_at = NULL, token_version = token_version + 1, updated_at = '${nowIso}' WHERE id = '${existingId}'`,
       `UPDATE sessions SET revoked_at = ${nowMs}, revoked_reason = 'super-admin-upsert' WHERE user_id = '${existingId}' AND revoked_at IS NULL`,
       `UPDATE refresh_tokens SET revoked_at = '${nowIso}', revoked_reason = COALESCE(revoked_reason, 'super-admin-upsert') WHERE user_id = '${existingId}' AND revoked_at IS NULL`,
-      ...clearSql,
-      ...tokenSql,
     ];
   }
   return [

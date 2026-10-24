@@ -1,7 +1,7 @@
 /** Regression tests for the Opus security review of the identity service (pre-hijacking, MFA races, login CSRF, TOTP replay). */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
-import { call, cookieOf, fakes, login, seedUser } from './helpers';
+import { call, emailCodeFor, cookieOf, fakes, login, seedUser } from './helpers';
 import { totpAt } from '../src/totp';
 import { sha256Hex } from '../src/util';
 
@@ -20,7 +20,7 @@ async function enrollMfa(u: { email: string; password: string }) {
   ).data.secret;
   // move to the next time step so enrolment's own code does not shadow the login codes below
   await call('/mfa/enroll/verify', {
-    json: { code: await totpAt(secret) },
+    json: { code: await totpAt(secret), emailCode: await emailCodeFor(u, s.body.access_token) },
     bearer: s.body.access_token,
   });
   await env.DB.prepare(`UPDATE users SET mfa_last_step = mfa_last_step - 5 WHERE id = ?1`)

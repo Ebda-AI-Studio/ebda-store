@@ -8,10 +8,11 @@ const app = createApp();
 
 export interface Fakes {
   stores: Array<{ id: string; role: 'owner' | 'staff' }>;
+  notices: Array<{ to: string; kind: string; factor: string }>;
   mails: Array<{ to: string; kind: string; code: string; ttlMinutes?: number; storeName?: string }>;
   directoryDown: boolean;
 }
-export const fakes: Fakes = { stores: [], mails: [], directoryDown: false };
+export const fakes: Fakes = { stores: [], notices: [], mails: [], directoryDown: false };
 
 export const testEnv = (): Cloudflare.Env =>
   ({
@@ -26,6 +27,9 @@ export const testEnv = (): Cloudflare.Env =>
       },
     },
     MAILER: {
+      sendNotice: async (m: { to: string; kind: string; factor: string }) => {
+        fakes.notices.push({ to: m.to, kind: m.kind, factor: m.factor });
+      },
       sendCode: async (m: {
         to: string;
         kind: string;
@@ -131,4 +135,11 @@ export async function verifyAsProduct(token: string, audience: string) {
     clockTolerance: 60,
     typ: 'at+jwt',
   });
+}
+
+/** The e-mailed code a first-factor enrolment needs (Ruling ID-15): request it the way the admin UI does, read it from the fake mailer. */
+export async function emailCodeFor(u: { password: string }, bearer: string): Promise<string> {
+  const r = await call('/mfa/bootstrap/code', { json: { password: u.password }, bearer });
+  if (r.status !== 202) throw new Error(`bootstrap code refused: ${r.status}`);
+  return fakes.mails.at(-1)!.code;
 }

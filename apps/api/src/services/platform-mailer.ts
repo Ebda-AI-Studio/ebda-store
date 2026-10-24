@@ -23,6 +23,10 @@ import { emailVerificationTemplate } from './email-templates/email-verification'
 import { passwordResetTemplate } from './email-templates/password-reset';
 import { staffInviteTemplate, type StaffInviteData } from './email-templates/staff-invite';
 import {
+  factorAddedNoticeTemplate,
+  type FactorAddedNoticeData,
+} from './email-templates/factor-added-notice';
+import {
   factorEnrolCodeTemplate,
   type FactorEnrolCodeData,
 } from './email-templates/factor-enrol-code';
@@ -250,6 +254,30 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
     },
     { redactLinkInLog: true }
   );
+}
+
+/** A sign-in method was added to the account (Ruling ID-15). */
+export async function sendFactorAddedNoticeEmail(
+  data: FactorAddedNoticeData,
+  language?: Lang
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(factorAddedNoticeTemplate[lang](data), {
+    name: BRAND.product.nameEn,
+    nameAr: BRAND.product.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+  });
+  await deliver({
+    to: data.email,
+    subject: factorAddedNoticeTemplate.subject[lang](data),
+    html,
+    replyTo: BRAND.supportEmail,
+  });
 }
 
 /** Platform-administrator first-factor enrolment code (Ruling ID-15). */

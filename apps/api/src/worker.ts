@@ -39,6 +39,8 @@ import {
   sendCodeMail,
   storesForUser,
   type CodeMail,
+  type NoticeMail,
+  sendNoticeMail,
   type StoreClaim,
 } from './lib/identity-directory';
 import { isPlatformOrigin } from './lib/cors-cache';
@@ -386,6 +388,9 @@ export class StoreDirectory extends WorkerEntrypoint<CfBindings> {
 export class IdentityMailer extends WorkerEntrypoint<CfBindings> {
   async sendCode(input: CodeMail): Promise<void> {
     return withWorkerContext(this.env, this.ctx as Ctx, () => sendCodeMail(input));
+  }
+  async sendNotice(input: NoticeMail): Promise<void> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => sendNoticeMail(input));
   }
 }
 

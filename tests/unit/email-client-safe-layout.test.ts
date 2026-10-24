@@ -63,6 +63,8 @@ import { lifecycleContent } from '@api/services/email-templates/lifecycle';
 import { webhookDisabledTemplate } from '@api/services/email-templates/webhook-disabled';
 import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 import { staffInviteTemplate } from '@api/services/email-templates/staff-invite';
+import { factorEnrolCodeTemplate } from '@api/services/email-templates/factor-enrol-code';
+import { factorAddedNoticeTemplate } from '@api/services/email-templates/factor-added-notice';
 import { legalNoticeTemplate } from '@api/services/email-templates/legal-notice';
 import { passkeyNoticeTemplate } from '@api/services/email-templates/passkey-notice';
 import { wholesaleNotice } from '@api/services/email-templates/wholesale';
@@ -233,6 +235,8 @@ const TEMPLATES: Record<string, Tpl> = {
   webhookDisabled: webhookDisabledTemplate,
   subscriptionBilling: subscriptionBillingTemplate,
   staffInvite: staffInviteTemplate,
+  factorEnrolCode: factorEnrolCodeTemplate,
+  factorAddedNotice: factorAddedNoticeTemplate,
   passkeyNotice: passkeyNoticeTemplate,
   // Recovery email takes a data object, not the (data, storeName, url) triple.
   cartRecovery: {

@@ -16,6 +16,14 @@ export interface MailerRpc {
     ttlMinutes: number;
     storeName?: string;
   }): Promise<void>;
+  /** A security notice with no code (a sign-in method was added). */
+  sendNotice(input: {
+    to: string;
+    kind: 'factor_added';
+    factor: 'totp' | 'passkey';
+    language: 'en' | 'ar';
+    firstName: string;
+  }): Promise<void>;
 }
 
 declare global {

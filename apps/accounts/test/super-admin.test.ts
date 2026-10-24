@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { env } from 'cloudflare:test';
 import { decodeJwt } from 'jose';
-import { call, fakes, login, seedUser } from './helpers';
+import { call, emailCodeFor, fakes, login, seedUser } from './helpers';
 import { totpAt } from '../src/totp';
 import { sha256Hex } from '../src/util';
 import { hashPassword } from '../src/password';
@@ -15,6 +15,7 @@ import {
   passwordProblem,
 } from '../scripts/super-admin-sql.mjs';
 
+const ORIGIN = { origin: 'https://store.ebda.app' };
 const run = (statements: string[]) => env.DB.batch(statements.map(s => env.DB.prepare(s)));
 const claims = (t: string) => decodeJwt(t) as Record<string, unknown>;
 
@@ -286,7 +287,13 @@ describe('first-factor bootstrap for a platform admin (Ruling ID-15)', () => {
   });
 
   it('a passkey cannot be registered without the proof either', async () => {
-    const { bearer } = await setup();
+    const { u, bearer } = await setup();
+    const opts = await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: u.password },
+      bearer,
+    });
+    expect(opts.status).toBe(200);
     const r = await call('/passkey/register/verify', { json: { response: {} }, bearer });
     expect(r.status).toBe(403);
     expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
@@ -361,14 +368,28 @@ describe('first-factor bootstrap for a platform admin (Ruling ID-15)', () => {
     expect(r.status).toBe(403);
   });
 
-  it('the e-mailed code is only for a super admin who still has no factor', async () => {
+  it('the e-mailed code is for an account that still has no factor, and needs the password', async () => {
     const merchant = await seedUser();
     const m = await login(merchant);
-    const r = await call('/mfa/bootstrap/code', {
-      json: { password: merchant.password },
-      bearer: m.body.access_token,
-    });
-    expect(r.status).toBe(409);
+    expect(
+      (
+        await call('/mfa/bootstrap/code', {
+          json: { password: merchant.password },
+          bearer: m.body.access_token,
+        })
+      ).status
+    ).toBe(202); // a merchant's first factor needs it too (E1)
+    await env.DB.prepare(`UPDATE users SET mfa_enabled = 1, mfa_secret = 'x' WHERE id = ?1`)
+      .bind(merchant.id)
+      .run();
+    expect(
+      (
+        await call('/mfa/bootstrap/code', {
+          json: { password: merchant.password },
+          bearer: m.body.access_token,
+        })
+      ).status
+    ).toBe(409); // already has a factor: step-up applies instead
     const wrong = await setup();
     expect(
       (
@@ -380,11 +401,56 @@ describe('first-factor bootstrap for a platform admin (Ruling ID-15)', () => {
     ).toBe(403);
   });
 
-  it('a merchant still enrols without any proof (the rule is for platform admins only)', async () => {
+  it("E1: a merchant's FIRST factor needs the e-mailed code: a phished password + session cannot bind one", async () => {
     const m = await seedUser();
     const s = await login(m);
-    const secret = await begin(m, s.body.access_token);
-    expect((await verify(secret, s.body.access_token, {})).status).toBe(200);
+    const bearer = s.body.access_token;
+    const secret = await begin(m, bearer);
+    const none = await verify(secret, bearer, {});
+    expect(none.status).toBe(403);
+    expect(((await none.json()) as { error: { code: string } }).error.code).toBe(
+      'EMAIL_CODE_REQUIRED'
+    );
+    await code(m, bearer);
+    const wrong = await verify(secret, bearer, { emailCode: '000000' });
+    expect(wrong.status).toBe(403);
+    expect(((await wrong.json()) as { error: { code: string } }).error.code).toBe(
+      'EMAIL_CODE_INVALID'
+    );
+    expect(await factorCount(m.id)).toBe(0);
+    const ok = await verify(secret, bearer, { emailCode: await code(m, bearer) });
+    expect(ok.status).toBe(200);
+    expect(await factorCount(m.id)).toBe(1);
+  });
+
+  it("E1: a merchant's first PASSKEY needs the e-mailed code as well", async () => {
+    const m = await seedUser();
+    const s = await login(m);
+    await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: m.password },
+      bearer: s.body.access_token,
+    });
+    const r = await call('/passkey/register/verify', {
+      json: { response: {} },
+      bearer: s.body.access_token,
+    });
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
+      'EMAIL_CODE_REQUIRED'
+    );
+  });
+
+  it('E1: a "new sign-in method added" notice goes to the mailbox when a factor is bound', async () => {
+    const m = await seedUser();
+    const s = await login(m);
+    const bearer = s.body.access_token;
+    const secret = await begin(m, bearer);
+    const before = fakes.notices.length;
+    expect((await verify(secret, bearer, { emailCode: await code(m, bearer) })).status).toBe(200);
+    expect(fakes.notices.slice(before)).toEqual([
+      { to: m.email, kind: 'factor_added', factor: 'totp' },
+    ]);
   });
 });
 
@@ -483,5 +549,241 @@ describe('promotion clears old factors and issues the token', () => {
     ).join('\n');
     expect(lines).toMatch(/WARNING: every existing TOTP secret/);
     expect(lines).toMatch(/ONE-TIME ENROLMENT TOKEN/);
+  });
+});
+
+describe('enrolment tickets and step-up for every factor (Ruling ID-15, review round 2)', () => {
+  const sidOf = (t: string) => claims(t).sid as string;
+  const mkToken = async (userId: string) => {
+    const t = crypto.randomUUID() + crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO enrolment_tokens (id, user_id, token_hash, expires_at, created_at) VALUES (?1,?2,?3,?4,?5)`
+    )
+      .bind(crypto.randomUUID(), userId, await sha256Hex(t), Date.now() + 1_800_000, Date.now())
+      .run();
+    return t;
+  };
+  const mailedCode = async (u: { password: string }, bearer: string) => {
+    await call('/mfa/bootstrap/code', { json: { password: u.password }, bearer });
+    return fakes.mails.at(-1)!.code;
+  };
+  const begin = async (u: { password: string }, bearer: string, code?: string) =>
+    call('/mfa/enroll', { json: { password: u.password, ...(code ? { code } : {}) }, bearer });
+  const secretOf = async (r: Response) =>
+    ((await r.json()) as { data: { secret: string } }).data.secret;
+  const setAmr = (sid: string, amr: string, ageMs = 0) =>
+    env.DB.prepare(`UPDATE sessions SET amr = ?2, created_at = ?3 WHERE sid = ?1`)
+      .bind(sid, amr, Date.now() - ageMs)
+      .run();
+  const addPasskeyRow = (userId: string) =>
+    env.DB.prepare(
+      `INSERT INTO passkey_credentials (id, user_id, credential_id, public_key, device_type, rp_id, name, created_at)
+       VALUES (?1,?2,?3,'pk','singleDevice','store.ebda.app','k',?4)`
+    )
+      .bind(crypto.randomUUID(), userId, `c-${crypto.randomUUID()}`, new Date().toISOString())
+      .run();
+  const count = async (sql: string, ...b: unknown[]) =>
+    ((
+      await env.DB.prepare(sql)
+        .bind(...b)
+        .first<{ n: number }>()
+    )?.n ?? 0) as number;
+
+  it('TOCTOU: a passkey ceremony started with no factor still demands the proof after a factor appears meanwhile', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    const { body } = await login(u);
+    const bearer = body.access_token;
+    expect(
+      (
+        await call('/passkey/register/options', {
+          json: { password: u.password },
+          bearer,
+          headers: ORIGIN,
+        })
+      ).status
+    ).toBe(200);
+    await addPasskeyRow(u.id); // another route enrolled a factor between options and verify
+    const r = await call('/passkey/register/verify', { json: { response: {} }, bearer });
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
+      'ENROLMENT_PROOF_REQUIRED'
+    );
+  });
+
+  it('verifying with no ticket (nothing was begun in this session) is refused', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    const { body } = await login(u);
+    // a real pending secret, but its ticket is gone (expired / cleared): completion must refuse
+    const secret = await secretOf(await begin(u, body.access_token));
+    await env.DB.prepare(`DELETE FROM challenges WHERE user_id = ?1 AND kind = 'factor-enrol'`)
+      .bind(u.id)
+      .run();
+    const r = await call('/mfa/enroll/verify', {
+      json: { code: await totpAt(secret) },
+      bearer: body.access_token,
+    });
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe('ENROL_NOT_STARTED');
+    expect(await count(`SELECT mfa_enabled AS n FROM users WHERE id = ?1`, u.id)).toBe(0);
+    // ... and the passkey path: verify without options
+    const p = await call('/passkey/register/verify', {
+      json: { response: {} },
+      bearer: body.access_token,
+    });
+    expect(p.status).toBe(409);
+    expect(((await p.json()) as { error: { code: string } }).error.code).toBe('ENROL_NOT_STARTED');
+  });
+
+  it("a ticket belongs to the session that began it: another session cannot finish someone else's enrolment", async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    const a = await login(u);
+    const b = await login(u);
+    const secret = await secretOf(await begin(u, a.body.access_token));
+    const t = await mkToken(u.id);
+    const code = await mailedCode(u, b.body.access_token);
+    const r = await call('/mfa/enroll/verify', {
+      json: { code: await totpAt(secret), enrolmentToken: t, emailCode: code },
+      bearer: b.body.access_token,
+    });
+    expect(r.status).toBe(409);
+    expect(await count(`SELECT mfa_enabled AS n FROM users WHERE id = ?1`, u.id)).toBe(0);
+  });
+
+  it('a successful first enrolment deletes every pending register challenge and ends the OTHER sessions', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    const a = await login(u);
+    const b = await login(u);
+    // a passkey ceremony is pending in session A
+    await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: u.password },
+      bearer: a.body.access_token,
+    });
+    expect(
+      await count(
+        `SELECT count(*) AS n FROM challenges WHERE user_id = ?1 AND kind = 'passkey-register'`,
+        u.id
+      )
+    ).toBe(1);
+    const secret = await secretOf(await begin(u, a.body.access_token));
+    const t = await mkToken(u.id);
+    const code = await mailedCode(u, a.body.access_token);
+    const done = await call('/mfa/enroll/verify', {
+      json: { code: await totpAt(secret), enrolmentToken: t, emailCode: code },
+      bearer: a.body.access_token,
+    });
+    expect(done.status).toBe(200);
+    expect(
+      await count(
+        `SELECT count(*) AS n FROM challenges WHERE user_id = ?1 AND kind IN ('passkey-register','factor-enrol')`,
+        u.id
+      )
+    ).toBe(0);
+    const sa = await env.DB.prepare(`SELECT revoked_at FROM sessions WHERE sid = ?1`)
+      .bind(sidOf(a.body.access_token))
+      .first<{ revoked_at: number | null }>();
+    const sb = await env.DB.prepare(`SELECT revoked_at FROM sessions WHERE sid = ?1`)
+      .bind(sidOf(b.body.access_token))
+      .first<{ revoked_at: number | null }>();
+    expect(sa!.revoked_at).toBeNull(); // the enrolling session survives
+    expect(sb!.revoked_at).not.toBeNull(); // every other session is ended
+    expect((await call('/token?aud=store', { cookie: b.cookie })).status).toBe(401);
+  });
+
+  it('ONCE A FACTOR EXISTS, adding another needs a fresh second-factor session (a password session is refused: super admin)', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    await addPasskeyRow(u.id);
+    const s = await login(u); // password only: amr 'pwd'
+    const opts = await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: u.password },
+      bearer: s.body.access_token,
+    });
+    expect(opts.status).toBe(403);
+    expect(((await opts.json()) as { error: { code: string } }).error.code).toBe(
+      'STEP_UP_REQUIRED'
+    );
+    expect((await begin(u, s.body.access_token)).status).toBe(403);
+  });
+
+  it('...and a store owner with a TOTP is refused the same way; a code or a fresh otp/passkey session lets it through', async () => {
+    const m = await seedUser();
+    const s0 = await login(m);
+    const secret = await secretOf(await begin(m, s0.body.access_token));
+    expect(
+      (
+        await call('/mfa/enroll/verify', {
+          json: {
+            code: await totpAt(secret),
+            emailCode: await emailCodeFor(m, s0.body.access_token),
+          },
+          bearer: s0.body.access_token,
+        })
+      ).status
+    ).toBe(200);
+    await env.DB.prepare(`UPDATE users SET mfa_last_step = NULL WHERE id = ?1`).bind(m.id).run();
+
+    // fresh session but password-only (phished password): refused, MFA_REQUIRED
+    const s = await login({ email: m.email, password: m.password }).catch(() => null);
+    const ch = (await (
+      await call('/login', { json: { email: m.email, password: m.password } })
+    ).json()) as {
+      data: { challenge: string };
+    };
+    expect(ch.data.challenge).toBeTruthy(); // a password alone never yields a session for a TOTP holder
+    expect(s).not.toBeNull();
+
+    // a session that really used the second factor, fresh: allowed
+    const withOtp = (await (
+      await call('/login/mfa', {
+        json: { challenge: ch.data.challenge, code: await totpAt(secret) },
+      })
+    ).json()) as { data: { access_token: string } };
+    const ok = await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: m.password },
+      bearer: withOtp.data.access_token,
+    });
+    expect(ok.status).toBe(200);
+
+    // the same session, older than 10 minutes: refused
+    await setAmr(sidOf(withOtp.data.access_token), 'pwd,otp', 11 * 60_000);
+    const stale = await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: m.password },
+      bearer: withOtp.data.access_token,
+    });
+    expect(stale.status).toBe(403);
+    // ...unless a current TOTP code is supplied
+    await env.DB.prepare(`UPDATE users SET mfa_last_step = NULL WHERE id = ?1`).bind(m.id).run();
+    const viaCode = await call('/passkey/register/options', {
+      headers: ORIGIN,
+      json: { password: m.password, code: await totpAt(secret) },
+      bearer: withOtp.data.access_token,
+    });
+    expect(viaCode.status).toBe(200);
+  });
+
+  it('a merchant with a passkey only cannot add a TOTP from a password session; a fresh passkey session can', async () => {
+    const m = await seedUser();
+    await addPasskeyRow(m.id);
+    const pw = await login(m);
+    expect((await begin(m, pw.body.access_token)).status).toBe(403);
+    await setAmr(sidOf(pw.body.access_token), 'hwk');
+    expect((await begin(m, pw.body.access_token)).status).toBe(200);
+  });
+
+  it('a first-factor merchant enrolment that races a second factor is re-checked at completion (stricter, never looser)', async () => {
+    const m = await seedUser();
+    const s = await login(m);
+    const secret = await secretOf(await begin(m, s.body.access_token)); // no factor: password mode
+    await addPasskeyRow(m.id); // a factor appears meanwhile
+    const r = await call('/mfa/enroll/verify', {
+      json: { code: await totpAt(secret) },
+      bearer: s.body.access_token,
+    });
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe('STEP_UP_REQUIRED');
+    expect(await count(`SELECT mfa_enabled AS n FROM users WHERE id = ?1`, m.id)).toBe(0);
   });
 });

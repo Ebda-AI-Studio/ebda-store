@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 import { decodeProtectedHeader, decodeJwt, SignJWT, generateKeyPair } from 'jose';
-import { call, cookieOf, fakes, login, seedUser, verifyAsProduct } from './helpers';
+import { call, emailCodeFor, cookieOf, fakes, login, seedUser, verifyAsProduct } from './helpers';
 import { totpAt } from '../src/totp';
 
 beforeEach(() => {
@@ -368,7 +368,7 @@ describe('MFA (TOTP)', () => {
     ).toBe(400);
     const verify = (await (
       await call('/mfa/enroll/verify', {
-        json: { code: await totpAt(secret) },
+        json: { code: await totpAt(secret), emailCode: await emailCodeFor(u, s.body.access_token) },
         bearer: s.body.access_token,
       })
     ).json()) as { data: { backupCodes: string[] } };
@@ -434,7 +434,7 @@ describe('MFA (TOTP)', () => {
       ).json()) as { data: { secret: string } }
     ).data.secret;
     await call('/mfa/enroll/verify', {
-      json: { code: await totpAt(secret) },
+      json: { code: await totpAt(secret), emailCode: await emailCodeFor(u, s.body.access_token) },
       bearer: s.body.access_token,
     });
     const ch = (

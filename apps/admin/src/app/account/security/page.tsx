@@ -161,9 +161,9 @@ export default function SecurityPage() {
         '/mfa/enroll/verify',
         {
           code: verifyCode.trim(),
-          ...(isFirstAdminFactor
-            ? { enrolmentToken: bootToken.trim(), emailCode: bootCode.trim() }
-            : {}),
+          // First factor of ANY account: a code e-mailed to it; a platform admin also needs the operator's token.
+          ...(isFirstFactor ? { emailCode: bootCode.trim() } : {}),
+          ...(isFirstAdminFactor ? { enrolmentToken: bootToken.trim() } : {}),
         },
         true
       );
@@ -213,7 +213,8 @@ export default function SecurityPage() {
     }
   }
 
-  const isFirstAdminFactor = user?.role === 'super_admin' && !status?.mfaEnabled;
+  const isFirstFactor = !status?.mfaEnabled;
+  const isFirstAdminFactor = user?.role === 'super_admin' && isFirstFactor;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -336,27 +337,29 @@ export default function SecurityPage() {
                   </code>
                 </div>
 
-                {/* Platform administrator: first-factor proof (operator token + e-mailed code) */}
-                {isFirstAdminFactor && (
+                {/* First factor: a code e-mailed to the account (a platform admin also needs the operator's token) */}
+                {isFirstFactor && (
                   <div className="space-y-3 rounded-xl border border-border p-4">
                     <p className="text-sm text-muted-foreground">{t('bootstrapIntro')}</p>
-                    <div>
-                      <label
-                        htmlFor="boot-token"
-                        className="block text-sm font-medium text-foreground"
-                      >
-                        {t('bootstrapTokenLabel')}
-                      </label>
-                      <Input
-                        id="boot-token"
-                        type="text"
-                        dir="ltr"
-                        autoComplete="off"
-                        value={bootToken}
-                        onChange={e => setBootToken(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
+                    {isFirstAdminFactor && (
+                      <div>
+                        <label
+                          htmlFor="boot-token"
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {t('bootstrapTokenLabel')}
+                        </label>
+                        <Input
+                          id="boot-token"
+                          type="text"
+                          dir="ltr"
+                          autoComplete="off"
+                          value={bootToken}
+                          onChange={e => setBootToken(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
                     <div className="flex items-end gap-2">
                       <div className="flex-1">
                         <label
@@ -452,7 +455,8 @@ export default function SecurityPage() {
                       disabled={
                         isSubmitting ||
                         verifyCode.length !== 6 ||
-                        (isFirstAdminFactor && (!bootToken.trim() || bootCode.trim().length !== 6))
+                        (isFirstFactor && bootCode.trim().length !== 6) ||
+                        (isFirstAdminFactor && !bootToken.trim())
                       }
                     >
                       {isSubmitting ? t('verifying') : t('verifyButton')}
