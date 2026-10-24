@@ -8,6 +8,9 @@ on:
       - 'apps/docs/**'
       - 'packages/shared/**'
       - 'packages/site-kit/**'
+      # the OpenAPI page is generated from these at build time
+      - 'apps/api/src/docs/**'
+      - 'apps/api/src/routes/**'
       - '.github/workflows/cf-docs-deploy.yml'
 permissions:
   contents: read
