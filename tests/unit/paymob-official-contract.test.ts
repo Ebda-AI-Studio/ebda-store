@@ -427,21 +427,36 @@ describe('Paymob re-verification 2026-10-24 (docs: create-intention, Postman col
     expect(b.billing_data.last_name.length).toBeLessThanOrEqual(50);
   });
 
-  it('a callback whose obj.is_refund is true is a refund event even when is_refunded is false', () => {
+  const verify = (obj: Record<string, unknown>, signedObj: Record<string, unknown>) => {
     const callback = fixture('callback.official.json');
+    return createPaymobProvider().verifyWebhook(
+      JSON.stringify({ ...callback, obj }),
+      { [PAYMOB_HMAC_HEADER]: paymobHmac(signedObj, SECRET) },
+      { ...creds, webhookSecret: SECRET }
+    );
+  };
+
+  it('a refund transaction (signed has_parent_transaction) is a refund even when is_refunded is false', () => {
     const obj = {
-      ...callback.obj,
-      is_refund: true,
+      ...fixture('callback.official.json').obj,
       has_parent_transaction: true,
       parent_transaction: 192036465,
       is_refunded: false,
       is_voided: false,
     };
-    const ev = createPaymobProvider().verifyWebhook(
-      JSON.stringify({ ...callback, obj }),
-      { [PAYMOB_HMAC_HEADER]: paymobHmac(obj, SECRET) },
-      { ...creds, webhookSecret: SECRET }
-    );
-    expect(ev.kind).toBe('refund');
+    expect(verify(obj, obj).kind).toBe('refund');
+  });
+
+  it('a tampered UNSIGNED is_refund / is_void on a signed payment does not make it a refund', () => {
+    const signed = { ...fixture('callback.official.json').obj, has_parent_transaction: false };
+    const tampered = { ...signed, is_refund: true, is_void: true };
+    const ev = verify(tampered, signed); // HMAC computed over signed fields only: still valid
+    expect(ev.kind).toBe('payment');
+  });
+
+  it('a replay classified differently gets a different eventId (cannot collide with the original)', () => {
+    const base = { ...fixture('callback.official.json').obj, has_parent_transaction: false };
+    const asRefund = { ...base, has_parent_transaction: true };
+    expect(verify(base, base).eventId).not.toBe(verify(asRefund, asRefund).eventId);
   });
 });

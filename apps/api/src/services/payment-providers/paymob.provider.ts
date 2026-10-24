@@ -665,18 +665,19 @@ export function createPaymobProvider(options: PaymobAdapterOptions = {}): Paymob
       const flags = [txn.pending, txn.success, txn.is_voided, txn.is_refunded]
         .map(b => (b === true ? 1 : 0))
         .join('');
-      const eventId = `paymob:${String(txn.id)}:${flags}`;
       const hasParent =
         (tx as { has_parent_transaction?: unknown }).has_parent_transaction === true;
 
       // A refund / void is its own transaction with a parent: the payment event is about the
       // PARENT, so these are reported as refund events (the refund id is this transaction's).
-      // `is_refund` / `is_void` are documented on the callback object (they are not in the HMAC
-      // list); the refund transaction itself is read by either pair of flags.
-      const refundLike =
-        txn.is_refund === true ||
-        txn.is_void === true ||
-        (hasParent && (txn.is_refunded === true || txn.is_voided === true));
+      // SECURITY: classification uses ONLY HMAC-signed fields (has_parent_transaction,
+      // is_capture). `is_refund` / `is_void` are NOT in the HMAC list, so an attacker could flip
+      // them on a captured signed payload; they are deliberately ignored. A capture of an auth
+      // also has a parent, so it is excluded via the signed is_capture.
+      const refundLike = hasParent && txn.is_capture !== true;
+      // The classification is part of the idempotency key, so a replay that is read
+      // differently can never collide with or override the original event.
+      const eventId = `paymob:${String(txn.id)}:${refundLike ? 'refund' : 'payment'}:${flags}`;
       if (refundLike) {
         const status: 'pending' | 'completed' | 'failed' =
           txn.pending === true ? 'pending' : txn.success === true ? 'completed' : 'failed';

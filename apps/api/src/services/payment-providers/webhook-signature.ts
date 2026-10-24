@@ -82,7 +82,7 @@ export function webhookRefs(provider: string, payload: Record<string, unknown>):
       const o = obj(payload.obj);
       const order = obj(o.order);
       const id = str(o.id);
-      const flags = [o.pending, o.success, o.is_voided, o.is_refunded]
+      const flags = [o.pending, o.success, o.is_voided, o.is_refunded, o.has_parent_transaction]
         .map(b => (b === true ? 1 : 0))
         .join('');
       return {

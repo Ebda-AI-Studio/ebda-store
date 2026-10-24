@@ -66,3 +66,7 @@ Ruling PROVIDERS-3. Payment adapters (Paymob, Kashier, FawryPay) re-checked agai
 ## Carriers
 
 <!-- carriers section appended by the carriers PR -->
+
+## Security follow-up: signed-fields-only classification (Paymob, Kashier, Fawry)
+
+Review finding (HIGH): Paymob `is_refund` / `is_void` are not in the documented HMAC field list, so they must not drive money classification. FIXED: refund-vs-payment is decided only from signed `has_parent_transaction` (and signed `is_capture` to exclude auth captures); the classification is part of the `eventId` and of the inbox idempotency key. Tests: tampered unsigned `is_refund`/`is_void` stays a payment; a differently classified replay has a different eventId. Kashier: `event` is unsigned by design, the applied kind comes from Kashier's own transaction record (`confirmWebhookEvent`), eventId deliberately omits `event`: OK. Fawry: kind comes from signed `orderStatus`, eventId only signed fields: OK.
