@@ -1,0 +1,4 @@
+{"impl":"drizzle","op":"products","n":300,"p50_ms":2.79,"p95_ms":4.49,"max_ms":13.64}
+{"impl":"prisma","op":"products","n":300,"p50_ms":4.42,"p95_ms":6.21,"max_ms":8.3}
+{"impl":"drizzle","op":"cart","n":300,"p50_ms":2.97,"p95_ms":6.02,"max_ms":12.68}
+{"impl":"prisma","op":"cart","n":300,"p50_ms":6.03,"p95_ms":8.81,"max_ms":32.53}
