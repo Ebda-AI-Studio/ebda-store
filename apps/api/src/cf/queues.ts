@@ -18,6 +18,8 @@ import { emailQueue, isQueuedEmail } from '../services/email-queue.service';
 import { EmailSendError } from '../services/mail-transport';
 import { smsQueue, isQueuedSms } from '../services/sms-queue.service';
 import logger from '../lib/logger';
+import { handleJobsBatch } from '../lib/jobs/run-queue';
+import { JOBS_DLQ_NAME, JOBS_QUEUE_NAME } from '../lib/jobs/start';
 
 export const EMAIL_QUEUE_NAME = 'ebda-email';
 export const SMS_QUEUE_NAME = 'ebda-sms';
@@ -43,6 +45,11 @@ export interface MessageBatchLike {
 }
 
 export async function handleQueueBatch(batch: MessageBatchLike): Promise<void> {
+  // Background jobs (G5) own their ack/retry/failure handling.
+  if (batch.queue === JOBS_QUEUE_NAME || batch.queue === JOBS_DLQ_NAME) {
+    await handleJobsBatch(batch);
+    return;
+  }
   for (const msg of batch.messages) {
     try {
       switch (batch.queue) {

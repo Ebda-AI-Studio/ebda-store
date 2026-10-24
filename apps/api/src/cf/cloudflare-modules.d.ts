@@ -59,3 +59,36 @@ declare class WebSocketPair {
   0: WebSocket;
   1: WebSocket;
 }
+
+declare module 'cloudflare:workflows' {
+  export interface WorkflowEvent<T> {
+    payload: Readonly<T>;
+    timestamp: Date;
+    instanceId: string;
+  }
+  export interface WorkflowStep {
+    do<T>(
+      name: string,
+      config: {
+        retries?: {
+          limit: number;
+          delay: string | number;
+          backoff?: 'constant' | 'linear' | 'exponential';
+        };
+        timeout?: string | number;
+      },
+      callback: () => Promise<T>
+    ): Promise<T>;
+    sleep(name: string, duration: string | number): Promise<void>;
+    sleepUntil(name: string, timestamp: Date | number): Promise<void>;
+  }
+  export abstract class WorkflowEntrypoint<Env = unknown, Params = unknown> {
+    protected ctx: { waitUntil(p: Promise<unknown>): void };
+    protected env: Env;
+    constructor(ctx: { waitUntil(p: Promise<unknown>): void }, env: Env);
+    abstract run(event: WorkflowEvent<Params>, step: WorkflowStep): Promise<unknown>;
+  }
+  export class NonRetryableError extends Error {
+    constructor(message: string, name?: string);
+  }
+}
