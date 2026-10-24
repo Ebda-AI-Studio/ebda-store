@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createPrismaClient } from '../../database/src/client';
 import { createPrismaLite } from '../src/prisma-lite/client';
 import { encode } from '../src/prisma-lite/codec';
-import { nodeSqlRunner } from '../src/prisma-lite/node-sql';
+import { nodeSqlRunner } from './node-sql';
 import type { Meta, ScalarField } from '../src/prisma-lite/types';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +23,7 @@ export const PG_URL = process.env.PRISMALITE_PG_URL;
 
 export function openSqlite(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = OFF'); // Store/User rows live in D1/identity; their FKs are plain columns in the DO
+  db.exec('PRAGMA foreign_keys = ON'); // Store/User FKs are not emitted in the DO schema (other database), so ON only enforces in-DO FKs
   db.exec(STORE_SQL);
   return db;
 }
