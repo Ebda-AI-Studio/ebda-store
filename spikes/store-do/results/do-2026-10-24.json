@@ -1,0 +1,47 @@
+{
+  "measured_at": "2026-10-24T17:27:14.421Z",
+  "base": "https://api.ebda.app",
+  "storeId": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
+  "mode": "warm",
+  "backend": "do",
+  "n": 200,
+  "concurrency": 4,
+  "endpoints": {
+    "GET products?limit=24": {
+      "n": 190,
+      "errors": 0,
+      "statuses": {
+        "200": 200
+      },
+      "p50_ms": 241.24,
+      "p95_ms": 318.85,
+      "p99_ms": 379.66,
+      "max_ms": 428.56
+    },
+    "POST cart/items": {
+      "n": 110,
+      "errors": 0,
+      "statuses": {
+        "200": 120
+      },
+      "p50_ms": 701.53,
+      "p95_ms": 1781.31,
+      "p99_ms": 2168.31,
+      "max_ms": 2180.92
+    },
+    "POST orders (COD, DO copy)": {
+      "n": 15,
+      "errors": 25,
+      "statuses": {
+        "200": 25,
+        "409": 5,
+        "429": 20
+      },
+      "p50_ms": 613.94,
+      "p95_ms": 1324.79,
+      "p99_ms": 1324.79,
+      "max_ms": 1324.79
+    }
+  },
+  "note": "merged from do-products/do-cart/do-orders runs; orders n=15 after warmup (limiter 429 + demo stock 409), tails INCONCLUSIVE"
+}

@@ -62,11 +62,26 @@ if (withOrders) {
     await a.arrayBuffer();
     if (a.status !== 200) return a.status;
     const t0 = performance.now();
-    const r = await fetch(`${api}/orders`, { method: 'POST', headers: h, body: '{}' });
+    const r = await fetch(`${api}/orders`, {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({
+        shippingAddress: {
+          firstName: 'Bench',
+          lastName: 'Run',
+          address1: '1 Test St',
+          country: 'EG',
+          phone: '01000000000',
+        },
+        paymentMethod: 'cod',
+      }),
+    });
     await r.arrayBuffer();
     return { status: r.status === 201 ? 200 : r.status, ms: performance.now() - t0 };
   };
 }
+const only = arg('only', '');
+for (const k of Object.keys(endpoints)) if (only && !k.includes(only)) delete endpoints[k];
 const out = {
   measured_at: new Date().toISOString(),
   base,

@@ -1,0 +1,22 @@
+{
+  "measured_at": "2026-10-24T17:27:33.556Z",
+  "base": "https://api.ebda.app",
+  "storeId": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
+  "mode": "warm",
+  "backend": "do",
+  "n": 120,
+  "concurrency": 4,
+  "endpoints": {
+    "POST cart/items": {
+      "n": 110,
+      "errors": 0,
+      "statuses": {
+        "200": 120
+      },
+      "p50_ms": 701.53,
+      "p95_ms": 1781.31,
+      "p99_ms": 2168.31,
+      "max_ms": 2180.92
+    }
+  }
+}
