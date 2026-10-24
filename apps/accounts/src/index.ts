@@ -101,15 +101,27 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   }
 
   /** Change an admin-namespace role (promote/demote). Ends every session so tokens are re-issued with the new grant. */
-  async setRole(userId: string, role: 'store_admin' | 'staff', reason: string): Promise<void> {
+  async setRole(
+    userId: string,
+    role: 'store_admin' | 'staff',
+    reason: string,
+    /** Compare-and-set: change the role only if it currently equals this (used by rollbacks). */
+    ifCurrentRole?: 'store_admin' | 'staff'
+  ): Promise<boolean> {
     z.string().uuid().parse(userId);
     // super_admin is deliberately NOT grantable over RPC: any Worker in the account can call this binding, so platform
     // operators are created only by an operator-run D1 statement (Ruling ID-12).
     z.enum(['store_admin', 'staff']).parse(role);
-    await this.env.DB.prepare(`UPDATE users SET role = ?2, updated_at = ?3 WHERE id = ?1`)
-      .bind(userId, role, new Date().toISOString())
+    if (ifCurrentRole !== undefined) z.enum(['store_admin', 'staff']).parse(ifCurrentRole);
+    const r = await this.env.DB.prepare(
+      `UPDATE users SET role = ?2, updated_at = ?3 WHERE id = ?1 AND (?4 IS NULL OR role = ?4)`
+    )
+      .bind(userId, role, new Date().toISOString(), ifCurrentRole ?? null)
       .run();
+    // A compare-and-set that matched nothing changed nothing, so it must not end anyone's sessions either.
+    if ((r.meta?.changes ?? 0) === 0) return false;
     await revokeAllForUser(this.env.DB, userId, reason.slice(0, 80));
+    return true;
   }
 
   /** Invite a merchant or staff member: an unverified identity plus a one-time code to set their own password. */

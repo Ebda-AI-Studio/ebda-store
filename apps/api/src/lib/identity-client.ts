@@ -51,8 +51,12 @@ export const inviteIdentity = (input: Parameters<NonNullable<AccountsRpc['invite
   call('inviteUser', r => r.inviteUser?.(input));
 export const forgotIdentityPassword = (email: string) =>
   call('forgotPassword', r => r.forgotPassword?.(email));
-export const setAccountRole = (userId: string, role: 'store_admin' | 'staff', reason: string) =>
-  call('setRole', r => r.setRole?.(userId, role, reason));
+export const setAccountRole = (
+  userId: string,
+  role: 'store_admin' | 'staff',
+  reason: string,
+  ifCurrentRole?: 'store_admin' | 'staff'
+) => call('setRole', r => r.setRole?.(userId, role, reason, ifCurrentRole));
 export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
 
 /**

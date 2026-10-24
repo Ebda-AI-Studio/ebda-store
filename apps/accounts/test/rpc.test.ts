@@ -73,6 +73,24 @@ describe('Accounts RPC for the Store', () => {
     ).toMatchObject({ role: 'staff' });
   });
 
+  it('setRole with ifCurrentRole is a compare-and-set: no match = no change and no sessions ended', async () => {
+    const u = await seedUser();
+    await env.DB.prepare(`UPDATE users SET role = 'store_admin' WHERE id = ?1`).bind(u.id).run();
+    const s = await login(u);
+    // the role is store_admin, so a rollback that expects 'staff' must do nothing
+    expect(await rpc().setRole(u.id, 'store_admin', 'rollback', 'staff')).toBe(false);
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(200);
+    // once it really is staff, the same call restores the role and ends the sessions
+    await env.DB.prepare(`UPDATE users SET role = 'staff' WHERE id = ?1`).bind(u.id).run();
+    expect(await rpc().setRole(u.id, 'store_admin', 'rollback', 'staff')).toBe(true);
+    expect(
+      await env.DB.prepare(`SELECT role FROM users WHERE id = ?1`).bind(u.id).first()
+    ).toMatchObject({
+      role: 'store_admin',
+    });
+    expect((await call('/token?aud=store', { cookie: s.cookie })).status).toBe(401);
+  });
+
   it('inviteUser creates an unverified, credential-less account and mails a 24h staff_invite code', async () => {
     const id = crypto.randomUUID();
     const email = `invitee-${id.slice(0, 8)}@example.com`;

@@ -15,6 +15,8 @@ import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ownedStoreIds } from '../lib/definer';
+import { storesForUser } from '../lib/identity-directory';
+import { redis } from '../services/redis.service';
 import { getAccountState, setAccountRole } from '../lib/identity-client';
 import { verifyStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
@@ -28,10 +30,24 @@ router.post(
   authenticate,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
+    let lockName: string | null = null;
     try {
       const { token } = z.object({ token: z.string().min(20).max(2000) }).parse(req.body);
       const claims = verifyStaffInviteToken(token);
       const userId = req.user!.userId;
+
+      // One accept at a time per account: two overlapping accepts (two links, or a double click) would otherwise race on the
+      // identity role switch and its rollback. Redis down = best effort (acquireLock allows it); the compare-and-set
+      // rollback below keeps the final role and memberships consistent even then.
+      lockName = `staff-accept:${userId}`;
+      if (!(await redis.acquireLock(lockName, 60))) {
+        lockName = null;
+        throw new AppError(
+          409,
+          'ACCEPT_IN_PROGRESS',
+          'Another invitation is being accepted on this account. Try again in a moment.'
+        );
+      }
 
       const acc = await getAccountState(userId);
       if (!acc || acc.status !== 'active') {
@@ -101,7 +117,12 @@ router.post(
       // so the account is never left as staff while owning a store.
       let requiresSignIn = false;
       const undoRoleSwitch = async () => {
-        await setAccountRole(userId, 'store_admin', 'staff-invite-rolled-back').catch(e =>
+        // Compare-and-set, and only while the account holds NO staff membership: another accept for the same account may
+        // have succeeded meanwhile, and then 'staff' is the right final role. (An owned store does not block the undo: that is
+        // exactly the OWNS_STORE case, where the account must go back to store_admin.)
+        const staffNow = (await storesForUser(userId)).filter(x => x.role === 'staff');
+        if (staffNow.length > 0) return;
+        await setAccountRole(userId, 'store_admin', 'staff-invite-rolled-back', 'staff').catch(e =>
           logger.error(
             { err: e, userId },
             '[staff-invite] could not restore store_admin after a failed accept'
@@ -171,6 +192,8 @@ router.post(
       res.json({ success: true, data: { storeId, requiresSignIn } });
     } catch (err) {
       next(err);
+    } finally {
+      if (lockName) await redis.releaseLock(lockName).catch(() => undefined);
     }
   }
 );

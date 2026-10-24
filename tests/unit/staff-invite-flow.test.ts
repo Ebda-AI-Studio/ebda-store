@@ -18,10 +18,14 @@ const h = vi.hoisted(() => ({
   mails: [] as any[],
   invite: vi.fn(),
   account: vi.fn(),
-  setRole: vi.fn(async (..._a: unknown[]) => {}),
+  setRole: vi.fn(async (..._a: unknown[]) => true),
   existingId: null as string | null,
   owned: [] as string[],
   ownedSeq: [] as string[][],
+  locks: new Set<string>(),
+  committed: new Set<string>(),
+  gate: null as null | Promise<void>,
+  onSeatLocked: null as null | (() => void),
   featureOn: true,
   seatPre: false,
   seatLocked: false,
@@ -72,7 +76,18 @@ vi.mock('@ebda/database', () => {
   };
   return {
     Prisma: {},
-    withStore: async (_s: string, fn: any) => fn(tx),
+    // transactional like Postgres: a throw rolls the in-memory rows back
+    withStore: async (_s: string, fn: any) => {
+      const snap = structuredClone({ i: h.invites, m: [...h.members], c: h.staffCreates });
+      try {
+        return await fn(tx);
+      } catch (e) {
+        h.invites = snap.i;
+        h.members = new Set(snap.m);
+        h.staffCreates = snap.c;
+        throw e;
+      }
+    },
     withUser: async (_u: string, fn: any) => fn(tx),
     UserRole: {
       staff: 'staff',
@@ -113,12 +128,27 @@ vi.mock('@api/lib/identity-client', () => ({
 vi.mock('@api/services/plan-limit.service', () => ({
   assertWithinLimit: async (_s: string, _k: string, opts?: { tx?: unknown }) => {
     h.order.push(opts?.tx ? 'seat-locked' : 'seat-pre');
+    if (opts?.tx) h.onSeatLocked?.();
     const full = opts?.tx ? h.seatLocked : h.seatPre;
     if (full) {
       const { AppError } = await import('@api/middleware/error-handler');
       throw new AppError(402, 'PLAN_LIMIT_REACHED', 'full');
     }
   },
+}));
+vi.mock('@api/services/redis.service', () => ({
+  redis: {
+    acquireLock: async (n: string) => {
+      if (h.locks.has(n)) return false;
+      h.locks.add(n);
+      return true;
+    },
+    releaseLock: async (n: string) => void h.locks.delete(n),
+  },
+}));
+vi.mock('@api/lib/identity-directory', () => ({
+  storesForUser: async () =>
+    [...h.members, ...h.committed].map(() => ({ id: 'store-a', role: 'staff' })),
 }));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: async () => h.featureOn },
@@ -160,6 +190,10 @@ beforeEach(() => {
   h.existingId = null;
   h.owned = [];
   h.ownedSeq = [];
+  h.locks = new Set();
+  h.committed = new Set();
+  h.gate = null;
+  h.onSeatLocked = null;
   h.featureOn = true;
   h.seatPre = false;
   h.seatLocked = false;
@@ -441,6 +475,54 @@ describe('POST /staff-invites/accept: the explicit accept step', () => {
     expect(h.setRole.mock.calls.map(c => c[1])).toEqual(['staff', 'store_admin']);
     expect(h.staffCreates).toEqual([]);
     expect(h.invites[0].status).toBe('pending'); // nothing consumed
+  });
+
+  it('ROLLBACK IS A COMPARE-AND-SET: it asks the identity to restore store_admin only if the role is still staff', async () => {
+    const token = await issue();
+    h.seatLocked = true;
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    await accept(token);
+    expect(h.setRole).toHaveBeenLastCalledWith(
+      'me',
+      'store_admin',
+      'staff-invite-rolled-back',
+      'staff'
+    );
+  });
+
+  it('ROLLBACK IS SKIPPED when another accept already gave the account a staff membership (final role stays staff)', async () => {
+    const token = await issue();
+    h.seatLocked = true;
+    // a concurrent accept for the same account lands its membership while this one is failing at the seat lock
+    h.onSeatLocked = () => h.committed.add('me');
+    h.account.mockResolvedValue(goodAccount({ role: 'store_admin' }));
+    expect((await accept(token)).status).toBe(402);
+    expect(h.setRole.mock.calls.map(c => c[1])).toEqual(['staff']); // switched, never reverted
+    expect(h.committed.has('me')).toBe(true);
+  });
+
+  it('TWO CONCURRENT ACCEPTS for one account: they serialise per user, one proceeds and one is told to retry; role and memberships end consistent', async () => {
+    const token = await issue();
+    h.account.mockImplementation(async () => {
+      await new Promise(r => setTimeout(r, 25)); // keep the first accept inside the critical section
+      return goodAccount({ role: 'store_admin' });
+    });
+    const [a, b] = await Promise.all([accept(token), accept(token)]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect([a, b].find(r => r.status === 409)!.body.error.code).toBe('ACCEPT_IN_PROGRESS');
+    expect(h.staffCreates).toHaveLength(1);
+    expect(h.setRole.mock.calls.map(c => c[1])).toEqual(['staff']);
+    expect(h.locks.size).toBe(0); // released
+  });
+
+  it('the per-user lock is released after a FAILED accept too, so a retry is not locked out', async () => {
+    const token = await issue();
+    h.seatLocked = true;
+    h.account.mockResolvedValue(goodAccount());
+    await accept(token);
+    expect(h.locks.size).toBe(0);
+    h.seatLocked = false;
+    expect((await accept(token)).status).toBe(200);
   });
 
   it('an account that OWNS a store is refused and the invite stays pending', async () => {
