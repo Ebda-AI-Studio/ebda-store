@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseSchema } from './prisma-parse.mjs';
 import { classifyStoreColumns } from './store-split.mjs';
-import { readRawInvariants, pgExprToSqlite } from './pg-raw.mjs';
+import { readRawInvariants, pgExprToSqlite, pgPredicateToSqlite } from './pg-raw.mjs';
 import { extraColumns, extraIndexes, extraModels } from './cf-additions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -147,7 +147,7 @@ export function build() {
         });
         continue;
       }
-      owner.rawChecks.push({ name: c.name, expr: pgExprToSqlite(c.expr) });
+      owner.rawChecks.push({ name: c.name, expr: pgPredicateToSqlite(c.expr) });
       (placed.checks[c.name] ??= []).push(`${target}:${owner.name}`);
     }
     for (const ix of raw.indexes) {
@@ -184,7 +184,7 @@ export function build() {
         continue;
       }
       const cols = pgExprToSqlite(ix.cols);
-      const where = ix.where ? pgExprToSqlite(ix.where) : null;
+      const where = ix.where ? pgPredicateToSqlite(ix.where) : null;
       // a raw partial unique supersedes a full unique declared in schema.prisma on the same columns
       const colList = ix.cols
         .replace(/"/g, '')
@@ -213,6 +213,14 @@ export function build() {
         });
       }
       owner.rawIndexes.push({ name: ix.name, unique: ix.unique, cols, where });
+      (manifest.translatedIndexes ??= []).push({
+        name: ix.name,
+        table: owner.name,
+        db: target,
+        unique: ix.unique,
+        pgCols: ix.cols,
+        pgWhere: ix.where,
+      });
       (placed.indexes[ix.name] ??= []).push(`${target}:${owner.name}`);
     }
     for (const t of tables) tableByName.set(t.name, t);
