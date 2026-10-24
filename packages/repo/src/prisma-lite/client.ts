@@ -32,18 +32,32 @@ export function createPrismaLite(meta: Meta, sql: SqlRunner) {
   });
 }
 
-/** `{ storeId_slug: { storeId, slug } }` -> `{ storeId, slug }` (Prisma's compound-unique selector). */
-function expandUnique(
+/**
+ * `{ storeId_slug: { storeId, slug } }` -> `{ storeId, slug }` (Prisma's compound-unique selector), and, like
+ * Prisma, REFUSES a selector that does not name a complete unique tuple: a missing or undefined field must
+ * never degrade into "first row" (a cross-record / cross-tenant read).
+ */
+export function expandUnique(
   meta: Meta,
   model: string,
   where: Record<string, unknown>
 ): Record<string, unknown> {
+  if (!where || typeof where !== 'object') throw new Error('prisma-lite: findUnique needs a where');
   const out: Record<string, unknown> = {};
   const uniques = meta.models[model].uniques.concat([meta.models[model].pk]);
   for (const [k, v] of Object.entries(where)) {
     const hit = uniques.find(u => u.length > 1 && u.join('_') === k);
-    if (hit && v && typeof v === 'object') Object.assign(out, v);
-    else out[k] = v;
+    if (hit) {
+      if (!v || typeof v !== 'object') throw new Error(`prisma-lite: ${k} needs an object`);
+      Object.assign(out, v);
+    } else out[k] = v;
   }
+  const complete = uniques.some(
+    u => u.length > 0 && u.every(f => out[f] !== undefined && out[f] !== null)
+  );
+  if (!complete)
+    throw new Error(
+      `prisma-lite: findUnique on ${model} needs every field of a unique key, non-null`
+    );
   return out;
 }

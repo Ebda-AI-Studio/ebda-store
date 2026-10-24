@@ -7,7 +7,32 @@ export const MAX_PARAMS = 90;
 type Where = Record<string, unknown> | undefined;
 type Args = Record<string, any>;
 
-const q = (s: string) => `"${s}"`;
+const q = (s: string) => {
+  // Identifiers come from the schema registry only; refuse anything that is not a plain identifier anyway.
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(s))
+    throw new Error(`prisma-lite: refusing identifier ${JSON.stringify(s)}`);
+  return `"${s}"`;
+};
+
+/** ASC/DESC only, case-insensitive. Anything else throws before any SQL is built. */
+export function sortDir(v: unknown): 'ASC' | 'DESC' {
+  const d = typeof v === 'string' ? v.toLowerCase() : '';
+  if (d === 'asc') return 'ASC';
+  if (d === 'desc') return 'DESC';
+  throw new Error('prisma-lite: sort direction must be asc or desc');
+}
+export function nullsPos(v: unknown): 'FIRST' | 'LAST' {
+  const d = typeof v === 'string' ? v.toLowerCase() : '';
+  if (d === 'first') return 'FIRST';
+  if (d === 'last') return 'LAST';
+  throw new Error('prisma-lite: nulls must be first or last');
+}
+function intArg(name: string, v: unknown, min = 0): number {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < min)
+    throw new Error(`prisma-lite: ${name} must be an integer >= ${min}`);
+  return v;
+}
+const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 
 export class Engine {
   private alias = 0;
@@ -17,7 +42,7 @@ export class Engine {
   ) {}
 
   model(name: string): ModelMeta {
-    const m = this.meta.models[name];
+    const m = own(this.meta.models, name) ? this.meta.models[name] : undefined;
     if (!m) throw new Error(`prisma-lite: model ${name} is not in this database`);
     return m;
   }
@@ -27,7 +52,7 @@ export class Engine {
   }
 
   scalar(m: ModelMeta, name: string): ScalarField {
-    const f = m.fields[name];
+    const f = own(m.fields, name) ? m.fields[name] : undefined;
     if (!f || f.kind === 'relation') throw new Error(`prisma-lite: ${name} is not a scalar field`);
     return f;
   }
@@ -51,8 +76,9 @@ export class Engine {
         for (const w of list) parts.push(`NOT (${this.compileWhere(modelName, w, alias, params)})`);
         continue;
       }
+      if (!own(m.fields, key))
+        throw new Error(`prisma-lite: unknown field ${modelName}.${key} in where`);
       const f = m.fields[key];
-      if (!f) throw new Error(`prisma-lite: unknown field ${modelName}.${key} in where`);
       if (f.kind === 'relation') {
         parts.push(
           this.compileRelationFilter(m, key, f, val as Record<string, unknown>, alias, params)
@@ -195,20 +221,22 @@ export class Engine {
     const out: string[] = [];
     for (const item of list) {
       for (const [key, dir] of Object.entries(item)) {
-        const f = m.fields[key] as FieldMeta | undefined;
+        const f = own(m.fields, key) ? (m.fields[key] as FieldMeta) : undefined;
         if (key === '_count') {
           for (const [rel, d] of Object.entries(dir as Record<string, string>)) {
-            const rf = m.fields[rel] as RelationField;
-            out.push(`${this.countSubquery(rf, alias)} ${String(d).toUpperCase()}`);
+            const rf = this.listRelation(m, rel);
+            out.push(`${this.countSubquery(rf, alias)} ${sortDir(d)}`);
           }
           continue;
         }
         if (!f) throw new Error(`prisma-lite: unknown orderBy field ${modelName}.${key}`);
         if (f.kind !== 'relation') {
-          const d = typeof dir === 'string' ? dir : dir.sort;
+          const d = sortDir(typeof dir === 'string' ? dir : dir?.sort);
           const nulls =
-            typeof dir === 'object' && dir.nulls ? ` NULLS ${String(dir.nulls).toUpperCase()}` : '';
-          out.push(`${alias}.${q(f.column)} ${String(d).toUpperCase()}${nulls}`);
+            dir && typeof dir === 'object' && dir.nulls !== undefined
+              ? ` NULLS ${nullsPos(dir.nulls)}`
+              : '';
+          out.push(`${alias}.${q(f.column)} ${d}${nulls}`);
         } else if (!f.list && !f.external) {
           // to-one: order by the related row's column through a correlated subquery
           const t = this.model(f.type);
@@ -216,16 +244,26 @@ export class Engine {
           const join = f
             .from!.map((c, i) => `${a}.${q(f.to![i])} = ${alias}.${q(c)}`)
             .join(' AND ');
-          const [[col, d]] = Object.entries(dir as Record<string, string>);
+          const entries = Object.entries(dir as Record<string, string>);
+          if (entries.length !== 1)
+            throw new Error('prisma-lite: relation orderBy takes exactly one field');
+          const [[col, d]] = entries;
           const cf = this.scalar(t, col);
           out.push(
-            `(SELECT ${a}.${q(cf.column)} FROM ${q(t.table)} ${a} WHERE ${join}) ${String(d).toUpperCase()}`
+            `(SELECT ${a}.${q(cf.column)} FROM ${q(t.table)} ${a} WHERE ${join}) ${sortDir(d)}`
           );
         } else throw new Error(`prisma-lite: unsupported orderBy on relation ${key}`);
       }
     }
     void params;
     return out.join(', ');
+  }
+
+  private listRelation(m: ModelMeta, rel: string): RelationField {
+    const rf = own(m.fields, rel) ? m.fields[rel] : undefined;
+    if (!rf || rf.kind !== 'relation' || !rf.list || rf.external || !rf.from)
+      throw new Error(`prisma-lite: ${rel} is not a countable relation`);
+    return rf;
   }
 
   private countSubquery(rf: RelationField, alias: string): string {
@@ -243,10 +281,11 @@ export class Engine {
     const a = 't0';
     const where = this.compileWhere(modelName, args.where, a, params);
     let order = this.compileOrderBy(modelName, args.orderBy, a, params);
-    if (args.take !== undefined && args.take < 0)
-      throw new Error('prisma-lite: negative take is not supported');
+    if (args.distinct !== undefined) throw new Error('prisma-lite: distinct is not supported');
+    const take = args.take === undefined ? undefined : intArg('take', args.take);
+    const skip = args.skip === undefined ? 0 : intArg('skip', args.skip);
     // Stable order for paging when the caller gave none (Prisma orders by the primary key implicitly for cursors only).
-    if (!order && (args.take !== undefined || args.skip))
+    if (!order && (take !== undefined || skip))
       order = m.pk.map(p => `${a}.${q(this.scalar(m, p).column)}`).join(', ');
     let sql = `SELECT ${a}.* FROM ${q(m.table)} ${a} WHERE ${where}`;
     if (args.cursor) {
@@ -256,9 +295,10 @@ export class Engine {
       sql += ` AND ${a}.${q(f.column)} >= ?`;
     }
     if (order) sql += ` ORDER BY ${order}`;
-    if (args.take !== undefined) sql += ` LIMIT ${Number(args.take)}`;
-    if (args.skip)
-      sql += `${args.take === undefined ? ' LIMIT -1' : ''} OFFSET ${Number(args.skip)}`;
+    if (take !== undefined || skip) {
+      sql += ' LIMIT ? OFFSET ?';
+      params.push(take ?? -1, skip);
+    }
     const rows = this.sql.all(sql, params);
     return this.hydrate(modelName, rows, args);
   }
@@ -268,8 +308,11 @@ export class Engine {
     const params: unknown[] = [];
     const where = this.compileWhere(modelName, args.where, 't0', params);
     let sql = `SELECT count(*) AS n FROM ${q(m.table)} t0 WHERE ${where}`;
-    if (args.take !== undefined || args.skip) {
-      sql = `SELECT count(*) AS n FROM (SELECT 1 FROM ${q(m.table)} t0 WHERE ${where} LIMIT ${args.take ?? -1} OFFSET ${args.skip ?? 0})`;
+    if (args.take !== undefined || args.skip !== undefined) {
+      const take = args.take === undefined ? -1 : intArg('take', args.take);
+      const skip = args.skip === undefined ? 0 : intArg('skip', args.skip);
+      sql = `SELECT count(*) AS n FROM (SELECT 1 FROM ${q(m.table)} t0 WHERE ${where} LIMIT ? OFFSET ?)`;
+      params.push(take, skip);
     }
     return Number(this.sql.all(sql, params)[0].n);
   }
@@ -297,8 +340,9 @@ export class Engine {
         this.attachCounts(modelName, rows, out, spec);
         continue;
       }
+      if (!own(m.fields, key)) continue;
       const f = m.fields[key];
-      if (!f || f.kind !== 'relation') continue;
+      if (f.kind !== 'relation') continue;
       if (f.external) throw new Error(`prisma-lite: ${modelName}.${key} lives in another database`);
       this.attachRelation(m, f, key, rows, out, spec === true ? {} : spec);
     }
@@ -320,7 +364,7 @@ export class Engine {
           )
         : Object.keys(sel).filter(k => sel[k]);
     for (const rel of rels) {
-      const f = m.fields[rel] as RelationField;
+      const f = this.listRelation(m, rel);
       const t = this.model(f.type);
       const cw = typeof sel[rel] === 'object' ? sel[rel].where : undefined;
       const fromCol = f.from![0];
