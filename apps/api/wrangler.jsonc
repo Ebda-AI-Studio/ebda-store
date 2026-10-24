@@ -149,8 +149,8 @@
     "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
-    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody.
-    "STORE_DO_ENABLED_IDS": "",
+    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
+    "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",

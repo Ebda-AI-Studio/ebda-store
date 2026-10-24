@@ -33,11 +33,13 @@ describe('store backend flag', () => {
     expect(backendFor(DEMO, req({ 'x-ebda-backend': 'do' }))).toBe('pg');
   });
 
-  it('the committed wrangler flag is empty (never ships a store id by accident outside a ruling)', async () => {
+  it('the committed wrangler flag is at most the one Phase 0 demo store (storedemo-souq), never the QA walk store', async () => {
     const { readFileSync } = await import('node:fs');
     const w = readFileSync('apps/api/wrangler.jsonc', 'utf8');
     const m = w.match(/"STORE_DO_ENABLED_IDS":\s*"([^"]*)"/);
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/qa-walk/);
+    const ids = m![1].split(',').filter(Boolean);
+    expect(ids.length).toBeLessThanOrEqual(1);
+    for (const id of ids) expect(id).toBe(DEMO);
   });
 });
