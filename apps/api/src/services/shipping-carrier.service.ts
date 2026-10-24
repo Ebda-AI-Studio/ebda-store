@@ -27,6 +27,7 @@ import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 
 import { CARRIER_REGISTRY } from './carriers/registry';
+import { withAramexEmails } from './carriers/aramex.carrier';
 import {
   activeCredentials,
   decryptCarrierBlob,
@@ -483,9 +484,9 @@ class ShippingCarrierService {
     }
 
     const settings = (carrierConfig?.settings as Record<string, any>) ?? {};
-    const pickupAddress = this.buildPickupAddress(storeId, settings);
+    let pickupAddress = this.buildPickupAddress(storeId, settings);
     const shippingAddr = order.shippingAddress as Record<string, any>;
-    const deliveryAddress: ShipmentAddress = {
+    let deliveryAddress: ShipmentAddress = {
       name: `${shippingAddr.firstName ?? ''} ${shippingAddr.lastName ?? ''}`.trim() || 'Customer',
       phone: shippingAddr.phone ?? '',
       email: order.customer?.email,
@@ -502,6 +503,17 @@ class ShippingCarrierService {
       floor: shippingAddr.floor,
       apartment: shippingAddr.apartment,
     };
+    if (resolvedCarrierCode === 'aramex') {
+      // Aramex needs both emails: fall back to the owner / order email, else refuse (AR + EN).
+      const store = await prisma.store.findFirst({
+        where: { id: storeId },
+        select: { owner: { select: { email: true } } },
+      });
+      ({ pickupAddress, deliveryAddress } = withAramexEmails(pickupAddress, deliveryAddress, {
+        ownerEmail: store?.owner?.email,
+        orderEmail: typeof shippingAddr.email === 'string' ? shippingAddr.email : null,
+      }));
+    }
     const items = order.items.map(item => ({
       name: item.productName,
       quantity: item.quantity,

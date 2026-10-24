@@ -993,3 +993,30 @@ function parseAramexDate(s: string): Date {
 }
 
 export const aramexCarrier = new AramexCarrier();
+
+/**
+ * Aramex requires an email for BOTH shipper and customer when a shipment is created (manual:
+ * REQ24 "Email Address is empty" otherwise). Shipper: the merchant's pickup email, else the
+ * store owner's account email. Customer: the order's email (customer account, else the one typed
+ * at checkout). If either is still missing the booking is refused here with a merchant-facing
+ * Arabic + English message, instead of sending an empty element Aramex rejects.
+ */
+export const ARAMEX_EMAIL_REQUIRED_MESSAGE =
+  'أراميكس تشترط بريدًا إلكترونيًا للمرسل والعميل: أضف بريد الاستلام في إعدادات أراميكس، أو تأكد أن الطلب يحتوي على بريد العميل. / Aramex requires an email for both the sender and the customer: add a pickup email in the Aramex settings, or make sure the order has a customer email.';
+
+export function withAramexEmails(
+  pickup: ShipmentAddress,
+  delivery: ShipmentAddress,
+  fallbacks: { ownerEmail?: string | null; orderEmail?: string | null }
+): { pickupAddress: ShipmentAddress; deliveryAddress: ShipmentAddress } {
+  const clean = (v?: string | null) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const shipper = clean(pickup.email) ?? clean(fallbacks.ownerEmail);
+  const customer = clean(delivery.email) ?? clean(fallbacks.orderEmail);
+  if (!shipper || !customer) {
+    throw new CarrierError('CARRIER_REJECTED', ARAMEX_EMAIL_REQUIRED_MESSAGE);
+  }
+  return {
+    pickupAddress: { ...pickup, email: shipper },
+    deliveryAddress: { ...delivery, email: customer },
+  };
+}

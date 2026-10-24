@@ -6,7 +6,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { AramexCarrier, mapAramexStatus, parseXml } from '@api/services/carriers/aramex.carrier';
+import {
+  AramexCarrier,
+  mapAramexStatus,
+  parseXml,
+  withAramexEmails,
+  ARAMEX_EMAIL_REQUIRED_MESSAGE,
+} from '@api/services/carriers/aramex.carrier';
 import { CarrierError } from '@api/services/carriers/types';
 import { AramexStub, ARAMEX_NS, ARAMEX_STUB, validateAramexRequest } from '../stubs/aramex-stub';
 import { shipmentRequest } from '../contract/shipping-carrier.contract';
@@ -637,5 +643,58 @@ describe('manual re-verify 2026-10-24', () => {
     await expect(carrier.createShipment(creds, shipmentRequest(), ctx)).rejects.toMatchObject({
       code: 'CARRIER_REJECTED',
     });
+  });
+});
+
+describe('Aramex needs a shipper and a customer email (manual: REQ24)', () => {
+  const base = shipmentRequest();
+  const pickup = { ...base.pickupAddress, email: undefined };
+  const delivery = { ...base.deliveryAddress, email: undefined };
+
+  it('falls back to the owner email for the shipper and the order email for the customer', () => {
+    const r = withAramexEmails(pickup, delivery, {
+      ownerEmail: 'owner@shop.eg',
+      orderEmail: 'buyer@mail.com',
+    });
+    expect(r.pickupAddress.email).toBe('owner@shop.eg');
+    expect(r.deliveryAddress.email).toBe('buyer@mail.com');
+  });
+
+  it('keeps an explicit pickup / customer email over the fallbacks', () => {
+    const r = withAramexEmails(
+      { ...pickup, email: 'pickup@shop.eg' },
+      { ...delivery, email: 'c@x.com' },
+      {
+        ownerEmail: 'owner@shop.eg',
+        orderEmail: 'other@x.com',
+      }
+    );
+    expect([r.pickupAddress.email, r.deliveryAddress.email]).toEqual(['pickup@shop.eg', 'c@x.com']);
+  });
+
+  it('refuses the booking with a bilingual merchant message when either email is missing', () => {
+    for (const fb of [{ orderEmail: 'b@x.com' }, { ownerEmail: 'o@x.com' }, {}]) {
+      try {
+        withAramexEmails(pickup, delivery, fb);
+        throw new Error('should have refused');
+      } catch (e) {
+        expect(e).toBeInstanceOf(CarrierError);
+        expect((e as Error).message).toBe(ARAMEX_EMAIL_REQUIRED_MESSAGE);
+        expect((e as Error).message).toMatch(/[\u0600-\u06FF]/);
+        expect((e as Error).message).toMatch(/Aramex requires an email/);
+      }
+    }
+  });
+
+  it('the booked SOAP carries both emails after the fallback', async () => {
+    const { pickupAddress, deliveryAddress } = withAramexEmails(pickup, delivery, {
+      ownerEmail: 'owner@shop.eg',
+      orderEmail: 'buyer@mail.com',
+    });
+    const { stub, carrier } = mk();
+    await carrier.createShipment(creds, { ...base, pickupAddress, deliveryAddress }, ctx);
+    const body = JSON.stringify(stub.log);
+    expect(body).toContain('owner@shop.eg');
+    expect(body).toContain('buyer@mail.com');
   });
 });
