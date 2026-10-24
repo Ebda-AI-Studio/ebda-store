@@ -1,4 +1,4 @@
-/* Working-phone engine styles (src/lib/phone-store-dom.ts). `&` is the look's phone (id-scoped by export.py,
+/* Working-phone engine styles (src/lib/phone-store-dom.ts). `&` is the look's phone (id-scoped by snapshot.mjs,
    so these rules win over the look's own `& img`, `& h2`, `& button` base rules). Everything is drawn from the
    look's variables: --bg --ink --mut --ac --fd --fb plus the per-look tokens --btn --btnfg (primary button),
    --r (image/card radius), --rb (button radius), --ga (product photo ratio).

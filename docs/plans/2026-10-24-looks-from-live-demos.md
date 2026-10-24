@@ -21,6 +21,10 @@ Only the CONTENT of each phone changes. Keep the phone frame, crop, which sectio
 8. **Retire the mocks (only after 7b approval).** Delete `scripts/looks/{art,build,catalog,dahab,export,gen,jasmine,lamma,lib,prompts,qamar,souq}.py` and `phone-store.css` only after grep shows no importer; point `npm run looks` at snapshot.mjs; update `docs/` and `apps/marketing` README mentions. Blast-radius sweep: `rg "scripts/looks|looks-fonts|public/looks"` across code, CI, docs.
 9. **Rollout + live verification.** Merge on green (squash, --delete-branch). Then: marketing deploy workflow success on the merge SHA; `curl -s https://ebda.app/looks/<t>.html` 200 for all 5 with a sha256 different from before; load / and /en, switch all 5 tabs, each tab shows the polished state and its own demo link (storedemo, -souq, -jasmine, -lamma, -dahab); Lighthouse LCP and CLS 0 on /. Report verified vs not verified. Append a dated line to EBDA-PROGRAM-REGISTER.md.
 
+## Outcome (2026-10-24)
+
+Built: `snapshot.mjs` + `snapshot-lib.mjs`, `drift.mjs`, weekly `looks-drift.yml`, offline guard `marketing-looks-fragments`, per-template engine flow spec. Deviations, measured: fragments are 255-407 KB raw (the 120 KB budget was a guess; gzip is 29-37 KB, accepted); photos are one 720 px webp each (no AVIF/srcset: the phone shows at most 348 css px); fonts come from the demo page's own Google Fonts link into `looks-fonts.ts`; the engine CSS file `phone-store.css` is kept (the snapshot reuses it). 7b approved by Ahmad; the Python mocks are deleted and `npm run looks` runs `snapshot.mjs`.
+
 ## Risks
 
 Neon cold starts (warm-up hit + retry); demo data changes (drift test); fragment size (budget: <= 120 KB HTML per template gzip-less, images lazy); real storefront JS not carried over (only the engine runs in phones).

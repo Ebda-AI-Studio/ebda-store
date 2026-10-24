@@ -3,7 +3,7 @@
  * per-phone cart, category filters and the in-phone view stack. No DOM, no network, no
  * dependencies; phone-store-dom.ts binds this to a phone's markup.
  *
- * Product data comes from the generator (scripts/looks/lib.py `pd()`), as `data-p-*` on the card:
+ * Product data comes from the snapshot (scripts/looks/snapshot.mjs, from the live demo store), as `data-p-*` on the card:
  *   id, name, price, old, img, imgs (comma list, 2-4 photos), cat / occ (space separated tokens),
  *   and per-vertical details: sizes, colors ("name:#hex|name:#hex"), shades, specs, ing, skin,
  *   portion, lead, karat, mm, mat, unit, days, engrave (max chars), gift, desc.

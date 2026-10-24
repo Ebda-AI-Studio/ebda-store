@@ -624,7 +624,7 @@ async function main() {
             .waitForSelector('nav[data-bottom-tab-bar], a[href="/cart"]', { timeout: 20_000 })
             .catch(() => {});
           await page.evaluate(() => document.fonts.ready);
-          await page.waitForTimeout(800);
+          await page.waitForTimeout(1500);
           const got = await page.evaluate(extractInPage, {
             phoneId,
             cats: catalog.cats,
@@ -724,7 +724,12 @@ async function main() {
         .map(([t, f]) => `  ${t}: [${f.map(x => `'${x}'`).join(', ')}],\n`)
         .join('') +
       '} as const;\n';
-    writeFileSync(path.join(ROOT, 'src', 'lib', 'looks-fonts.ts'), ts);
+    const target = path.join(ROOT, 'src', 'lib', 'looks-fonts.ts');
+    const prettier = await import('prettier');
+    writeFileSync(
+      target,
+      await prettier.format(ts, { ...(await prettier.resolveConfig(target)), filepath: target })
+    );
   }
   console.log(report.join('\n'));
   void fam;

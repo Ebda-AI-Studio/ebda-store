@@ -32,7 +32,7 @@ if (problems.length) {
   console.error(
     'DRIFT between the committed phones and the live demo stores:\n' + problems.join('\n')
   );
-  console.error('Run `npm run looks:snapshot -w apps/marketing` and commit the result.');
+  console.error('Run `npm run looks -w apps/marketing` and commit the result.');
   process.exit(1);
 }
 console.log('no drift: committed phones match the live demo stores');

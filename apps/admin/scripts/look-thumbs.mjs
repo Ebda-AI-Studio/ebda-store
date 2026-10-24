@@ -3,7 +3,7 @@
  * Generates apps/admin/public/looks/<lookId>.webp: the first screen of each look's phone, 360px wide,
  * for the admin LookPicker. Source of truth is the already-exported marketing fragments
  * (apps/marketing/public/looks/<template>.html, phones `ph-<template>-<a|b|c>`); nothing here
- * redefines a look. Re-run after `npm run looks` in apps/marketing changes the fragments.
+ * redefines a look. Re-run after `npm run looks -w apps/marketing` changes the fragments.
  *
  *   node apps/admin/scripts/look-thumbs.mjs [lookId ...]
  *

@@ -112,3 +112,13 @@ Local review: copy `scripts/dahab-demo/assets/*` into an untracked `apps/web/pub
 ## DQ-1: showrooms never show a no-photo product (2026-10-23)
 
 A demo store's showcase PDPs must have photos. The one no-photo product in `storedemo` (`modal-scarf-no-image`), `storedemo-souq` (`phone-case-set`) and `storedemo-jasmine` (`makeup-brush-set`) is dropped from the catalogues (the no-photo case lives in the `*-noimg` scenario stores, as for Lamma and Dahab). `spec.retiredSlugs` in `scripts/storedemo/seed.mjs` archives them in an already-seeded store on a re-seed (archived, never deleted: cart lines may point at them). Counts: Qamar 17, Souq 19, Jasmine 21 products.
+
+## The ebda.app home phones are snapshots of these stores (MKT-PHONES-1, 2026-10-24)
+
+The 15 phones in the home page's looks section (`apps/marketing/public/looks/<template>.html`) are not mock-ups: `npm run looks -w apps/marketing` (`scripts/looks/snapshot.mjs`) renders each demo store at phone width (Arabic, reduced motion, `?look=<template>.<look>`), keeps the CSS rules that apply at that width, scopes them per phone, re-hosts the photos (webp, 720 px) and wires cards, category controls and the cart to the in-phone engine through `data-*` attributes (`phone-store-dom.ts` is unchanged). Nothing is clicked or typed on the store, and the demo bar and cookie banner are never copied. A weekly job (`.github/workflows/looks-drift.yml`, `scripts/looks/drift.mjs`) re-snapshots into a temp dir and fails with the template and look that drifted; run `npm run looks` and commit when a demo store's content or look changes. The old hand-written Python mock-ups were retired; a local archive is at `business/ebda/archive/home-phone-mockups-2026-10-23/`.
+
+Sizes (measured): fragments are 255-407 KB raw, 29-37 KB gzip per template (the real DOM and the Tailwind CSS that applies to it are heavier than the mocks' 57-70 KB raw); photos 1.3 MB for all 15 phones. The first template is server-rendered into the home page, the others are fetched on tab select.
+
+## Demo store names (BRAND-NAME-1)
+
+Each showroom is named after its template, never "Ebda ... Demo": storedemo = Qamar / «قمر», storedemo-souq = Souq / «سوق», storedemo-jasmine = Jasmine / «ياسمين», storedemo-lamma = Lamma / «لمّة», storedemo-dahab = Dahab / «دهب» (the registry names in `packages/shared/src/types/store-theme.ts`). Set in `TEMPLATE_SPECS` in `scripts/storedemo/seed.mjs`; a prod re-seed applies them.
