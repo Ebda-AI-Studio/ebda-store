@@ -56,15 +56,22 @@ export async function hit(
   const sKey = `s:${budget.name}:${key}`;
   const iKey = `i:${budget.name}:${ip}`;
   const guarded = `INSERT INTO login_attempts (key, at) SELECT ?1, ?2 WHERE (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
+  // A counter with no limit (MAX) is not kept at all: it would only grow into one hot global key under a flood.
+  const skipKey = budget.perKey === Number.MAX_SAFE_INTEGER;
+  const skipIp = budget.perIp === Number.MAX_SAFE_INTEGER;
   const res = await db.batch([
-    db.prepare(guarded).bind(sKey, at, since, budget.perKey),
-    db.prepare(guarded).bind(iKey, at, since, budget.perIp),
+    db
+      .prepare(skipKey ? `SELECT NULL AS id WHERE 0` : guarded)
+      .bind(...(skipKey ? [] : [sKey, at, since, budget.perKey])),
+    db
+      .prepare(skipIp ? `SELECT NULL AS id WHERE 0` : guarded)
+      .bind(...(skipIp ? [] : [iKey, at, since, budget.perIp])),
     // opportunistic cleanup keeps the table small
     db.prepare(`DELETE FROM login_attempts WHERE at < ?1`).bind(at - 2 * WINDOW_MS),
   ]);
   const sId = (res[0].results[0] as { id: number } | undefined)?.id;
   const iId = (res[1].results[0] as { id: number } | undefined)?.id;
-  const ok = sId !== undefined && iId !== undefined;
+  const ok = (skipKey || sId !== undefined) && (skipIp || iId !== undefined);
   if (!ok) {
     // Admitted by one counter only: give that row back so a refused request leaves no trace.
     const strays = [sId, iId].filter((x): x is number => x !== undefined);

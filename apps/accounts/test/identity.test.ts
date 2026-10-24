@@ -280,11 +280,15 @@ describe('signup, OTP and password reset', () => {
     const code = fakes.mails[0].code;
     expect(code).toMatch(/^\d{6}$/);
     const wrong = await call('/otp/verify', {
-      json: { email, code: code === '000000' ? '111111' : '000000' },
+      json: { email, code: code === '000000' ? '111111' : '000000', password: body.password },
     });
     expect(wrong.status).toBe(400);
-    expect((await call('/otp/verify', { json: { email, code } })).status).toBe(200);
-    expect((await call('/otp/verify', { json: { email, code } })).status).toBe(400); // single use
+    expect(
+      (await call('/otp/verify', { json: { email, code, password: body.password } })).status
+    ).toBe(200);
+    expect(
+      (await call('/otp/verify', { json: { email, code, password: body.password } })).status
+    ).toBe(400); // single use
     const { body: session } = await login({ email, password: body.password });
     expect(session.user.id).toBeTruthy();
   });
@@ -303,14 +307,14 @@ describe('signup, OTP and password reset', () => {
     const wrong = code === '123456' ? '654321' : '123456';
     for (let i = 0; i < 5; i++)
       await call('/otp/verify', {
-        json: { email, code: wrong },
+        json: { email, code: wrong, password: 'Str0ng!Passw0rd' },
         headers: { 'cf-connecting-ip': `192.0.2.${i + 1}` },
       });
     // refused either by the email lock (429) or the dead code (400): never accepted
     expect([400, 429]).toContain(
       (
         await call('/otp/verify', {
-          json: { email, code },
+          json: { email, code, password: 'Str0ng!Passw0rd' },
           headers: { 'cf-connecting-ip': '192.0.2.99' },
         })
       ).status

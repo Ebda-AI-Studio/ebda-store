@@ -96,8 +96,11 @@ describe('1. pre-hijacking: an unverified account is unusable and is stripped on
       .run();
     await call('/otp/resend', { json: { email: u.email } });
     expect(
-      (await call('/otp/verify', { json: { email: u.email, code: fakes.mails.at(-1)!.code } }))
-        .status
+      (
+        await call('/otp/verify', {
+          json: { email: u.email, code: fakes.mails.at(-1)!.code, password: u.password },
+        })
+      ).status
     ).toBe(200);
     expect(
       (await env.DB.prepare(`SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`)
@@ -205,8 +208,17 @@ describe('1. pre-hijacking: an unverified account is unusable and is stripped on
     const victimCode = fakes.mails.at(-1)!.code;
     expect(victimCode).not.toBe(attackerCode);
     // the attacker's earlier code was superseded: it does nothing
-    expect((await call('/otp/verify', { json: { email, code: attackerCode } })).status).toBe(400);
-    expect((await call('/otp/verify', { json: { email, code: victimCode } })).status).toBe(200);
+    expect(
+      (
+        await call('/otp/verify', {
+          json: { email, code: attackerCode, password: 'Attacker!Pass1' },
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (await call('/otp/verify', { json: { email, code: victimCode, password: 'Victim!Pass123' } }))
+        .status
+    ).toBe(200);
     expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
       401
     );
@@ -220,12 +232,72 @@ describe('1. pre-hijacking: an unverified account is unusable and is stripped on
     await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'Victoria' } });
     await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'Mallory' } });
     const newest = fakes.mails.at(-1)!.code;
-    expect((await call('/otp/verify', { json: { email, code: newest } })).status).toBe(200);
+    // the owner opens the newest mail (it carries the ATTACKER's pending credential): their own password does not activate it
+    expect(
+      (await call('/otp/verify', { json: { email, code: newest, password: 'Victim!Pass123' } }))
+        .status
+    ).toBe(400);
+    expect(
+      await env.DB.prepare(`SELECT email_verified FROM users WHERE lower(email) = ?1`)
+        .bind(email)
+        .first()
+    ).toMatchObject({ email_verified: 0 });
+    expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
+      401
+    ); // nothing was activated
+    // the attacker can only activate it with a code that only the mailbox holder can read; with the code AND their password it works
+    expect(
+      (await call('/otp/verify', { json: { email, code: newest, password: 'Attacker!Pass1' } }))
+        .status
+    ).toBe(200);
     expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
       401
     );
     expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
       200
+    );
+  });
+
+  it("the takeover path from the review: victim signs up, attacker signs up, victim resends and verifies with their own password -> never the attacker's", async () => {
+    const email = `pre6-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'Victoria' } });
+    await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'Mallory' } });
+    await call('/otp/resend', { json: { email } }); // copies the latest signup's credential
+    const code = fakes.mails.at(-1)!.code;
+    expect(
+      (await call('/otp/verify', { json: { email, code, password: 'Victim!Pass123' } })).status
+    ).toBe(400);
+    expect(
+      await env.DB.prepare(
+        `SELECT email_verified, password_hash FROM users WHERE lower(email) = ?1`
+      )
+        .bind(email)
+        .first()
+    ).toMatchObject({
+      email_verified: 0,
+      password_hash: '!pending',
+    });
+    // the owner's recovery: wait out the send window (3 codes per 15 minutes), then sign up again with their own password
+    await env.DB.prepare(
+      `UPDATE verification_tokens SET created_at = ?1 WHERE user_id = (SELECT id FROM users WHERE lower(email) = ?2)`
+    )
+      .bind(new Date(Date.now() - 20 * 60_000).toISOString(), email)
+      .run();
+    await env.DB.prepare(`DELETE FROM login_attempts`).run();
+    await call('/signup', {
+      json: { email, password: 'Victim!Pass123', firstName: 'Victoria' },
+      headers: { 'cf-connecting-ip': '198.51.100.9' },
+    });
+    const fresh = fakes.mails.at(-1)!.code;
+    expect(
+      (await call('/otp/verify', { json: { email, code: fresh, password: 'Victim!Pass123' } }))
+        .status
+    ).toBe(200);
+    expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
+      200
+    );
+    expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
+      401
     );
   });
 
@@ -258,7 +330,9 @@ describe('1. pre-hijacking: an unverified account is unusable and is stripped on
     await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'V' } });
     await call('/otp/resend', { json: { email } });
     const code = fakes.mails.at(-1)!.code;
-    expect((await call('/otp/verify', { json: { email, code } })).status).toBe(200);
+    expect(
+      (await call('/otp/verify', { json: { email, code, password: 'Victim!Pass123' } })).status
+    ).toBe(200);
     expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
       200
     );
@@ -373,7 +447,7 @@ describe('3. login CSRF: every state-changing endpoint needs an allowed origin a
         '/password/reset',
         { email: 'a@example.com', code: '123456', newPassword: 'Str0ng!Passw0rd' },
       ],
-      ['/otp/verify', { email: 'a@example.com', code: '123456' }],
+      ['/otp/verify', { email: 'a@example.com', code: '123456', password: 'x' }],
     ] as const) {
       const r = await call(
         path,

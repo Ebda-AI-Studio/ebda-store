@@ -79,7 +79,12 @@ export async function verifyOtp(
   db: D1Database,
   user: Pick<UserRow, 'id'>,
   type: OtpType,
-  code: string
+  code: string,
+  /**
+   * Extra proof required AFTER the code matches and BEFORE it is consumed (signup: the password submitted with the signup
+   * that produced this code). A refusal counts as a wrong guess and leaves the code usable.
+   */
+  accept?: (pending: PendingSignup | null) => Promise<boolean>
 ): Promise<OtpResult> {
   const fail: OtpResult = { ok: false, pending: null };
   if (!/^\d{6}$/.test(code ?? '')) return fail;
@@ -91,7 +96,9 @@ export async function verifyOtp(
     .bind(user.id, type, iso())
     .first<{ id: string; token: string; attempts: number; pending: string | null }>();
   if (!row) return fail;
-  if (!safeEqual(row.token, await hashCode(user.id, type, code))) {
+  const pending = row.pending ? (JSON.parse(row.pending) as PendingSignup) : null;
+  const codeMatches = safeEqual(row.token, await hashCode(user.id, type, code));
+  if (!codeMatches || (accept && !(await accept(pending)))) {
     await db
       .prepare(
         `UPDATE verification_tokens SET attempts = attempts + 1, used_at = CASE WHEN attempts + 1 >= ?2 THEN ?3 ELSE used_at END WHERE id = ?1`
@@ -105,5 +112,5 @@ export async function verifyOtp(
     .bind(row.id, iso())
     .run();
   if ((res.meta.changes ?? 0) !== 1) return fail;
-  return { ok: true, pending: row.pending ? (JSON.parse(row.pending) as PendingSignup) : null };
+  return { ok: true, pending };
 }

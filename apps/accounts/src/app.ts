@@ -576,7 +576,13 @@ export function createApp() {
     return c.json({ success: true, data: { status: 'verification_sent' } }, 202);
   });
 
-  const otpBody = z.object({ email: emailSchema, code: z.string().regex(/^\d{6}$/) });
+  // Verifying an address also needs the PASSWORD chosen at signup: a code mailed because someone else typed this address
+  // cannot activate their password on the owner's behalf (the owner will not know it).
+  const otpBody = z.object({
+    email: emailSchema,
+    code: z.string().regex(/^\d{6}$/),
+    password: z.string().min(1).max(200),
+  });
 
   app.post('/otp/verify', async c => {
     const body = await json(c, otpBody);
@@ -584,7 +590,10 @@ export function createApp() {
     if (!attempt.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
     const user = await findUserByEmail(c.env.DB, body.email);
     const res = user
-      ? await verifyOtp(c.env.DB, user, 'email', body.code)
+      ? await verifyOtp(c.env.DB, user, 'email', body.code, async pending => {
+          const hash = pending ? pending.password_hash : user.password_hash;
+          return verifyPassword(body.password, hash); // '!pending' / seed markers never match
+        })
       : { ok: false, pending: null };
     if (!res.ok || !user) throw err(400, 'INVALID_CODE');
     const wasUnverified = !user.email_verified;
