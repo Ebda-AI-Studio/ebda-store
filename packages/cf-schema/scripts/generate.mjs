@@ -279,7 +279,18 @@ function buildMeta(schema, split) {
       if (f.kind === 'unsupported') continue;
       if (f.kind !== 'relation') {
         const dec = (f.attrs.db ?? '').match(/Decimal\((\d+),\s*(\d+)\)/);
-        fields[f.name] = { kind: f.kind, type: f.type, column: f.column, list: f.list, optional: f.optional, ...(dec ? { scale: Number(dec[2]) } : {}), ...(f.kind === 'enum' ? { enum: f.type } : {}), ...(f.attrs.default !== undefined ? { default: f.attrs.default } : {}), ...(f.attrs.updatedAt ? { updatedAt: true } : {}), ...(f.attrs.id ? { id: true } : {}) };
+        fields[f.name] = {
+          kind: f.kind,
+          type: f.type,
+          column: f.column,
+          list: f.list,
+          optional: f.optional,
+          ...(dec ? { scale: Number(dec[2]) } : {}),
+          ...(f.kind === 'enum' ? { enum: f.type } : {}),
+          ...(f.attrs.default !== undefined ? { default: f.attrs.default } : {}),
+          ...(f.attrs.updatedAt ? { updatedAt: true } : {}),
+          ...(f.attrs.id ? { id: true } : {}),
+        };
         continue;
       }
       const tm = byName.get(f.type);
@@ -287,20 +298,47 @@ function buildMeta(schema, split) {
       let rel = { kind: 'relation', type: f.type, list: f.list, optional: f.optional, external };
       const r = f.attrs.relation;
       if (r && r.fields.length) {
-        rel = { ...rel, owner: true, from: r.fields.map(n => m.fields.find(x => x.name === n).column), fromProps: r.fields, to: r.references.map(n => tm.fields.find(x => x.name === n).column), toProps: r.references, onDelete: r.onDelete };
+        rel = {
+          ...rel,
+          owner: true,
+          from: r.fields.map(n => m.fields.find(x => x.name === n).column),
+          fromProps: r.fields,
+          to: r.references.map(n => tm.fields.find(x => x.name === n).column),
+          toProps: r.references,
+          onDelete: r.onDelete,
+        };
       } else if (!external) {
-        const back = tm.fields.filter(g => g.kind === 'relation' && g.type === m.name && g.attrs.relation?.fields.length && (!r?.name || g.attrs.relation.name === r.name));
-        if (back.length !== 1) throw new Error(`cannot resolve inverse of ${m.name}.${f.name} (${back.length} candidates)`);
+        const back = tm.fields.filter(
+          g =>
+            g.kind === 'relation' &&
+            g.type === m.name &&
+            g.attrs.relation?.fields.length &&
+            (!r?.name || g.attrs.relation.name === r.name)
+        );
+        if (back.length !== 1)
+          throw new Error(
+            `cannot resolve inverse of ${m.name}.${f.name} (${back.length} candidates)`
+          );
         const g = back[0].attrs.relation;
-        rel = { ...rel, owner: false, from: g.references.map(n => m.fields.find(x => x.name === n).column), fromProps: g.references, to: g.fields.map(n => tm.fields.find(x => x.name === n).column), toProps: g.fields };
+        rel = {
+          ...rel,
+          owner: false,
+          from: g.references.map(n => m.fields.find(x => x.name === n).column),
+          fromProps: g.references,
+          to: g.fields.map(n => tm.fields.find(x => x.name === n).column),
+          toProps: g.fields,
+        };
       }
       fields[f.name] = rel;
     }
     out[m.name] = {
       table: m.dbName,
       db: target,
-      pk: (m.id ?? m.fields.filter(f => f.attrs.id).map(f => f.name)),
-      uniques: [...m.fields.filter(f => f.attrs.unique && f.kind !== 'relation').map(f => [f.name]), ...m.uniques.map(u => u.fields.map(x => x.field))],
+      pk: m.id ?? m.fields.filter(f => f.attrs.id).map(f => f.name),
+      uniques: [
+        ...m.fields.filter(f => f.attrs.unique && f.kind !== 'relation').map(f => [f.name]),
+        ...m.uniques.map(u => u.fields.map(x => x.field)),
+      ],
       fields,
     };
   }
