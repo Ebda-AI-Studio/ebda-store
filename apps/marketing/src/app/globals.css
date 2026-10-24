@@ -710,7 +710,9 @@ html[lang='ar'] .hero-sub {
    Scroll-linked (Ruling MKT-STORY-1): Motion.tsx writes ONE number, --p (0..1 across the pinned stretch), and
    everything below is a calc() of it that lands on opacity and transform only (compositor-only: no layout, no
    paint beyond the layers). Beats: 0-.14 the phone rises and levels; frames crossfade at .30 / .50 / .70; the
-   order notifications arrive from .78. No transitions: the scroll IS the clock. */
+   order notifications arrive from .78. No transitions: the scroll IS the clock.
+   The DEFAULT below is the static finished store in normal flow (--p: 1): that is what no-JS, reduced-motion and
+   browsers without the `scripting` media feature get. Only `(scripting: enabled)` + no-preference pins and scrubs. */
 .story {
   position: relative;
   --p: 1;
@@ -718,17 +720,20 @@ html[lang='ar'] .hero-sub {
 .story-sticky {
   padding-block: clamp(72px, 11vw, 132px);
 }
-.story[data-live] {
-  height: 400vh;
-}
-.story[data-live] .story-sticky {
-  position: sticky;
-  top: 0;
-  height: 100svh;
-  padding-block: 72px 24px;
-  display: flex;
-  align-items: flex-start;
-  overflow: hidden;
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .story {
+    --p: 0;
+    height: 400vh;
+  }
+  .story-sticky {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    padding-block: 72px 24px;
+    display: flex;
+    align-items: flex-start;
+    overflow: hidden;
+  }
 }
 .story-grid {
   display: grid;
@@ -789,20 +794,22 @@ html[lang='ar'] .story h2 {
   --s: 0.67;
   --e: 1.1;
 }
-.story[data-live] .story-steps li {
-  --act: calc(
-    clamp(0, calc((var(--p) - var(--s) - 0.01) / 0.03), 1) *
-      (1 - clamp(0, calc((var(--p) - var(--e) + 0.02) / 0.03), 1))
-  );
-  opacity: calc(
-    0.62 + 0.38 * var(--act)
-  ); /* inactive steps stay >= 4.5:1 (AA); 0.38 measured below it */
-  transform: translateY(calc((1 - var(--act)) * 8px));
-  will-change: opacity, transform;
-}
-/* the dimmed (inactive) steps blend with the canvas, so their small text uses the full ink: muted ink at 62% fails AA */
-.story[data-live] .story-step-d {
-  color: var(--fg);
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .story-steps li {
+    --act: calc(
+      clamp(0, calc((var(--p) - var(--s) - 0.01) / 0.03), 1) *
+        (1 - clamp(0, calc((var(--p) - var(--e) + 0.02) / 0.03), 1))
+    );
+    opacity: calc(
+      0.62 + 0.38 * var(--act)
+    ); /* inactive steps stay >= 4.5:1 (AA, Ruling A11Y-WINS-1); 0.38 measured below it */
+    transform: translateY(calc((1 - var(--act)) * 8px));
+    will-change: opacity, transform;
+  }
+  /* the dimmed (inactive) steps blend with the canvas, so their small text uses the full ink: muted ink at 62% fails AA */
+  .story-step-d {
+    color: var(--fg);
+  }
 }
 .story-stage {
   position: relative;
@@ -825,7 +832,7 @@ html[lang='ar'] .story h2 {
 .story-frame[data-f='4'] {
   --t: 0.67;
 }
-.story[data-live] .story-frame:not([data-f='1']) {
+.story-frame:not([data-f='1']) {
   opacity: clamp(0, calc((var(--p) - var(--t)) / 0.06), 1);
   will-change: opacity;
 }
@@ -837,14 +844,16 @@ html[lang='ar'] .story h2 {
   object-position: top center;
 }
 .story-phone {
-  --w: min(300px, 62vw, calc((100svh - 260px) / 2.07));
-  --in: clamp(0, calc(var(--p) / 0.14), 1);
-  transform: translateY(calc((1 - var(--in)) * 70px + var(--p) * -12px))
-    rotateX(calc((1 - var(--in)) * 10deg)) scale(calc(0.94 + 0.06 * var(--in)));
-  will-change: transform;
-}
-.story:not([data-live]) .story-phone {
   --w: min(300px, 70vw);
+}
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .story-phone {
+    --w: min(300px, 62vw, calc((100svh - 260px) / 2.07));
+    --in: clamp(0, calc(var(--p) / 0.14), 1);
+    transform: translateY(calc((1 - var(--in)) * 70px + var(--p) * -12px))
+      rotateX(calc((1 - var(--in)) * 10deg)) scale(calc(0.94 + 0.06 * var(--in)));
+    will-change: transform;
+  }
 }
 .story-screen {
   position: absolute;
@@ -902,21 +911,21 @@ html[lang='ar'] .story h2 {
     gap: 48px;
   }
 }
-@media (max-width: 899px) {
-  .story[data-live] .story-grid {
+@media (max-width: 899px) and (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .story .story-grid {
     grid-template-rows: auto 1fr;
     height: 100%;
     align-content: center;
   }
-  .story[data-live] h2 {
+  .story h2 {
     font-size: 1.6rem;
     margin-bottom: 8px;
   }
   /* one line at a time: all four share a cell and cross-fade with --act */
-  .story[data-live] .story-steps {
+  .story .story-steps {
     display: grid;
   }
-  .story[data-live] .story-steps li {
+  .story .story-steps li {
     grid-area: 1 / 1;
     opacity: var(--act);
   }

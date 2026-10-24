@@ -10,27 +10,11 @@ const reducedMotion = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * The static story (the finished store in normal flow): what reduced-motion visitors and visitors without
- * JavaScript get. The server renders the JS state instead (step 0, phone tilted in, live layout) so the first
- * frame paints exactly where the scroll script will leave it; these overrides take over where that script
- * never runs. Used twice: a `<style media="(prefers-reduced-motion: reduce)">` and a `<noscript><style>`.
- */
-const STORY_STATIC_CSS = `
-.story[data-live]{height:auto!important;--p:1!important}
-.story[data-live] .story-sticky{position:static!important;height:auto!important;display:block!important;overflow:visible!important;padding-block:clamp(72px,11vw,132px)!important}
-.story[data-live] h2{font-size:clamp(1.9rem,5.2vw,3.4rem)!important;margin-bottom:24px!important}
-.story[data-live] .story-steps{display:grid!important}
-.story[data-live] .story-steps li{grid-area:auto!important;opacity:1!important;transform:none!important}
-.story .story-phone{--w:min(300px,70vw)!important;transform:none!important}
-.story .story-toast{transform:none!important;opacity:1!important}
-`;
-
-/**
  * The pinned scroll story: the Dahab store assembling inside a phone, one frame per step
  * (name + logo, products, colours + photos, first order) and then the order notifications. Five beats, scrubbed
  * by scroll progress: --p (0..1) is the only moving part and CSS maps it to opacity/transform. The server renders
  * the beginning (frame 1, --p 0) so the first paint is where the scroll script leaves it; no-JS and reduced-motion
- * get the finished store in normal flow (STORY_STATIC_CSS), as do crawlers.
+ * get the finished store in normal flow (the default CSS; the pin is behind `(scripting: enabled)`), as do crawlers.
  * The frames are screenshots of the Dahab look A fragment (scripts/story-frames/make.mjs).
  */
 export function StoryScroll({
@@ -75,6 +59,53 @@ export function StoryScroll({
       last = -1;
       onScroll();
     };
+    // ---- desktop glide: a ~40-line rAF lerp on the wheel (Ahmad 2026-10-24). Fine pointer + hover only (never touch),
+    // never under reduced motion (this effect already returned), and only while the story is on screen. Keyboard,
+    // space bar, scrollbar drags and anchors stay native: any scroll we did not make re-syncs the target.
+    const fine =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+    let target = window.scrollY;
+    let cur = window.scrollY;
+    let glideRaf = 0;
+    let lastT = 0;
+    const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
+    const glide = (t: number) => {
+      const dt = Math.min(64, t - lastT || 16);
+      lastT = t;
+      cur += (target - cur) * (1 - Math.exp(-dt / 110));
+      if (Math.abs(target - cur) < 0.4) cur = target;
+      window.scrollTo({ top: cur, behavior: 'instant' }); // the page has scroll-behavior: smooth; the glide is the easing
+      glideRaf = cur === target ? 0 : requestAnimationFrame(glide);
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.defaultPrevented || e.deltaY === 0) return; // pinch-zoom / handled elsewhere
+      e.preventDefault();
+      const dy =
+        e.deltaMode === 1
+          ? e.deltaY * 16
+          : e.deltaMode === 2
+            ? e.deltaY * window.innerHeight
+            : e.deltaY;
+      if (!glideRaf) {
+        cur = window.scrollY;
+        target = cur;
+        lastT = 0;
+      }
+      target = Math.min(maxScroll(), Math.max(0, target + dy));
+      if (!glideRaf) glideRaf = requestAnimationFrame(glide);
+    };
+    const resync = () => {
+      if (!glideRaf) {
+        target = cur = window.scrollY;
+      }
+    };
+    const stopGlide = () => {
+      if (glideRaf) cancelAnimationFrame(glideRaf);
+      glideRaf = 0;
+      resync();
+    };
+
     let listening = false;
     const io = new IntersectionObserver(entries => {
       const e = entries[entries.length - 1];
@@ -83,11 +114,21 @@ export function StoryScroll({
         measure();
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('resize', onResize);
+        if (fine) {
+          window.addEventListener('wheel', onWheel, { passive: false });
+          window.addEventListener('scroll', resync, { passive: true });
+          window.addEventListener('keydown', stopGlide);
+          window.addEventListener('pointerdown', stopGlide);
+        }
         onScroll();
       } else if (!e.isIntersecting && listening) {
         listening = false;
         window.removeEventListener('scroll', onScroll);
         window.removeEventListener('resize', onResize);
+        window.removeEventListener('wheel', onWheel);
+        window.removeEventListener('scroll', resync);
+        window.removeEventListener('keydown', stopGlide);
+        window.removeEventListener('pointerdown', stopGlide);
       }
     });
     // anything above the story that changes the page height (font swap, lazy image) moves `top`: watch the body too
@@ -95,7 +136,6 @@ export function StoryScroll({
     ro?.observe(el);
     ro?.observe(document.body);
     void document.fonts?.ready.then(onResize);
-    el.dataset.live = '1';
     measure();
     update();
     io.observe(el);
@@ -104,23 +144,17 @@ export function StoryScroll({
       ro?.disconnect();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('scroll', resync);
+      window.removeEventListener('keydown', stopGlide);
+      window.removeEventListener('pointerdown', stopGlide);
+      if (glideRaf) cancelAnimationFrame(glideRaf);
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
 
   return (
-    <section
-      id="story"
-      ref={ref}
-      className="story"
-      data-live="1"
-      style={{ '--p': 0 } as CSSProperties}
-      aria-labelledby="story-h"
-    >
-      <style media="(prefers-reduced-motion: reduce)">{STORY_STATIC_CSS}</style>
-      <noscript>
-        <style>{STORY_STATIC_CSS}</style>
-      </noscript>
+    <section id="story" ref={ref} className="story" aria-labelledby="story-h">
       <div className="story-sticky">
         <div className="wrap story-grid">
           <div className="story-copy">
