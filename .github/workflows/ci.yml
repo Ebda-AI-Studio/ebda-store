@@ -103,6 +103,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -125,6 +134,15 @@ jobs:
         with:
           # Prettier-on-changed-files below diffs against the PR base.
           fetch-depth: 0
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -193,6 +211,15 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -221,6 +248,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -261,6 +297,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -315,6 +360,15 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -354,6 +408,15 @@ jobs:
         app: ${{ fromJSON(needs.changes.outputs.workers) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -449,6 +512,15 @@ jobs:
           --health-start-period 30s
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -483,6 +555,15 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -524,6 +605,15 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -617,6 +707,15 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -739,6 +838,15 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -926,6 +1034,15 @@ jobs:
           --health-start-period 30s
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1029,6 +1146,15 @@ jobs:
           --health-start-period 30s
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1107,6 +1233,15 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1167,6 +1302,15 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1211,6 +1355,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
+        # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
+        # The runner's own .env now sets TMPDIR per runner (umbra runner harden); this makes the job independent
+        # of that: point TMPDIR at this runner's private RUNNER_TEMP (cleaned by the runner between jobs).
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
