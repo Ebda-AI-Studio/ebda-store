@@ -18,7 +18,6 @@ import {
   type ProviderCatalogEntry,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
-import { isProviderUsable } from '../payment-providers/provider-gate';
 import { mergeCredentialFields } from '../payment-providers/provider-connection.service';
 import type { CredentialHints } from '../payment-providers/credentials';
 import {
@@ -34,7 +33,13 @@ import {
 import { getCarrierAdapter } from './registry';
 import type { CarrierCallContext } from './types';
 
-export type CarrierTestCode = 'ok' | 'bad_credentials' | 'incomplete' | 'unreachable' | 'unknown';
+export type CarrierTestCode =
+  | 'ok'
+  | 'bad_credentials'
+  | 'incomplete'
+  | 'unreachable'
+  | 'unknown'
+  | 'no_check';
 
 /** What `connection_test` holds. `fingerprint` is set only for a successful test. */
 export interface StoredCarrierTest {
@@ -153,22 +158,12 @@ export function carrierTestLooksCurrent(row: ConnectableCarrierRow): boolean {
 }
 
 /** The enable gate, for EVERY write path that can leave an API carrier enabled. */
-export function assertCarrierEnableAllowed(
-  row: ConnectableCarrierRow,
-  opts: { storeActivated?: boolean } = {}
-): void {
+export function assertCarrierEnableAllowed(row: ConnectableCarrierRow): void {
   const entry = getProviderEntry(row.carrier);
   if (!entry || entry.kind !== 'shipping') {
     throw new AppError(422, 'UNKNOWN_CARRIER', `Unknown carrier "${row.carrier}"`);
   }
   if (entry.manual) return;
-  if (!isProviderUsable(row.carrier) && !opts.storeActivated) {
-    throw new AppError(
-      409,
-      'PROVIDER_NOT_VERIFIED',
-      `${row.carrier} is not activated for this store yet: request activation first`
-    );
-  }
   if (!carrierTestIsCurrent(row)) {
     throw new AppError(
       409,
@@ -181,14 +176,18 @@ export function assertCarrierEnableAllowed(
 /** Run the adapter's harmless call for the row's ACTIVE mode. Never throws for carrier errors. */
 export async function runCarrierConnectionTest(
   row: ConnectableCarrierRow,
-  ctx: CarrierCallContext
+  ctx: CarrierCallContext,
+  /** Check this mode's credentials instead of the active one (the mode just saved: sandbox first). */
+  forMode?: CredentialMode
 ): Promise<{
   result: { ok: boolean; code: CarrierTestCode; message: string };
   stored: StoredCarrierTest;
 }> {
   const entry = carrierEntry(row.carrier);
-  const mode = modeOfRow(row);
-  const fields = activeFieldSet(row);
+  const mode = forMode ?? modeOfRow(row);
+  const fields = forMode
+    ? (decryptCarrierBlob(row.credentials, row.settings)[mode] ?? {})
+    : activeFieldSet(row);
   const at = new Date().toISOString();
   const missing = missingRequiredFields(entry, fields);
   let result: { ok: boolean; code: CarrierTestCode; message: string };
@@ -197,7 +196,12 @@ export async function runCarrierConnectionTest(
   } else {
     const adapter = getCarrierAdapter(row.carrier);
     if (!adapter) {
-      result = { ok: false, code: 'unknown', message: 'This carrier has no connection test' };
+      // PROVIDERS-3: no safe read-only call; usable but explicitly UNVERIFIED.
+      result = {
+        ok: true,
+        code: 'no_check',
+        message: 'This carrier has no safe connection test; the connection is unverified',
+      };
     } else {
       try {
         const r = await adapter.testConnection(fields, {

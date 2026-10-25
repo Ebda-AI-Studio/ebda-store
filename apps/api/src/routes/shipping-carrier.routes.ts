@@ -252,7 +252,32 @@ router.put(
         userAgent: req.headers['user-agent'],
       });
 
-      res.json({ success: true, data: result });
+      // PROVIDERS-3: SANDBOX-FIRST automatic check of the credentials just saved (the saved mode),
+      // the carrier's one read-only call. Never a shipment. A failed check does not undo the save.
+      let check = null;
+      if (result.changed.length > 0 && body.mode) {
+        const tested = await shippingCarrierService.testConnection(storeId, carrier, body.mode);
+        check = tested.check;
+        await auditLog({
+          action: 'shipping_carrier_config.connection_tested',
+          storeId,
+          userId: req.user?.userId,
+          resourceType: 'shipping_carrier_config',
+          resourceId: String(result.config.id),
+          details: {
+            storeId,
+            carrier,
+            mode: tested.mode,
+            ok: tested.test.ok,
+            code: tested.test.code,
+            auto: true,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
+
+      res.json({ success: true, data: { ...result, check } });
     } catch (error) {
       next(error);
     }

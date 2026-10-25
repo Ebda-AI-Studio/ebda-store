@@ -3,21 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
-  isActivationRequestable,
   isMaskedSecret,
   validateCredentialValue,
   type CredentialFieldDef,
+  type ConnectionCheckView,
   type CredentialMode,
   type ProviderCatalogEntry,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
-import type { ActivationRequest } from '../../../../../lib/provider-activation';
-import {
-  ActivatedChip,
-  ProviderActivationPanel,
-} from '../../../../../components/ProviderActivationPanel';
+import { UnverifiedProviderNotice } from '../../../../../components/UnverifiedProviderNotice';
 import { PickupAddressForm, type PickupAddress } from './PickupAddressForm';
 import {
   pickupFromSettings,
@@ -42,8 +38,6 @@ interface Props {
   entry: ProviderCatalogEntry;
   config: CarrierConfigRow | undefined;
   storeId: string;
-  /** This provider's activation request for the store (unverified providers only). */
-  activation?: ActivationRequest;
   /** Refetch the store's configs after any write. */
   onChanged: () => Promise<void> | void;
 }
@@ -72,7 +66,7 @@ const SHIPBLU_SIZES = ['1', '2', '3', '4'];
  * Mylerz, Aramex): credential fields per mode (write-only secrets), Test connection, the enable
  * gate, and the carrier's non-secret settings (pickup address, weight, size, Aramex product).
  */
-export function CarrierConnectCard({ entry, config, storeId, activation, onChanged }: Props) {
+export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props) {
   const t = useT('shipping.carriers.connect');
   const locale: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
   const base = `/api/v1/stores/${storeId}/shipping-carriers`;
@@ -110,19 +104,16 @@ export function CarrierConnectCard({ entry, config, storeId, activation, onChang
     entry.fields.every(f => !f.required || hintFor(m, f.key) !== null);
   const activeReady = Boolean(config) && requiredSavedFor(activeMode);
 
-  // An unverified provider is usable only once Ebda activated it for this store.
-  const requestable = isActivationRequestable(entry);
-  const activated = requestable && activation?.status === 'activated';
-  const usable = !requestable || activated;
+  // PROVIDERS-3: an unverified provider connects like any other; the automatic check on save
+  // (and Test connection) is the gate, and the first real order confirms it.
+  const unverified = !entry.manual && !entry.verified;
   const connected = Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok);
-  const canEnable = connected && usable;
-  const enableBlockedReason = !usable
-    ? t('enable.notActivated')
-    : !config
-      ? t('enable.saveFirst')
-      : !connected
-        ? t('enable.testFirst')
-        : null;
+  const canEnable = connected;
+  const enableBlockedReason = !config
+    ? t('enable.saveFirst')
+    : !connected
+      ? t('enable.testFirst')
+      : null;
 
   const statusKey = config?.enabled ? 'enabled' : connected ? 'connected' : 'notConnected';
   const statusTone =
@@ -165,7 +156,10 @@ export function CarrierConnectCard({ entry, config, storeId, activation, onChang
     }
     setBusy(activate ? 'activate' : 'save');
     setNotice(null);
-    const { data, error: apiErr } = await apiPut<{ disabledUntilRetested?: boolean }>(configUrl, {
+    const { data, error: apiErr } = await apiPut<{
+      disabledUntilRetested?: boolean;
+      check?: ConnectionCheckView | null;
+    }>(configUrl, {
       mode,
       credentials: fields,
       ...(activate ? { activate: true } : {}),
@@ -176,13 +170,18 @@ export function CarrierConnectCard({ entry, config, storeId, activation, onChang
       return;
     }
     setTest(null);
+    const savedText = data?.disabledUntilRetested
+      ? t('messages.savedDisabled')
+      : activate
+        ? t('messages.modeActivated', { mode: t(`modes.${mode}`) })
+        : t('messages.saved');
+    // PROVIDERS-3: the automatic check ran on save; say connected / wrong credentials / unreachable.
+    const check = data?.check;
     setNotice({
-      type: 'success',
-      text: data?.disabledUntilRetested
-        ? t('messages.savedDisabled')
-        : activate
-          ? t('messages.modeActivated', { mode: t(`modes.${mode}`) })
-          : t('messages.saved'),
+      type: check && !check.ok ? 'error' : 'success',
+      text: check
+        ? `${savedText} ${locale === 'ar' ? check.messageAr : check.messageEn}`
+        : savedText,
     });
     await onChanged();
   }
@@ -212,9 +211,7 @@ export function CarrierConnectCard({ entry, config, storeId, activation, onChang
       const text =
         apiErr.code === 'CONNECTION_NOT_TESTED'
           ? t('enable.testFirst')
-          : apiErr.code === 'PROVIDER_NOT_VERIFIED'
-            ? t('enable.notActivated')
-            : apiErr.message || t('messages.failed');
+          : apiErr.message || t('messages.failed');
       setNotice({ type: 'error', text });
       return;
     }
@@ -273,7 +270,6 @@ export function CarrierConnectCard({ entry, config, storeId, activation, onChang
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone}`}>
               {t(`status.${statusKey}`)}
             </span>
-            {activated && <ActivatedChip />}
             {config?.isDefault && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-ink">
                 {t('default.badge')}
@@ -301,14 +297,9 @@ export function CarrierConnectCard({ entry, config, storeId, activation, onChang
         </button>
       </div>
 
-      {requestable && !activated && (
+      {unverified && (
         <div className="border-t px-4 py-3">
-          <ProviderActivationPanel
-            provider={entry.code}
-            storeId={storeId}
-            activation={activation}
-            onChanged={onChanged}
-          />
+          <UnverifiedProviderNotice />
         </div>
       )}
 

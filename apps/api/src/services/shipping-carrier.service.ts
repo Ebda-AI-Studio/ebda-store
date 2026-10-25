@@ -42,10 +42,9 @@ import {
   runCarrierConnectionTest,
   type CarrierCredentialUpdate,
 } from './carriers/carrier-connection.service';
-import {
-  isProviderActivatedForStore,
-  isProviderUsableForStore,
-} from './payment-providers/provider-gate';
+import { isProviderUsableForStore } from './payment-providers/provider-gate';
+import { recordProviderOperation, reportConnectionCheck } from './provider-verification.service';
+import { describeConnectionCheck, type CredentialMode } from '@ebda/shared';
 import {
   ShippingCarrierProvider,
   CarrierCode,
@@ -106,6 +105,12 @@ interface ListShipmentsOptions {
   limit?: number;
   status?: string;
   carrier?: string;
+}
+
+/** A short, secret-free code for a booking failure (the CarrierError code, never its message). */
+function shipmentErrorCode(err: unknown): string {
+  if (err instanceof CarrierError) return err.code;
+  return err instanceof Error ? err.name.slice(0, 60) : 'UNKNOWN';
 }
 
 class ShippingCarrierService {
@@ -243,18 +248,15 @@ class ShippingCarrierService {
       const nextSettings = input.settings ? settings : ((existing?.settings as object) ?? {});
 
       if (nextEnabled) {
-        assertCarrierEnableAllowed(
-          {
-            carrier,
-            enabled: true,
-            testMode: nextTestMode,
-            credentials: cipher,
-            settings: nextSettings,
-            credentialHints: hints,
-            connectionTest: existing?.connectionTest ?? null,
-          },
-          { storeActivated: await isProviderActivatedForStore(storeId, carrier) }
-        );
+        assertCarrierEnableAllowed({
+          carrier,
+          enabled: true,
+          testMode: nextTestMode,
+          credentials: cipher,
+          settings: nextSettings,
+          credentialHints: hints,
+          connectionTest: existing?.connectionTest ?? null,
+        });
       }
 
       const data = {
@@ -348,7 +350,7 @@ class ShippingCarrierService {
    * Test connection: the adapter's ONE harmless authenticated call with the ACTIVE mode's stored
    * credentials. Records `{ok, code, mode, at, fingerprint}` on the row: the enable gate.
    */
-  async testConnection(storeId: string, carrier: CarrierCode) {
+  async testConnection(storeId: string, carrier: CarrierCode, forMode?: CredentialMode) {
     const row = await prisma.shippingCarrierConfig.findUnique({
       where: { storeId_carrier: { storeId, carrier } },
     });
@@ -358,7 +360,13 @@ class ShippingCarrierService {
     const startedAt = Date.now();
     const { result, stored } = await runCarrierConnectionTest(
       row,
-      this.callContext({ storeId, carrier, settings: row.settings, testMode: row.testMode })
+      this.callContext({
+        storeId,
+        carrier,
+        settings: row.settings,
+        testMode: forMode ? forMode === 'sandbox' : row.testMode,
+      }),
+      forMode
     );
     const latency = Date.now() - startedAt;
     await prisma.shippingCarrierConfig.update({
@@ -366,10 +374,17 @@ class ShippingCarrierService {
       data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
     });
     await this.invalidateCarrierConfigCache(storeId);
+    await reportConnectionCheck({
+      storeId,
+      provider: carrier,
+      mode: stored.mode,
+      code: result.code,
+    });
     return {
       carrier,
       mode: stored.mode,
       test: { ok: result.ok, code: result.code, message: result.message, latency },
+      check: describeConnectionCheck(result),
     };
   }
 
@@ -470,8 +485,8 @@ class ShippingCarrierService {
         `Carrier ${resolvedCarrierCode} is not enabled for this store`
       );
     }
-    // PROVIDERS-2 at the point of use (belt and braces next to the enable gate): a carrier the
-    // catalog does not list as verified never books a parcel, whatever a stored row says.
+    // At the point of use (belt and braces next to the enable gate): only a carrier in the
+    // catalog books a parcel, whatever a stored row says (PROVIDERS-3: verified or not).
     if (
       resolvedCarrierCode !== 'manual' &&
       !(await isProviderUsableForStore(resolvedCarrierCode, storeId))
@@ -479,7 +494,7 @@ class ShippingCarrierService {
       throw new AppError(
         409,
         'CARRIER_NOT_ENABLED',
-        `Carrier ${resolvedCarrierCode} is coming soon and cannot book shipments yet`
+        `Carrier ${resolvedCarrierCode} is not a supported carrier and cannot book shipments`
       );
     }
 
@@ -576,8 +591,23 @@ class ShippingCarrierService {
       );
     } catch (err) {
       await this.recordCreationFailure(storeId, claimedId, err);
+      // PROVIDERS-3: a failed real booking of a not-yet-verified carrier pages ops (never throws).
+      await recordProviderOperation({
+        storeId,
+        provider: resolvedCarrierCode,
+        op: 'create_shipment',
+        ok: false,
+        errorCode: shipmentErrorCode(err),
+      });
       throw err;
     }
+    await recordProviderOperation({
+      storeId,
+      provider: resolvedCarrierCode,
+      op: 'create_shipment',
+      ok: true,
+      ref: response.trackingNumber ?? response.carrierShipmentId ?? null,
+    });
 
     // ---- record it (own short transaction) and move the order along
     const shipment = await runInTenantContext(storeId, () =>

@@ -123,29 +123,20 @@ describe('provider catalog', () => {
   });
 });
 
-describe('PROVIDERS-2 gate', () => {
+describe('provider gate (PROVIDERS-3)', () => {
   const saved = { ...process.env };
   afterEach(() => {
     process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = saved.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     process.env.NODE_ENV = saved.NODE_ENV;
   });
 
-  it('an unverified gateway is not usable; manual methods always are', () => {
-    delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
-    expect(isProviderUsable('paymob')).toBe(false);
+  it('every catalog provider is usable (PROVIDERS-3); an unknown code is not', () => {
+    expect(isProviderUsable('paymob')).toBe(true);
     expect(isProviderUsable('kashier')).toBe(true);
-    expect(isProviderUsable('fawry')).toBe(false);
+    expect(isProviderUsable('fawry')).toBe(true);
     expect(isProviderUsable('cod')).toBe(true);
     expect(isProviderUsable('instapay')).toBe(true);
     expect(isProviderUsable('geidea')).toBe(false);
-  });
-
-  it('the stub seam is ignored in production', () => {
-    process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = '1';
-    process.env.NODE_ENV = 'production';
-    expect(isProviderUsable('paymob')).toBe(false);
-    process.env.NODE_ENV = 'test';
-    expect(isProviderUsable('paymob')).toBe(true);
   });
 });
 
@@ -318,33 +309,18 @@ describe('enable gate: a passing test of EXACTLY the stored credentials', () => 
     }
   });
 
-  it('refuses an unverified provider even with a current test (PROVIDERS-2)', () => {
-    delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
-    expect(() => assertEnableAllowed(row({ provider: 'paymob' }))).toThrow(/not activated/);
-  });
-
-  it('accepts an unverified provider for a store Ebda activated it for, but still needs the test (PROVIDERS-ACTIVATION)', () => {
+  it('an unverified provider is enabled by a current test alone, never without it (PROVIDERS-3)', () => {
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     const paymobTest = {
       ...okTest,
       fingerprint: connectionFingerprint('paymob', 'sandbox', fields),
     };
     expect(() =>
-      assertEnableAllowed(row({ provider: 'paymob', connectionTest: paymobTest }), {
-        storeActivated: true,
-      })
+      assertEnableAllowed(row({ provider: 'paymob', connectionTest: paymobTest }))
     ).not.toThrow();
-    // not activated for this store: still refused with the same current test
-    expect(() =>
-      assertEnableAllowed(row({ provider: 'paymob', connectionTest: paymobTest }), {
-        storeActivated: false,
-      })
-    ).toThrow(/not activated/);
-    expect(() =>
-      assertEnableAllowed(row({ provider: 'paymob', connectionTest: null }), {
-        storeActivated: true,
-      })
-    ).toThrow(/Test connection/);
+    expect(() => assertEnableAllowed(row({ provider: 'paymob', connectionTest: null }))).toThrow(
+      /Test connection/
+    );
   });
 
   it('allows a verified provider with a current test (PROVIDERS-2)', () => {
@@ -362,6 +338,15 @@ describe('enable gate: a passing test of EXACTLY the stored credentials', () => 
     const partial = encryptCredentialBlob({ sandbox: { merchantId: 'MID-1-1' } });
     const { result, stored } = await runConnectionTest(row({ credentials: partial }));
     expect(result.code).toBe('incomplete');
+    expect(stored.fingerprint).toBeNull();
+  });
+
+  it('checks the SAVED mode when asked (sandbox first), not the active one (PROVIDERS-3)', async () => {
+    // sandbox is active and complete; nothing is saved for live: a live check says incomplete
+    // and sends nothing, while the active-mode check still runs the adapter.
+    const { result, stored } = await runConnectionTest(row(), 'live');
+    expect(result.code).toBe('incomplete');
+    expect(stored.mode).toBe('live');
     expect(stored.fingerprint).toBeNull();
   });
 });

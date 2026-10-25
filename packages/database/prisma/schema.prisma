@@ -5442,6 +5442,39 @@ model ProviderActivationRequest {
   @@map("provider_activation_requests")
 }
 
+// PROVIDERS-3: what the first merchants' real traffic proves about a provider. GLOBAL (no tenant
+// data: store ids are plain strings with no FK, so deleting a store never erases the evidence).
+// `provider_verifications` holds the per-provider counters and `verified_at` (set automatically
+// after PROVIDER_AUTO_VERIFY_AFTER successful real operations); `provider_verification_events` is
+// the append-only evidence (op, outcome, reference, error code; never a credential or a body).
+model ProviderVerification {
+  provider     String    @id
+  kind         String
+  successCount Int       @default(0) @map("success_count")
+  failureCount Int       @default(0) @map("failure_count")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("provider_verifications")
+}
+
+model ProviderVerificationEvent {
+  id        String   @id @default(uuid())
+  provider  String
+  // Not `storeId` on purpose: the tenant guard would class this table as store-scoped.
+  sourceStoreId String @map("source_store_id")
+  op        String
+  ok        Boolean
+  ref       String?
+  errorCode String?  @map("error_code")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([provider, createdAt])
+  @@index([provider, sourceStoreId])
+  @@map("provider_verification_events")
+}
+
 /// An ISSUED fiscal document — tax invoice, receipt, credit note, refund
 /// receipt — or a store-deletion archive record (rulings MONEYB-1, MONEYB-4).
 ///

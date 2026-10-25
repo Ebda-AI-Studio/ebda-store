@@ -253,29 +253,17 @@ describe('the enable gate (PROVIDERS-2 + current Test connection)', () => {
     fingerprint: carrierFingerprint('bosta', mode, fields),
   });
 
-  it('an unverified carrier cannot be enabled, whatever the test says', () => {
+  it('an unverified carrier needs a current test, and with one it CAN be enabled (PROVIDERS-3)', () => {
     const u = make(true);
+    expect(() => assertCarrierEnableAllowed(row(u.cipher, true))).toThrow(/Test connection/);
     expect(() =>
       assertCarrierEnableAllowed(
         row(u.cipher, true, { connectionTest: okTest('sandbox', { apiKey: key }) })
       )
-    ).toThrow(/not activated/);
-  });
-
-  it('an unverified carrier activated for the store passes the verified check but still needs the test', () => {
-    const u = make(true);
-    expect(() =>
-      assertCarrierEnableAllowed(
-        row(u.cipher, true, { connectionTest: okTest('sandbox', { apiKey: key }) }),
-        { storeActivated: true }
-      )
     ).not.toThrow();
-    expect(() => assertCarrierEnableAllowed(row(u.cipher, true), { storeActivated: true })).toThrow(
-      /Test connection/
-    );
   });
 
-  it('with the stub seam: needs a successful test for EXACTLY the current credentials', () => {
+  it('needs a successful test for EXACTLY the current credentials', () => {
     process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = '1';
     const u = make(true);
     expect(() => assertCarrierEnableAllowed(row(u.cipher, true))).toThrow(/Test connection/);

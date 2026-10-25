@@ -1,3 +1,4 @@
+import { listProviderVerification } from '../services/provider-verification.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, asPlatformOperator } from '@ebda/database';
@@ -124,6 +125,19 @@ adminProviderActivationRoutes.get(
       const { status } = parseInput(statusSchema, req.query);
       const requests = await asPlatformOperator(req.user!.userId, () => listAllRequests(status));
       res.json({ success: true, data: { requests } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** PROVIDERS-3: per-provider real-traffic evidence and the automatic `verified` flip. */
+adminProviderActivationRoutes.get(
+  '/provider-verification',
+  ...superAdmin,
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: { providers: await listProviderVerification() } });
     } catch (error) {
       next(error);
     }
