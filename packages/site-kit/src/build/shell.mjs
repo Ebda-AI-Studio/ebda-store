@@ -1,6 +1,6 @@
 // Static page shell shared by docs + help: header (wordmark, nav, language switch, search),
 // optional sidebar, footer. Pure string templates; no client framework.
-import { BRAND } from '@ebda/shared/brand';
+import { BRAND, SITE_NAV_CSS, siteNavHtml, siteWordmarkHtml } from '@ebda/shared/brand';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,9 +13,10 @@ export const esc = s =>
 /** Copy the shared stylesheet into `<outDir>/assets/site.css`. */
 export function writeSiteCss(outDir) {
   mkdirSync(path.join(outDir, 'assets'), { recursive: true });
+  // the shared header nav (packages/shared/src/brand/index.ts) styles itself with the same string status inlines
   writeFileSync(
     path.join(outDir, 'assets', 'site.css'),
-    readFileSync(path.join(here, '..', 'css', 'site.css'))
+    readFileSync(path.join(here, '..', 'css', 'site.css'), 'utf8') + '\n' + SITE_NAV_CSS
   );
 }
 
@@ -32,7 +33,7 @@ const tokensCss = () =>
  * @param {{hreflang:string, href:string}[]} [p.alternates]
  * @param {string} p.siteLabel        e.g. "Docs" / "مركز المساعدة"
  * @param {string} p.homeHref
- * @param {{href:string,label:string}[]} p.nav
+ * @param {'docs'|'help'} p.active    the site this page belongs to (its nav link gets aria-current)
  * @param {{href:string,label:string,lang:string}} [p.langSwitch]
  * @param {{action:string,label:string,placeholder:string}} p.search
  * @param {string} [p.sidebar]        html (a <nav>)
@@ -50,7 +51,6 @@ export function renderPage(p) {
   const sw = p.langSwitch
     ? `<a class="lang-switch" href="${esc(p.langSwitch.href)}" hreflang="${p.langSwitch.lang}" lang="${p.langSwitch.lang}">${esc(p.langSwitch.label)}</a>`
     : '';
-  const nav = p.nav.map(n => `<li><a href="${esc(n.href)}">${esc(n.label)}</a></li>`).join('');
   return `<!doctype html>
 <html lang="${p.lang}" dir="${dir}">
 <head>
@@ -76,8 +76,8 @@ export function renderPage(p) {
 <a class="skip" href="#main">${esc(p.skipLabel)}</a>
 <header class="site-header">
   <div class="wrap header-row">
-    <a class="wordmark" href="${esc(p.homeHref)}"><img src="/icon.svg" alt="" width="28" height="28"><span>${esc(p.lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn)}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>
-    <nav class="top-nav" aria-label="${esc(p.siteLabel)}"><ul>${nav}</ul></nav>
+    ${siteWordmarkHtml({ lang: p.lang, href: p.homeHref, siteLabel: p.siteLabel, markHtml: '<img src="/icon.svg" alt="" width="28" height="28">' })}
+    ${siteNavHtml(p.lang, p.active)}
     <form class="search" role="search" action="${esc(p.search.action)}" method="get">
       <label class="sr-only" for="q">${esc(p.search.label)}</label>
       <input id="q" name="q" type="search" placeholder="${esc(p.search.placeholder)}" autocomplete="off">
