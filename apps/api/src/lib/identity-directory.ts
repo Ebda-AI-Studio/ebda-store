@@ -64,12 +64,14 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
         verificationUrl: `${config.adminUrl}/verify-email?${q}`,
         expiresInHours: Math.max(1, Math.round(m.ttlMinutes / 60)),
       },
-      m.language
+      m.language,
+      true
     );
   } else if (m.kind === 'factor_enrol') {
     await sendFactorEnrolCodeEmail(
       { email: m.to, name: m.firstName, code: m.code, expiresInMinutes: m.ttlMinutes },
-      m.language
+      m.language,
+      true
     );
   } else if (m.kind === 'staff_invite') {
     await sendStaffInviteEmail(
@@ -81,7 +83,8 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
         setPasswordUrl: `${config.adminUrl}/reset-password?${q}`,
         expiresInMinutes: m.ttlMinutes,
       },
-      m.language
+      m.language,
+      true
     );
   } else {
     await sendMerchantPasswordResetEmail(
@@ -91,7 +94,8 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
         resetUrl: `${config.adminUrl}/reset-password?${q}`,
         expiresInMinutes: m.ttlMinutes,
       },
-      m.language
+      m.language,
+      true
     );
   }
 }
@@ -109,6 +113,7 @@ export async function sendNoticeMail(m: NoticeMail): Promise<void> {
   if (m.kind !== 'factor_added') throw new Error('sendNoticeMail: unknown kind');
   await sendFactorAddedNoticeEmail(
     { email: m.to, name: m.firstName, factor: m.factor },
-    m.language
+    m.language,
+    true
   );
 }

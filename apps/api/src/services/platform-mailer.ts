@@ -96,7 +96,7 @@ function redactTokenParam(link: string | null): string | null {
 }
 
 async function deliver(
-  msg: { to: string; subject: string; html: string; replyTo?: string },
+  msg: { to: string; subject: string; html: string; replyTo?: string; fromName?: string },
   opts: { redactLinkInLog?: boolean } = {}
 ): Promise<void> {
   if (shouldReallySend()) {
@@ -107,6 +107,7 @@ async function deliver(
       subject: msg.subject,
       html: msg.html,
       ...(msg.replyTo ? { replyTo: msg.replyTo } : {}),
+      ...(msg.fromName ? { fromName: msg.fromName } : {}),
     });
     return;
   }
@@ -135,24 +136,32 @@ type Lang = 'en' | 'ar';
 
 export async function sendMerchantVerificationEmail(
   data: { email: string; name: string; verificationUrl: string; expiresInHours: number },
-  language?: Lang
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = emailVerificationTemplate[lang](data, productName(lang));
+  const content = emailVerificationTemplate[lang](
+    data,
+    studio ? (lang === 'ar' ? BRAND.nameAr : BRAND.name) : productName(lang)
+  );
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver({
     to: data.email,
     subject: emailVerificationTemplate.subject[lang](data, ''),
     html,
+    ...(studio ? { fromName: BRAND.name } : {}),
   });
 }
 
@@ -198,25 +207,33 @@ export async function sendMerchantDuplicateSignupNotice(
  */
 export async function sendMerchantPasswordResetEmail(
   data: { email: string; name: string; resetUrl: string; expiresInMinutes: number },
-  language?: Lang
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = passwordResetTemplate[lang](data, productName(lang));
+  const content = passwordResetTemplate[lang](
+    data,
+    studio ? (lang === 'ar' ? BRAND.nameAr : BRAND.name) : productName(lang)
+  );
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver(
     {
       to: data.email,
       subject: passwordResetTemplate.subject[lang](data, ''),
       html,
+      ...(studio ? { fromName: BRAND.name } : {}),
       replyTo: BRAND.supportEmail,
     },
     { redactLinkInLog: true }
@@ -232,11 +249,16 @@ export async function sendMerchantPasswordResetEmail(
  * set-password link for a brand-new account, or none when the account already
  * has a password (added to a second store).
  */
-export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lang): Promise<void> {
+export async function sendStaffInviteEmail(
+  data: StaffInviteData,
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
+): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
   const content = staffInviteTemplate[lang](data, '');
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
+    name: studio ? BRAND.name : BRAND.product.nameEn,
     nameAr: null,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
@@ -244,12 +266,15 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver(
     {
       to: data.email,
       subject: staffInviteTemplate.subject[lang](data, ''),
       html,
+      ...(studio ? { fromName: BRAND.name } : {}),
       replyTo: BRAND.supportEmail,
     },
     { redactLinkInLog: true }
@@ -259,23 +284,28 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
 /** A sign-in method was added to the account (Ruling ID-15). */
 export async function sendFactorAddedNoticeEmail(
   data: FactorAddedNoticeData,
-  language?: Lang
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
   const html = renderBrandedShell(factorAddedNoticeTemplate[lang](data), {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver({
     to: data.email,
     subject: factorAddedNoticeTemplate.subject[lang](data),
     html,
+    ...(studio ? { fromName: BRAND.name } : {}),
     replyTo: BRAND.supportEmail,
   });
 }
@@ -283,24 +313,29 @@ export async function sendFactorAddedNoticeEmail(
 /** Platform-administrator first-factor enrolment code (Ruling ID-15). */
 export async function sendFactorEnrolCodeEmail(
   data: FactorEnrolCodeData,
-  language?: Lang
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
   const html = renderBrandedShell(factorEnrolCodeTemplate[lang](data), {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver(
     {
       to: data.email,
       subject: factorEnrolCodeTemplate.subject[lang](data),
       html,
+      ...(studio ? { fromName: BRAND.name } : {}),
       replyTo: BRAND.supportEmail,
     },
     { redactLinkInLog: true }
