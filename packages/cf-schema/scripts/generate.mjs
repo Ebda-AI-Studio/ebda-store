@@ -67,6 +67,8 @@ export function build() {
   const d1Names = new Set([...storeBuckets.d1Only, ...storeBuckets.mirror]);
   d1Store.fields = d1Store.fields.filter(x => x.kind !== 'relation' && d1Names.has(x.name));
   d1Store.indexes = d1Store.indexes.filter(ix => ix.fields.every(x => d1Names.has(x.field)));
+  // CF-only D1 columns (storage_backend): the router reads them from the directory row, never from the DO.
+  for (const col of extraColumns.Store ?? []) d1Store.fields.push(clone(col));
   dbs.d1.push(d1Store);
   // Store -> DO `store_profile` (mirror + profile) and `store_config` (config)
   const mkPart = (name, dbName, names, idNote) => {
@@ -607,6 +609,24 @@ function main() {
     'src/platform/schema.generated.ts': emitTs(out.d1, 'platform'),
     'generated/manifest.json': JSON.stringify(manifest, null, 2) + '\n',
   };
+  // workerd refuses a LIKE/GLOB pattern longer than 50 bytes at EXECUTION time ("LIKE or GLOB pattern too
+  // complex"), so an oversize CHECK only fails on a real Durable Object, never in node:sqlite. Fail here.
+  const longPatterns = [];
+  const scanPatterns = (label, text) => {
+    for (const m of text.matchAll(/\b(?:NOT\s+)?(?:GLOB|LIKE)\s+'((?:[^']|'')*)'/gi))
+      if (Buffer.byteLength(m[1].replace(/''/g, "'")) > 50)
+        longPatterns.push(`${label}: ${Buffer.byteLength(m[1])} bytes in ${m[0].slice(0, 90)}`);
+  };
+  for (const [rel, content] of Object.entries(files))
+    if (rel.endsWith('.sql')) scanPatterns(rel, content);
+  for (const dir of ['migrations/store', 'migrations/platform'])
+    for (const f of fs.readdirSync(path.join(pkg, dir)))
+      if (f.endsWith('.sql') && !(`${dir}/${f}` in files))
+        scanPatterns(`${dir}/${f}`, fs.readFileSync(path.join(pkg, dir, f), 'utf8'));
+  if (longPatterns.length)
+    throw new Error(
+      `LIKE/GLOB patterns over workerd's 50-byte limit:\n- ${longPatterns.join('\n- ')}`
+    );
   for (const [rel, content] of Object.entries(files)) {
     const p = path.join(pkg, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });

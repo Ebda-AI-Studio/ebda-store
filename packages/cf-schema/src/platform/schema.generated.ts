@@ -480,6 +480,9 @@ export const stores = sqliteTable('stores', {
     .default('qamar'),
   look: text('look'),
   isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
+  storageBackend: text('storage_backend', { enum: ['pg', 'do'] })
+    .notNull()
+    .default('pg'),
 });
 
 export const systemSettings = sqliteTable('system_settings', {

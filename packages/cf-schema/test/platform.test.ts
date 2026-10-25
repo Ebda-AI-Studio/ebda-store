@@ -18,6 +18,20 @@ describe('D1 platform schema', () => {
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   });
 
+  it('stores.storage_backend defaults to pg and only accepts pg or do (backend selector, task 2.4)', () => {
+    const cols = db.prepare(`PRAGMA table_info("stores")`).all() as {
+      name: string;
+      notnull: number;
+      dflt_value: string | null;
+    }[];
+    const c = cols.find(x => x.name === 'storage_backend');
+    expect(c).toMatchObject({ notnull: 1, dflt_value: "'pg'" });
+    const cmd = db.prepare(`SELECT sql FROM sqlite_master WHERE name = 'stores'`).get() as {
+      sql: string;
+    };
+    expect(cmd.sql).toContain(`CHECK ("storage_backend" IN ('pg', 'do'))`);
+  });
+
   it('has the directory keys: unique stores.slug and stores.domain, slug_redirects, entity_index(kind,id)', () => {
     const idx = (t: string) =>
       (db.prepare(`PRAGMA index_list("${t}")`).all() as { name: string; unique: number }[]).filter(

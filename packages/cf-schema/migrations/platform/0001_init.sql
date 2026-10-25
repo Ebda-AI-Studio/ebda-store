@@ -443,11 +443,13 @@ CREATE TABLE IF NOT EXISTS "stores" (
   "template" TEXT NOT NULL DEFAULT 'qamar',
   "look" TEXT,
   "is_demo" INTEGER NOT NULL DEFAULT 0,
+  "storage_backend" TEXT NOT NULL DEFAULT 'pg',
   CONSTRAINT "stores_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "stores_status_chk" CHECK ("status" IN ('active', 'inactive', 'suspended')),
   CONSTRAINT "stores_plan_chk" CHECK ("plan" IN ('free', 'starter', 'professional', 'enterprise')),
   CONSTRAINT "stores_template_chk" CHECK ("template" IN ('modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab', 'qamar', 'souq', 'jasmine', 'lamma')),
   CONSTRAINT "stores_is_demo_chk" CHECK ("is_demo" IN (0, 1)),
+  CONSTRAINT "stores_storage_backend_chk" CHECK ("storage_backend" IN ('pg', 'do')),
   CONSTRAINT "stores_domain_status_check" CHECK ("domain_status" IS NULL OR "domain_status" IN ('pending', 'active', 'failed')),
   CONSTRAINT "stores_billing_suspended_reason_check" CHECK ("billing_suspended_reason" IS NULL OR "billing_suspended_reason" IN ('unpaid', 'over_store_limit')),
   CONSTRAINT "stores_look_format" CHECK ("look" IS NULL OR ("look" GLOB '*.*' AND "look" NOT GLOB '*.*.*' AND "look" NOT GLOB '*[^a-z.]*' AND "look" NOT GLOB '*.' AND substr("look", 1, instr("look", '.') - 1) IN ('qamar', 'souq', 'jasmine', 'lamma', 'dahab')))

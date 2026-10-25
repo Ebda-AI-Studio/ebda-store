@@ -45,6 +45,14 @@ export const COMMERCE_OUTCOME_KINDS = [
 ];
 
 export const extraColumns = {
+  Store: [
+    f('storageBackend', 'String', {
+      kind: 'enum',
+      enumValues: ['pg', 'do'],
+      default: 'pg',
+      note: 'Per-store backend selector (task 2.4 + flip-backend): pg = Postgres, do = this store runs on its StoreDO. Lives in D1 (the directory) so the router can read it before it knows which DO to call.',
+    }),
+  ],
   Shipment: [
     f('returnReasonRaw', 'String', {
       optional: true,

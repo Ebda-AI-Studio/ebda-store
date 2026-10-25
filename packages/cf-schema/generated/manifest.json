@@ -149,7 +149,7 @@
         "store_lifecycle_emails": 6,
         "billing_webhook_events": 7,
         "provider_activation_requests": 11,
-        "stores": 30,
+        "stores": 31,
         "entity_index": 4,
         "platform_audit_log": 8
       }

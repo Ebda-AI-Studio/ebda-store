@@ -1582,7 +1582,7 @@ CREATE TABLE IF NOT EXISTS "product_model_bindings" (
   CONSTRAINT "product_model_bindings_model_id_fkey" FOREIGN KEY ("model_id") REFERENCES "product_models" ("id") ON DELETE CASCADE,
   CONSTRAINT "product_model_bindings_option_value_id_fkey" FOREIGN KEY ("option_value_id") REFERENCES "product_option_values" ("id") ON DELETE CASCADE,
   CONSTRAINT "product_model_bindings_kind_check" CHECK ("kind" IN ('material', 'gltf_variant')),
-  CONSTRAINT "product_model_bindings_color_check" CHECK ("color" IS NULL OR (length("color") = 7 AND "color" GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]')),
+  CONSTRAINT "product_model_bindings_color_check" CHECK ("color" IS NULL OR (length("color") = 7 AND substr("color", 1, 1) = '#' AND substr("color", 2) NOT GLOB '*[^0-9a-f]*')),
   CONSTRAINT "product_model_bindings_unit_check" CHECK (("metalness" IS NULL OR ("metalness" >= 0 AND "metalness" <= 1)) AND ("roughness" IS NULL OR ("roughness" >= 0 AND "roughness" <= 1))),
   CONSTRAINT "product_model_bindings_target_check" CHECK (length("target") BETWEEN 1 AND 100)
 );
@@ -1629,7 +1629,7 @@ CREATE TABLE IF NOT EXISTS "product_option_values" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_option_values_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "product_option_values_option_id_fkey" FOREIGN KEY ("option_id") REFERENCES "product_options" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_option_values_swatch_hex_format" CHECK ("swatch_hex" IS NULL OR (length("swatch_hex") = 7 AND "swatch_hex" GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]'))
+  CONSTRAINT "product_option_values_swatch_hex_format" CHECK ("swatch_hex" IS NULL OR (length("swatch_hex") = 7 AND substr("swatch_hex", 1, 1) = '#' AND substr("swatch_hex", 2) NOT GLOB '*[^0-9A-Fa-f]*'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "product_option_values_option_id_value_key" ON "product_option_values" ("option_id", "value");
 
