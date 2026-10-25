@@ -16,6 +16,7 @@
 import { hasTenantContext, prisma, Prisma, runInTenantContext } from '@ebda/database';
 import {
   correlateSettleNotice,
+  executedClaimForRefundId,
   isRefundEventAlreadySeen,
   readAccountedRefundEventIds,
   selectInFlightClaims,
@@ -129,17 +130,45 @@ export async function settleRefundEvent(input: SettleEventInput): Promise<Settle
   const payment = await lockPayment(input.paymentId);
   if (!payment) throw new Error(`settleRefund: payment ${input.paymentId} not found`);
   const prevRefundStatus = (payment.metadata.refundStatus as string | undefined) || 'pending';
+  const completed = input.refund.status === 'completed';
+  const events = await refundEvents(input.paymentId, input.storeId);
+  // The refund's OWN webhook (the id the refund API answered with) settles the executed claim and CONSUMES it: that is what
+  // closes a claim for the Kashier unverified-id hold (age never does).
+  const ownIdClaim = completed
+    ? executedClaimForRefundId({
+        events,
+        refundId: input.refund.refundId,
+        executedEvent: REFUND_EXECUTED_EVENT,
+        closingEvents: FAWRY_CLOSING,
+      })
+    : null;
+  const consumeOwnId = () =>
+    prisma.paymentEvent.create({
+      data: {
+        paymentId: input.paymentId,
+        storeId: input.storeId,
+        orderId: input.orderId,
+        eventType: REFUND_ABSORBED_EVENT,
+        provider: input.provider,
+        details: {
+          claimId: ownIdClaim,
+          refundId: input.refund.refundId,
+          via: 'id_match',
+        } as Prisma.InputJsonValue,
+      },
+    });
   const seen = isRefundEventAlreadySeen({
     metadata: payment.metadata,
     refundId: input.refund.refundId,
     status: input.refund.status,
     previousPaymentStatus: prevRefundStatus,
   });
-  if (seen) return { payment, seen: true, decision: null, commit: async () => undefined };
+  if (seen) {
+    if (ownIdClaim) await consumeOwnId();
+    return { payment, seen: true, decision: null, commit: async () => undefined };
+  }
 
-  const completed = input.refund.status === 'completed';
   const amountless = !(typeof input.refund.amount === 'number' && input.refund.amount > 0);
-  const events = completed ? await refundEvents(input.paymentId, input.storeId) : [];
   // only a COMPLETED refund can be reconciled with (and consume) a claim
   const inFlightClaims = completed
     ? selectInFlightClaims({
@@ -197,6 +226,7 @@ export async function settleRefundEvent(input: SettleEventInput): Promise<Settle
           where: { id: input.paymentId },
           data: patch.data as Prisma.PaymentUpdateInput,
         });
+      if (ownIdClaim && !decision.absorbedClaimId) await consumeOwnId();
       if (decision.absorbedClaimId && completed)
         await prisma.paymentEvent.create({
           data: {

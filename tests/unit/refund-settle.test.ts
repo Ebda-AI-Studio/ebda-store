@@ -116,6 +116,11 @@ const claim = (
     db.payment.metadata = {
       ...db.payment.metadata,
       refundEventIds: [...((db.payment.metadata.refundEventIds as string[]) ?? []), o.executedRef],
+      // completeRefund seeds the per-refund status map, exactly like production
+      refundStatusById: {
+        ...((db.payment.metadata.refundStatusById as object) ?? {}),
+        [o.executedRef]: 'completed',
+      },
     };
   }
   db.clock = NOW;
@@ -398,13 +403,45 @@ describe('Kashier: an unknown id while our own refund is open is HELD, never aut
       matchRefundToClaim({ ...A, claimId: 'c2', providerRefundId: 'X', actorUserId: 'op1' })
     ).rejects.toThrow('no executed refund');
   });
+  it('AGE never closes the hold: an unknown id 2 days later with an unconsumed executed claim is held, not booked', async () => {
+    claim('c1', 1000, { executedRef: 'API-REFUND-ID-1' });
+    const s = await settleRefundEvent({
+      ...event('kashier', 'LATE-ID', 1000),
+      now: NOW + 2 * 86_400_000,
+    });
+    expect(s.decision?.heldOpenClaimIdUnverified).toBe(true);
+    expect(s.decision?.accountedThisEvent).toBe(false);
+  });
+  it("the refund's OWN webhook (the API id) consumes the claim; afterwards an unknown id is a genuine refund and is booked", async () => {
+    claim('c1', 1000, { executedRef: 'SAME-ID' });
+    await settleRefundEvent(event('kashier', 'R0', 500)); // the seed refund's own webhook closes c0
+    const own = await settleRefundEvent(event('kashier', 'SAME-ID', 1000));
+    expect(own.seen).toBe(true);
+    expect(
+      types('refund_webhook_absorbed')
+        .map(e => e.details.claimId)
+        .sort()
+    ).toEqual(['c0', 'c1']);
+    expect(types('refund_webhook_absorbed')[1].details).toMatchObject({
+      claimId: 'c1',
+      via: 'id_match',
+    });
+    const later = await settleRefundEvent({
+      ...event('kashier', 'DASH-2', 700),
+      now: NOW + 2 * 86_400_000,
+    });
+    expect(later.decision?.heldOpenClaimIdUnverified).toBe(false);
+    expect(later.decision?.accountedThisEvent).toBe(true);
+  });
   it('the same id as the API answered with is the normal path: seen/accounted, no hold', async () => {
     claim('c1', 1000, { executedRef: 'SAME-ID' });
     const s = await apply('kashier', 'SAME-ID', 1000);
-    expect(s.decision?.heldOpenClaimIdUnverified).toBe(false);
+    expect(s.seen).toBe(true); // on the ledger: nothing held, nothing added
     expect(db.payment.refundedAmount).toBe(1500);
   });
   it('with NO open own claim an unknown id is a genuine dashboard refund and is booked', async () => {
+    // the seed refund's own webhook (R0) arrived and closed its claim
+    await settleRefundEvent(event('kashier', 'R0', 500));
     const s = await apply('kashier', 'DASH-1', 700);
     expect(s.decision?.heldOpenClaimIdUnverified).toBe(false);
     expect(db.payment.refundedAmount).toBe(1200);
