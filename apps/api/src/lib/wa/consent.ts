@@ -12,6 +12,9 @@ import { suiteBuyerKeySecret } from './config';
 
 export type ConsentSource = 'checkout' | 'cart' | 'admin' | 'whatsapp';
 
+/** Revoke sources that are not a grant source (see the table's revoked_source check). */
+export type RevokeSource = ConsentSource | 'erasure' | 'profile';
+
 export interface ConsentInput {
   consent: boolean;
   /** The account making the write (absent for a STOP or an admin action on a bare number). Never binds. */
@@ -44,6 +47,32 @@ export async function phoneOnOwnOrder(
   return orders.some(o => {
     const p = (o.shippingAddress as { phone?: unknown } | null)?.phone;
     return typeof p === 'string' && toE164(p) === want;
+  });
+}
+
+/**
+ * An account is being deleted or deactivated: withdraw consent for every row it owns and for its
+ * current number when that number is proven, with source `erasure` (the observer announces each one).
+ * Rows are kept (an opt-out record), only switched off.
+ */
+export async function revokeForAccount(
+  storeId: string,
+  userId: string,
+  phone: string | null
+): Promise<void> {
+  const proven = phone && (await phoneOnOwnOrder(storeId, userId, phone));
+  const key = proven ? await buyerKeyFor(suiteBuyerKeySecret(), phone) : null;
+  await runInTenantContext(storeId, async () => {
+    const rows = await prisma.storeWhatsAppConsent.findMany({
+      where: { storeId, granted: true, OR: [{ userId }, ...(key ? [{ buyerKey: key }] : [])] },
+      select: { buyerKey: true },
+    });
+    for (const r of rows) {
+      await prisma.storeWhatsAppConsent.updateMany({
+        where: { storeId, buyerKey: r.buyerKey },
+        data: { granted: false, revokedAt: new Date(), revokedSource: 'erasure' },
+      });
+    }
   });
 }
 
@@ -157,6 +186,19 @@ export const WhatsAppConsentService = {
       ...(input.consent ? { bindUserId: userId } : {}),
     });
     if (!r) return { status: 'no_phone' };
+    // A grant can race a phone change (updateProfile revokes the old number BEFORE it writes the new
+    // one): if the profile phone is no longer the one we checked, undo the grant so the old number is
+    // never left opted in.
+    if (input.consent) {
+      const after = await prisma.user.findFirst({
+        where: { id: userId, storeId },
+        select: { phone: true },
+      });
+      if (!after?.phone || toE164(after.phone) !== toE164(user.phone)) {
+        await revokeForPhoneChange(storeId, user.phone);
+        return { status: 'phone_unproven' };
+      }
+    }
     return { status: 'recorded', granted: r.granted, cartId: cart?.id ?? 'none' };
   },
 
@@ -204,10 +246,15 @@ export const WhatsAppConsentService = {
     // PROVEN number (`buyerKey` must be passed only when proven). A STOP-sourced opt-out on an older
     // number is KEPT (owner cleared): an opt-out must survive for that number's real owner, and
     // losing it could re-enable messages.
-    const rows = await tx.storeWhatsAppConsent.findMany({
+    const found = await tx.storeWhatsAppConsent.findMany({
       where: { storeId, OR: [{ userId }, ...(buyerKey ? [{ buyerKey }] : [])] },
-      select: { buyerKey: true, granted: true, revokedSource: true },
+      select: { buyerKey: true, granted: true, revokedSource: true, userId: true },
     });
+    // A row reached ONLY through the shared number but owned by ANOTHER account (two customers with
+    // delivered orders on the same number) is that account's record: leave it.
+    const rows = found.filter(
+      r => r.userId === userId || r.userId === null || r.userId === undefined
+    );
     for (const r of rows) {
       const keepOptOut =
         r.buyerKey !== buyerKey && r.granted === false && r.revokedSource === 'whatsapp';
@@ -256,33 +303,41 @@ export async function applyOptOutChanged(
   version: number
 ): Promise<'applied' | 'ignored'> {
   return runInTenantContext(storeId, async () => {
-    const row = await prisma.storeWhatsAppConsent.findUnique({
-      where: { storeId_buyerKey: { storeId, buyerKey } },
-      select: { optOutVersion: true, granted: true },
-    });
-    if (row && row.optOutVersion >= version) return 'ignored';
     const now = new Date();
+    // Atomic and monotonic: the version guard is IN the write, so two concurrent events can never
+    // lower `optOutVersion` and a replayed older version changes nothing.
     if (!optedOut) {
-      // Record the version only; consent stays as it is.
-      if (!row) return 'ignored';
-      await prisma.storeWhatsAppConsent.update({
-        where: { storeId_buyerKey: { storeId, buyerKey } },
+      // optedOut=false never re-enables consent; record the version only.
+      await prisma.storeWhatsAppConsent.updateMany({
+        where: { storeId, buyerKey, optOutVersion: { lt: version } },
         data: { optOutVersion: version },
       });
       return 'ignored';
     }
-    await prisma.storeWhatsAppConsent.upsert({
-      where: { storeId_buyerKey: { storeId, buyerKey } },
-      create: {
-        storeId,
-        buyerKey,
-        granted: false,
-        revokedAt: now,
-        revokedSource: 'whatsapp',
-        optOutVersion: version,
-      },
-      update: { granted: false, revokedAt: now, revokedSource: 'whatsapp', optOutVersion: version },
+    const { count } = await prisma.storeWhatsAppConsent.updateMany({
+      where: { storeId, buyerKey, optOutVersion: { lt: version } },
+      data: { granted: false, revokedAt: now, revokedSource: 'whatsapp', optOutVersion: version },
     });
-    return 'applied';
+    if (count > 0) return 'applied';
+    const exists = await prisma.storeWhatsAppConsent.findUnique({
+      where: { storeId_buyerKey: { storeId, buyerKey } },
+      select: { optOutVersion: true },
+    });
+    if (exists) return 'ignored'; // already at this version or newer
+    try {
+      await prisma.storeWhatsAppConsent.create({
+        data: {
+          storeId,
+          buyerKey,
+          granted: false,
+          revokedAt: now,
+          revokedSource: 'whatsapp',
+          optOutVersion: version,
+        },
+      });
+      return 'applied';
+    } catch {
+      return 'ignored'; // a concurrent event created the row first
+    }
   });
 }

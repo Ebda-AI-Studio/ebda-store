@@ -13,11 +13,13 @@ const h = vi.hoisted(() => ({
   linked: vi.fn(),
   send: vi.fn(),
   consent: vi.fn(),
+  owner: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findUnique: h.order },
     abandonedCart: { findFirst: h.cart },
+    user: { findFirst: h.owner },
     product: { findMany: h.products },
   },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
@@ -62,6 +64,7 @@ beforeEach(() => {
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
   h.consent.mockReset().mockResolvedValue(true);
+  h.owner.mockReset().mockResolvedValue({ deletedAt: null });
   h.linkRow.mockReset().mockResolvedValue(true);
   h.cart.mockReset().mockResolvedValue({
     status: 'pending',
@@ -392,6 +395,16 @@ describe('cart/abandoned', () => {
     h.consent.mockResolvedValueOnce(false);
     expect(await emitStoreEventsFor(ev)).toBe(0);
     h.consent.mockResolvedValueOnce(true);
+    expect(await emitStoreEventsFor(ev)).toBe(1);
+  });
+
+  it('a deactivated account is never chased, even with a live consent row', async () => {
+    h.cart.mockResolvedValue({ ...(await h.cart()), customerId: 'user-1' });
+    h.owner.mockResolvedValue({ deletedAt: new Date() });
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    h.owner.mockResolvedValue(null);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    h.owner.mockResolvedValue({ deletedAt: null });
     expect(await emitStoreEventsFor(ev)).toBe(1);
   });
 

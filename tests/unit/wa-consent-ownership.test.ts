@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   users: [] as Row[],
   orders: [] as Row[],
   consents: [] as Row[],
+  afterOrderRead: null as null | (() => void),
 }));
 
 const same = (r: Row, k: { storeId: string; buyerKey: string }) =>
@@ -38,15 +39,23 @@ const consentTable = {
 };
 const fakePrisma = {
   cart: { findFirst: async ({ where }: any) => h.carts.find(r => matches(r, where)) ?? null },
-  user: { findFirst: async ({ where }: any) => h.users.find(r => matches(r, where)) ?? null },
+  user: {
+    findFirst: async ({ where }: any) => {
+      const u = h.users.find(r => matches(r, where));
+      return u ? { ...u } : null; // a copy, like a database read
+    },
+  },
   order: {
-    findMany: async ({ where }: any) =>
-      h.orders.filter(
+    findMany: async ({ where }: any) => {
+      const hit = h.orders.filter(
         r =>
           r.customerId === where.customerId &&
           r.storeId === where.storeId &&
           r.status === where.status
-      ),
+      );
+      h.afterOrderRead?.();
+      return hit;
+    },
   },
   storeWhatsAppConsent: consentTable,
 };
@@ -63,6 +72,7 @@ const key = (phone: string) => buyerKeyFor(process.env.SUITE_BUYER_KEY_SECRET!, 
 
 beforeEach(async () => {
   process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+  h.afterOrderRead = null;
   for (const a of [h.carts, h.users, h.orders, h.consents]) a.length = 0;
   h.carts.push({ id: 'cart-a', storeId: S, sessionId: 'sess-a', customerId: 'user-a' });
   h.users.push({ id: 'user-a', storeId: S, phone: '01001234567' });
@@ -180,5 +190,48 @@ describe('PDPL export and erasure', () => {
       await WhatsAppConsentService.eraseForAccount(fakePrisma as any, S, 'user-y', undefined)
     ).toBe(0);
     expect(h.consents).toHaveLength(1);
+  });
+});
+
+describe('review follow-ups', () => {
+  it('a grant that races a phone change is undone: the OLD number is never left opted in', async () => {
+    const A = (await key('01001234567'))!;
+    // the profile phone changes to B right after the grant checked A
+    h.afterOrderRead = () => {
+      h.users[0]!.phone = '01112345678';
+    };
+    const r = await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: true });
+    expect(r).toEqual({ status: 'phone_unproven' });
+    expect(h.consents.find(c => c.buyerKey === A)).toMatchObject({ granted: false });
+  });
+
+  it('erasing X does not delete a row owned by ANOTHER account that shares the number', async () => {
+    const P = (await key('01001234567'))!;
+    h.consents.push({ storeId: S, buyerKey: P, userId: 'user-y', granted: true });
+    const n = await WhatsAppConsentService.eraseForAccount(fakePrisma as any, S, 'user-x', P);
+    expect(n).toBe(0);
+    expect(h.consents).toHaveLength(1);
+  });
+
+  it('revokeForAccount switches off what the account owns and its proven number, source erasure, others untouched', async () => {
+    const { revokeForAccount } = await import('@api/lib/wa/consent');
+    const P = (await key('01001234567'))!;
+    h.consents.push(
+      { storeId: S, buyerKey: P, userId: 'user-a', granted: true },
+      { storeId: S, buyerKey: '6'.repeat(64), userId: 'user-a', granted: true },
+      { storeId: S, buyerKey: '7'.repeat(64), userId: 'user-y', granted: true }
+    );
+    await revokeForAccount(S, 'user-a', '01001234567');
+    expect(
+      h.consents.map(c => [
+        c.buyerKey[0] === P[0] ? 'P' : c.buyerKey[0],
+        c.granted,
+        c.revokedSource,
+      ])
+    ).toEqual([
+      ['P', false, 'erasure'],
+      ['6', false, 'erasure'],
+      ['7', true, undefined],
+    ]);
   });
 });

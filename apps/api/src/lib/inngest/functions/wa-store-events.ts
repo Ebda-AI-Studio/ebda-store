@@ -212,6 +212,7 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
         status: true,
         recoveredAt: true,
         customerPhone: true,
+        customerId: true,
         createdAt: true,
         store: { select: { slug: true, domain: true, settings: true } },
       },
@@ -220,6 +221,16 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   if (!row) throw new Error(`abandoned cart ${cartId} not visible yet`);
   // Stop-on-convert: a shopper who already ordered must not be chased.
   if (row.status === 'recovered' || row.recoveredAt) return [];
+  // A deactivated / erased account is never chased (belt and braces next to the revoke on delete).
+  if (row.customerId) {
+    const owner = await runInTenantContext(storeId, () =>
+      prisma.user.findFirst({
+        where: { id: row.customerId!, storeId },
+        select: { deletedAt: true },
+      })
+    );
+    if (!owner || owner.deletedAt) return [];
+  }
   const phone = toE164(row.customerPhone);
   if (!phone) return [];
   const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), phone);

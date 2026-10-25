@@ -667,6 +667,12 @@ describe('AuthService.eraseAccount — WhatsApp marketing consent (WA-CONSENT-1)
     const proofCall = mockPrisma.order.findMany.mock.calls.findIndex(
       (c: any[]) => c[0]?.where?.status === 'delivered'
     );
+    // the proof read used THIS store and THIS account (not another scope)
+    expect(mockPrisma.order.findMany.mock.calls[proofCall]![0].where).toMatchObject({
+      storeId: 'store-1',
+      customerId: CUSTOMER.id,
+      status: 'delivered',
+    });
     expect(mockPrisma.order.findMany.mock.invocationCallOrder[proofCall]).toBeLessThan(
       mockPrisma.order.updateMany.mock.invocationCallOrder[0]!
     );
@@ -680,5 +686,32 @@ describe('AuthService.eraseAccount — WhatsApp marketing consent (WA-CONSENT-1)
         result: { count: 1 },
       })
     ).toEqual({ storeId: 'store-1', buyerKey: key });
+  });
+});
+
+describe("AuthService.updateProfile — phone change ends the old number's WhatsApp consent", () => {
+  it('revokes the OLD number first; if the revoke fails the phone is NOT changed', async () => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: CUSTOMER.id,
+      storeId: 'store-1',
+      phone: '01001234567',
+    });
+    mockPrisma.storeWhatsAppConsent.updateMany = vi.fn().mockRejectedValue(new Error('db down'));
+    mockPrisma.user.update.mockClear();
+    await expect(AuthService.updateProfile(CUSTOMER.id, { phone: '01112345678' })).rejects.toThrow(
+      'db down'
+    );
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+
+    // success path: revoke first, then the phone write
+    mockPrisma.storeWhatsAppConsent.updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    await AuthService.updateProfile(CUSTOMER.id, { phone: '01112345678' });
+    const rev = (mockPrisma.storeWhatsAppConsent.updateMany as any).mock.invocationCallOrder[0];
+    expect(rev).toBeLessThan(mockPrisma.user.update.mock.invocationCallOrder[0]!);
+    // a formatting-only change (same E.164) revokes nothing
+    (mockPrisma.storeWhatsAppConsent.updateMany as any).mockClear();
+    await AuthService.updateProfile(CUSTOMER.id, { phone: '+201001234567' });
+    expect(mockPrisma.storeWhatsAppConsent.updateMany).not.toHaveBeenCalled();
   });
 });

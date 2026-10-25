@@ -8,10 +8,20 @@ const h = vi.hoisted(() => ({
   find: vi.fn(),
   upsert: vi.fn(),
   update: vi.fn(),
+  updateMany: vi.fn(),
+  create: vi.fn(),
   send: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
-  prisma: { storeWhatsAppConsent: { findUnique: h.find, upsert: h.upsert, update: h.update } },
+  prisma: {
+    storeWhatsAppConsent: {
+      findUnique: h.find,
+      upsert: h.upsert,
+      update: h.update,
+      updateMany: h.updateMany,
+      create: h.create,
+    },
+  },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/inngest/send-after-commit', () => ({ sendEventAfterCommit: h.send }));
@@ -109,25 +119,44 @@ describe('the service', () => {
 });
 
 describe('whatsapp.opt_out_changed (v1.1)', () => {
-  it('optedOut=true revokes, source whatsapp, and records the version', async () => {
-    h.find.mockResolvedValue({ optOutVersion: 1, granted: true });
-    expect(await applyOptOutChanged(S, K, true, 2)).toBe('applied');
-    expect(h.upsert.mock.calls[0]![0].update).toMatchObject({
-      granted: false,
-      revokedSource: 'whatsapp',
-      optOutVersion: 2,
+  // A one-row table whose updateMany honours the `optOutVersion: { lt }` guard, like the database.
+  function table(row: { optOutVersion: number; granted: boolean } | null) {
+    let r = row;
+    h.find.mockImplementation(async () => r);
+    h.updateMany.mockImplementation(async ({ where, data }: any) => {
+      if (!r || !(r.optOutVersion < where.optOutVersion.lt)) return { count: 0 };
+      r = { ...r, ...data };
+      return { count: 1 };
     });
+    h.create.mockImplementation(async ({ data }: any) => {
+      r = { optOutVersion: data.optOutVersion, granted: data.granted };
+      return {};
+    });
+    return () => r;
+  }
+
+  it('optedOut=true revokes (source whatsapp) and records the version, guarded IN the write', async () => {
+    const get = table({ optOutVersion: 1, granted: true });
+    expect(await applyOptOutChanged(S, K, true, 2)).toBe('applied');
+    expect(get()).toMatchObject({ granted: false, optOutVersion: 2 });
+    expect(h.updateMany.mock.calls[0]![0].where.optOutVersion).toEqual({ lt: 2 });
+    expect(h.updateMany.mock.calls[0]![0].data).toMatchObject({ revokedSource: 'whatsapp' });
   });
-  it('a stale or replayed version is ignored', async () => {
-    h.find.mockResolvedValue({ optOutVersion: 3, granted: false });
+  it('no row yet: created already opted out', async () => {
+    const get = table(null);
+    expect(await applyOptOutChanged(S, K, true, 1)).toBe('applied');
+    expect(get()).toMatchObject({ granted: false, optOutVersion: 1 });
+  });
+  it('a stale or replayed version changes nothing, and the version never goes down', async () => {
+    const get = table({ optOutVersion: 3, granted: false });
     expect(await applyOptOutChanged(S, K, true, 3)).toBe('ignored');
     expect(await applyOptOutChanged(S, K, true, 2)).toBe('ignored');
-    expect(h.upsert).not.toHaveBeenCalled();
+    expect(get()!.optOutVersion).toBe(3);
+    expect(h.create).not.toHaveBeenCalled();
   });
-  it('optedOut=false never re-enables consent', async () => {
-    h.find.mockResolvedValue({ optOutVersion: 1, granted: false });
+  it('optedOut=false never re-enables consent (version only)', async () => {
+    const get = table({ optOutVersion: 1, granted: false });
     expect(await applyOptOutChanged(S, K, false, 2)).toBe('ignored');
-    expect(h.upsert).not.toHaveBeenCalled();
-    expect(h.update.mock.calls[0]![0].data).toEqual({ optOutVersion: 2 });
+    expect(get()).toMatchObject({ granted: false, optOutVersion: 2 });
   });
 });
