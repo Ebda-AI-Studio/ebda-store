@@ -507,6 +507,8 @@ export default function CheckoutClient() {
   // Needs an account: the number comes from the account, never from this form (security review).
   const showWhatsAppOptIn = store?.whatsappMarketingOptIn === true && isAuthenticated;
   const whatsAppRecorded = useRef(false);
+  // Shown under the box when the number cannot be proven yet (no silent failure).
+  const [whatsAppUnproven, setWhatsAppUnproven] = useState(false);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -1105,7 +1107,14 @@ export default function CheckoutClient() {
       api
         .post('/public/cart/whatsapp-optin', { consent: whatsAppOptIn, language })
         .then(res => {
-          if (res.success) whatsAppRecorded.current = whatsAppOptIn;
+          if (res.success) {
+            whatsAppRecorded.current = whatsAppOptIn;
+            setWhatsAppUnproven(false);
+          } else if (whatsAppOptIn) {
+            // PHONE_UNPROVEN (or no phone on the account): untick and explain, the box stays usable.
+            setWhatsAppOptIn(false);
+            setWhatsAppUnproven(true);
+          }
         })
         .catch(() => {});
     }, 600);
@@ -2392,7 +2401,10 @@ export default function CheckoutClient() {
                             <input
                               type="checkbox"
                               checked={whatsAppOptIn}
-                              onChange={e => setWhatsAppOptIn(e.target.checked)}
+                              onChange={e => {
+                                setWhatsAppUnproven(false);
+                                setWhatsAppOptIn(e.target.checked);
+                              }}
                               className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
@@ -2408,6 +2420,14 @@ export default function CheckoutClient() {
                                   'رسائل تسويقية بس، وتحديثات الطلب منفصلة. وتقدر توقفها في أي وقت.'
                                 )}
                               </span>
+                              {whatsAppUnproven && (
+                                <span role="status" className="text-xs text-destructive">
+                                  {t(
+                                    'WhatsApp offers turn on after your first order with this number',
+                                    'نقدر نفعّل رسايل واتساب بعد أول طلب ليك بالرقم ده'
+                                  )}
+                                </span>
+                              )}
                             </span>
                           </label>
                         )}

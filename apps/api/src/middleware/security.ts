@@ -1686,6 +1686,23 @@ export const newsletterLimiter = rateLimit({
   },
 });
 
+// WhatsApp marketing-consent: per-CALLER ceiling (the signed-in customer), applied to grants AND
+// revocations so one customer cannot spam, but keyed on the user so nobody else's traffic can exhaust it.
+export const whatsappConsentUserLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-user'),
+  windowMs: 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => `u:${req.user?.userId ?? 'anon'}`,
+});
+
 // WhatsApp marketing-consent writes: a per-STORE ceiling on top of the per-IP+session limiter, so a
 // distributed burst cannot mass-toggle consents for one store. Keyed on the raw tenant header (cheap),
 // falling back to the IP so a header-less request never shares a global bucket.

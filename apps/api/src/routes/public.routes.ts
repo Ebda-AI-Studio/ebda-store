@@ -31,6 +31,7 @@ import {
   couponAttemptLimiter,
   newsletterLimiter,
   whatsappConsentStoreLimiter,
+  whatsappConsentUserLimiter,
   auditLog,
   viewIngestLimiter,
 } from '../middleware/security';
@@ -55,6 +56,7 @@ import {
   cartEmailOptInAvailable,
 } from '../services/cart-email-optin.service';
 import { isWhatsAppLinked } from '../lib/wa/link';
+import { createWhatsAppOptInHandlers } from './whatsapp-optin';
 import { WhatsAppConsentService } from '../lib/wa/consent';
 import { boundedCacheKey, getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
@@ -976,79 +978,17 @@ router.post(
 // number on their own account (the number the reminder goes to), source 'checkout', audited with the
 // cart id. A guest, another session or a body-supplied phone cannot opt anyone in or out. Rate-limited
 // per IP+session and per store. Only offered on a store that has Ebda WhatsApp linked.
-const cartWhatsAppOptInSchema = z
-  .object({ consent: z.boolean(), language: z.enum(['en', 'ar']).optional() })
-  .strict();
 router.post(
   '/cart/whatsapp-optin',
-  cartLimiter,
-  newsletterLimiter,
-  optionalAuthenticate,
-  // The store-wide ceiling counts only SIGNED-IN GRANTS: anonymous calls (401) and every revocation
-  // bypass it, so a flood can never block a buyer's withdrawal (revocation must always succeed).
-  (req: Request, res: Response, next: NextFunction) =>
-    req.user && req.body?.consent === true ? whatsappConsentStoreLimiter(req, res, next) : next(),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const sessionId = req.headers['x-session-id'] as string;
-      if (!sessionId) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
-        });
-        return;
-      }
-      const userId = req.user?.userId;
-      if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: { code: 'LOGIN_REQUIRED', message: 'Sign in to manage WhatsApp offers' },
-        });
-        return;
-      }
-      const body = cartWhatsAppOptInSchema.parse(req.body);
-      const storeId = await getStoreIdFromRequest(req);
-      if (body.consent && !(await isWhatsAppLinked(storeId))) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'WHATSAPP_NOT_AVAILABLE', message: 'Not available' },
-        });
-        return;
-      }
-      const result = await WhatsAppConsentService.recordForCart(storeId, sessionId, userId, {
-        consent: body.consent,
-        locale: body.language,
-      });
-      if (result.status !== 'recorded') {
-        res.status(result.status === 'no_cart' ? 404 : 400).json({
-          success: false,
-          error: {
-            code:
-              result.status === 'no_cart'
-                ? 'NO_CART'
-                : result.status === 'phone_unproven'
-                  ? 'PHONE_UNPROVEN'
-                  : 'NO_PHONE',
-            message: 'Not recorded',
-          },
-        });
-        return;
-      }
-      await auditLog({
-        action: body.consent
-          ? 'whatsapp.marketing_consent_granted'
-          : 'whatsapp.marketing_consent_revoked',
-        resourceType: 'cart',
-        resourceId: result.cartId,
-        storeId,
-        userId,
-        details: { source: 'checkout', cartId: result.cartId, locale: body.language ?? null },
-      });
-      res.json({ success: true, data: { granted: result.granted } });
-    } catch (error) {
-      next(error);
-    }
-  }
+  ...createWhatsAppOptInHandlers({
+    authenticate: optionalAuthenticate,
+    userLimiter: whatsappConsentUserLimiter,
+    storeLimiter: whatsappConsentStoreLimiter,
+    storeIdFor: getStoreIdFromRequest,
+    isLinked: isWhatsAppLinked,
+    record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    audit: auditLog,
+  })
 );
 
 // POST /cart/restore - the recovery email's button: copy the emailed cart's lines into THIS

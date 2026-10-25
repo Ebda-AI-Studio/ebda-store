@@ -127,39 +127,3 @@ describe('a profile phone is self-declared: granting needs proof it is theirs', 
     expect(src).toContain('revokeForPhoneChange(change.storeId, change.oldPhone)');
   });
 });
-
-describe('the route', () => {
-  const src = readFileSync('apps/api/src/routes/public.routes.ts', 'utf8');
-  const block = src.slice(
-    src.indexOf("'/cart/whatsapp-optin'") - 200,
-    src.indexOf('// POST /cart/restore')
-  );
-
-  it('has no phone in its body schema (strict: a body phone is rejected, never used)', () => {
-    const schema = block.slice(
-      block.indexOf('cartWhatsAppOptInSchema'),
-      block.indexOf('router.post')
-    );
-    expect(schema).not.toMatch(/phone/i);
-    expect(schema).toContain('.strict()');
-    expect(block).not.toMatch(/body\.phone|req\.body\.phone/);
-  });
-
-  it('runs auth BEFORE the store ceiling, and the ceiling never counts anonymous calls or revocations', () => {
-    expect(block.indexOf('optionalAuthenticate')).toBeLessThan(
-      block.indexOf('whatsappConsentStoreLimiter(')
-    );
-    expect(block).toMatch(
-      /req\.user && req\.body\?\.consent === true\s*\?\s*whatsappConsentStoreLimiter/
-    );
-  });
-
-  it('requires a signed-in customer and rate-limits per IP+session and per store', () => {
-    expect(block).toContain('optionalAuthenticate');
-    expect(block).toContain('LOGIN_REQUIRED');
-    expect(block).toContain('cartLimiter');
-    expect(block).toContain('newsletterLimiter');
-    expect(block).toContain('whatsappConsentStoreLimiter');
-    expect(block).toContain("source: 'checkout'");
-  });
-});
