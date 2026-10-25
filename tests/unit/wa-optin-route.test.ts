@@ -28,7 +28,7 @@ function build(opts: { userMax?: number; storeMax?: number } = {}) {
   const storeLimiter = rateLimit({
     windowMs: 60_000,
     max: opts.storeMax ?? 5,
-    keyGenerator: () => `store:${S}`,
+    keyGenerator: (_req, res) => `store:${res.locals.waStoreId}`,
     validate: false,
   });
   const app = express();
@@ -47,9 +47,11 @@ function build(opts: { userMax?: number; storeMax?: number } = {}) {
       storeIdFor: async () => S,
       isLinked: async () => true,
       record,
+      state: async () => ({ granted: true }),
       audit,
     })
   );
+  // Keyed on the RESOLVED store id (res.locals.waStoreId), like production.
   app.use((err: any, _req: any, res: any, _next: any) =>
     res.status(err?.name === 'ZodError' ? 400 : 500).json({ success: false })
   );

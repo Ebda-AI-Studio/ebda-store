@@ -32,6 +32,7 @@ export interface WhatsAppOptInDeps {
     | { status: 'recorded'; granted: boolean; cartId: string }
     | { status: 'no_cart' | 'no_phone' | 'phone_unproven' }
   >;
+  state: (storeId: string, userId: string) => Promise<{ granted: boolean }>;
   audit: (entry: {
     action: string;
     resourceType: string;
@@ -59,6 +60,16 @@ export function createWhatsAppOptInHandlers(deps: WhatsAppOptInDeps): RequestHan
     }
     next();
   };
+  // Resolve the store BEFORE the store-wide limiter so it is keyed on the resolved id, never on a raw
+  // client-controlled header.
+  const resolveStore: RequestHandler = async (req, res, next) => {
+    try {
+      res.locals.waStoreId = await deps.storeIdFor(req);
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
   const grantsOnly: RequestHandler = (req, res, next) =>
     req.body?.consent === true ? deps.storeLimiter(req, res, next) : next();
 
@@ -74,7 +85,7 @@ export function createWhatsAppOptInHandlers(deps: WhatsAppOptInDeps): RequestHan
       }
       const userId = req.user!.userId;
       const body = bodySchema.parse(req.body);
-      const storeId = await deps.storeIdFor(req);
+      const storeId = res.locals.waStoreId as string;
       if (body.consent && !(await deps.isLinked(storeId))) {
         res.status(404).json({
           success: false,
@@ -108,5 +119,27 @@ export function createWhatsAppOptInHandlers(deps: WhatsAppOptInDeps): RequestHan
       next(error);
     }
   };
-  return [deps.authenticate, requireSignedIn, deps.userLimiter, grantsOnly, handler];
+  return [deps.authenticate, requireSignedIn, deps.userLimiter, resolveStore, grantsOnly, handler];
+}
+
+/** `GET`: the signed-in customer's current consent, for the checkout box. */
+export function createWhatsAppOptInStateHandlers(deps: WhatsAppOptInDeps): RequestHandler[] {
+  const requireSignedIn: RequestHandler = (req, res, next) => {
+    if (!req.user?.userId) {
+      res
+        .status(401)
+        .json({ success: false, error: { code: 'LOGIN_REQUIRED', message: 'Sign in' } });
+      return;
+    }
+    next();
+  };
+  const handler = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await deps.storeIdFor(req);
+      res.json({ success: true, data: await deps.state(storeId, req.user!.userId) });
+    } catch (error) {
+      next(error);
+    }
+  };
+  return [deps.authenticate, requireSignedIn, deps.userLimiter, handler];
 }

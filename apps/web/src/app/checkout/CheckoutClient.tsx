@@ -1098,6 +1098,24 @@ export default function CheckoutClient() {
     return () => clearTimeout(timeoutId);
   }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
 
+  // Show the customer's REAL current consent (they may have ticked it on an earlier visit), so
+  // an already-granted box can be unticked to withdraw.
+  useEffect(() => {
+    if (!showWhatsAppOptIn) return;
+    let cancelled = false;
+    api
+      .get<{ granted: boolean }>('/public/cart/whatsapp-optin')
+      .then(res => {
+        if (cancelled || !res.success || res.data?.granted !== true) return;
+        whatsAppRecorded.current = true;
+        setWhatsAppOptIn(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showWhatsAppOptIn]);
+
   // Record / withdraw the WhatsApp marketing consent. Debounced; only withdraws if a tick was
   // actually recorded. No phone is sent: the server uses the signed-in customer's own number.
   useEffect(() => {

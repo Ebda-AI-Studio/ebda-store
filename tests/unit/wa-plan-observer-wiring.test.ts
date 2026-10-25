@@ -102,7 +102,7 @@ describe('wiring', () => {
   it('no code writes subscription / plan state with raw SQL (it would bypass the observer)', () => {
     const raw = walk(SRC).filter(
       f =>
-        /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(store_subscriptions)"?/i.test(
+        /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(store_subscriptions|store_whatsapp_consents)"?/i.test(
           readFileSync(f, 'utf8')
         ) || /UPDATE\s+"?stores"?\s+SET\s+"?plan"?\b/i.test(readFileSync(f, 'utf8'))
     );

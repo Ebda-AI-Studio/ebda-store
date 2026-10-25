@@ -111,7 +111,8 @@ router.post(
         resourceType: 'store',
         resourceId: req.params.storeId,
         storeId: req.params.storeId,
-        details: {},
+        userId: getAuthUser(req).userId,
+        details: { source: 'admin' },
       });
       res.json({ success: true, data: { granted: false } });
     } catch (err) {

@@ -56,7 +56,7 @@ import {
   cartEmailOptInAvailable,
 } from '../services/cart-email-optin.service';
 import { isWhatsAppLinked } from '../lib/wa/link';
-import { createWhatsAppOptInHandlers } from './whatsapp-optin';
+import { createWhatsAppOptInHandlers, createWhatsAppOptInStateHandlers } from './whatsapp-optin';
 import { WhatsAppConsentService } from '../lib/wa/consent';
 import { boundedCacheKey, getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
@@ -987,6 +987,20 @@ router.post(
     storeIdFor: getStoreIdFromRequest,
     isLinked: isWhatsAppLinked,
     record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    state: (s, u) => WhatsAppConsentService.stateForUser(s, u),
+    audit: auditLog,
+  })
+);
+router.get(
+  '/cart/whatsapp-optin',
+  ...createWhatsAppOptInStateHandlers({
+    authenticate: optionalAuthenticate,
+    userLimiter: whatsappConsentUserLimiter,
+    storeLimiter: whatsappConsentStoreLimiter,
+    storeIdFor: getStoreIdFromRequest,
+    isLinked: isWhatsAppLinked,
+    record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    state: (s, u) => WhatsAppConsentService.stateForUser(s, u),
     audit: auditLog,
   })
 );

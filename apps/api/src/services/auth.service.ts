@@ -37,6 +37,7 @@ import {
   JWT_MFA_AUDIENCE,
   PASSWORD_RESET_TTL_MINUTES,
   registrationEventId as registrationEventIdFor,
+  toE164,
 } from '@ebda/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
@@ -1428,14 +1429,21 @@ export class AuthService {
     userId: string,
     data: { firstName?: string; lastName?: string; phone?: string }
   ) {
-    let phoneChange: { storeId: string; oldPhone: string } | null = null;
-    const result = await withUser(userId, async () => {
+    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one
+    // needs a fresh tick and proof). Revoked BEFORE the phone is written: if the revoke fails the phone
+    // is unchanged and the caller retries, so the old number can never keep a live consent.
+    if (data.phone !== undefined) {
+      const current = await withUser(userId, () =>
+        prisma.user.findUnique({ where: { id: userId }, select: { phone: true, storeId: true } })
+      );
+      if (current?.phone && current.storeId && toE164(current.phone) !== toE164(data.phone)) {
+        await revokeForPhoneChange(current.storeId, current.phone);
+      }
+    }
+    return withUser(userId, async () => {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
         throw new AppError(404, 'NOT_FOUND', 'User not found');
-      }
-      if (data.phone !== undefined && user.phone && user.storeId && data.phone !== user.phone) {
-        phoneChange = { storeId: user.storeId, oldPhone: user.phone };
       }
 
       const updated = await prisma.user.update({
@@ -1461,11 +1469,6 @@ export class AuthService {
 
       return updated;
     });
-    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number; the new one
-    // needs a fresh tick (and proof it is theirs). Announced to Ebda WhatsApp by the consent observer.
-    const change = phoneChange as { storeId: string; oldPhone: string } | null;
-    if (change) await revokeForPhoneChange(change.storeId, change.oldPhone);
-    return result;
   }
 
   static async changePassword(userId: string, currentPassword: string, newPassword: string) {

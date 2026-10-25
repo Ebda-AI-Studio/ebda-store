@@ -21,7 +21,12 @@ vi.mock('@ebda/database', () => ({
     user: { findFirst: async ({ where }: any) => h.users.find(r => matches(r, where)) ?? null },
     order: {
       findMany: async ({ where }: any) =>
-        h.orders.filter(r => r.customerId === where.customerId && r.storeId === where.storeId),
+        h.orders.filter(
+          r =>
+            r.customerId === where.customerId &&
+            r.storeId === where.storeId &&
+            r.status === where.status
+        ),
     },
     storeWhatsAppConsent: { upsert: h.upsert, updateMany: h.updateMany },
   },
@@ -37,8 +42,18 @@ beforeEach(() => {
   h.upsert.mockReset().mockResolvedValue({});
   h.updateMany.mockReset().mockResolvedValue({ count: 1 });
   h.orders.length = 0;
-  h.orders.push({ storeId: S, customerId: 'user-a', shippingAddress: { phone: '+201001234567' } });
-  h.orders.push({ storeId: S, customerId: 'user-b', shippingAddress: { phone: '01112345678' } });
+  h.orders.push({
+    storeId: S,
+    customerId: 'user-a',
+    status: 'delivered',
+    shippingAddress: { phone: '+201001234567' },
+  });
+  h.orders.push({
+    storeId: S,
+    customerId: 'user-b',
+    status: 'delivered',
+    shippingAddress: { phone: '01112345678' },
+  });
   h.carts.length = 0;
   h.users.length = 0;
   h.carts.push({ id: 'cart-a', storeId: S, sessionId: 'sess-a', customerId: 'user-a' });
@@ -57,21 +72,21 @@ describe('recordForCart', () => {
     });
   });
 
-  it("a different session cannot opt in or revoke: the session cart must be the caller's", async () => {
-    for (const consent of [true, false]) {
-      // user-b with user-a's session id
-      expect(
-        await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-b', { consent })
-      ).toEqual({
-        status: 'no_cart',
-      });
-    }
+  it("a different session cannot opt in; a revoke only ever touches the CALLER's own number", async () => {
+    // user-b with user-a's session id: no grant
+    expect(
+      await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-b', { consent: true })
+    ).toEqual({ status: 'no_cart' });
     expect(
       await WhatsAppConsentService.recordForCart(S, 'unknown', 'user-a', { consent: true })
-    ).toEqual({
-      status: 'no_cart',
-    });
+    ).toEqual({ status: 'no_cart' });
     expect(h.upsert).not.toHaveBeenCalled();
+    // user-b "revoking" with user-a's session id withdraws user-b's number, never user-a's
+    await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-b', { consent: false });
+    const bKey = h.upsert.mock.calls[0]![0].where.storeId_buyerKey.buyerKey;
+    await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false });
+    const aKey = h.upsert.mock.calls[1]![0].where.storeId_buyerKey.buyerKey;
+    expect(aKey).not.toBe(bKey);
   });
 
   it('an account with no phone records nothing', async () => {
@@ -110,6 +125,17 @@ describe('a profile phone is self-declared: granting needs proof it is theirs', 
       status: 'phone_unproven',
     });
   });
+  it('a pending or cancelled order proves nothing: only a DELIVERED order does', async () => {
+    const src = readFileSync('apps/api/src/lib/wa/consent.ts', 'utf8');
+    expect(src).toMatch(/status: 'delivered'/);
+  });
+  it('REVOKING needs no proof and no cart: withdrawal always works (any device)', async () => {
+    h.carts.length = 0;
+    const r = await WhatsAppConsentService.recordForCart(S, 'other-device', 'user-a', {
+      consent: false,
+    });
+    expect(r).toMatchObject({ status: 'recorded', granted: false });
+  });
   it('REVOKING needs no proof: withdrawal always works', async () => {
     h.users[0]!.phone = '01099999999';
     const r = await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false });
@@ -124,6 +150,10 @@ describe('a profile phone is self-declared: granting needs proof it is theirs', 
   });
   it('updateProfile calls it when the phone changes', () => {
     const src = readFileSync('apps/api/src/services/auth.service.ts', 'utf8');
-    expect(src).toContain('revokeForPhoneChange(change.storeId, change.oldPhone)');
+    expect(src).toContain('revokeForPhoneChange(current.storeId, current.phone)');
+    // BEFORE the phone is written: a failed revoke leaves the phone unchanged.
+    expect(src.indexOf('revokeForPhoneChange(current.storeId')).toBeLessThan(
+      src.indexOf('...(data.phone !== undefined && { phone: data.phone })')
+    );
   });
 });

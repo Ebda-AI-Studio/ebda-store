@@ -18,7 +18,10 @@ export interface ConsentInput {
   locale?: 'en' | 'ar';
 }
 
-/** Is `phone` the delivery/contact number on an order this customer placed? */
+/**
+ * Is `phone` the contact number on a DELIVERED order this customer placed? A pending or cancelled order
+ * proves nothing (the number is typed free text); a delivered one means the courier reached it.
+ */
 export async function phoneOnOwnOrder(
   storeId: string,
   userId: string,
@@ -27,7 +30,7 @@ export async function phoneOnOwnOrder(
   const want = toE164(phone);
   if (!want) return false;
   const orders = await prisma.order.findMany({
-    where: { storeId, customerId: userId, status: { not: 'cancelled' } },
+    where: { storeId, customerId: userId, status: 'delivered' },
     select: { shippingAddress: true },
     orderBy: { createdAt: 'desc' },
     take: 25,
@@ -117,7 +120,8 @@ export const WhatsAppConsentService = {
       where: { storeId, sessionId, customerId: userId },
       select: { id: true },
     });
-    if (!cart) return { status: 'no_cart' };
+    // GRANTING is tied to this session's cart; WITHDRAWING needs no cart (any device, any time).
+    if (!cart && input.consent) return { status: 'no_cart' };
     const user = await prisma.user.findFirst({
       where: { id: userId, storeId },
       select: { phone: true },
@@ -134,7 +138,18 @@ export const WhatsAppConsentService = {
       locale: input.locale,
     });
     if (!r) return { status: 'no_phone' };
-    return { status: 'recorded', granted: r.granted, cartId: cart.id };
+    return { status: 'recorded', granted: r.granted, cartId: cart?.id ?? 'none' };
+  },
+
+  /** The signed-in customer's current consent for their account number (so the box shows the truth). */
+  async stateForUser(storeId: string, userId: string): Promise<{ granted: boolean }> {
+    const user = await prisma.user.findFirst({
+      where: { id: userId, storeId },
+      select: { phone: true },
+    });
+    if (!user?.phone) return { granted: false };
+    const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), user.phone);
+    return { granted: buyerKey ? await this.hasConsent(storeId, buyerKey) : false };
   },
 
   /** True only for an active, un-revoked consent. Unknown buyer = no consent. */
