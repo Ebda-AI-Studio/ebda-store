@@ -179,7 +179,7 @@ export function isBrandHost(host: string | null | undefined): boolean {
 export function brandFrom(displayName: string = BRAND.product.nameEn): string {
   // BRAND-NAME-1: never the bare master name as a sender (an inbox shows "Ebda", not the product).
   if (displayName.trim().toLowerCase() === 'ebda') {
-    throw new Error('brandFrom: the sender name must name the product, not only the brand');
+    throw new Error('brandFrom: the sender name must not be the bare brand, name the product');
   }
   return `${displayName} <${BRAND.noReplyEmail}>`;
 }
