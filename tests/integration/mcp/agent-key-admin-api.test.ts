@@ -220,27 +220,27 @@ describe('agent key admin API — the merchant lifecycle', () => {
     expect(JSON.stringify(listBody)).not.toContain('"agentApiKey"');
   });
 
-  it('no store read returns ANY stored credential — the global omit covers all three (2026-09-25)', async () => {
+  it('no store read returns ANY stored credential — the global omit covers it (2026-09-25)', async () => {
     // GET /admin/stores/:id ran a bare findUnique + include and shipped every
-    // ciphertext column to the admin client (Ruling M5 residual). Set all
-    // three so the leak is possible, then read every wide store endpoint.
+    // ciphertext column to the admin client (Ruling M5 residual). Set the
+    // credential so the leak is possible, then read every wide store endpoint.
     await prisma.storeCredential.upsert({
       where: { storeId },
-      create: { storeId, wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
-      update: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+      create: { storeId, agentApiKey: 'ciphertext-agent' },
+      update: { agentApiKey: 'ciphertext-agent' },
     });
     for (const path of [`/admin/stores/${storeId}`, `/stores/${storeId}`, '/stores']) {
       const res = await fetch(`${API}${path}`, { headers: auth() });
       expect(res.status, path).toBe(200);
       const raw = JSON.stringify(await res.json());
-      for (const field of ['"agentApiKey"', '"wbsApiKey"', '"metaAccessToken"']) {
+      for (const field of ['"agentApiKey"']) {
         expect(raw, `${path} must not return ${field}`).not.toContain(field);
       }
     }
     await prisma.storeCredential.upsert({
       where: { storeId },
-      create: { storeId, wbsApiKey: null, metaAccessToken: null },
-      update: { wbsApiKey: null, metaAccessToken: null },
+      create: { storeId, agentApiKey: null },
+      update: { agentApiKey: null },
     });
   });
 
@@ -250,8 +250,8 @@ describe('agent key admin API — the merchant lifecycle', () => {
     // verbatim. Only the global omit keeps the ciphertexts out of it.
     await prisma.storeCredential.upsert({
       where: { storeId },
-      create: { storeId, wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
-      update: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+      create: { storeId, agentApiKey: 'ciphertext-agent' },
+      update: { agentApiKey: 'ciphertext-agent' },
     });
     const minted = await fetch(keyEndpoint(), { method: 'POST', headers: auth() });
     expect(minted.status).toBe(201);
@@ -265,29 +265,23 @@ describe('agent key admin API — the merchant lifecycle', () => {
     const body = await res.json();
     expect(body.data.store.id, 'the update must return the store row').toBe(storeId);
     const raw = JSON.stringify(body);
-    for (const field of ['"agentApiKey"', '"wbsApiKey"', '"metaAccessToken"']) {
+    for (const field of ['"agentApiKey"']) {
       expect(raw, `PUT /announcement must not return ${field}`).not.toContain(field);
     }
 
     await fetch(keyEndpoint(), { method: 'DELETE', headers: auth() });
     await prisma.storeCredential.upsert({
       where: { storeId },
-      create: { storeId, wbsApiKey: null, metaAccessToken: null },
-      update: { wbsApiKey: null, metaAccessToken: null },
+      create: { storeId, agentApiKey: null },
+      update: { agentApiKey: null },
     });
   });
 
-  it('an explicit select still reads every omitted credential back (#1938)', async () => {
+  it('an explicit select still reads the omitted credential back (#1938)', async () => {
     // The global omit is only safe because a query-level `select` overrides
-    // it: wbsApiKey feeds `if (!store.wbsApiKey) return;` guards
-    // (abandoned-cart, order-whatsapp-notify, wa-bridge-auth) that would turn
-    // into SILENT no-ops if it did not. Pin the positive read-back for all
-    // three, not just agentApiKey.
-    const creds = {
-      wbsApiKey: 'ciphertext-wbs',
-      metaAccessToken: 'ciphertext-meta',
-      agentApiKey: 'ciphertext-agent',
-    };
+    // it: guards like `if (!credentials.agentApiKey) return;` would turn
+    // into SILENT no-ops if it did not.
+    const creds = { agentApiKey: 'ciphertext-agent' };
     await prisma.storeCredential.upsert({
       where: { storeId },
       create: { storeId, ...creds },
@@ -295,23 +289,17 @@ describe('agent key admin API — the merchant lifecycle', () => {
     });
     const row = await prisma.storeCredential.findUnique({
       where: { storeId },
-      select: { wbsApiKey: true, metaAccessToken: true, agentApiKey: true },
+      select: { agentApiKey: true },
     });
-    expect(row).toEqual({
-      wbsApiKey: 'ciphertext-wbs',
-      metaAccessToken: 'ciphertext-meta',
-      agentApiKey: 'ciphertext-agent',
-    });
+    expect(row).toEqual({ agentApiKey: 'ciphertext-agent' });
     // Negative control: without the select the same row carries none of them.
     const bare = await prisma.storeCredential.findUnique({ where: { storeId } });
-    expect(bare).not.toHaveProperty('wbsApiKey');
-    expect(bare).not.toHaveProperty('metaAccessToken');
     expect(bare).not.toHaveProperty('agentApiKey');
 
     await prisma.storeCredential.upsert({
       where: { storeId },
-      create: { storeId, wbsApiKey: null, metaAccessToken: null, agentApiKey: null },
-      update: { wbsApiKey: null, metaAccessToken: null, agentApiKey: null },
+      create: { storeId, agentApiKey: null },
+      update: { agentApiKey: null },
     });
   });
 

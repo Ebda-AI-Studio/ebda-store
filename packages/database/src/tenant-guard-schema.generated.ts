@@ -162,7 +162,6 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       funnelSnapshots: 'FunnelSnapshot',
       customerRfmSnapshots: 'CustomerRfmSnapshot',
       productDailyViews: 'ProductDailyView',
-      whatsAppTemplates: 'WhatsAppTemplate',
       paymentEvents: 'PaymentEvent',
       orderEvents: 'OrderEvent',
       webhookEvents: 'WebhookEvent',
@@ -1309,14 +1308,6 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       session: 'CountSession',
       product: 'Product',
       variant: 'ProductVariant',
-    },
-  },
-  {
-    name: 'WhatsAppTemplate',
-    table: 'whatsapp_templates',
-    storeId: true,
-    relations: {
-      store: 'Store',
     },
   },
   {

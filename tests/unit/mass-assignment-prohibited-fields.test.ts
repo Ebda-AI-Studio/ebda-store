@@ -33,7 +33,7 @@
  *      most directly onto a Prisma row: store create/update/status,
  *      product create/update, and order checkout-create/admin-create/status.
  *      Each sends prohibited fields (id, storeId, ownerId, createdAt,
- *      updatedAt, deletedAt, agentApiKey, wbsApiKey, metaAccessToken, and for
+ *      updatedAt, deletedAt, agentApiKey, and for
  *      store also plan + status) alongside a valid body and asserts none of
  *      them reach the mocked service call that performs the write.
  *
@@ -42,7 +42,7 @@
  * through a Zod `z.object(...)` schema BEFORE calling its service (Zod's
  * default "strip" mode silently drops unrecognised keys — none of these
  * schemas declare `id`/`storeId`/`ownerId`/`createdAt`/`updatedAt`/`deletedAt`
- * /`agentApiKey`/`wbsApiKey`/`metaAccessToken`, and the store schema also
+ * /`agentApiKey`, and the store schema also
  * never declares `plan`/`status`), and a manual read of `StoreService.update`,
  * `ProductService.create`/`update` and `OrderService.createAdminOrder`/
  * `OrderService.create` confirms the service layer itself enumerates each
@@ -264,8 +264,6 @@ const BASE_PROHIBITED: Record<string, unknown> = {
   updatedAt: '1999-01-01T00:00:00.000Z',
   deletedAt: '1999-01-01T00:00:00.000Z',
   agentApiKey: 'attacker-agent-key',
-  wbsApiKey: 'attacker-wbs-key',
-  metaAccessToken: 'attacker-meta-token',
 };
 const STORE_PROHIBITED: Record<string, unknown> = {
   ...BASE_PROHIBITED,
