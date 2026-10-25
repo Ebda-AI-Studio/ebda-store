@@ -168,6 +168,8 @@ backup copies of the whole database for disaster recovery
 at a moment in time — an erasure that happens today doesn't retroactively
 edit a backup that was already taken yesterday.
 
+**Cloudflare storage (from the cutover, G8/G10).** The same boundary applies to the new copies: nightly StoreDO exports (`ebda-private/store-do-backups/`), D1 exports (`d1-backups/`) and their copy on the Mac (`_backups/ebda-cloudflare/`, 30 days) keep a pre-erasure row until they rotate, and StoreDO PITR / D1 Time Travel keep 30 days. A restore from any of them must be followed by re-running the ledger's erasures (`erasure-ledger/<requestId>.json` lists every request; the job is idempotent). Erasure design and per-surface tests: `docs/privacy/erasure-export.md`.
+
 Concretely, as of 2026-07-11 (`docs/DB-BACKUP-RESTORE.md` is the live
 source of truth if these numbers ever change):
 

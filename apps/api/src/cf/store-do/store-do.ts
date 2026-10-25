@@ -12,12 +12,15 @@ import { makeDrizzle, listProducts, addCartItem, createOrder, StoreError, type D
 import { CORE_0001 } from './migrations';
 import { statements } from './sql';
 import { STORE_TABLES } from './tables';
+import { countCustomerRows, eraseCustomerRows, exportCustomerRows } from '../erasure/store-do-sql';
+import type { Subject } from '../erasure/types';
 import {
   buildBackup,
   dumpTables,
   loadBackup,
   sha256Hex,
   backupKey,
+  verifyWritten,
   type BackupManifest,
 } from './backup';
 
@@ -152,6 +155,8 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       await r2.put(backupKey(storeId, day, name), body);
     // The manifest goes last: a day folder without one is an incomplete backup and must be ignored.
     await r2.put(backupKey(storeId, day, 'manifest.json'), JSON.stringify(manifest, null, 2));
+    // Read-back (rule N11): a backup that is not read back is not a backup.
+    await verifyWritten(r2, storeId, day, manifest);
     return manifest;
   }
 
@@ -214,6 +219,34 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       };
     }
     return out;
+  }
+
+  // ---- PDPL export / erasure (G10; cf/erasure). Registry-driven, see cf/erasure/registry.ts ----
+  /** Merchant: every table, whole. Customer: only the registry's customer-pii rows that match. */
+  exportSubject(s: Subject): { tables: Record<string, Array<Record<string, unknown>>> } {
+    if (s.kind === 'customer') return { tables: exportCustomerRows(this.ctx.storage.sql, s) };
+    const tables: Record<string, Array<Record<string, unknown>>> = {};
+    for (const t of STORE_TABLES)
+      tables[t] = this.ctx.storage.sql.exec(`SELECT * FROM ${t} ORDER BY rowid`).toArray();
+    return { tables };
+  }
+
+  /** Merchant: wipe the whole DO (rows, alarm). Customer: delete/scrub the registry rows that match. */
+  async eraseSubject(s: Subject): Promise<{ erased: Record<string, number>; remaining: number }> {
+    const sqlx = this.ctx.storage.sql;
+    if (s.kind === 'customer') {
+      const erased = this.ctx.storage.transactionSync(() => eraseCustomerRows(sqlx, s));
+      return { erased, remaining: countCustomerRows(sqlx, s) };
+    }
+    const erased = this.rowCounts();
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    const left = sqlx
+      .exec(
+        "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
+      )
+      .one().n as number;
+    return { erased, remaining: left };
   }
 
   /** PITR bookmark for "now" (SQLite-backed DOs, 30 days). Returned so the drill can record availability. */

@@ -14,5 +14,7 @@
       "zone_name": "ebda.app",
     },
   ],
-  "observability": { "enabled": true },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
+  "logpush": true,
 }

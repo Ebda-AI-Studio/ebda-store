@@ -16,6 +16,7 @@
     "cf:dev:ai": "wrangler dev",
     "cf:dry-run": "wrangler deploy --dry-run --outdir dist-cf",
     "cf:test": "npm run cf:dry-run && vitest run --config vitest.workers.config.mts",
+    "cf:test:do": "vitest run --config vitest.workers-do.config.mts",
     "cf:exit-test": "node scripts/stage1-exit-test.mjs"
   },
   "dependencies": {

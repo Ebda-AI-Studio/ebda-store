@@ -47,6 +47,7 @@ const PR_LANE = [
   'unit',
   'worker-dry-run',
   'api-workerd-smoke',
+  'workerd-integration',
 ];
 
 /** Does the job (or, through `needs`, a job it waits on) skip on pull_request? */

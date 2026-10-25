@@ -15,6 +15,9 @@ import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { loyaltyAutomationService } from '../services/loyalty-automation.service';
 import { AuthService } from '../services/auth.service';
 import logger from '../lib/logger';
+import { sendAlert } from '../services/alerts.service';
+import { cfBindings } from './bindings';
+import { runBackupSweep, flaggedStoreIds, type SweepEnv } from './ops/backup-sweep';
 
 export interface CronJob {
   name: string;
@@ -35,6 +38,18 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
   // Loyalty: birthday bonuses + point expiry (was every 24 h).
   '0 3 * * *': [
     { name: 'loyalty-daily', run: () => loyaltyAutomationService.runDailyAutomation() },
+    // G8: arm StoreDO alarms, check yesterday's backups landed, export D1 to R2 (cf/ops/backup-sweep.ts).
+    {
+      name: 'backup-sweep',
+      run: async () => {
+        const env = (cfBindings() ?? {}) as unknown as SweepEnv;
+        const report = await runBackupSweep(env, {
+          listStoreIds: () => flaggedStoreIds(process.env.STORE_DO_ENABLED_IDS),
+          alert: (title, body) => sendAlert({ level: 'p1', source: 'backup-sweep', title, body }),
+        });
+        if (!report.ok) throw new Error('backup sweep reported failures (alert sent)');
+      },
+    },
   ],
 };
 

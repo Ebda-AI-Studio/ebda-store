@@ -20,8 +20,9 @@ In rough order of how an incident usually surfaces:
 2. **Sentry** — new error cluster or rate spike on existing cluster. Alert rules: >10 new errors/hr OR any new issue type. Telegram integration.
 3. **Merchant report** — WhatsApp / email from Ahmad's contacts. Treat as P1 minimum until ruled out — merchants don't ping for cosmetic issues.
 4. **`cf-deploy.yml` workflow failure (GitHub Actions)** — a red `cf-deploy` run on `main` means Cloudflare Workers (web/admin/orders) are still serving the OLD build even though the merge shows green. P1; rerun with `gh run rerun <id> --failed` after fixing the cause — or, if a newer run on `main` has since gone green, do NOT rerun the old one (its deploy jobs would ship the older commit); the next run already diffs from the last success and picks the failed changes up, or `workflow_dispatch` redeploys `main`.
-5. **Railway deployment failure** — same, P0 if production health check failed.
-6. **Customer-facing site error message** — explicit user complaint, often surfaces P1-P2 issues that don't trigger alerts.
+5. **Workers Logs / Logpush** (G7) - the first place to look once an alert names a Worker: dashboard > Workers & Pages > the Worker > Logs (live, recent); older than that, the 30-day gzip NDJSON in R2 bucket `ebda-logs` (`workers/<date>/`, how to read it: `docs/DEPLOYMENT.md` section 7). Filter on `Outcome != ok` and the `Exceptions` field first.
+6. **Railway deployment failure** — same, P0 if production health check failed.
+7. **Customer-facing site error message** — explicit user complaint, often surfaces P1-P2 issues that don't trigger alerts.
 
 ## P0 Triage Checklist (run in order, stop when you find the root cause)
 
