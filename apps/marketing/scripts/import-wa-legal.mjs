@@ -4,7 +4,7 @@
 //   node apps/marketing/scripts/import-wa-legal.mjs <path-to>/docs/legal
 // Drops the review-pending HTML comments and markdown markup; headings become sections, bullets and table rows
 // become paragraphs. The output is committed; the marketing build never reads the markdown.
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
