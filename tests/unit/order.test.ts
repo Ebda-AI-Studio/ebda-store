@@ -14,6 +14,8 @@ import { socketService } from '@api/services/socket.service';
 // by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
 // Gold-rate pricing is proven in gold-*.test.ts and tests/integration/gold-checkout.test.ts; this suite
 // is about something else, so the gate is stubbed to "no gold lines".
+const priorUses = vi.hoisted(() => vi.fn().mockResolvedValue(0));
+vi.mock('@api/lib/coupon-per-customer-limit', () => ({ countPriorCouponUses: priorUses }));
 vi.mock('@api/services/gold-rate/gate', () => ({
   assertGoldLinesPriceable: async () => ({ snapshots: new Map(), rateIds: new Map() }),
   assertSameRates: async () => undefined,
@@ -805,29 +807,25 @@ describe('OrderService', () => {
       });
 
       it('registered customer already at usageLimitPerUser → rejects, never creates the order', async () => {
-        txOrderCount.mockResolvedValue(1); // already used once, limit is 1
+        priorUses.mockResolvedValue(1); // already used once, limit is 1
 
         await expect(
           OrderService.create(mockStoreId, mockCustomerId, mockSessionId, couponOrderData)
         ).rejects.toThrow('Coupon usage limit reached');
 
         // Counts by customerId, scoped to this coupon + non-cancelled/refunded.
-        expect(txOrderCount).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              storeId: mockStoreId,
-              couponCode: 'SAVE10',
-              customerId: mockCustomerId,
-              status: { notIn: ['cancelled', 'refunded'] },
-            }),
-          })
+        expect(priorUses).toHaveBeenCalledWith(
+          expect.anything(),
+          mockStoreId,
+          'SAVE10',
+          expect.objectContaining({ customerId: mockCustomerId })
         );
         // The global reserve step must never run once the per-user gate rejects.
         expect(txCouponUpdateMany).not.toHaveBeenCalled();
       });
 
       it('registered customer under usageLimitPerUser → order proceeds', async () => {
-        txOrderCount.mockResolvedValue(0);
+        priorUses.mockResolvedValue(0);
 
         const result = await OrderService.create(
           mockStoreId,
@@ -841,7 +839,7 @@ describe('OrderService', () => {
       });
 
       it('guest checkout identified by shipping email already at the per-user limit → rejects', async () => {
-        txOrderCount.mockResolvedValue(1);
+        priorUses.mockResolvedValue(1);
         const guestData = {
           ...couponOrderData,
           shippingAddress: { ...couponOrderData.shippingAddress, email: 'guest@test.com' },
@@ -851,31 +849,23 @@ describe('OrderService', () => {
           OrderService.create(mockStoreId, undefined, mockSessionId, guestData)
         ).rejects.toThrow('Coupon usage limit reached');
 
-        expect(txOrderCount).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              storeId: mockStoreId,
-              couponCode: 'SAVE10',
-              OR: [{ shippingAddress: { path: ['email'], equals: 'guest@test.com' } }],
-            }),
-          })
+        expect(priorUses).toHaveBeenCalledWith(
+          expect.anything(),
+          mockStoreId,
+          'SAVE10',
+          expect.objectContaining({ customerId: undefined })
         );
       });
 
-      it('guest checkout with NEITHER email nor phone → never blocked (identity ambiguous, fail open)', async () => {
-        // Even if txOrderCount were to return a high count, the code must
-        // never call it when there's no identifier to key on.
-        txOrderCount.mockResolvedValue(99);
+      it('guest checkout with NEITHER email nor phone → REFUSED the per-customer coupon (no stable identity), nothing created', async () => {
+        const { AppError } = await import('@api/middleware/error-handler');
+        priorUses.mockRejectedValueOnce(new AppError(400, 'COUPON_NEEDS_CONTACT', 'needs contact'));
 
-        const result = await OrderService.create(
-          mockStoreId,
-          undefined,
-          mockSessionId,
-          couponOrderData // shippingAddress has no email/phone
-        );
+        await expect(
+          OrderService.create(mockStoreId, undefined, mockSessionId, couponOrderData) // no email/phone
+        ).rejects.toMatchObject({ code: 'COUPON_NEEDS_CONTACT' });
 
-        expect(result.orderNumber).toBeDefined();
-        expect(txOrderCount).not.toHaveBeenCalled();
+        expect(txCouponUpdateMany).not.toHaveBeenCalled(); // the redemption is never claimed
       });
 
       it('coupon with no usageLimitPerUser set → skips the per-user check entirely', async () => {
@@ -1336,7 +1326,7 @@ describe('OrderService', () => {
       });
 
       it('registered customer already at usageLimitPerUser → rejects, never creates the admin order', async () => {
-        txOrderCount.mockResolvedValue(1); // already used once, limit is 1
+        priorUses.mockResolvedValue(1); // already used once, limit is 1
 
         await expect(
           OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
@@ -1345,20 +1335,16 @@ describe('OrderService', () => {
           })
         ).rejects.toThrow('Coupon usage limit reached');
 
-        expect(txOrderCount).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              storeId: mockStoreId,
-              couponCode: 'SAVE10',
-              customerId: mockCustomerId,
-              status: { notIn: ['cancelled', 'refunded'] },
-            }),
-          })
+        expect(priorUses).toHaveBeenCalledWith(
+          expect.anything(),
+          mockStoreId,
+          'SAVE10',
+          expect.objectContaining({ customerId: mockCustomerId })
         );
       });
 
       it('registered customer under usageLimitPerUser → admin order proceeds', async () => {
-        txOrderCount.mockResolvedValue(0);
+        priorUses.mockResolvedValue(0);
 
         const result = await OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
           ...couponAdminOrderData,
@@ -1374,7 +1360,7 @@ describe('OrderService', () => {
       });
 
       it('guest admin order identified by shipping email already at the per-user limit → rejects', async () => {
-        txOrderCount.mockResolvedValue(1);
+        priorUses.mockResolvedValue(1);
 
         await expect(
           OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
@@ -1386,30 +1372,20 @@ describe('OrderService', () => {
           })
         ).rejects.toThrow('Coupon usage limit reached');
 
-        expect(txOrderCount).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              storeId: mockStoreId,
-              couponCode: 'SAVE10',
-              OR: [{ shippingAddress: { path: ['email'], equals: 'guest@test.com' } }],
-            }),
-          })
+        expect(priorUses).toHaveBeenCalledWith(
+          expect.anything(),
+          mockStoreId,
+          'SAVE10',
+          expect.objectContaining({ customerId: undefined })
         );
       });
 
-      it('guest admin order with NEITHER email nor phone → never blocked (identity ambiguous, fail open)', async () => {
-        // Even if txOrderCount were to return a high count, the code must
-        // never call it when there's no identifier to key on.
-        txOrderCount.mockResolvedValue(99);
-
-        const result = await OrderService.createAdminOrder(
-          mockStoreId,
-          mockAdminUserId,
-          couponAdminOrderData // no customerId, shippingAddress has no email/phone
-        );
-
-        expect(result.orderNumber).toBeDefined();
-        expect(txOrderCount).not.toHaveBeenCalled();
+      it('guest admin order with NEITHER email nor phone → refused (an admin override reports it as a violation instead)', async () => {
+        const { AppError } = await import('@api/middleware/error-handler');
+        priorUses.mockRejectedValueOnce(new AppError(400, 'COUPON_NEEDS_CONTACT', 'needs contact'));
+        await expect(
+          OrderService.createAdminOrder(mockStoreId, mockAdminUserId, couponAdminOrderData)
+        ).rejects.toMatchObject({ code: 'COUPON_NEEDS_CONTACT' });
       });
 
       it('coupon with no usageLimitPerUser set → skips the per-user check entirely', async () => {
