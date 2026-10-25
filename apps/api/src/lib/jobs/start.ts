@@ -69,7 +69,9 @@ export async function startJob(def: JobDef, event: JobEvent): Promise<'started' 
     await b.JOBS_WORKFLOW.create({ id, params });
     return 'started';
   } catch (err) {
-    if (idem && ALREADY_EXISTS.test(err instanceof Error ? err.message : String(err))) {
+    // A re-create of the same id is a no-op for ANY deterministic id: an idempotency key, a cron tick
+    // (`cron-<job>-<ts>`) or a store alarm occurrence (`alarm-<job>-<store>-<at>`). Random ids never collide.
+    if (ALREADY_EXISTS.test(err instanceof Error ? err.message : String(err))) {
       return 'duplicate';
     }
     throw err;
