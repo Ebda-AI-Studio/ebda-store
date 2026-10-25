@@ -97,17 +97,20 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // Feature gate — inventory.basic (see the cron handler above for why this
     // is not inventory.purchase_orders).
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
+    // One step for both gates: on a Workflow only step bodies hold a database connection.
+    const { enabled, store } = await step.run('gates', async () => ({
+      enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
+      store: await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    }));
     if (!enabled) {
       logger.info({ storeId }, 'stock-reorder-scan-on-demand: inventory.basic disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
     }
 
-    // Plan gate — inventory.basic is in the `free` baseline so a lapsed
-    // merchant can still see their stock; it must not buy them AI spend.
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    // Plan gate: inventory.basic is in the `free` baseline so a lapsed merchant can still see their
+    // stock; it must not buy them AI spend.
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },
