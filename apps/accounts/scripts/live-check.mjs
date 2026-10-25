@@ -120,7 +120,7 @@ try {
     .find(c => c.startsWith('__Host-ebda_rt='))
     .split(';')[0];
   const wa = await fetch(`${ACCOUNTS}/token?aud=whatsapp`, {
-    headers: { cookie: rt, origin: ORIGIN },
+    headers: { cookie: rt, origin: 'https://wa.ebda.app' },
   });
   const waTok = (await wa.json()).data?.access_token;
   check('SSO: the same cookie mints an aud=whatsapp token', wa.status === 200 && !!waTok);
@@ -185,7 +185,7 @@ try {
   });
   check('the identity refresh cookie is dead too', refreshAfter.status === 401);
   const waAfter = await fetch(`${ACCOUNTS}/token?aud=whatsapp`, {
-    headers: { cookie: rt, origin: ORIGIN },
+    headers: { cookie: rt, origin: 'https://wa.ebda.app' },
   });
   check('...for every product (SSO logout)', waAfter.status === 401);
 } finally {
