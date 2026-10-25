@@ -31,7 +31,7 @@ beforeEach(async () => {
   });
 });
 
-const body = '<html>ebda {"status":"ok"}</html>';
+const body = '<html>ebda <main data-zone="hero"></main> {"status":"ok"}</html>';
 const healthy: Fetcher = async () => new Response(body, { status: 200 });
 /** Everything healthy except the API, which answers 503. */
 const apiDown: Fetcher = async url =>
