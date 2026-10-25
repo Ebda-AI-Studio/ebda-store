@@ -1,41 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// scripts/ci/host-lock.sh: the heavy pre-push test run is serialised host-wide and NEVER skipped.
+// scripts/ci/host-lock.sh: the heavy pre-push test run is serialised host-wide on the ONE shared lock file
+// (~/.claude/locks/heavy-test.lock, lockf/flock) and NEVER skipped.
 const SCRIPT = join(__dirname, '../../../scripts/ci/host-lock.sh');
-const env = (dir: string, extra: Record<string, string> = {}) => ({
+const env = (file: string, extra: Record<string, string> = {}) => ({
   ...process.env,
-  HOST_LOCK_DIR: dir,
-  HOST_LOCK_POLL_S: '1',
+  HOST_LOCK_FILE: file,
   ...extra,
 });
+const fresh = () => join(mkdtempSync(join(tmpdir(), 'hl-')), 'heavy-test.lock');
 
 describe('host-lock.sh', () => {
-  it('runs the command, passes its exit code through, and releases the lock', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hl-'));
-    const ok = spawnSync('bash', [SCRIPT, 'a', 'sh', '-c', 'exit 0'], { env: env(dir) });
-    const bad = spawnSync('bash', [SCRIPT, 'a', 'sh', '-c', 'exit 7'], { env: env(dir) });
-    expect(ok.status).toBe(0);
-    expect(bad.status).toBe(7);
-    expect(existsSync(join(dir, 'a.lock'))).toBe(false);
+  it('runs the command and passes its exit code through', () => {
+    const f = fresh();
+    expect(spawnSync('bash', [SCRIPT, 'sh', '-c', 'exit 0'], { env: env(f) }).status).toBe(0);
+    expect(spawnSync('bash', [SCRIPT, 'sh', '-c', 'exit 7'], { env: env(f) }).status).toBe(7);
   });
 
   it('a second run WAITS for the first (never overlaps, never skipped) and says so', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hl-'));
-    const log = join(dir, 'order.log');
+    const f = fresh();
+    const log = join(f, '..', 'order.log');
     const first = spawn(
       'bash',
-      [SCRIPT, 'b', 'sh', '-c', `echo first-start >> ${log}; sleep 3; echo first-end >> ${log}`],
-      { env: env(dir) }
+      [SCRIPT, 'sh', '-c', `echo first-start >> ${log}; sleep 3; echo first-end >> ${log}`],
+      { env: env(f) }
     );
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 800));
     let err = '';
-    const second = spawn('bash', [SCRIPT, 'b', 'sh', '-c', `echo second >> ${log}`], {
-      env: env(dir),
-    });
+    const second = spawn('bash', [SCRIPT, 'sh', '-c', `echo second >> ${log}`], { env: env(f) });
     second.stderr.on('data', d => (err += d));
     const [c1, c2] = await Promise.all([
       new Promise(r => first.on('close', r)),
@@ -47,35 +43,50 @@ describe('host-lock.sh', () => {
       'first-end',
       'second',
     ]);
-    expect(err).toContain('holds the host lock');
+    expect(err).toContain('queues');
   }, 20000);
 
-  it('reclaims a lock whose holder died (a killed push must not wedge the queue)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hl-'));
-    mkdirSync(join(dir, 'c.lock'));
-    writeFileSync(join(dir, 'c.lock', 'pid'), '999999\n');
-    const r = spawnSync('bash', [SCRIPT, 'c', 'echo', 'ran'], { env: env(dir) });
+  it('interoperates with the manual rule: a holder taking the lock with lockf/flock directly blocks the hook', async () => {
+    const f = fresh();
+    const manual = process.platform === 'darwin' ? ['lockf', '-k', f] : ['flock', f];
+    const holder = spawn(manual[0], [...manual.slice(1), 'sleep', '3'], { env: process.env });
+    await new Promise(r => setTimeout(r, 800));
+    const t0 = Date.now();
+    const r = spawnSync('bash', [SCRIPT, 'echo', 'ran'], { env: env(f) });
     expect(r.status).toBe(0);
-    expect(String(r.stdout)).toContain('ran');
-  });
+    expect(Date.now() - t0).toBeGreaterThan(1500); // it had to wait for the manual holder
+    holder.kill();
+  }, 20000);
 
-  it('on timeout it FAILS (75) and does not run the command unlocked', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hl-'));
-    mkdirSync(join(dir, 'd.lock'));
-    writeFileSync(join(dir, 'd.lock', 'pid'), `${process.pid}\n`); // a live holder: this test process
-    const marker = join(dir, 'ran');
-    const r = spawnSync('bash', [SCRIPT, 'd', 'touch', marker], {
-      env: env(dir, { HOST_LOCK_MAX_WAIT_S: '2' }),
+  it('a killed holder frees the lock (the kernel drops it)', async () => {
+    const f = fresh();
+    const holder = spawn('bash', [SCRIPT, 'sleep', '60'], { env: env(f) });
+    await new Promise(r => setTimeout(r, 800));
+    holder.kill('SIGKILL');
+    spawnSync('pkill', ['-f', 'sleep 60']);
+    await new Promise(r => setTimeout(r, 500));
+    const r = spawnSync('bash', [SCRIPT, 'echo', 'ran'], {
+      env: env(f, { HOST_LOCK_MAX_WAIT_S: '5' }),
+    });
+    expect(r.status).toBe(0);
+  }, 20000);
+
+  it('on timeout it FAILS (75) and does not run the command unlocked', async () => {
+    const f = fresh();
+    const marker = join(f, '..', 'ran');
+    const holder = spawn('bash', [SCRIPT, 'sleep', '8'], { env: env(f) });
+    await new Promise(r => setTimeout(r, 800));
+    const r = spawnSync('bash', [SCRIPT, 'touch', marker], {
+      env: env(f, { HOST_LOCK_MAX_WAIT_S: '2' }),
     });
     expect(r.status).toBe(75);
     expect(existsSync(marker)).toBe(false);
-  }, 15000);
+    holder.kill();
+  }, 20000);
 
   it('the pre-push hook runs the unit suite through it with a worker cap', () => {
     const hook = readFileSync(join(__dirname, '../../../.husky/pre-push'), 'utf8');
-    expect(hook).toContain(
-      'scripts/ci/host-lock.sh ebda-unit-suite npm run test:unit -- --maxWorkers=50%'
-    );
+    expect(hook).toContain('scripts/ci/host-lock.sh npm run test:unit -- --maxWorkers=50%');
     expect(hook).not.toMatch(/^npm run test:unit$/m);
   });
 });

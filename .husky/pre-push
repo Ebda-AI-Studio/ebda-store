@@ -88,7 +88,7 @@ _DB="test_db"
 export TEST_DATABASE_URL="${_SCHEME}://${_CREDS}@${_HOST}/${_DB}"
 # ONE full suite on this host at a time (scripts/ci/host-lock.sh queues, never skips) and half the cores
 # per run, so parallel agents + the Umbra CI VM cannot starve the host again (2026-10-25 wedge).
-bash scripts/ci/host-lock.sh ebda-unit-suite npm run test:unit -- --maxWorkers=50%
+bash scripts/ci/host-lock.sh npm run test:unit -- --maxWorkers=50%
 
 # --- Blast-radius + AI review: ALSO run locally before push (still run in CI too) ---
 # Corrected 2026-09-02 (adversarial audit): this used to claim blast-radius.yml /
