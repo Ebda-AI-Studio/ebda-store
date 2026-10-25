@@ -669,7 +669,14 @@ export function createApp() {
   };
 
   // ---- discovery ----
-  app.get('/health', c => c.json({ status: 'ok', service: 'accounts' }));
+  app.get('/health', c =>
+    c.json({
+      status: 'ok',
+      service: 'accounts',
+      commit: c.env.BUILD_COMMIT_SHA || null,
+      deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
+    })
+  );
   app.get('/.well-known/jwks.json', async c => {
     c.header('Cache-Control', 'public, max-age=300');
     return c.json(await jwks(c.env));
@@ -749,6 +756,7 @@ export function createApp() {
       .first<{ user_id: string; data: string }>();
     if (!row) throw err(401, 'INVALID_CHALLENGE');
     const data = JSON.parse(row.data) as { aud: string };
+    originAudience(c, data.aud);
     const user = await findUserById(c.env.DB, row.user_id);
     if (
       !user ||

@@ -95,3 +95,13 @@ describe('wa.ebda.app origin', () => {
     expect((await call('/token?aud=whatsapp', { cookie: s.cookie })).status).toBe(200);
   });
 });
+
+describe('/health reports the running version', () => {
+  it('has commit and deploymentId fields (null when not deployed with them)', async () => {
+    const r = await call('/health');
+    expect(r.status).toBe(200);
+    const b = (await r.json()) as Record<string, unknown>;
+    expect(b).toMatchObject({ status: 'ok', service: 'accounts' });
+    expect('commit' in b && 'deploymentId' in b).toBe(true);
+  });
+});

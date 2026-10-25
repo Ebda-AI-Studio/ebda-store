@@ -89,6 +89,40 @@ try {
     `stores=${JSON.stringify(payload.stores)}`
   );
 
+  // The shape every product's verifier relies on (contract v1.2): asserted from the REAL token; the token itself is never logged.
+  const nowS = Math.floor(Date.now() / 1000);
+  const isUuid = v =>
+    typeof v === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  check(
+    'claims: iss / aud / sub',
+    payload.iss === ACCOUNTS && payload.aud === 'store' && payload.sub === id
+  );
+  check(
+    'claims: iat = nbf, exp = iat + 900, not expired, iat not in the future (60 s skew)',
+    payload.nbf === payload.iat &&
+      payload.exp - payload.iat === 900 &&
+      payload.exp > nowS &&
+      payload.iat <= nowS + 60
+  );
+  check('claims: sid and jti are uuids', isUuid(payload.sid) && isUuid(payload.jti));
+  check(
+    'claims: stores[] entries are { id: uuid, role: owner|staff }',
+    Array.isArray(payload.stores) &&
+      payload.stores.every(
+        s =>
+          isUuid(s.id) &&
+          ['owner', 'staff'].includes(s.role) &&
+          Object.keys(s).sort().join() === 'id,role'
+      )
+  );
+  check(
+    'claims: auth_time present, email_verified boolean, no platform role for a merchant',
+    typeof payload.auth_time === 'number' &&
+      typeof payload.email_verified === 'boolean' &&
+      payload.pa === undefined
+  );
+
   // Store: exchange for the API cookie, then an authenticated call
   const sess = await fetch(`${API}/api/v1/auth/session`, {
     method: 'POST',

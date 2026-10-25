@@ -268,6 +268,27 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 
 - **Allowed browser origins** (`ALLOWED_ORIGINS`, exact match, https, no wildcard): `store.ebda.app`, `orders.ebda.app`, `wa.ebda.app` (Ebda WhatsApp, product audience `whatsapp`). `PASSKEY_ORIGINS` stays the Store hosts only.
 
+### Identity secrets: where they live and how to rotate (no values here)
+
+| Secret (Worker `ebda-accounts`) | What it is                                                                                                                  | Backup (macOS Keychain, account `ebda-identity`) |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `JWT_PRIVATE_JWK`               | ES256 (P-256) private JWK with a `kid`; signs every access token. The public half is published at `/.well-known/jwks.json`. | service `ebda-accounts-JWT_PRIVATE_JWK`          |
+| `MFA_KEY`                       | 32 random bytes, base64; seals TOTP secrets at rest (AES-GCM).                                                              | service `ebda-accounts-MFA_KEY`                  |
+
+Read a backup: `security find-generic-password -a ebda-identity -s <service> -w` (it prompts; never paste the value into chat, a ticket or a log). Both were generated on 2026-10-25, set with `wrangler secret put ... --name ebda-accounts` (value on stdin), and are Cloudflare-account secrets (personal account `69188202efc4df480140dd76545aa3ab`).
+
+**Rotate the signing key (no downtime, tokens live 15 minutes):**
+
+1. Generate a new P-256 JWK with a new `kid` (same recipe as the first: `crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' })`, export as JWK, add `kid`, `alg: ES256`, `use: sig`).
+2. Put the OLD key's PUBLIC JWK into `JWT_PREVIOUS_PUBLIC_JWKS` (a JSON array of public JWKs) so tokens signed with it keep verifying for 24 hours; `wrangler secret put JWT_PREVIOUS_PUBLIC_JWKS --name ebda-accounts`.
+3. `wrangler secret put JWT_PRIVATE_JWK --name ebda-accounts` with the NEW private JWK; update the Keychain entry (`security add-generic-password -U -a ebda-identity -s ebda-accounts-JWT_PRIVATE_JWK -w`).
+4. Verify `/.well-known/jwks.json` now lists both keys, and a fresh login's token header carries the new `kid`. After 24 hours drop `JWT_PREVIOUS_PUBLIC_JWKS`.
+   Products cache the JWKS for at most 10 minutes and refetch once on an unknown `kid`, so they pick the new key up on their own.
+
+**Rotating `MFA_KEY`** is a data migration, not a swap: every sealed TOTP secret must be re-sealed with the new key, so do it only with a script that reads each `users.mfa_secret`, unseals with the old key and seals with the new one inside one D1 batch, then flips the secret. Until that exists, treat `MFA_KEY` as non-rotatable; its loss means every TOTP user re-enrols (reset factors with the operator script).
+
+**Lost both?** Redeploy with new values: tokens signed by the old key stop verifying (everyone signs in again), and TOTP users re-enrol.
+
 ### Cutover order (Ruling ID-16): the identity service goes live BEFORE the Store stops accepting its own logins
 
 Merging the stage-3 PR deploys ebda-api (legacy login, refresh and session issue are CLOSED for every merchant/staff/admin account), admin and orders (they sign in only at accounts.ebda.app). They deploy in parallel and nothing orders them, so the identity service, its secrets and the migrated accounts must already exist:
