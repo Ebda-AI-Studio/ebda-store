@@ -31,6 +31,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import {
   createPrismaClient,
+  Prisma,
   runInTenantContext,
   runWithRequestDb,
   type AppPrismaClient,
@@ -308,8 +309,11 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         });
       }
       expect(cfg.credentialHints.fingerprints).toBeUndefined();
-      expect(cfg.connectionTest).toBeNull();
-      expect(cfg.connectionTestCurrent).toBe(false);
+      // PROVIDERS-3: saving the ACTIVE mode ran the automatic check and stored its proof; saving the
+      // OTHER (live) mode afterwards reported only and did not replace it. Saving never enables.
+      expect(res.body.data.check).toMatchObject({ status: 'connected', ok: true });
+      expect(cfg.connectionTest).toMatchObject({ ok: true, code: 'ok', mode: 'sandbox' });
+      expect(cfg.connectionTestCurrent).toBe(true);
       expect(cfg.enabled).toBe(false);
 
       // single-carrier GET is the same browser-safe view
@@ -374,6 +378,12 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const s = await mkStore(`${c.code}-gate`);
       await saveSandbox(s, s);
 
+      // PROVIDERS-3: the save already checked these keys, so a passing proof of exactly the stored
+      // credentials exists. Without one (no proof, or a failing one) enabling is still 409.
+      await owner.shippingCarrierConfig.updateMany({
+        where: { storeId: s.id, carrier: c.code },
+        data: { connectionTest: Prisma.DbNull },
+      });
       const early = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(early.status).toBe(409);
       expect(early.body.error.code).toBe('CONNECTION_NOT_TESTED');
@@ -451,14 +461,24 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(edited.body.data.disabledUntilRetested).toBe(true);
       expect(edited.body.data.config.enabled).toBe(false);
       expect((await row(s, c.code)).enabled).toBe(false);
-      expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(false);
+      // PROVIDERS-3: the edit re-ran the check on the NEW credentials (the stub accepts them), so
+      // the proof covers exactly what is stored now; re-enabling is the merchant's explicit act.
+      expect(edited.body.data.check).toMatchObject({ status: 'connected', ok: true });
+      expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(true);
+      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
 
+      // a re-edit to a key the carrier REFUSES fails its check: disabled, and enabling stays 409
+      const refused = await saveSandbox(s, s, { apiKey: 'definitely-not-the-stub-key-0123456789' });
+      expect(refused.body.data.check).toMatchObject({ status: 'credentials_wrong', ok: false });
+      expect(refused.body.data.disabledUntilRetested).toBe(true);
+      expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(false);
       const again = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(again.status).toBe(409);
       expect(again.body.error.code).toBe('CONNECTION_NOT_TESTED');
 
-      // a new Test connection of the NEW credentials opens it again
-      expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
+      // restoring the good credentials passes the check again and opens the gate
+      const restored = await saveSandbox(s, s, c.fields);
+      expect(restored.body.data.check).toMatchObject({ status: 'connected' });
       expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
 
       // editing the OTHER mode's key does not touch the active one

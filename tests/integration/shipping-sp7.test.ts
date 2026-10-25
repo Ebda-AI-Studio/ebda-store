@@ -138,6 +138,9 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
           firstName: 'Mona',
           lastName: 'Adel',
           phone: '+201012345678',
+          // Aramex requires a consignee email (ARAMEX_EMAIL_REQUIRED, #194); the shipper side falls back
+          // to the store owner's email.
+          email: 'mona.adel@example.test',
           address1: '5 Nile Corniche',
           city: 'Giza',
           state: 'Giza',
