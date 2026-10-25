@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>النماذج مقابل القوالب الفعلية</title>
+<meta name="robots" content="noindex"/>
+<style>
+:root{--bg:#fbfaf7;--ink:#17181a;--muted:#5b5f66;--line:#e3dfd6;--gold:#7a5a1f;--card:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0e0f10;--ink:#f1efe9;--muted:#b4b2ab;--line:#2a2b2d;--gold:#d3b56e;--card:#17181a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 system-ui,"Segoe UI",Tahoma,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:1.9rem;line-height:1.3;margin:.2em 0}
+h2{font-size:1.25rem;margin:0 0 .25rem}
+p{margin:.4em 0}
+.lede{color:var(--muted);max-width:68ch}
+.note{color:var(--muted);font-size:.9rem}
+nav ul{display:flex;flex-wrap:wrap;gap:.4rem .8rem;padding:0;list-style:none;margin:1rem 0}
+nav a{color:var(--gold)}
+.look{border-top:1px solid var(--line);padding:1.4rem 0}
+figure{margin:.6rem 0 0}
+figure img{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--line);background:var(--card)}
+figcaption{font-size:.85rem;color:var(--muted);margin-top:.35rem}
+.decide{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem;margin:1.2rem 0}
+.decide li{margin:.3rem 0}
+</style>
+</head>
+<body>
+<main>
+<h1>النماذج مقابل القوالب الفعلية</h1>
+<p class="lede">للمراجعة يا أحمد. كل شريط يعرض النموذج الذي رسمته سكربتات بايثون بجانب المتجر الفعلي على موبايل 390 بالعربي، عند موضعي تمرير. المتجر الفعلي هنا هو الإنتاج قبل التعديلات (٢٥ أكتوبر ٢٠٢٦). بعد نشر السلسلة نعيد التصوير بنفس السكربت (<span dir="ltr">apps/marketing/scripts/looks/snapshot.mjs</span> على فرع <span dir="ltr">feat/looks-real-snapshot</span>) فيظهر الأثر. لا يتغير أي هاتف في الصفحة الرئيسية قبل موافقتك.</p>
+<p class="note" lang="en" dir="ltr">Plan: docs/plans/2026-10-25-templates-match-mockups.md. Stack: store lockup (#235), hero ratio, slim tab bar + photo notice in the footer, type hierarchy, bare home cards, phone section padding, mock hero photos + clinic hero band, palette.</p>
+<div class="decide">
+<h2>قرارات تحتاج موافقتك</h2>
+<ol>
+<li>الألوان التي لم تُطبَّق لأن بوابات الألوان الحالية تمنعها (حكم PAL-1 في <span dir="ltr">docs/RULINGS.md</span>): ذهب دهب (درجة لونية ٣٦ إلى ٣٨ داخل نطاق البرتقالي، وتباينه على الأبيض أقل من AA)، مرجاني الورشة، طيني لمّة، عنبري ياسمين، نعناع الكلينيك الفاتح. أي منها يحتاج استثناءً بنطاق محدد منك مثل استثناء النحاسي في سوق ليل.</li>
+<li>تبديل صور الهاتف في الصفحة الرئيسية للموقع إلى المتاجر الفعلية: لم يُنفَّذ، ينتظر موافقتك بعد رؤية الصور بعد النشر.</li>
+<li>الصور: صور البطل (الهيرو) هي نفس صور النماذج وصارت مرفوعة في R2 تحت <span dir="ltr">demo/&lt;template&gt;/mock/</span> دون استبدال القديمة؛ إعادة بذر المعارض الخمسة تتم بعد دمج السلسلة ونشرها.</li>
+</ol>
+</div>
+<nav aria-label="المتاجر"><ul>
+<li><a href="#qamar-atelier">قمر · أتيليه</a></li><li><a href="#qamar-lookbook">قمر · لوك بوك</a></li><li><a href="#qamar-vitrine">قمر · فاترينة</a></li><li><a href="#souq-catalogue">سوق · كتالوج</a></li><li><a href="#souq-night">سوق · ليل</a></li><li><a href="#souq-showroom">سوق · معرض</a></li><li><a href="#jasmine-apothecary">ياسمين · صيدلية</a></li><li><a href="#jasmine-bloom">ياسمين · بلوم</a></li><li><a href="#jasmine-clinic">ياسمين · كلينيك</a></li><li><a href="#lamma-table">لمّة · سفرة</a></li><li><a href="#lamma-notebook">لمّة · كراسة</a></li><li><a href="#lamma-market">لمّة · سوق</a></li><li><a href="#dahab-worn">دهب · ورن</a></li><li><a href="#dahab-workshop">دهب · ورشة</a></li><li><a href="#dahab-giftbox">دهب · علبة هدايا</a></li>
+</ul></nav>
+    <section class="look" id="qamar-atelier" aria-labelledby="h-qamar-atelier">
+      <h2 id="h-qamar-atelier">قمر · أتيليه <span lang="en" dir="ltr">(Qamar · Atelier)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: portrait hero 3/4, bare cards, 20 px sections, slim tab bar, lockup.</p>
+      <figure><img src="templates-side-by-side/qamar-A-atelier.webp" width="1432" height="700" loading="lazy" alt="قمر · أتيليه: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="qamar-lookbook" aria-labelledby="h-qamar-lookbook">
+      <h2 id="h-qamar-lookbook">قمر · لوك بوك <span lang="en" dir="ltr">(Qamar · Lookbook)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: 28/400 headings (Lalezar), bare cards, 22 px sections, lockup.</p>
+      <figure><img src="templates-side-by-side/qamar-B-lookbook.webp" width="1432" height="700" loading="lazy" alt="قمر · لوك بوك: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="qamar-vitrine" aria-labelledby="h-qamar-vitrine">
+      <h2 id="h-qamar-vitrine">قمر · فاترينة <span lang="en" dir="ltr">(Qamar · Vitrine)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 4/4.6, 30/700 headings, bare cards, 72 px Ruqaa lockup.</p>
+      <figure><img src="templates-side-by-side/qamar-C-vitrine.webp" width="1432" height="700" loading="lazy" alt="قمر · فاترينة: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="souq-catalogue" aria-labelledby="h-souq-catalogue">
+      <h2 id="h-souq-catalogue">سوق · كتالوج <span lang="en" dir="ltr">(Souq · Catalogue)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: 20/700 headings, bare cards, 14 px sections, slim tab bar.</p>
+      <figure><img src="templates-side-by-side/souq-A-catalogue.webp" width="1432" height="700" loading="lazy" alt="سوق · كتالوج: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="souq-night" aria-labelledby="h-souq-night">
+      <h2 id="h-souq-night">سوق · ليل <span lang="en" dir="ltr">(Souq · Night)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 1/1.05 with the mock hero photo, 26/700 headings.</p>
+      <figure><img src="templates-side-by-side/souq-B-night.webp" width="1432" height="700" loading="lazy" alt="سوق · ليل: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="souq-showroom" aria-labelledby="h-souq-showroom">
+      <h2 id="h-souq-showroom">سوق · معرض <span lang="en" dir="ltr">(Souq · Showroom)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: 30/700 headings, 28 px sections, bare cards.</p>
+      <figure><img src="templates-side-by-side/souq-C-showroom.webp" width="1432" height="700" loading="lazy" alt="سوق · معرض: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="jasmine-apothecary" aria-labelledby="h-jasmine-apothecary">
+      <h2 id="h-jasmine-apothecary">ياسمين · صيدلية <span lang="en" dir="ltr">(Jasmine · Apothecary)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: 28/700 Amiri headings, mock hero photo, bare cards.</p>
+      <figure><img src="templates-side-by-side/jasmine-A-apothecary.webp" width="1432" height="700" loading="lazy" alt="ياسمين · صيدلية: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="jasmine-bloom" aria-labelledby="h-jasmine-bloom">
+      <h2 id="h-jasmine-bloom">ياسمين · بلوم <span lang="en" dir="ltr">(Jasmine · Bloom)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 4/4.4 with the mock hero photo, 28/700 headings.</p>
+      <figure><img src="templates-side-by-side/jasmine-B-bloom.webp" width="1432" height="700" loading="lazy" alt="ياسمين · بلوم: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="jasmine-clinic" aria-labelledby="h-jasmine-clinic">
+      <h2 id="h-jasmine-clinic">ياسمين · كلينيك <span lang="en" dir="ltr">(Jasmine · Clinic)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: aqua hero band added to the mix, mock hero photo, 25/700 headings.</p>
+      <figure><img src="templates-side-by-side/jasmine-C-clinic.webp" width="1432" height="700" loading="lazy" alt="ياسمين · كلينيك: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="lamma-table" aria-labelledby="h-lamma-table">
+      <h2 id="h-lamma-table">لمّة · سفرة <span lang="en" dir="ltr">(Lamma · Table)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 1/1 with the mock hero photo, herb accent #3E7A3A, 30/700.</p>
+      <figure><img src="templates-side-by-side/lamma-A-table.webp" width="1432" height="700" loading="lazy" alt="لمّة · سفرة: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="lamma-notebook" aria-labelledby="h-lamma-notebook">
+      <h2 id="h-lamma-notebook">لمّة · كراسة <span lang="en" dir="ltr">(Lamma · Notebook)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: 30/700 headings, 26 px sections.</p>
+      <figure><img src="templates-side-by-side/lamma-B-notebook.webp" width="1432" height="700" loading="lazy" alt="لمّة · كراسة: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="lamma-market" aria-labelledby="h-lamma-market">
+      <h2 id="h-lamma-market">لمّة · سوق <span lang="en" dir="ltr">(Lamma · Market)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: 22/700 headings, 14 px sections, bare cards.</p>
+      <figure><img src="templates-side-by-side/lamma-C-market.webp" width="1432" height="700" loading="lazy" alt="لمّة · سوق: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="dahab-worn" aria-labelledby="h-dahab-worn">
+      <h2 id="h-dahab-worn">دهب · ورن <span lang="en" dir="ltr">(Dahab · Worn)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 4/5 with the mock hero photo, 28/600 headings, 24 px sections.</p>
+      <figure><img src="templates-side-by-side/dahab-A-worn.webp" width="1432" height="700" loading="lazy" alt="دهب · ورن: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="dahab-workshop" aria-labelledby="h-dahab-workshop">
+      <h2 id="h-dahab-workshop">دهب · ورشة <span lang="en" dir="ltr">(Dahab · Workshop)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 4/3.4 with the mock hero photo, 34/600 headings.</p>
+      <figure><img src="templates-side-by-side/dahab-B-workshop.webp" width="1432" height="700" loading="lazy" alt="دهب · ورشة: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+    <section class="look" id="dahab-giftbox" aria-labelledby="h-dahab-giftbox">
+      <h2 id="h-dahab-giftbox">دهب · علبة هدايا <span lang="en" dir="ltr">(Dahab · Gift box)</span></h2>
+      <p class="note" lang="en" dir="ltr">Changes in the stack: hero 16/11 with the mock hero photo, 30/600 headings.</p>
+      <figure><img src="templates-side-by-side/dahab-C-giftbox.webp" width="1432" height="700" loading="lazy" alt="دهب · علبة هدايا: من اليمين إلى اليسار على الشاشة، النموذج الأصلي ثم المتجر الحالي، عند موضعي تمرير"/>
+      <figcaption>كل شريط: النموذج (Python) | المتجر الفعلي قبل التعديلات، عند موضعي تمرير.</figcaption></figure>
+    </section>
+</main>
+</body>
+</html>
