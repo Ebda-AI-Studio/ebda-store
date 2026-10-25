@@ -38,19 +38,15 @@ const imgs = (db: ReturnType<typeof openSqlite>, product: string) =>
 describe('review finding 1: global omit (secrets) is honoured', () => {
   it('a plain read hides the store credentials; select names them; omit:false opts back in; unknown args throw', async () => {
     const { db, lite } = setup();
-    db.prepare(
-      `INSERT INTO store_credentials (store_id, wbs_api_key, meta_access_token, agent_api_key) VALUES ('s1', 'W', 'M', 'A')`
-    ).run();
+    db.prepare(`INSERT INTO store_credentials (store_id, agent_api_key) VALUES ('s1', 'A')`).run();
     const plain = await lite.storeCredential.findFirst({ where: { storeId: 's1' } });
-    expect(plain).not.toHaveProperty('wbsApiKey');
-    expect(plain).not.toHaveProperty('metaAccessToken');
     expect(plain).not.toHaveProperty('agentApiKey');
-    expect((await lite.storeCredential.findFirst({ select: { wbsApiKey: true } })).wbsApiKey).toBe(
-      'W'
-    );
     expect(
-      (await lite.storeCredential.findFirst({ omit: { metaAccessToken: false } })).metaAccessToken
-    ).toBe('M');
+      (await lite.storeCredential.findFirst({ select: { agentApiKey: true } })).agentApiKey
+    ).toBe('A');
+    expect(
+      (await lite.storeCredential.findFirst({ omit: { agentApiKey: false } })).agentApiKey
+    ).toBe('A');
     await expect(lite.storeCredential.findFirst({ whre: {} })).rejects.toThrow(
       /unsupported argument/
     );
