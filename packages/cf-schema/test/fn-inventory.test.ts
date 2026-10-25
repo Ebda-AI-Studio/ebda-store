@@ -30,7 +30,7 @@ describe('docs/cf/fn-map.json', () => {
   const defs = definitions();
   const names = [...new Set(defs)].sort();
 
-  it('finds the 89 definitions (82 distinct names; several are redefinitions, ebda_wbs_bridge_keys is dropped by 20261103000100)', () => {
+  it('finds the 89 definitions (82 distinct names; several are redefinitions, one legacy bridge function was dropped by 20261103000100)', () => {
     expect(defs.length).toBe(89);
     expect(names.length).toBe(82);
   });
