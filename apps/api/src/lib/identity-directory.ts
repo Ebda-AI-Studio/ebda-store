@@ -13,7 +13,10 @@ import {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export type StoreClaim = { id: string; role: 'owner' | 'staff' };
+export type StoreRole = 'owner' | 'staff';
+export type StoreClaim = { id: string; role: StoreRole };
+const OWNER: StoreRole = 'owner';
+const STAFF: StoreRole = 'staff';
 
 /** owner = Store.ownerId (live stores), staff = a StoreStaff row on a live store. An owner is never listed twice. */
 export async function storesForUser(userId: string): Promise<StoreClaim[]> {
@@ -24,12 +27,12 @@ export async function storesForUser(userId: string): Promise<StoreClaim[]> {
       where: { userId },
       select: { storeId: true, store: { select: { deletedAt: true } } },
     });
-    const out: StoreClaim[] = owned.map(id => ({ id, role: 'owner' as const }));
+    const out: StoreClaim[] = owned.map(id => ({ id, role: OWNER }));
     const seen = new Set(owned);
     for (const s of staff) {
       if (seen.has(s.storeId) || s.store.deletedAt !== null) continue;
       seen.add(s.storeId);
-      out.push({ id: s.storeId, role: 'staff' });
+      out.push({ id: s.storeId, role: STAFF });
     }
     return out;
   });
