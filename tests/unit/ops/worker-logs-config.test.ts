@@ -6,7 +6,17 @@ import { join } from 'node:path';
 // Logpush on. Logpush has no effect until the job exists (scripts/ops/cf-logs-setup.sh), but the
 // per-script flag is the part a PR can lose silently, so it is pinned here.
 const ROOT = join(__dirname, '../../..');
-const WORKERS = ['api', 'web', 'admin', 'marketing', 'orders'] as const;
+const WORKERS = [
+  'api',
+  'web',
+  'admin',
+  'marketing',
+  'orders',
+  'accounts',
+  'help',
+  'docs',
+  'status',
+] as const;
 
 /** JSONC -> object: strips // and block comments outside strings, and trailing commas. */
 function parseJsonc(src: string): Record<string, unknown> {
