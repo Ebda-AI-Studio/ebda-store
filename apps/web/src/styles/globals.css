@@ -1973,3 +1973,28 @@ html[lang='en'] [data-look] .font-display {
 [data-look] [data-bottom-tab-bar] ul > li > :is(a, button) > span:first-child {
   height: var(--look-tab-icon, 2.25rem);
 }
+
+/*
+ * Template-match PR4 (G5): hierarchy on a phone. A look sets heading, product-name and price type through
+ * --look-h-* / --look-name-* / --look-price-* (mock-tokens.ts), emitted for look stores only. The rules are
+ * :where([data-look]) so they stay at one class of specificity: they beat the skins' Tailwind size utilities (they
+ * come later in this file) but TIE with a merchant's own zone typography (layout.tsx emits `[data-zone=...]` rules
+ * from the typography settings), so the merchant's value is never raised above by this look rule. The name and price
+ * rules target the cards' own markers (.look-card-name / .look-card-price, rendered for look stores only), never the
+ * product page, cart or list rows that share the data-zone names. Phones only; every var has the mock default as fallback.
+ */
+@media (max-width: 639.98px) {
+  :where([data-look]) [data-zone='sectionTitle'] {
+    font-size: var(--look-h-size, 1.75rem);
+    font-weight: var(--look-h-weight, 700);
+    line-height: 1.25;
+  }
+  :where([data-look]) .look-card-name {
+    font-size: var(--look-name-size, 0.875rem);
+    font-weight: var(--look-name-weight, 500);
+  }
+  :where([data-look]) .look-card-price {
+    font-size: var(--look-price-size, 0.9375rem);
+    font-weight: var(--look-price-weight, 700);
+  }
+}

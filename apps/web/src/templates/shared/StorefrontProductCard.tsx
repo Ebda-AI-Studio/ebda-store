@@ -562,7 +562,7 @@ function StorefrontProductCardImpl({
                 <p
                   id={nameId}
                   data-zone="productName"
-                  className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`[overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] font-semibold${onLook ? ' look-card-name' : ''} ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
                     textWrap: 'balance',
                     fontFamily: productNameZone?.fontFamily,
@@ -594,7 +594,7 @@ function StorefrontProductCardImpl({
                   <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
                   <span
                     data-zone="productPrice"
-                    className={`whitespace-nowrap font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
+                    className={`whitespace-nowrap font-bold tabular-nums${onLook ? ' look-card-price' : ''} ${textSizes.price} ${styles.productCardPrice}`}
                     style={{
                       fontFamily: productPriceZone?.fontFamily,
                       fontSize: responsiveFontSize(productPriceZone?.fontSize),

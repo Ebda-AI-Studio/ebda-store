@@ -1,3 +1,4 @@
+import { LOOK_FONT_SPECS } from './fonts';
 import { getLook } from './registry';
 import type { LookId } from './types';
 
@@ -11,24 +12,46 @@ import type { LookId } from './types';
 export interface MockTokens {
   /** PR2. Mobile hero box `w / h` (replaces the shared 4:3-ish landscape crop and its 45vh ceiling). */
   heroAspect?: string;
+  /** PR4 (G5). Section heading size in px on a phone (the weight follows the display face, see `headingWeight`). */
+  headingSize?: number;
 }
 
 const T = (t: MockTokens): MockTokens => t;
 
-/** Only looks whose mock-up differs from the real store appear here. */
+/** One entry per built look: the mock-up's own numbers. */
 export const MOCK_TOKENS: Readonly<Partial<Record<LookId, MockTokens>>> = {
-  'qamar.atelier': T({ heroAspect: '3 / 4' }),
-  'qamar.vitrine': T({ heroAspect: '4 / 4.6' }),
-  'souq.night': T({ heroAspect: '1 / 1.05' }),
-  'jasmine.bloom': T({ heroAspect: '4 / 4.4' }),
-  'lamma.table': T({ heroAspect: '1 / 1' }),
-  'dahab.worn': T({ heroAspect: '4 / 5' }),
-  'dahab.workshop': T({ heroAspect: '4 / 3.4' }),
-  'dahab.giftbox': T({ heroAspect: '16 / 11' }),
+  'qamar.atelier': T({ heroAspect: '3 / 4', headingSize: 28 }),
+  'qamar.lookbook': T({ headingSize: 28 }),
+  'qamar.vitrine': T({ heroAspect: '4 / 4.6', headingSize: 30 }),
+  'souq.catalogue': T({ headingSize: 20 }),
+  'souq.night': T({ heroAspect: '1 / 1.05', headingSize: 26 }),
+  'souq.showroom': T({ headingSize: 30 }),
+  'jasmine.apothecary': T({ headingSize: 28 }),
+  'jasmine.bloom': T({ heroAspect: '4 / 4.4', headingSize: 28 }),
+  'jasmine.clinic': T({ headingSize: 25 }),
+  'lamma.table': T({ heroAspect: '1 / 1', headingSize: 30 }),
+  'lamma.notebook': T({ headingSize: 30 }),
+  'lamma.market': T({ headingSize: 22 }),
+  'dahab.worn': T({ heroAspect: '4 / 5', headingSize: 28 }),
+  'dahab.workshop': T({ heroAspect: '4 / 3.4', headingSize: 34 }),
+  'dahab.giftbox': T({ heroAspect: '16 / 11', headingSize: 30 }),
 };
 
 export function mockTokensFor(lookId: string | null | undefined): MockTokens {
   return (lookId && MOCK_TOKENS[lookId as LookId]) || {};
+}
+
+/**
+ * The heading weight a look's display face really ships: the heaviest of its loaded weights up to 700, else its only
+ * weight (Lalezar, Italiana: 400). Asking for a weight the face lacks would make the browser fake-bold it.
+ */
+export function headingWeight(lookId: string): number {
+  const display = getLook(lookId)?.tokens.fonts.display ?? '';
+  const spec = LOOK_FONT_SPECS[display] ?? '';
+  const ws = (spec.split('@')[1] ?? '').split(';').map(Number).filter(Boolean);
+  if (ws.length === 0) return 400;
+  const ok = ws.filter(w => w <= 700);
+  return ok.length ? Math.max(...ok) : Math.min(...ws);
 }
 
 /** The CSS variables of a look's mock tokens (the slim tab bar for every look, plus its own). Callers pass a registered look. */
@@ -42,6 +65,13 @@ export function mockCssVars(lookId: string | null | undefined): Record<string, s
     '--look-tab-pad': '0.25rem',
     '--look-tab-icon': '1.75rem',
   };
+  // PR4 (G5): hierarchy on a phone. Card text is the mock's 13/500 name and 14/700 price, drawn at 360 px.
+  v['--look-h-size'] = `${t.headingSize ?? 28}px`;
+  v['--look-h-weight'] = String(headingWeight(lookId as string));
+  v['--look-name-size'] = '0.875rem';
+  v['--look-name-weight'] = '500';
+  v['--look-price-size'] = '0.9375rem';
+  v['--look-price-weight'] = '700';
   if (t.heroAspect) {
     v['--look-hero-aspect'] = t.heroAspect;
     // A portrait hero is taller than 45vh on a phone: lift the ceiling for looks that set a ratio.
