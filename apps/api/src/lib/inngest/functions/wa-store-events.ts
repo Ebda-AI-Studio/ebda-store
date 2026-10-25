@@ -1,11 +1,12 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { acrossStores, prisma, runInTenantContext } from '@ebda/database';
 import { BUYER_KEY_VERSION, buyerKeyFor, toE164 } from '@ebda/shared';
 import { inngest } from '../client';
 import logger from '../../logger';
 import { suiteBuyerKeySecret } from '../../wa/config';
 import { buildStoreEvent, sendStoreEvents, type StoreEventInput } from '../../wa/events';
-import { isWhatsAppLinked } from '../../wa/link';
+import { isWhatsAppLinked, hasWhatsAppLinkRow } from '../../wa/link';
+import { PLAN_CHANGED_EVENT, planChangedInput } from '../../wa/plan-state';
 
 /**
  * Store -> Ebda WhatsApp events (contract 2026-10-24, section 4): order created, COD confirmation
@@ -240,9 +241,27 @@ async function statusEvent(event: SourceEvent): Promise<Planned[]> {
   ];
 }
 
+/** `store.plan_changed`: for any store that has a WhatsApp link row (linked now or ever), current state. */
+async function planEvent(event: SourceEvent): Promise<Planned[]> {
+  const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
+  if (!storeId) return [];
+  const p = await planChangedInput(storeId);
+  return p ? [{ input: p.input, seed: p.seed }] : [];
+}
+
 export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
-  if (!storeId || !(await isWhatsAppLinked(storeId))) return 0;
+  if (!storeId) return 0;
+  // Plan state goes to Ebda WhatsApp for every store it knows (it holds a link row), including a
+  // store that was unlinked or downgraded: that is exactly when the gate must hear about it.
+  if (event.name === PLAN_CHANGED_EVENT) {
+    if (!(await hasWhatsAppLinkRow(storeId))) return 0;
+    const planned = await planEvent(event);
+    const events = await Promise.all(planned.map(p => buildStoreEvent(p.input, { seed: p.seed })));
+    await sendStoreEvents(events);
+    return events.length;
+  }
+  if (!(await isWhatsAppLinked(storeId))) return 0;
   const planned =
     event.name === 'order/created'
       ? await orderEvents(event)
@@ -268,10 +287,46 @@ export const waStoreEvents: InngestFunction.Any = inngest.createFunction(
       { event: 'order/created' },
       { event: 'order/status-changed' },
       { event: 'shipment/status-updated' },
+      { event: PLAN_CHANGED_EVENT },
     ],
   },
   async ({ event, step }) => {
     const sent = await step.run('emit', () => emitStoreEventsFor(event as SourceEvent));
     return { sent, keyVersion: BUYER_KEY_VERSION };
+  }
+);
+
+/**
+ * Backstop for `store.plan_changed` (an entitlement is a NEVER-stale class: the per-write observer
+ * is the mechanism, this is the net under it): every 12 hours the CURRENT plan state of every store
+ * that has a WhatsApp link row is re-sent. Same state = same envelope id, so a store whose state did
+ * not change costs the consumer one deduped message; one that was missed is corrected within hours.
+ */
+export const waPlanSync: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'wa-plan-sync',
+    name: 'Ebda WhatsApp: plan state reconcile (12-hourly)',
+    retries: 2,
+    concurrency: { limit: 1 },
+    triggers: [{ cron: '41 */12 * * *' }],
+  },
+  async ({ step }) => {
+    // Idle exit BEFORE any step: most ticks find no store that ever linked WhatsApp (one execution).
+    const linked = (
+      await acrossStores(storeId =>
+        prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
+      )
+    )
+      .filter(r => r.value)
+      .map(r => r.storeId);
+    if (linked.length === 0) return { sent: 0 };
+    const sent = await step.run('sweep', async () => {
+      let n = 0;
+      for (const storeId of linked) {
+        n += await emitStoreEventsFor({ name: PLAN_CHANGED_EVENT, data: { storeId } });
+      }
+      return n;
+    });
+    return { sent };
   }
 );

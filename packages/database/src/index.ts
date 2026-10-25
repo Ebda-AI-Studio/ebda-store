@@ -38,6 +38,8 @@ export {
   USER_KEYED_MODELS,
   GLOBAL_MODELS,
   setDbHopObserver,
+  setModelWriteObserver,
+  type ModelWriteEvent,
 } from './tenant-guard';
 export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
 export type { ClientLease, ClientPoolOptions } from './client-pool';

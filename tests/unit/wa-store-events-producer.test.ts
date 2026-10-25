@@ -5,6 +5,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
+  linkRow: vi.fn(),
+  planInput: vi.fn(),
   order: vi.fn(),
   linked: vi.fn(),
   send: vi.fn(),
@@ -13,7 +15,11 @@ vi.mock('@ebda/database', () => ({
   prisma: { order: { findUnique: h.order } },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
-vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked }));
+vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked, hasWhatsAppLinkRow: h.linkRow }));
+vi.mock('@api/lib/wa/plan-state', () => ({
+  PLAN_CHANGED_EVENT: 'store/plan-changed',
+  planChangedInput: h.planInput,
+}));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -47,6 +53,22 @@ beforeEach(() => {
   process.env.SUITE_BUYER_KEY_SECRET = SECRET;
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
+  h.linkRow.mockReset().mockResolvedValue(true);
+  h.planInput.mockReset().mockResolvedValue({
+    seed: 'plan:x',
+    input: {
+      type: 'store.plan_changed',
+      storeId: STORE,
+      data: {
+        planCode: 'business',
+        includesWhatsApp: true,
+        ownerUserId: 'o1',
+        effectiveAt: '2026-10-25T10:00:00.000Z',
+        status: 'past_due',
+        periodEnd: '2026-12-01T00:00:00.000Z',
+      },
+    },
+  });
   h.send.mockReset().mockResolvedValue(undefined);
   clearCfBindings();
   setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, WA_EVENTS_QUEUE: { send: h.send } });
@@ -299,5 +321,30 @@ describe('helpers', () => {
     ).toThrow(/SUITE_BUYER_KEY_SECRET/);
     process.env.SUITE_BUYER_KEY_SECRET = 'short';
     expect(() => suiteBuyerKeySecret()).toThrow();
+  });
+});
+
+describe('store/plan-changed', () => {
+  const ev = { id: 'p1', name: 'store/plan-changed', data: { storeId: STORE } };
+  it('goes to every store that has a link row, even an UNLINKED one (that is when the gate must hear)', async () => {
+    h.linked.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(1);
+    expect(sent()[0]).toMatchObject({
+      type: 'store.plan_changed',
+      data: { planCode: 'business', status: 'past_due', periodEnd: '2026-12-01T00:00:00.000Z' },
+    });
+    expect(storeEventSchema.safeParse(sent()[0]).success).toBe(true);
+  });
+  it('a store Ebda WhatsApp has never heard of gets nothing', async () => {
+    h.linkRow.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    expect(h.send).not.toHaveBeenCalled();
+  });
+  it('the same state sends the same envelope id (the 6-hourly reconcile dedupes)', async () => {
+    await emitStoreEventsFor(ev);
+    const first = sent()[0]!.id;
+    h.send.mockClear();
+    await emitStoreEventsFor({ ...ev, id: 'another' });
+    expect(sent()[0]!.id).toBe(first);
   });
 });

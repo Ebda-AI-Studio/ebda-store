@@ -6,6 +6,7 @@ import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 import { getAuthUser } from '../utils/store-helpers';
 import { buildStoreEvent, sendStoreEvents } from '../lib/wa/events';
+import { notifyPlanChanged } from '../lib/wa/plan-state';
 import { WhatsAppLinkService, canLinkWhatsApp, whatsAppLinkState } from '../lib/wa/link';
 
 /**
@@ -56,6 +57,8 @@ async function change(req: Request, linked: boolean): Promise<{ linked: boolean 
     { seed: `link:${storeId}:${linked}:${Date.now()}` }
   );
   await sendStoreEvents([event]);
+  // Ebda WhatsApp learns the store's plan state right after it learns the store (and again on unlink).
+  await notifyPlanChanged(storeId);
   await auditLog({
     action: linked ? 'whatsapp.linked' : 'whatsapp.unlinked',
     userId,

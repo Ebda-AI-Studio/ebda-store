@@ -55,6 +55,14 @@ export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
   return (await entitled(storeId, link)).plan;
 }
 
+/** Does Ebda WhatsApp know this store (a link row exists: linked now, unlinked, or entitlement only)? */
+export async function hasWhatsAppLinkRow(storeId: string): Promise<boolean> {
+  const row = await runInTenantContext(storeId, () =>
+    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { storeId: true } })
+  );
+  return row !== null;
+}
+
 /** What Store admin shows: the stored link and whether the plan or a package entitles it. */
 export async function whatsAppLinkState(
   storeId: string
