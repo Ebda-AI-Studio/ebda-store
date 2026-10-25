@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { withStore, storeDirectory } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -21,7 +22,7 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 30 1 * * *` }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // One window for the whole run: `now` is fixed in a step so a replay uses the same cutoff for
     // the ops and GL sides (a per-replay cutoff made them disagree and raised false drift).
     const sinceIso = await step.run('window', () =>
@@ -31,7 +32,7 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
 
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory(s => s.accountingEnabled).then(list =>
+      storeDirectory(storeFilter(event, s => s.accountingEnabled)).then(list =>
         list.map(s => ({ id: s.id, slug: s.slug, name: s.name }))
       )
     );

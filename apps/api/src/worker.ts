@@ -51,6 +51,7 @@ export { AuthState } from './cf/auth-state';
 export { StoreRealtime } from './cf/store-realtime';
 export { StoreDO } from './cf/store-do/store-do';
 export { JobGate } from './cf/job-gate';
+export { StoreSchedule } from './cf/store-schedule-do';
 
 // The Worker's `process.on('unhandledRejection')` (index.ts, Node): a rejection nobody awaited
 // (a late socket error from a closing pg connection, a fire-and-forget that failed) is logged with

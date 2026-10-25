@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
@@ -42,11 +43,11 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 */6 * * *' }], // every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory().then(list => list.map(s => ({ id: s.id })))
+      storeDirectory(storeFilter(event)).then(list => list.map(s => ({ id: s.id })))
     );
 
     // One UTC day for the whole run (memoized), so webhook inventory.low dedupes per product per day.
