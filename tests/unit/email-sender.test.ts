@@ -65,9 +65,18 @@ describe('resolveSender (platform domain)', () => {
     expect(from).not.toMatch(/<(no-?reply|no\.reply|security|ahlan|admin|ebda)/i);
   });
 
-  it('the slug suffix is mandatory: a store without a slug cannot send', () => {
-    expect(() => resolveSender(baseStore({ slug: null }))).toThrow(/slug/);
-    expect(() => resolveSender(baseStore({ slug: '---' }))).toThrow(/slug/);
+  it('the slug suffix is mandatory for a merchant mailbox (the builder itself still throws)', () => {
+    expect(() => merchantSenderLocalPart('orders', null)).toThrow(/slug/);
+    expect(() => merchantSenderLocalPart('orders', '---')).toThrow(/slug/);
+  });
+
+  it('a feeder query that forgot to select slug falls back to the PLATFORM sender instead of crashing', () => {
+    for (const slug of [null, undefined, '---']) {
+      const r = resolveSender(baseStore({ slug: slug as never, name: 'Demo Shop' }));
+      expect(r.from).toBe('Demo Shop via Ebda Store <no-reply@ebda.app>');
+      // never a bare brand and never an invented merchant mailbox
+      expect(r.from).not.toMatch(/<orders\./);
+    }
   });
 
   it('a slug is reduced to [a-z0-9-] so it cannot add a mailbox or a domain', () => {

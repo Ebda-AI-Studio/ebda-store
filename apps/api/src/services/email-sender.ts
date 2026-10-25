@@ -6,9 +6,11 @@
 // the from-line. The full ResendService composes this helper.
 import { z } from 'zod';
 import { BRAND } from '@ebda/shared';
+import logger from '../lib/logger';
 import { customSenderDomainsSupported } from './mail-transport';
 
 const PLATFORM_EMAIL_DOMAIN: string = BRAND.domains.marketing;
+const PLATFORM_FALLBACK_LOCAL = 'no-reply';
 
 export interface StoreSenderShape {
   name: string;
@@ -89,9 +91,26 @@ export function resolveSender(store: StoreSenderShape): ResolvedSender {
 
   // A verified merchant domain (legacy provider only) keeps the merchant's own prefix; the
   // platform domain gets the allowlisted `<prefix>.<slug>` form.
-  const localPart = useCustomDomain
-    ? store.emailSenderLocalPart?.trim() || 'noreply'
-    : merchantSenderLocalPart(store.emailSenderLocalPart, store.slug);
+  let localPart: string;
+  if (useCustomDomain) {
+    localPart = store.emailSenderLocalPart?.trim() || 'noreply';
+  } else {
+    try {
+      localPart = merchantSenderLocalPart(store.emailSenderLocalPart, store.slug);
+    } catch {
+      // A caller whose store query did not select `slug` must not crash the send (a job would fail
+      // and retry forever). Fall back to the PLATFORM sender with the store named in the display
+      // name, never a bare or invented merchant mailbox: replies still reach the merchant.
+      logger.warn(
+        { storeName: store.name },
+        '[email] store slug missing, platform sender fallback'
+      );
+      return {
+        from: `${displayName} via ${BRAND.product.nameEn} <${PLATFORM_FALLBACK_LOCAL}@${PLATFORM_EMAIL_DOMAIN}>`,
+        replyTo: store.email ? store.email : undefined,
+      };
+    }
+  }
 
   const host = useCustomDomain ? (store.domain as string) : PLATFORM_EMAIL_DOMAIN;
 
