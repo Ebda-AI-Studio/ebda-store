@@ -27,6 +27,9 @@ export const VECTOR_STATEMENTS: readonly string[] = [
      doc_hash TEXT, words_hash TEXT, embedded_at INTEGER NOT NULL,
      fail_key TEXT, fail_until INTEGER, fail_kind TEXT) WITHOUT ROWID`,
   `CREATE INDEX IF NOT EXISTS product_vector_state_store_idx ON product_vector_state (store_id)`,
+  // Workers AI spend: texts SENT to the provider per store per day, reserved atomically BEFORE each call (so a re-embed
+  // loop, a failed batch and its single-product retries all count, which `count(state rows)` never could)
+  `CREATE TABLE IF NOT EXISTS vector_usage (store_id TEXT NOT NULL, day INTEGER NOT NULL, texts INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (store_id, day)) WITHOUT ROWID`,
 ];
 
 export interface EmbeddingProviderLike {
@@ -210,10 +213,8 @@ export interface SyncDeps {
   provider: EmbeddingProviderLike;
   index: VectorizeLike;
   now?: number;
-  /** per-store embeds per Cairo day (SEARCH_EMBED_STORE_DAILY_CAP); default 3000 */
+  /** texts sent to the provider per store per day (SEARCH_EMBED_STORE_DAILY_CAP); default 3000 */
   dailyCap?: number;
-  /** start of today's region day, epoch ms (the cap counts vectors written since) */
-  dayStart?: number;
   batchLimit?: number;
   /** a text that could not be embedded (alert / Sentry hook) */
   onFailure?: (f: { productId: string; kind: string; retryable: boolean }) => void;
@@ -240,7 +241,43 @@ const checkVectors = (vs: number[][], n: number) => {
         throw new EmbeddingFailure('shape', 'non-finite component', false);
   }
 };
-async function embedTexts(provider: EmbeddingProviderLike, texts: string[]): Promise<number[][]> {
+export class EmbedCapReached extends Error {
+  constructor() {
+    super('daily embedding cap reached');
+    this.name = 'EmbedCapReached';
+  }
+}
+const DAY_MS = 86_400_000;
+const dayKey = (now: number) => Math.floor(now / DAY_MS) * DAY_MS;
+/** Texts already sent to the provider today for this store. */
+export const embedUsageToday = (db: SyncSql, storeId: string, now = Date.now()): number =>
+  (db.all('SELECT texts FROM vector_usage WHERE store_id = ? AND day = ?', [
+    storeId,
+    dayKey(now),
+  ])[0]?.texts as number | undefined) ?? 0;
+/** Atomically add `n` texts to today's counter, or throw EmbedCapReached without counting. */
+export function reserveEmbedTexts(
+  db: SyncSql,
+  storeId: string,
+  n: number,
+  cap: number,
+  now = Date.now()
+): void {
+  db.transactionSync(() => {
+    const used = embedUsageToday(db, storeId, now);
+    if (used + n > cap) throw new EmbedCapReached();
+    db.run(
+      'INSERT INTO vector_usage (store_id, day, texts) VALUES (?, ?, ?) ON CONFLICT (store_id, day) DO UPDATE SET texts = texts + excluded.texts',
+      [storeId, dayKey(now), n]
+    );
+  });
+}
+
+async function embedTexts(
+  provider: EmbeddingProviderLike,
+  texts: string[],
+  reserve?: (n: number) => void
+): Promise<number[][]> {
   if (provider.model !== EMBED_MODEL)
     throw new EmbeddingFailure(
       'provider',
@@ -250,6 +287,7 @@ async function embedTexts(provider: EmbeddingProviderLike, texts: string[]): Pro
   const out: number[][] = [];
   for (let i = 0; i < texts.length; i += EMBED_MAX_BATCH) {
     const chunk = texts.slice(i, i + EMBED_MAX_BATCH);
+    reserve?.(chunk.length);
     const vs = await provider.embed(chunk);
     checkVectors(vs, chunk.length);
     out.push(...vs);
@@ -289,22 +327,22 @@ export async function syncProductVectors(
 
   let work = plan.work;
   const cap = deps.dailyCap ?? DEFAULT_DAILY_CAP;
-  const doneToday =
-    deps.dayStart === undefined
-      ? 0
-      : (db.all(
-          'SELECT count(*) AS n FROM product_vector_state WHERE store_id = ? AND embedded_at >= ?',
-          [storeId, deps.dayStart]
-        )[0].n as number);
-  const left = cap - doneToday;
-  if (left <= 0) {
-    result.capped = work.length > 0;
-    return result;
+  const reserve = (n: number) => reserveEmbedTexts(db, storeId, n, cap, now);
+  const textCount = (w: VectorWork) =>
+    (w.needDoc && w.doc ? 1 : 0) + (w.needWords && w.words ? 1 : 0);
+  // trim the batch to what the day's budget still allows (greedy, in order); an exhausted budget embeds nothing
+  let room = cap - embedUsageToday(db, storeId, now);
+  const fit: VectorWork[] = [];
+  for (const w of work) {
+    const n = textCount(w);
+    if (n > room) {
+      result.capped = true;
+      break;
+    }
+    room -= n;
+    fit.push(w);
   }
-  if (work.length > left) {
-    work = work.slice(0, left);
-    result.capped = true;
-  }
+  work = fit;
   if (work.length === 0) return result;
 
   // embed: every text of the batch together; on a batch failure fall back to one product at a time
@@ -347,21 +385,27 @@ export async function syncProductVectors(
   };
   const all = work.flatMap(textsOf);
   try {
-    const vs = await embedTexts(deps.provider, all);
+    const vs = await embedTexts(deps.provider, all, reserve);
     let at = 0;
     for (const w of work) {
       const n = textsOf(w).length;
       assign(w, vs.slice(at, at + n));
       at += n;
     }
-  } catch {
-    for (const w of work) {
-      try {
-        assign(w, await embedTexts(deps.provider, textsOf(w)));
-      } catch (e) {
-        fail(w, e);
+  } catch (batchError) {
+    if (batchError instanceof EmbedCapReached) result.capped = true;
+    else
+      for (const w of work) {
+        try {
+          assign(w, await embedTexts(deps.provider, textsOf(w), reserve));
+        } catch (e) {
+          if (e instanceof EmbedCapReached) {
+            result.capped = true; // spend stops now; what is left stays stale for tomorrow
+            break;
+          }
+          fail(w, e);
+        }
       }
-    }
   }
 
   // upsert to Vectorize (external), then commit the state product by product against the CURRENT row
@@ -525,8 +569,22 @@ export async function semanticProductIds(
 }
 
 /** Embed ONE query text (the caller races it against its own timeout and budget, like the Postgres path). */
-export async function embedQuery(provider: EmbeddingProviderLike, text: string): Promise<number[]> {
+export async function embedQuery(
+  provider: EmbeddingProviderLike,
+  text: string,
+  budget?: { db: SyncSql; storeId: string; dailyCap?: number; now?: number }
+): Promise<number[]> {
   const t = trimWs(text);
   if (!t) throw new EmbeddingFailure('input', 'empty query', false);
-  return (await embedTexts(provider, [t]))[0];
+  const reserve = budget
+    ? (n: number) =>
+        reserveEmbedTexts(
+          budget.db,
+          budget.storeId,
+          n,
+          budget.dailyCap ?? DEFAULT_DAILY_CAP,
+          budget.now
+        )
+    : undefined;
+  return (await embedTexts(provider, [t], reserve))[0];
 }
