@@ -38,3 +38,6 @@ docs/ebda/templates/editor-matrix.md
 docs/ebda/templates/editor-matrix.json
 scripts/editor-audit/baseline.json
 scripts/editor-audit/parity-baseline.json
+
+# vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/support-wa-help-drift.test.ts)
+apps/help/wa-source
