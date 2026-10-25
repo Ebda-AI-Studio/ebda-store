@@ -11,12 +11,21 @@ export interface Fakes {
   notices: Array<{ to: string; kind: string; factor: string }>;
   mails: Array<{ to: string; kind: string; code: string; ttlMinutes?: number; storeName?: string }>;
   directoryDown: boolean;
+  /** Per-test overrides merged over the worker env (e.g. MFA_KEY / MFA_KEY_PREV during a rotation). */
+  envOverride: Record<string, unknown>;
 }
-export const fakes: Fakes = { stores: [], notices: [], mails: [], directoryDown: false };
+export const fakes: Fakes = {
+  stores: [],
+  notices: [],
+  mails: [],
+  directoryDown: false,
+  envOverride: {},
+};
 
 export const testEnv = (): Cloudflare.Env =>
   ({
     ...env,
+    ...fakes.envOverride,
     ISSUER: 'https://accounts.ebda.app',
     PRODUCTS: 'store,whatsapp,crm,erp',
     PASSKEY_ORIGINS: 'https://store.ebda.app,https://orders.ebda.app',

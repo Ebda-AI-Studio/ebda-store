@@ -21,7 +21,7 @@ import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './pass
 import { CODE_GUESS, hit, LOGIN, PER_EMAIL, PER_IP_ONLY, SECOND_FACTOR } from './throttle';
 import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType, type PendingSignup } from './otp';
 import * as passkeys from './passkeys';
-import { newSecret, seal, totpUri, unseal, verifyTotp } from './totp';
+import { newSecret, sealCurrent, totpUri, unsealAny, verifyTotp } from './totp';
 import { csv, iso, nowMs, randomCode, sha256Hex } from './util';
 
 export const COOKIE = '__Host-ebda_rt';
@@ -396,6 +396,15 @@ async function requirePassword(c: C, user: UserRow, password: unknown): Promise<
   await a.succeeded();
 }
 
+/** Open a sealed TOTP secret with the keyring; a key that is not in it is an operator problem (503), never a 500 or a pass. */
+async function openTotpSecret(c: C, sealed: string): Promise<string> {
+  try {
+    return await unsealAny(c.env, sealed);
+  } catch {
+    throw err(503, 'MFA_UNAVAILABLE');
+  }
+}
+
 /**
  * EVERY endpoint that checks a TOTP code goes through here (or /login/mfa, which does the same): counted first against a
  * per-user budget, the matched time step is claimed single-use, a success clears the counter.
@@ -405,7 +414,7 @@ async function checkTotp(c: C, user: UserRow, code: unknown): Promise<boolean> {
   if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
   if (typeof code !== 'string' || !user.mfa_secret || !c.env.MFA_KEY) return false;
   const step = await verifyTotp(
-    await unseal(c.env.MFA_KEY, user.mfa_secret),
+    await openTotpSecret(c, user.mfa_secret),
     code,
     Date.now(),
     user.mfa_last_step
@@ -773,7 +782,7 @@ export function createApp() {
     let spentBackup: { old: string; next: string } | null = null;
     if (body.code) {
       const step = await verifyTotp(
-        await unseal(c.env.MFA_KEY, user.mfa_secret),
+        await openTotpSecret(c, user.mfa_secret),
         body.code,
         Date.now(),
         user.mfa_last_step
@@ -1029,7 +1038,7 @@ export function createApp() {
     await startEnrolment(c, user, sid, body.code);
     const secret = newSecret();
     await c.env.DB.prepare(`UPDATE users SET mfa_secret = ?2 WHERE id = ?1`)
-      .bind(user.id, await seal(c.env.MFA_KEY, secret))
+      .bind(user.id, await sealCurrent(c.env, secret))
       .run();
     return c.json({
       success: true,

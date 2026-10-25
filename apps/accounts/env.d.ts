@@ -48,6 +48,8 @@ declare global {
       ORIGIN_PRODUCTS: string;
       /** AES-256-GCM key (base64) for TOTP secrets at rest (wrangler secret). */
       MFA_KEY?: string;
+      /** The previous MFA key while a rotation is in flight (opens old secrets; never used to seal). */
+      MFA_KEY_PREV?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
       TEST_MIGRATIONS?: D1Migration[];

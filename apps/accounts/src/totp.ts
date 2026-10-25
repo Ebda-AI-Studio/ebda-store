@@ -69,7 +69,17 @@ async function aes(keyB64: string): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 
-/** Format `v1.<iv>.<ciphertext+tag>` (base64url). */
+/**
+ * Sealed format `v2.<kid>.<iv>.<ciphertext+tag>` (base64url). `kid` = first 8 hex chars of sha256(key bytes), so a ciphertext names the
+ * key that made it and a keyring (`MFA_KEY` current, `MFA_KEY_PREV` previous) can open it during a rotation. The legacy
+ * `v1.<iv>.<ciphertext+tag>` (no kid) is still opened by trying each key in the ring, and is re-sealed as v2 by the re-encrypt job.
+ */
+export async function keyId(keyB64: string): Promise<string> {
+  const raw = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', raw));
+  return [...d.slice(0, 4)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function seal(keyB64: string, plain: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(
@@ -79,18 +89,65 @@ export async function seal(keyB64: string, plain: string): Promise<string> {
       new TextEncoder().encode(plain)
     )
   );
-  return `v1.${b64urlEncode(iv)}.${b64urlEncode(ct)}`;
+  return `v2.${await keyId(keyB64)}.${b64urlEncode(iv)}.${b64urlEncode(ct)}`;
 }
 
-export async function unseal(keyB64: string, sealed: string): Promise<string> {
-  const [v, iv, ct] = sealed.split('.');
-  if (v !== 'v1' || !iv || !ct) throw new Error('unsupported sealed format');
+async function open(keyB64: string, ivB64: string, ctB64: string): Promise<string> {
   const pt = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: b64urlDecode(iv) },
+    { name: 'AES-GCM', iv: b64urlDecode(ivB64) },
     await aes(keyB64),
-    b64urlDecode(ct)
+    b64urlDecode(ctB64)
   );
   return new TextDecoder().decode(pt);
+}
+
+/** The keys that may OPEN a sealed secret: current first, then the previous one while a rotation is in flight. */
+export interface MfaKeyring {
+  MFA_KEY?: string;
+  MFA_KEY_PREV?: string;
+}
+const ring = (k: MfaKeyring): string[] =>
+  [k.MFA_KEY, k.MFA_KEY_PREV].filter((x): x is string => !!x);
+
+/** Seal with the CURRENT key. */
+export async function sealCurrent(k: MfaKeyring, plain: string): Promise<string> {
+  if (!k.MFA_KEY) throw new Error('MFA_KEY is not configured');
+  return seal(k.MFA_KEY, plain);
+}
+
+/** Open with whichever key in the ring made it (by kid for v2, by trial for legacy v1). */
+export async function unsealAny(k: MfaKeyring, sealed: string): Promise<string> {
+  const parts = sealed.split('.');
+  const keys = ring(k);
+  if (parts[0] === 'v2' && parts.length === 4) {
+    for (const key of keys) {
+      if ((await keyId(key)) === parts[1]) return open(key, parts[2], parts[3]);
+    }
+    throw new Error('sealed secret names a key that is not in the keyring');
+  }
+  if (parts[0] === 'v1' && parts.length === 3) {
+    let last: unknown = new Error('no key');
+    for (const key of keys) {
+      try {
+        return await open(key, parts[1], parts[2]);
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last;
+  }
+  throw new Error('unsupported sealed format');
+}
+
+/** Is this secret sealed with something other than the current key (v1, or a v2 of another kid)? */
+export async function needsReseal(k: MfaKeyring, sealed: string): Promise<boolean> {
+  if (!k.MFA_KEY) return false;
+  return !sealed.startsWith(`v2.${await keyId(k.MFA_KEY)}.`);
+}
+
+/** Single-key open (kept for callers and tests that hold one key): v1 or v2 whose kid matches. */
+export async function unseal(keyB64: string, sealed: string): Promise<string> {
+  return unsealAny({ MFA_KEY: keyB64 }, sealed);
 }
 
 /** The code a device would show at `atMs` (exported for tests and the enrolment self-check). */

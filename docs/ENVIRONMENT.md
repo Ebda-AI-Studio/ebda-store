@@ -285,7 +285,13 @@ Read a backup: `security find-generic-password -a ebda-identity -s <service> -w`
 4. Verify `/.well-known/jwks.json` now lists both keys, and a fresh login's token header carries the new `kid`. After 24 hours drop `JWT_PREVIOUS_PUBLIC_JWKS`.
    Products cache the JWKS for at most 10 minutes and refetch once on an unknown `kid`, so they pick the new key up on their own.
 
-**Rotating `MFA_KEY`** is a data migration, not a swap: every sealed TOTP secret must be re-sealed with the new key, so do it only with a script that reads each `users.mfa_secret`, unseals with the old key and seals with the new one inside one D1 batch, then flips the secret. Until that exists, treat `MFA_KEY` as non-rotatable; its loss means every TOTP user re-enrols (reset factors with the operator script).
+**Rotate `MFA_KEY` (no downtime, no re-enrolment):** sealed TOTP secrets name their key (`v2.<kid>...`), and the worker holds a keyring: `MFA_KEY` (current, seals everything new) and `MFA_KEY_PREV` (opens old secrets only).
+
+1. Generate a new 32-byte key (`openssl rand -base64 32`), update the Keychain entry.
+2. `wrangler secret put MFA_KEY_PREV --name ebda-accounts` with the OLD key, then `wrangler secret put MFA_KEY --name ebda-accounts` with the NEW one (order matters: set PREV first, so there is no moment a secret cannot be opened).
+3. The hourly job (`scheduled`, cron `23 * * * *`; or `Accounts.reencryptMfa()` over the Service Binding) re-seals every secret on the new key with a per-row compare-and-set. Wait until it reports `remaining: 0` (verify with `SELECT count(*) FROM users WHERE mfa_secret IS NOT NULL AND mfa_secret NOT LIKE 'v2.<new kid>.%'`; the kid is the first 8 hex chars of sha256 of the key bytes).
+4. `wrangler secret delete MFA_KEY_PREV --name ebda-accounts`.
+   A secret sealed with a key that is in neither slot answers 503 `MFA_UNAVAILABLE` (never a pass); putting the old key back as `MFA_KEY_PREV` restores service with no data loss.
 
 **Lost both?** Redeploy with new values: tokens signed by the old key stop verifying (everyone signs in again), and TOTP users re-enrol.
 

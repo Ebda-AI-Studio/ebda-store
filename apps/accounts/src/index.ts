@@ -16,12 +16,17 @@ import {
   type UserRow,
 } from './data';
 import { z } from 'zod';
+import { reencryptMfaSecrets } from './mfa-keys';
 import { hashPassword, passwordPolicy } from './password';
 
 const app = createApp();
 
 export default {
   fetch: (req: Request, env: Cloudflare.Env, ctx: ExecutionContext) => app.fetch(req, env, ctx),
+  // Hourly: re-seal TOTP secrets that are not on the current MFA key (a no-op once none are left).
+  scheduled: (_event: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(reencryptMfaSecrets(env));
+  },
 } satisfies ExportedHandler<Cloudflare.Env>;
 
 /**
@@ -171,6 +176,14 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
     await forgotPasswordFor(
       this.env,
       z.string().trim().toLowerCase().email().max(254).parse(email)
+    );
+  }
+
+  /** Re-seal TOTP secrets onto the current MFA key (rotation). Same job as the hourly cron; returns what it did. */
+  async reencryptMfa(limit?: number) {
+    return reencryptMfaSecrets(
+      this.env,
+      z.number().int().min(1).max(1000).default(200).parse(limit)
     );
   }
 

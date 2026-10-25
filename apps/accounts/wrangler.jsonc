@@ -7,6 +7,8 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // MFA key rotation job (re-seals TOTP secrets onto the current key; a no-op when none are left).
+  "triggers": { "crons": ["23 * * * *"] },
   // /health reports the running version: the deployment id from this binding and the commit from BUILD_COMMIT_SHA, which the
   // deploy workflow overrides per deploy (`wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA`).
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
