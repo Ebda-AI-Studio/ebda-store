@@ -46,3 +46,16 @@ export const WhatsAppLinkService = {
     );
   },
 };
+
+/** What Store admin shows: the stored link and whether the plan includes the package. */
+export async function whatsAppLinkState(
+  storeId: string
+): Promise<{ linked: boolean; entitled: boolean; active: boolean }> {
+  const link = await runInTenantContext(storeId, () =>
+    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { linked: true } })
+  );
+  const flags = await getAutomationFlags(storeId);
+  const linked = link?.linked === true;
+  const entitled = flags?.whatsappAutomation === true;
+  return { linked, entitled, active: linked && entitled };
+}

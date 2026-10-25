@@ -33,7 +33,8 @@ import { featureService } from '@api/services/feature.service';
 
 describe('productMetaSync', () => {
   beforeEach(() => {
-    process.env.WBS_RECEIVER_BASE_URL = 'http://wbs:3001';
+    process.env.EBDA_WA_BASE_URL = 'http://wbs:3001';
+    delete process.env.WBS_RECEIVER_BASE_URL;
     vi.clearAllMocks();
     // Reset global fetch mock
     vi.stubGlobal('fetch', undefined);
@@ -53,7 +54,7 @@ describe('productMetaSync', () => {
     expect(mockPrisma.product.findUnique).not.toHaveBeenCalled();
   });
 
-  it('skips when no WBS_RECEIVER_BASE_URL is configured', async () => {
+  it('skips when no EBDA_WA_BASE_URL is configured', async () => {
     const event = { data: { storeId: 'store1', productId: 'prod1', action: 'upsert' as const } };
     const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
     const mockPrisma = {
@@ -66,6 +67,7 @@ describe('productMetaSync', () => {
       product: { findUnique: vi.fn() },
     };
     // No WBS_RECEIVER_BASE_URL env
+    delete process.env.EBDA_WA_BASE_URL;
     delete process.env.WBS_RECEIVER_BASE_URL;
     const result = await productMetaSync({ event, step, prisma: mockPrisma as any });
     expect(result.skipped).toBe(true);

@@ -17,3 +17,7 @@ Source of truth: `business/ebda/plans/2026-10-24-ebda-whatsapp-store-contract.md
 ## Verify
 
 Unit: envelope pin, buyer-key vector and normaliser spellings, producer (COD pair, retry-same-ids, not linked, no phone, enqueue failure throws, enum mapping), consumer (every outcome x order state, duplicates, invalid, erasure race, queue wiring). workerd: the buyer-key vector on the real WebCrypto (`workers-test/buyer-key.test.ts`).
+
+## Connect / disconnect (store.linked / store.unlinked)
+
+The link is changed in Store admin, not by a queue message: the envelope has no WhatsApp-to-Store link event, and the contract has the Store EMIT `store.linked` / `store.unlinked` when the merchant connects. `POST` / `DELETE /stores/:storeId/whatsapp-link` (owner/admin + MFA, plan entitlement on connect, fail closed) writes the server-owned row through `WhatsAppLinkService` and enqueues the event in the same request transaction: an enqueue failure rolls the write back. `GET` returns `{ linked, entitled, active }`. A Basic/Growth store that bought the package separately stays blocked until Ebda WhatsApp provides an entitlement source.
