@@ -28,3 +28,18 @@ export function doSqlRunner(storage: DoStorageLike): SqlRunner {
     transaction: fn => storage.transaction(async () => fn()),
   };
 }
+
+import type { SyncSql } from '../do/sync-sql';
+
+/** The money/stock core's synchronous surface over a Durable Object (`transactionSync`, never async). */
+export function doSyncSql(storage: DoStorageLike): SyncSql {
+  return {
+    all: (q, p) => storage.sql.exec(q, ...p).toArray(),
+    run: (q, p) => {
+      const c = storage.sql.exec(q, ...p);
+      c.toArray();
+      return { changes: c.rowsWritten };
+    },
+    transactionSync: fn => storage.transactionSync(fn),
+  };
+}
