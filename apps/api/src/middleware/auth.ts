@@ -509,7 +509,7 @@ export async function rejectIdentityManaged(req: Request, _res: Response, next: 
         new AppError(
           409,
           'USE_IDENTITY_SERVICE',
-          'Manage sign-in settings in your Ebda account settings'
+          'Manage sign-in settings in your Ebda AI Studio account settings'
         )
       );
     }
