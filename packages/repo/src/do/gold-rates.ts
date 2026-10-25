@@ -8,6 +8,7 @@
 import {
   GOLD_KARATS,
   computeGoldUnitPrice,
+  GOLD_ROUNDING_STEPS,
   loadCurrentRates,
   loadGoldSettings,
   resolveVariantGoldSpec,
@@ -194,22 +195,23 @@ interface Plan {
 export function repriceGoldStore(
   db: SyncSql,
   storeId: string,
-  karats: readonly GoldKarat[],
+  karats: readonly GoldKarat[] | null,
   rates: RateLookup,
   step: GoldRoundingStep,
-  now: number
+  now: number,
+  onlyProductId?: string
 ): number {
   const prods = db.all(
     `SELECT id, price, gold_rate_id, gold_karat, gold_weight_mg, making_charge_type, making_charge_value, gold_margin_bps
-       FROM products WHERE store_id = ? AND pricing_mode = 'gold_rate' AND deleted_at IS NULL LIMIT ?`,
-    [storeId, GOLD_CATALOGUE_CAP + 1]
+       FROM products WHERE store_id = ?1 AND pricing_mode = 'gold_rate' AND deleted_at IS NULL AND (?2 IS NULL OR id = ?2) LIMIT ?3`,
+    [storeId, onlyProductId ?? null, GOLD_CATALOGUE_CAP + 1]
   );
   if (prods.length > GOLD_CATALOGUE_CAP)
     throw err(
       'GOLD_CATALOGUE_TOO_LARGE',
       `A store can hold at most ${GOLD_CATALOGUE_CAP} gold-priced products`
     );
-  const affected = new Set<number>(karats);
+  const affected = karats ? new Set<number>(karats) : null;
   const plan: Plan = { products: [], variants: [] };
   for (const p of prods) {
     const pf = {
@@ -223,7 +225,7 @@ export function repriceGoldStore(
     const pPrice = Number(p.price);
     const pRate = (p.gold_rate_id ?? null) as string | null;
     const priceOf = (spec: GoldPriceSpec): { price: number; rateId: string } | null => {
-      if (!affected.has(spec.karat)) return null;
+      if (affected && !affected.has(spec.karat)) return null;
       const rate = rates.get(spec.karat);
       if (!rate)
         throw err('GOLD_RATE_MISSING', `No ${spec.karat}k rate has been set for this store`, 409, {
@@ -296,4 +298,148 @@ export function repriceGoldStore(
       [w.price, w.rateId, now, w.id, storeId]
     );
   return plan.products.length + plan.variants.length;
+}
+
+/** Confirm or reject a PENDING feed rate. Confirming applies it exactly as typed (current row + reprice), atomically. */
+export function decidePendingGoldRate(
+  db: SyncSql,
+  storeId: string,
+  rateId: string,
+  decision: 'confirm' | 'reject',
+  actor: { userId: string },
+  opts: { now?: number } = {}
+): { status: 'applied' | 'rejected'; repriced: number } {
+  if (!storeId) throw err('STORE_REQUIRED', 'storeId is required', 500);
+  if (decision !== 'confirm' && decision !== 'reject')
+    throw err('BAD_DECISION', 'confirm or reject', 400);
+  const now = opts.now ?? Date.now();
+  return db.transactionSync(() => {
+    const row = db.all(
+      'SELECT id, karat, rate_per_gram, status FROM gold_rates WHERE id = ? AND store_id = ?',
+      [rateId, storeId]
+    )[0];
+    if (!row) throw err('NOT_FOUND', 'Rate not found', 404);
+    if (row.status !== 'pending')
+      throw err('RATE_NOT_PENDING', 'This rate has already been decided');
+    if (decision === 'reject') {
+      db.run(
+        "UPDATE gold_rates SET status = 'rejected', decided_by = ? WHERE id = ? AND store_id = ? AND status = 'pending'",
+        [actor.userId, rateId, storeId]
+      );
+      return { status: 'rejected' as const, repriced: 0 };
+    }
+    const settings = loadGoldSettings(db, storeId);
+    const current = loadCurrentRates(db, storeId, GOLD_KARATS);
+    const karat = row.karat as GoldKarat;
+    db.run(
+      "UPDATE gold_rates SET status = 'applied', decided_by = ?, applied_at = ? WHERE id = ? AND store_id = ? AND status = 'pending'",
+      [actor.userId, now, rateId, storeId]
+    );
+    db.run(
+      `INSERT INTO gold_rates_current (store_id, karat, rate_id, rate_per_gram, applied_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (store_id, karat) DO UPDATE SET rate_id = excluded.rate_id, rate_per_gram = excluded.rate_per_gram, applied_at = excluded.applied_at`,
+      [storeId, karat, rateId, row.rate_per_gram, now]
+    );
+    const lookup = new Map<GoldKarat, { id: string; ratePerGram: number }>();
+    for (const [k, r] of current) lookup.set(k, { id: r.rateId, ratePerGram: r.ratePerGram });
+    lookup.set(karat, { id: rateId, ratePerGram: Number(row.rate_per_gram) });
+    setFlag(db, true);
+    try {
+      return {
+        status: 'applied' as const,
+        repriced: repriceGoldStore(db, storeId, [karat], lookup, settings.roundingStep, now),
+      };
+    } finally {
+      setFlag(db, false);
+    }
+  });
+}
+
+export interface GoldSettingsInput {
+  enabled: boolean;
+  feedEnabled: boolean;
+  feedPremiumBps: number;
+  maxAgeMinutes: number;
+  jumpConfirmBps: number;
+  roundingStep: GoldRoundingStep;
+  showBreakdown: boolean;
+}
+/** Save the store's gold settings; a changed rounding step re-prices every gold row in the same section. */
+export function updateGoldSettings(
+  db: SyncSql,
+  storeId: string,
+  input: GoldSettingsInput,
+  actor: { userId: string },
+  opts: { now?: number } = {}
+): { repriced: number } {
+  if (!storeId) throw err('STORE_REQUIRED', 'storeId is required', 500);
+  const bad = (m: string) => err('GOLD_SETTINGS_INVALID', m, 400);
+  if (!isInt(input.feedPremiumBps, -1000, 1000)) throw bad('feedPremiumBps');
+  if (!isInt(input.maxAgeMinutes, 60, 1560)) throw bad('maxAgeMinutes');
+  if (!isInt(input.jumpConfirmBps, 100, 5000)) throw bad('jumpConfirmBps');
+  if (!GOLD_ROUNDING_STEPS.includes(input.roundingStep)) throw bad('roundingStep');
+  const now = opts.now ?? Date.now();
+  return db.transactionSync(() => {
+    const before = loadGoldSettings(db, storeId);
+    db.run(
+      `INSERT INTO gold_rate_settings (store_id, enabled, feed_enabled, feed_premium_bps, max_age_minutes, jump_confirm_bps, rounding_step, show_breakdown, updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (store_id) DO UPDATE SET enabled = excluded.enabled, feed_enabled = excluded.feed_enabled,
+         feed_premium_bps = excluded.feed_premium_bps, max_age_minutes = excluded.max_age_minutes,
+         jump_confirm_bps = excluded.jump_confirm_bps, rounding_step = excluded.rounding_step,
+         show_breakdown = excluded.show_breakdown, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+      [
+        storeId,
+        input.enabled ? 1 : 0,
+        input.feedEnabled ? 1 : 0,
+        input.feedPremiumBps,
+        input.maxAgeMinutes,
+        input.jumpConfirmBps,
+        input.roundingStep,
+        input.showBreakdown ? 1 : 0,
+        actor.userId,
+        now,
+      ]
+    );
+    if (before.roundingStep === input.roundingStep) return { repriced: 0 };
+    const current = loadCurrentRates(db, storeId, GOLD_KARATS);
+    const lookup = new Map<GoldKarat, { id: string; ratePerGram: number }>();
+    for (const [k, r] of current) lookup.set(k, { id: r.rateId, ratePerGram: r.ratePerGram });
+    setFlag(db, true);
+    try {
+      return {
+        repriced: repriceGoldStore(
+          db,
+          storeId,
+          [...lookup.keys()],
+          lookup,
+          input.roundingStep,
+          now
+        ),
+      };
+    } finally {
+      setFlag(db, false);
+    }
+  });
+}
+
+/** Re-price ONE product after a spec or mode edit (every gold row of it, whatever the karat). */
+export function repriceGoldProduct(
+  db: SyncSql,
+  storeId: string,
+  productId: string,
+  now = Date.now()
+): number {
+  return db.transactionSync(() => {
+    const settings = loadGoldSettings(db, storeId);
+    const current = loadCurrentRates(db, storeId, GOLD_KARATS);
+    const lookup = new Map<GoldKarat, { id: string; ratePerGram: number }>();
+    for (const [k, r] of current) lookup.set(k, { id: r.rateId, ratePerGram: r.ratePerGram });
+    setFlag(db, true);
+    try {
+      return repriceGoldStore(db, storeId, null, lookup, settings.roundingStep, now, productId);
+    } finally {
+      setFlag(db, false);
+    }
+  });
 }

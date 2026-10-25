@@ -179,7 +179,9 @@ export function resolveCustomerContext(
 export function cartItemsForTargeting(
   db: SyncSql,
   storeId: string,
-  priced: PricedCart
+  priced: PricedCart,
+  /** every loose line, not only the coupon-eligible ones (free-shipping coupons judge the whole cart, Ruling B2B-M2) */
+  allLines = false
 ): CartItemForTargeting[] {
   id(storeId, 'storeId');
   const catCache = new Map<string, string[]>();
@@ -198,7 +200,7 @@ export function cartItemsForTargeting(
     return c;
   };
   return priced.lines
-    .filter(l => l.couponEligible)
+    .filter(l => allLines || l.couponEligible)
     .map(l => ({
       productId: l.productId,
       categoryIds: cats(l.productId),

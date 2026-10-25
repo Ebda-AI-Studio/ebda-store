@@ -99,7 +99,7 @@ export function removeProductIndex(db: SyncSql, productId: string): void {
 /** Rebuild the whole index from `products` (restore, import, repair). */
 export function reindexStore(db: SyncSql, storeId: string): number {
   return db.transactionSync(() => {
-    db.run('DELETE FROM product_search_fts', []);
+    db.run('DELETE FROM product_search_fts WHERE store_id = ?', [storeId]);
     const rows = db.all(`SELECT ${PRODUCT_COLS} FROM products WHERE store_id = ?`, [storeId]);
     for (const r of rows) writeIndexRow(db, r);
     return rows.length;
@@ -184,7 +184,8 @@ export function searchProductIdSet(
   const storefront = opts.scope === 'storefront';
   const withSku = opts.withSku ?? opts.scope === 'admin';
   const docCol = opts.field === 'name' ? 'name_doc' : 'doc';
-  const wordStart = tokens.every(t => [...t].length < 3);
+  // UTF-16 units, exactly like the Postgres caller's `t.length < 3`
+  const wordStart = tokens.every(t => t.length < 3);
 
   const where: string[] = ['f.store_id = ?'];
   const params: unknown[] = [storeId];
@@ -222,7 +223,7 @@ export function searchProductIdSet(
   }
   sqlParams.push(...params);
   const status = storefront ? "AND p.status = 'active' AND p.audience = 'public'" : '';
-  const deleted = opts.includeDeleted ? '' : 'AND p.deleted_at IS NULL';
+  const deleted = opts.includeDeleted && !storefront ? '' : 'AND p.deleted_at IS NULL';
   const rows = db.all(
     `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.name_doc AS name_doc
        FROM product_search_fts f JOIN products p ON p.id = f.product_id AND p.store_id = ?
