@@ -38,6 +38,7 @@ function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown>
 }
 import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
+import { countPriorCouponUses, type CouponLimitTx } from '../lib/coupon-per-customer-limit';
 import { PriceResolver, wholesaleEntitledUncached } from './price-resolver.service';
 import { assertGoldLinesPriceable, assertSameRates } from './gold-rate/gate';
 import { redactOrderForCustomer } from './gold-rate/public';
@@ -1722,52 +1723,30 @@ export class OrderService {
         // customers by `customerId`; guests by shipping-address email/phone
         // (JSON path match, same field names/precedent as the customer
         // detail lookup in customers.routes.ts). A guest checkout with
-        // NEITHER an email nor a phone on the shipping address has no
-        // reliable identity to check — we deliberately do NOT block in that
-        // case (a false block on an unidentifiable guest is worse than the
-        // narrow loophole; the store-wide usageLimit still caps total abuse).
+        // NEITHER an email nor a phone on the shipping address has no stable identity: such a guest is REFUSED the
+        // coupon (COUPON_NEEDS_CONTACT, 2026-10-25; it used to be waved through, which made the coupon unlimited).
         if (
           appliedCoupon &&
           couponApplied &&
           appliedCoupon.usageLimitPerUser &&
           appliedCoupon.usageLimitPerUser > 0
         ) {
-          const guestEmail =
-            typeof data.shippingAddress.email === 'string' && data.shippingAddress.email
-              ? data.shippingAddress.email
-              : undefined;
-          const guestPhone =
-            typeof data.shippingAddress.phone === 'string' && data.shippingAddress.phone
-              ? data.shippingAddress.phone
-              : undefined;
-
-          const identityWhere: Prisma.OrderWhereInput | null = customerId
-            ? { customerId }
-            : guestEmail || guestPhone
-              ? {
-                  OR: [
-                    ...(guestEmail
-                      ? [{ shippingAddress: { path: ['email'], equals: guestEmail } }]
-                      : []),
-                    ...(guestPhone
-                      ? [{ shippingAddress: { path: ['phone'], equals: guestPhone } }]
-                      : []),
-                  ],
-                }
-              : null;
-
-          if (identityWhere) {
-            const priorUsageCount = await tx.order.count({
-              where: {
-                storeId,
-                couponCode: appliedCoupon.code,
-                status: { notIn: ['cancelled', 'refunded'] },
-                ...identityWhere,
-              },
-            });
-            if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
-              throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+          // Guests are identified by E.164 phone / lowercased email, counted under an advisory lock in this same
+          // transaction (lib/coupon-per-customer-limit.ts); an unidentifiable guest is refused, not waved through.
+          const priorUsageCount = await countPriorCouponUses(
+            tx as unknown as CouponLimitTx,
+            storeId,
+            appliedCoupon.code,
+            {
+              customerId,
+              email:
+                typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
+              phone:
+                typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null,
             }
+          );
+          if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
+            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
           }
         }
 
@@ -3361,58 +3340,45 @@ export class OrderService {
       // store-wide `usageLimit` — `usageLimitPerUser` was never checked on
       // this path, so an admin/phone order could bypass a customer's cap).
       // Identity resolution mirrors create(): registered customers by
-      // `customerId`; guests by shippingAddress email/phone. An
-      // unidentifiable guest (neither) is deliberately NOT blocked — same
-      // narrow-loophole tradeoff as create() (store-wide usageLimit still
-      // caps total abuse).
+      // `customerId`; guests by E.164 phone / lowercased email under an advisory lock
+      // (lib/coupon-per-customer-limit.ts). An unidentifiable guest is refused (or
+      // reported as a violation when the admin overrides the coupon rules).
       if (
         couponCode &&
         appliedCoupon &&
         appliedCoupon.usageLimitPerUser &&
         appliedCoupon.usageLimitPerUser > 0
       ) {
-        const guestEmail =
-          typeof data.shippingAddress.email === 'string' && data.shippingAddress.email
-            ? (data.shippingAddress.email as string)
-            : undefined;
-        const guestPhone =
-          typeof data.shippingAddress.phone === 'string' && data.shippingAddress.phone
-            ? (data.shippingAddress.phone as string)
-            : undefined;
-
-        const identityWhere: Prisma.OrderWhereInput | null = data.customerId
-          ? { customerId: data.customerId }
-          : guestEmail || guestPhone
-            ? {
-                OR: [
-                  ...(guestEmail
-                    ? [{ shippingAddress: { path: ['email'], equals: guestEmail } }]
-                    : []),
-                  ...(guestPhone
-                    ? [{ shippingAddress: { path: ['phone'], equals: guestPhone } }]
-                    : []),
-                ],
-              }
-            : null;
-
-        if (identityWhere) {
-          const priorUsageCount = await tx.order.count({
-            where: {
-              storeId,
-              couponCode,
-              status: { notIn: ['cancelled', 'refunded'] },
-              ...identityWhere,
-            },
-          });
-          if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
-            if (!overrideCoupon) {
-              throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+        let priorUsageCount: number | null = null;
+        try {
+          priorUsageCount = await countPriorCouponUses(
+            tx as unknown as CouponLimitTx,
+            storeId,
+            couponCode,
+            {
+              customerId: data.customerId,
+              email:
+                typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
+              phone:
+                typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null,
             }
-            couponViolations.push({
-              code: 'COUPON_LIMIT_REACHED',
-              message: 'Per-customer coupon usage limit reached',
-            });
+          );
+        } catch (e) {
+          if (!(e instanceof AppError) || e.code !== 'COUPON_NEEDS_CONTACT') throw e;
+          if (!overrideCoupon) throw e;
+          couponViolations.push({
+            code: 'COUPON_NEEDS_CONTACT',
+            message: 'Per-customer coupon with no phone or email',
+          });
+        }
+        if (priorUsageCount !== null && priorUsageCount >= appliedCoupon.usageLimitPerUser) {
+          if (!overrideCoupon) {
+            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
           }
+          couponViolations.push({
+            code: 'COUPON_LIMIT_REACHED',
+            message: 'Per-customer coupon usage limit reached',
+          });
         }
       }
 

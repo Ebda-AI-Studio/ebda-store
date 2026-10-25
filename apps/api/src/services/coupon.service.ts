@@ -10,7 +10,8 @@ export interface CouponRuleViolation {
     | 'COUPON_EXPIRED'
     | 'COUPON_LIMIT_REACHED'
     | 'MIN_ORDER_NOT_MET'
-    | 'COUPON_NOT_ELIGIBLE';
+    | 'COUPON_NOT_ELIGIBLE'
+    | 'COUPON_NEEDS_CONTACT';
   message: string;
 }
 
