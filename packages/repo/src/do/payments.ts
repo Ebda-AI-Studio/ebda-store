@@ -426,7 +426,7 @@ export function completeRefund(
     reason?: string;
     now?: number;
   }
-): { orderStatus: string; booked: boolean } {
+): { orderStatus: string; booked: boolean; review: boolean } {
   need(a.refundId, 'refundId');
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
@@ -436,7 +436,34 @@ export function completeRefund(
       "SELECT 1 AS x FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.claimId') = ?",
       [p.id, REFUND_EXECUTED_EVENT, a.claimId]
     )[0];
-    if (done) return { orderStatus: loadOrder(db, a.storeId, p.order_id).status, booked: false }; // replay
+    if (done)
+      return {
+        orderStatus: loadOrder(db, a.storeId, p.order_id).status,
+        booked: false,
+        review: false,
+      }; // replay
+    // a settle webhook already ABSORBED this claim under a different refund id than the provider just answered with: two
+    // refunds may have been reconciled as one. Nothing is overwritten; a human reviews it.
+    const absorbedAs = db.all(
+      "SELECT json_extract(details, '$.refundId') AS rid FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.claimId') = ?",
+      [p.id, REFUND_ABSORBED_EVENT, a.claimId]
+    )[0]?.rid as string | undefined;
+    const review = !!absorbedAs && absorbedAs !== a.refundId;
+    if (review)
+      addPaymentEvent(db, {
+        storeId: a.storeId,
+        paymentId: p.id,
+        orderId: p.order_id,
+        eventType: REFUND_REVIEW_EVENT,
+        provider: p.provider,
+        details: {
+          claimId: a.claimId,
+          reason: 'absorbed_under_a_different_refund_id',
+          absorbedRefundId: absorbedAs,
+          answeredRefundId: a.refundId,
+        },
+        now,
+      });
     const meta = parse(p.metadata);
     const status = a.providerStatus ?? 'completed';
     const next = {
@@ -493,7 +520,7 @@ export function completeRefund(
       });
       booked = true;
     }
-    return { orderStatus: loadOrder(db, a.storeId, p.order_id).status, booked };
+    return { orderStatus: loadOrder(db, a.storeId, p.order_id).status, booked, review };
   });
 }
 
@@ -736,11 +763,15 @@ export async function applyPaymentEvent(
     };
     let kind = input.kind;
     let status = input.status;
+    let refundOverride: PaymentWebhookInput['refund'] | undefined;
     if (confirmed) {
       const confirmedKind = confirmed.kind === 'authorize' ? 'authorize' : confirmed.kind;
+      const foldRefund = (c: ConfirmedTransaction['status']) =>
+        c === 'SUCCESS' ? 'completed' : c === 'FAILURE' ? 'failed' : 'pending';
       const mismatch =
         confirmedKind !== input.kind ||
-        (input.kind === 'payment' && foldStatus(confirmed.status) !== input.status);
+        (input.kind === 'payment' && foldStatus(confirmed.status) !== input.status) ||
+        (input.kind === 'refund' && foldRefund(confirmed.status) !== input.refund?.status);
       addPaymentEvent(db, {
         storeId: input.storeId,
         paymentId: p.id,
@@ -756,13 +787,26 @@ export async function applyPaymentEvent(
         now,
       });
       if (confirmedKind === 'authorize') return finish('ignored', 'authorized only');
-      kind = confirmedKind;
+      if (confirmedKind !== input.kind) {
+        // the delivery was relabelled (payment <-> refund): the gateway record has no amount/id for the other kind, so
+        // NOTHING is applied; a human looks (fail closed)
+        alerts.push({
+          kind: 'webhook_kind_mismatch',
+          paymentId: p.id,
+          orderId: p.order_id,
+          body: `Order ${o.order_number}: ${input.provider} delivered a ${input.kind} but the gateway record says ${confirmedKind}. Nothing applied.`,
+        });
+        return finish('held', 'kind mismatch');
+      }
       if (kind === 'payment') status = foldStatus(confirmed.status);
+      // the GATEWAY's refund status is what is applied, not the delivery's label
+      if (kind === 'refund' && input.refund)
+        refundOverride = { ...input.refund, status: foldRefund(confirmed.status) };
     }
     if (kind === 'refund')
       return applyRefundWebhook({
         db,
-        input,
+        input: refundOverride ? { ...input, refund: refundOverride } : input,
         p,
         o,
         now,
@@ -1116,7 +1160,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   const next = {
     ...meta,
     refundId: r.refundId,
-    ...(s.accountedThisEvent
+    ...(s.accountedThisEvent || (completed && s.absorbedClaimId)
       ? { [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, r.refundId) }
       : {}),
     refundStatus: r.status,
@@ -1347,6 +1391,16 @@ export function matchRefundToClaim(
       has(REFUND_RECONCILED_EVENT)
     )
       throw err('CLAIM_CLOSED', 'claim is already closed', 409);
+    // the id must be one a provider webhook delivered and we HELD on this payment, and not yet accounted: a typo must not
+    // pre-mark a future real refund as seen
+    if (readAccountedRefundEventIds(parse(p.metadata)).includes(a.providerRefundId))
+      throw err('REFUND_ID_ACCOUNTED', 'that refund id is already accounted', 409);
+    const held = db.all(
+      "SELECT 1 AS x FROM payment_events WHERE payment_id = ? AND event_type = 'webhook' AND json_extract(details, '$.flavour') = 'refund' AND json_extract(details, '$.refundId') = ? AND json_extract(details, '$.heldUnaccountedRefund') = 1",
+      [p.id, a.providerRefundId]
+    );
+    if (held.length === 0)
+      throw err('NO_HELD_WEBHOOK', 'no held webhook for that refund id on this payment', 409);
     addPaymentEvent(db, {
       storeId: a.storeId,
       paymentId: p.id,

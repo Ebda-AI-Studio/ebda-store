@@ -26,6 +26,8 @@ export interface D1Like {
   };
 }
 
+/** After this many failures a row is dead-lettered (still in the outbox, no longer retried, counted for the alert). */
+export const MAX_ATTEMPTS = 20;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 60 * 60 * 1000;
 export const backoffMs = (attempts: number): number =>
@@ -34,6 +36,8 @@ export const backoffMs = (attempts: number): number =>
 export interface DrainResult {
   written: number;
   failed: number;
+  /** rows that failed MAX_ATTEMPTS times: no longer retried, need a human (alert on this) */
+  deadLettered: number;
   /** an id already points at ANOTHER store: not applied, needs a human */
   conflicts: Array<{ kind: string; id: string; existing: string; attempted: string }>;
 }
@@ -46,10 +50,10 @@ export async function drainEntityIndexOutbox(
 ): Promise<DrainResult> {
   const now = opts.now ?? Date.now();
   const rows = db.all(
-    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND next_attempt_at <= ? ORDER BY id LIMIT ?",
-    [now, Math.min(opts.limit ?? 100, 500)]
+    "SELECT id, payload, attempts FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL AND attempts < ? AND next_attempt_at <= ? ORDER BY id LIMIT ?",
+    [MAX_ATTEMPTS, now, Math.min(opts.limit ?? 100, 500)]
   );
-  const out: DrainResult = { written: 0, failed: 0, conflicts: [] };
+  const out: DrainResult = { written: 0, failed: 0, deadLettered: 0, conflicts: [] };
   for (const r of rows) {
     const rowId = r.id as number;
     try {
@@ -84,6 +88,7 @@ export async function drainEntityIndexOutbox(
         rowId,
       ]);
       out.failed++;
+      if (attempts >= MAX_ATTEMPTS) out.deadLettered++;
     }
   }
   return out;
