@@ -10,7 +10,6 @@ import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
-import { ResendService } from '../services/resend.service';
 import { merchantSenderPrefixInput } from '../services/email-sender';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
@@ -1357,61 +1356,19 @@ router.get(
       const domainSvc = resolveDomainService({ domainProvider: storeRow?.domainProvider });
       const providerStatus = await domainSvc.getDomain(shownDomain);
 
-      // Best-effort: refresh Resend status alongside. Failure shouldn't block
-      // the admin page from rendering — the storefront domain status is the
-      // primary concern; the email DNS records are secondary.
-      // `priority` (MX-only, Resend's AWS SES feedback MX defaults to 10)
-      // and `ttl` (string, e.g. "Auto" or seconds) are preserved through
-      // the merge. Without them merchants hit registrar fields they don't
-      // know how to fill — caught on demo-shop.example 2026-05-13.
-      // Refresh Resend status live and capture the fresh status + records.
-      // The critical fix: the response MUST use the live `refreshed.status`
-      // returned from this call, NOT the pre-refresh `storeRow.emailDomainStatus`.
-      // storeRow was fetched BEFORE refreshDomainStatus writes the updated value
-      // to the DB, so returning storeRow.emailDomainStatus would return a stale
-      // snapshot and show "Verified" even after Resend has deleted/revoked the
-      // domain. (Exact failure mode: demo-shop had emailDomainStatus='verified' in
-      // DB but Resend had already deleted the domain; storeRow carried the stale
-      // 'verified'; refreshDomainStatus threw 404, was swallowed in catch, so the
-      // response returned the stale 'verified' badge — Fix 2 2026-06-29.)
-      let resendRecords: Array<{
+      // Mail is sent from ebda.app by Cloudflare Email Service (G6): a merchant domain has no email
+      // DNS records of its own; the stored email-domain fields are legacy and shown as stored.
+      const resendRecords: Array<{
         type: string;
         name: string;
         value: string;
         priority?: number;
         ttl?: string;
       }> = [];
-      let liveEmailStatus: string | null = storeRow?.emailDomainStatus ?? null;
-      let liveEmailVerifiedAt: Date | null = storeRow?.emailDomainVerifiedAt ?? null;
-      if (storeRow?.emailDomainId) {
-        try {
-          const refreshed = await ResendService.refreshDomainStatus(id);
-          // Use the live status returned from Resend, not the stale storeRow value.
-          liveEmailStatus = refreshed.status;
-          // If Resend now says NOT verified, clear the verifiedAt so the badge
-          // won't show a stale timestamp either.
-          if (refreshed.status !== 'verified') {
-            liveEmailVerifiedAt = null;
-          }
-          resendRecords = refreshed.records.map(r => ({
-            type: r.type,
-            name: r.name,
-            value: r.value,
-            ...(typeof r.priority === 'number' ? { priority: r.priority } : {}),
-            ...(r.ttl ? { ttl: r.ttl } : {}),
-          }));
-        } catch (err) {
-          logger.warn(
-            { err, storeId: id },
-            'Resend status fetch failed during GET /domain — falling back to stored status'
-          );
-          // On failure, keep the last-known stored values (storeRow snapshot).
-          // This is a best-effort degradation: the badge may be stale when Resend
-          // is unreachable, but we do not surface a hard error on the admin page.
-        }
-      }
+      const liveEmailStatus: string | null = storeRow?.emailDomainStatus ?? null;
+      const liveEmailVerifiedAt: Date | null = storeRow?.emailDomainVerifiedAt ?? null;
 
-      // Merge provider + Resend DNS records into one panel. The admin renders
+      // Merge provider DNS records into one panel. The admin renders
       // this list under a neutral 'DNS records to add at your registrar'
       // heading so merchants never see provider names. The fallback when the
       // provider API is unreachable is a single CNAME to the Cloudflare-for-SaaS
@@ -1580,43 +1537,21 @@ router.put(
   }
 );
 
-// POST /stores/:id/email-sender/provision — create or refresh the Resend
-// domain entry and return the DNS records the merchant must add. Idempotent.
-router.post(
-  '/:id/email-sender/provision',
-  authenticate,
-  requireMfaEnrolled,
-  authorize('store_admin', 'super_admin'),
-  requireStoreAccess,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const records = await ResendService.provisionStoreDomain(req.params.id);
-      res.json({ success: true, data: { records } });
-    } catch (error) {
-      next(error);
+// POST /stores/:id/email-sender/provision and /verify: retired with Resend (G6). Mail is sent from
+// ebda.app by Cloudflare Email Service, so a merchant domain needs no email DNS records. The routes
+// stay so an older admin build gets a clean, empty answer instead of a 404.
+for (const action of ['provision', 'verify'] as const) {
+  router.post(
+    `/:id/email-sender/${action}`,
+    authenticate,
+    requireMfaEnrolled,
+    authorize('store_admin', 'super_admin'),
+    requireStoreAccess,
+    (_req: Request, res: Response) => {
+      res.json({ success: true, data: { status: 'unsupported', records: [] } });
     }
-  }
-);
-
-// POST /stores/:id/email-sender/verify — kick off Resend verification AND
-// refresh the local state. Previously called refreshDomainStatus which only
-// does a GET; without the POST-to-/verify the domain stays in `not_started`
-// forever. Caught on demo-shop.example 2026-05-13.
-router.post(
-  '/:id/email-sender/verify',
-  authenticate,
-  requireMfaEnrolled,
-  authorize('store_admin', 'super_admin'),
-  requireStoreAccess,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const result = await ResendService.verifyAndRefreshDomain(req.params.id);
-      res.json({ success: true, data: result });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+  );
+}
 
 // ===== Store FAQ CRUD =====
 

@@ -162,8 +162,8 @@ vi.mock('@api/services/store-creation-limit', () => ({
 vi.mock('@api/services/domain-provider', () => ({
   resolveDomainService: vi.fn(() => ({ isConfigured: () => false })),
 }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: {
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: {
     provisionStoreDomain: vi.fn(),
     verifyAndRefreshDomain: vi.fn(),
     refreshDomainStatus: vi.fn(),

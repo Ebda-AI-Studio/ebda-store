@@ -217,8 +217,8 @@ function PrivacyFallback() {
               </li>
               <li>
                 {t(
-                  'Resend (email delivery) — to send transactional emails such as order confirmations and password resets.',
-                  'Resend (تسليم البريد الإلكتروني) — لإرسال رسائل البريد الإلكتروني المعاملاتية مثل تأكيدات الطلبات وإعادة تعيين كلمة المرور.'
+                  'Cloudflare Email Service (email delivery) — to send transactional emails such as order confirmations and password resets.',
+                  'Cloudflare Email Service (تسليم البريد الإلكتروني) — لإرسال رسائل البريد الإلكتروني المعاملاتية مثل تأكيدات الطلبات وإعادة تعيين كلمة المرور.'
                 )}
               </li>
               <li>
