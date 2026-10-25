@@ -818,7 +818,11 @@ export class AuthService {
     // accept a password hash the identity service no longer controls (a reset there would not reach it), so it is closed for
     // them: the right password here proves nothing and issues nothing.
     if (user.storeId === null && user.role !== 'customer') {
-      throw new AppError(409, 'USE_IDENTITY_SERVICE', 'Sign in through the Ebda account service');
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
     }
 
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
@@ -898,7 +902,11 @@ export class AuthService {
     // The only place a legacy (HS256) session is minted for a login: closed for identity-managed accounts, which sign in at
     // the identity service. Covers the passkey and MFA completions that reach here.
     if (user.storeId === null && user.role !== 'customer') {
-      throw new AppError(409, 'USE_IDENTITY_SERVICE', 'Sign in through the Ebda account service');
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
     }
 
     const tokens = await this.generateTokens({
