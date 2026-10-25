@@ -35,11 +35,11 @@ The Processor applies appropriate technical and organisational measures, includi
 
 6.1 The Controller gives general authorisation for these sub-processors:
 
-| Provider   | Role                                  | Notes                                                                                         |
-| ---------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Cloudflare | Hosting, storage and AI inference     | Global network; the AI model (Workers AI) runs inside our hosting provider                    |
-| Sentry     | Error monitoring                      | Error reports without message content                                                         |
-| Kashier    | Payment processing for wallet top-ups | Handles card payments for the Controller as payer; receives payment data, not message content |
+| Provider | Role | Notes |
+|---|---|---|
+| Cloudflare | Hosting, storage and AI inference | Global network; the AI model (Workers AI) runs inside our hosting provider |
+| Sentry | Error monitoring | Error reports without message content |
+| Kashier | Payment processing for wallet top-ups | Handles card payments for the Controller as payer; receives payment data, not message content |
 
 6.2 Meta Platforms (WhatsApp Business Platform) is not a sub-processor of the Processor. It is a separate, independent controller for WhatsApp, and delivers and receives messages under its own terms.
 
