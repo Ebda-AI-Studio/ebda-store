@@ -26,7 +26,7 @@
  *
  */
 
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInTenantContext, storeDirectory } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -76,7 +76,7 @@ export async function runStoreRollupSteps(
 /** Events per `step.sendEvent` call — keeps each request well under Inngest's payload limit. */
 export const FANOUT_BATCH = 500;
 
-export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunction(
+export const analyticsDailyRollupCron: JobDef = inngest.createFunction(
   {
     id: 'analytics-daily-rollup',
     name: 'Insights — nightly cohort/funnel/rfm rollup',
@@ -116,7 +116,7 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
 // On-demand — triggered by `insights/rollup-requested` event
 // ---------------------------------------------------------------------------
 
-export const analyticsRollupOnDemand: InngestFunction.Any = inngest.createFunction(
+export const analyticsRollupOnDemand: JobDef = inngest.createFunction(
   {
     id: 'analytics-rollup-on-demand',
     name: 'Insights — per-store rollup (nightly fan-out + on-demand)',

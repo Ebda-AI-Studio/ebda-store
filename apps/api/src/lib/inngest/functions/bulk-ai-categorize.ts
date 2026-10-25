@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -62,7 +62,7 @@ interface BatchResult {
   cancelled: boolean;
 }
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type when the returned object mixes a plain string[]
 // with a richer array-of-objects sibling (the annotation widens the
@@ -332,4 +332,4 @@ const bulkAiCategorizeFn = inngest.createFunction(
     }); // end runInStoreScope
   }
 );
-export const bulkAiCategorize: InngestFunction.Any = bulkAiCategorizeFn;
+export const bulkAiCategorize: JobDef = bulkAiCategorizeFn;

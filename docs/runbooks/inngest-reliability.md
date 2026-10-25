@@ -1,3 +1,5 @@
+> **Historical (Ruling G5-3).** Inngest was removed on 2026-10-25; jobs run on Cloudflare Workflows and Queues. For incidents use `docs/INCIDENT.md` section 3 and `docs/cf/jobs-map.md`. The rest of this page describes the retired Inngest setup.
+
 # Inngest Reliability Runbook
 
 > Operational patterns and operational gotchas for the 30+ Inngest functions in Ebda Store.

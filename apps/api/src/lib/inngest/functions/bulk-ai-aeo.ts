@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -235,7 +235,7 @@ interface AeoErr {
 // bulk-ai-faq-aeo — draft store-level FAQ items
 // -----------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -559,13 +559,13 @@ No other text, no markdown code fences — pure JSON only.`;
     }); // end runInStoreScope
   }
 );
-export const bulkAiFaqAeo: InngestFunction.Any = bulkAiFaqAeoFn;
+export const bulkAiFaqAeo: JobDef = bulkAiFaqAeoFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-howto-aeo — draft HowTo guides
 // -----------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -880,7 +880,7 @@ No markdown, no code fences — pure JSON only.`;
     }); // end runInStoreScope
   }
 );
-export const bulkAiHowtoAeo: InngestFunction.Any = bulkAiHowtoAeoFn;
+export const bulkAiHowtoAeo: JobDef = bulkAiHowtoAeoFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-meta-aeo — rewrite meta descriptions in conversational style
@@ -907,7 +907,7 @@ interface MetaBatchResult {
  * never stomp on a merchant who has written a custom one. `force` bypasses
  * the skip.
  */
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -1345,7 +1345,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
     }); // end runInStoreScope
   }
 );
-export const bulkAiMetaAeo: InngestFunction.Any = bulkAiMetaAeoFn;
+export const bulkAiMetaAeo: JobDef = bulkAiMetaAeoFn;
 
 // Prompt builder for conversational meta descriptions (store/product/category)
 // now lives in lib/ai/product-meta-aeo-generator.ts as `buildMetaAeoPrompt` —

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { withStore, storeDirectory } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -13,7 +13,7 @@ import { REGION } from '@ebda/shared';
  *
  * Runs at 01:00 Cairo (`TZ=` cron; Egypt observes DST).
  */
-export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
+export const accountingDailyClose: JobDef = inngest.createFunction(
   {
     id: 'accounting-daily-close',
     name: 'Accounting daily close',

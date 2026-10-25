@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -151,7 +151,7 @@ export async function handleOrderCreatedStuckSweep(
   return { swept: stuck.length, resent, alerted: veryStale.length };
 }
 
-export const orderCreatedStuckSweep: InngestFunction.Any = inngest.createFunction(
+export const orderCreatedStuckSweep: JobDef = inngest.createFunction(
   {
     id: 'order-created-stuck-sweep',
     name: 'Order created — sweep paid-but-unnotified orders',

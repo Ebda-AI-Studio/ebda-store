@@ -26,7 +26,7 @@
  *   even on a delayed/retried delivery of this event — see the check below.
  */
 
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { storefrontOrigin } from '@ebda/shared';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { inngest } from '../client';
@@ -37,7 +37,7 @@ import {
 } from '../../../services/pixels-capi.service';
 import logger from '../../logger';
 
-export const orderCapiConversion: InngestFunction.Any = inngest.createFunction(
+export const orderCapiConversion: JobDef = inngest.createFunction(
   {
     id: 'order-capi-conversion',
     name: 'Order — server-side CAPI conversion (Meta + TikTok)',

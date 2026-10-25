@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma } from '@ebda/database';
 import { AWAITING_PAYMENT_CONFIRMATION } from '@ebda/shared';
 import logger from '../../logger';
@@ -24,7 +24,7 @@ import { InstapayService } from '../../../services/payment-providers/instapay.se
  */
 const RUN_CAP = 500;
 
-export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
+export const instapayExpiry: JobDef = inngest.createFunction(
   {
     id: 'instapay-expiry',
     name: 'Expire unconfirmed InstaPay orders (hourly)',
