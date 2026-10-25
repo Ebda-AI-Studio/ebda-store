@@ -713,7 +713,7 @@ export function createApp() {
       .run();
     return c.json({
       success: true,
-      data: { secret, otpauthUrl: totpUri(user.email, secret, 'Ebda') },
+      data: { secret, otpauthUrl: totpUri(user.email, secret, 'Ebda AI Studio') },
     });
   });
 
