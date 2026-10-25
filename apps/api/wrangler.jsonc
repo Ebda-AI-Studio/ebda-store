@@ -79,6 +79,8 @@
 
   "queues": {
     "producers": [
+      // Store -> Ebda WhatsApp events (contract 2026-10-24; lib/wa/events.ts). Ebda WhatsApp consumes it.
+      { "binding": "WA_EVENTS_QUEUE", "queue": "ebda-wa-events" },
       { "binding": "EMAIL_QUEUE", "queue": "ebda-email" },
       { "binding": "SMS_QUEUE", "queue": "ebda-sms" },
     ],
@@ -102,6 +104,16 @@
         "dead_letter_queue": "ebda-sms-dlq",
       },
       { "queue": "ebda-email-dlq", "max_batch_size": 10, "max_retries": 2 },
+      // WhatsApp -> Store events (COD outcomes, erasure races): lib/wa/store-events-consumer.ts.
+      {
+        "queue": "ebda-store-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 2,
+        "max_retries": 5,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-store-events-dlq",
+      },
+      { "queue": "ebda-store-events-dlq", "max_batch_size": 10, "max_retries": 2 },
       { "queue": "ebda-sms-dlq", "max_batch_size": 10, "max_retries": 2 },
     ],
   },

@@ -3,6 +3,7 @@
 // Orchestrates carrier integrations: shipment creation, tracking, webhooks
 // ==========================================
 
+import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import crypto from 'node:crypto';
 import {
   currentStoreId,
@@ -1011,6 +1012,27 @@ class ShippingCarrierService {
           source,
         },
       });
+    }
+
+    // Ebda WhatsApp (contract 2026-10-24 section 4): every carrier status change is a
+    // `shipment.updated`; the job drops it unless the store linked WhatsApp. Enqueue failures are
+    // logged, never block tracking (the next poll re-sends a changed status).
+    if (prevStatus !== nextStatus) {
+      await sendEventAfterCommit(
+        'shipment-status-updated',
+        {
+          name: 'shipment/status-updated',
+          data: {
+            storeId: shipment.storeId,
+            orderId: shipment.orderId,
+            shipmentId,
+            status: nextStatus,
+            trackingUrl: updated.trackingUrl ?? null,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        { ifUnhookable: 'send' }
+      );
     }
 
     if (nextStatus === 'delivered' && prevStatus !== 'delivered') {

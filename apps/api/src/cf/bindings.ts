@@ -59,6 +59,8 @@ export interface CfBindings {
   STORE_DO?: DurableObjectNamespaceLike;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
+  /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */
+  WA_EVENTS_QUEUE?: QueueProducerLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */

@@ -17,6 +17,8 @@ import { runInStoreScope } from '@ebda/database';
 import { emailQueue, isQueuedEmail } from '../services/email-queue.service';
 import { smsQueue, isQueuedSms } from '../services/sms-queue.service';
 import logger from '../lib/logger';
+import { handleStoreEvent } from '../lib/wa/store-events-consumer';
+import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from '../lib/wa/config';
 
 export const EMAIL_QUEUE_NAME = 'ebda-email';
 export const SMS_QUEUE_NAME = 'ebda-sms';
@@ -42,6 +44,11 @@ export interface MessageBatchLike {
 }
 
 export async function handleQueueBatch(batch: MessageBatchLike): Promise<void> {
+  // WhatsApp -> Store events own their ack/retry (lib/wa/store-events-consumer.ts).
+  if (batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ) {
+    await handleStoreEventsBatch(batch);
+    return;
+  }
   for (const msg of batch.messages) {
     try {
       switch (batch.queue) {
@@ -103,3 +110,26 @@ export async function handleQueueBatch(batch: MessageBatchLike): Promise<void> {
 }
 
 class PoisonMessage extends Error {}
+
+/**
+ * `ebda-store-events`: a message is applied once; a transient failure retries with backoff (the
+ * queue's `max_retries`, then the DLQ); an unreadable or unknown-order message is acked (a retry
+ * cannot fix it) after being logged. The DLQ side only logs loudly: the Store never guesses at a
+ * COD answer it could not apply.
+ */
+async function handleStoreEventsBatch(batch: MessageBatchLike): Promise<void> {
+  for (const msg of batch.messages) {
+    if (batch.queue === STORE_EVENTS_DLQ) {
+      logger.error({ id: msg.id }, '[wa-store-events] dead-lettered message (not applied)');
+      msg.ack();
+      continue;
+    }
+    try {
+      await handleStoreEvent(msg.body);
+      msg.ack();
+    } catch (err) {
+      logger.warn({ err, id: msg.id, attempt: msg.attempts }, '[wa-store-events] failed, retrying');
+      msg.retry({ delaySeconds: retryDelaySeconds(msg.attempts) });
+    }
+  }
+}
