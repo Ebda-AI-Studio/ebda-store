@@ -25,28 +25,34 @@ export async function reencryptMfaSecrets(
   const report: ReencryptReport = { scanned: 0, resealed: 0, skipped: 0, failed: 0, remaining: 0 };
   if (!env.MFA_KEY) return report;
   const current = `v2.${await keyId(env.MFA_KEY)}.%`;
-  const rows = await env.DB.prepare(
-    `SELECT id, mfa_secret FROM users WHERE mfa_secret IS NOT NULL AND mfa_secret NOT LIKE ?1 LIMIT ?2`
-  )
-    .bind(current, limit)
-    .all<{ id: string; mfa_secret: string }>();
-  for (const row of rows.results) {
-    report.scanned++;
-    try {
-      if (!(await needsReseal(env, row.mfa_secret))) continue;
-      const next = await sealCurrent(env, await unsealAny(env, row.mfa_secret));
-      const r = await env.DB.prepare(
-        `UPDATE users SET mfa_secret = ?3 WHERE id = ?1 AND mfa_secret = ?2`
-      )
-        .bind(row.id, row.mfa_secret, next)
-        .run();
-      if ((r.meta.changes ?? 0) === 1) report.resealed++;
-      else report.skipped++;
-    } catch (e) {
-      report.failed++;
-      console.error(
-        JSON.stringify({ msg: 'mfa reseal failed', userId: row.id, error: (e as Error).message })
-      );
+  // Paged by id so a row that can never be opened is stepped over (not re-picked forever) and cannot starve the rest.
+  let after = '';
+  while (report.scanned < limit) {
+    const rows = await env.DB.prepare(
+      `SELECT id, mfa_secret FROM users WHERE mfa_secret IS NOT NULL AND mfa_secret NOT LIKE ?1 AND id > ?2 ORDER BY id LIMIT ?3`
+    )
+      .bind(current, after, Math.min(100, limit - report.scanned))
+      .all<{ id: string; mfa_secret: string }>();
+    if (rows.results.length === 0) break;
+    for (const row of rows.results) {
+      after = row.id;
+      report.scanned++;
+      try {
+        if (!(await needsReseal(env, row.mfa_secret))) continue;
+        const next = await sealCurrent(env, await unsealAny(env, row.mfa_secret, row.id), row.id);
+        const r = await env.DB.prepare(
+          `UPDATE users SET mfa_secret = ?3 WHERE id = ?1 AND mfa_secret = ?2`
+        )
+          .bind(row.id, row.mfa_secret, next)
+          .run();
+        if ((r.meta.changes ?? 0) === 1) report.resealed++;
+        else report.skipped++;
+      } catch (e) {
+        report.failed++;
+        console.error(
+          JSON.stringify({ msg: 'mfa reseal failed', userId: row.id, error: (e as Error).message })
+        );
+      }
     }
   }
   const left = await env.DB.prepare(

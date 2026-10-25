@@ -397,9 +397,9 @@ async function requirePassword(c: C, user: UserRow, password: unknown): Promise<
 }
 
 /** Open a sealed TOTP secret with the keyring; a key that is not in it is an operator problem (503), never a 500 or a pass. */
-async function openTotpSecret(c: C, sealed: string): Promise<string> {
+async function openTotpSecret(c: C, sealed: string, userId: string): Promise<string> {
   try {
-    return await unsealAny(c.env, sealed);
+    return await unsealAny(c.env, sealed, userId);
   } catch {
     throw err(503, 'MFA_UNAVAILABLE');
   }
@@ -414,7 +414,7 @@ async function checkTotp(c: C, user: UserRow, code: unknown): Promise<boolean> {
   if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
   if (typeof code !== 'string' || !user.mfa_secret || !c.env.MFA_KEY) return false;
   const step = await verifyTotp(
-    await openTotpSecret(c, user.mfa_secret),
+    await openTotpSecret(c, user.mfa_secret, user.id),
     code,
     Date.now(),
     user.mfa_last_step
@@ -782,7 +782,7 @@ export function createApp() {
     let spentBackup: { old: string; next: string } | null = null;
     if (body.code) {
       const step = await verifyTotp(
-        await openTotpSecret(c, user.mfa_secret),
+        await openTotpSecret(c, user.mfa_secret, user.id),
         body.code,
         Date.now(),
         user.mfa_last_step
@@ -1038,7 +1038,7 @@ export function createApp() {
     await startEnrolment(c, user, sid, body.code);
     const secret = newSecret();
     await c.env.DB.prepare(`UPDATE users SET mfa_secret = ?2 WHERE id = ?1`)
-      .bind(user.id, await sealCurrent(c.env, secret))
+      .bind(user.id, await sealCurrent(c.env, secret, user.id))
       .run();
     return c.json({
       success: true,

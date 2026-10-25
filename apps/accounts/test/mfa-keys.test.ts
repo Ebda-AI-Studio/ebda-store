@@ -8,6 +8,7 @@ import { reencryptMfaSecrets } from '../src/mfa-keys';
 const rndKey = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
 const K1 = env.MFA_KEY as string;
 let K2 = rndKey();
+const U = '00000000-0000-4000-8000-0000000000aa';
 
 beforeEach(() => {
   K2 = rndKey();
@@ -60,17 +61,17 @@ async function loginWithTotp(u: { email: string; password: string }, secret: str
 
 describe('sealed format and keyring', () => {
   it('seals as v2 naming the key; opens with that key; the kid is derived from the key bytes', async () => {
-    const sealed = await seal(K1, 'JBSWY3DPEHPK3PXP');
+    const sealed = await seal(K1, 'JBSWY3DPEHPK3PXP', U);
     expect(sealed.startsWith(`v2.${await keyId(K1)}.`)).toBe(true);
-    expect(await unsealAny({ MFA_KEY: K1 }, sealed)).toBe('JBSWY3DPEHPK3PXP');
+    expect(await unsealAny({ MFA_KEY: K1 }, sealed, U)).toBe('JBSWY3DPEHPK3PXP');
     expect(await keyId(K1)).not.toBe(await keyId(K2));
   });
 
   it('opens with the previous key during a rotation, and refuses a key that is in neither slot', async () => {
-    const sealed = await seal(K1, 'SECRET');
-    expect(await unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, sealed)).toBe('SECRET');
-    await expect(unsealAny({ MFA_KEY: K2 }, sealed)).rejects.toThrow();
-    await expect(unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: rndKey() }, sealed)).rejects.toThrow();
+    const sealed = await seal(K1, 'SECRET', U);
+    expect(await unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, sealed, U)).toBe('SECRET');
+    await expect(unsealAny({ MFA_KEY: K2 }, sealed, U)).rejects.toThrow();
+    await expect(unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: rndKey() }, sealed, U)).rejects.toThrow();
   });
 
   it('still opens legacy v1 secrets (no kid) with the right key from the ring', async () => {
@@ -87,12 +88,12 @@ describe('sealed format and keyring', () => {
         .replaceAll('/', '_')
         .replace(/=+$/, '');
     const v1 = `v1.${b64u(iv)}.${b64u(ct)}`;
-    expect(await unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, v1)).toBe('LEGACY');
+    expect(await unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, v1, U)).toBe('LEGACY');
     expect(await needsReseal({ MFA_KEY: K1 }, v1)).toBe(true); // v1 is always re-sealed as v2
   });
 
   it('encrypts with the CURRENT key only (the previous one never seals)', async () => {
-    const s = await sealCurrent({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, 'X');
+    const s = await sealCurrent({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, 'X', U);
     expect(s.startsWith(`v2.${await keyId(K2)}.`)).toBe(true);
   });
 });
@@ -154,11 +155,11 @@ describe('rotation mid-flight', () => {
 describe('re-encrypt job', () => {
   it('is compare-and-set: a secret that changes while the job runs is never overwritten', async () => {
     const u = await seedUser();
-    const sealedOld = await seal(K1, 'OLDSECRET');
+    const sealedOld = await seal(K1, 'OLDSECRET', u.id);
     await env.DB.prepare(`UPDATE users SET mfa_secret = ?2, mfa_enabled = 1 WHERE id = ?1`)
       .bind(u.id, sealedOld)
       .run();
-    const changed = await seal(K1, 'NEWSECRET'); // the user re-enrolled meanwhile
+    const changed = await seal(K1, 'NEWSECRET', u.id); // the user re-enrolled meanwhile
     // a DB wrapper that changes the row right after the job has READ it
     const db = env.DB;
     const proxy = new Proxy(db, {
@@ -200,7 +201,7 @@ describe('re-encrypt job', () => {
 
   it('is idempotent and a no-op without a current key; a row it cannot open is reported, not destroyed', async () => {
     const u = await seedUser();
-    const bad = await seal(rndKey(), 'FOREIGN'); // sealed with a key we do not hold
+    const bad = await seal(rndKey(), 'FOREIGN', u.id); // sealed with a key we do not hold
     await env.DB.prepare(`UPDATE users SET mfa_secret = ?2, mfa_enabled = 1 WHERE id = ?1`)
       .bind(u.id, bad)
       .run();
@@ -212,5 +213,32 @@ describe('re-encrypt job', () => {
     await env.DB.prepare(`UPDATE users SET mfa_secret = NULL, mfa_enabled = 0 WHERE id = ?1`)
       .bind(u.id)
       .run();
+  });
+
+  it("the sealed secret is bound to its OWNER: copied onto another user's row it does not open", async () => {
+    const a = '00000000-0000-4000-8000-0000000000a1';
+    const b = '00000000-0000-4000-8000-0000000000b2';
+    const sealed = await seal(K1, 'ALICE-SECRET', a);
+    expect(await unsealAny({ MFA_KEY: K1 }, sealed, a)).toBe('ALICE-SECRET');
+    await expect(unsealAny({ MFA_KEY: K1 }, sealed, b)).rejects.toThrow();
+  });
+
+  it('a row that can never be opened does not starve the others (paged by id)', async () => {
+    const stuck = await seedUser();
+    const fine = await seedUser();
+    const [first, second] = [stuck, fine].sort((x, y) => (x.id < y.id ? -1 : 1));
+    await env.DB.prepare(`UPDATE users SET mfa_secret = ?2, mfa_enabled = 1 WHERE id = ?1`)
+      .bind(first.id, await seal(rndKey(), 'FOREIGN', first.id))
+      .run();
+    await env.DB.prepare(`UPDATE users SET mfa_secret = ?2, mfa_enabled = 1 WHERE id = ?1`)
+      .bind(second.id, await seal(K1, 'GOOD', second.id))
+      .run();
+    const rep = await reencryptMfaSecrets({ ...env, MFA_KEY: K2, MFA_KEY_PREV: K1 } as never, 1000);
+    expect(rep.failed).toBeGreaterThanOrEqual(1);
+    expect((await row(second.id))!.mfa_secret!.startsWith(`v2.${await keyId(K2)}.`)).toBe(true);
+    for (const x of [first, second])
+      await env.DB.prepare(`UPDATE users SET mfa_secret = NULL, mfa_enabled = 0 WHERE id = ?1`)
+        .bind(x.id)
+        .run();
   });
 });

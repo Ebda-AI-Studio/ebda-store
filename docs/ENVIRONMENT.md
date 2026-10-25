@@ -288,9 +288,9 @@ Read a backup: `security find-generic-password -a ebda-identity -s <service> -w`
 **Rotate `MFA_KEY` (no downtime, no re-enrolment):** sealed TOTP secrets name their key (`v2.<kid>...`), and the worker holds a keyring: `MFA_KEY` (current, seals everything new) and `MFA_KEY_PREV` (opens old secrets only).
 
 1. Generate a new 32-byte key (`openssl rand -base64 32`), update the Keychain entry.
-2. `wrangler secret put MFA_KEY_PREV --name ebda-accounts` with the OLD key, then `wrangler secret put MFA_KEY --name ebda-accounts` with the NEW one (order matters: set PREV first, so there is no moment a secret cannot be opened).
+2. Set both in ONE deployment: `wrangler secret bulk` with `{ "MFA_KEY_PREV": "<old>", "MFA_KEY": "<new>" }` on stdin (never a file in the repo). If you must use two puts, set `MFA_KEY_PREV` FIRST: the reverse order leaves the ring as `{new}` only and every TOTP user gets 503 until the second put lands.
 3. The hourly job (`scheduled`, cron `23 * * * *`; or `Accounts.reencryptMfa()` over the Service Binding) re-seals every secret on the new key with a per-row compare-and-set. Wait until it reports `remaining: 0` (verify with `SELECT count(*) FROM users WHERE mfa_secret IS NOT NULL AND mfa_secret NOT LIKE 'v2.<new kid>.%'`; the kid is the first 8 hex chars of sha256 of the key bytes).
-4. `wrangler secret delete MFA_KEY_PREV --name ebda-accounts`.
+4. Only when the report shows `remaining: 0` AND `failed: 0`: `wrangler secret delete MFA_KEY_PREV --name ebda-accounts`. Keep the old key in the Keychain until then. Each sealed secret is bound to its owner (AAD `v2|kid|userId`), so a secret copied onto another user's row does not open.
    A secret sealed with a key that is in neither slot answers 503 `MFA_UNAVAILABLE` (never a pass); putting the old key back as `MFA_KEY_PREV` restores service with no data loss.
 
 **Lost both?** Redeploy with new values: tokens signed by the old key stop verifying (everyone signs in again), and TOTP users re-enrol.

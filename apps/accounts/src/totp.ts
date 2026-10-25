@@ -80,21 +80,30 @@ export async function keyId(keyB64: string): Promise<string> {
   return [...d.slice(0, 4)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function seal(keyB64: string, plain: string): Promise<string> {
+/** AAD binds the ciphertext to its key id AND its owner: a sealed secret copied onto another user's row (or another kid) fails to open. */
+const aad = (kid: string, userId: string) => new TextEncoder().encode(`v2|${kid}|${userId}`);
+
+export async function seal(keyB64: string, plain: string, userId: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
+  const kid = await keyId(keyB64);
   const ct = new Uint8Array(
     await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv, additionalData: aad(kid, userId) },
       await aes(keyB64),
       new TextEncoder().encode(plain)
     )
   );
-  return `v2.${await keyId(keyB64)}.${b64urlEncode(iv)}.${b64urlEncode(ct)}`;
+  return `v2.${kid}.${b64urlEncode(iv)}.${b64urlEncode(ct)}`;
 }
 
-async function open(keyB64: string, ivB64: string, ctB64: string): Promise<string> {
+async function open(
+  keyB64: string,
+  ivB64: string,
+  ctB64: string,
+  additionalData?: Uint8Array
+): Promise<string> {
   const pt = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: b64urlDecode(ivB64) },
+    { name: 'AES-GCM', iv: b64urlDecode(ivB64), ...(additionalData ? { additionalData } : {}) },
     await aes(keyB64),
     b64urlDecode(ctB64)
   );
@@ -109,19 +118,20 @@ export interface MfaKeyring {
 const ring = (k: MfaKeyring): string[] =>
   [k.MFA_KEY, k.MFA_KEY_PREV].filter((x): x is string => !!x);
 
-/** Seal with the CURRENT key. */
-export async function sealCurrent(k: MfaKeyring, plain: string): Promise<string> {
+/** Seal with the CURRENT key, bound to the owner. */
+export async function sealCurrent(k: MfaKeyring, plain: string, userId: string): Promise<string> {
   if (!k.MFA_KEY) throw new Error('MFA_KEY is not configured');
-  return seal(k.MFA_KEY, plain);
+  return seal(k.MFA_KEY, plain, userId);
 }
 
-/** Open with whichever key in the ring made it (by kid for v2, by trial for legacy v1). */
-export async function unsealAny(k: MfaKeyring, sealed: string): Promise<string> {
+/** Open with whichever key in the ring made it (by kid for v2, by trial for legacy v1, which has no AAD). */
+export async function unsealAny(k: MfaKeyring, sealed: string, userId: string): Promise<string> {
   const parts = sealed.split('.');
   const keys = ring(k);
   if (parts[0] === 'v2' && parts.length === 4) {
     for (const key of keys) {
-      if ((await keyId(key)) === parts[1]) return open(key, parts[2], parts[3]);
+      if ((await keyId(key)) === parts[1])
+        return open(key, parts[2], parts[3], aad(parts[1], userId));
     }
     throw new Error('sealed secret names a key that is not in the keyring');
   }
@@ -143,11 +153,6 @@ export async function unsealAny(k: MfaKeyring, sealed: string): Promise<string> 
 export async function needsReseal(k: MfaKeyring, sealed: string): Promise<boolean> {
   if (!k.MFA_KEY) return false;
   return !sealed.startsWith(`v2.${await keyId(k.MFA_KEY)}.`);
-}
-
-/** Single-key open (kept for callers and tests that hold one key): v1 or v2 whose kid matches. */
-export async function unseal(keyB64: string, sealed: string): Promise<string> {
-  return unsealAny({ MFA_KEY: keyB64 }, sealed);
 }
 
 /** The code a device would show at `atMs` (exported for tests and the enrolment self-check). */
