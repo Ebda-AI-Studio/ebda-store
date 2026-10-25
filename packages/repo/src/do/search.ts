@@ -14,14 +14,92 @@
 // must not see). Vector (Vectorize) fusion stays a separate stage: this module is the keyword arm.
 import { escapeLike, normalizeArabicSearch, searchTokens } from '../../../shared/src/search';
 import { MoneyError, type SyncSql } from './sync-sql';
+import { indexCustomer, indexGuestOrder } from './search-customers';
+import { VECTOR_STATEMENTS } from './search-vectors';
 
 export const PRODUCT_SEARCH_ID_CAP = 1000;
 export const PRODUCT_SEARCH_MAX_LIMIT = 10_000;
 
-export const SEARCH_DDL = `CREATE VIRTUAL TABLE IF NOT EXISTS product_search_fts USING fts5(
-  doc, name_doc, sku, product_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`;
+/**
+ * Index schema, applied by the StoreDO bootstrap (`ensureSearchIndex`). The TRIGGERS are what make "every write path
+ * keeps the index fresh" true by construction: any INSERT/UPDATE/DELETE on the indexed columns of products, customers
+ * or guest orders (prisma-lite, a raw writer, a bulk import, a migration) marks the row in `search_dirty`, and
+ * `flushSearchIndex` (run at the start of every search and by the write paths that want it eager) re-derives the
+ * TypeScript-folded documents. SQLite cannot fold Arabic itself, so the fold stays in TS, the marking in SQL.
+ */
+export const SEARCH_STATEMENTS: readonly string[] = [
+  ...VECTOR_STATEMENTS,
+  `CREATE VIRTUAL TABLE IF NOT EXISTS product_search_fts USING fts5(
+  doc, name_doc, sku, product_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
+  `CREATE VIRTUAL TABLE IF NOT EXISTS customer_search_fts USING fts5(
+  name_doc, digits, email, kind UNINDEXED, ref_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
+  `CREATE TABLE IF NOT EXISTS search_dirty (kind TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY (kind, id)) WITHOUT ROWID`,
+  `CREATE TRIGGER IF NOT EXISTS search_products_ai AFTER INSERT ON products BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('product', NEW.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_products_au AFTER UPDATE OF name, name_ar, search_terms, description, description_ar, sku, store_id ON products BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('product', NEW.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_products_ad AFTER DELETE ON products BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('product', OLD.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_customers_ai AFTER INSERT ON customers BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('customer', NEW.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_customers_au AFTER UPDATE OF first_name, last_name, phone, email, store_id ON customers BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('customer', NEW.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_customers_ad AFTER DELETE ON customers BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('customer', OLD.id); END`,
+  // guest orders only (customer_id IS NULL): a registered customer's order never enters the customer index
+  `CREATE TRIGGER IF NOT EXISTS search_orders_ai AFTER INSERT ON orders WHEN NEW.customer_id IS NULL BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('order', NEW.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_orders_au AFTER UPDATE OF customer_id, shipping_address, deleted_at, store_id ON orders
+     WHEN OLD.customer_id IS NULL OR NEW.customer_id IS NULL BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('order', NEW.id); END`,
+  `CREATE TRIGGER IF NOT EXISTS search_orders_ad AFTER DELETE ON orders WHEN OLD.customer_id IS NULL BEGIN
+     INSERT OR IGNORE INTO search_dirty (kind, id) VALUES ('order', OLD.id); END`,
+];
+
+/** Idempotent. A first run (no index yet) marks every existing product, customer and guest order dirty: the backfill. */
 export function ensureSearchIndex(db: SyncSql): void {
-  db.run(SEARCH_DDL, []);
+  const fresh =
+    db.all("SELECT 1 AS x FROM sqlite_master WHERE name = 'product_search_fts'", []).length === 0;
+  db.transactionSync(() => {
+    for (const stmt of SEARCH_STATEMENTS) db.run(stmt, []);
+    if (fresh) {
+      db.run(
+        "INSERT OR IGNORE INTO search_dirty (kind, id) SELECT 'product', id FROM products",
+        []
+      );
+      db.run(
+        "INSERT OR IGNORE INTO search_dirty (kind, id) SELECT 'customer', id FROM customers",
+        []
+      );
+      db.run(
+        "INSERT OR IGNORE INTO search_dirty (kind, id) SELECT 'order', id FROM orders WHERE customer_id IS NULL",
+        []
+      );
+    }
+  });
+}
+
+const FLUSH_BATCH = 2000;
+/** Re-derive the documents of every dirty row. Synchronous, one section; returns how many rows it processed. */
+export function flushSearchIndex(db: SyncSql): number {
+  let total = 0;
+  for (;;) {
+    const dirty = db.all('SELECT kind, id FROM search_dirty LIMIT ?', [FLUSH_BATCH]);
+    if (dirty.length === 0) return total;
+    db.transactionSync(() => {
+      for (const d of dirty) {
+        const id = d.id as string;
+        if (d.kind === 'product') {
+          const r = db.all(`SELECT ${PRODUCT_COLS} FROM products WHERE id = ?`, [id])[0];
+          if (r) writeIndexRow(db, r);
+          else removeProductIndex(db, id);
+        } else if (d.kind === 'customer') indexCustomer(db, id);
+        else if (d.kind === 'order') indexGuestOrder(db, id);
+        db.run('DELETE FROM search_dirty WHERE kind = ? AND id = ?', [d.kind, id]);
+      }
+    });
+    total += dirty.length;
+  }
 }
 
 export interface ProductSearchOpts {
@@ -180,6 +258,7 @@ export function searchProductIdSet(
   if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
   const tokens = searchTokens(raw);
   if (tokens.length === 0) return { ids: [], truncated: false };
+  flushSearchIndex(db);
   const limit = clampLimit(opts.limit);
   const storefront = opts.scope === 'storefront';
   const withSku = opts.withSku ?? opts.scope === 'admin';

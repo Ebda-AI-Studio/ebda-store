@@ -373,3 +373,70 @@ describe('refund, loyalty and hold-cap races on a real Durable Object', () => {
     );
   });
 });
+
+describe('search freshness and gold admin on a real Durable Object', () => {
+  const stub = (n: string) =>
+    env.LITE_DO.get(env.LITE_DO.idFromName(`${n}-${Math.random()}`)) as any;
+
+  it('triggers installed by the bootstrap keep product, customer and guest-order search fresh for RAW writes', async () => {
+    const s = stub('fresh');
+    await s.sqlRun(
+      `INSERT INTO products (id, store_id, name, slug, price, status) VALUES ('p', 's1', 'alpha lamp', 'p', 1, 'active')`
+    );
+    expect(await s.search('alpha')).toEqual(['p']);
+    await s.sqlRun(`UPDATE products SET search_terms = 'omegaterm' WHERE id = 'p'`);
+    expect(await s.search('omegaterm')).toEqual(['p']);
+    await s.sqlRun(`DELETE FROM products WHERE id = 'p'`);
+    expect(await s.search('alpha')).toEqual([]);
+    await s.sqlRun(
+      `INSERT INTO customers (id, store_id, first_name, last_name, phone) VALUES ('c', 's1', 'محمد', 'علي', '01012345678')`
+    );
+    expect((await s.customerSearch('محمد')).userIds).toEqual(['c']);
+    expect((await s.customerSearch('+20 101 234 5678')).userIds).toEqual(['c']);
+    await s.sqlRun(
+      `INSERT INTO orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address) VALUES ('g', 's1', 'N1', 0, 0, '{"firstName":"Guesty","phone":"01099999999"}', '{}')`
+    );
+    expect((await s.customerSearch('guesty')).guestOrderIds).toEqual(['g']);
+    expect(await s.searchDrift()).toEqual({ missing: [], orphaned: [], stale: [] });
+  });
+
+  it('gold: pending feed rate reject / confirm, rounding re-price, per-product re-price (atomic on the DO)', async () => {
+    const s = stub('goldadmin');
+    await s.seedGold(5);
+    const unit = (rate: number, step: 1 | 100 | 500 | 1000 = 100) =>
+      computeGoldUnitPrice(
+        {
+          karat: 21,
+          weightMg: 10_000,
+          makingChargeType: 'fixed',
+          makingChargeValue: 50_000,
+          marginBps: 500,
+        },
+        rate,
+        step
+      ).unitPrice;
+    const rejected = (await s.goldApplyFeed(500_000)).pending[0];
+    expect(await s.goldDecide(rejected.id, 'reject')).toEqual({ status: 'rejected', repriced: 0 });
+    expect((await s.goldState()).rate).toBe(300_000);
+    const pending = (await s.goldApplyFeed(520_000)).pending[0];
+    expect(await s.goldDecide(pending.id, 'confirm')).toMatchObject({
+      status: 'applied',
+      repriced: 1,
+    });
+    expect(await s.goldState()).toMatchObject({ rate: 520_000, price: unit(520_000) });
+    expect(await s.goldSettings(1000)).toEqual({ repriced: 1 });
+    expect((await s.goldState()).price).toBe(unit(520_000, 1000));
+    expect(await s.goldSettings(1000)).toEqual({ repriced: 0 });
+    await s.sqlRun(`UPDATE products SET gold_weight_mg = 20000 WHERE id = 'ring'`);
+    expect(await s.goldRepriceProduct('ring')).toBe(1);
+    // a checkout after the admin actions is priced from the new state
+    const r = await s.checkout({
+      lines: [{ productId: 'ring', quantity: 1 }],
+      customerId: 'cust',
+      shippingAddress: {},
+      goldRequireQuote: false,
+    });
+    expect(r.ok).toBe(true);
+    expect((await s.goldOrders())[0].rate).toBe(520_000);
+  });
+});
