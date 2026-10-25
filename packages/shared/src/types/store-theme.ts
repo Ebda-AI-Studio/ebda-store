@@ -21,6 +21,7 @@ import type {
 } from '../looks/types';
 import { getLook } from '../looks/registry';
 import { resolveLookFonts } from '../looks/fonts';
+import { mockCssVars } from '../looks/mock-tokens';
 
 /**
  * Available store templates
@@ -1093,6 +1094,7 @@ export function lookCssVars(
   if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
   if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
   if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];
+  Object.assign(v, mockCssVars(lookId));
   return v;
 }
 
