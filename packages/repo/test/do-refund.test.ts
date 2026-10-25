@@ -198,7 +198,7 @@ describe('cancelOrder', () => {
     expect(r.backorderLinesCancelled).toBe(1);
     expect(
       f.one<{ cancelled_reason: string }>(
-        `SELECT cancelled_reason FROM backorder_lines WHERE id = 'bl'`
+        `SELECT cancelled_reason FROM backorder_lines WHERE store_id = 's1'`
       ).cancelled_reason
     ).toBe('Order refunded');
   });
