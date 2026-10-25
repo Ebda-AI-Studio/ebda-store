@@ -21,7 +21,7 @@ export function couponErrorCopy(code: string | undefined, t: T): string {
     case 'COUPON_NEEDS_CONTACT':
       return t(
         'Add your phone number or email to use this code (one use per customer).',
-        'ضيف رقم موبايلك أو إيميلك علشان تستخدم الكود ده (مرة واحدة لكل عميل).'
+        'ضيف رقم موبايلك أو إيميلك عشان تستخدم الكود ده (مرة واحدة لكل عميل).'
       );
     case 'MIN_ORDER_NOT_MET':
       return t("Your order is below this code's minimum.", 'طلبك أقل من الحد الأدنى للكود ده.');
