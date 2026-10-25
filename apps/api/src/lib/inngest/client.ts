@@ -1,6 +1,9 @@
-import { Inngest, type EventPayload } from 'inngest';
-import { config } from '../../config';
-import { attachJobs } from '../jobs/with-jobs';
+import { dispatchEvents } from '../jobs/dispatch';
+import { registerJob } from '../jobs/registry';
+import type { JobDef, JobEvent, JobHandler, JobOptions } from '../jobs/types';
+
+/** The shape every event below extends (was the Inngest SDK's `EventPayload`). */
+type EventPayload = { name: string; data?: unknown; id?: string; ts?: number };
 
 /**
  * Event registry — every event the API can fan out lives here so
@@ -412,64 +415,27 @@ export type AppEvent =
   | WebhookInventoryLowEvent
   | StoreSelfServeProvisionedEvent;
 
-// Inngest re-registers the function manifest only when it detects a
-// deploy-version change. Without an explicit deploy id, Railway boots
-// look identical across deploys to Inngest's tracker — new functions
-// get accepted as events but no handler runs (BulkAiJob rows stuck
-// 'queued' forever). Map RAILWAY_DEPLOYMENT_ID (auto-set per deploy)
-// to INNGEST_DEPLOY_ID at process start. Fallback chain handles other
-// platforms + local dev gracefully.
-//
-// See ~/.claude/projects/-Users-ahmadsharaf/memory/feedback-inngest-deploy-sync-trap.md
-// for the full trap explanation.
-if (!process.env.INNGEST_DEPLOY_ID) {
-  const detected =
-    process.env.RAILWAY_DEPLOYMENT_ID ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.GIT_COMMIT ||
-    process.env.SOURCE_VERSION;
-  if (detected) {
-    process.env.INNGEST_DEPLOY_ID = detected;
-  }
+/**
+ * The background-job client. `createFunction` registers a handler in the job registry (the
+ * Cloudflare Workflow / Queue runners execute it, lib/jobs); `send` starts every subscriber of an
+ * event (lib/jobs/dispatch.ts). Same call shape the code used when this was the Inngest SDK, so no
+ * call site changed; the SDK, its serve endpoint and its deploy sync are gone.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface JobClient {
+  createFunction(
+    options: JobOptions,
+    handler: (ctx: {
+      event: JobEvent & { data: any };
+      step: import('../jobs/types').JobStep;
+      runId: string;
+      attempt: number;
+    }) => Promise<any> | any
+  ): JobDef;
+  send(payload: JobEvent | JobEvent[]): Promise<{ ids: string[] }>;
 }
 
-// In CI (and any test run), the Inngest dev server is not running.
-// Rather than letting every inngest.send() throw a "fetch failed" network
-// error that spams logs and can cascade into test failures, we substitute a
-// no-op send when in dry-run mode.
-//
-// We always export a real Inngest instance (not a cast-to-any stub) so
-// TypeScript can properly type the createFunction handlers (step, event,
-// etc.). The send method is replaced at runtime when isDryRun is true.
-//
-// Activation: set INNGEST_DRY_RUN=true OR NODE_ENV=test.
-// Production and local dev are never affected (NODE_ENV=production/development,
-// INNGEST_DRY_RUN unset).
-const isDryRun = process.env.INNGEST_DRY_RUN === 'true' || process.env.NODE_ENV === 'test';
-
-export const inngest = new Inngest({
-  id: 'ebda-api',
-  // Inngest's SDK auto-detects dev mode from the absence of an event
-  // key, but on Railway we always have NODE_ENV=production set even
-  // for staging — be explicit so dev mode is never accidentally on
-  // in a deployed environment.
-  isDev: config.nodeEnv !== 'production',
-  eventKey: config.inngestEventKey || undefined,
-  signingKey: config.inngestSigningKey || undefined,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...(isDryRun ? { middleware: [] } : {}),
-});
-
-// Override send() to be a no-op in dry-run mode so CI never hits the
-// Inngest dev server over the network. createFunction() is left intact
-// so that TypeScript has full handler-parameter types (step, event, etc.)
-// — which is why we keep a real Inngest instance rather than cast-to-any.
-if (isDryRun) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (inngest as any).send = async () => ({ ids: [] });
-}
-
-// G5: the job layer (lib/jobs). Registers every function for the Cloudflare runners, routes
-// `send` per rollout group (JOBS_CF_GROUPS) and makes a function that already moved a no-op
-// here. Applied AFTER the dry-run override so CI's no-op send stays the Inngest fallback.
-attachJobs(inngest);
+export const inngest: JobClient = {
+  createFunction: (options, handler) => registerJob(options, handler as unknown as JobHandler),
+  send: payload => dispatchEvents(payload),
+};

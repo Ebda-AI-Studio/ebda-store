@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -132,7 +132,7 @@ export function decideAutoCancelAction(input: {
   return 'cancel';
 }
 
-export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction(
+export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
   {
     id: 'order-auto-cancel-unpaid',
     name: 'Auto-cancel stale unpaid orders (daily cron)',

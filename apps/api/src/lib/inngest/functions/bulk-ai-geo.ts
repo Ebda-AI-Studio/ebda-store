@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -94,7 +94,7 @@ interface GeoErr {
 // bulk-ai-llms-txt — generate /llms.txt content for the store
 // -----------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -344,7 +344,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
     }); // end runInStoreScope
   }
 );
-export const bulkAiLlmsTxt: InngestFunction.Any = bulkAiLlmsTxtFn;
+export const bulkAiLlmsTxt: JobDef = bulkAiLlmsTxtFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-citation-copy — rewrite product descriptions for LLM citation
@@ -646,7 +646,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
     }); // end runInStoreScope
   }
 );
-export const bulkAiCitationCopy: InngestFunction.Any = bulkAiCitationCopyFn;
+export const bulkAiCitationCopy: JobDef = bulkAiCitationCopyFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-brand-facts — generate Store.aboutJson for Organization JSON-LD
@@ -876,4 +876,4 @@ Populate using only the information provided above. For keyCategories, use the c
     }); // end runInStoreScope
   }
 );
-export const bulkAiBrandFacts: InngestFunction.Any = bulkAiBrandFactsFn;
+export const bulkAiBrandFacts: JobDef = bulkAiBrandFactsFn;

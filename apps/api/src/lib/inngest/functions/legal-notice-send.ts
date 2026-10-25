@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import logger from '../../logger';
 import { sendAlert } from '../../../services/alerts.service';
@@ -186,4 +186,4 @@ const legalNoticeSendFn = inngest.createFunction(
     runLegalNoticeSend({ event: event as { data?: SendData }, step: step as unknown as StepLike })
 );
 
-export const legalNoticeSend: InngestFunction.Any = legalNoticeSendFn;
+export const legalNoticeSend: JobDef = legalNoticeSendFn;

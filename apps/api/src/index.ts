@@ -122,69 +122,6 @@ function onListening(): void {
         'Defaults are 30d access + 1y refresh; unset the env var to restore.'
     );
   }
-
-  // Guard: in production the self-PUT below registers whatever origin the
-  // SDK advertises. With serveHost unset it advertises 127.0.0.1 (the PUT's
-  // own Host), which Inngest Cloud can't reach — jobs then sit queued
-  // forever. Warn loudly so this is caught at boot, not via a 7-hour
-  // queue-depth alert.
-  // issue 2064: the global-limiter bypass for Inngest step calls and the
-  // endpoint's own safety both rest on the SDK verifying signatures, which it
-  // only does in cloud mode with a key. With no key in production the bypass
-  // turns itself off (inngestSignatureIsEnforced), but say so loudly.
-  if (config.nodeEnv === 'production' && !config.inngestSigningKey) {
-    logger.error(
-      'INNGEST_SIGNING_KEY is unset in production — the Inngest serve endpoint cannot ' +
-        'verify callers; the global rate-limit bypass for it is disabled'
-    );
-    void sendAlert({
-      level: 'p1',
-      scope: 'platform',
-      source: 'boot.inngest_signing_key_missing',
-      title: 'INNGEST_SIGNING_KEY unset in production',
-      body: 'The Inngest serve endpoint cannot verify request signatures. Set INNGEST_SIGNING_KEY on the API service.',
-    }).catch(() => undefined);
-  }
-
-  if (config.nodeEnv === 'production' && !config.inngestServeHost) {
-    logger.warn(
-      'INNGEST_SERVE_HOST is unset in production — Inngest will register the ' +
-        'localhost origin and enqueued jobs will never run. Set it to the public ' +
-        'API origin, e.g. https://api.ebda.app'
-    );
-  }
-
-  // Self-PUT the Inngest serve endpoint after boot so the new container
-  // registers its functions with Inngest cloud. Without this, after a
-  // Railway redeploy the new container's function definitions stay
-  // unregistered until Inngest cloud happens to ping us — which can take
-  // 30+ min. Verified 2026-05-27: 3 bulk-ai jobs queued for 30 min on
-  // Demo Shop after a redeploy because functions hadn't synced.
-  // With serveHost set (config.inngestServeHost), this PUT still registers
-  // the correct public origin even though it originates from 127.0.0.1.
-  //
-  // Fire-and-forget. If Inngest cloud is unreachable or the SDK rejects,
-  // log + move on — health check still passes, jobs will retry later.
-  setTimeout(() => {
-    fetch(`http://127.0.0.1:${config.port}/api/v1/inngest`, { method: 'PUT' })
-      .then(async res => {
-        const body = await res.text().catch(() => '');
-        if (res.ok) {
-          logger.info({ status: res.status, body: body.slice(0, 200) }, 'Inngest self-register OK');
-        } else {
-          logger.warn(
-            { status: res.status, body: body.slice(0, 200) },
-            'Inngest self-register non-2xx'
-          );
-        }
-      })
-      .catch(err => {
-        logger.warn(
-          { err: err instanceof Error ? err.message : String(err) },
-          'Inngest self-register failed'
-        );
-      });
-  }, 3000);
 }
 
 // Graceful shutdown handler

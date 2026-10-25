@@ -3,7 +3,7 @@ import { setCfBindings, type CfBindings } from './bindings';
 import { StoreScheduleBase, type AlarmEvent, type LogFields } from './store-schedule';
 import { getJob } from '../lib/jobs/registry';
 import { startJob } from '../lib/jobs/start';
-import { dispatchEventsToAll } from '../lib/jobs/dispatch-all';
+import { dispatchEventsToAll } from '../lib/jobs/dispatch';
 import { failedEvent } from '../lib/jobs/failure';
 import logger from '../lib/logger';
 

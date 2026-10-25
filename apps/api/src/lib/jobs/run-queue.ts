@@ -6,7 +6,7 @@
  * message with a delay instead of burning an attempt.
  */
 import logger from '../logger';
-import { dispatchEventsToAll } from './dispatch-all';
+import { dispatchEventsToAll } from './dispatch';
 import { failedEvent, runOnFailure } from './failure';
 import {
   debounceClient,

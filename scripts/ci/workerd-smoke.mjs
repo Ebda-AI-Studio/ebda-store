@@ -130,7 +130,6 @@ async function main() {
       'TAP_API_KEY=k',
       'TAP_SECRET_KEY=s',
       'TAP_WEBHOOK_SECRET=smoke-only-tap-webhook-secret',
-      'INNGEST_EVENT_KEY=smoke',
       // No AI binding in the smoke (stripAiBinding): say so explicitly, so a `true` set in the
       // config's vars cannot fail the boot check here for a reason production does not have.
       'SEARCH_SEMANTIC_ENABLED=false',

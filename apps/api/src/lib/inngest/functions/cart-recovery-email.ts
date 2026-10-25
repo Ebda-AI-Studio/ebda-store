@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -47,4 +47,4 @@ const cartRecoveryEmailFn = inngest.createFunction(
   }
 );
 
-export const cartRecoveryEmail: InngestFunction.Any = cartRecoveryEmailFn;
+export const cartRecoveryEmail: JobDef = cartRecoveryEmailFn;

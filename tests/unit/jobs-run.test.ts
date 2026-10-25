@@ -4,7 +4,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearCfBindings, setCfBindings } from '@api/cf/bindings';
 import { clearJobRegistry, registerJob } from '@api/lib/jobs/registry';
-import { setRawInngestSend } from '@api/lib/jobs/dispatch-all';
 import { runJobWorkflow } from '@api/lib/jobs/run-workflow';
 import {
   handleJobsBatch,
@@ -59,7 +58,6 @@ const gateStub = (id: string) => ({
   touch: async () => 'tok',
 });
 let latest = true;
-const raw = vi.fn(async () => ({ ids: [] }));
 const qsend = vi.fn(async () => undefined);
 
 beforeEach(() => {
@@ -68,10 +66,13 @@ beforeEach(() => {
   now = 0;
   acquireFails = 0;
   latest = true;
-  raw.mockClear();
   qsend.mockClear();
   clearJobRegistry();
-  setRawInngestSend(raw);
+  // The failure path's subscriber: the failed event starts it (a queue message).
+  registerJob(
+    { id: 'alerts-failure-watch', triggers: [{ event: 'inngest/function.failed' }] },
+    async () => undefined
+  );
   setCfBindings({
     HYPERDRIVE: { connectionString: 'x' },
     JOBS_WORKFLOW: { create: async () => ({ id: 'i' }) },
@@ -212,7 +213,7 @@ describe('runJobWorkflow', () => {
     expect(failure.event.name).toBe('inngest/function.failed');
     expect(failure.event.data.event.name).toBe('x/y');
     expect(failure.error.message).toBe('boom');
-    expect(raw).toHaveBeenCalledTimes(1); // the failed event, routed (no subscriber here -> Inngest)
+    expect(qsend).toHaveBeenCalledTimes(1); // the failed event, routed to its subscriber
     expect(calls).toContain('do:on-failure');
     expect(calls[calls.length - 1]).toBe('do:gate-release-0');
   });
@@ -300,7 +301,7 @@ describe('handleJobsBatch', () => {
     expect(last.ack).toHaveBeenCalled();
     expect(last.retry).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(raw).toHaveBeenCalledTimes(1);
+    expect(qsend).toHaveBeenCalledTimes(1);
   });
 
   it('NonRetriableError fails at once', async () => {

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import {
   deleteOneSignalPlayers,
   deletePostHogPerson,
@@ -24,7 +24,7 @@ import { inngest } from '../client';
  * doesn't cancel the PostHog call, matching the fan-out pattern in
  * `order-created.ts`.
  */
-export const accountErasedPropagation: InngestFunction.Any = inngest.createFunction(
+export const accountErasedPropagation: JobDef = inngest.createFunction(
   {
     id: 'account-erased-propagation',
     name: 'Account erased — third-party deletion propagation (OneSignal, PostHog)',

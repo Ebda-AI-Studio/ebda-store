@@ -929,8 +929,8 @@ jobs:
         # allowance, no bypass setting). The API server below runs as ebda_app,
         # exactly as production does — for the
         # SYNCHRONOUS HTTP request/response paths only (#1974). The sibling
-        # "Start API server" step below sets INNGEST_DRY_RUN: 'true', which
-        # no-ops every Inngest function, so async/cron writers under
+        # "Start API server" step below runs in Node, where no background job is started (the
+        # Worker bindings are absent), so async/cron writers under
         # ebda_app (order-auto-cancel-unpaid, payment-abandonment-sweep,
         # stock-reorder-scan, analytics-daily-rollup, audit-log-archive, and
         # the rest) remain entirely unexercised here — see
@@ -968,7 +968,6 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
-          INNGEST_DRY_RUN: 'true'
 
       - name: Assert the API connected as ebda_app, not a bypass role
         # /health is a liveness probe: it answers 200 identically as the `test`
@@ -1018,9 +1017,6 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
-          # Suppress inngest.send() network calls — dev server is not running in CI.
-          # The client.ts no-op path activates when this is 'true' OR NODE_ENV=test.
-          INNGEST_DRY_RUN: 'true'
           # Match the value passed to the seed step above so the login test
           # can authenticate with the seeded super admin.
           ADMIN_PASSWORD: test-admin-password-ci
@@ -1317,8 +1313,6 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
-          # Suppress inngest.send() network calls — dev server is not running in CI.
-          INNGEST_DRY_RUN: 'true'
           WEB_URL: http://localhost:3000
           ADMIN_URL: http://localhost:3001
 

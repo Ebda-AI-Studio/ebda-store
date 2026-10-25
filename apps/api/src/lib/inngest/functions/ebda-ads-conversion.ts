@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { withStore, withUser } from '@ebda/database';
 import { REGION } from '@ebda/shared';
 import logger from '../../logger';
@@ -137,7 +137,7 @@ export async function attemptConversion(
   }
 }
 
-export const ebdaAdsConversion: InngestFunction.Any = inngest.createFunction(
+export const ebdaAdsConversion: JobDef = inngest.createFunction(
   {
     id: 'ebda-ads-conversion',
     name: 'Ebda own ads — Meta Conversions API (registration, store, first paid subscription)',

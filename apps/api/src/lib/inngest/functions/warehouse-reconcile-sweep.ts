@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope, acrossStores } from '@ebda/database';
 import { acrossOpts } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -74,13 +74,6 @@ export interface WarehouseSweepResult {
  *
  * Failures are alerted, not only logged: a store that throws is a P1, and a
  * night with failed SKUs sends an info alert with the counts.
- *
- * INNGEST_DEPLOY_ID note: like every other cron in this registry, this new
- * function is invisible to the Inngest platform until a deploy bumps
- * `INNGEST_DEPLOY_ID` (see the trap explained in `client.ts` and
- * `queue-depth-watch.ts`) — the first deploy that ships this file needs a
- * real deploy (not just a hot-reload) for Inngest to pick up the new
- * cron/on-demand pair.
  */
 export async function sweepAllWarehouseStores(
   step: FanoutStep,
@@ -148,7 +141,7 @@ export async function sweepAllWarehouseStores(
   return result;
 }
 
-export const warehouseReconcileSweepCron: InngestFunction.Any = inngest.createFunction(
+export const warehouseReconcileSweepCron: JobDef = inngest.createFunction(
   {
     id: 'warehouse-reconcile-sweep-cron',
     name: 'Warehouse stock reconcile — daily completeness sweep',
@@ -182,7 +175,7 @@ export async function reconcileOneStoreOnDemand(
   return result;
 }
 
-export const warehouseReconcileOnDemand: InngestFunction.Any = inngest.createFunction(
+export const warehouseReconcileOnDemand: JobDef = inngest.createFunction(
   {
     id: 'warehouse-reconcile-on-demand',
     name: 'Warehouse stock reconcile — on-demand',

@@ -21,11 +21,11 @@ describe('cf-api-deploy.yml auto-deploy', () => {
     expect(wf).toMatch(/concurrency:\n\s+group: ebda-api-production\n\s+cancel-in-progress: false/);
     expect(wf).not.toMatch(/cancel-in-progress: true/);
   });
-  it('keeps the gates: workerd smoke, /health commit verify with rollback, Inngest sync, main only', () => {
+  it('keeps the gates: workerd smoke, /health commit verify with rollback, main only', () => {
     expect(wf).toContain('scripts/ci/workerd-smoke.sh');
     expect(wf).toContain('--probe "https://api.ebda.app/health|200|commit=$GITHUB_SHA"');
     expect(wf).toContain('deploy-guard.mjs verify');
-    expect(wf).toContain('api/v1/inngest');
+    expect(wf).not.toMatch(/inngest/i);
     expect(wf).toContain("github.ref == 'refs/heads/main'");
   });
 });

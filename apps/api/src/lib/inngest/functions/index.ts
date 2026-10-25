@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { orderCreated } from './order-created';
 import { orderRefunded } from './order-refunded';
 import { bulkImportProducts } from './bulk-import';
@@ -87,12 +87,12 @@ import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 
 /**
- * Registry of every Inngest function the API exposes. The serve
- * handler in `apps/api/src/index.ts` mounts this list at
- * `/api/v1/inngest`. Functions added here are picked up by the
- * Inngest platform on the next deploy / dev sync.
+ * Registry of every background function the API runs. Importing a
+ * function file registers it (`createFunction`); the Worker's Workflow, Queue and
+ * Cron runners (lib/jobs) execute them. A new function also needs its entry in
+ * `lib/jobs/jobs-map.ts` (pinned by tests/unit/jobs-map.test.ts).
  */
-const allInngestFunctions: InngestFunction.Any[] = [
+const allInngestFunctions: JobDef[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
@@ -208,9 +208,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // WarehouseStock to the authoritative Product/ProductVariant.inventory
   // aggregate for every store with a warehouse, regardless of which writer
   // last drifted it (the class-fix, not a per-writer hook) + its on-demand
-  // twin for the admin "Reconcile now" button. NOTE: like every new
-  // cron/event here, this is invisible to Inngest until a real deploy bumps
-  // INNGEST_DEPLOY_ID (see client.ts) — a hot-reload alone won't register it.
+  // twin for the admin "Reconcile now" button.
   warehouseReconcileSweepCron,
   warehouseReconcileOnDemand,
   // Answer-Engine Insights (Task 6): weekly citation scan across every
@@ -249,6 +247,6 @@ const allInngestFunctions: InngestFunction.Any[] = [
  * (TCP + TLS to Gmail), dropped from the Ebda API (R-EBDA-001 section 5); Ebda alerts come from
  * Sentry and the status page.
  */
-export const inngestFunctions: InngestFunction.Any[] = isWorkers
+export const inngestFunctions: JobDef[] = isWorkers
   ? allInngestFunctions.filter(f => f !== gmailAlertPoller)
   : allInngestFunctions;

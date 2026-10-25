@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postRefundJournal } from '../../../services/accounting/posting/refund-posting';
@@ -30,7 +30,7 @@ import { featureService } from '../../../services/feature.service';
  * Idempotent — postRefundJournal skips already-reversed entries;
  * postPartialReturnJournal posts one entry set per refundKey.
  */
-export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFunction(
+export const accountingPostRefundJournal: JobDef = inngest.createFunction(
   {
     id: 'accounting-post-refund-journal',
     name: 'Accounting — post journal reversal on refund',

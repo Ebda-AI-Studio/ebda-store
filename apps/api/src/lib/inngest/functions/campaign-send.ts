@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { config } from '../../../config';
 import logger from '../../logger';
@@ -579,4 +579,4 @@ const campaignSendFn = inngest.createFunction(
   }
 );
 
-export const campaignSend: InngestFunction.Any = campaignSendFn;
+export const campaignSend: JobDef = campaignSendFn;

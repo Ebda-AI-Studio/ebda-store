@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
 import { acrossOpts } from '../../jobs/store-scope';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
@@ -49,7 +49,7 @@ const ABANDONED_CART_BATCH_CAP = 10_000;
 const USER_ANONYMIZE_BATCH_CAP = 200;
 const ORDER_ANONYMIZE_BATCH_CAP = 500;
 
-export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
+export const abandonedCartPurge: JobDef = inngest.createFunction(
   {
     id: 'abandoned-cart-purge-weekly',
     name: 'Purge anonymous abandoned carts older than 30 days',
@@ -112,7 +112,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
  * included. Daily, so the table never holds more than ~91 days per store; one small DELETE
  * per store per run.
  */
-export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
+export const searchLogPurge: JobDef = inngest.createFunction(
   {
     id: 'search-log-purge-daily',
     name: `Purge storefront search log rows older than ${SEARCH_LOG_RETENTION_DAYS} days`,
@@ -134,7 +134,7 @@ export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
   }
 );
 
-export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunction(
+export const softDeletedUserAnonymize: JobDef = inngest.createFunction(
   {
     id: 'soft-deleted-user-anonymize-monthly',
     name: 'Anonymize customer users soft-deleted > 12 months ago',
@@ -231,7 +231,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
  * Schedule: monthly, 1st of month 03:30 UTC (offset from the user
  * anonymization at 02:00 + audit-log archive at 03:00 to spread Neon I/O).
  */
-export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunction(
+export const orderAnonymizeAtFiveYears: JobDef = inngest.createFunction(
   {
     id: 'order-anonymize-5y-monthly',
     name: 'Anonymize orders older than 5 years (Egypt MOF retention window)',

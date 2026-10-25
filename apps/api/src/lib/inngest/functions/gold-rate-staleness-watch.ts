@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { withStore } from '@ebda/database';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
@@ -143,7 +143,7 @@ export async function handleGoldRateStalenessWatch(
   }
 }
 
-export const goldRateStalenessWatchCron: InngestFunction.Any = inngest.createFunction(
+export const goldRateStalenessWatchCron: JobDef = inngest.createFunction(
   {
     id: 'gold-rate-staleness-watch',
     name: 'Gold rate — stale-rate alerts (hourly)',

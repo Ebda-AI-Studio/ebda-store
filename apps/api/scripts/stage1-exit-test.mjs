@@ -25,7 +25,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { writeFileSync } from 'node:fs';
-import { createServer, request as httpRequest, Agent } from 'node:http';
+import { request as httpRequest, Agent } from 'node:http';
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -49,16 +49,6 @@ const STATS = process.argv.includes('--stats');
 const STAGGER_MS = Number(arg('stagger-ms', '4'));
 const DB = arg('db', 'ebda_s1');
 const WEBHOOK_SECRET = process.env.TAP_WEBHOOK_SECRET || 'dev-only-tap-webhook-secret';
-
-// The API sends `payment/webhook.received` to Inngest (dev mode: http://localhost:8288). A stand-in
-// that accepts events keeps the run about the Worker, not about a missing external service.
-const inngestMock = createServer((req, res) => {
-  req.resume();
-  res.setHeader('content-type', 'application/json');
-  res.end(JSON.stringify({ ids: [randomUUID()], status: 200 }));
-});
-await new Promise(resolve => inngestMock.listen(8288, '127.0.0.1', resolve)).catch(() => undefined);
-inngestMock.on('error', () => undefined);
 
 const A = { id: '11111111-1111-4111-8111-111111111111', host: 'alpha.ebda.app', tag: 'ALPHA' };
 const B = { id: '22222222-2222-4222-8222-222222222222', host: 'bravo.ebda.app', tag: 'BRAVO' };
@@ -425,5 +415,4 @@ if (report.limiter.rateLimited === 0 || report.limiter.accountLocked === 0) {
 report.pass = !failed;
 if (OUT) writeFileSync(OUT, JSON.stringify(report, null, 2));
 console.log(failed ? 'EXIT TEST FAILED' : 'EXIT TEST PASSED: 0 errors, 0 cross-tenant leaks');
-inngestMock.close();
 process.exit(failed ? 1 : 0);

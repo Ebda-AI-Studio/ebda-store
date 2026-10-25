@@ -1,4 +1,5 @@
-import { NonRetriableError, type InngestFunction } from 'inngest';
+import { NonRetriableError } from '../../jobs/errors';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@ebda/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
@@ -1162,7 +1163,7 @@ export async function handleOrderRefunded(
   }
 }
 
-export const orderRefunded: InngestFunction.Any = inngest.createFunction(
+export const orderRefunded: JobDef = inngest.createFunction(
   {
     id: 'order-refunded-fanout',
     name: 'Order refunded — inventory/coupon/affiliate/loyalty/wallet reversal + email + push + dispatcher fan-out',

@@ -43,15 +43,17 @@ curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_total}s\n" \
 - Neon dashboard → check compute status + connection pool depth
 - If Neon is degraded → check Neon status page (status.neon.tech)
 
-**3. Is Inngest processing jobs?**
+**3. Are background jobs running?**
 
 ```bash
-cd ~/Desktop/projects/ebda-store/apps/api
-railway logs --lines 100 | grep -i inngest
+cd apps/api
+npx wrangler workflows instances list ebda-jobs | head
+npx wrangler queues list | grep ebda-jobs
 ```
 
-- Stuck "queued" jobs older than 5 min → Inngest sync broken (see `feedback-inngest-deploy-sync-trap.md`)
-- Recovery: `curl -X PUT https://api.ebda.app/api/v1/inngest` to force re-sync (since Ruling INNGEST-SYNC-1, `cf-api-deploy.yml` does this after every deploy and fails the job if it is refused)
+- Instances `errored` or stuck `running` → read the instance (`wrangler workflows instances describe ebda-jobs <id>`) and the `inngest/function.failed` alert from `alerts-failure-watch`.
+- A message sitting in `ebda-jobs-dlq` → the job exhausted its attempts; the failure path already alerted.
+- A gate that never frees (`concurrency gate ... not free`) → the `JobGate` lease expires by itself after 20 min.
 
 **4. Is Sentry showing a new error cluster?**
 
@@ -85,7 +87,7 @@ Once you've identified the failure mode:
 | Bad deploy WITH a migration              | Neon branch restore → `prod-<previous-sha>`                                                                                                                                                                                                                                                                                      | `docs/ROLLBACK.md`                            |
 | Worker (web/admin/orders) down           | `wrangler rollback` to the previous version, or rerun the LATEST green `cf-deploy` run (re-running an older run is a deliberate no-op — its commit is already live). After a `wrangler rollback`, redeploy with `gh workflow run cf-deploy.yml` once main is fixed — push-triggered detection cannot see an out-of-band rollback | `docs/ROLLBACK.md`                            |
 | Railway service stuck                    | Railway dashboard → API service → Deployments → previous → "Redeploy"                                                                                                                                                                                                                                                            | `docs/ROLLBACK.md`                            |
-| Inngest functions not firing             | `curl -X PUT $API_URL/api/v1/inngest` to force manifest re-sync                                                                                                                                                                                                                                                                  | `feedback-inngest-deploy-sync-trap.md`        |
+| Background jobs not firing               | `wrangler workflows instances list ebda-jobs`; check the Cron Triggers in `wrangler.jsonc` and the `ebda-jobs` queue depth                                                                                                                                                                                                       | `feedback-inngest-deploy-sync-trap.md`        |
 | Rate-limit false positives               | Bump `publicLimiter` cap temporarily OR add path-specific skip                                                                                                                                                                                                                                                                   | `feedback-status-polling-rate-limiter.md`     |
 | Webhook signatures failing for one store | Re-paste webhook secret from provider portal → admin `/stores/[id]/seo` payment settings                                                                                                                                                                                                                                         | `feedback-payment-listing-bugs-2026-05-12.md` |
 

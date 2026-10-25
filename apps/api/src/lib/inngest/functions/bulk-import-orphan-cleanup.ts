@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, acrossStores } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -30,7 +30,7 @@ import { inngest } from '../client';
  * raising bulk-import-products `retries` to 2. Rejected — would violate
  * the deliberate "no duplicate products on retry" design intent.
  */
-export const bulkImportOrphanCleanup: InngestFunction.Any = inngest.createFunction(
+export const bulkImportOrphanCleanup: JobDef = inngest.createFunction(
   {
     id: 'bulk-import-orphan-cleanup',
     name: 'Mark orphaned bulk-import jobs as failed',

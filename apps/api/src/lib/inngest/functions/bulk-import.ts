@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { BulkService } from '../../../services/bulk.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
@@ -30,7 +30,7 @@ export function shouldInvalidateAfterBulkImport(result: {
  * for 30-90s. The HTTP layer would time out before the import
  * finished, leaving the admin with no idea whether to retry.
  */
-export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
+export const bulkImportProducts: JobDef = inngest.createFunction(
   {
     id: 'bulk-import-products',
     name: 'Bulk import products from CSV',

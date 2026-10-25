@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { withStore, storeDirectory } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -14,7 +14,7 @@ import { REGION } from '@ebda/shared';
  *
  * Runs at 01:30 Cairo (`TZ=` cron), after daily-close.
  */
-export const accountingPeriodReconciliation: InngestFunction.Any = inngest.createFunction(
+export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
   {
     id: 'accounting-period-reconciliation',
     name: 'Accounting period reconciliation',

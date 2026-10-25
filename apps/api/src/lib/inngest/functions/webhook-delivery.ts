@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { acrossStores, prisma, runInTenantContext, storeDirectory } from '@ebda/database';
 import {
   WEBHOOK_CONSECUTIVE_FAILURE_LIMIT,
@@ -116,7 +116,7 @@ export async function runWebhookFanout(
   return { deliveries: ids.length };
 }
 
-export const webhookFanout: InngestFunction.Any = inngest.createFunction(
+export const webhookFanout: JobDef = inngest.createFunction(
   {
     id: 'webhook-fanout',
     name: 'Merchant webhooks - fan out an event',
@@ -165,7 +165,7 @@ async function notifyEndpointDisabled(storeId: string, endpointId: string): Prom
   }
 }
 
-export const webhookDeliver: InngestFunction.Any = inngest.createFunction(
+export const webhookDeliver: JobDef = inngest.createFunction(
   {
     id: 'webhook-deliver',
     // The same delivery request delivered twice must not start two runs that both POST.
@@ -205,7 +205,7 @@ export const webhookDeliver: InngestFunction.Any = inngest.createFunction(
   }
 );
 
-export const webhookDeliveryPurge: InngestFunction.Any = inngest.createFunction(
+export const webhookDeliveryPurge: JobDef = inngest.createFunction(
   {
     id: 'webhook-delivery-purge-daily',
     name: `Purge webhook deliveries older than ${WEBHOOK_LOG_RETENTION_DAYS} days`,
