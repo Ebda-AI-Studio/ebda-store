@@ -1,6 +1,6 @@
 # Ebda Store (ابدأ ستور) — full capability list
 
-> Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). A self-serve online store builder for sellers in Egypt, Arabic-first with English. Not to be confused with any other site named Ebda. Generated from the same source as https://ebda.app/en/features/ and /en/compare/*; short version: https://ebda.app/llms.txt
+> Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app). A self-serve online store builder for sellers in Egypt, Arabic-first with English. Not to be confused with any unrelated site with a similar name. Generated from the same source as https://ebda.app/en/features/ and /en/compare/*; short version: https://ebda.app/llms.txt
 
 Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on every plan. Sign up: https://store.ebda.app/signup
 

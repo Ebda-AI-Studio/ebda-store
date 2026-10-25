@@ -1,0 +1,61 @@
+name: Deploy Ebda accounts (identity) to Cloudflare
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/accounts/**'
+      - 'package-lock.json'
+      - '.github/workflows/cf-accounts-deploy.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ebda-accounts-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+      - name: Require deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - run: npm ci
+      - name: Typecheck and test the identity service (workerd, local D1)
+        run: |
+          npm run typecheck -w apps/accounts
+          npm run test -w apps/accounts
+      - name: Record the version serving production (rollback target)
+        id: previous
+        working-directory: apps/accounts
+        run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-accounts
+      # Migrations are additive and idempotent (d1_migrations ledger); the Worker only ever reads columns that exist
+      # in the CURRENT migration set, so schema goes first.
+      - name: Apply D1 migrations (ebda-identity)
+        working-directory: apps/accounts
+        run: npx wrangler d1 migrations apply ebda-identity --remote
+      - name: Deploy ebda-accounts Worker
+        working-directory: apps/accounts
+        run: npx wrangler deploy
+      - name: Verify the live Worker, roll back automatically if not
+        env:
+          PREVIOUS_VERSION: ${{ steps.previous.outputs.previous }}
+        run: |
+          ip=$(dig +short api.ebda.app | head -1)
+          test -n "$ip" || { echo "::error::could not resolve the ebda.app edge IP"; exit 1; }
+          node scripts/ci/deploy-guard.mjs verify --name ebda-accounts --cwd apps/accounts \
+            --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" --window 120 --resolve-ip "$ip" \
+            --probe "https://accounts.ebda.app/health|200" \
+            --probe "https://accounts.ebda.app/.well-known/jwks.json|200" \
+            --rollback-probe "https://accounts.ebda.app/health|200"

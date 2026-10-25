@@ -18,7 +18,11 @@ declare module 'cloudflare:workers' {
     protected ctx: DurableObjectStateLike;
     protected env: Env;
   }
-  export class WorkerEntrypoint {}
+  export class WorkerEntrypoint<Env = unknown> {
+    constructor(ctx: unknown, env: Env);
+    protected ctx: unknown;
+    protected env: Env;
+  }
   export const env: Record<string, unknown>;
 }
 

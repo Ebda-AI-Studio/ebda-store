@@ -990,7 +990,7 @@ export default function StoreBillingPage() {
 
           <section id="plans" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             {/* InstaPay merchants pick a plan here too: it is paid by transfer and
-                activated when the Ebda team confirms the receipt. */}
+                activated when the Ebda Store team confirms the receipt. */}
             <h2 className="mb-1 text-base font-semibold">{t('subscribeTitle')}</h2>
             <p className="mb-3 text-sm text-muted-foreground">
               {cardPayments && !instapayChosen ? t('subscribeBody') : t('subscribeBodyInstapay')}

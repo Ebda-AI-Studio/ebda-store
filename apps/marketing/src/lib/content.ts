@@ -137,6 +137,9 @@ export interface Copy {
     menu: string;
     switchTo: string;
     switchLabel: string;
+    /** The Products menu (BRAND-ARCH-1): one entry per LIVE product; the others are added when they ship. */
+    products: string;
+    storeBlurb: string;
     contact: string;
   };
   hero: {
@@ -144,8 +147,6 @@ export interface Copy {
     /** Names the product (BRAND.product), then what it gives you. */
     sub: string;
     cta: string;
-    /** Secondary link: jumps to #looks. */
-    secondary: string;
   };
   /** The /credits page (Ruling MKT-12): attribution for the third-party 3D models and the illustrative photos. */
   creditsPage: {
@@ -298,13 +299,14 @@ export const COPY: Record<Locale, Copy> = {
       menu: 'القائمة',
       switchTo: 'English',
       switchLabel: 'Switch to English',
+      products: 'المنتجات',
+      storeBlurb: 'متجرك أونلاين في دقايق',
       contact: 'تواصل معنا',
     },
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
       sub: `${PN.nameAr} بيديك لينك باسمك، ومنتجاتك، وطلباتك. كله من موبايلك.`,
       cta: 'ابدأ دلوقتي',
-      secondary: 'شوف القوالب',
     },
     model3d: {
       title: 'خلّي عميلك يقلّب المنتج بإيده.',
@@ -690,13 +692,14 @@ export const COPY: Record<Locale, Copy> = {
       menu: 'Menu',
       switchTo: 'العربية',
       switchLabel: 'التبديل إلى العربية',
+      products: 'Products',
+      storeBlurb: 'Your online store in minutes',
       contact: 'Contact',
     },
     hero: {
       h1: 'Open your online store in minutes.',
       sub: `${PN.nameEn} gives you your own link, products and orders. All from your phone.`,
       cta: 'Start now',
-      secondary: 'See the templates',
     },
     model3d: {
       title: 'Let shoppers turn it in their hands.',

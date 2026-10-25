@@ -252,7 +252,7 @@ export const translations = {
   'is currently undergoing maintenance. Please check back later.':
     'عليه صيانة دلوقتي. جرّب تاني بعدين.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
-  'Powered by Ebda': `مدعوم من ${BRAND.product.nameAr}`,
+  'Powered by Ebda Store': `مدعوم من ${BRAND.product.nameAr}`,
 
   // Campaign unsubscribe page (/unsubscribe, D2 email campaigns).
   'Email preferences': 'تفضيلات البريد الإلكتروني',

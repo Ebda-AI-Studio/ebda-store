@@ -4,6 +4,6 @@ import { unavailable } from './_unavailable';
 
 export class ImapFlow {
   constructor() {
-    unavailable('imapflow', 'the Gmail alert poller is not part of the Ebda API');
+    unavailable('imapflow', 'the Gmail alert poller is not part of the Ebda Store API');
   }
 }

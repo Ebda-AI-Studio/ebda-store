@@ -167,7 +167,7 @@ export async function createTestDelivery(storeId: string, endpointId: string): P
         eventId,
         type: WEBHOOK_TEST_EVENT,
         storeId,
-        data: { message: 'This is a test event from Ebda.' },
+        data: { message: 'This is a test event from Ebda Store.' },
       }) as unknown as Prisma.InputJsonValue,
     },
     select: { id: true },

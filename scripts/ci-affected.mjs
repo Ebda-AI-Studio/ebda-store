@@ -45,6 +45,7 @@ export const WORKER_APPS = [
   'apps/orders',
   'apps/marketing',
   'apps/status',
+  'apps/accounts',
 ];
 
 /** Changing these affects every workspace. */
@@ -71,6 +72,7 @@ export const BASE_UNIT_PATHS = ['tests/unit'];
 const WORKER_ENTRY = {
   'apps/web': /^apps\/web\/sentry-worker-entry\.ts$/,
   'apps/status': /^apps\/status\/src\//,
+  'apps/accounts': /^apps\/accounts\/src\//,
   'apps/api': /^apps\/api\//,
 };
 const WORKER_CONFIG = dir =>
@@ -185,6 +187,7 @@ export function classify(files, workspaces) {
     unit: [...unit],
     // status runs on workerd, outside the root vitest config (npm run test:status)
     statusTests: all || direct.has('apps/status'),
+    accountsTests: all || direct.has('apps/accounts'),
     workers: ws.filter(w => workerTouched.has(w.dir) && w.hasWrangler).map(w => w.dir.slice(5)),
     changedFiles: codeFiles,
   };
@@ -202,6 +205,7 @@ function formatOutputs(r) {
     typecheck: r.typecheck.join(' '),
     unit: r.unit.join(' '),
     status_tests: String(r.statusTests),
+    accounts_tests: String(r.accountsTests),
     workers: JSON.stringify(r.workers),
     has_workers: String(r.workers.length > 0),
     affected: r.workspaces.join(' '),
