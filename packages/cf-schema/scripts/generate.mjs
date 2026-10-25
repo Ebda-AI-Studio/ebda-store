@@ -749,7 +749,7 @@ function main() {
     const p = path.join(pkg, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, content);
-    if (rel.endsWith('.ts'))
+    if (rel.endsWith('.ts') || rel.endsWith('.json'))
       execFileSync('npx', ['prettier', '--write', p], { cwd: repo, stdio: 'ignore' });
   }
   if (check) {
