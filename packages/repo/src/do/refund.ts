@@ -184,7 +184,12 @@ export function reverseOrderPayment(
        WHERE store_id = ? AND order_id = ? AND type = 'refund_credit' AND substr(idempotency_key, 1, ?) = ?`,
       [a.storeId, a.orderId, RETURN_WALLET_SHARE_KEY_PREFIX.length, RETURN_WALLET_SHARE_KEY_PREFIX]
     )[0].s as number;
-    const remaining = -(spend.amount as number) - returned;
+    const credited = db.all(
+      `SELECT COALESCE(SUM(amount), 0) AS s FROM wallet_transactions
+       WHERE store_id = ? AND order_id = ? AND idempotency_key LIKE 'return-credit:%' AND amount > 0`,
+      [a.storeId, a.orderId]
+    )[0].s as number;
+    const remaining = -(spend.amount as number) - returned - credited;
     if (remaining <= 0) return null;
     const r = applyWalletEntry(db, {
       storeId: a.storeId,
@@ -209,11 +214,12 @@ interface OrderRow {
   total: number;
   coupon_code: string | null;
   refund_reversed_at: number | null;
+  wallet_amount: number | null;
 }
 
 function loadOrder(db: SyncSql, storeId: string, orderId: string): OrderRow {
   const o = db.all(
-    'SELECT id, customer_id, status, payment_status, total, coupon_code, refund_reversed_at FROM orders WHERE id = ?1 AND store_id = ?2 AND deleted_at IS NULL',
+    'SELECT id, customer_id, status, payment_status, total, coupon_code, refund_reversed_at, wallet_amount FROM orders WHERE id = ?1 AND store_id = ?2 AND deleted_at IS NULL',
     [orderId, storeId]
   )[0];
   if (!o) throw new MoneyError('ORDER_NOT_FOUND', 'order not found', 404);
@@ -391,25 +397,7 @@ function reverseWholeOrder(
   )[0];
   if (!stockMarker) {
     const restored = alreadyRestoredByItem(db, storeId, o.id);
-    const neverTaken = new Map<string, number>();
-    for (const bl of db.all(
-      `SELECT order_item_id, qty, stock_taken, qty_fulfilled FROM backorder_lines
-       WHERE store_id = ? AND order_item_id IN (SELECT id FROM order_items WHERE order_id = ?)`,
-      [storeId, o.id]
-    )) {
-      const qty = bl.qty as number;
-      const untaken = Math.max(
-        0,
-        qty -
-          ((bl.stock_taken as number | null) ?? qty) -
-          ((bl.qty_fulfilled as number | null) ?? 0)
-      );
-      if (untaken > 0)
-        neverTaken.set(
-          bl.order_item_id as string,
-          (neverTaken.get(bl.order_item_id as string) ?? 0) + untaken
-        );
-    }
+    const neverTaken = neverTakenByItem(db, storeId, o.id);
     for (const item of loadItems(db, o.id)) {
       const qty = item.quantity - (restored.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0);
       if (qty <= 0) continue;
@@ -505,6 +493,28 @@ export function cancelOrder(
   });
 }
 
+/** Units a backordered line never took from stock (qty - stock_taken - qty_fulfilled): they must never be restocked. */
+function neverTakenByItem(db: SyncSql, storeId: string, orderId: string): Map<string, number> {
+  const neverTaken = new Map<string, number>();
+  for (const bl of db.all(
+    `SELECT order_item_id, qty, stock_taken, qty_fulfilled FROM backorder_lines
+     WHERE store_id = ? AND order_item_id IN (SELECT id FROM order_items WHERE order_id = ?)`,
+    [storeId, orderId]
+  )) {
+    const qty = bl.qty as number;
+    const untaken = Math.max(
+      0,
+      qty - ((bl.stock_taken as number | null) ?? qty) - ((bl.qty_fulfilled as number | null) ?? 0)
+    );
+    if (untaken > 0)
+      neverTaken.set(
+        bl.order_item_id as string,
+        (neverTaken.get(bl.order_item_id as string) ?? 0) + untaken
+      );
+  }
+  return neverTaken;
+}
+
 export interface PartialLine {
   orderItemId: string;
   quantity: number;
@@ -535,7 +545,7 @@ export function refundOrder(
   id(a.storeId, 'storeId');
   id(a.orderId, 'orderId');
   const now = a.now ?? Date.now();
-  const partial = a.lines !== undefined || a.amount !== undefined;
+  const partial = a.lines !== undefined || a.amount !== undefined || a.walletCredit !== undefined;
 
   if (!partial) {
     return db.transactionSync(() => {
@@ -600,7 +610,7 @@ export function refundOrder(
   const amount = a.amount === undefined ? undefined : amountOk(a.amount, 'amount');
   const walletCredit =
     a.walletCredit === undefined ? undefined : amountOk(a.walletCredit, 'walletCredit');
-  if (a.lines === undefined && amount === undefined)
+  if (a.lines === undefined && amount === undefined && walletCredit === undefined)
     throw new MoneyError('BAD_REFUND', 'nothing to refund', 400);
 
   return db.transactionSync(() => {
@@ -621,32 +631,47 @@ export function refundOrder(
     if (o.status === 'pending' || o.status === 'awaiting_payment_confirmation')
       throw new MoneyError('INVALID_TRANSITION', 'an unconfirmed order has nothing to refund', 409);
 
-    // bound every recorded amount (and the store credit) by the order total across all partial events
+    // Bound EVERYTHING credited back for this order, across all partial events and channels, by what was actually paid:
+    // provider/cash amounts recorded on events + store credit already written to the wallet ledger + this call.
+    // (`o.total` is the ceiling for a paid order; an unpaid one has only its wallet share captured.) Same transaction
+    // as the writes below, so two partials racing at the boundary cannot both win.
     const priorAmount = db.all(
       `SELECT COALESCE(SUM(json_extract(metadata, '$.amount')), 0) AS s FROM order_events
        WHERE store_id = ? AND order_id = ? AND to_status IN (?, ?)`,
       [a.storeId, a.orderId, PARTIAL_RESTORE_MARKER, PARTIAL_REFUND_MARKER]
     )[0].s as number;
-    if (amount !== undefined && priorAmount + amount > o.total)
-      throw new MoneyError('REFUND_EXCEEDS_ORDER', 'refunds would exceed the order total', 409);
-    if (walletCredit !== undefined && walletCredit > o.total)
+    const priorCredit = db.all(
+      `SELECT COALESCE(SUM(amount), 0) AS s FROM wallet_transactions
+       WHERE store_id = ? AND order_id = ? AND idempotency_key LIKE 'return-credit:%' AND amount > 0`,
+      [a.storeId, a.orderId]
+    )[0].s as number;
+    const captured =
+      o.payment_status === 'paid' || o.payment_status === 'disputed'
+        ? o.total
+        : (o.wallet_amount ?? 0);
+    if (priorAmount + priorCredit + (amount ?? 0) + (walletCredit ?? 0) > captured)
       throw new MoneyError(
         'REFUND_EXCEEDS_ORDER',
-        'store credit would exceed the order total',
-        409
+        'refunds and store credit would exceed what the customer paid',
+        409,
+        { captured, prior: priorAmount + priorCredit }
       );
 
     const restored: Array<{ orderItemId: string; quantity: number }> = [];
     if (a.lines !== undefined) {
       const items = new Map(loadItems(db, o.id).map(i => [i.id, i]));
       const already = alreadyRestoredByItem(db, a.storeId, o.id);
+      const neverTaken = neverTakenByItem(db, a.storeId, o.id);
       // validate every line before moving any stock (the unit is atomic anyway, this gives the clearer error)
       for (const l of a.lines)
         if (!items.has(l.orderItemId))
           throw new MoneyError('UNKNOWN_LINE', 'a listed line does not belong to this order', 400);
       for (const l of a.lines) {
         const item = items.get(l.orderItemId)!;
-        const qty = Math.min(l.quantity, item.quantity - (already.get(item.id) ?? 0));
+        const qty = Math.min(
+          l.quantity,
+          item.quantity - (already.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0)
+        );
         if (qty <= 0) continue;
         if (restoreLine(db, a.storeId, item, qty, key, 'Return completed — partial restore') > 0)
           out.restocked.push({
@@ -678,7 +703,12 @@ export function refundOrder(
       o.id,
       null,
       marker,
-      { refundKey: key, items: restored, ...(amount !== undefined ? { amount } : {}) },
+      {
+        refundKey: key,
+        items: restored,
+        ...(amount !== undefined ? { amount } : {}),
+        ...(walletCredit !== undefined ? { walletCredit } : {}),
+      },
       now
     );
     return out;
