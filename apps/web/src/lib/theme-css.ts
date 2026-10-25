@@ -83,6 +83,9 @@ export const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
   '--image-ratio': /^\d+ \/ \d+$/,
   '--motion-duration': /^\d+ms$/,
   '--look-hero-aspect': /^\d+(?:\.\d+)? \/ \d+(?:\.\d+)?$/,
+  '--bottom-tab-h': /^\d+px$/,
+  '--look-tab-pad': /^\d+(?:\.\d+)?rem$/,
+  '--look-tab-icon': /^\d+(?:\.\d+)?rem$/,
   '--look-hero-maxh': /^(?:none|\d+vh)$/,
 };
 

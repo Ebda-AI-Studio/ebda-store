@@ -884,13 +884,12 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
           description: spec.description,
           descriptionAr: spec.descriptionAr,
           returnWindowDays: 14,
-          // "Demo store" is said once, by the demo bar above it (DemoLookBar); this line only
-          // labels the photos (Task 9 review).
-          announcementBar: {
-            enabled: true,
-            text: spec.announcement?.text ?? 'Illustrative photos',
-            textAr: spec.announcement?.textAr ?? 'الصور توضيحية',
-          },
+          // "Demo store" is said once, by the demo bar above it (DemoLookBar). The "illustrative photos"
+          // notice is a footer line, not a 41 px strip above the header (template-match PR3, G3). Only a
+          // showroom whose announcement is real merchant copy (Lamma's delivery time, Ruling B4-12) keeps a bar.
+          announcementBar: spec.announcement
+            ? { enabled: true, text: spec.announcement.text, textAr: spec.announcement.textAr }
+            : { enabled: false, text: '', textAr: '' },
           settings: {
             ...((store?.settings && typeof store.settings === 'object' && store.settings) || {}),
             currency: 'EGP',
@@ -902,6 +901,17 @@ export async function seedCatalogue(prisma, Prisma, storeId, base, spec = TEMPLA
             ...(spec.instalments ? { instalments: spec.instalments } : {}),
             // Ruling B4-7: minimum order, delivery calendar and date chips (Lamma only).
             ...(spec.storeSettings ?? {}),
+            // The photo notice lives in the footer's bottom bar (display-helpers copyrightOverride).
+            footerLinks: {
+              ...((store?.settings?.footerLinks && typeof store.settings.footerLinks === 'object'
+                ? store.settings.footerLinks
+                : {}) ?? {}),
+              bottomBar: {
+                enabled: true,
+                copyrightOverride: 'Illustrative photos · demo store',
+                copyrightOverrideAr: 'الصور توضيحية · متجر تجريبي',
+              },
+            },
           },
         },
       });
