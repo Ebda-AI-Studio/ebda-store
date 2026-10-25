@@ -22,6 +22,7 @@ import {
   REFUND_STATUS_BY_ID_KEY,
   appendRefundEventId,
   correlateSettleNotice,
+  executedClaimForRefundId,
   isRefundEventAlreadySeen,
   readAccountedRefundEventIds,
   recordRefundStatus,
@@ -963,18 +964,6 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   const { db, input, p, o, now, alerts, postCommit, finish } = c;
   const r = input.refund;
   if (!r) throw err('BAD_WEBHOOK', 'a refund event carries a refund', 400);
-  const meta = parse(p.metadata);
-  const prevStatus = (meta.refundStatus as string | undefined) ?? 'pending';
-  if (
-    isRefundEventAlreadySeen({
-      metadata: meta,
-      refundId: r.refundId,
-      status: r.status,
-      previousPaymentStatus: prevStatus,
-    })
-  )
-    return finish('ignored', 'refund event matches stored status');
-
   const events = db
     .all(
       'SELECT event_type, created_at, details FROM payment_events WHERE payment_id = ? AND event_type IN (' +
@@ -987,6 +976,43 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       createdAt: e.created_at as number,
       details: parse(e.details),
     }));
+  const consumeByOwnId = () => {
+    const cid = executedClaimForRefundId({
+      events,
+      refundId: r.refundId,
+      executedEvent: REFUND_EXECUTED_EVENT,
+      closingEvents: [
+        REFUND_RELEASED_EVENT,
+        REFUND_INDETERMINATE_EVENT,
+        REFUND_RECONCILED_EVENT,
+        REFUND_ABSORBED_EVENT,
+      ],
+    });
+    if (cid)
+      addPaymentEvent(db, {
+        storeId: input.storeId,
+        paymentId: p.id,
+        orderId: p.order_id,
+        eventType: REFUND_ABSORBED_EVENT,
+        provider: input.provider,
+        details: { claimId: cid, refundId: r.refundId, via: 'id_match' },
+        now,
+      });
+  };
+  const meta = parse(p.metadata);
+  const prevStatus = (meta.refundStatus as string | undefined) ?? 'pending';
+  if (
+    isRefundEventAlreadySeen({
+      metadata: meta,
+      refundId: r.refundId,
+      status: r.status,
+      previousPaymentStatus: prevStatus,
+    })
+  ) {
+    if (r.status === 'completed') consumeByOwnId();
+    return finish('ignored', 'refund event matches stored status');
+  }
+
   const completed = r.status === 'completed';
   // only a COMPLETED refund can be reconciled with (and consume) a claim
   const inFlightClaims = completed
@@ -1074,6 +1100,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       });
     }
   }
+  if (completed && !s.absorbedClaimId) consumeByOwnId();
   if (s.absorbedClaimId && completed) {
     // CONSUME the claim in this same section: no second webhook can match it
     addPaymentEvent(db, {

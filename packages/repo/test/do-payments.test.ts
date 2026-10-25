@@ -789,6 +789,47 @@ describe('settlement rules (mirror of the Postgres settleRefund)', () => {
     expect(f.one('SELECT refunded_amount a FROM payments').a).toBe(1000);
   });
 
+  it('Kashier: AGE never closes the hold - an unknown id 2 days later with an unconsumed executed claim is held + P1, not booked', async () => {
+    const f = fx();
+    const p = await f.paid(6, 'kashier');
+    const c = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 1000, now: NOW });
+    completeRefund(f.db, { storeId: 's1', claimId: c.claimId, refundId: 'API-ID', now: NOW });
+    const confirm = async () => ({ kind: 'refund' as const, status: 'SUCCESS' as const });
+    const late = await applyPaymentEvent(
+      f.db,
+      refundEv(p.ref, 'LATE-ID', 1000, { provider: 'kashier', now: NOW + 2 * 86_400_000 }),
+      { confirm }
+    );
+    expect(late.alerts.map(a => a.kind)).toEqual(['held_open_claim_id_unverified']);
+    expect(f.one('SELECT refunded_amount a FROM payments').a).toBe(1000);
+  });
+
+  it("Kashier: the refund's OWN webhook (the API id) closes the claim; afterwards an unknown id is a genuine refund and is booked", async () => {
+    const f = fx();
+    const p = await f.paid(6, 'kashier');
+    const c = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 1000, now: NOW });
+    completeRefund(f.db, { storeId: 's1', claimId: c.claimId, refundId: 'API-ID', now: NOW });
+    const confirm = async () => ({ kind: 'refund' as const, status: 'SUCCESS' as const });
+    await applyPaymentEvent(
+      f.db,
+      refundEv(p.ref, 'API-ID', 1000, { provider: 'kashier', now: NOW + 5000 }),
+      { confirm }
+    );
+    expect(
+      f.one(`SELECT count(*) n FROM payment_events WHERE event_type = 'refund_webhook_absorbed'`).n
+    ).toBe(1);
+    const later = await applyPaymentEvent(
+      f.db,
+      {
+        ...refundEv(p.ref, 'DASH', 700, { provider: 'kashier', now: NOW + 2 * 86_400_000 }),
+        eventId: 'rw-dash',
+      },
+      { confirm }
+    );
+    expect(later.alerts).toEqual([]);
+    expect(f.one('SELECT refunded_amount a FROM payments').a).toBe(1700);
+  });
+
   it('Kashier with NO open own claim: an unknown id is a genuine dashboard refund and is booked', async () => {
     const f = fx();
     const p = await f.paid(6, 'kashier');
