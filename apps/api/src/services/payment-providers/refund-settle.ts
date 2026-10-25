@@ -13,7 +13,7 @@
  *   - the unique index `payment_events_claim_single_outcome_key` makes "one claim, one of absorbed/released" a database fact.
  * The callers keep their own effects (order reversal, booking, alerts) and pass their payment-row patch to `commit`.
  */
-import { prisma, Prisma } from '@ebda/database';
+import { hasTenantContext, prisma, Prisma, runInTenantContext } from '@ebda/database';
 import {
   correlateSettleNotice,
   isRefundEventAlreadySeen,
@@ -51,6 +51,16 @@ const FAWRY_CLOSING = [
   REFUND_RECONCILED_EVENT,
   REFUND_ABSORBED_EVENT,
 ];
+
+/**
+ * Run `fn` inside ONE transaction that the settle functions can lock in: join the ambient tenant transaction (the lock then
+ * lives until the caller's transaction ends), else open one. Nested `runInTenantContext` would be a SEPARATE connection
+ * (Prisma has no nested interactive transactions) and would wait on locks the outer transaction already holds, so it is
+ * never opened when one exists.
+ */
+export function inSettlementTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  return hasTenantContext() ? fn() : runInTenantContext(storeId, fn);
+}
 
 export interface FreshPayment {
   id: string;
@@ -171,11 +181,14 @@ export async function settleRefundEvent(input: SettleEventInput): Promise<Settle
         closingEvents: FAWRY_CLOSING,
       }).length > 0,
   });
+  // only a COMPLETED refund is accounted: a pending / failed notice must not file its id (that would make the real, later
+  // completed refund look already counted, and it would never be added)
+  const decided = completed ? decision : { ...decision, accountedThisEvent: false };
   let committed = false;
   return {
     payment,
     seen: false,
-    decision,
+    decision: decided,
     async commit(patch) {
       if (committed) throw new Error('settleRefund: commit called twice');
       committed = true;

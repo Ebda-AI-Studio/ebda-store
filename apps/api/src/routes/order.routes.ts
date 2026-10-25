@@ -43,7 +43,11 @@ import { prisma } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
-import { settleRefundEvent, matchRefundToClaim } from '../services/payment-providers/refund-settle';
+import {
+  settleRefundEvent,
+  matchRefundToClaim,
+  inSettlementTx,
+} from '../services/payment-providers/refund-settle';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { InstapayService } from '../services/payment-providers/instapay.service';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
@@ -1566,49 +1570,15 @@ router.post(
       const prevStatus = (prevMeta.refundStatus as string | undefined) || 'pending';
       const statusChanged = prevStatus !== status.status;
 
-      // Update Payment.metadata with the fresh status. If the provider
-      // says the refund completed and our Payment row isn't marked
-      // refunded yet (out-of-band path), promote it now.
-      let settleRes: Awaited<ReturnType<typeof settleRefundEvent>> | null = null;
-      const updateData: Record<string, unknown> = {
-        metadata: {
-          ...prevMeta,
-          refundStatus: status.status,
-          refundReference: status.refundReference ?? prevMeta.refundReference,
-          refundStatusCheckedAt: new Date().toISOString(),
-        },
-      };
-      // `partially_refunded` is admitted (#1432/#1472): excluding it locked a
-      // payment out of this route forever once any partial refund landed, so
-      // the balance refunded later in the provider portal was never recorded
-      // and the whole-order reversal never ran. resolveRefundSettlement never
-      // lowers the total and refuses to re-count an already-accounted refund
-      // id, so re-entering is safe.
-      if (status.status === 'completed' && payment.status !== 'refunded') {
-        // Derive the terminal status from the arithmetic, do not assert it.
-        // `refundedAmount` is the cumulative budget PaymentService.refund
-        // compare-and-swaps against, and `status` decides whether ReturnService
-        // will accept the payment as a refund source at all. A PARTIAL
-        // out-of-band refund reported here would otherwise be written as a full
-        // one: the payment is marked settled while money remains refundable, so
-        // every later partial return is rejected for having no refundable
-        // payment. The guard above only skips rows already fully refunded.
-        //
-        // A missing, non-finite or non-positive provider amount is NOT
-        // evidence of a partial refund — a status payload that carries no
-        // amount would otherwise be recorded as a 0-piastre partial refund while
-        // the gateway has already sent the WHOLE sum back: the order keeps its
-        // pre-refund status, no reversal or GL entry runs, and the payment
-        // still reads as refundable so a later return fires a second real
-        // gateway refund. Same rule as the sibling webhook path in
-        // payment.factory.ts — only an amount the provider actually REPORTED,
-        // and that falls short of the total, downgrades to partial; unknown
-        // means FULL.
-        // Shared with the refund-webhook branch — see resolveRefundSettlement.
-        // ONE function settles it under the payment lock (shared with the webhook and the claim release): see
-        // refund-settle.ts. This route raised the total but recorded nothing, so the refund it counted could be counted a
-        // SECOND time by the webhook for the same refund; the ledger is maintained by the same code on every path.
-        settleRes = await settleRefundEvent({
+      // Update Payment.metadata with the fresh status. If the provider says the refund completed and our Payment row isn't
+      // marked refunded yet (out-of-band path), promote it now.
+      //
+      // The whole read-decide-write runs in ONE transaction that holds the payment row lock (`inSettlementTx` joins the
+      // ambient tenant transaction or opens one): every patch below is built from the LOCKED copy, never from the row read
+      // before the lock, so a concurrent webhook cannot interleave and have its metadata overwritten by a stale spread.
+      const updateData: Record<string, unknown> = {};
+      await inSettlementTx(storeId, async () => {
+        const settleRes = await settleRefundEvent({
           paymentId: payment.id,
           storeId,
           orderId,
@@ -1619,31 +1589,59 @@ router.post(
             amount: status.refundedAmount ?? status.amount ?? null,
           },
         });
-        const decision = settleRes.decision;
-        const settledTotal = decision?.settledTotal ?? settleRes.payment.refundedAmount;
-        const refundIsFullRefund =
-          decision?.isFullRefund ?? settleRes.payment.status === 'refunded';
-        const accountedThisEvent = decision?.accountedThisEvent ?? false;
-        updateData.status = refundIsFullRefund ? 'refunded' : 'partially_refunded';
-        updateData.refundedAmount = settledTotal;
-        if (accountedThisEvent) {
-          updateData.metadata = {
-            ...(updateData.metadata as Record<string, unknown>),
-            [REFUND_EVENT_IDS_KEY]: appendRefundEventId(payment.metadata, status.refundId),
-            [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
-              payment.metadata,
-              status.refundId,
-              status.status
-            ),
-          };
+        const locked = settleRes.payment;
+        updateData.metadata = {
+          ...locked.metadata,
+          refundStatus: status.status,
+          refundReference: status.refundReference ?? locked.metadata.refundReference,
+          refundStatusCheckedAt: new Date().toISOString(),
+        };
+        // `partially_refunded` is admitted (#1432/#1472): excluding it locked a payment out of this route forever once any
+        // partial refund landed. The settlement rule never lowers the total and refuses to re-count an accounted id.
+        if (
+          !settleRes.seen &&
+          settleRes.decision &&
+          status.status === 'completed' &&
+          locked.status !== 'refunded'
+        ) {
+          // Derive the terminal status from the arithmetic, do not assert it.
+          // `refundedAmount` is the cumulative budget PaymentService.refund
+          // compare-and-swaps against, and `status` decides whether ReturnService
+          // will accept the payment as a refund source at all. A PARTIAL
+          // out-of-band refund reported here would otherwise be written as a full
+          // one: the payment is marked settled while money remains refundable, so
+          // every later partial return is rejected for having no refundable
+          // payment. The guard above only skips rows already fully refunded.
+          //
+          // A missing, non-finite or non-positive provider amount is NOT
+          // evidence of a partial refund — a status payload that carries no
+          // amount would otherwise be recorded as a 0-piastre partial refund while
+          // the gateway has already sent the WHOLE sum back: the order keeps its
+          // pre-refund status, no reversal or GL entry runs, and the payment
+          // still reads as refundable so a later return fires a second real
+          // gateway refund. Same rule as the sibling webhook path in
+          // payment.factory.ts — only an amount the provider actually REPORTED,
+          // and that falls short of the total, downgrades to partial; unknown
+          // means FULL.
+          // Shared with the refund-webhook branch — see resolveRefundSettlement.
+          const d = settleRes.decision;
+          updateData.status = d.isFullRefund ? 'refunded' : 'partially_refunded';
+          updateData.refundedAmount = d.settledTotal;
+          if (d.accountedThisEvent) {
+            updateData.metadata = {
+              ...(updateData.metadata as Record<string, unknown>),
+              [REFUND_EVENT_IDS_KEY]: appendRefundEventId(locked.metadata, status.refundId),
+              [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
+                locked.metadata,
+                status.refundId,
+                status.status
+              ),
+            };
+          }
         }
-      }
-      if (settleRes && !settleRes.seen) await settleRes.commit({ data: updateData });
-      else
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: updateData,
-        });
+        if (!settleRes.seen) await settleRes.commit({ data: updateData });
+        else await prisma.payment.update({ where: { id: payment.id }, data: updateData });
+      });
 
       // Append-only audit row. Records the refund-status refresh — fromStatus
       // is the pre-update payment status; toStatus is what we just wrote (or

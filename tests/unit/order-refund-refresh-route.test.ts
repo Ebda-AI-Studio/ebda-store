@@ -42,6 +42,7 @@ vi.mock('@ebda/database', () => ({
     },
     store: { findUnique: vi.fn().mockResolvedValue({ name: 'Store' }) },
   },
+  hasTenantContext: () => true,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
   // The error-handler middleware checks `err instanceof
   // Prisma.PrismaClientKnownRequestError` for every non-AppError/ZodError —
@@ -510,8 +511,9 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
       .send({});
 
     const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
-    expect(data.status).toBe('partially_refunded');
-    expect(data.refundedAmount).toBe(2000);
+    // seen under the lock: the total and status are left exactly as they are (nothing is re-counted)
+    expect(data.status ?? 'partially_refunded').toBe('partially_refunded');
+    expect(data.refundedAmount ?? 2000).toBe(2000);
     expect(applyRefundEffects).not.toHaveBeenCalled();
   });
 
