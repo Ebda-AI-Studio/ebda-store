@@ -266,6 +266,8 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 | `ACCOUNTS`                  | `ebda-api` Service Binding           | `ebda-accounts` (entrypoint `Accounts`): JWKS over fetch, `isRevoked` / `getAccountState` / `setStatus` / `setRole` / `eraseUser` / `exportUser` / `createUser` over RPC. The API refuses sign-in-dependent work (503) when it is missing. |
 | `STORE_DIRECTORY`, `MAILER` | `ebda-accounts` Service Bindings     | `ebda-api` entrypoints (`StoreDirectory`, `IdentityMailer`): the stores a user may act on, and the Store's platform mailer for the one-time codes.                                                                                         |
 
+- **Allowed browser origins** (`ALLOWED_ORIGINS`, exact match, https, no wildcard): `store.ebda.app`, `orders.ebda.app`, `wa.ebda.app` (Ebda WhatsApp, product audience `whatsapp`). `PASSKEY_ORIGINS` stays the Store hosts only.
+
 ### Platform administrators (Ruling ID-15)
 
 - **Create or promote one (you run it, you type the password):** `cd apps/accounts && CLOUDFLARE_ACCOUNT_ID=69188202efc4df480140dd76545aa3ab node scripts/upsert-super-admin.mjs --email=you@example.com --remote` shows the plan (dry run is the default and writes nothing); add `--apply` to be asked for the password twice at a hidden prompt (14+ characters, all four classes). The script refuses a `--password` argument and refuses to run `--apply` without a terminal, so the password never passes through an agent, a pipe or shell history. Only a bcrypt hash is written, through a 0600 temp file that is deleted afterwards. Idempotent: running it again re-sets the password and ends the account's sessions.

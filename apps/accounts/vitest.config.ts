@@ -31,7 +31,7 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             JWT_PRIVATE_JWK: JSON.stringify(jwk),
             MFA_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
-            ALLOWED_ORIGINS: 'https://store.ebda.app,https://orders.ebda.app',
+            ALLOWED_ORIGINS: 'https://store.ebda.app,https://orders.ebda.app,https://wa.ebda.app',
           },
         },
       }),
