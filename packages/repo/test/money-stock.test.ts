@@ -268,7 +268,14 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
     const { raw, db, base } = fixture();
     coupon(raw, 'zero', ', usage_limit, usage_limit_per_user', ', 0, 0');
     for (let i = 0; i < 3; i++)
-      placeOrder(db, base({ couponCode: 'ZERO', shippingAddress: { phone: '01012345678' } }));
+      placeOrder(
+        db,
+        base({
+          couponCode: 'ZERO',
+          holdCaps: { manual: 99 },
+          shippingAddress: { phone: '01012345678' },
+        })
+      );
   });
 
   it('targeting: product scope, customer group, first-order-only and min quantity are enforced; the discount base is the matching subtotal', () => {
@@ -418,5 +425,46 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
       (raw.prepare(`SELECT balance n FROM customer_wallets WHERE id = 'w1'`).get() as { n: number })
         .n
     ).toBe(500);
+  });
+
+  it('the hold cap is decided from the FINAL payment state: a token wallet amount does not exempt, a full wallet payment does, an omitted method is capped strictly', () => {
+    const { raw, db, base } = fixture();
+    raw.exec(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);
+    raw.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+    );
+    raw.exec(
+      `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 100000)`
+    );
+    const phone = { phone: '01012345678' };
+    placeOrder(db, base({ paymentMethod: 'cod', shippingAddress: phone }));
+    placeOrder(db, base({ paymentMethod: 'cod', shippingAddress: phone }));
+    // 1 EGP (100 piastres) from the wallet + COD remainder is still capped
+    const e = err(() =>
+      placeOrder(
+        db,
+        base({
+          paymentMethod: 'cod',
+          customerId: 'cust',
+          walletAmount: 100,
+          shippingAddress: phone,
+        })
+      )
+    );
+    expect(e.code).toBe('TOO_MANY_OPEN_ORDERS');
+    expect(
+      (raw.prepare(`SELECT balance n FROM customer_wallets WHERE id = 'w1'`).get() as { n: number })
+        .n
+    ).toBe(100000); // the refused order took nothing
+    // the method omitted: the strict (cod) cap applies
+    expect(err(() => placeOrder(db, base({ shippingAddress: phone }))).code).toBe(
+      'TOO_MANY_OPEN_ORDERS'
+    );
+    // a wallet that pays IN FULL is exempt (nothing is held unpaid)
+    const full = placeOrder(
+      db,
+      base({ paymentMethod: 'cod', customerId: 'cust', walletAmount: 1500, shippingAddress: phone })
+    );
+    expect(full).toMatchObject({ paymentStatus: 'paid', walletAmount: 1500 });
   });
 });
