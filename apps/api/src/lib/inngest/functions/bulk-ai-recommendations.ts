@@ -244,16 +244,18 @@ const bulkAiRecommendationsFn = inngest.createFunction(
         // at the last completion left a sibling sweep writing content and
         // invalidating nothing.
         await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: {
-            status: 'completed',
-            completedAt: new Date(),
-            processed: catalogIndex.length,
-            filled: 0,
-            skipped: catalogIndex.length,
-            failed: 0,
-          },
+        await step.run('finalize-small', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: {
+              status: 'completed',
+              completedAt: new Date(),
+              processed: catalogIndex.length,
+              filled: 0,
+              skipped: catalogIndex.length,
+              failed: 0,
+            },
+          });
         });
         logger.info({ jobId, storeId }, 'bulk-ai-recommendations: catalog too small, skipped');
         return;
@@ -522,10 +524,6 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
 
       // Only mark completed if the merchant didn't cancel — otherwise the
       // status row already says 'cancelled' from the cancel endpoint.
-      const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
 
       // A bulk AI sweep rewrites product-facing content (titles, descriptions,
       // SEO, translations, tags, categories, image alt, FAQs) with raw Prisma
@@ -535,17 +533,24 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const finalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed,
+            filled,
+            skipped,
+            failed,
+            errors: errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
