@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
+  products: vi.fn(),
   cart: vi.fn(),
   linkRow: vi.fn(),
   planInput: vi.fn(),
@@ -13,7 +14,11 @@ const h = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
-  prisma: { order: { findUnique: h.order }, abandonedCart: { findFirst: h.cart } },
+  prisma: {
+    order: { findUnique: h.order },
+    abandonedCart: { findFirst: h.cart },
+    product: { findMany: h.products },
+  },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked, hasWhatsAppLinkRow: h.linkRow }));
@@ -422,5 +427,63 @@ describe('account/erased (customer.erased)', () => {
     h.linkRow.mockResolvedValue(true);
     expect(await emitStoreEventsFor({ ...ev, data: { storeId: STORE, userId: 'u1' } })).toBe(0);
     expect(await emitStoreEventsFor({ ...ev, data: { buyerKey: KEY } })).toBe(0);
+  });
+});
+
+describe('catalog/changed', () => {
+  const UP = new Date('2026-10-25T08:00:00Z');
+  const ev = (productIds: string[] | null) => ({
+    id: 'k1',
+    name: 'catalog/changed',
+    data: { storeId: STORE, productIds },
+  });
+  beforeEach(() => {
+    h.products.mockReset();
+  });
+
+  it('upserted for a live product with its variant ids, deleted for a soft-deleted or vanished one', async () => {
+    h.products.mockResolvedValue([
+      { id: 'p1', updatedAt: UP, deletedAt: null, variants: [{ id: 'v1' }, { id: 'v2' }] },
+      {
+        id: 'p2',
+        updatedAt: UP,
+        deletedAt: new Date('2026-10-25T09:00:00Z'),
+        variants: [{ id: 'v3' }],
+      },
+    ]);
+    expect(await emitStoreEventsFor(ev(['p1', 'p2', 'p3']))).toBe(3);
+    const [a, b, c] = sent();
+    expect(a).toMatchObject({
+      type: 'catalog.product_upserted',
+      data: { productId: 'p1', variantIds: ['v1', 'v2'], updatedAt: UP.toISOString() },
+    });
+    expect(b).toMatchObject({
+      type: 'catalog.product_deleted',
+      data: { productId: 'p2', variantIds: ['v3'] },
+    });
+    expect(c).toMatchObject({
+      type: 'catalog.product_deleted',
+      data: { productId: 'p3', variantIds: [] },
+    });
+    for (const e of sent()) expect(storeEventSchema.safeParse(e).success).toBe(true);
+  });
+
+  it('productIds null resyncs the whole catalog; a store that is not linked sends nothing', async () => {
+    h.products
+      .mockResolvedValueOnce([{ id: 'p1' }])
+      .mockResolvedValueOnce([{ id: 'p1', updatedAt: UP, deletedAt: null, variants: [] }]);
+    expect(await emitStoreEventsFor(ev(null))).toBe(1);
+    h.linked.mockResolvedValue(false);
+    h.send.mockClear();
+    expect(await emitStoreEventsFor(ev(['p1']))).toBe(0);
+  });
+
+  it('the same product state is the same envelope id (a re-sent change dedupes)', async () => {
+    h.products.mockResolvedValue([{ id: 'p1', updatedAt: UP, deletedAt: null, variants: [] }]);
+    await emitStoreEventsFor(ev(['p1']));
+    const first = sent()[0]!.id;
+    h.send.mockClear();
+    await emitStoreEventsFor({ ...ev(['p1']), id: 'k2' });
+    expect(sent()[0]!.id).toBe(first);
   });
 });

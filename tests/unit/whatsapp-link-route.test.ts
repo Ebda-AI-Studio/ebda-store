@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   state: vi.fn(),
   can: vi.fn(),
   notify: vi.fn(),
+  catalog: vi.fn(),
   send: vi.fn(),
   audit: vi.fn(),
 }));
@@ -37,6 +38,10 @@ vi.mock('@api/lib/wa/link', () => ({
   canLinkWhatsApp: h.can,
 }));
 vi.mock('@api/lib/wa/plan-state', () => ({ notifyPlanChanged: h.notify }));
+vi.mock('@api/lib/wa/catalog-state', () => ({
+  clearKnownStoreCache: vi.fn(),
+  notifyCatalogChanged: h.catalog,
+}));
 vi.mock('@api/lib/wa/events', async () => {
   const real = await vi.importActual<typeof import('@api/lib/wa/events')>('@api/lib/wa/events');
   return { ...real, sendStoreEvents: h.send };
@@ -60,6 +65,7 @@ beforeEach(async () => {
   h.state.mockReset().mockResolvedValue({ linked: true, entitled: true, active: true });
   h.can.mockReset().mockResolvedValue(true);
   h.notify.mockReset().mockResolvedValue(undefined);
+  h.catalog.mockReset().mockResolvedValue(undefined);
   h.send.mockReset().mockResolvedValue(undefined);
   h.audit.mockReset().mockResolvedValue(undefined);
   a ??= await app();
@@ -82,6 +88,8 @@ describe('POST /whatsapp-link', () => {
     expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'whatsapp.linked' }));
     // Ebda WhatsApp learns the plan state right after it learns the store
     expect(h.notify).toHaveBeenCalledWith(STORE);
+    // ...and the whole catalog once
+    expect(h.catalog).toHaveBeenCalledWith({ storeId: STORE, productIds: null });
   });
 
   it('a plan without WhatsApp is refused (403) and nothing is written or sent', async () => {

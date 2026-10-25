@@ -7,6 +7,7 @@ import { AppError } from '../middleware/error-handler';
 import { getAuthUser } from '../utils/store-helpers';
 import { buildStoreEvent, sendStoreEvents } from '../lib/wa/events';
 import { notifyPlanChanged } from '../lib/wa/plan-state';
+import { clearKnownStoreCache, notifyCatalogChanged } from '../lib/wa/catalog-state';
 import { WhatsAppLinkService, canLinkWhatsApp, whatsAppLinkState } from '../lib/wa/link';
 
 /**
@@ -59,6 +60,11 @@ async function change(req: Request, linked: boolean): Promise<{ linked: boolean 
   await sendStoreEvents([event]);
   // Ebda WhatsApp learns the store's plan state right after it learns the store (and again on unlink).
   await notifyPlanChanged(storeId);
+  if (linked) {
+    // The store is known to Ebda WhatsApp from now on: send it the whole catalog once.
+    clearKnownStoreCache();
+    await notifyCatalogChanged({ storeId, productIds: null });
+  }
   await auditLog({
     action: linked ? 'whatsapp.linked' : 'whatsapp.unlinked',
     userId,

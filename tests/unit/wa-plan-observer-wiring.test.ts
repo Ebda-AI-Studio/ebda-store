@@ -80,9 +80,16 @@ function walk(dir: string, out: string[] = []): string[] {
 
 describe('wiring', () => {
   it('app.ts installs the observer at startup (Node shell and Worker both import it)', () => {
-    expect(readFileSync(path.join(SRC, 'app.ts'), 'utf8')).toMatch(
-      /installPlanChangeObserver\(\);/
+    expect(readFileSync(path.join(SRC, 'app.ts'), 'utf8')).toMatch(/installWaWriteObservers\(\);/);
+  });
+
+  it('no code writes catalog tables with raw SQL (it would bypass the catalog observer)', () => {
+    const raw = walk(SRC).filter(f =>
+      /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(products|product_variants|warehouse_stock)"?/i.test(
+        readFileSync(f, 'utf8')
+      )
     );
+    expect(raw.map(f => path.relative(SRC, f))).toEqual([]);
   });
 
   it('no code writes subscription / plan state with raw SQL (it would bypass the observer)', () => {

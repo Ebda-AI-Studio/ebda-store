@@ -3,7 +3,7 @@
  * WhatsApp package, and its standing (`status`, `periodEnd`), so a dunning suspension, a cancellation
  * or an expiry reaches Ebda WhatsApp's package gate. Entitlement is a NEVER-stale class: it is
  * sent on EVERY write of a plan or subscription (one observer on the database client, see
- * `installPlanChangeObserver`), with an 12-hourly reconciliation as the backstop.
+ * `installWaWriteObservers`), with an 12-hourly reconciliation as the backstop.
  */
 import {
   prisma,
@@ -82,22 +82,17 @@ export async function notifyPlanChanged(storeId: string): Promise<void> {
   );
 }
 
-let installed = false;
-/** Idempotent: every plan / subscription write anywhere in the API reaches `notifyPlanChanged`. */
-export function installPlanChangeObserver(): void {
-  if (installed) return;
-  installed = true;
-  setModelWriteObserver(e => {
-    const storeId = planChangeStoreId(e);
-    if (storeId) {
-      void notifyPlanChanged(storeId).catch(err =>
-        logger.warn(
-          { err, storeId },
-          '[wa] plan change notify failed (12-hourly reconcile covers it)'
-        )
-      );
-    }
-  });
+/** Called by the database observer (lib/wa/observers.ts) for every write. */
+export function onPlanWrite(e: ModelWriteEvent): void {
+  const storeId = planChangeStoreId(e);
+  if (storeId) {
+    void notifyPlanChanged(storeId).catch(err =>
+      logger.warn(
+        { err, storeId },
+        '[wa] plan change notify failed (12-hourly reconcile covers it)'
+      )
+    );
+  }
 }
 
 function toPlanStatus(status: string, periodEnd: Date | null, now: Date): PlanStatus {

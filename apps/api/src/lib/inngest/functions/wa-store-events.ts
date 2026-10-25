@@ -8,6 +8,7 @@ import { suiteBuyerKeySecret } from '../../wa/config';
 import { buildStoreEvent, sendStoreEvents, type StoreEventInput } from '../../wa/events';
 import { isWhatsAppLinked, hasWhatsAppLinkRow } from '../../wa/link';
 import { PLAN_CHANGED_EVENT, planChangedInput } from '../../wa/plan-state';
+import { CATALOG_CHANGED_EVENT } from '../../wa/catalog-state';
 
 /**
  * Store -> Ebda WhatsApp events (contract 2026-10-24, section 4): order created, COD confirmation
@@ -254,6 +255,57 @@ async function erasedEvent(event: SourceEvent): Promise<Planned[]> {
   ];
 }
 
+const CATALOG_PAGE = 200;
+const CATALOG_MAX = 5000;
+
+/** `catalog.product_upserted` / `product_deleted`: the CURRENT state of each touched product. */
+async function catalogEvents(event: SourceEvent): Promise<Planned[]> {
+  const { storeId, productIds } = (event.data ?? {}) as {
+    storeId?: string;
+    productIds?: string[] | null;
+  };
+  if (!storeId) return [];
+  let ids = productIds ?? null;
+  if (!ids) {
+    // Unknown or many: resync the store's whole catalog (capped; a store past the cap is resynced by
+    // the link flow's catalog read over the bridge anyway).
+    const all = await runInTenantContext(storeId, () =>
+      prisma.product.findMany({ where: { storeId }, select: { id: true }, take: CATALOG_MAX })
+    );
+    ids = all.map(p => p.id);
+  }
+  const out: Planned[] = [];
+  for (let i = 0; i < ids.length; i += CATALOG_PAGE) {
+    const chunk = ids.slice(i, i + CATALOG_PAGE);
+    const rows = await runInTenantContext(storeId, () =>
+      prisma.product.findMany({
+        where: { id: { in: chunk }, storeId },
+        select: { id: true, updatedAt: true, deletedAt: true, variants: { select: { id: true } } },
+      })
+    );
+    const byId = new Map(rows.map(r => [r.id, r]));
+    for (const productId of chunk) {
+      const row = byId.get(productId);
+      const gone = !row || row.deletedAt !== null;
+      const at = (gone ? (row?.deletedAt ?? new Date()) : row.updatedAt) as Date;
+      out.push({
+        seed: `catalog:${productId}:${gone ? 'del' : 'up'}:${at.getTime()}`,
+        occurredAt: at,
+        input: {
+          type: gone ? 'catalog.product_deleted' : 'catalog.product_upserted',
+          storeId,
+          data: {
+            productId,
+            variantIds: row?.variants.map(v => v.id) ?? [],
+            updatedAt: at.toISOString(),
+          },
+        },
+      });
+    }
+  }
+  return out;
+}
+
 async function statusEvent(event: SourceEvent): Promise<Planned[]> {
   const d = (event.data ?? {}) as {
     orderId?: string;
@@ -337,7 +389,9 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
           ? await statusEvent(event)
           : event.name === 'cart/abandoned'
             ? await cartEvent(event)
-            : [];
+            : event.name === CATALOG_CHANGED_EVENT
+              ? await catalogEvents(event)
+              : [];
   if (planned.length === 0) return 0;
   const events = await Promise.all(
     planned.map(p => buildStoreEvent(p.input, { seed: p.seed, occurredAt: p.occurredAt }))
@@ -358,6 +412,7 @@ export const waStoreEvents: InngestFunction.Any = inngest.createFunction(
       { event: PLAN_CHANGED_EVENT },
       { event: 'cart/abandoned' },
       { event: 'account/erased' },
+      { event: CATALOG_CHANGED_EVENT },
     ],
   },
   async ({ event, step }) => {
