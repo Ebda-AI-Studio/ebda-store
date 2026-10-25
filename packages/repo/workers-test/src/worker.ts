@@ -44,6 +44,11 @@ export class LiteDO extends DurableObject {
       wallet
     );
   }
+  seedPerUserCoupon(): void {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit_per_user, scope_product_ids, scope_category_ids) VALUES ('pu', 's1', 'ONCE', 'once', 'fixed', 100, 1, '[]', '[]')`
+    );
+  }
   checkout(input: CheckoutInput): { ok: true; orderId: string } | { ok: false; code: string } {
     try {
       return {

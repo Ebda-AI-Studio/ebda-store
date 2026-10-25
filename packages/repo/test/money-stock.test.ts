@@ -90,7 +90,13 @@ describe('checkout core: stock', () => {
     placeOrder(db, base({ lines: [{ productId: 'vprod', variantId: 'v1', quantity: 2 }] }));
     expect(stock('product_variants', 'v1')).toBe(1);
     expect(stock('products', 'vprod')).toBe(0); // the parent column is untouched
-    placeOrder(db, base({ lines: [{ productId: 'vprod', variantId: 'v2', quantity: 5 }] })); // backorder: 1 on hand, 5 ordered
+    placeOrder(
+      db,
+      base({
+        lines: [{ productId: 'vprod', variantId: 'v2', quantity: 5 }],
+        backorderEnabled: true,
+      })
+    ); // backorder: 1 on hand, 5 ordered
     expect(stock('product_variants', 'v2')).toBe(0);
   });
 
@@ -138,8 +144,8 @@ describe('checkout core: coupon', () => {
       `INSERT INTO coupons (id, store_id, code, name, type, value, expires_at, scope_product_ids, scope_category_ids) VALUES ('cold', 's1', 'OLD', 'old', 'fixed', 100, 1, '[]', '[]')`
     );
     expect(placeOrder(db, base({ couponCode: 'ten' })).couponDiscount).toBe(150); // case-insensitive code
-    expect(placeOrder(db, base({ couponCode: 'BIG' })).couponDiscount).toBe(300);
-    expect(err(() => placeOrder(db, base({ couponCode: 'MIN' }))).code).toBe('COUPON_MIN_ORDER');
+    expect(placeOrder(db, base({ couponCode: 'BIG' })).couponDiscount).toBe(1500); // fixed: capped at the subtotal; max_discount is for percentages (Postgres parity)
+    expect(err(() => placeOrder(db, base({ couponCode: 'MIN' }))).code).toBe('COUPON_NOT_ELIGIBLE');
     expect(err(() => placeOrder(db, base({ couponCode: 'OFF' }))).code).toBe('COUPON_INVALID');
     expect(err(() => placeOrder(db, base({ couponCode: 'OLD' }))).code).toBe('COUPON_EXPIRED');
     expect(err(() => placeOrder(db, base({ couponCode: 'NOPE' }))).code).toBe('COUPON_INVALID');
@@ -176,6 +182,9 @@ describe('checkout core: wallet', () => {
   it('debits at most the total and the balance, records the ledger, can pay in full, never goes negative', () => {
     const { raw, db, base } = fixture();
     raw.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+    );
+    raw.exec(
       `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 2000)`
     );
     const a = placeOrder(db, base({ customerId: 'cust', walletAmount: 99999 })); // total 1500: capped
@@ -203,5 +212,211 @@ describe('checkout core: wallet', () => {
     expect(err(() => placeOrder(db, base({ walletAmount: 100 }))).code).toBe(
       'WALLET_NEEDS_CUSTOMER'
     );
+  });
+});
+
+describe('checkout core: review fixes (coupon identity, targeting, trust boundary)', () => {
+  const coupon = (
+    raw: ReturnType<typeof fixture>['raw'],
+    id: string,
+    extra: string,
+    vals: string
+  ) =>
+    raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids${extra}) VALUES ('${id}', 's1', '${id.toUpperCase()}', 'x', 'fixed', 100, '[]', '[]'${vals})`
+    );
+
+  it('a one-per-customer coupon is enforced for GUESTS by normalised phone or email; a different guest is allowed', () => {
+    const { raw, db, base } = fixture();
+    coupon(raw, 'once', ', usage_limit_per_user', ', 1');
+    const guest = (phone: string, email: string) =>
+      base({ couponCode: 'ONCE', shippingAddress: { name: 'g', phone, email } });
+    placeOrder(db, guest('01012345678', 'A@x.com'));
+    expect(err(() => placeOrder(db, guest('+201012345678', 'other@x.com'))).code).toBe(
+      'COUPON_USER_LIMIT'
+    ); // same phone, other spelling
+    expect(err(() => placeOrder(db, guest('01099999999', ' a@X.com '))).code).toBe(
+      'COUPON_USER_LIMIT'
+    ); // same email, other case
+    placeOrder(db, guest('01011112222', 'different@x.com')); // a different guest
+  });
+
+  it('a guest with NO phone and NO email cannot use a per-customer coupon (no stable key): clear error, nothing burned', () => {
+    const { raw, db, base } = fixture();
+    coupon(raw, 'once', ', usage_limit_per_user', ', 1');
+    expect(
+      err(() => placeOrder(db, base({ couponCode: 'ONCE', shippingAddress: { name: 'anon' } })))
+        .code
+    ).toBe('COUPON_NEEDS_CONTACT');
+    expect(
+      (raw.prepare(`SELECT usage_count n FROM coupons WHERE id = 'once'`).get() as { n: number }).n
+    ).toBe(0);
+  });
+
+  it('cancelled orders do not count against the per-customer limit', () => {
+    const { raw, db, base } = fixture();
+    coupon(raw, 'once', ', usage_limit_per_user', ', 1');
+    const o = placeOrder(
+      db,
+      base({ couponCode: 'ONCE', shippingAddress: { phone: '01012345678' } })
+    );
+    raw.prepare(`UPDATE orders SET status = 'cancelled' WHERE id = ?`).run(o.orderId);
+    placeOrder(db, base({ couponCode: 'ONCE', shippingAddress: { phone: '01012345678' } }));
+  });
+
+  it('a limit of 0 means unlimited (Postgres truthiness)', () => {
+    const { raw, db, base } = fixture();
+    coupon(raw, 'zero', ', usage_limit, usage_limit_per_user', ', 0, 0');
+    for (let i = 0; i < 3; i++)
+      placeOrder(db, base({ couponCode: 'ZERO', shippingAddress: { phone: '01012345678' } }));
+  });
+
+  it('targeting: product scope, customer group, first-order-only and min quantity are enforced; the discount base is the matching subtotal', () => {
+    const { raw, db, base } = fixture();
+    raw.exec(
+      `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('other', 's1', 'Other', 'other', 1000, 10, 'active')`
+    );
+    raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids) VALUES ('scoped', 's1', 'SCOPED', 'x', 'percentage', 10, '["sku"]', '[]')`
+    );
+    const o = placeOrder(
+      db,
+      base({
+        couponCode: 'SCOPED',
+        lines: [
+          { productId: 'sku', quantity: 1 },
+          { productId: 'other', quantity: 1 },
+        ],
+      })
+    );
+    expect(o.couponDiscount).toBe(150); // 10% of the sku line only (1500), not of 2500
+    expect(
+      err(() =>
+        placeOrder(db, base({ couponCode: 'SCOPED', lines: [{ productId: 'other', quantity: 1 }] }))
+      ).code
+    ).toBe('COUPON_NOT_ELIGIBLE');
+    raw.exec(`INSERT INTO customer_groups (id, store_id, name) VALUES ('vip', 's1', 'VIP')`);
+    raw.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name, group_id) VALUES ('vipc', 's1', 'V', 'I', 'vip'), ('plain', 's1', 'P', 'L', NULL)`
+    );
+    raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, customer_group_id, scope_product_ids, scope_category_ids) VALUES ('vipc1', 's1', 'VIPONLY', 'x', 'fixed', 100, 'vip', '[]', '[]')`
+    );
+    placeOrder(db, base({ couponCode: 'VIPONLY', customerId: 'vipc' }));
+    expect(
+      err(() => placeOrder(db, base({ couponCode: 'VIPONLY', customerId: 'plain' }))).code
+    ).toBe('COUPON_NOT_ELIGIBLE');
+    expect(err(() => placeOrder(db, base({ couponCode: 'VIPONLY' }))).code).toBe(
+      'COUPON_NOT_ELIGIBLE'
+    ); // a guest is in no group
+    raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, first_order_only, min_quantity, scope_product_ids, scope_category_ids) VALUES ('first', 's1', 'FIRST', 'x', 'fixed', 100, 1, 2, '[]', '[]')`
+    );
+    expect(err(() => placeOrder(db, base({ couponCode: 'FIRST', customerId: 'plain' }))).code).toBe(
+      'COUPON_NOT_ELIGIBLE'
+    ); // quantity 1 < 2
+    placeOrder(
+      db,
+      base({ couponCode: 'FIRST', customerId: 'plain', lines: [{ productId: 'sku', quantity: 2 }] })
+    );
+    expect(
+      err(() =>
+        placeOrder(
+          db,
+          base({
+            couponCode: 'FIRST',
+            customerId: 'plain',
+            lines: [{ productId: 'sku', quantity: 2 }],
+          })
+        )
+      ).code
+    ).toBe('COUPON_NOT_ELIGIBLE'); // no longer a first order
+  });
+
+  it('free_shipping zeroes the shipping line (and uses one redemption); expectedTotal gates a changed price', () => {
+    const { raw, db, base } = fixture();
+    raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids) VALUES ('fs', 's1', 'SHIPFREE', 'x', 'free_shipping', 0, '[]', '[]')`
+    );
+    expect(placeOrder(db, base({ couponCode: 'SHIPFREE', shipping: 4000 }))).toMatchObject({
+      shipping: 0,
+      total: 1500,
+    });
+    expect(err(() => placeOrder(db, base({ shipping: 4000, expectedTotal: 1500 }))).code).toBe(
+      'PRICE_CHANGED'
+    );
+    expect(placeOrder(db, base({ shipping: 4000, expectedTotal: 5500 })).total).toBe(5500);
+  });
+
+  it('a variant without its own price inherits the product price; untracked products are not decremented', () => {
+    const { raw, db, base, stock } = fixture();
+    raw.exec(`UPDATE product_variants SET price = NULL WHERE id = 'v1'`);
+    raw.exec(`UPDATE products SET price = 777 WHERE id = 'vprod'`);
+    expect(
+      placeOrder(db, base({ lines: [{ productId: 'vprod', variantId: 'v1', quantity: 1 }] }))
+        .subtotal
+    ).toBe(777);
+    raw.exec(`UPDATE products SET track_inventory = 0 WHERE id = 'vprod'`);
+    placeOrder(db, base({ lines: [{ productId: 'vprod', variantId: 'v1', quantity: 5 }] })); // 2 left, ordering 5: allowed, nothing decremented
+    expect(stock('product_variants', 'v1')).toBe(2);
+  });
+
+  it('backorder only when the store feature is on; a customer id must belong to this store; a key reused for a different order conflicts', () => {
+    const { db, base } = fixture();
+    expect(
+      err(() =>
+        placeOrder(db, base({ lines: [{ productId: 'vprod', variantId: 'v2', quantity: 5 }] }))
+      ).code
+    ).toBe('OUT_OF_STOCK');
+    expect(err(() => placeOrder(db, base({ customerId: 'someone-elses' }))).code).toBe(
+      'CUSTOMER_NOT_FOUND'
+    );
+    placeOrder(db, base({ idempotencyKey: 'dup-key' }));
+    expect(
+      err(() =>
+        placeOrder(
+          db,
+          base({ idempotencyKey: 'dup-key', lines: [{ productId: 'sku', quantity: 2 }] })
+        )
+      ).code
+    ).toBe('IDEMPOTENCY_CONFLICT');
+  });
+
+  it('stock-hold cap: a third open COD order from one phone is refused; a gateway label has the looser cap; paid orders do not count', () => {
+    const { raw, db, base } = fixture();
+    raw.exec(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);
+    const o = (pm: string) =>
+      base({ paymentMethod: pm, shippingAddress: { phone: '01012345678' } });
+    placeOrder(db, o('cod'));
+    placeOrder(db, o('cod'));
+    expect(err(() => placeOrder(db, o('cod'))).code).toBe('TOO_MANY_OPEN_ORDERS');
+    placeOrder(db, o('card')); // gateway cap is 5, 2 open
+    const ipA = (i: number) =>
+      base({
+        paymentMethod: 'cod',
+        checkoutIp: '9.9.9.9',
+        shippingAddress: { phone: `0101000000${i}` },
+      });
+    for (let i = 0; i < 8; i++) placeOrder(db, ipA(i));
+    expect(err(() => placeOrder(db, ipA(9))).code).toBe('TOO_MANY_OPEN_ORDERS');
+  });
+
+  it('a 100% coupon with a wallet request does not write a zero wallet transaction', () => {
+    const { raw, db, base } = fixture();
+    raw.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+    );
+    raw.exec(
+      `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 500)`
+    );
+    raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids) VALUES ('full', 's1', 'FULL', 'x', 'percentage', 100, '[]', '[]')`
+    );
+    const o = placeOrder(db, base({ customerId: 'cust', couponCode: 'FULL', walletAmount: 300 }));
+    expect(o).toMatchObject({ total: 0, walletAmount: 0 });
+    expect(
+      (raw.prepare(`SELECT balance n FROM customer_wallets WHERE id = 'w1'`).get() as { n: number })
+        .n
+    ).toBe(500);
   });
 });
