@@ -406,7 +406,13 @@ export async function sweepDeletedStoreClients(
     } catch {
       continue;
     }
-    if (!live) removed += (await deleteStoreClients(db, store_id)).clients;
+    if (!live) {
+      try {
+        removed += (await deleteStoreClients(db, store_id)).clients;
+      } catch {
+        // one store that cannot be cleaned must not stall the cursor; it is retried on the next lap (access is already refused)
+      }
+    }
   }
   const next = wrapped ? '' : (ids.at(-1)?.store_id ?? '');
   await db
