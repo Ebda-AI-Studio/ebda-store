@@ -56,14 +56,8 @@ export abstract class StoreScheduleBase<Env = unknown> extends DurableObject<Env
   /** An occurrence was given up on after MAX_ATTEMPTS failed starts: tell the alert channel. */
   protected async onGaveUp(_job: string, _event: AlarmEvent, _err: unknown): Promise<void> {}
 
-  /** Structured log line (the deployed class routes it to the app logger). */
-  protected log(level: 'warn' | 'error', obj: Record<string, unknown>, msg: string): void {
-    // The base class stays free of the app logger (loads in a bare test worker); the deployed class overrides this.
-    // eslint-disable-next-line no-console
-    console[level](
-      JSON.stringify({ msg, ...obj, err: obj.err instanceof Error ? obj.err.message : obj.err })
-    );
-  }
+  /** Structured log line. A no-op here (the base loads in a bare test worker); the deployed class logs. */
+  protected log(_level: 'warn' | 'error', _fields: LogFields, _msg: string): void {}
 
   private init(): void {
     const sql = this.ctx.storage.sql;
@@ -231,6 +225,14 @@ export abstract class StoreScheduleBase<Env = unknown> extends DurableObject<Env
       await this.rearm();
     }
   }
+}
+
+export interface LogFields {
+  job: string;
+  storeId: string;
+  due?: number;
+  attempts?: number;
+  err?: unknown;
 }
 
 export interface AlarmEvent {
