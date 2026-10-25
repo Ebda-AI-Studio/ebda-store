@@ -44,6 +44,26 @@ export class LiteDO extends DurableObject {
       wallet
     );
   }
+  /** Insert one option value with this swatch colour on the real schema; returns 'ok' or the SQLite error text. */
+  insertSwatch(hex: string | null): string {
+    const sql = this.ctx.storage.sql;
+    try {
+      sql.exec(
+        `INSERT OR IGNORE INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('swp', 's1', 'Shirt', 'shirt', 100, 1, 'active')`
+      );
+      sql.exec(
+        `INSERT OR IGNORE INTO product_options (id, product_id, name, position) VALUES ('swo', 'swp', 'Colour', 0)`
+      );
+      sql.exec(`DELETE FROM product_option_values WHERE option_id = 'swo'`);
+      sql.exec(
+        `INSERT INTO product_option_values (id, option_id, value, swatch_hex) VALUES ('swv', 'swo', 'x', ?)`,
+        hex
+      );
+      return 'ok';
+    } catch (e) {
+      return String((e as Error).message);
+    }
+  }
   seedPerUserCoupon(): void {
     this.ctx.storage.sql.exec(
       `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit_per_user, scope_product_ids, scope_category_ids) VALUES ('pu', 's1', 'ONCE', 'once', 'fixed', 100, 1, '[]', '[]')`
