@@ -194,16 +194,19 @@ describe('souq header: targets, landmarks, long names, focus', () => {
     expect(logo.getAttribute('class')).toContain('md:max-w-[16rem]');
     const mark = container.querySelector('[data-zone="storeName"]')!;
     // STOP-2: wraps (2 lines, balanced) instead of ending in an ellipsis; the title keeps the full name.
-    expect(mark.getAttribute('class')).toMatch(/\bline-clamp-2\b/);
-    expect(mark.getAttribute('class')).not.toMatch(/\btruncate\b/);
+    expect(mark.firstElementChild!.getAttribute('class')).toMatch(/\bline-clamp-2\b/);
+    expect(mark.firstElementChild!.getAttribute('class')).not.toMatch(/\btruncate\b/);
     expect(mark.getAttribute('title')).toBe(longName);
   });
   it('the wordmark is the sized, untracked display one; nav links are 14px untracked', () => {
     setLook('souq.catalogue', 'en');
     const { container } = render(<SouqHeader branding={branding} navigation={nav} />);
-    const mark = container.querySelector('[data-zone="storeName"]')!.getAttribute('class')!;
-    expect(mark).toContain('text-2xl');
-    expect(mark).not.toMatch(/tracking-\[|ui-caps-toggle|uppercase/);
+    // G1 (template-match): the no-logo wordmark is the look's lockup, sized from the mock-up (>= 28px) and untracked.
+    const lockup = container.querySelector('[data-zone="storeName"]')!;
+    expect(lockup.getAttribute('data-lockup')).toBeTruthy();
+    const size = Number.parseInt((lockup.firstElementChild as HTMLElement).style.fontSize, 10);
+    expect(size).toBeGreaterThanOrEqual(28);
+    expect(lockup.outerHTML).not.toMatch(/ui-caps-toggle|tracking-\[/);
     expect(container.querySelector('a[href="/products"]')!.getAttribute('class')).toContain(
       'text-sm'
     );
