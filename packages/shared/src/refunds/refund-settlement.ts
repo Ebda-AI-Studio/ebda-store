@@ -166,7 +166,10 @@ export function selectOpenExecutedClaims(input: {
   executedEvent: string;
   closingEvents: readonly string[];
 }): string[] {
-  const windowMs = input.windowMs ?? SETTLE_NOTICE_WINDOW_MS;
+  // AGE NEVER CLOSES THIS: a late Kashier webhook (days later) with an unknown id while an executed claim is still
+  // unconsumed is held, not booked. A claim closes only when its own id is seen, an operator matches it, or it is
+  // released / indeterminate / reconciled / absorbed.
+  const windowMs = input.windowMs ?? Number.POSITIVE_INFINITY;
   const at = (e: RefundClaimEventRow) =>
     e.createdAt instanceof Date ? e.createdAt.getTime() : e.createdAt;
   const det = (e: RefundClaimEventRow) =>
@@ -188,6 +191,38 @@ export function selectOpenExecutedClaims(input: {
       );
     })
     .map(e => det(e).claimId as string);
+}
+
+/**
+ * The executed, still-unconsumed claim whose provider refund id IS `refundId`: the refund's own webhook has arrived with
+ * the id the refund API answered with, so the claim is settled and is consumed (this is what closes a claim for the
+ * Kashier hold above). Null when none.
+ */
+export function executedClaimForRefundId(input: {
+  events: readonly RefundClaimEventRow[];
+  refundId: string | null | undefined;
+  executedEvent: string;
+  closingEvents: readonly string[];
+}): string | null {
+  if (typeof input.refundId !== 'string' || input.refundId.length === 0) return null;
+  const det = (e: RefundClaimEventRow) =>
+    e.details && typeof e.details === 'object' ? (e.details as Record<string, unknown>) : {};
+  const closed = new Set<string>();
+  for (const e of input.events) {
+    const id = det(e).claimId;
+    if (typeof id === 'string' && input.closingEvents.includes(e.eventType)) closed.add(id);
+  }
+  for (const e of input.events) {
+    const d = det(e);
+    if (
+      e.eventType === input.executedEvent &&
+      d.refundId === input.refundId &&
+      typeof d.claimId === 'string' &&
+      !closed.has(d.claimId)
+    )
+      return d.claimId;
+  }
+  return null;
 }
 
 /** One `payment_events` refund row, as `correlateSettleNotice` reads it. */
