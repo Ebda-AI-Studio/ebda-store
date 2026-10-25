@@ -482,7 +482,14 @@ jobs:
       - name: API Worker startup budget (startup CPU and bundle size)
         if: matrix.app == 'api'
         timeout-minutes: 10
-        run: node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
+        # PRs: compare with main's bundle profiled in this same job (a starved shared runner slows both
+        # alike; the absolute 140 ms ceiling flaked at 189 ms on one). main/nightly: absolute ceiling.
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/ci/worker-startup-budget.mjs --runs 5 --baseline-ref origin/main --record "$RUNNER_TEMP/worker-startup-budget.json"
+          else
+            node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
+          fi
       - name: Upload the startup measurement
         if: matrix.app == 'api' && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

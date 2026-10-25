@@ -12,12 +12,29 @@
  * (measured 35 ms there vs 90 ms of real startup), and its 1.5 ms sampling is too coarse.
  *
  *   node scripts/ci/worker-startup-budget.mjs [--runs 5] [--config wrangler.jsonc] [--record out.json]
+ *                                              [--baseline-ref origin/main]
+ *
+ * Two modes. ABSOLUTE (default, nightly/main on a quiet runner): startup CPU must stay under the
+ * ceiling in the JSON. RELATIVE (`--baseline-ref`, pull requests): the base ref is built and
+ * profiled in the SAME job on the SAME runner, samples alternate PR/base, and the PR fails only
+ * when it is slower than the base by more than `relative.ratio` plus `relative.slackMs`. A loaded
+ * shared runner slows both bundles alike, so the absolute ceiling (which flaked at 189 ms vs 140 ms
+ * on a starved runner, 2026-10-25) is not applied to PRs. Bundle size is deterministic and stays an
+ * absolute gate in both modes.
  *
  * No database and no Cloudflare login. The numbers are local-workerd CPU, not Cloudflare's: the
  * budget is a regression gate with headroom, not the platform limit.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -45,7 +62,7 @@ export function median(xs) {
 }
 
 /** Verdict on a measurement against the budget; exported for the unit test. */
-export function budgetProblems(measured, budget) {
+export function budgetProblems(measured, budget, { skipCpu = false } = {}) {
   const problems = [];
   const check = (key, label, unit) => {
     if (!(measured[key] <= budget[key]))
@@ -53,10 +70,22 @@ export function budgetProblems(measured, budget) {
         `${label} ${Math.round(measured[key])}${unit} is over the budget of ${budget[key]}${unit}`
       );
   };
-  check('startupCpuMs', 'startup CPU', ' ms');
+  if (!skipCpu) check('startupCpuMs', 'startup CPU', ' ms');
   check('bundleBytes', 'bundle size', ' B');
   check('bundleGzipBytes', 'gzipped bundle size', ' B');
   return problems;
+}
+
+/** Relative verdict: the PR may be at most `ratio` + `slackMs` slower than the base measured beside it. */
+export function relativeProblems(prMs, baseMs, { ratio, slackMs }) {
+  if (!(prMs >= 0) || !(baseMs > 0))
+    return [`startup CPU not measured (pr ${prMs}, base ${baseMs})`];
+  const limit = baseMs * (1 + ratio) + slackMs;
+  return prMs <= limit
+    ? []
+    : [
+        `startup CPU ${Math.round(prMs)} ms is over ${Math.round(limit)} ms (base ${Math.round(baseMs)} ms x ${1 + ratio} + ${slackMs} ms, measured in this job)`,
+      ];
 }
 
 // Fake values only: just enough for config/index.ts to pass its NODE_ENV=production checks.
@@ -132,6 +161,54 @@ async function profileOnce(outdir, compat) {
   }
 }
 
+/** Build `ref` into a throwaway worktree that borrows this checkout's installed deps. Returns { dir, outdir }. */
+function buildBaseline(ref, config) {
+  const sh = (cmd, args, cwd = ROOT) => {
+    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
+    if (r.status !== 0)
+      throw new Error(`${cmd} ${args.join(' ')} failed:\n${r.stdout}\n${r.stderr}`);
+    return r.stdout;
+  };
+  const remoteRef = ref.replace(/^origin\//, '');
+  if (ref.startsWith('origin/'))
+    sh('git', ['fetch', '--no-tags', '--depth=1', 'origin', remoteRef]);
+  const dir = mkdtempSync(path.join(tmpdir(), 'ebda-startup-base-'));
+  sh('git', [
+    'worktree',
+    'add',
+    '--detach',
+    '--force',
+    dir,
+    ref.startsWith('origin/') ? 'FETCH_HEAD' : ref,
+  ]);
+  // Borrow installed deps and built workspace packages; only apps/api SOURCE differs from the PR.
+  for (const rel of [
+    'node_modules',
+    'apps/api/node_modules',
+    ...readdirSync(path.join(ROOT, 'packages')).flatMap(p => [
+      `packages/${p}/node_modules`,
+      `packages/${p}/dist`,
+    ]),
+  ]) {
+    const from = path.join(ROOT, rel);
+    const to = path.join(dir, rel);
+    try {
+      statSync(from);
+      rmSync(to, { recursive: true, force: true });
+      symlinkSync(from, to);
+    } catch {
+      /* absent in this checkout: nothing to borrow */
+    }
+  }
+  const outdir = mkdtempSync(path.join(tmpdir(), 'ebda-startup-base-out-'));
+  sh(
+    'npx',
+    ['wrangler', 'deploy', '--dry-run', '--config', config, '--outdir', outdir],
+    path.join(dir, 'apps/api')
+  );
+  return { dir, outdir };
+}
+
 async function main() {
   const arg = n => {
     const i = process.argv.indexOf(`--${n}`);
@@ -164,8 +241,24 @@ async function main() {
         ...(/"compatibility_flags":\s*\[([^\]]*)\]/.exec(cfg)?.[1] ?? '').matchAll(/"([^"]+)"/g),
       ].map(m => m[1]),
     };
+    const baselineRef = arg('baseline-ref');
+    let base;
     const samples = [];
-    for (let i = 0; i < runs; i++) samples.push(await profileOnce(outdir, compat));
+    const baseSamples = [];
+    try {
+      if (baselineRef) base = buildBaseline(baselineRef, config);
+      // Alternate PR/base so a load spike hits both, never just one side.
+      for (let i = 0; i < runs; i++) {
+        samples.push(await profileOnce(outdir, compat));
+        if (base) baseSamples.push(await profileOnce(base.outdir, compat));
+      }
+    } finally {
+      if (base) {
+        spawnSync('git', ['worktree', 'remove', '--force', base.dir], { cwd: ROOT });
+        rmSync(base.dir, { recursive: true, force: true });
+        rmSync(base.outdir, { recursive: true, force: true });
+      }
+    }
     const measured = {
       // MIN of the runs: scheduler noise only ever adds CPU time, so the minimum is the stable estimate.
       startupCpuMs: Math.min(...samples),
@@ -175,6 +268,15 @@ async function main() {
     const record = {
       measured,
       samplesMs: samples.map(s => Math.round(s * 10) / 10),
+      ...(base
+        ? {
+            baseline: {
+              ref: baselineRef,
+              startupCpuMs: Math.min(...baseSamples),
+              samplesMs: baseSamples.map(s => Math.round(s * 10) / 10),
+            },
+          }
+        : {}),
       budget: {
         startupCpuMs: budget.startupCpuMs,
         bundleBytes: budget.bundleBytes,
@@ -191,7 +293,12 @@ async function main() {
         { flag: 'a' }
       );
     }
-    const problems = budgetProblems(measured, budget);
+    const problems = [
+      ...budgetProblems(measured, budget, { skipCpu: !!base }),
+      ...(base
+        ? relativeProblems(measured.startupCpuMs, record.baseline.startupCpuMs, budget.relative)
+        : []),
+    ];
     if (problems.length) {
       console.error(`Worker startup budget exceeded:\n- ${problems.join('\n- ')}`);
       process.exitCode = 1;
