@@ -117,3 +117,27 @@ describe('sendMail on Cloudflare', () => {
     ).rejects.toMatchObject({ code: 'E_NO_BINDING' });
   });
 });
+
+describe('undeliverable recipients (Ruling WA-LEGACY-1) on the Cloudflare path', () => {
+  const base = { from: 'Ebda Store <orders.souq@ebda.app>', subject: 's', html: '<p>x</p>' };
+
+  it('a .invalid recipient is dropped and the binding is never called', async () => {
+    const r = await sendMail({ ...base, to: 'wa-201001234567@placeholder.invalid' });
+    expect(r).toEqual({ id: 'skipped-undeliverable' });
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('a mixed list keeps only the deliverable address', async () => {
+    h.send.mockResolvedValue({ messageId: 'm1' });
+    await sendMail({ ...base, to: ['a@placeholder.invalid', 'buyer@example.com'] });
+    expect(h.send).toHaveBeenCalledTimes(1);
+    expect(h.send.mock.calls[0]![0].to).toEqual(['buyer@example.com']);
+  });
+
+  it('the same filter holds on the Resend path (no provider ever sees it)', async () => {
+    h.cfg.emailProvider = 'resend';
+    expect(await sendMail({ ...base, to: 'x@orders.invalid' })).toEqual({
+      id: 'skipped-undeliverable',
+    });
+  });
+});
