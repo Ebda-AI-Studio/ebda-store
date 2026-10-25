@@ -66,3 +66,41 @@ export async function verifyOwnAccessToken(
     throw new Error('token has no sub/sid');
   return { sub: payload.sub, sid: payload.sid, payload: payload as Record<string, unknown> };
 }
+
+export interface ClientTokenClaims {
+  clientId: string;
+  storeId: string;
+  aud: string;
+  scope: string;
+}
+
+/**
+ * Integrator client token (identity contract v1.3): the only non-person token. sub = sid = the client id, one `integration`
+ * store claim, `client: true`, the granted scope, 10 minutes. It NEVER carries pa, auth_time or email, and no RPC reaches this
+ * function (Ruling ID-12): the HTTP token endpoint is the only mint.
+ */
+export async function mintClientToken(
+  env: { JWT_PRIVATE_JWK: string; ISSUER: string },
+  c: ClientTokenClaims,
+  ttlSeconds: number
+): Promise<{ token: string; jti: string; expiresAt: number }> {
+  const key = await signingKey(env.JWT_PRIVATE_JWK);
+  const now = Math.floor(Date.now() / 1000);
+  const jti = crypto.randomUUID();
+  const token = await new SignJWT({
+    sid: c.clientId,
+    stores: [{ id: c.storeId, role: 'integration' }],
+    scope: c.scope,
+    client: true,
+  })
+    .setProtectedHeader({ alg: 'ES256', kid: key.kid, typ: 'at+jwt' })
+    .setIssuer(env.ISSUER)
+    .setAudience(c.aud)
+    .setSubject(c.clientId)
+    .setIssuedAt(now)
+    .setNotBefore(now)
+    .setExpirationTime(now + ttlSeconds)
+    .setJti(jti)
+    .sign(key.privateKey);
+  return { token, jti, expiresAt: (now + ttlSeconds) * 1000 };
+}

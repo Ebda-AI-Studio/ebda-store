@@ -52,6 +52,8 @@ declare global {
       MFA_KEY_PREV?: string;
       /** 'true' after the re-encrypt job reports 0 remaining: refuse legacy v1/v2 sealed secrets. */
       MFA_REJECT_LEGACY?: string;
+      /** HMAC key (base64, >= 32 bytes) for integrator client secrets at rest (wrangler secret). Missing = the client endpoints answer 503 and log loudly. */
+      CLIENT_SECRET_PEPPER?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
       TEST_MIGRATIONS?: D1Migration[];

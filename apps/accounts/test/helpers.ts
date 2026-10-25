@@ -67,6 +67,8 @@ export async function call(
     cookie?: string;
     bearer?: string;
     json?: unknown;
+    /** application/x-www-form-urlencoded body (the OAuth token endpoint). */
+    form?: string;
     headers?: Record<string, string>;
   } = {}
 ): Promise<Response> {
@@ -76,12 +78,13 @@ export async function call(
     ...(init.headers ?? {}),
   };
   if (init.json !== undefined) headers['content-type'] = 'application/json';
+  if (init.form !== undefined) headers['content-type'] = 'application/x-www-form-urlencoded';
   if (init.cookie) headers.cookie = init.cookie;
   if (init.bearer) headers.authorization = `Bearer ${init.bearer}`;
   const req = new Request(BASE + path, {
-    method: init.method ?? (init.json !== undefined ? 'POST' : 'GET'),
+    method: init.method ?? (init.json !== undefined || init.form !== undefined ? 'POST' : 'GET'),
     headers,
-    body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
+    body: init.json !== undefined ? JSON.stringify(init.json) : init.form,
   });
   const pending: Promise<unknown>[] = [];
   const res = await app.fetch(req, testEnv(), {

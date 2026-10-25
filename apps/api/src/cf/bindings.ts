@@ -76,6 +76,8 @@ export interface AccountsRpc {
   ): Promise<void>;
   getAccountState?(userId: string): Promise<AccountState | null>;
   resendVerification?(email: string): Promise<void>;
+  /** Store deletion: remove the store's integrator clients, secrets and trail (idempotent). */
+  deleteStoreClients?(storeId: string): Promise<{ clients: number }>;
   eraseUser?(userId: string, requestId?: string): Promise<{ erased: boolean; remaining: number }>;
   exportUser?(userId: string): Promise<Record<string, unknown[]>>;
   setRole?(
