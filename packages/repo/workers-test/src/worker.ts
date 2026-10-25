@@ -6,6 +6,12 @@ import { createPrismaLite } from '../../src/prisma-lite/client';
 import { doSqlRunner, doSyncSql } from '../../src/prisma-lite/do-runner';
 import { placeOrder, type CheckoutInput } from '../../src/do/checkout';
 import { applyGoldRates } from '../../src/do/gold-rates';
+import {
+  ensureSearchIndex,
+  reindexStore,
+  searchProductIdSet,
+  verifyProductIndex,
+} from '../../src/do/search';
 import { MoneyError } from '../../src/do/sync-sql';
 import { splitSql } from '../../src/prisma-lite/split-sql';
 import type { Meta } from '../../src/prisma-lite/types';
@@ -127,6 +133,27 @@ export class LiteDO extends DurableObject {
       price: one(`SELECT price AS n FROM products WHERE id = 'ring'`),
       rate: one(`SELECT rate_per_gram AS n FROM gold_rates_current WHERE karat = 21`),
     };
+  }
+
+  /** Search fixtures: the catalogue is [id, name, nameAr]; builds the FTS5 index on the real DO SQLite. */
+  searchSeed(rows: Array<[string, string, string]>): number {
+    const db = doSyncSql(this.ctx.storage);
+    ensureSearchIndex(db);
+    for (const [id, name, nameAr] of rows)
+      this.ctx.storage.sql.exec(
+        `INSERT INTO products (id, store_id, name, name_ar, slug, price, status) VALUES (?, 's1', ?, ?, ?, 100, 'active')`,
+        id,
+        name,
+        nameAr,
+        id
+      );
+    return reindexStore(db, 's1');
+  }
+  search(q: string, scope: 'storefront' | 'admin' = 'storefront'): string[] {
+    return searchProductIdSet(doSyncSql(this.ctx.storage), 's1', q, { scope, limit: 10_000 }).ids;
+  }
+  searchDrift(): { missing: string[]; orphaned: string[]; stale: string[] } {
+    return verifyProductIndex(doSyncSql(this.ctx.storage), 's1');
   }
 
   async seed(): Promise<void> {

@@ -214,3 +214,23 @@ describe('gold rate write concurrent with checkouts on a real Durable Object', (
     }
   });
 });
+
+describe('product search on a real Durable Object (FTS5 trigram)', () => {
+  it('FTS5 + trigram works inside workerd: substring, short-word start, Arabic folding, no drift', async () => {
+    const s = env.LITE_DO.get(env.LITE_DO.idFromName(`search-${Math.random()}`)) as any;
+    expect(
+      await s.searchSeed([
+        ['a', 'Black crepe abaya', 'عباية كريب سوداء'],
+        ['b', 'Navy chiffon abaya', 'عباية شيفون كحلي'],
+        ['c', 'Leather boots', 'بوت جلد'],
+        ['d', 'Gas cooker', 'بوتاجاز'],
+      ])
+    ).toBe(4);
+    expect((await s.search('abaya')).sort()).toEqual(['a', 'b']);
+    expect(await s.search('عبايه سوداء')).toEqual(['a']); // folded: ه for ة, no hamza
+    expect((await s.search('بوت')).sort()).toEqual(['c', 'd']); // substring, like pg_trgm LIKE
+    expect(await s.search('ch')).toEqual(['b']); // all words under 3 chars: word-start mode
+    expect(await s.search('rep')).toEqual(['a']);
+    expect(await s.searchDrift()).toEqual({ missing: [], orphaned: [], stale: [] });
+  });
+});
