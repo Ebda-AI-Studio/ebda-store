@@ -1,0 +1,10 @@
+// LOCAL ONLY (vitest-pool-workers). Never deployed: Ruling INFRA-PREVIEW-1.
+{
+  "name": "prisma-lite-do-test",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "LITE_DO", "class_name": "LiteDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiteDO"] }],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+}

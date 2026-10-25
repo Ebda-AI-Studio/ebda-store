@@ -31,6 +31,8 @@ export default defineConfig({
       'apps/status/**',
       // apps/accounts runs on workerd with a local D1 (npm run test:accounts).
       'apps/accounts/**',
+      // packages/repo/workers-test runs prisma-lite on a real Durable Object (workerd): npm run test:repo-workers.
+      'packages/repo/workers-test/**',
       // apps/api/workers-test runs the BUILT Worker on workerd via @cloudflare/vitest-pool-workers
       // (npm run cf:test -w apps/api).
       'apps/api/workers-test/**',

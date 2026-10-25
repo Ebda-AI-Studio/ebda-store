@@ -351,6 +351,9 @@ jobs:
       - name: Run accounts worker tests
         if: needs.changes.outputs.accounts_tests == 'true'
         run: npm run test:accounts
+      # prisma-lite on a real Durable Object (workerd): the transaction runner contract. ~5 s.
+      - name: Run prisma-lite Durable Object tests
+        run: npm run test:repo-workers
 
   # Visual builder editor E2E (Phase 2): the admin builder in a real Chromium,
   # Arabic (RTL) and English at 390 / 820 / 1280, against the in-memory API
@@ -716,6 +719,8 @@ jobs:
 
       - name: Run accounts worker tests
         run: npm run test:accounts
+      - name: Run prisma-lite Durable Object tests
+        run: npm run test:repo-workers
 
       - name: Upload coverage artifact
         if: always()

@@ -60,7 +60,11 @@ export function createPrismaLite(
   // A write (create with nested creates, update with nested writes, deleteMany, ...) is ONE atomic unit, like Prisma:
   // a failure midway must not leave the earlier statements applied. Inside `$transaction` the runner joins the open one.
   const atomic = <T>(fn: () => T): Promise<T> =>
-    sql.transaction ? sql.transaction(async () => fn()) : Promise.reject(noTransaction());
+    sql.transactionSync
+      ? Promise.resolve().then(() => sql.transactionSync!(fn))
+      : sql.transaction
+        ? sql.transaction(async () => fn())
+        : Promise.reject(noTransaction());
   const write = <T>(fn: () => T) => lazy(() => atomic(fn));
   const delegate = (model: string) => ({
     findMany: (args?: Record<string, unknown>) => lazy(() => engine.findMany(model, args)),
