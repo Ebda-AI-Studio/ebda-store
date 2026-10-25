@@ -6,7 +6,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { AramexCarrier, mapAramexStatus, parseXml } from '@api/services/carriers/aramex.carrier';
+import {
+  AramexCarrier,
+  mapAramexStatus,
+  parseXml,
+  withAramexEmails,
+  ARAMEX_EMAIL_REQUIRED_MESSAGE,
+} from '@api/services/carriers/aramex.carrier';
 import { CarrierError } from '@api/services/carriers/types';
 import { AramexStub, ARAMEX_NS, ARAMEX_STUB, validateAramexRequest } from '../stubs/aramex-stub';
 import { shipmentRequest } from '../contract/shipping-carrier.contract';
@@ -73,6 +79,7 @@ describe('request element ORDER follows the WSDL sequences', () => {
       'ShippingDateTime',
       'DueDate',
       'Details',
+      'ForeignHAWB',
     ]);
     expect(names(first(shipment, 'Details'))).toEqual([
       'Dimensions',
@@ -567,5 +574,162 @@ describe('the tolerant XML reader', () => {
     expect(a.children[0].text).toBe('1 & 2 A <x> &a;');
     expect(a.children[1].text).toBe('<raw>');
     expect(a.children[3].nil).toBe(true);
+  });
+});
+
+/**
+ * Re-verified 2026-10-24 against Aramex's "Shipping Services API Manual" (aramex.com/docs/default-source/
+ * resourses/resourcesdata/shipping-services-api-manual.pdf): Table 31 (Pickup Details), Table 30
+ * (Volume), Appendix F (error codes).
+ */
+describe('manual re-verify 2026-10-24', () => {
+  const when = new Date('2026-10-08T10:00:00Z');
+  const pickupInput = () => ({
+    address: shipmentRequest().pickupAddress,
+    pickupDate: when,
+    readyTime: when,
+    lastPickupTime: when,
+    closingTime: when,
+    shipments: 1,
+  });
+
+  it('CreatePickup sends the manual-mandatory Status ("Ready") after PickupItems', async () => {
+    const { stub, carrier } = mk();
+    await carrier.createPickup(creds, pickupInput(), ctx);
+    const w = wrapperOf(stub.log.find(l => l.action?.endsWith('/CreatePickup'))!.xml);
+    const pickup = first(w, 'Pickup');
+    const n = names(pickup);
+    expect(n[n.length - 1]).toBe('Status');
+    expect(n.indexOf('Status')).toBeGreaterThan(n.indexOf('PickupItems'));
+    expect(first(pickup, 'Status').textContent).toBe('Ready');
+    expect(stub.violations).toEqual([]);
+  });
+
+  it('CreatePickup ShipmentVolume is > 0 (manual Table 30) and uses the documented unit "Cm3"', async () => {
+    const { stub, carrier } = mk();
+    await carrier.createPickup(creds, pickupInput(), ctx);
+    const w = wrapperOf(stub.log.find(l => l.action?.endsWith('/CreatePickup'))!.xml);
+    const vol = first(first(w, 'PickupItemDetail'), 'ShipmentVolume');
+    expect(Number(first(vol, 'Value').textContent)).toBeGreaterThan(0);
+    expect(first(vol, 'Unit').textContent).toBe('Cm3');
+  });
+
+  it.each([
+    ['ERR01', 'Invalid username or password'],
+    ['ERR02', 'Invalid account information'],
+    ['ERR03', 'Account is blocked'],
+  ])(
+    'Appendix F %s is a credentials/account problem (CARRIER_MISCONFIGURED)',
+    async (code, msg) => {
+      const reply = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ShipmentCreationResponse xmlns="${ARAMEX_NS}"><Transaction><Reference1/><Reference2/><Reference3/><Reference4/><Reference5/></Transaction><Notifications><Notification><Code>${code}</Code><Message>${msg}</Message></Notification></Notifications><HasErrors>true</HasErrors></ShipmentCreationResponse></s:Body></s:Envelope>`;
+      const { carrier } = mk(
+        async () =>
+          new Response(reply, {
+            status: 200,
+            headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+          })
+      );
+      await expect(carrier.createShipment(creds, shipmentRequest(), ctx)).rejects.toMatchObject({
+        code: 'CARRIER_MISCONFIGURED',
+      });
+    }
+  );
+
+  it('other Appendix F refusals stay CARRIER_REJECTED (ERR20 Invalid Product Type)', async () => {
+    const reply = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ShipmentCreationResponse xmlns="${ARAMEX_NS}"><Transaction><Reference1/><Reference2/><Reference3/><Reference4/><Reference5/></Transaction><Notifications><Notification><Code>ERR20</Code><Message>Invalid Product Type</Message></Notification></Notifications><HasErrors>true</HasErrors></ShipmentCreationResponse></s:Body></s:Envelope>`;
+    const { carrier } = mk(
+      async () =>
+        new Response(reply, { status: 200, headers: { 'Content-Type': 'text/xml; charset=utf-8' } })
+    );
+    await expect(carrier.createShipment(creds, shipmentRequest(), ctx)).rejects.toMatchObject({
+      code: 'CARRIER_REJECTED',
+    });
+  });
+});
+
+describe('Aramex needs a shipper and a customer email (manual: REQ24)', () => {
+  const base = shipmentRequest();
+  const pickup = { ...base.pickupAddress, email: undefined };
+  const delivery = { ...base.deliveryAddress, email: undefined };
+
+  it('falls back to the owner email for the shipper and the order email for the customer', () => {
+    const r = withAramexEmails(pickup, delivery, {
+      ownerEmail: 'owner@shop.eg',
+      orderEmail: 'buyer@mail.com',
+    });
+    expect(r.pickupAddress.email).toBe('owner@shop.eg');
+    expect(r.deliveryAddress.email).toBe('buyer@mail.com');
+  });
+
+  it('keeps an explicit pickup / customer email over the fallbacks', () => {
+    const r = withAramexEmails(
+      { ...pickup, email: 'pickup@shop.eg' },
+      { ...delivery, email: 'c@x.com' },
+      {
+        ownerEmail: 'owner@shop.eg',
+        orderEmail: 'other@x.com',
+      }
+    );
+    expect([r.pickupAddress.email, r.deliveryAddress.email]).toEqual(['pickup@shop.eg', 'c@x.com']);
+  });
+
+  it('refuses the booking with a bilingual merchant message when either email is missing', () => {
+    for (const fb of [{ orderEmail: 'b@x.com' }, { ownerEmail: 'o@x.com' }, {}]) {
+      try {
+        withAramexEmails(pickup, delivery, fb);
+        throw new Error('should have refused');
+      } catch (e) {
+        expect(e).toBeInstanceOf(CarrierError);
+        expect((e as Error).message).toBe(ARAMEX_EMAIL_REQUIRED_MESSAGE);
+        expect((e as Error).message).toMatch(/[\u0600-\u06FF]/);
+        expect((e as Error).message).toMatch(/Aramex requires an email/);
+      }
+    }
+  });
+
+  it('the booked SOAP carries both emails after the fallback', async () => {
+    const { pickupAddress, deliveryAddress } = withAramexEmails(pickup, delivery, {
+      ownerEmail: 'owner@shop.eg',
+      orderEmail: 'buyer@mail.com',
+    });
+    const { stub, carrier } = mk();
+    await carrier.createShipment(creds, { ...base, pickupAddress, deliveryAddress }, ctx);
+    const body = JSON.stringify(stub.log);
+    expect(body).toContain('owner@shop.eg');
+    expect(body).toContain('buyer@mail.com');
+  });
+});
+
+/**
+ * Manual Table 18: "ForeignHAWB ... If filled this field must be unique for each shipment"
+ * (Appendix F ERR30 "Another shipment with the same Foreign AWB Number already exists"). The
+ * official PHP sample (createShipmentsPHP.txt) sends it. It is Aramex's only server-side
+ * duplicate guard, so the merchant reference rides in it.
+ */
+describe('ForeignHAWB duplicate guard (manual Table 18, ERR30)', () => {
+  it('sends the merchant reference as ForeignHAWB, after Details (schema order)', async () => {
+    const { stub, xml } = await bookOne({ merchantReference: 'EBDA-REF-77' });
+    const shipment = first(wrapperOf(xml), 'Shipment');
+    const n = names(shipment);
+    expect(first(shipment, 'ForeignHAWB').textContent).toBe('EBDA-REF-77');
+    expect(n.indexOf('ForeignHAWB')).toBe(n.indexOf('Details') + 1);
+    expect(stub.violations).toEqual([]);
+  });
+
+  it('omits ForeignHAWB when the reference exceeds the documented 50 chars (never truncates: uniqueness)', async () => {
+    const { xml } = await bookOne({ merchantReference: 'R'.repeat(51) });
+    expect(xml).not.toContain('ForeignHAWB');
+  });
+
+  it('ERR30 is a non-retryable CARRIER_REJECTED that says the shipment already exists', async () => {
+    const reply = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ShipmentCreationResponse xmlns="${ARAMEX_NS}"><Transaction><Reference1/><Reference2/><Reference3/><Reference4/><Reference5/></Transaction><Notifications><Notification><Code>ERR30</Code><Message>Another shipment with the same Foreign AWB Number already exists</Message></Notification></Notifications><HasErrors>true</HasErrors></ShipmentCreationResponse></s:Body></s:Envelope>`;
+    const { carrier } = mk(
+      async () =>
+        new Response(reply, { status: 200, headers: { 'Content-Type': 'text/xml; charset=utf-8' } })
+    );
+    const err = await carrier.createShipment(creds, shipmentRequest(), ctx).catch(e => e);
+    expect(err).toMatchObject({ code: 'CARRIER_REJECTED' });
+    expect(err.retryable).toBeFalsy();
+    expect(err.message).toMatch(/already exists/i);
   });
 });
