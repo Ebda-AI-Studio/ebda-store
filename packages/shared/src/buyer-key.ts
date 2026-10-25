@@ -16,8 +16,10 @@ export const BUYER_KEY_VERSION = 1;
 
 /**
  * Any phone a shopper typed -> E.164, or null when it cannot be one. Egypt (+20) is the default
- * country: `01001234567`, `201001234567`, `+20 100 123 4567`, `00201001234567` and Arabic-Indic
- * digits all become `+201001234567`.
+ * country, and ONLY Egyptian mobile shapes are accepted without an explicit country prefix:
+ * `01001234567`, `1001234567`, `201001234567`, `+20 100 123 4567`, `+20 0100 123 4567` (trunk 0
+ * dropped), `00201001234567` and Arabic-Indic digits all become `+201001234567`. A foreign number
+ * must carry `+` or `00` (a UK `07911123456` is NOT turned into an Egyptian number: it is null).
  */
 export function toE164(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -25,17 +27,21 @@ export function toE164(raw: string | null | undefined): string | null {
     .replace(ARABIC_INDIC, d => String(d.charCodeAt(0) - 0x0660))
     .replace(EXTENDED_ARABIC_INDIC, d => String(d.charCodeAt(0) - 0x06f0));
   const trimmed = ascii.trim();
-  const plus = trimmed.startsWith('+');
   const digits = trimmed.replace(/\D/g, '');
   if (!digits) return null;
-  let e164: string;
-  if (plus) e164 = `+${digits}`;
-  else if (digits.startsWith('00')) e164 = `+${digits.slice(2)}`;
-  else if (digits.startsWith('20') && digits.length === 12) e164 = `+${digits}`;
-  else if (digits.startsWith('0') && digits.length === 11) e164 = `+20${digits.slice(1)}`;
-  else if (digits.length === 10 && digits.startsWith('1')) e164 = `+20${digits}`;
-  else return null;
-  return E164.test(e164) ? e164 : null;
+  let e164: string | null = null;
+  const explicit = trimmed.startsWith('+')
+    ? digits
+    : digits.startsWith('00')
+      ? digits.slice(2)
+      : null;
+  if (explicit !== null) {
+    // `+20 0100...`: people type the national trunk 0 after the country code; it is not part of E.164.
+    e164 = `+${explicit.startsWith('200') ? `20${explicit.slice(3)}` : explicit}`;
+  } else if (/^01[0125]\d{8}$/.test(digits)) e164 = `+20${digits.slice(1)}`;
+  else if (/^1[0125]\d{8}$/.test(digits)) e164 = `+20${digits}`;
+  else if (/^201[0125]\d{8}$/.test(digits)) e164 = `+${digits}`;
+  return e164 && E164.test(e164) ? e164 : null;
 }
 
 /** `HMAC-SHA256(secret, e164)` as lowercase hex, or null for a phone that is not E.164. */

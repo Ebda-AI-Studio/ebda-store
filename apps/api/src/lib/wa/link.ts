@@ -1,14 +1,48 @@
 import { prisma, runInTenantContext } from '@ebda/database';
+import { getAutomationFlags } from '../../services/plan-entitlements';
 
 /**
- * Has this store connected Ebda WhatsApp? (`settings.ebdaWhatsApp.linked`, set by the `store.linked`
- * / `store.unlinked` flow.) Until a store links, nothing is sent to WhatsApp for it: no event
- * leaves the Store, so a store that never opted in produces no traffic and no phone ever travels.
+ * Is Ebda WhatsApp linked AND entitled for this store? Both must hold; anything unknown fails closed.
+ *
+ *  - Link state: the server-only `store_whatsapp_links` row, written ONLY by `WhatsAppLinkService`
+ *    (the `store.linked` / `store.unlinked` path). It is NOT a flag in `stores.settings`, which the
+ *    store owner writes through the update routes (reserved key, see SERVER_OWNED_SETTINGS_KEYS).
+ *  - Entitlement: the store's EFFECTIVE plan includes the Ebda WhatsApp package
+ *    (`whatsappAutomation`, contract section 1). A downgrade, a lapsed subscription or an unknown
+ *    store stops all events at once, with no event needed.
+ *
+ * No link or no entitlement: no event leaves the Store and no phone travels.
  */
 export async function isWhatsAppLinked(storeId: string): Promise<boolean> {
-  const store = await runInTenantContext(storeId, () =>
-    prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } })
+  const link = await runInTenantContext(storeId, () =>
+    prisma.storeWhatsAppLink.findUnique({ where: { storeId }, select: { linked: true } })
   );
-  const wa = (store?.settings as { ebdaWhatsApp?: { linked?: unknown } } | null)?.ebdaWhatsApp;
-  return wa?.linked === true;
+  if (link?.linked !== true) return false;
+  const flags = await getAutomationFlags(storeId);
+  return flags?.whatsappAutomation === true;
 }
+
+/**
+ * The ONE writer of the link state. Called from the connect / disconnect flow behind the
+ * `store.linked` / `store.unlinked` events, never from a generic update route. Idempotent.
+ */
+export const WhatsAppLinkService = {
+  async setLinked(storeId: string, linked: boolean, ownerUserId?: string): Promise<void> {
+    await runInTenantContext(storeId, () =>
+      prisma.storeWhatsAppLink.upsert({
+        where: { storeId },
+        create: {
+          storeId,
+          linked,
+          ownerUserId: ownerUserId ?? null,
+          linkedAt: linked ? new Date() : null,
+        },
+        update: {
+          linked,
+          ...(ownerUserId ? { ownerUserId } : {}),
+          linkedAt: linked ? new Date() : null,
+        },
+      })
+    );
+  },
+};

@@ -14,6 +14,7 @@ describe('toE164 (Egypt default +20)', () => {
     '201001234567',
     '+201001234567',
     '+20 100 123 4567',
+    '+20 0100 123 4567', // trunk 0 after the country code
     '00201001234567',
     '(0100) 123-4567',
     '٠١٠٠١٢٣٤٥٦٧', // Arabic-Indic digits
@@ -21,6 +22,13 @@ describe('toE164 (Egypt default +20)', () => {
     '1001234567',
   ])('%s -> +201001234567', raw => {
     expect(toE164(raw)).toBe('+201001234567');
+  });
+
+  it('a foreign number needs + or 00: national-looking foreign numbers are NOT turned into Egyptian ones', () => {
+    expect(toE164('07911123456')).toBeNull(); // UK mobile
+    expect(toE164('0501234567')).toBeNull(); // Saudi national
+    expect(toE164('0212345678')).toBeNull(); // Cairo landline
+    expect(toE164('2012345678901')).toBeNull();
   });
 
   it('keeps another country code as given', () => {

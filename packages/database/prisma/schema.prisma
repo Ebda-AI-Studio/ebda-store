@@ -425,6 +425,7 @@ model Store {
   owner                      User                        @relation(fields: [ownerId], references: [id])
   /// Encrypted provider credentials, split out of the routing table (R-EBDA-005).
   credentials                StoreCredential?
+  whatsappLink               StoreWhatsAppLink?
   // Customer accounts that authenticate against this store. Distinct from
   // `customers` (which is the per-store order-history record).
   customerUsers              User[]                      @relation("StoreCustomers")
@@ -551,6 +552,22 @@ model Store {
 /// on first write (`credentials: { upsert: ... }`). Every value is AES-256-GCM ciphertext from
 /// apps/api/src/services/encryption.service.ts; the client omits all three by default, so a
 /// reader names the field it needs in a `select`.
+/// Server-owned link state of Ebda WhatsApp for a store (Store <-> WhatsApp contract 2026-10-24).
+/// Written ONLY by WhatsAppLinkService (the `store.linked` / `store.unlinked` path), never by a
+/// merchant-facing route or the merchant-writable `stores.settings` JSON, which is where a flag
+/// would let a store owner switch the integration on. Read by lib/wa/link.ts together with the
+/// plan entitlement.
+model StoreWhatsAppLink {
+  storeId     String    @id @map("store_id")
+  linked      Boolean   @default(false)
+  ownerUserId String?   @map("owner_user_id")
+  linkedAt    DateTime? @map("linked_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_whatsapp_links")
+}
+
 model StoreCredential {
   storeId         String   @id @map("store_id")
   /// WhatsApp Bulk Sender API key (was `stores.wbs_api_key`).

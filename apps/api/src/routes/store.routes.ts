@@ -33,6 +33,7 @@ import {
   receiptBarcodeShapeSchema,
   footerBottomBarSchema,
   normalizeStoredBottomBar,
+  reservedSettingsKeys,
 } from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
@@ -182,6 +183,14 @@ function addInstalmentsIssues(settings: Record<string, unknown> | undefined, ctx
  * All other keys pass through unvalidated (existing behaviour).
  */
 function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z.RefinementCtx) {
+  // Server-owned keys (e.g. the Ebda WhatsApp link) are never accepted from a client.
+  for (const key of reservedSettingsKeys(settings)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [key],
+      message: `settings.${key} is managed by the platform and cannot be set`,
+    });
+  }
   const contact = settings?.contact;
   if (contact && typeof contact === 'object') {
     const addressUrl = (contact as Record<string, unknown>).addressUrl;

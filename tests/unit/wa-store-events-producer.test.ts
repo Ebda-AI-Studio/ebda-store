@@ -37,6 +37,10 @@ const ORDER = {
   locale: 'ar',
   source: 'web',
   createdAt: new Date('2026-10-25T10:00:00Z'),
+  status: 'pending',
+  paymentStatus: 'unpaid',
+  statusFanoutRequestedAt: new Date('2026-10-25T10:05:00Z'),
+  payments: [{ provider: 'cod', status: 'cod_pending' }],
 };
 
 beforeEach(() => {
@@ -91,6 +95,40 @@ describe('order/created', () => {
     expect(sent()[0]).toMatchObject({ type: 'order.created', data: { paymentMethod: 'card' } });
   });
 
+  it('order/created is re-sent by other paths: the SAME order always yields the SAME envelope ids', async () => {
+    await emitStoreEventsFor(ev('cod'));
+    const first = sent().map(e => e.id);
+    h.send.mockClear();
+    // a different source event id (a COD mark-paid / delivery / stuck-sweep re-send)
+    await emitStoreEventsFor({ ...ev('cod'), id: 'a-completely-different-source-event' });
+    expect(sent().map(e => e.id)).toEqual(first);
+  });
+
+  it('a re-sent order/created after the COD order was paid or shipped does NOT ask the buyer to confirm again', async () => {
+    for (const settled of [
+      { paymentStatus: 'paid', payments: [{ provider: 'cod', status: 'completed' }] },
+      { status: 'shipped' },
+      { status: 'delivered', paymentStatus: 'paid' },
+    ]) {
+      h.send.mockClear();
+      h.order.mockResolvedValue({ ...ORDER, ...settled });
+      await emitStoreEventsFor(ev('cod'));
+      expect(sent().map(e => e.type)).toEqual(['order.created']);
+    }
+  });
+
+  it('a card order that is still unpaid never gets a COD request', async () => {
+    h.order.mockResolvedValue({ ...ORDER, payments: [{ provider: 'paymob', status: 'pending' }] });
+    await emitStoreEventsFor(ev('paymob'));
+    expect(sent().map(e => e.type)).toEqual(['order.created']);
+  });
+
+  it('empty locale / source fall back instead of failing the envelope forever', async () => {
+    h.order.mockResolvedValue({ ...ORDER, locale: '', source: '' });
+    await emitStoreEventsFor({ ...ev('cod'), data: { ...ev('cod').data, locale: '' } });
+    expect(sent()[0]!.data).toMatchObject({ locale: 'ar', channel: 'web' });
+  });
+
   it('a retry of the same source event sends the SAME envelope ids (consumers dedupe on id)', async () => {
     await emitStoreEventsFor(ev('cod'));
     const first = sent().map(e => e.id);
@@ -129,7 +167,7 @@ describe('order/created', () => {
 });
 
 describe('order/status-changed and shipment/status-updated', () => {
-  it('emits order.status_changed', async () => {
+  it('emits order.status_changed stamped with when the transition was REQUESTED, not when the job ran', async () => {
     await emitStoreEventsFor({
       id: 's2',
       name: 'order/status-changed',
@@ -137,8 +175,21 @@ describe('order/status-changed and shipment/status-updated', () => {
     });
     expect(sent()[0]).toMatchObject({
       type: 'order.status_changed',
-      data: { orderId: 'o1', status: 'cancelled' },
+      data: { orderId: 'o1', status: 'cancelled', updatedAt: '2026-10-25T10:05:00.000Z' },
     });
+  });
+
+  it('two transitions of one order get different ids (a later status is not deduped away)', async () => {
+    const mk = (status: string, at: string) => {
+      h.order.mockResolvedValue({ ...ORDER, statusFanoutRequestedAt: new Date(at) });
+      return emitStoreEventsFor({
+        name: 'order/status-changed',
+        data: { orderId: 'o1', storeId: STORE, status },
+      });
+    };
+    await mk('confirmed', '2026-10-25T10:01:00Z');
+    await mk('cancelled', '2026-10-25T10:09:00Z');
+    expect(new Set(sent().map(e => e.id)).size).toBe(2);
   });
 
   it('emits shipment.updated with the phone and tracking link when known, and drops a non-http link', async () => {
