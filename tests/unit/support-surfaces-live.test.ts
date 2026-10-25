@@ -28,9 +28,9 @@ describe.each([
     if (app === 'docs') expect(read('apps/docs/out/ar/index.html')).toContain(titleAr);
     const home = read('apps', app, 'out', app === 'help' ? 'en/index.html' : 'index.html');
     expect(home).toContain('Ebda Store');
-    // a product gets its section the day it ships; the shared header's Products menu (NAV-1) lists the live products
+    // a product gets its section the day it ships (WhatsApp ships with Store); the shared header's Products menu (NAV-1) lists the live products
     const withoutNav = home.replace(/<nav class="top-nav"[\s\S]*?<\/nav>/, '');
-    expect(withoutNav).not.toMatch(/Ebda (WhatsApp|CRM|ERP)/);
+    expect(withoutNav).not.toMatch(/Ebda (CRM|ERP)/);
   });
 
   it('has its own sitemap, robots and a security.txt with its own canonical', () => {
@@ -78,4 +78,28 @@ describe('deploy workflows (production only, verified after deploy)', () => {
       expect(y).not.toMatch(/preview|staging|--env/i);
     });
   }
+});
+
+describe('docs.ebda.app Ebda WhatsApp section (LAUNCH-SUITE-1)', () => {
+  it('four pages build in English at /whatsapp/<slug>/ and Arabic at /ar/whatsapp/<slug>/, linked and listed', () => {
+    const slugs = ['overview', 'connect-your-number', 'api', 'webhooks'];
+    const out = (...p: string[]) => path.join(ROOT, 'apps/docs/out', ...p);
+    for (const s of slugs) {
+      expect(existsSync(out('whatsapp', s, 'index.html')), `en ${s}`).toBe(true);
+      expect(existsSync(out('ar', 'whatsapp', s, 'index.html')), `ar ${s}`).toBe(true);
+    }
+    const ar = readFileSync(out('ar', 'whatsapp', 'api', 'index.html'), 'utf8');
+    expect(ar).toContain('dir="rtl"');
+    expect(ar).toContain('hreflang="en" href="https://docs.ebda.app/whatsapp/api/"');
+    expect(readFileSync(out('whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
+      'Ebda WhatsApp'
+    );
+    const map = readFileSync(out('sitemap.xml'), 'utf8');
+    expect(map).toContain('https://docs.ebda.app/whatsapp/webhooks/');
+    expect(map).toContain('https://docs.ebda.app/ar/whatsapp/webhooks/');
+    // Arabic pages link to Arabic pages, never to the English twin by accident
+    expect(readFileSync(out('ar', 'whatsapp', 'overview', 'index.html'), 'utf8')).toContain(
+      'href="/ar/whatsapp/api/"'
+    );
+  });
 });

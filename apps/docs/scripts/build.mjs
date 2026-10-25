@@ -26,6 +26,8 @@ const ORIGIN = `https://${BRAND.domains.docs}`;
 const url = slug => (slug === 'index' ? '/' : `/${slug}/`);
 
 const SECTIONS = ['Start', 'Concepts', 'Reference'];
+/** Further products (BRAND-ARCH-1, LAUNCH-SUITE-1): content/<folder>/{en,ar}/<slug>.mdx -> /<folder>/<slug>/ (en) and /ar/<folder>/<slug>/ (ar). */
+const WA = { folder: 'whatsapp', section: 'Ebda WhatsApp', sectionAr: 'ابدأ واتساب' };
 /** The products this site documents (BRAND-ARCH-1). A product is added when it ships; never a placeholder. */
 const PRODUCT = BRAND.product.nameEn;
 const EN = {
@@ -55,6 +57,18 @@ resetOut(out, path.join(root, 'public'));
 writeSiteCss(out);
 
 const pages = loadContent(path.join(root, 'content'));
+const waEn = loadContent(path.join(root, 'content', WA.folder, 'en')).map(p => ({
+  ...p,
+  slug: `${WA.folder}/${p.slug}`,
+}));
+const waAr = loadContent(path.join(root, 'content', WA.folder, 'ar')).map(p => ({
+  ...p,
+  slug: `${WA.folder}/${p.slug}`,
+}));
+if (waEn.map(p => p.slug).join() !== waAr.map(p => p.slug).join())
+  throw new Error(
+    `WhatsApp docs differ between en and ar:\n en: ${waEn.map(p => p.slug)}\n ar: ${waAr.map(p => p.slug)}`
+  );
 const arIndex = loadContent(path.join(root, 'content', 'ar'))[0];
 const spec = JSON.parse(readFileSync(path.join(root, '.generated', 'openapi.json'), 'utf8'));
 const coverage = JSON.parse(readFileSync(path.join(root, '.generated', 'coverage.json'), 'utf8'));
@@ -76,17 +90,25 @@ const allNav = [
     section: p.data.section,
     order: p.data.order,
   })),
+  ...waEn.map(p => ({
+    slug: p.slug,
+    title: p.data.title,
+    section: WA.section,
+    order: p.data.order,
+  })),
   REF,
 ];
 const sidebarFor = current =>
   renderSidebar(
-    SECTIONS.map(section => ({
-      title: `${PRODUCT} · ${section}`,
-      items: allNav
-        .filter(p => p.section === section)
-        .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
-        .map(p => ({ href: url(p.slug), label: p.title, current: p.slug === current })),
-    })).filter(g => g.items.length),
+    [...SECTIONS, WA.section]
+      .map(section => ({
+        title: section === WA.section ? WA.section : `${PRODUCT} · ${section}`,
+        items: allNav
+          .filter(p => p.section === section)
+          .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+          .map(p => ({ href: url(p.slug), label: p.title, current: p.slug === current })),
+      }))
+      .filter(g => g.items.length),
     EN.sidebarLabel
   );
 
@@ -112,14 +134,23 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
         : `${title} | ${BRAND.company.shortNameEn} Docs`,
     description,
     canonical: ORIGIN + url(slug),
-    alternates: [
-      { hreflang: 'en', href: ORIGIN + '/' },
-      { hreflang: 'ar', href: ORIGIN + '/ar/' },
-    ],
+    alternates: slug.startsWith(`${WA.folder}/`)
+      ? [
+          { hreflang: 'en', href: ORIGIN + url(slug) },
+          { hreflang: 'ar', href: ORIGIN + '/ar' + url(slug) },
+        ]
+      : [
+          { hreflang: 'en', href: ORIGIN + '/' },
+          { hreflang: 'ar', href: ORIGIN + '/ar/' },
+        ],
     siteLabel: EN.site,
     homeHref: '/',
     active: 'docs',
-    langSwitch: { href: '/ar/', label: 'العربية', lang: 'ar' },
+    langSwitch: {
+      href: slug.startsWith(`${WA.folder}/`) ? `/ar${url(slug)}` : '/ar/',
+      label: 'العربية',
+      lang: 'ar',
+    },
     search: EN.search,
     sidebar: sidebarFor(slug),
     main: `<article class="prose">${renderToc(headings, EN.tocLabel)}${main}</article>`,
@@ -150,7 +181,12 @@ for (const p of pages) {
           )
           .join(
             ''
-          )}<li><a href="${url(REF.slug)}">${esc(REF.title)}</a><p class="muted">${esc(REF.description)}</p></li></ul>`
+          )}<li><a href="${url(REF.slug)}">${esc(REF.title)}</a><p class="muted">${esc(REF.description)}</p></li></ul><h2 id="p-whatsapp">${esc(WA.section)}</h2><ul class="cards">${waEn
+          .map(
+            x =>
+              `<li><a href="${url(x.slug)}">${esc(x.data.title)}</a><p class="muted">${esc(x.data.description)}</p></li>`
+          )
+          .join('')}</ul>`
       : '';
   enPage({
     slug: p.slug,
@@ -160,6 +196,83 @@ for (const p of pages) {
     main: `<h1>${esc(p.data.title)}</h1>${html}${cards}`,
     headings,
     bodyHtml: html + cards,
+  });
+}
+
+// Ebda WhatsApp section (English at /whatsapp/<slug>/, Arabic at /ar/whatsapp/<slug>/).
+for (const p of waEn) {
+  const { html, headings } = await renderMdx(p.body, { tableLabel: p.data.title });
+  enPage({
+    slug: p.slug,
+    title: p.data.title,
+    description: p.data.description,
+    section: WA.section,
+    main: `<h1>${esc(p.data.title)}</h1>${html}`,
+    headings,
+    bodyHtml: html,
+  });
+}
+const arNav = [
+  { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
+  { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
+  { href: `https://${BRAND.domains.help}`, label: 'مركز المساعدة' },
+  { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
+];
+const arFooter = renderFooter({
+  copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
+  links: [{ href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail }],
+});
+const arWaSidebar = current =>
+  renderSidebar(
+    [
+      {
+        title: WA.sectionAr,
+        items: waAr
+          .slice()
+          .sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99))
+          .map(p => ({
+            href: `/ar${url(p.slug)}`,
+            label: p.data.title,
+            current: p.slug === current,
+          })),
+      },
+    ],
+    'الوثائق'
+  );
+for (const p of waAr) {
+  const { html, headings } = await renderMdx(p.body, { tableLabel: p.data.title });
+  const arUrl = `/ar${url(p.slug)}`;
+  writePage(
+    out,
+    arUrl,
+    renderPage({
+      lang: 'ar',
+      title: `${p.data.title} | وثائق ${BRAND.company.shortNameAr}`,
+      description: p.data.description,
+      canonical: ORIGIN + arUrl,
+      alternates: [
+        { hreflang: 'en', href: ORIGIN + url(p.slug) },
+        { hreflang: 'ar', href: ORIGIN + arUrl },
+      ],
+      siteLabel: 'وثائق المطوّرين',
+      homeHref: '/ar/',
+      nav: arNav,
+      langSwitch: { href: url(p.slug), label: 'English', lang: 'en' },
+      search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
+      sidebar: arWaSidebar(p.slug),
+      main: `<article class="prose">${renderToc(headings, 'في هذه الصفحة')}<h1>${esc(p.data.title)}</h1>${html}</article>`,
+      footer: arFooter,
+      skipLabel: 'تخطَّ إلى المحتوى',
+    })
+  );
+  urls.push(arUrl);
+  searchDocs.push({
+    url: arUrl,
+    title: p.data.title,
+    section: WA.sectionAr,
+    lang: 'ar',
+    headings: headings.map(h => h.text),
+    html,
   });
 }
 
@@ -187,6 +300,11 @@ for (const p of pages) {
     .map(
       x =>
         `<li><a href="${url(x.slug)}">${esc(x.data.title)}</a><p class="muted">${esc(x.data.description)}</p></li>`
+    )
+    .join('')}</ul><h2 id="p-whatsapp">${esc(WA.sectionAr)}</h2><ul class="cards">${waAr
+    .map(
+      x =>
+        `<li><a href="/ar${url(x.slug)}">${esc(x.data.title)}</a><p class="muted">${esc(x.data.description)}</p></li>`
     )
     .join('')}</ul>`;
   const page = renderPage({
@@ -346,6 +464,8 @@ writeFileSync(
   path.join(out, 'llms.txt'),
   `# ${BRAND.company.shortNameEn} Docs\n\n> Developer documentation for ${BRAND.product.nameEn}, from ${BRAND.company.shortNameEn}. Products are added here as they ship.\n\n${pages
     .map(p => `- [${p.data.title}](${ORIGIN}${url(p.slug)}): ${p.data.description}`)
-    .join('\n')}\n- [OpenAPI document](${ORIGIN}/openapi.json)\n`
+    .join(
+      '\n'
+    )}\n${waEn.map(p => `- [${p.data.title}](${ORIGIN}${url(p.slug)}): ${p.data.description}`).join('\n')}\n- [OpenAPI document](${ORIGIN}/openapi.json)\n`
 );
 console.log(`docs built: ${urls.length} pages -> ${out}`);
