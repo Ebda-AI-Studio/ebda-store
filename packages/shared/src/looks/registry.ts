@@ -752,7 +752,8 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#62505A',
       primary: '#A5303F',
       onPrimary: '#FFFFFF',
-      accent: '#2F6B34',
+      // Template-match PR8: the mock-up's herb green (#3E7A3A, 5.19:1 on white), a step lighter than the #2F6B34 of B4-2.
+      accent: '#3E7A3A',
       line: '#EBD6DA',
       fonts: { display: 'El Messiri', body: 'Cairo', latin: 'Fraunces' },
       radius: 'md',
