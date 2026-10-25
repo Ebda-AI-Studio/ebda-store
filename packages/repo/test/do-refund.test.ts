@@ -193,14 +193,6 @@ describe('cancelOrder', () => {
       })
     ); // 2 on hand, 5 ordered: took 2
     expect(f.stock('product_variants', 'v2')).toBe(0);
-    const item = f.one<{ id: string }>(
-      `SELECT id FROM order_items WHERE order_id = ?`,
-      o.orderId
-    ).id;
-    f.x(
-      `INSERT INTO backorder_lines (id, store_id, order_item_id, product_id, variant_id, qty, stock_taken) VALUES ('bl', 's1', ?, 'vprod', 'v2', 5, 2)`,
-      item
-    );
     const r = cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
     expect(f.stock('product_variants', 'v2')).toBe(2); // 5 - 3 never taken
     expect(r.backorderLinesCancelled).toBe(1);
