@@ -63,7 +63,7 @@ export async function countPriorCouponUses(
     throw new AppError(
       400,
       'COUPON_NEEDS_CONTACT',
-      'This coupon is limited per customer: add a phone number or email to use it. / هذا الكوبون لكل عميل مرة واحدة، أضف رقم الموبايل أو الإيميل لاستخدامه.'
+      'This coupon is limited per customer: add a phone number or email to use it.'
     );
   }
   const keys = [
