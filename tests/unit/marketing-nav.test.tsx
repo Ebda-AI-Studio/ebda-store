@@ -42,7 +42,7 @@ describe('header nav and footer links', () => {
     const homeIds = new Set([...pages.home.matchAll(/ id="([^"]+)"/g)].map(m => m[1]));
     for (const [name, html] of Object.entries(pages)) {
       it(`${l} ${name}: nav labels are unique and every nav + footer href resolves`, () => {
-        const nav = hrefs(html, /<ul class="nav-links">.*?<\/ul>/s);
+        const nav = hrefs(html, /<ul class="nav-links">.*?<\/ul>(?=<details class="nav-menu">)/s);
         const menu = hrefs(html, /<details class="nav-menu">.*?<\/details>/s);
         const footer = hrefs(html, /<footer class="site-footer.*?<\/footer>/s);
         expect(nav.length).toBeGreaterThan(3);

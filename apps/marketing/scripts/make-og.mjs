@@ -71,7 +71,7 @@ const phones = embed =>
 
 const build =
   embed => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-<title>ebda ابدأ — ابدأ متجرك</title>
+<title>ابدأ ستور — ابدأ متجرك</title>
 <rect width="${W}" height="${H}" fill="${CANVAS}"/>
 <g filter="url(#sh)">${phones(embed)}</g>
 <defs><filter id="sh" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#121314" flood-opacity=".22"/></filter></defs>

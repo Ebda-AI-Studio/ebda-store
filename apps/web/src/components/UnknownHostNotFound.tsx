@@ -44,8 +44,8 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
       </h1>
       <p className="mt-3 max-w-sm text-[15px] leading-relaxed" style={{ color: MUTED }}>
         {t(
-          'Check the link, or start your own store on Ebda in minutes.',
-          'اتأكد من الرابط، أو ابدأ متجرك الخاص على إبدأ في دقايق.'
+          'Check the link, or start your own store on Ebda Store in minutes.',
+          'اتأكد من الرابط، أو ابدأ متجرك الخاص على ابدأ ستور في دقايق.'
         )}
       </p>
 
@@ -55,7 +55,7 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
           className={button}
           style={{ background: BRAND.colors.gold, color: BRAND.colors.night, outlineColor: INK }}
         >
-          {t('Create your store on Ebda', 'أنشئ متجرك على إبدأ')}
+          {t('Create your store on Ebda Store', 'أنشئ متجرك على ابدأ ستور')}
         </a>
         {links.whatsappHref && (
           <a

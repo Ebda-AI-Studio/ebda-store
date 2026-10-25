@@ -97,14 +97,14 @@ export function posthogAssetsHost(apiHost: string): string {
 
 const COPY = {
   ar: {
-    text: 'بنستخدم كوكيز عشان نعرف الناس بتوصل لابدأ منين وإعلاناتنا شغالة ولا لأ. توافق أو ترفض، والموقع بيشتغل زي بعضه في الحالتين.',
+    text: 'بنستخدم كوكيز عشان نعرف الناس بتوصل لـ ابدأ ستور منين وإعلاناتنا شغالة ولا لأ. توافق أو ترفض، والموقع بيشتغل زي بعضه في الحالتين.',
     accept: 'موافق',
     decline: 'لا، شكرًا',
     more: 'تفاصيل أكتر',
     label: 'إعدادات الكوكيز',
   },
   en: {
-    text: 'We use cookies to learn where visitors find Ebda and whether our ads work. Accept or decline: the site works the same either way.',
+    text: 'We use cookies to learn where visitors find Ebda Store and whether our ads work. Accept or decline: the site works the same either way.',
     accept: 'Accept',
     decline: 'Decline',
     more: 'Learn more',

@@ -37,7 +37,7 @@ const OG_IMAGE = {
   width: 1200,
   height: 630,
   // Describes what og.png shows (the wordmark, «ابدأ متجرك» and the domain), nothing else.
-  alt: `ebda ابدأ — ابدأ متجرك · ${BRAND.domains.marketing}`,
+  alt: `${BRAND.product.nameAr} — ابدأ متجرك · ${BRAND.domains.marketing}`,
 };
 
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */

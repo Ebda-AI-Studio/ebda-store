@@ -288,7 +288,7 @@
         "deletedToastDescription": "{name} and all of its data have been removed."
       },
       "acquisition": {
-        "title": "How they found Ebda",
+        "title": "How they found Ebda Store",
         "none": "No acquisition data. The owner signed up without accepting tracking, or before it existed.",
         "source": "Source",
         "medium": "Medium",
@@ -7485,7 +7485,7 @@
   },
   "lifecycleEmails": {
     "title": "Setup emails",
-    "subtitle": "The onboarding emails Ebda sent to your account, and what happened to each.",
+    "subtitle": "The onboarding emails Ebda Store sent to your account, and what happened to each.",
     "optedOut": "You unsubscribed: no more setup or trial emails will be sent. Order and billing emails are not affected.",
     "colEmail": "Email",
     "colStatus": "Status",
@@ -10559,7 +10559,7 @@
     }
   },
   "ebdaReceipt": {
-    "aria": "Ebda payment receipt",
+    "aria": "Ebda Store payment receipt",
     "subtitle": "Payment receipt",
     "total": "Total",
     "paid": "Payment received. Thank you.",

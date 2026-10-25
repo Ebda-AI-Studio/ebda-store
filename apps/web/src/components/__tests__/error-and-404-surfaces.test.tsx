@@ -71,14 +71,14 @@ describe('UnknownHostNotFound', () => {
     languageState.language = 'ar';
     const { container } = render(<UnknownHostNotFound links={unknownHostLinks({})} />);
     expect(container.textContent).toContain('المتجر ده مش موجود أو لسه مفتحش');
-    expect(container.textContent).toContain('أنشئ متجرك على إبدأ');
-    expect(container.textContent).not.toContain('Create your store on Ebda');
+    expect(container.textContent).toContain('أنشئ متجرك على ابدأ ستور');
+    expect(container.textContent).not.toContain('Create your store on Ebda Store');
   });
 
   it('keeps the English copy for an English visitor', () => {
     const { container } = render(<UnknownHostNotFound links={unknownHostLinks({})} />);
     expect(container.textContent).toContain('This store doesn’t exist or hasn’t opened yet');
-    expect(container.textContent).toContain('Create your store on Ebda');
+    expect(container.textContent).toContain('Create your store on Ebda Store');
   });
 
   // #1541 — brand gold button with night text (not the retired Force orange).

@@ -72,7 +72,7 @@ Write a meta description that directly answers the question a user might ask an 
 - Both English and Arabic. ${EGYPTIAN_ARABIC_REGISTER}
 
 Return ONLY a JSON object with keys "en" and "ar". No markdown, no code fences — pure JSON only.
-Example: {"en": "Ebda is an Egypt-based online retailer ...", "ar": "ابدأ متجر مصري متخصص في ..."}`;
+Example: {"en": "Acme Souq is an Egypt-based online retailer ...", "ar": "أكمي سوق متجر مصري متخصص في ..."}`;
 }
 
 export interface GenerateProductMetaAeoInput {

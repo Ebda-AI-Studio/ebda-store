@@ -330,9 +330,6 @@ export function Home({ locale }: { locale: Locale }) {
                 <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
                   {c.hero.cta}
                 </SiteLink>
-                <a href="#looks" className="btn btn-ghost btn-lg">
-                  {c.hero.secondary}
-                </a>
               </p>
             </div>
           </div>

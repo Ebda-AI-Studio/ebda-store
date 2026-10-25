@@ -28,6 +28,9 @@ export function Header({
   const c = COPY[locale];
   const other: Locale = locale === 'ar' ? 'en' : 'ar';
   const home = HOME[locale];
+  /** The master brand (BRAND-ARCH-1): the studio lockup, never a bare product or a bare Ebda. */
+  const studio = locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
+  const store = locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn;
   const anchor = (id: string) =>
     page === '' && !offHome ? `#${id}` : `${home === '/' ? '' : home}/#${id}`;
   /** "Features" is the real /features/ page; every other item is a home section, absolute off the home. */
@@ -40,18 +43,25 @@ export function Header({
   return (
     <header className="site-header">
       <div className="wrap header-row">
-        <Link
-          href={home}
-          className="wordmark"
-          aria-label={locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
-        >
+        <Link href={home} className="wordmark" aria-label={studio}>
           <img src="/icon.svg" alt="" width={28} height={28} />
-          <span className="wm-name">
-            {locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
-          </span>
+          <span className="wm-name">{studio}</span>
         </Link>
         <nav aria-label={c.nav.label} className="nav">
           <ul className="nav-links">
+            <li className="nav-products">
+              <details>
+                <summary>{c.nav.products}</summary>
+                <ul>
+                  <li>
+                    <Link href={home}>
+                      <b>{store}</b>
+                      <span>{c.nav.storeBlurb}</span>
+                    </Link>
+                  </li>
+                </ul>
+              </details>
+            </li>
             {NAV_ANCHORS.map(n => (
               <li key={n.key}>{navLink(n)}</li>
             ))}
@@ -70,6 +80,9 @@ export function Header({
               <span className="menu-label">{c.nav.menu}</span>
             </summary>
             <ul>
+              <li>
+                <Link href={home}>{store}</Link>
+              </li>
               {NAV_ANCHORS.map(n => (
                 <li key={n.key}>{navLink(n)}</li>
               ))}

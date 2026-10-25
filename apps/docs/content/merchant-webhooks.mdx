@@ -5,7 +5,7 @@ section: Reference
 order: 32
 ---
 
-Ebda can send an HTTPS `POST` to your server whenever an order or product changes. This page is about webhooks Ebda sends **to you**. For the payment and billing webhooks Ebda receives, see [Webhooks](/webhooks/).
+Ebda Store can send an HTTPS `POST` to your server whenever an order or product changes. This page is about webhooks Ebda Store sends **to you**. For the payment and billing webhooks Ebda Store receives, see [Webhooks](/webhooks/).
 
 Webhooks are included in the **Growth** and **Business** plans. Manage endpoints in the dashboard under **Settings, Webhooks** (store owner only).
 
@@ -85,7 +85,7 @@ Amounts are in **piastres** (1 EGP = 100). `apiVersion` changes only for a break
 
 ### Personal data
 
-Payloads carry no customer details by default. If you turn on **Include customer name, email and phone** for an endpoint, order events gain `data.customer = { name, email, phone }` for that endpoint only. You are then the controller of that copy; Ebda keeps the delivery log for 30 days.
+Payloads carry no customer details by default. If you turn on **Include customer name, email and phone** for an endpoint, order events gain `data.customer = { name, email, phone }` for that endpoint only. You are then the controller of that copy; Ebda Store keeps the delivery log for 30 days.
 
 ## Verify the signature
 
