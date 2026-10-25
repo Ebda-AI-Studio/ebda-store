@@ -21,13 +21,8 @@ export const FORBIDDEN = /wbs|fwb/i;
 const ALLOWLIST: Record<string, string> = {
   'apps/api/src/lib/barcode-png/shape-masks.generated.ts':
     'base64 mask blobs: the letters "fwb" occur by chance inside the encoded data',
-  // Expand/contract: the code is gone but the DB columns/function are dropped by the follow-up
-  // migration PR, which deletes these three entries.
-  'packages/database/prisma/schema.prisma': 'columns still live until the drop migration ships',
-  'packages/database/src/client.ts': 'omit list names the credential column until it is dropped',
-  'packages/database/src/index.ts': 'store directory still maps the column until it is dropped',
 };
-const MAX_ALLOWLIST_SIZE = 4;
+const MAX_ALLOWLIST_SIZE = 1;
 
 const EXEMPT_PREFIX = 'packages/database/prisma/migrations/';
 const BINARY = /\.(png|jpe?g|webp|avif|gif|ico|glb|woff2?|ttf|otf|pdf|mp4|webm|zip|gz|svg)$/i;

@@ -37,15 +37,15 @@ const prismaOptions = {
   // and greppable. A query-level `select` also still returns the field (naming
   // it IS asking for it); `select` and `omit` cannot be combined in one query.
   //
-  // Store credentials (wbsApiKey, metaAccessToken, agentApiKey) joined the
+  // Store credentials (agentApiKey) joined the
   // omit on 2026-09-25. The earlier worry was that guards like
-  // `if (!store.wbsApiKey) return;` would turn into SILENT no-ops. They can't:
+  // `if (!store.credentials.agentApiKey) return;` would turn into SILENT no-ops. They can't:
   // the generated types follow the global omit, so reading an omitted field
   // off a query that didn't select it is a TYPE ERROR, and every reader now
   // names the field in its `select`. PaymentConfig.{apiKey,secretKey,
   // webhookSecret} still needs the same pass.
   //
-  // 2026-10-07 (R-EBDA-005): the three store credentials moved out of `stores`
+  // 2026-10-07 (R-EBDA-005): the store credentials moved out of `stores`
   // into `store_credentials` (strict store RLS); the omit moved with them, so a
   // reader still names each one in a `select`.
   omit: {
@@ -58,8 +58,6 @@ const prismaOptions = {
       acquisition: true,
     },
     storeCredential: {
-      wbsApiKey: true,
-      metaAccessToken: true,
       agentApiKey: true,
     },
   },

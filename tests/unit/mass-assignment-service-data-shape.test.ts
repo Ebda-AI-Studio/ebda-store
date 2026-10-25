@@ -75,8 +75,6 @@ const PROHIBITED = [
   'plan',
   'status',
   'agentApiKey',
-  'wbsApiKey',
-  'metaAccessToken',
 ] as const;
 
 describe('StoreService.update — Prisma `data` is enumerated, never spread (#1950)', () => {

@@ -772,7 +772,6 @@ export interface StoreDirectoryEntry {
   accountingEnabled: boolean;
   aiFeaturesEnabled: boolean;
   loyaltyEnabled: boolean;
-  wbsEnabled: boolean;
   hasDomain: boolean;
   hasPendingDomain: boolean;
 }
@@ -792,7 +791,6 @@ export async function storeDirectory(
       accounting_enabled: boolean;
       ai_features_enabled: boolean;
       loyalty_enabled: boolean;
-      wbs_enabled: boolean;
       has_domain: boolean;
       has_pending_domain: boolean;
     }>
@@ -806,7 +804,6 @@ export async function storeDirectory(
     accountingEnabled: r.accounting_enabled,
     aiFeaturesEnabled: r.ai_features_enabled,
     loyaltyEnabled: r.loyalty_enabled,
-    wbsEnabled: r.wbs_enabled,
     hasDomain: r.has_domain,
     hasPendingDomain: r.has_pending_domain,
   }));

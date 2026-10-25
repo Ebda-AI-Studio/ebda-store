@@ -270,7 +270,6 @@ model Store {
   whatsapp      String?
   address       String?
   addressAr     String? @map("address_ar")
-  // Used by WhatsApp bot "Locations & Hours" branch (Phase D.6 / Wave 2A)
   businessHours String? @map("business_hours") // free-text, e.g. "Sat–Thu 9am–10pm"
   googleMapsUrl String? @map("google_maps_url") // full Maps URL for the store location
 
@@ -336,33 +335,6 @@ model Store {
   // /locations routes return 404 and the locations admin page is hidden.
   locationsEnabled Boolean @default(false) @map("locations_enabled")
 
-  // Ebda WhatsApp Business Platform integration (opt-in per store)
-  // The WBS API key lives in `StoreCredential.wbsApiKey` (R-EBDA-005), AES-GCM encrypted.
-  // wbsTemplates shape: { orderPaid?, orderShipped?, orderDelivered? }
-  //   each entry: { name: string, languageCode: string, channels?: { whatsapp: boolean, email: boolean } }
-  //   channels defaults: { whatsapp: true, email: true } when absent (backward-compatible)
-  wbsEnabled                Boolean @default(false) @map("wbs_enabled")
-  wbsClientId               String? @map("wbs_client_id")
-  wbsTemplates              Json?   @map("wbs_templates")
-  /// Phase 7 opt-in (2026-05-22): when true, generate templates with a
-  /// HEADER IMAGE component pinned to Store.logo. Customer sees the store
-  /// logo at the top of every order-update WhatsApp message. Defaults
-  /// false because uploading + maintaining the Meta header_handle adds
-  /// complexity per template re-submission.
-  wbsTemplateUseLogoHeader  Boolean @default(false) @map("wbs_template_use_logo_header")
-  /// Customer-DM ordering via WhatsApp (2026-05-23): when true, WBS
-  /// state machine is enabled for this store — customers who DM the
-  /// store's WhatsApp number can order directly. Stored here so Ebda
-  /// can gate the feature per-store and push the flag to WBS.
-  /// Default OFF — merchant must opt in explicitly.
-  waCustomerOrderingEnabled Boolean @default(false) @map("wa_customer_ordering_enabled")
-  /// Phase 2 bot intelligence (2026-05-24): per-store WhatsApp bot copy overrides.
-  /// Shape: Record<string, { en?: string; ar?: string }> keyed by state/purpose.
-  /// e.g. { greeting: { en: "Hi!", ar: "مرحبا!" }, ask_category: { ar: "أي فئة؟" } }
-  /// Absent keys fall back to canonical defaults in WBS botCopyDefaults.js.
-  /// Supports {storeName}, {customerName}, {items}, {total}, {currency} placeholder vars.
-  botCopy                   Json?   @map("bot_copy")
-
   /// When the agent (MCP) write credential was last minted / revoked. The credential
   /// itself is `StoreCredential.agentApiKey` (R-EBDA-005).
   agentApiKeyRotatedAt DateTime? @map("agent_api_key_rotated_at")
@@ -402,24 +374,6 @@ model Store {
   // Accounting Settings (Batch 4 — Insights)
   aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
   insightsRollupCron String  @default("daily") @map("insights_rollup_cron")
-
-  // WhatsApp Native Catalog Bot (Phase A, 2026-05-25)
-  // bot_mode controls which state machine branch WBS activates:
-  //   legacy_chat                    — original category/product list bot (default)
-  //   native_catalog                 — Meta Commerce Catalog send + pre-catalog greeting flow
-  //   native_catalog_with_gemini_agent — native_catalog + Gemini AI agent on Agent path
-  // Flip via Admin → WhatsApp → Bot Mode dropdown. No automatic cutover on existing stores.
-  botMode        String  @default("legacy_chat") @map("bot_mode")
-  /// Service menu configuration (JSON). Shape:
-  /// { orderNow: bool, subscriptionBoxes: bool, locationsHours: bool, chatWithAgent: bool,
-  ///   labels: { en: { orderNow?, subscriptionBoxes?, locationsHours?, chatWithAgent? },
-  ///              ar: { ... } } }
-  /// Absent = WBS uses canonical defaults.
-  botServiceMenu Json?   @map("bot_service_menu")
-  /// FB Commerce Catalog ID (per-merchant, obtained from Meta Business Manager)
-  metaCatalogId  String? @map("meta_catalog_id")
-  /// FB Business Manager ID
-  metaBusinessId String? @map("meta_business_id")
 
   // Relations
   owner                      User                        @relation(fields: [ownerId], references: [id])
@@ -517,7 +471,6 @@ model Store {
   funnelSnapshots            FunnelSnapshot[]
   customerRfmSnapshots       CustomerRfmSnapshot[]
   productDailyViews          ProductDailyView[]
-  whatsAppTemplates          WhatsAppTemplate[]
   paymentEvents              PaymentEvent[]
   orderEvents                OrderEvent[]
   webhookEvents              WebhookEvent[]
@@ -553,10 +506,6 @@ model Store {
 /// reader names the field it needs in a `select`.
 model StoreCredential {
   storeId         String   @id @map("store_id")
-  /// WhatsApp Bulk Sender API key (was `stores.wbs_api_key`).
-  wbsApiKey       String?  @map("wbs_api_key")
-  /// Meta Catalog long-lived access token (was `stores.meta_access_token`).
-  metaAccessToken String?  @map("meta_access_token")
   /// Agent (MCP) write credential (was `stores.agent_api_key`).
   agentApiKey     String?  @map("agent_api_key")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -4794,33 +4743,6 @@ model CountLine {
   @@index([productId])
   @@index([variantId])
   @@map("count_lines")
-}
-
-/// Phase 7: store-driven WhatsApp template management.
-/// One row per (storeId, sourceKey, language). Status updates land via
-/// the WBS bridge callback at POST /api/v1/wa-bridge/templates/status.
-/// The 6 canonical sourceKeys are defined in apps/api/src/lib/wa-templates/definitions.ts;
-/// new sourceKeys can be added without a schema change.
-model WhatsAppTemplate {
-  id              String    @id @default(uuid())
-  storeId         String    @map("store_id")
-  sourceKey       String    @map("source_key") @db.VarChar(64)
-  language        String    @db.VarChar(8)
-  metaName        String    @map("meta_name") @db.VarChar(255)
-  category        String    @db.VarChar(32)
-  body            String    @db.Text
-  status          String    @default("draft") @db.VarChar(32)
-  rejectionReason String?   @map("rejection_reason") @db.Text
-  metaTemplateId  String?   @map("meta_template_id") @db.VarChar(255)
-  lastSyncedAt    DateTime? @map("last_synced_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
-
-  @@unique([storeId, sourceKey, language])
-  @@index([storeId, status])
-  @@map("whatsapp_templates")
 }
 
 // ==========================================
