@@ -1973,3 +1973,25 @@ html[lang='en'] [data-look] .font-display {
 [data-look] [data-bottom-tab-bar] ul > li > :is(a, button) > span:first-child {
   height: var(--look-tab-icon, 2.25rem);
 }
+
+/*
+ * Template-match PR4 (G5): hierarchy on a phone. A look sets heading, product-name and price type through
+ * --look-h-* / --look-name-* / --look-price-* (mock-tokens.ts), emitted for look stores only and read here under
+ * [data-look], so legacy stores are untouched. A merchant's own zone typography is an inline style and still wins.
+ * Phones only: from 640px the skins' own scale applies.
+ */
+@media (max-width: 639.98px) {
+  [data-look] [data-zone='sectionTitle'] {
+    font-size: var(--look-h-size);
+    font-weight: var(--look-h-weight);
+    line-height: 1.25;
+  }
+  [data-look] [data-zone='productName'] {
+    font-size: var(--look-name-size);
+    font-weight: var(--look-name-weight);
+  }
+  [data-look] [data-zone='productPrice'] {
+    font-size: var(--look-price-size);
+    font-weight: var(--look-price-weight);
+  }
+}

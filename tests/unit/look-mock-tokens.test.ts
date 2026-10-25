@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { mockCssVars, mockTokensFor, MOCK_TOKENS } from '../../packages/shared/src';
+import { headingWeight, mockCssVars, mockTokensFor, MOCK_TOKENS } from '../../packages/shared/src';
+import { LOOK_FONT_SPECS } from '../../packages/shared/src/looks/fonts';
+import { LOOKS } from '../../packages/shared/src/looks/registry';
 import { LOOK_VAR_PATTERNS, buildThemeStyleTag } from '../../apps/web/src/lib/theme-css';
 import { getLook } from '../../packages/shared/src/looks/registry';
 
@@ -10,14 +12,21 @@ describe('look mock tokens (template-match)', () => {
     for (const id of Object.keys(MOCK_TOKENS)) expect(getLook(id), id).toBeTruthy();
   });
 
-  it('a look without hero tokens still slims the tab bar; no look emits nothing (byte-identical to before)', () => {
-    expect(mockCssVars('qamar.lookbook')).toEqual({
-      '--bottom-tab-h': '57px',
-      '--look-tab-pad': '0.25rem',
-      '--look-tab-icon': '1.75rem',
-    });
+  it('a look without a hero ratio sets no hero variables; no look or an unknown one emits nothing', () => {
+    const v = mockCssVars('qamar.lookbook');
+    expect(v['--look-hero-aspect']).toBeUndefined();
+    expect(v['--bottom-tab-h']).toBe('57px');
     expect(mockCssVars(null)).toEqual({});
     expect(mockCssVars('not.a.look')).toEqual({});
+  });
+
+  it('every built look has a heading size, and its weight is one its display face really loads', () => {
+    for (const l of LOOKS) {
+      expect(mockTokensFor(l.id).headingSize, l.id).toBeGreaterThanOrEqual(20);
+      const spec = LOOK_FONT_SPECS[l.tokens.fonts.display] ?? '';
+      const loaded = spec ? (spec.split('@')[1] ?? '').split(';').map(Number) : [400];
+      expect(loaded, `${l.id} ${l.tokens.fonts.display}`).toContain(headingWeight(l.id));
+    }
   });
 
   it('every emitted variable has a strict allow-list pattern and its value passes it', () => {
