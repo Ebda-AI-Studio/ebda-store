@@ -23,7 +23,8 @@ export function writeFreeze(req: Request, res: Response, next: NextFunction): vo
     success: false,
     error: {
       code: 'READ_ONLY_WINDOW',
-      message: 'Ebda is moving to its new infrastructure. Reads work; try again in a few minutes.',
+      message:
+        'The service is moving to new infrastructure. Reads work; try again in a few minutes.',
     },
   });
 }

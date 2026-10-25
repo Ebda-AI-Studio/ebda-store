@@ -10,14 +10,14 @@ case "$CUTOVER_PG_URL" in *neon.tech*) echo "refusing: this is a Neon URL; the r
 WORK="${1:-$(mktemp -d)}"; PORT="${REHEARSAL_PORT:-8799}"
 export CUTOVER_IMPORT_SECRET="${CUTOVER_IMPORT_SECRET:-rehearsal-$(openssl rand -hex 16)}"
 export CUTOVER_DO_URL="http://localhost:$PORT"
-CFG=packages/cf-migrate/harness/wrangler.jsonc
+CFG=packages/cf-migrate/harness/.wrangler.smoke.jsonc
 D1=(--d1 ebda-platform --d1-config "$CFG" --persist-to "$WORK/state")
 declare -a ROWS
 step() { local name="$1"; shift; local t0=$SECONDS; local s0; s0=$(date +%s); "$@" >"$WORK/$name.log" 2>&1 || { echo "STEP FAILED: $name (see $WORK/$name.log)"; tail -15 "$WORK/$name.log"; exit 1; }; ROWS+=("$(printf '%-34s %5ss' "$name" "$(( $(date +%s) - s0 ))")"); }
 
 pkill -f "wrangler dev -c $CFG" 2>/dev/null || true; sleep 1
 rm -rf "$WORK/state"; mkdir -p "$WORK/state"
-npx wrangler dev -c "$CFG" --persist-to "$WORK/state" --port "$PORT" --var "CUTOVER_IMPORT_SECRET:$CUTOVER_IMPORT_SECRET" >"$WORK/wrangler.log" 2>&1 &
+npx wrangler dev -c packages/cf-migrate/harness/.wrangler.smoke.jsonc --persist-to "$WORK/state" --port "$PORT" --var "CUTOVER_IMPORT_SECRET:$CUTOVER_IMPORT_SECRET" >"$WORK/wrangler.log" 2>&1 &
 WPID=$!; trap 'kill $WPID 2>/dev/null || true; pkill -f "wrangler dev -c $CFG" 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do grep -q "Ready on" "$WORK/wrangler.log" && break; sleep 1; done
 grep -q "Ready on" "$WORK/wrangler.log" || { echo "harness did not start"; tail "$WORK/wrangler.log"; exit 1; }
