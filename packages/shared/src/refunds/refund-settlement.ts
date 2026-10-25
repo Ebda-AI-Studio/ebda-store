@@ -235,7 +235,8 @@ export interface RefundClaimEventRow {
 /** Longest after OUR refund executed that a Fawry settle notice may still be attributed to it (Fawry documents no delay). */
 export const SETTLE_NOTICE_WINDOW_MS = 30 * 60 * 1000;
 
-const FAWRY_NOTICE_REF = /^fawry-refund-([A-Za-z0-9_.]{1,64})-(REFUNDED|PARTIAL_REFUNDED)$/;
+const FAWRY_NOTICE_REF =
+  /^fawry-refund-([A-Za-z0-9_.]{1,64})-(REFUNDED|PARTIAL_REFUNDED)(?:~[A-Za-z0-9_.-]{1,64})?$/;
 const FAWRY_INBAND_REF = /^fawry-refund-([A-Za-z0-9_.]{1,64})-(\d{1,12})$/;
 
 /**

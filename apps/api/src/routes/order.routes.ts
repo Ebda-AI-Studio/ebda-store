@@ -1577,6 +1577,8 @@ router.post(
       // ambient tenant transaction or opens one): every patch below is built from the LOCKED copy, never from the row read
       // before the lock, so a concurrent webhook cannot interleave and have its metadata overwritten by a stale spread.
       const updateData: Record<string, unknown> = {};
+      // the LOCKED row: everything computed from the payment after the lock (raised amount, status) uses this, never the row read before it
+      const lockedHolder: { v: { refundedAmount: number; status: string } | null } = { v: null };
       await inSettlementTx(storeId, async () => {
         const settleRes = await settleRefundEvent({
           paymentId: payment.id,
@@ -1590,6 +1592,7 @@ router.post(
           },
         });
         const locked = settleRes.payment;
+        lockedHolder.v = { refundedAmount: locked.refundedAmount, status: locked.status };
         updateData.metadata = {
           ...locked.metadata,
           refundStatus: status.status,
@@ -1651,7 +1654,7 @@ router.post(
         storeId,
         orderId,
         eventType: 'reconciliation',
-        fromStatus: payment.status,
+        fromStatus: (lockedHolder.v?.status ?? payment.status) as typeof payment.status,
         toStatus: (updateData.status as typeof payment.status | undefined) ?? null,
         provider: payment.provider,
         triggeredByUserId: user.userId,
@@ -1707,7 +1710,8 @@ router.post(
       // sent after this request commits, with the payment write above.
       const raisedBy =
         typeof updateData.refundedAmount === 'number'
-          ? updateData.refundedAmount - (payment.refundedAmount ?? 0)
+          ? updateData.refundedAmount -
+            (lockedHolder.v?.refundedAmount ?? payment.refundedAmount ?? 0)
           : 0;
       const providerRefundId = status.refundId ?? payment.refundId;
       if (updateData.status === 'partially_refunded' && raisedBy > 0 && providerRefundId) {
@@ -1718,7 +1722,8 @@ router.post(
       }
       const needsSideEffects =
         status.status === 'completed' &&
-        (payment.status === 'completed' || payment.status === 'partially_refunded') &&
+        ((lockedHolder.v?.status ?? payment.status) === 'completed' ||
+          (lockedHolder.v?.status ?? payment.status) === 'partially_refunded') &&
         refundIsFull;
       if (needsSideEffects) {
         // Guard the direct Order.status write with the state machine — this

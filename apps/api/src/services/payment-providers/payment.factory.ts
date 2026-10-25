@@ -53,8 +53,15 @@ import {
   REFUND_RELEASED_EVENT,
   REFUND_INDETERMINATE_EVENT,
   REFUND_RECONCILED_EVENT,
+  REFUND_REVIEW_EVENT,
 } from './refund-outcome';
-import { settleRefundEvent, settleClaimRelease, inSettlementTx } from './refund-settle';
+import {
+  settleRefundEvent,
+  settleClaimRelease,
+  inSettlementTx,
+  lockPayment,
+  absorbedRefundIdFor,
+} from './refund-settle';
 
 import { REGION } from '@ebda/shared';
 import { paymentWebhookUrl } from './webhook-url';
@@ -1199,7 +1206,12 @@ export class PaymentService {
       }
       await prisma.paymentEvent.create({
         data: {
-          ...refundEvent(REFUND_CLAIM_EVENT, 'refund_claimed'),
+          ...refundEvent(REFUND_CLAIM_EVENT, 'refund_claimed', {
+            // read back by the settlement rules (Fawry kind match, release status): same shape as the StoreDO claim
+            isFullRefund,
+            flipsOrder,
+            priorStatus: payment.status,
+          }),
           fromStatus: payment.status,
           toStatus: claimedStatus,
         },
@@ -1314,11 +1326,34 @@ export class PaymentService {
     // caller the money moved.
     try {
       await commitOnOwnTransaction(moneyStoreId, async () => {
-        const current = await prisma.payment.findUnique({
-          where: { id: payment.id },
-          select: { metadata: true },
-        });
-        const currentMetadata = current?.metadata ?? payment.metadata;
+        // Under the payment LOCK, from the LOCKED row: a webhook that committed meanwhile (its id, its status map) must not be
+        // overwritten by a stale spread, or its redelivery would be booked a second time.
+        const locked = await lockPayment(payment.id);
+        const currentMetadata = locked?.metadata ?? payment.metadata;
+        // A settle webhook already ABSORBED this claim under a different refund id than the one the provider just answered
+        // with: two refunds were reconciled as one. Nothing is overwritten; a human reviews it.
+        const absorbedAs = await absorbedRefundIdFor(payment.id, moneyStoreId ?? '', claimId);
+        if (absorbedAs && absorbedAs !== response.refundId) {
+          await prisma.paymentEvent.create({
+            data: {
+              ...refundEvent(REFUND_REVIEW_EVENT, 'absorbed_under_a_different_refund_id', {
+                absorbedRefundId: absorbedAs,
+                answeredRefundId: response.refundId,
+              }),
+              fromStatus: claimedStatus,
+            },
+          });
+          void alertUnbookedRefund({
+            kind: 'absorbed_id_mismatch',
+            store: {
+              id: moneyStoreId ?? '',
+              name: payment.order?.store?.name ?? moneyStoreId ?? '',
+            },
+            orderRef: payment.order?.orderNumber ?? payment.orderId,
+            body: `Order ${payment.order?.orderNumber ?? payment.orderId}: a refund webhook (${absorbedAs}) was reconciled with our refund, but the provider answered our refund with ${response.refundId}. They may be two refunds counted as one: check the provider dashboard.`,
+            context: { paymentId: payment.id, claimId, absorbedAs, answeredAs: response.refundId },
+          }).catch(() => undefined);
+        }
         await prisma.payment.update({
           where: { id: payment.id },
           data: {

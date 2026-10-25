@@ -34,6 +34,7 @@ const db = vi.hoisted(() => ({
   clock: 0,
   uniqueViolations: 0,
   ambient: true,
+  scope: undefined as string | undefined,
   yieldRandom: false,
   mutex: Promise.resolve() as Promise<unknown>,
   rnd: 1,
@@ -41,6 +42,7 @@ const db = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   Prisma: {},
   hasTenantContext: () => db.ambient,
+  currentTenantGucs: () => (db.scope ? { storeId: db.scope } : undefined),
   // a separate transaction: one at a time, like the payment row lock serialises them
   runInTenantContext: (_s: unknown, fn: () => Promise<unknown>) => {
     const run = db.mutex.then(fn, fn);
@@ -63,9 +65,10 @@ vi.mock('@ebda/database', () => ({
       },
     },
     paymentEvent: {
-      findMany: async ({ where }: { where: { eventType: { in: string[] } } }) => {
+      findMany: async ({ where }: { where: { eventType: string | { in: string[] } } }) => {
         await tick();
-        return db.events.filter(e => where.eventType.in.includes(e.eventType));
+        const types = typeof where.eventType === 'string' ? [where.eventType] : where.eventType.in;
+        return db.events.filter(e => types.includes(e.eventType));
       },
       create: async ({ data }: { data: Ev & { details: Record<string, unknown> } }) => {
         await tick();
@@ -140,6 +143,12 @@ const apply = async (
   const s = await settleRefundEvent(event(provider, refundId, amount, status));
   if (!s.seen && s.decision) {
     const d = s.decision;
+    if (d.heldOpenClaimIdUnverified || d.heldUnaccountedEvent)
+      db.events.push({
+        eventType: 'webhook',
+        createdAt: new Date(NOW),
+        details: { flavour: 'refund', refundId, heldUnaccountedRefund: true },
+      });
     await s.commit({
       data: {
         metadata: {
@@ -508,6 +517,7 @@ describe('the settlement owns its transaction: interleaved at every await point 
       expect(by.R9, `seed ${seed}: R9 status kept (no lost update)`).toBe('completed');
       expect((db.payment.metadata.refundEventIds as string[]).sort(), `seed ${seed}`).toEqual([
         'R0',
+        'R1', // the absorbed id is filed by commit(), not by the caller
         'R9',
       ]);
     }
@@ -543,5 +553,43 @@ describe('the settlement owns its transaction: interleaved at every await point 
     }
     db.ambient = true;
     db.yieldRandom = false;
+  });
+});
+
+describe('review fixes: operator match validation, absorbed id filed, lock mode, store scope', () => {
+  it('the operator match refuses an id no held webhook delivered, and an id already accounted', async () => {
+    claim('c1', 1000, { executedRef: 'API-ID' });
+    await expect(
+      matchRefundToClaim({ ...A, claimId: 'c1', providerRefundId: 'TYPO', actorUserId: 'op' })
+    ).rejects.toThrow('no held webhook');
+    expect(types('refund_webhook_absorbed')).toHaveLength(0);
+    await expect(
+      matchRefundToClaim({ ...A, claimId: 'c1', providerRefundId: 'R0', actorUserId: 'op' })
+    ).rejects.toThrow('already accounted');
+  });
+  it('an absorbed id is FILED as accounted and its status recorded by commit(), whatever the caller patches', async () => {
+    claim('c1', 1000);
+    const s = await settleRefundEvent(event('paymob', 'R1', 1000));
+    await s.commit({ data: { metadata: { refundStatus: 'completed' } } }); // a caller that forgot the ledger
+    expect(db.payment.metadata.refundEventIds).toContain('R1');
+    expect((db.payment.metadata.refundStatusById as Record<string, string>).R1).toBe('completed');
+    // a replay after the claim closed is therefore still seen
+    expect((await settleRefundEvent(event('paymob', 'R1', 1000))).seen).toBe(true);
+  });
+  it('the payment is locked FOR NO KEY UPDATE (serialises writers, does not conflict with FK key-share locks)', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '../../apps/api/src/services/payment-providers/refund-settle.ts'),
+      'utf8'
+    );
+    expect(src).toContain('FOR NO KEY UPDATE');
+    expect(src).not.toMatch(/FROM payments WHERE id = \$\{paymentId\} FOR UPDATE/);
+  });
+  it('an ambient transaction scoped to ANOTHER store is refused (RLS would hide the events: fail open)', async () => {
+    db.ambient = true;
+    db.scope = 'other-store';
+    await expect(inSettlementTx('s1', async () => 1)).rejects.toThrow('another store');
+    db.scope = 's1';
+    expect(await inSettlementTx('s1', async () => 1)).toBe(1);
+    db.scope = undefined;
   });
 });

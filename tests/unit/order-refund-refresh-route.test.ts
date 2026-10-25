@@ -43,6 +43,7 @@ vi.mock('@ebda/database', () => ({
     store: { findUnique: vi.fn().mockResolvedValue({ name: 'Store' }) },
   },
   hasTenantContext: () => true,
+  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
   // The error-handler middleware checks `err instanceof
   // Prisma.PrismaClientKnownRequestError` for every non-AppError/ZodError —
@@ -351,7 +352,9 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     );
     const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
     const meta = data.metadata as Record<string, unknown>;
-    expect(meta.refundEventIds ?? []).not.toContain('rf_inflight');
+    // an absorbed id is FILED (and its status recorded) so a replay after the claim closes is still seen
+    expect(meta.refundEventIds).toContain('rf_inflight');
+    expect(meta.refundStatusById).toMatchObject({ rf_inflight: 'completed' });
   });
 
   it('treats an amount-less provider response as a FULL refund, not a 0-fil partial', async () => {
