@@ -191,6 +191,11 @@ export const config = {
   // fallback bridges the migration without forcing an env-var rename
   // on Railway. When neither is set, ResendService gracefully degrades to
   // no-op + logs a warning so dev environments don't crash on every send.
+  // Outbound email provider (services/mail-transport.ts): `cloudflare` = the Email Service
+  // `send_email` binding (default), `resend` = the legacy SDK, the rollback path until decommission.
+  emailProvider: (process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'cloudflare') as
+    | 'cloudflare'
+    | 'resend',
   resendApiKey: process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || '',
 
   // Public origin Inngest Cloud must call to reach our serve endpoint

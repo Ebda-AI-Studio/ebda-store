@@ -94,17 +94,9 @@ vi.mock('@ebda/database', () => {
   };
 });
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: h.send, createFunction: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => {
-  class ResendSendError extends Error {
-    constructor(
-      readonly code: string,
-      message: string
-    ) {
-      super(message);
-    }
-  }
-  return { ResendService: { sendMarketingEmail: h.sendMarketingEmail }, ResendSendError };
-});
+vi.mock('@api/services/resend.service', () => ({
+  ResendService: { sendMarketingEmail: h.sendMarketingEmail },
+}));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: h.isFeatureEnabled },
 }));
@@ -113,7 +105,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { ResendSendError } from '@api/services/resend.service';
+import { EmailSendError as ResendSendError } from '@api/services/mail-transport';
 import {
   cartEmailDueAt,
   sweepCartRecoveryEmails,
