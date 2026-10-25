@@ -50,16 +50,58 @@ function firstVersion(): LegalVersion {
   });
 }
 
+/** v1.1, 2026-10-25 (LEGAL-1): published before launch, so effective on publication. */
+function v11(material: boolean, summary: { ar: string; en: string }): LegalVersion {
+  return Object.freeze({
+    version: '1.1',
+    publishedAt: '2026-10-25',
+    effectiveAt: '2026-10-25',
+    material,
+    feeChange: false,
+    summary: Object.freeze(summary),
+  });
+}
+
 const doc = (...history: LegalVersion[]) =>
   Object.freeze({ history: Object.freeze(history) as readonly LegalVersion[] });
 
 /** Oldest first; the LAST entry is the current version. Frozen: the registry is code, not state. */
 export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
-  legal: doc(firstVersion()),
-  privacy: doc(firstVersion()),
-  terms: doc(firstVersion()),
-  acceptableUse: doc(firstVersion()),
-  merchant: doc(firstVersion()),
+  legal: doc(
+    firstVersion(),
+    v11(false, {
+      ar: 'بريد مستقل لطلبات الخصوصية وحماية البيانات، وروابط إلى صفحة حذف البيانات ووثائق ابدأ واتساب.',
+      en: 'A separate address for privacy and data-protection requests, and links to the data deletion page and the Ebda WhatsApp documents.',
+    })
+  ),
+  privacy: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ واتساب، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
+      en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda WhatsApp is used, 72-hour breach notice, and a link to the data deletion page.',
+    })
+  ),
+  terms: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'ضريبة القيمة المضافة (14%) على رسومنا تُضاف وتُعرض منفصلة، وإشارة إلى شروط ابدأ واتساب.',
+      en: 'VAT (14%) on our fees is added and shown separately, and a pointer to the Ebda WhatsApp terms.',
+    })
+  ),
+  acceptableUse: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'منتجات ممنوعة عبر ابدأ واتساب وفق سياسة التجارة في واتساب من Meta.',
+      en: "Products that may not be sold through Ebda WhatsApp, following Meta's WhatsApp Commerce Policy.",
+    })
+  ),
+  merchant: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'ضريبة القيمة المضافة على رسومنا، وإخطار التاجر بالاختراق خلال 72 ساعة، وضمانات النقل خارج مصر.',
+      en: 'VAT on our fees, notice of a data breach to the merchant within 72 hours, and safeguards for transfers outside Egypt.',
+    })
+  ),
 });
 
 /** Document titles, identical to the marketing pages' titles (parity-tested in marketing-site.test.tsx). */

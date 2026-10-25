@@ -1,5 +1,12 @@
 import type { MetadataRoute } from 'next';
-import { LEGAL_SLUGS, LOCALES, SITE_URL, SITE_PAGES, pagePath } from '@/lib/site';
+import {
+  LEGAL_EXTRA_SLUGS,
+  LEGAL_SLUGS,
+  LOCALES,
+  SITE_URL,
+  SITE_PAGES,
+  pagePath,
+} from '@/lib/site';
 import { LEGAL_UPDATED } from '@/lib/content';
 import lastmod from '@/lib/page-lastmod.json';
 
@@ -20,7 +27,7 @@ const DATES = lastmod as Record<string, { hash: string; date: string }>;
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModifiedFor = (page: string) =>
     new Date(
-      (LEGAL_SLUGS as readonly string[]).includes(page)
+      ([...LEGAL_SLUGS, ...LEGAL_EXTRA_SLUGS] as readonly string[]).includes(page)
         ? String(LEGAL_UPDATED)
         : (DATES[page || 'home']?.date ??
             (() => {

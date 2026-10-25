@@ -15,11 +15,19 @@ const pages = [
   '/terms/',
   '/merchant-agreement/',
   '/acceptable-use/',
+  '/legal/data-deletion/',
+  '/legal/whatsapp-terms/',
+  '/legal/whatsapp-privacy/',
+  '/legal/whatsapp-dpa/',
   '/en/legal/',
   '/en/privacy/',
   '/en/terms/',
   '/en/merchant-agreement/',
   '/en/acceptable-use/',
+  '/en/legal/data-deletion/',
+  '/en/legal/whatsapp-terms/',
+  '/en/legal/whatsapp-privacy/',
+  '/en/legal/whatsapp-dpa/',
 ];
 
 await runA11y({

@@ -1,15 +1,18 @@
 import Link from 'next/link';
 import { LEGAL_POLICIES, currentLegalVersion, formatLegalDate } from '@ebda/shared/legal';
 import { COPY } from '../lib/content';
-import { HOME, type LegalSlug, type Locale } from '../lib/site';
+import { HOME, pagePath, type LegalExtraSlug, type LegalSlug, type Locale } from '../lib/site';
 import type { LegalPages } from '../lib/legal-types';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
-const DOC_KEY: Record<
-  LegalSlug,
-  keyof Pick<LegalPages, 'legal' | 'privacy' | 'terms' | 'merchant' | 'acceptableUse'>
-> = {
+type StoreDocKey = keyof Pick<
+  LegalPages,
+  'legal' | 'privacy' | 'terms' | 'merchant' | 'acceptableUse'
+>;
+type ExtraDocKey = keyof Pick<LegalPages, 'dataDeletion' | 'waTerms' | 'waPrivacy' | 'waDpa'>;
+
+const DOC_KEY: Record<LegalSlug, StoreDocKey> = {
   legal: 'legal',
   privacy: 'privacy',
   terms: 'terms',
@@ -17,10 +20,19 @@ const DOC_KEY: Record<
   'acceptable-use': 'acceptableUse',
 };
 
-export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug }) {
+/** Documents under /legal/ that are not Ebda Store acceptance documents: they carry their own version and date. */
+const EXTRA_KEY: Record<LegalExtraSlug, ExtraDocKey> = {
+  'legal/data-deletion': 'dataDeletion',
+  'legal/whatsapp-terms': 'waTerms',
+  'legal/whatsapp-privacy': 'waPrivacy',
+  'legal/whatsapp-dpa': 'waDpa',
+};
+
+export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | LegalExtraSlug }) {
   const c = COPY[locale].legalPages;
-  const doc = c[DOC_KEY[page]];
-  const current = currentLegalVersion(LEGAL_POLICIES, DOC_KEY[page]);
+  const doc =
+    page in EXTRA_KEY ? c[EXTRA_KEY[page as LegalExtraSlug]] : c[DOC_KEY[page as LegalSlug]];
+  const current = doc.meta ?? currentLegalVersion(LEGAL_POLICIES, DOC_KEY[page as LegalSlug]);
   return (
     <>
       <Header locale={locale} page={page} />
@@ -63,6 +75,18 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug })
                 ))}
               </section>
             ))}
+            {page === 'legal' && (
+              <section id="s-more" aria-labelledby="s-more-h">
+                <h2 id="s-more-h">{c.more.h}</h2>
+                <ul>
+                  {c.more.links.map(l => (
+                    <li key={l.slug}>
+                      <Link href={pagePath(locale, l.slug as LegalExtraSlug)}>{l.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <p className="legal-back">
               <Link href={HOME[locale]}>{c.back}</Link>
             </p>
