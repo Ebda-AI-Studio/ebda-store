@@ -83,6 +83,7 @@ vi.mock('@ebda/database', () => ({
   Prisma: {},
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
+  hasTenantContext: () => true,
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
   // The factory reads a store's provider configs inside that store's scope.
   withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),

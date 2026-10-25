@@ -7,6 +7,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** every database call is an await point where another flow may run (random, deterministic LCG) */
+const tick = async () => {
+  if (!db.yieldRandom) return;
+  db.rnd = (db.rnd * 1103515245 + 12345) & 0x7fffffff;
+  const n = db.rnd % 4;
+  for (let i = 0; i < n; i++) await Promise.resolve();
+};
+
 interface Ev {
   eventType: string;
   createdAt: Date;
@@ -25,21 +33,42 @@ const db = vi.hoisted(() => ({
   events: [] as Ev[],
   clock: 0,
   uniqueViolations: 0,
+  ambient: true,
+  yieldRandom: false,
+  mutex: Promise.resolve() as Promise<unknown>,
+  rnd: 1,
 }));
 vi.mock('@ebda/database', () => ({
   Prisma: {},
+  hasTenantContext: () => db.ambient,
+  // a separate transaction: one at a time, like the payment row lock serialises them
+  runInTenantContext: (_s: unknown, fn: () => Promise<unknown>) => {
+    const run = db.mutex.then(fn, fn);
+    db.mutex = run.catch(() => undefined);
+    return run;
+  },
   prisma: {
-    $queryRaw: async () => [],
+    $queryRaw: async () => {
+      await tick();
+      return [];
+    },
     payment: {
-      findUnique: async () => ({ ...db.payment }),
+      findUnique: async () => {
+        await tick();
+        return { ...db.payment };
+      },
       update: async ({ data }: { data: Record<string, unknown> }) => {
+        await tick();
         Object.assign(db.payment, data);
       },
     },
     paymentEvent: {
-      findMany: async ({ where }: { where: { eventType: { in: string[] } } }) =>
-        db.events.filter(e => where.eventType.in.includes(e.eventType)),
+      findMany: async ({ where }: { where: { eventType: { in: string[] } } }) => {
+        await tick();
+        return db.events.filter(e => where.eventType.in.includes(e.eventType));
+      },
       create: async ({ data }: { data: Ev & { details: Record<string, unknown> } }) => {
+        await tick();
         // the unique index payment_events_claim_single_outcome_key
         const claimed = (t: string) => ['refund_webhook_absorbed', 'refund_failed'].includes(t);
         if (
@@ -60,6 +89,7 @@ import {
   settleRefundEvent,
   settleClaimRelease,
   matchRefundToClaim,
+  inSettlementTx,
 } from '@api/services/payment-providers/refund-settle';
 
 const NOW = 1_000_000_000;
@@ -175,6 +205,8 @@ describe('absorb only a COMPLETED event; one claim, one notice', () => {
     const pending = await apply('paymob', 'R1', 1000, 'pending');
     expect(pending.decision?.absorbedClaimId ?? null).toBeNull();
     expect(types('refund_webhook_absorbed')).toHaveLength(0);
+    // and a pending notice does not file its id as accounted (the real completed refund must still be counted)
+    expect((db.payment.metadata.refundEventIds as string[]) ?? []).not.toContain('R1');
     const done = await apply('paymob', 'R1', 1000, 'completed');
     expect(done.decision?.absorbedClaimId).toBe('c1');
   });
@@ -382,5 +414,97 @@ describe('Kashier: an unknown id while our own refund is open is HELD, never aut
     const s = await apply('paymob', 'DIFFERENT', 1000);
     expect(s.decision?.heldOpenClaimIdUnverified).toBe(false);
     expect(db.payment.refundedAmount).toBe(2500);
+  });
+});
+
+describe('the settlement owns its transaction: interleaved at every await point (refresh route + webhooks)', () => {
+  const inTx = (fn: () => Promise<unknown>) => inSettlementTx('s1', fn);
+  const flow = (provider: string, id: string, amount: number) =>
+    inTx(async () => {
+      const s = await settleRefundEvent(event(provider, id, amount));
+      const meta = s.payment.metadata; // the LOCKED copy: every patch is built from it
+      const patch = s.decision
+        ? {
+            metadata: {
+              ...meta,
+              refundStatus: 'completed',
+              refundStatusById: { ...((meta.refundStatusById as object) ?? {}), [id]: 'completed' },
+              ...(s.decision.accountedThisEvent
+                ? { refundEventIds: [...((meta.refundEventIds as string[]) ?? []), id] }
+                : {}),
+            },
+            refundedAmount: s.decision.settledTotal,
+            status: s.decision.isFullRefund ? 'refunded' : 'partially_refunded',
+          }
+        : {};
+      if (!s.seen) await s.commit({ data: patch });
+    });
+
+  it('route + webhook for the SAME refund, and a different genuine refund, over 60 random interleavings: one effect, no lost metadata', async () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      db.ambient = false;
+      db.yieldRandom = true;
+      db.rnd = seed * 7919;
+      db.mutex = Promise.resolve();
+      db.payment = {
+        id: 'p1',
+        amount: 10000,
+        currency: 'EGP',
+        status: 'completed',
+        refundedAmount: 0,
+        metadata: {},
+      };
+      db.events = [];
+      claim('c0', 500, { executedRef: 'R0', ageMs: 3_600_000 });
+      claim('c1', 1000);
+      const order = [
+        () => flow('paymob', 'R1', 1000), // the manual refresh route
+        () => flow('paymob', 'R1', 1000), // the provider webhook for the same refund
+        () => flow('paymob', 'R9', 700), // a genuine dashboard refund
+      ];
+      if (seed % 2) order.reverse();
+      await Promise.all(order.map(f => f()));
+      expect(db.payment.refundedAmount, `seed ${seed}`).toBe(500 + 1000 + 700);
+      expect(types('refund_webhook_absorbed'), `seed ${seed}`).toHaveLength(1);
+      const by = db.payment.metadata.refundStatusById as Record<string, string>;
+      expect(by.R1, `seed ${seed}: R1 status kept`).toBe('completed');
+      expect(by.R9, `seed ${seed}: R9 status kept (no lost update)`).toBe('completed');
+      expect((db.payment.metadata.refundEventIds as string[]).sort(), `seed ${seed}`).toEqual([
+        'R0',
+        'R9',
+      ]);
+    }
+    db.ambient = true;
+    db.yieldRandom = false;
+  });
+
+  it('release racing a webhook over 60 interleavings: never both a decrement and an absorb', async () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      db.ambient = false;
+      db.yieldRandom = true;
+      db.rnd = seed * 104729;
+      db.mutex = Promise.resolve();
+      db.payment = {
+        id: 'p1',
+        amount: 10000,
+        currency: 'EGP',
+        status: 'completed',
+        refundedAmount: 0,
+        metadata: {},
+      };
+      db.events = [];
+      claim('c0', 500, { executedRef: 'R0', ageMs: 3_600_000 });
+      claim('c1', 1000);
+      const flows = [() => flow('paymob', 'R1', 1000), () => inTx(() => release('c1', 1000))];
+      if (seed % 2) flows.reverse();
+      await Promise.all(flows.map(f => f()));
+      const absorbed = types('refund_webhook_absorbed').length;
+      const released = types('refund_failed').length;
+      expect(absorbed + released, `seed ${seed}: exactly one outcome`).toBe(1);
+      // absorbed -> the claim stands (1500); released first -> the webhook is a real refund (1500). Money never lost either way.
+      expect(db.payment.refundedAmount, `seed ${seed}`).toBe(1500);
+    }
+    db.ambient = true;
+    db.yieldRandom = false;
   });
 });
