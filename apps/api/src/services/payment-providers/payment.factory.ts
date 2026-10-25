@@ -539,6 +539,45 @@ function commitOnOwnTransaction<T>(storeId: string | undefined, fn: () => Promis
 }
 
 /**
+ * Amounts of in-band refund claims on this payment that are committed but have NO outcome event yet (executed, released,
+ * indeterminate or reconciled). Their amount is already inside `refundedAmount` and their provider id is not recorded
+ * (the executed event and the id are written in one transaction), so a settle webhook that outruns that write must be
+ * absorbed, not added again (see resolveRefundSettlement).
+ */
+export async function findInFlightRefundClaimAmounts(
+  paymentId: string,
+  storeId: string
+): Promise<number[]> {
+  const rows = await prisma.paymentEvent.findMany({
+    where: {
+      storeId,
+      paymentId,
+      eventType: {
+        in: [
+          REFUND_CLAIM_EVENT,
+          REFUND_EXECUTED_EVENT,
+          REFUND_RELEASED_EVENT,
+          REFUND_INDETERMINATE_EVENT,
+          REFUND_RECONCILED_EVENT,
+        ],
+      },
+    },
+    select: { eventType: true, details: true },
+  });
+  const open = new Map<string, number>();
+  const closed = new Set<string>();
+  for (const row of rows) {
+    const d = (row.details as Record<string, unknown> | null) ?? {};
+    const id = d.claimId;
+    if (typeof id !== 'string') continue;
+    if (row.eventType === REFUND_CLAIM_EVENT) {
+      if (typeof d.amount === 'number') open.set(id, d.amount);
+    } else closed.add(id);
+  }
+  return [...open].filter(([id]) => !closed.has(id)).map(([, amount]) => amount);
+}
+
+/**
  * Claim ids for `refundKey` on this payment that were never released — each is
  * a refund that went out, or may have. A released claim (the provider refused,
  * or the request was never sent) does not count.
@@ -1791,6 +1830,10 @@ export class PaymentService {
         // settle notice for one the in-band claim already applied.
         reportedEventId: webhookData.refund.refundId,
         accountedEventIds: readAccountedRefundEventIds(payment.metadata),
+        inFlightClaimAmounts: await findInFlightRefundClaimAmounts(
+          payment.id,
+          payment.order?.storeId ?? storeId ?? ''
+        ),
       });
 
       if (newStatus === 'completed' && !orderAlreadyReversed && refundIsFull && payment.order) {
