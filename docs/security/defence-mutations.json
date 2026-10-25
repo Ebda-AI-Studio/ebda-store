@@ -2135,7 +2135,7 @@
       "id": "demo-store-refuses-orders",
       "domain": "money / payment / refund",
       "tier": "integration",
-      "why": "the demo showroom (stores.is_demo) takes a real order: checkout, an admin/phone order or a WhatsApp payment link writes an order row and moves stock on a store nobody runs (Ruling B1-13, MKT-3)",
+      "why": "the demo showroom (stores.is_demo) takes a real order: checkout or an admin/phone order writes an order row and moves stock on a store nobody runs (Ruling B1-13, MKT-3)",
       "source": "apps/api/src/services/plan-limit.service.ts",
       "find": "  if (row.isDemo) {\n    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {",
       "replace": "  if (false) {\n    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {",
@@ -2145,10 +2145,10 @@
       "id": "demo-store-every-order-path-gated",
       "domain": "money / payment / refund",
       "tier": "unit",
-      "why": "an order-creating path stops calling assertOrderAllowed (here the WhatsApp payment link), so the demo store (and the plan order cap) can be bypassed through it; the static owner/guard scan must catch it (Ruling B1-13, plan amendment C12)",
-      "source": "apps/api/src/routes/payment-links.routes.ts",
-      "find": "      await assertOrderAllowed(storeId);",
-      "replace": "",
+      "why": "an order-creating path stops calling assertOrderAllowed (here the merchant admin order), so the demo store (and the plan order cap) can be bypassed through it; the static owner/guard scan must catch it (Ruling B1-13, plan amendment C12)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "    await assertOrderAllowed(storeId);\n    if (data.items.length === 0) {",
+      "replace": "    if (data.items.length === 0) {",
       "test": "tests/unit/demo-order-guard-coverage.test.ts"
     },
     {

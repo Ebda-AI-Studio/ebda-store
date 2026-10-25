@@ -25,7 +25,6 @@ import { gmailAlertPoller } from './gmail-alert-poller';
 import { isWorkers } from '../../runtime';
 import { queueDepthWatch } from './queue-depth-watch';
 import { agentWriteDeniedWatch } from './agent-write-denied-watch';
-import { orderWhatsAppNotify } from './order-whatsapp-notify';
 import { accountingPostOrderJournal } from './accounting-post-order-journal';
 import { accountingPostRefundJournal } from './accounting-post-refund-journal';
 import { accountingDailyClose } from './accounting-daily-close';
@@ -44,7 +43,6 @@ import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
 import { instapayReceiptExtract } from './instapay-receipt-extract';
 import { analyticsDailyRollupCron, analyticsRollupOnDemand } from './analytics-daily-rollup';
-import { productMetaSyncFn, productMetaSyncDeleteFn } from './product-meta-sync';
 import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
@@ -122,7 +120,6 @@ const allInngestFunctions: InngestFunction.Any[] = [
   gmailAlertPoller,
   queueDepthWatch,
   agentWriteDeniedWatch,
-  orderWhatsAppNotify,
   accountingPostOrderJournal,
   accountingPostRefundJournal,
   accountingDailyClose,
@@ -145,8 +142,6 @@ const allInngestFunctions: InngestFunction.Any[] = [
   analyticsDailyRollupCron,
   analyticsRollupOnDemand,
   // Phase A: product → Meta Catalog sync (native catalog bot)
-  productMetaSyncFn,
-  productMetaSyncDeleteFn,
   // AI-first autofill: fills product fields + kicks recommendations on create
   aiAutofillProduct,
   // AI-first autofill: purges recommendation graph rows on product delete

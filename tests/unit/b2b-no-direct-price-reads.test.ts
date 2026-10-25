@@ -86,27 +86,10 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'create + createAdminOrder feed base prices to priceCart; persisted values elsewhere',
     reads: { create: 9, createAdminOrder: 4 },
   },
-  'routes/payment-links.routes.ts': {
-    category: 'resolver-input',
-    reason: 'link lines priced via priceCart as an anonymous buyer',
-    reads: { 'POST /': 8 },
-  },
   'routes/promotion.routes.ts': {
     category: 'resolver-input',
     reason: 'preview lines priced via priceCart',
     reads: { 'POST /public/:storeId/promotions/preview': 2 },
-  },
-  'routes/wa-bridge.routes.ts': {
-    category: 'resolver-input',
-    reason: 'WhatsApp cart total via priceCart (anonymous); catalogue lists show retail',
-    reads: {
-      'GET /products/by-category': 2,
-      'GET /products/search': 1,
-      'GET /store-catalog': 7,
-      'POST /cart/from-wa': 3,
-      bridgeProductSearchPage: 1,
-      buildCustomerHistory: 3,
-    },
   },
   'services/cart-recovery-email.service.ts': {
     category: 'resolver-output',
@@ -248,11 +231,6 @@ const ALLOW: Record<string, AllowEntry> = {
     category: 'retail-display',
     reason: 'recommendation select: retail',
     reads: { '<module>': 2 },
-  },
-  'lib/inngest/functions/product-meta-sync.ts': {
-    category: 'retail-display',
-    reason: 'SEO/meta uses retail price',
-    reads: { productMetaSync: 1 },
   },
   'lib/inngest/functions/bulk-ai-geo.ts': {
     category: 'retail-display',
@@ -476,8 +454,6 @@ describe('B2B: direct price reads are classified per file and per symbol (AST sc
       }
     }
     expect(found.sort()).toEqual([
-      // Ruling B5-17: the gold order gate is a CHECK on the base price, not a price decision (PriceResolver still decides)
-      'routes/payment-links.routes.ts -> services/gold-rate/gate.ts: assertGoldLinesPriceable,assertSameRates',
       // STOREFRONT_PRODUCT_SELECT is a Prisma select constant (no price decision).
       'routes/wholesale.routes.ts -> services/product.service.ts: ProductService', // the approved-buyer catalogue list / detail (no price decision)
       'services/cart.service.ts -> services/gold-rate/gate.ts: goldQuoteKey,goldQuotesForLines',
@@ -562,11 +538,13 @@ describe('B2B (M-4): every known bypass is PLANTED and goes red', () => {
   });
 
   it('swapping a resolver-input read for a direct charge read INSIDE an anonymous route handler keeps the count only if it is the same handler; a different handler is a new symbol', () => {
-    // payment-links: all reads live in "POST /". A read added to a second handler is reported under ITS route, not hidden.
+    // promotion preview: all reads live in one handler. A read added to a second handler is reported under ITS route, not hidden.
     const v = planted(
-      'routes/payment-links.routes.ts',
-      "router.post('/', async () => { " +
-        'a.price;'.repeat(ALLOW['routes/payment-links.routes.ts']!.reads['POST /']!) +
+      'routes/promotion.routes.ts',
+      "router.post('/public/:storeId/promotions/preview', async () => { " +
+        'a.price;'.repeat(
+          ALLOW['routes/promotion.routes.ts']!.reads['POST /public/:storeId/promotions/preview']!
+        ) +
         " });\nrouter.get('/preview', async () => { b.price; });"
     );
     expect(v.join()).toMatch(/new symbol "GET \/preview" reads a price/);
@@ -621,8 +599,8 @@ describe('B2B: the forBuyer argument is never a literal', () => {
 });
 
 describe('B2B (review I2): order-creating paths read the entitlement UNCACHED', () => {
-  it('every PriceResolver.forBuyer( in order.service and payment-links passes uncachedEntitlement', () => {
-    for (const f of ['services/order.service.ts', 'routes/payment-links.routes.ts']) {
+  it('every PriceResolver.forBuyer( in order.service passes uncachedEntitlement', () => {
+    for (const f of ['services/order.service.ts']) {
       const sf = ts.createSourceFile(f, read(f), ts.ScriptTarget.Latest, true);
       const calls: ts.CallExpression[] = [];
       const visit = (n: ts.Node) => {

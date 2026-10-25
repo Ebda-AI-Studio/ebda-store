@@ -1,5 +1,7 @@
 # WhatsApp Native Catalog Bot — Design Spec
 
+> **SUPERSEDED (Ruling WA-LEGACY-1, 2026-10-25):** the Store-side bridge this spec describes was deleted. Historical record only; Ebda WhatsApp (wa.ebda.app) now owns this surface.
+
 **Status**: design approved, ready for implementation plan
 **Author**: Ahmad Sharaf + Claude (brainstorming session 2026-05-25)
 **Touches**: `ebda-store` (Ebda Store) + `whatsapp-broadcaster` (WBS)

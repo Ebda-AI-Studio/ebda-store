@@ -56,9 +56,7 @@ vi.mock('@ebda/database', () => ({
   },
   // `stores` is under RLS: crons list stores through the directory definer.
   storeDirectory: async (filter?: (s: Record<string, unknown>) => boolean) =>
-    m.stores
-      .map(id => ({ id, loyaltyEnabled: true, wbsEnabled: true }))
-      .filter(s => (filter ? filter(s) : true)),
+    m.stores.map(id => ({ id, loyaltyEnabled: true })).filter(s => (filter ? filter(s) : true)),
   withStore: async (id: string, fn: (tx: unknown) => Promise<unknown>) => {
     m.scope = id;
     try {
@@ -87,11 +85,6 @@ vi.mock('@api/services/feature.service', () => ({
 vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({ notificationDispatcher: {} }));
 vi.mock('@api/services/bundle.service', () => ({ resolveBundle: vi.fn() }));
-vi.mock('@api/services/wbs-bridge.service', () => ({
-  wbsBridgeService: {},
-  WbsUnauthorizedError: class extends Error {},
-}));
-vi.mock('@api/services/encryption.service', () => ({ encryption: {} }));
 import { loyaltyAutomationService } from '@api/services/loyalty-automation.service';
 import { abandonedCartService } from '@api/services/abandoned-cart.service';
 beforeEach(() => {

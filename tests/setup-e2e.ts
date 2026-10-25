@@ -142,7 +142,7 @@ async function resetPrismaSingleton(): Promise<void> {
  *
  * NOTE ON THE REMOVED TRUNCATE: this hook used to also TRUNCATE the accounting
  * tables. That code had never executed (see the header), and waking it up on
- * 2026-08-31 broke CI — it wiped fixtures the wa-bridge suites depend on and
+ * 2026-08-31 broke CI — it wiped fixtures other suites depend on and
  * produced a 40P01 deadlock across parallel files. The suite has been green
  * without it for its entire life, so it is deliberately not reinstated here.
  * If accounting-table pollution ever returns, it belongs in a globalSetup that

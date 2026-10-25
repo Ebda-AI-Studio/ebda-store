@@ -29,8 +29,6 @@ describe('admin settings search: the requested queries, Arabic and English', () 
     ['logo', 'branding.logo', 3],
     ['دليل المقاسات', 'page:/size-charts', 1],
     ['size guide', 'page:/size-charts', 2],
-    ['واتساب', 'page:/whatsapp', 3],
-    ['whatsapp', 'page:/whatsapp', 3],
     ['الشحن', 'page:/shipping', 3],
     ['shipping', 'page:/shipping', 3],
     ['الضريبة', 'page:/tax', 3],
@@ -51,7 +49,6 @@ describe('admin settings search: the requested queries, Arabic and English', () 
   it('an Arabic definite article is optional: "الشحن" and "شحن" find the same page', () => {
     expect(ids('شحن').slice(0, 3)).toContain('page:/shipping');
     expect(ids('الشحن').slice(0, 3)).toContain('page:/shipping');
-    expect(ids('الواتساب').slice(0, 3)).toContain('page:/whatsapp');
   });
 
   it('every word must match, and a blank query matches nothing', () => {
@@ -61,11 +58,11 @@ describe('admin settings search: the requested queries, Arabic and English', () 
   });
 
   it('own-label hits rank before page-name hits, and pages before the settings on them', () => {
-    const hits = searchRegistry('whatsapp', all(), 50);
+    const hits = searchRegistry('shipping', all(), 50);
     const ranks = hits.map(h => h.rank);
     expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
     const firstSetting = hits.findIndex(h => h.entry.kind === 'setting' && h.rank === 0);
-    const pageIdx = hits.findIndex(h => h.entry.id === 'page:/whatsapp');
+    const pageIdx = hits.findIndex(h => h.entry.id === 'page:/shipping');
     if (firstSetting !== -1) expect(pageIdx).toBeLessThan(firstSetting);
   });
 });
@@ -92,13 +89,12 @@ describe('admin settings search: who may see what', () => {
   });
 
   it('a feature-keyed entry is hidden while features load and when the feature is off', () => {
-    const off: SearchContext = { ...all(), isFeatureEnabled: k => k !== 'whatsapp' };
-    expect(
-      ids('whatsapp', off).some(id => id.startsWith('whatsapp.tab.') || id === 'page:/whatsapp')
-    ).toBe(false);
+    const off: SearchContext = { ...all(), isFeatureEnabled: k => k !== 'agent_checkout' };
+    expect(ids('mcp', all())).toContain('page:/agent-key');
+    expect(ids('mcp', off)).not.toContain('page:/agent-key');
     expect(ids('واتساب', off)).toContain('branding.whatsapp-buttons'); // not feature-gated
     const loading: SearchContext = { ...all(), featuresLoading: true };
-    expect(ids('whatsapp', loading)).not.toContain('page:/whatsapp');
+    expect(ids('mcp', loading)).not.toContain('page:/agent-key');
     expect(ids('shipping carriers', { ...all(), isFeatureEnabled: () => false })).not.toContain(
       'page:/shipping-carriers'
     );
@@ -124,9 +120,6 @@ describe('admin settings search: links and palette items', () => {
     );
     expect(entryHref('s1', byId('branding.logo-size'))).toBe(
       '/stores/s1/branding?tab=theme&setting=branding.logo-size'
-    );
-    expect(entryHref('s1', byId('whatsapp.tab.templates'))).toBe(
-      '/stores/s1/whatsapp?tab=templates&setting=whatsapp.tab.templates'
     );
   });
 

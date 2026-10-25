@@ -220,8 +220,7 @@ describe('no API query re-derives variant stock blind to isActive (#1103)', () =
   // helper as variant-less, and the helper then falls back to the parent
   // column. In any file that computes stock, variants must be selected
   // unfiltered, with `isActive`, and disabled rows dropped for display after.
-  // Mutation proof: restore `where: { isActive: true }` on the PDP select or a
-  // wa-bridge select → this goes red.
+  // Mutation proof: restore `where: { isActive: true }` on the PDP select → this goes red.
   it('no stock-computing file pre-filters its variants relation to isActive', () => {
     const preFiltered =
       /variants:\s*{\s*(?:orderBy:\s*{[^}]*},\s*)?where:\s*{\s*isActive:\s*true\s*}/;

@@ -102,7 +102,7 @@ interface CartContextType {
   removeBundle: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
   syncCartToBackend: () => Promise<void>;
-  /** Refetch the server cart and update local state. Used by WaTokenHydrator. */
+  /** Refetch the server cart and update local state. */
   refetchCart: () => Promise<void>;
   /** True while any gold line's price moved since it was added (Ruling B5-17). */
   priceChanged: boolean;

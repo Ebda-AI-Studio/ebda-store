@@ -20,7 +20,7 @@
  *
  * NOTE ON ENCRYPTION:
  *   The marketingPixels JSON blob stores accessToken in plaintext (not encrypted
- *   at-rest like wbsApiKey). The mask is display-only. Reading from the DB row
+ *   at-rest). The mask is display-only. Reading from the DB row
  *   gives the real token directly.
  */
 
@@ -184,8 +184,7 @@ async function sendMetaCAPI(
   // Transport (issues 1960 / 2173): FORM-ENCODED — `data` as a JSON string plus
   // `access_token` as a form field — which is the shape Meta's Conversions API
   // documents (its curl sample uses `-F data=… -F access_token=…`) and the
-  // shape this repo's own Graph client already uses successfully
-  // (meta-provisioner.service.ts). The token stays out of the URL, which
+  // shape Meta's Graph API clients use. The token stays out of the URL, which
   // OpenTelemetry / Sentry record for every outbound fetch (#190). A token in
   // a JSON body is not a documented Graph transport; that is what this
   // replaces.

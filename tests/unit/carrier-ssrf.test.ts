@@ -199,7 +199,7 @@ describe('no adapter takes a host from the merchant', () => {
  *     chosen by `isTestMode` (verified 2026-09-11), so the money path was
  *     never exposed;
  *   - aramex uses a module-level `ARAMEX_BASE_URL`;
- *   - onesignal / wbs-bridge / sms / gsc / cloudflare-domain build from config.
+ *   - onesignal / sms / gsc / cloudflare-domain build from config.
  *
  * A 17-file allowlist is the rule the original scoping note predicted people
  * would learn to silence, and an `eslint-disable` comment silences it for

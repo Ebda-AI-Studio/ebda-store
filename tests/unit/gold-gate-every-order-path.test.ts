@@ -11,10 +11,9 @@ import path from 'node:path';
 
 const API_SRC = path.resolve(__dirname, '../../apps/api/src');
 
-/** The three order-creating entry points (shopper + MCP agent, admin manual order, payment link). */
+/** The order-creating entry points (shopper + MCP agent, admin manual order). */
 const KNOWN_SITES: Record<string, string> = {
   'services/order.service.ts': 'OrderService.create and OrderService.createAdminOrder',
-  'routes/payment-links.routes.ts': 'the payment-link draft order',
 };
 
 const SITE = /\b(?:order|orderItem)\s*\.\s*(?:create|createMany)\s*\(/g;
@@ -58,11 +57,10 @@ export function isGuarded(src: string, expectedGateCalls: number): string[] {
 describe('every path that writes an order line runs the gold gate', () => {
   const sites = findOrderCreateSites(API_SRC);
 
-  it('the sites are exactly the three known entry points (a new site must be added here AND guarded)', () => {
+  it('the sites are exactly the known entry points (a new site must be added here AND guarded)', () => {
     expect([...sites.keys()].sort()).toEqual(Object.keys(KNOWN_SITES).sort());
-    // order.service has two order.create calls (create + createAdminOrder), payment-links one
+    // order.service has two order.create calls (create + createAdminOrder)
     expect(sites.get('services/order.service.ts')).toBe(2);
-    expect(sites.get('routes/payment-links.routes.ts')).toBe(1);
   });
 
   it('each enclosing file runs the gate before the write, re-checks the rates in the transaction, and stores the snapshot', () => {
@@ -72,12 +70,10 @@ describe('every path that writes an order line runs the gold gate', () => {
     }
   });
 
-  it('checkout and the admin order pass requireQuote correctly: checkout requires a quote, the admin and link paths do not', () => {
+  it('checkout and the admin order pass requireQuote correctly: checkout requires a quote, the admin path does not', () => {
     const order = readFileSync(path.join(API_SRC, 'services/order.service.ts'), 'utf8');
     expect(order).toMatch(/requireQuote: requestContext\?\.dryRun !== true/);
     expect(order).toMatch(/requireQuote: false/);
-    const link = readFileSync(path.join(API_SRC, 'routes/payment-links.routes.ts'), 'utf8');
-    expect(link).toMatch(/requireQuote: false/);
   });
 
   describe('negative controls (the scan can fail)', () => {

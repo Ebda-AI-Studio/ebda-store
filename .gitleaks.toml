@@ -47,7 +47,7 @@ regexes = [
   '''sk-super-secret-key''',
   # Fake Tap payment-provider secret key fixture (payment-provider.test.ts) — CI-only.
   '''sk_secret_12345''',
-  # Fake WBS-bridge encryption-key fixture (wbs-bridge.test.ts) — CI-only, sibling of the
+  # Fake encryption-key fixture (CI-only), sibling of the
   # test-encryption-key-for-ci-32chars entry above with a different literal value.
   '''test-encryption-key-that-is-32-chars''',
   # mcp-agent-write-auth.test.ts's fixture used THIS literal at commit cad3d87e

@@ -21,7 +21,6 @@ const { ProductService } = await import('../../apps/api/src/services/product.ser
 const { BulkService } = await import('../../apps/api/src/services/bulk.service');
 const { PromotionService } = await import('../../apps/api/src/services/promotion.service');
 const { WarehouseService } = await import('../../apps/api/src/services/warehouse.service');
-const { bridgeProductSearchPage } = await import('../../apps/api/src/routes/wa-bridge.routes');
 /** Per-CALL unique tag: a retried test never meets its failed attempt's rows (CLAUDE.md). */
 const uniq = () => crypto.randomUUID().slice(0, 8);
 
@@ -336,43 +335,6 @@ describe.skipIf(!hasDb)('normalised product search', () => {
           await prisma.warehouse.deleteMany({ where: { id: warehouseId } });
         }
         if (productId) await prisma.product.deleteMany({ where: { id: productId } });
-      }
-    });
-
-    it('WhatsApp bridge pages one stable match set: no repeats, no gaps, no drafts', async () => {
-      const u = uniq();
-      const sid = await mkStore(`ps-wa-${u}`);
-      try {
-        await prisma.product.createMany({
-          data: Array.from({ length: 28 }, (_, i) => ({
-            storeId: sid,
-            slug: `wa-${i}-${u}`,
-            price: 1000,
-            // every 4th one is a draft: it must never take a page slot
-            status: i % 4 === 3 ? ('draft' as const) : ('active' as const),
-            name: `Scarf ${String(i).padStart(2, '0')}`,
-            nameAr: `وشاح ${i}`,
-          })),
-        });
-        const active = await prisma.product.findMany({
-          where: { storeId: sid, status: 'active' },
-          select: { id: true },
-        });
-        const seen: string[] = [];
-        let more = true;
-        for (let page = 1; more; page++) {
-          const res = await runInTenantContext(sid, () =>
-            bridgeProductSearchPage(sid, 'وشاح', page, 8)
-          );
-          seen.push(...res.products.map(p => p.id));
-          more = res.hasMore;
-          if (page > 5) throw new Error('hasMore never turned false');
-        }
-        expect(new Set(seen).size).toBe(seen.length); // no repeats
-        expect(seen.sort()).toEqual(active.map(a => a.id).sort()); // no gaps, no drafts
-      } finally {
-        await prisma.product.deleteMany({ where: { storeId: sid } });
-        await prisma.store.deleteMany({ where: { id: sid } });
       }
     });
 

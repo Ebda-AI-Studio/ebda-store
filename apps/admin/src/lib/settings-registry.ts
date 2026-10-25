@@ -83,15 +83,10 @@ const setting = (
 export const REDIRECT_ROUTES: Record<string, string> = {
   '/hero': '/builder',
   '/insights': '/insights/dashboard',
-  '/integrations/wbs': '/whatsapp?tab=connection',
   '/inventory': '/stock/inventory',
   '/navigation': '/builder',
   '/page-builder': '/builder',
   '/pages': '/builder',
-  '/payment-link': '/whatsapp?tab=payment-link',
-  '/wa-bot': '/whatsapp?tab=bot-config',
-  '/wa-order-updates': '/whatsapp?tab=order-updates',
-  '/wa-templates': '/whatsapp?tab=templates',
 };
 
 export const PAGES: PageEntry[] = [
@@ -434,13 +429,6 @@ export const PAGES: PageEntry[] = [
   }),
   page('/template', 'template.page.title', 'owner', {
     syn: { en: 'theme design skin look storefront', ar: 'قالب تصميم مظهر شكل المتجر' },
-  }),
-  page('/whatsapp', 'whatsappIntegration.page.title', 'owner', {
-    feature: 'whatsapp',
-    syn: {
-      en: 'wa chat bot templates order updates payment link',
-      ar: 'واتساب دردشة بوت قوالب تحديثات الطلب رابط دفع',
-    },
   }),
   page('/agent-key', 'agentKey.page.title', 'owner', {
     feature: 'agent_checkout',
@@ -785,57 +773,6 @@ export const SETTINGS: SettingEntry[] = [
     en: 'which events send notifications order alerts channels',
     ar: 'احداث الاشعارات تنبيهات الطلبات قنوات',
   }),
-  // ── WhatsApp tabs ──────────────────────────────────────────────────────────
-  ...(
-    [
-      ['connection', 'connection', 'connect api key wbs link number', 'ربط مفتاح api رقم'],
-      [
-        'bot-config',
-        'botConfig',
-        'bot mode service menu meta catalog ordering by chat',
-        'وضع البوت قائمة الخدمات كتالوج ميتا الطلب بالشات',
-      ],
-      [
-        'templates',
-        'templates',
-        'message templates meta approval sync',
-        'قوالب الرسائل موافقة ميتا',
-      ],
-      [
-        'order-updates',
-        'orderUpdates',
-        'order status messages shipped delivered confirmation sms',
-        'رسائل حالة الطلب تم الشحن تاكيد',
-      ],
-      [
-        'payment-link',
-        'paymentLink',
-        'send payment link to customer pay by link',
-        'ارسال رابط دفع للعميل',
-      ],
-      [
-        'bot-copy',
-        'botCopy',
-        'bot replies wording texts messages customise',
-        'ردود البوت نصوص تخصيص',
-      ],
-      [
-        'bot-analytics',
-        'botAnalytics',
-        'bot conversations metrics stats',
-        'محادثات البوت احصائيات',
-      ],
-    ] as const
-  ).map(([tab, key, en, ar]) =>
-    setting(
-      `whatsapp.tab.${tab}`,
-      '/whatsapp',
-      `whatsappIntegration.tabs.${key}`,
-      'owner',
-      { en, ar },
-      { query: `tab=${tab}`, feature: 'whatsapp' }
-    )
-  ),
   // ── Visual editor (/builder): one entry per control the editor added (Tasks 1-10) ─────────
   // The deep link is `?select=<sectionId|type|theme|history>&block=&field=<id>&page=<kind>`; the
   // builder selects on the canvas + tree and rings the control (Task 11). `query` carries the rest
@@ -990,5 +927,4 @@ export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/seo': 24,
   '/floating-widget': 26,
   '/notifications': 9,
-  '/whatsapp': 0,
 };

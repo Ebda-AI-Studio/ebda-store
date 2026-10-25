@@ -7,7 +7,7 @@
  * would have no way to be satisfied and the feature would be bricked rather
  * than secured.
  *
- * Routes (same auth chain and mount shape as `wbs-integration.routes.ts`):
+ * Routes:
  *   GET    /stores/:id/integrations/agent-key  — status only (never the key):
  *                                                whether one exists, when it was
  *                                                last rotated, and whether the
@@ -18,8 +18,8 @@
  *   DELETE /stores/:id/integrations/agent-key  — revoke (writes are refused
  *                                                again from the next call)
  *
- * The key is stored AES-256-GCM-encrypted in `Store.agentApiKey` via the same
- * `encryption.service` the WBS bridge key uses. It is never logged, never
+ * The key is stored AES-256-GCM-encrypted in `Store.agentApiKey` via the shared
+ * `encryption.service`. It is never logged, never
  * returned by GET, and never used as a cache or rate-limit key.
  */
 

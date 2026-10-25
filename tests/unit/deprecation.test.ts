@@ -2,7 +2,7 @@
  * Endpoint deprecation signalling (audit lens L15).
  *
  * A version prefix says which contract you are on; it does not say the one you
- * are on is going away. Before this, a merchant integration or the WBS bridge
+ * are on is going away. Before this, a merchant integration
  * learned an endpoint was retiring when it 404'd.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -25,7 +25,7 @@ function run(mw: ReturnType<typeof deprecate>) {
     originalUrl: '/api/v1/legacy',
     method: 'GET',
     params: { storeId: 'store-1' },
-    headers: { 'user-agent': 'wbs-bridge/1.0', origin: 'https://wbs.example' },
+    headers: { 'user-agent': 'partner-client/1.0', origin: 'https://partner.example' },
   } as unknown as Request;
   const res = {
     setHeader: (k: string, v: string) => {
@@ -82,7 +82,7 @@ describe('deprecate()', () => {
         path: '/api/v1/legacy',
         reason: 'superseded by /new',
         callerStore: 'store-1',
-        userAgent: 'wbs-bridge/1.0',
+        userAgent: 'partner-client/1.0',
       }),
       expect.stringContaining('deprecated-endpoint')
     );

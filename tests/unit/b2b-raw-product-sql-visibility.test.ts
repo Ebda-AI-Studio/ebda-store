@@ -186,8 +186,6 @@ describe('B2B raw-SQL product visibility checklist', () => {
         .match(/visibleProductWhere\(\)/g) ?? []
     ).length;
     expect(helperUses).toBeGreaterThanOrEqual(9);
-    expect(count('routes/wa-bridge.routes.ts')).toBe(4);
-    expect(count('routes/payment-links.routes.ts')).toBe(1);
     expect(count('routes/wishlist.routes.ts')).toBeGreaterThanOrEqual(1);
   });
 

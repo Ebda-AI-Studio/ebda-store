@@ -1,9 +1,9 @@
 /**
- * WHATSAPP-OFF-1 (2026-10-14): the WhatsApp Business API integration (the
- * `whatsapp` feature — WBS bridge, templates, bot, order-update sends) is
- * flagged OFF for every store. The code stays; no plan baseline contains the
- * key, the registry entry is hidden, and only a super-admin StoreFeature
- * override turns it on for one store.
+ * WHATSAPP-OFF-1 (2026-10-14): the `whatsapp` feature (the separate Ebda WhatsApp
+ * product, wa.ebda.app; the legacy in-Store bridge was deleted by WA-LEGACY-1) is
+ * flagged OFF for every store. No plan baseline contains the key, the registry
+ * entry is hidden, and only a super-admin StoreFeature override turns it on for
+ * one store.
  *
  * Covers: PLAN_BASELINE / registry shape, FeatureService resolution for every
  * plan (including a plan whose limits say `whatsappAutomation: true`), and the

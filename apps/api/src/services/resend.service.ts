@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { prisma, withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { deliverableOnly } from '../lib/undeliverable-email';
 import { resolveSender, type StoreSenderShape } from './email-sender';
 
 // Resend SDK wrapper — single platform-wide account. Merchant domains
@@ -320,6 +321,8 @@ export class ResendService {
     storeId: string,
     opts: { to: string | string[]; subject: string; html: string; text?: string; replyTo?: string }
   ): Promise<{ id: string }> {
+    const recipients = deliverableOnly(opts.to);
+    if (recipients.length === 0) return { id: 'skipped-undeliverable' };
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
@@ -341,7 +344,7 @@ export class ResendService {
     type SendPayload = Parameters<typeof client.emails.send>[0];
     const sdkPayload: SendPayload = {
       from: sender.from,
-      to: Array.isArray(opts.to) ? opts.to : [opts.to],
+      to: recipients,
       subject: opts.subject,
       html: opts.html,
     };
@@ -379,6 +382,7 @@ export class ResendService {
       idempotencyKey?: string;
     }
   ): Promise<{ id: string }> {
+    if (deliverableOnly(opts.to).length === 0) return { id: 'skipped-undeliverable' };
     const sender = resolveSender(store);
     const client = ensureClient();
 
@@ -421,8 +425,9 @@ export class ResendService {
       }>;
     }
   ): Promise<{ ids: string[] }> {
-    if (opts.messages.length === 0) return { ids: [] };
     if (opts.messages.length > 100) throw new Error('Resend batch accepts at most 100 emails');
+    const messages = opts.messages.filter(m => deliverableOnly(m.to).length > 0);
+    if (messages.length === 0) return { ids: [] };
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
@@ -441,7 +446,7 @@ export class ResendService {
     const sender = resolveSender(store);
     const client = ensureClient();
     type BatchPayload = Parameters<typeof client.batch.send>[0];
-    const payload: BatchPayload = opts.messages.map(m => ({
+    const payload: BatchPayload = messages.map(m => ({
       from: sender.from,
       to: [m.to],
       subject: opts.subject,

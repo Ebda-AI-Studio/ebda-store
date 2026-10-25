@@ -2,14 +2,14 @@
  * SP6b leftovers from 6a, against a real Postgres with the code under test bound to an
  * `ebda_app` login (strict RLS) and the REAL Paymob adapter talking to a loopback stub:
  *
- *   - the admin payment link, and a customer's payment retry, ask the gateway with NO
+ *   - a customer's payment retry asks the gateway with NO
  *     transaction open (read -> commit -> call -> short transaction to record);
  *   - GET /payments/:id/events and /events/:id/payload resolve the payment's store through the
  *     guarded definer: the payment's own store owner and super_admin see it, ANOTHER store's
  *     admin and an unknown id get 404, and the raw payload is super_admin only.
  *
  * Mutation proof: put the provider call back inside `runInTenantContext` in
- * PaymentService.createPayment -> the two "NO transaction open" tests go red.
+ * PaymentService.createPayment -> the "NO transaction open" test goes red.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
@@ -20,13 +20,10 @@ import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebd
 import { PaymobStub, PAYMOB_STUB } from '../stubs/paymob-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
-import { config } from '@api/config';
 import { encryption } from '@api/services/encryption.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
 import { resetProviderHealthForTests } from '@api/services/payment-providers/provider-health';
 import paymentRoutes from '@api/routes/payment.routes';
-import paymentLinksRoutes from '@api/routes/payment-links.routes';
-import { storeScopeContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 import { planService } from '@api/services/plan.service';
 import { redis } from '@api/services/redis.service';
@@ -42,7 +39,6 @@ const TOTAL = 15_000;
 const paymob = new PaymobStub();
 const idleTxAtGatewayCall: number[] = [];
 let paymobServer: ServedStub;
-let wbsServer: ServedStub;
 
 function appUrl(): string {
   const u = new URL(OWNER_URL);
@@ -91,18 +87,9 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
         slug: `scope-${tag}-${run}`,
         ownerId: admin.id,
         status: 'active',
-        wbsEnabled: true,
       },
     });
-    await owner.storeCredential.create({
-      data: { storeId: store.id, wbsApiKey: encryption.encrypt('wbs-test-key') },
-    });
     storeIds.push(store.id);
-    // WHATSAPP-OFF-1: the WhatsApp payment-link send needs the per-store
-    // `whatsapp` override (the feature is OFF for every plan, `comped` included).
-    await owner.storeFeature.create({
-      data: { storeId: store.id, featureKey: 'whatsapp', enabled: true },
-    });
     await planService.assignPlan(store.id, { planCode: 'comped' });
     const product = await owner.product.create({
       data: {
@@ -123,17 +110,6 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
         apiKey: encryption.encrypt(PAYMOB_STUB.secretKey),
         webhookSecret: encryption.encrypt(PAYMOB_STUB.hmacSecret),
         settings: { publicKey: PAYMOB_STUB.publicKey, integrationIds: PAYMOB_STUB.integrationIds },
-      },
-    });
-    await owner.whatsAppTemplate.create({
-      data: {
-        storeId: store.id,
-        sourceKey: 'paymentLink',
-        language: 'en',
-        metaName: 'payment_link_en',
-        category: 'UTILITY',
-        body: '{{1}} {{5}}',
-        status: 'approved',
       },
     });
     return {
@@ -205,15 +181,12 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
     paymobServer = await serveStub(paymob.fetch, async () => {
       idleTxAtGatewayCall.push(await idleAppTransactions());
     });
-    wbsServer = await serveStub(async () => Response.json({ success: true, messageId: 'wamid.1' }));
     process.env.PAYMOB_BASE_URL = paymobServer.url;
-    (config as { wbsBaseUrl: string }).wbsBaseUrl = wbsServer.url;
     await redis.connect().catch(() => undefined);
     app = express();
     app.set('trust proxy', true);
     app.use(express.json());
     app.use('/api/v1/payments', paymentRoutes);
-    app.use('/api/v1/stores/:id/payment-links', storeScopeContext, paymentLinksRoutes);
     app.use(errorHandler);
   });
   beforeEach(() => {
@@ -237,9 +210,6 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
       .deleteMany({ where: { storeId: { in: storeIds } } })
       .catch(() => undefined);
     await owner.order.deleteMany({ where: { storeId: { in: storeIds } } }).catch(() => undefined);
-    await owner.whatsAppTemplate
-      .deleteMany({ where: { storeId: { in: storeIds } } })
-      .catch(() => undefined);
     await owner.paymentConfig
       .deleteMany({ where: { storeId: { in: storeIds } } })
       .catch(() => undefined);
@@ -249,26 +219,6 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
     await owner.$disconnect();
     await redis.disconnect().catch(() => undefined);
     await paymobServer.close();
-    await wbsServer.close();
-  });
-
-  it('the admin payment link asks the gateway with NO transaction open', async () => {
-    const s = await mkStore('link');
-    const res = await asApp(async () =>
-      http()
-        .post(`/api/v1/stores/${s.id}/payment-links`)
-        .set('Authorization', `Bearer ${s.jwt}`)
-        .send({
-          customerPhone: '+201012345678',
-          customerName: 'Mona Adel',
-          items: [{ productId: s.productId, quantity: 1 }],
-        })
-    );
-    expect(res.status, JSON.stringify(res.body)).toBeLessThan(300);
-    expect(paymob.requests.filter(r => r.path === '/v1/intention/')).toHaveLength(1);
-    expect(idleTxAtGatewayCall).toEqual([0]);
-    const [p] = await owner.payment.findMany({ where: { order: { storeId: s.id } } });
-    expect(p).toMatchObject({ provider: 'paymob', status: 'pending', amount: TOTAL });
   });
 
   it("a customer's retry of a failed payment asks the gateway with NO transaction open", async () => {

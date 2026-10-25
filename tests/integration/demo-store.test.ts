@@ -5,7 +5,6 @@
  * Paths checked (all funnel through plan-limit.service `assertOrderAllowed`):
  *   OrderService.create          storefront checkout, public routes, MCP order tools
  *   OrderService.createAdminOrder merchant phone/manual orders
- *   payment-links.routes          WhatsApp payment link (calls assertOrderAllowed before any write)
  * A non-demo store is unaffected.
  *
  * Ruling B1-13 (+ plan amendment C13): the showroom also refuses every public write that collects
@@ -13,14 +12,10 @@
  * apply, push subscribe) with the same 403 DEMO_STORE, writing nothing and sending nothing.
  */
 import { describe, it, expect, afterAll, beforeAll, vi } from 'vitest';
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express from 'express';
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
-import paymentLinksRoutes from '@api/routes/payment-links.routes';
-import { storeScopeContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
-import { config } from '@api/config';
 import { AppError } from '@api/middleware/error-handler';
 import { OrderService } from '@api/services/order.service';
 import { assertOrderAllowed, assertNotDemoStore } from '@api/services/plan-limit.service';
@@ -122,72 +117,6 @@ describe.skipIf(!hasDb)('demo store refuses orders', () => {
     ).rejects.toMatchObject({ statusCode: 403, code: 'DEMO_STORE' });
     expect(await counts(s.storeId)).toEqual({ orders: 0, items: 0 });
     expect(await stockOf(s.productId)).toBe(10);
-  });
-
-  it('WhatsApp payment link (HTTP, ebda_app): 403 DEMO_STORE and nothing written', async () => {
-    const s = await seed(true);
-    // Everything the route checks BEFORE the order gate is satisfied, so only is_demo refuses.
-    await withRlsBypass(async tx => {
-      await tx.store.update({ where: { id: s.storeId }, data: { wbsEnabled: true } });
-      await tx.storeCredential.upsert({
-        where: { storeId: s.storeId },
-        create: { storeId: s.storeId, wbsApiKey: 'enc-test-key' },
-        update: { wbsApiKey: 'enc-test-key' },
-      });
-      // WHATSAPP-OFF-1: `whatsapp` is OFF for every store by default, so this
-      // store carries the per-store override — otherwise the feature gate (not
-      // is_demo) would be the thing refusing.
-      await tx.storeFeature.create({
-        data: { storeId: s.storeId, featureKey: 'whatsapp', enabled: true },
-      });
-      await tx.whatsAppTemplate.create({
-        data: {
-          storeId: s.storeId,
-          sourceKey: 'paymentLink',
-          language: 'en',
-          metaName: 'payment_link',
-          category: 'UTILITY',
-          body: 'Pay here',
-          status: 'approved',
-        },
-      });
-    });
-    const owner = await prisma.user.findUniqueOrThrow({
-      where: { id: s.ownerId },
-      select: { email: true },
-    });
-    const token = jwt.sign(
-      { userId: s.ownerId, email: owner.email, role: 'store_admin', tv: 0 },
-      config.jwtSecret,
-      { expiresIn: '10m', issuer: 'ebda-api', audience: 'ebda-app' }
-    );
-    const app = express();
-    app.use(express.json());
-    app.use((_req: Request, res: Response, next: NextFunction) => {
-      asApp(
-        () =>
-          new Promise<void>(resolve => {
-            res.once('finish', resolve);
-            res.once('close', resolve);
-            next();
-          })
-      ).catch(next);
-    });
-    app.use('/api/v1/stores/:id/payment-links', storeScopeContext, paymentLinksRoutes);
-    app.use(errorHandler);
-
-    const res = await request(app)
-      .post(`/api/v1/stores/${s.storeId}/payment-links`)
-      .set({ Authorization: `Bearer ${token}` })
-      .send({ customerPhone: '+201012345678', items: [{ productId: s.productId, quantity: 1 }] });
-    expect(res.status, JSON.stringify(res.body)).toBe(403);
-    expect(res.body.error.code).toBe('DEMO_STORE');
-    expect(await counts(s.storeId)).toEqual({ orders: 0, items: 0 });
-    expect(await stockOf(s.productId)).toBe(10);
-    const waCustomers = await withRlsBypass(tx =>
-      tx.user.count({ where: { storeId: s.storeId, role: 'customer' } })
-    );
-    expect(waCustomers).toBe(0);
   });
 
   it('assertOrderAllowed reads is_demo under the ebda_app role (strict RLS)', async () => {

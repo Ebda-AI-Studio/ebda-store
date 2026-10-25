@@ -5,106 +5,12 @@ import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Modal, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { WhatsAppIcon } from '../../../../components/icons/WhatsAppIcon';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
 import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@ebda/shared';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
-
-/**
- * Fetches the WBS integration status for the current store and surfaces
- * two status chips directly on the Settings page WhatsApp card:
- *   • Connected / Not connected
- *   • DM ordering: ON / OFF (only shown when connected)
- *
- * This makes the critical waCustomerOrderingEnabled toggle discoverable
- * without requiring a click-through to Settings → WhatsApp → Connection tab.
- */
-function WhatsAppStatusInline({ storeId }: { storeId: string }) {
-  const t = useT('settings');
-  const [status, setStatus] = useState<{
-    /** credentials saved in the DB (API key present + WBS toggle on) */
-    saved: boolean;
-    /** a live call to WBS with that key actually succeeded just now */
-    verified: boolean;
-    waOrdering: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!storeId) return;
-    apiGet<{
-      hasApiKey: boolean;
-      wbsEnabled: boolean;
-      waCustomerOrderingEnabled: boolean;
-      // wbsLiveVerified is true ONLY when the live fetchMetadata() call to WBS
-      // succeeded this request. connectedTenant may be non-null even when
-      // wbsLiveVerified is false (local-template fallback populates it for the
-      // ConnectionTab's template list). Always use wbsLiveVerified here — never
-      // connectedTenant != null — to avoid showing "Connected" when the WBS key
-      // is revoked/disconnected but the store still has local approved templates.
-      wbsLiveVerified?: boolean;
-    }>(`/api/v1/stores/${storeId}/integrations/wbs`)
-      .then(({ data }) => {
-        if (data) {
-          setStatus({
-            saved: Boolean(data.hasApiKey && data.wbsEnabled),
-            verified: Boolean(data.wbsLiveVerified),
-            waOrdering: Boolean(data.waCustomerOrderingEnabled),
-          });
-        }
-      })
-      .catch(() => {
-        // Silent — badge simply won't render on error
-      });
-  }, [storeId]);
-
-  if (!status) return null;
-
-  // Three honest states:
-  //   verified  → green  "Connected"            (live WBS check passed just now)
-  //   saved     → amber  "Saved · not verified" (key in DB but WBS unreachable / key invalid)
-  //   neither   → gray   "Not connected"
-  const tone = status.verified ? 'green' : status.saved ? 'amber' : 'gray';
-  const chip =
-    tone === 'green'
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
-      : tone === 'amber'
-        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
-        : 'bg-muted text-muted-ink border-border';
-  const dot =
-    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-muted-foreground';
-  const label =
-    tone === 'green'
-      ? t('whatsappStatus.connected')
-      : tone === 'amber'
-        ? t('whatsappStatus.savedNotVerified')
-        : t('whatsappStatus.notConnected');
-
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      <span
-        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${chip}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-        {label}
-      </span>
-      {status.verified && (
-        <span
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-            status.waOrdering
-              ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800'
-              : 'bg-muted text-muted-ink border-border'
-          }`}
-        >
-          {t('whatsappStatus.dmOrdering')}{' '}
-          {status.waOrdering ? t('aiAutopilotChip.on') : t('aiAutopilotChip.off')}
-        </span>
-      )}
-    </div>
-  );
-}
 
 /**
  * Fetches the store theme and surfaces the aiAutopilot flag as a small
@@ -455,25 +361,7 @@ export default function StoreSettingsPage() {
      *
      * shippingCarriers card also removed — it's a sub-concern of Shipping;
      * the /shipping page links to /shipping-carriers from inside.
-     *
-     * 2026-05-22 (Ahmad audit pt.2): WhatsApp surfaces moved BACK to
-     * Settings — they're integration config + administrative actions,
-     * not customer-engagement campaigns. Marketing hub keeps the
-     * non-integration cards (notifications, newsletter, etc).
      */
-    {
-      key: 'whatsapp',
-      href: `/stores/${storeId}/whatsapp`,
-      // WhatsApp Business API integration: flagged OFF for every store
-      // (Ruling WHATSAPP-OFF-1, 2026-10-14) — the card (and its status fetch)
-      // renders only when the `whatsapp` feature resolves ON for the store.
-      featureKey: 'whatsapp',
-      color: 'bg-[#25D366]/10 text-[#25D366]',
-      icon: <WhatsAppIcon className="h-6 w-6" />,
-    },
-    // 2026-05-28: waBotConfig card removed — Bot Mode + Service Menu +
-    // Meta Catalog merged into the WhatsApp Integration tabset (above)
-    // as the "Bot Config" tab to remove the page-bouncing overlap.
     {
       /*
        * The MCP agent write credential (Ruling M1). Feature-gated on
@@ -619,7 +507,6 @@ export default function StoreSettingsPage() {
                       {tCards(`${card.key}.description`)}
                     </p>
                     {card.key === 'branding' && <AiAutopilotChip storeId={storeId} />}
-                    {card.key === 'whatsapp' && <WhatsAppStatusInline storeId={storeId} />}
                   </div>
                 </Link>
               ))}

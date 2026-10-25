@@ -19,8 +19,7 @@ export function CustomerCard({ order }: CustomerCardProps) {
   if (!customer) return null;
 
   const phone = customer.phone || order.shippingAddress?.phone || '';
-  const rawEmail = customer.email || order.shippingAddress?.email || '';
-  const email = rawEmail.endsWith('@placeholder.forcestore.kw') ? '' : rawEmail;
+  const email = customer.email || order.shippingAddress?.email || '';
   const name = `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim();
 
   if (!phone && !email && !name) return null;

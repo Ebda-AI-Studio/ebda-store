@@ -178,56 +178,15 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
         prisma.store
           .findUnique({
             where: { id: storeId },
-            select: { name: true, wbsTemplates: true, settings: true },
+            select: { name: true, settings: true },
           })
           .catch(() => null)
       )
     );
 
-    // Origin-aware notification routing: orders that originated on
-    // WhatsApp (merchant-initiated payment link, customer DM ordering,
-    // etc.) should NOT receive an email — the customer didn't give us
-    // a real email address (the User row carries a synthetic
-    // wa-<digits>@placeholder.forcestore.kw placeholder), the WhatsApp
-    // template already confirms the order via the orderPaid template
-    // (handled by the parallel orderWhatsappNotify Inngest fn), and
-    // sending email to the placeholder address would either bounce or
-    // (worse) deliver to whoever owns the placeholder domain. We detect
-    // the origin via shippingAddress._source — set when the
-    // payment-links.routes.ts flow creates the draft order. Any future
-    // WhatsApp-origin flows (customer DM, BWA bot) should stamp the
-    // same marker so the email skip applies uniformly.
-    const orderSource = (order.shippingAddress as { _source?: string } | null)?._source;
-    const skipEmailByOrigin = orderSource === 'wa_payment_link' || orderSource === 'wa_dm_order';
-    if (skipEmailByOrigin) {
-      logger.info(
-        { orderId: order.id, source: orderSource },
-        '[order-created] skipping customer email — WhatsApp-origin order, customer notified via template'
-      );
-    }
-
-    // Merchant-level channel toggle: check wbsTemplates.orderPaid.channels.email.
-    // When explicitly set to false, the merchant wants this event silent on email
-    // (e.g. they rely solely on WhatsApp for paid confirmation). Absent channels
-    // object = both on (backward-compatible default).
-    type TemplateChannels = { whatsapp?: boolean; email?: boolean };
-    type TemplateEntry = { name?: string; languageCode?: string; channels?: TemplateChannels };
-    type WbsTemplatesShape = { orderPaid?: TemplateEntry };
-    const wbsTemplates = store?.wbsTemplates as WbsTemplatesShape | null;
-    const emailChannelEnabled = wbsTemplates?.orderPaid?.channels?.email !== false;
-    const skipEmail = skipEmailByOrigin || !emailChannelEnabled;
-    if (!emailChannelEnabled && !skipEmailByOrigin) {
-      logger.info(
-        { orderId: order.id, storeId },
-        '[order-created] skipping customer email — merchant disabled email channel for orderPaid'
-      );
-    }
-
     const results = await Promise.allSettled([
       step.run('send-customer-confirmation', () =>
-        skipEmail
-          ? Promise.resolve()
-          : EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
+        EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
       ),
       // No "new order" alert to Ebda's own address any more (Ruling FU46-1a): it carried
       // every store's shopper name, email and items. The store's own notice is the invoice
@@ -312,7 +271,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     // always completed as "success" — so `inngest/function.failed` never fired
     // and alerts-failure-watch could never dead-letter this fanout, even when
     // every customer/admin notification was lost. Sibling consumers of the same
-    // order/created event (order-whatsapp-notify, accounting-post-order-journal)
+    // order/created event (accounting-post-order-journal)
     // already throw + escalate; this brings the notification fanout up to parity.
     // Idempotent on retry: each side-effect is its own memoized step.run, so a
     // retry re-runs only the failed steps.

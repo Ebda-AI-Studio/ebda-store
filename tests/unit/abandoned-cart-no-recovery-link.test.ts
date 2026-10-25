@@ -31,11 +31,6 @@ vi.mock('@api/services/notification-dispatcher.service', () => ({
 }));
 vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/services/bundle.service', () => ({ resolveBundle: vi.fn() }));
-vi.mock('@api/services/wbs-bridge.service', () => ({
-  wbsBridgeService: {},
-  WbsUnauthorizedError: class extends Error {},
-}));
-vi.mock('@api/services/encryption.service', () => ({ encryption: {} }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

@@ -9,8 +9,7 @@ import { inngest } from '../client';
  * invalidate the caches of every product that referenced it.
  *
  * Triggered by the `product.deleted` event emitted from
- * product.service.ts after a successful soft-delete. Runs alongside
- * productMetaSyncDeleteFn on the same event.
+ * product.service.ts after a successful soft-delete.
  *
  * Tables cleaned:
  *   - AiRecommendation: rows where targetProductId === deleted product
