@@ -528,4 +528,41 @@ describe('heldUnaccountedEvent means "an unaccounted refund whose amount could n
     expect(r.accountedThisEvent).toBe(true);
     expect(r.heldUnaccountedEvent).toBe(false);
   });
+
+  describe('an in-flight in-band refund claim (webhook outruns the id write)', () => {
+    // R1 (2000) is accounted with its id. An in-band refund of 1000 has CLAIMED its amount (alreadyRefunded 3000) and the
+    // provider has answered, but the claim has not yet recorded its id. The provider's settle webhook for that SAME refund
+    // arrives first: id R2 is on no list. Without the in-flight list it reads as a brand-new refund and adds 1000 again.
+    const base = {
+      paymentAmount: PAYMENT,
+      alreadyRefunded: 3000,
+      reported: [1000],
+      reportedEventId: 'R2',
+      accountedEventIds: ['R1'],
+    };
+    it('absorbs the webhook into the claim: total stays 3000, nothing is added twice', () => {
+      const r = resolveRefundSettlement({ ...base, inFlightClaimAmounts: [1000] });
+      expect(r.settledTotal).toBe(3000);
+      expect(r.accountedThisEvent).toBe(false);
+      expect(r.absorbedByInFlightClaim).toBe(true);
+      expect(r.heldUnaccountedEvent).toBe(false);
+    });
+    it('a genuinely different amount is still a new out-of-band refund and adds', () => {
+      const r = resolveRefundSettlement({ ...base, reported: [700], inFlightClaimAmounts: [1000] });
+      expect(r.settledTotal).toBe(3700);
+      expect(r.accountedThisEvent).toBe(true);
+      expect(r.absorbedByInFlightClaim).toBe(false);
+    });
+    it('one claim absorbs one webhook: two equal webhooks with one claim, the second adds', () => {
+      const first = resolveRefundSettlement({ ...base, inFlightClaimAmounts: [1000] });
+      expect(first.absorbedByInFlightClaim).toBe(true);
+      const second = resolveRefundSettlement({ ...base, inFlightClaimAmounts: [] });
+      expect(second.accountedThisEvent).toBe(true);
+    });
+    it('with no in-flight claim nothing changes (a dashboard refund applies exactly once)', () => {
+      const r = resolveRefundSettlement({ ...base });
+      expect(r.settledTotal).toBe(4000);
+      expect(r.accountedThisEvent).toBe(true);
+    });
+  });
 });

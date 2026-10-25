@@ -87,6 +87,11 @@ export interface RefundSettlement {
    * an amount" text (PR 2279 audit P1).
    */
   heldProvenanceUnknown: boolean;
+  /**
+   * True when this event is the settle notice of an in-band refund whose claim already added its amount but has not
+   * yet recorded the provider's id (the webhook outran the id write). It is NOT added again; the claim records the id.
+   */
+  absorbedByInFlightClaim: boolean;
 }
 
 export function resolveRefundSettlement(input: {
@@ -111,6 +116,12 @@ export function resolveRefundSettlement(input: {
    * finite positive one wins. Pass every candidate the payload offers.
    */
   reported: Array<number | null | undefined>;
+  /**
+   * Amounts of in-band refund claims that are committed (their amount is inside `alreadyRefunded`) but have no
+   * outcome event yet, so their provider id is on no list. A webhook for an unaccounted id whose credible amount
+   * equals one of them is that refund's own settle notice, not a second refund.
+   */
+  inFlightClaimAmounts?: readonly number[] | null;
 }): RefundSettlement {
   const { paymentAmount, alreadyRefunded, reported, reportedEventId, accountedEventIds } = input;
 
@@ -173,8 +184,12 @@ export function resolveRefundSettlement(input: {
     );
   }
 
+  const absorbedByInFlightClaim =
+    isUnaccountedEvent &&
+    credibleAmount !== null &&
+    (input.inFlightClaimAmounts ?? []).includes(credibleAmount);
   const settled =
-    isUnaccountedEvent && credibleAmount !== null
+    isUnaccountedEvent && credibleAmount !== null && !absorbedByInFlightClaim
       ? accounted + credibleAmount
       : Math.max(accounted, credibleAmount ?? 0);
 
@@ -182,7 +197,8 @@ export function resolveRefundSettlement(input: {
   const unknownMeansFull = credibleAmount === null && !hasAccountedRefund;
   const isFullRefund = unknownMeansFull || paymentAmount <= 0 || settled >= paymentAmount;
 
-  const accountedThisEvent = isUnaccountedEvent && credibleAmount !== null;
+  const accountedThisEvent =
+    isUnaccountedEvent && credibleAmount !== null && !absorbedByInFlightClaim;
   return {
     reportedAmount,
     // A full refund exhausts the payment even when nothing was reported.
@@ -193,6 +209,7 @@ export function resolveRefundSettlement(input: {
     // event WITH a credible amount is a different case with different wording
     // — heldProvenanceUnknown below — because it may be a benign settle notice
     // for the refund already counted OR a genuinely new refund (PR 2279 audit).
+    absorbedByInFlightClaim,
     heldUnaccountedEvent:
       typeof reportedEventId === 'string' &&
       reportedEventId.length > 0 &&
