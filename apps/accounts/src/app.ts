@@ -341,7 +341,11 @@ async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
     ...(await mintFor(c.env, user, s.sid, aud, { created_at: nowMs(), amr })),
     // A platform admin without a second factor gets no admin power: the client must send them to enrol one.
     ...(user.role === 'super_admin' && !hasSecondFactor(amr)
-      ? { mfaEnrollmentRequired: !(await hasAnyFactor(c.env.DB, user)) }
+      ? await (async () => {
+          const factor = await hasAnyFactor(c.env.DB, user);
+          // no factor yet: enrol one; a passkey but no TOTP: a password sign-in carries no admin power, use the passkey
+          return factor ? { secondFactorRequired: true } : { mfaEnrollmentRequired: true };
+        })()
       : {}),
   };
 }

@@ -5414,7 +5414,8 @@
       "forgotPassword": "Forgot password?",
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
-      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password."
+      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
+      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue."
     },
     "forgot": {
       "title": "Reset your password",

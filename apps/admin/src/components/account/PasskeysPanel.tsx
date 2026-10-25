@@ -44,9 +44,12 @@ type Action = () => Promise<void>;
 
 export function PasskeysPanel({
   mfaEnabled,
+  isAdmin = false,
   onCount,
 }: {
   mfaEnabled: boolean;
+  /** A platform administrator's FIRST factor also needs the operator's one-time enrolment token. */
+  isAdmin?: boolean;
   /** Reports how many passkeys the account has (the page needs it to know whether a TOTP would be a FIRST factor). */
   onCount?: (n: number) => void;
 }) {
@@ -67,13 +70,19 @@ export function PasskeysPanel({
   const pending = useRef<Action | null>(null);
   // The identity service asks for the password (and a TOTP code when TOTP is on) with EACH sensitive call; they are held only
   // for the one retry after the step-up form and then dropped.
-  const creds = useRef<{ password: string; code?: string; emailCode?: string } | null>(null);
+  const creds = useRef<{
+    password: string;
+    code?: string;
+    emailCode?: string;
+    enrolmentToken?: string;
+  } | null>(null);
   const [askStepUp, setAskStepUp] = useState(false);
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [stepUpError, setStepUpError] = useState('');
   // The FIRST sign-in factor of an account (no TOTP, no passkey) also needs a code e-mailed to the account.
   const [emailCode, setEmailCode] = useState('');
+  const [enrolToken, setEnrolToken] = useState('');
   const [codeSent, setCodeSent] = useState(false);
 
   const fmt = (iso: string) =>
@@ -141,7 +150,12 @@ export function PasskeysPanel({
     }
   }
 
-  const needCreds = (): { password: string; code?: string; emailCode?: string } => {
+  const needCreds = (): {
+    password: string;
+    code?: string;
+    emailCode?: string;
+    enrolmentToken?: string;
+  } => {
     if (!creds.current) throw { code: 'STEP_UP_REQUIRED' } satisfies ApiError;
     return creds.current;
   };
@@ -156,6 +170,7 @@ export function PasskeysPanel({
         response,
         name: name.trim() || undefined,
         ...(c.emailCode ? { emailCode: c.emailCode } : {}),
+        ...(c.enrolmentToken ? { enrolmentToken: c.enrolmentToken } : {}),
       });
     } catch (e) {
       creds.current = null;
@@ -195,10 +210,12 @@ export function PasskeysPanel({
         password,
         ...(mfaEnabled ? { code: code.trim() } : {}),
         ...(emailCode.trim() ? { emailCode: emailCode.trim() } : {}),
+        ...(enrolToken.trim() ? { enrolmentToken: enrolToken.trim() } : {}),
       };
       setPassword('');
       setCode('');
       setEmailCode('');
+      setEnrolToken('');
       setCodeSent(false);
       setAskStepUp(false);
       const next = pending.current;
@@ -288,6 +305,25 @@ export function PasskeysPanel({
           {!mfaEnabled && (items?.length ?? 0) === 0 && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">{ts('firstFactorEmailHint')}</p>
+              {isAdmin && (
+                <div>
+                  <label
+                    htmlFor="passkey-enrol-token"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    {ts('bootstrapTokenLabel')}
+                  </label>
+                  <Input
+                    id="passkey-enrol-token"
+                    type="text"
+                    dir="ltr"
+                    autoComplete="off"
+                    value={enrolToken}
+                    onChange={e => setEnrolToken(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              )}
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <label
@@ -348,7 +384,9 @@ export function PasskeysPanel({
               disabled={
                 busy ||
                 !password ||
-                (!mfaEnabled && (items?.length ?? 0) === 0 && emailCode.trim().length !== 6)
+                (!mfaEnabled &&
+                  (items?.length ?? 0) === 0 &&
+                  (emailCode.trim().length !== 6 || (isAdmin && !enrolToken.trim())))
               }
             >
               {t('stepUpConfirm')}

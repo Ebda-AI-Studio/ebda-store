@@ -218,9 +218,9 @@ export default function SecurityPage() {
     }
   }
 
-  // A TOTP is a FIRST factor only when the account has neither a TOTP nor a passkey (super admins have no passkey panel).
-  const isFirstFactor =
-    !status?.mfaEnabled && (serverWantsCode || user?.role === 'super_admin' || passkeyCount === 0);
+  // A TOTP is a FIRST factor only when the account has neither a TOTP nor a passkey. A passkey alone is a complete
+  // second-factor state for everyone, platform administrators included (it satisfies the second-factor requirement).
+  const isFirstFactor = !status?.mfaEnabled && (serverWantsCode || passkeyCount === 0);
   const isFirstAdminFactor = user?.role === 'super_admin' && isFirstFactor;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -228,38 +228,42 @@ export default function SecurityPage() {
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 space-y-6">
         {/* Super-admin required banner */}
-        {user?.role === 'super_admin' && status && !status.mfaEnabled && step === 'idle' && (
-          <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-            <svg
-              className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-              />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {t('mfaBanner')}
-              </p>
-              <Button
-                type="button"
-                className="mt-3"
-                size="sm"
-                onClick={handleBeginEnroll}
-                disabled={isSubmitting}
+        {user?.role === 'super_admin' &&
+          status &&
+          !status.mfaEnabled &&
+          passkeyCount === 0 &&
+          step === 'idle' && (
+            <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+              <svg
+                className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
               >
-                {t('mfaBannerCta')}
-              </Button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {t('mfaBanner')}
+                </p>
+                <Button
+                  type="button"
+                  className="mt-3"
+                  size="sm"
+                  onClick={handleBeginEnroll}
+                  disabled={isSubmitting}
+                >
+                  {t('mfaBannerCta')}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Status card */}
         {isLoadingStatus ? (
@@ -664,8 +668,12 @@ export default function SecurityPage() {
             )}
           </>
         )}
-        {status && user?.role !== 'super_admin' && (
-          <PasskeysPanel mfaEnabled={status.mfaEnabled} onCount={setPasskeyCount} />
+        {status && (
+          <PasskeysPanel
+            mfaEnabled={status.mfaEnabled}
+            isAdmin={user?.role === 'super_admin'}
+            onCount={setPasskeyCount}
+          />
         )}
         <LegalAcceptancesPanel />
       </div>

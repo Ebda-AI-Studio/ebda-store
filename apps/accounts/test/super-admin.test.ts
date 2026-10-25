@@ -773,6 +773,41 @@ describe('enrolment tickets and step-up for every factor (Ruling ID-15, review r
     expect((await begin(m, pw.body.access_token)).status).toBe(200);
   });
 
+  it('a passkey and no TOTP is a COMPLETE state for a super admin: a password sign-in says to use the passkey, a passkey session carries pa', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    await addPasskeyRow(u.id);
+    const pw = await login(u);
+    const body = pw.body as unknown as {
+      access_token: string;
+      mfaEnrollmentRequired?: boolean;
+      secondFactorRequired?: boolean;
+    };
+    expect(body.secondFactorRequired).toBe(true);
+    expect(body.mfaEnrollmentRequired).toBeUndefined();
+    expect(claims(body.access_token).pa).toBeUndefined();
+    // the same account through a session created by a passkey login (amr hwk) is a platform admin
+    await setAmr(sidOf(body.access_token), 'hwk');
+    const minted = (await (await call('/token?aud=store', { cookie: pw.cookie })).json()) as {
+      data: { access_token: string };
+    };
+    expect(claims(minted.data.access_token).pa).toBe('super_admin');
+  });
+
+  it('...and adding a TOTP to it needs a fresh passkey session, with NO operator token and NO e-mailed code', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    await addPasskeyRow(u.id);
+    const s = await login(u);
+    const bearer = s.body.access_token;
+    // from a password-only session: refused
+    expect((await begin(u, bearer)).status).toBe(403);
+    // from a fresh passkey session: allowed, and completes with just the TOTP code
+    await setAmr(sidOf(bearer), 'hwk');
+    const secret = await secretOf(await begin(u, bearer));
+    const r = await call('/mfa/enroll/verify', { json: { code: await totpAt(secret) }, bearer });
+    expect(r.status).toBe(200);
+    expect(await count(`SELECT mfa_enabled AS n FROM users WHERE id = ?1`, u.id)).toBe(1);
+  });
+
   it('a first-factor merchant enrolment that races a second factor is re-checked at completion (stricter, never looser)', async () => {
     const m = await seedUser();
     const s = await login(m);
