@@ -15,6 +15,7 @@ import {
   purgeCredentials,
   type UserRow,
 } from './data';
+import { AUDIENCE_SCOPES } from './client-scopes';
 import {
   ACCESS_TTL_SECONDS,
   mintAccessToken,
@@ -23,11 +24,13 @@ import {
   type StoreClaim,
 } from './jwt';
 import {
+  auditAuthFailure,
   audit,
   authenticateClient,
   CLIENT_TOKEN_TTL_SECONDS,
   createClient,
   DEFAULT_OVERLAP_HOURS,
+  getStoreClient,
   ipPrefix,
   listClients,
   MAX_OVERLAP_HOURS,
@@ -395,14 +398,19 @@ async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
  * a token minted for another product must not be able to change how the account signs in. Logout and revoke only
  * ever END sessions, so they accept any product's token (`anyAud`).
  */
-async function bearerAuth(c: C, anyAud = false): Promise<{ user: UserRow; sid: string }> {
+async function bearerAuth(
+  c: C,
+  anyAud = false
+): Promise<{ user: UserRow; sid: string; aud: string }> {
   const h = c.req.header('authorization') ?? '';
   const m = /^Bearer (.+)$/.exec(h);
   if (!m) throw err(401, 'UNAUTHORIZED');
   let verified: Awaited<ReturnType<typeof verifyOwnAccessToken>> | undefined;
+  let verifiedAud = 'store';
   for (const aud of anyAud ? csv(c.env.PRODUCTS) : ['store']) {
     try {
       verified = await verifyOwnAccessToken(c.env, m[1], aud);
+      verifiedAud = aud;
       break;
     } catch {
       /* try the next audience */
@@ -414,7 +422,7 @@ async function bearerAuth(c: C, anyAud = false): Promise<{ user: UserRow; sid: s
   if (await isSessionRevoked(c.env.DB, verified.sid)) throw err(401, 'SESSION_REVOKED');
   const user = await findUserById(c.env.DB, verified.sub);
   if (!user || user.status !== 'active') throw err(401, 'UNAUTHORIZED');
-  return { user, sid: verified.sid };
+  return { user, sid: verified.sid, aud: verifiedAud };
 }
 
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
@@ -647,8 +655,15 @@ export function createApp() {
   app.use('*', async (c, next) => {
     const origin = c.req.header('origin');
     // /oauth/token is for servers: no CORS, ever (browsers must not hold a client secret).
-    const allowed =
+    let allowed =
       !!origin && c.req.path !== '/oauth/token' && csv(c.env.ALLOWED_ORIGINS).includes(origin);
+    // Client management is for the integration product's own origin only (no CORS for the other products' pages).
+    if (allowed && /^\/stores\/[^/]+\/clients(\/|$)/.test(c.req.path)) {
+      const product = csv(c.env.ORIGIN_PRODUCTS)
+        .map(p => p.split('='))
+        .find(([o]) => o === origin)?.[1];
+      allowed = !!product && Object.hasOwn(AUDIENCE_SCOPES, product);
+    }
     if (c.req.method === 'OPTIONS') {
       if (!allowed) return c.body(null, 403);
       return c.body(null, 204, {
@@ -1255,10 +1270,15 @@ export function createApp() {
   const STORE_ID = /^[A-Za-z0-9_-]{1,64}$/;
   const CLIENT_ID = /^cli_[A-Za-z0-9_-]{1,60}$/;
 
-  /** The store owner, decided NOW from the Store directory (never from the bearer's `stores` claim, which can be 15 min stale). */
+  /**
+   * The store owner, decided NOW from the Store directory (never from the bearer's `stores` claim, which can be 15 min stale).
+   * Returns the audience of the person token that was presented: client management is bound to it (a token issued to one
+   * product cannot manage another product's clients), and a browser Origin must belong to that same product.
+   */
   async function storeOwner(c: C, storeId: string, needFreshFactor: boolean) {
     if (!STORE_ID.test(storeId)) throw err(404, 'NOT_FOUND');
-    const { user, sid } = await bearerAuth(c, true);
+    const { user, sid, aud } = await bearerAuth(c, true);
+    originAudience(c, aud);
     const stores = await storesFor(c.env, user.id);
     if (!stores.some(s => s.id === storeId && s.role === 'owner')) throw err(403, 'FORBIDDEN');
     if (needFreshFactor && !(await sessionFactorFresh(c, sid)))
@@ -1267,13 +1287,20 @@ export function createApp() {
         'FACTOR_REQUIRED',
         'Sign in again with your second factor to manage integrator clients'
       );
-    return user;
+    return { user, aud };
   }
+  /** Create, rotate and list act on ONE audience's clients and need a token issued to exactly that audience. */
+  const sameAudience = (tokenAud: string, clientAud: string) => {
+    if (tokenAud !== clientAud)
+      throw err(403, 'AUDIENCE_MISMATCH', 'Use a token issued to the integration product');
+  };
 
   app.get('/stores/:storeId/clients', async c => {
     const storeId = c.req.param('storeId');
-    await storeOwner(c, storeId, false);
-    return c.json({ success: true, data: await listClients(c.env.DB, storeId) });
+    const { aud } = await storeOwner(c, storeId, false);
+    if (!Object.hasOwn(AUDIENCE_SCOPES, aud))
+      throw err(403, 'AUDIENCE_MISMATCH', 'This product has no integrator clients');
+    return c.json({ success: true, data: await listClients(c.env.DB, storeId, aud) });
   });
 
   const createSchema = z.object({
@@ -1283,8 +1310,9 @@ export function createApp() {
   });
   app.post('/stores/:storeId/clients', async c => {
     const storeId = c.req.param('storeId');
-    const user = await storeOwner(c, storeId, true);
+    const { user, aud } = await storeOwner(c, storeId, true);
     const body = await json(c, createSchema);
+    sameAudience(aud, body.audience);
     const r = await createClient(c.env.DB, c.env, {
       storeId,
       audience: body.audience,
@@ -1315,8 +1343,11 @@ export function createApp() {
   app.post('/stores/:storeId/clients/:id/rotate', async c => {
     const storeId = c.req.param('storeId');
     const id = c.req.param('id');
-    const user = await storeOwner(c, storeId, true);
+    const { user, aud } = await storeOwner(c, storeId, true);
     if (!CLIENT_ID.test(id)) throw err(404, 'NOT_FOUND');
+    const existing = await getStoreClient(c.env.DB, storeId, id);
+    if (!existing) throw err(404, 'NOT_FOUND');
+    sameAudience(aud, existing.audience);
     const body = (c.req.header('content-type') ?? '').toLowerCase().startsWith('application/json')
       ? await json(c, rotateSchema)
       : rotateSchema.parse({});
@@ -1340,7 +1371,8 @@ export function createApp() {
   app.delete('/stores/:storeId/clients/:id', async c => {
     const storeId = c.req.param('storeId');
     const id = c.req.param('id');
-    const user = await storeOwner(c, storeId, true);
+    // Revoking only ever REDUCES access: any audience of the owner may do it.
+    const { user } = await storeOwner(c, storeId, true);
     if (!CLIENT_ID.test(id)) throw err(404, 'NOT_FOUND');
     if ((await revokeClient(c.env.DB, storeId, id, user.id)) === 'not_found')
       throw err(404, 'NOT_FOUND');
@@ -1411,17 +1443,20 @@ export function createApp() {
       const auth = await authenticateClient(c.env.DB, c.env, id, secret);
       if (!auth.client) {
         // Only a KNOWN client gets a trail row (random ids cannot grow the table); the answer is the same either way.
-        if (auth.known)
-          await audit(c.env.DB, {
-            clientId: auth.known.id,
-            storeId: auth.known.store_id,
-            event: 'auth_failed',
-            ip,
-          }).run();
+        if (auth.known) await auditAuthFailure(c.env.DB, auth.known, ip);
         return oauth(401, 'invalid_client');
       }
       await attempt.succeeded();
       const client = auth.client;
+      // A deleted store ends its clients at once, whatever the cleanup has done yet. A directory error fails CLOSED (503).
+      if (!c.env.STORE_DIRECTORY) return oauth(503, 'temporarily_unavailable');
+      let live: boolean;
+      try {
+        live = await c.env.STORE_DIRECTORY.storeExists(client.store_id);
+      } catch {
+        return oauth(503, 'temporarily_unavailable');
+      }
+      if (!live) return oauth(401, 'invalid_client');
       const audience = params.get('audience') ?? client.audience;
       if (audience !== client.audience) return oauth(400, 'unauthorized_client');
       const held = client.scopes.split(' ');

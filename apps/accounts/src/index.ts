@@ -17,7 +17,12 @@ import {
 } from './data';
 import { z } from 'zod';
 import { reencryptMfaSecrets } from './mfa-keys';
-import { deleteStoreClients, isClientRevoked, pruneClientAudit } from './clients';
+import {
+  deleteStoreClients,
+  isClientRevoked,
+  pruneClientAudit,
+  sweepDeletedStoreClients,
+} from './clients';
 import { hashPassword, passwordPolicy } from './password';
 
 const app = createApp();
@@ -29,6 +34,9 @@ export default {
     ctx.waitUntil(reencryptMfaSecrets(env));
     // integrator client trail: `issued` rows older than 90 days go
     ctx.waitUntil(pruneClientAudit(env.DB));
+    // clients of deleted stores: retried every hour until the directory confirms they are gone
+    const dir = env.STORE_DIRECTORY;
+    if (dir) ctx.waitUntil(sweepDeletedStoreClients(env.DB, id => dir.storeExists(id)));
   },
 } satisfies ExportedHandler<Cloudflare.Env>;
 
@@ -45,7 +53,15 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   async isRevoked(sid: string): Promise<boolean> {
     // An integrator client token (v1.3) has sid = the client id: it is revoked when the client is revoked, the store was
     // deleted, or the id is unknown. Rotating a secret does not revoke tokens already issued.
-    if (sid.startsWith('cli_')) return isClientRevoked(this.env.DB, sid);
+    if (sid.startsWith('cli_')) {
+      if (await isClientRevoked(this.env.DB, sid)) return true;
+      // A deleted store ends its clients at once. A directory error THROWS (the product fails closed), it is never "not revoked".
+      const row = await this.env.DB.prepare(`SELECT store_id FROM clients WHERE id = ?1`)
+        .bind(sid)
+        .first<{ store_id: string }>();
+      if (!row || !this.env.STORE_DIRECTORY) return true;
+      return !(await this.env.STORE_DIRECTORY.storeExists(row.store_id));
+    }
     return isSessionRevoked(this.env.DB, sid);
   }
 

@@ -7,7 +7,7 @@ import { env } from 'cloudflare:test';
 import { decodeProtectedHeader } from 'jose';
 import { call, fakes, login, seedUser, testEnv, verifyAsProduct } from './helpers';
 import { Accounts } from '../src/index';
-import { pruneClientAudit } from '../src/clients';
+import { ipPrefix, pruneClientAudit, sweepDeletedStoreClients } from '../src/clients';
 
 // the D1 survives between tests of a file: every test gets its own stores
 let STORE = 'store-a';
@@ -27,7 +27,7 @@ beforeEach(() => {
 async function owner(storeId = STORE, amr = 'pwd,otp', ageMs = 0) {
   const u = await seedUser();
   fakes.stores = [{ id: storeId, role: 'owner' }];
-  const s = await login(u);
+  const s = await login(u, 'whatsapp'); // client management needs a token issued to the integration product
   await env.DB.prepare(`UPDATE sessions SET amr = ?2, created_at = ?3 WHERE user_id = ?1`)
     .bind(u.id, amr, Date.now() - ageMs)
     .run();
@@ -123,8 +123,13 @@ describe('client management (owner + fresh second factor)', () => {
 
   it('validates audience and scopes: only whatsapp, only registry scopes, orders:events is refused', async () => {
     const o = await owner();
-    for (const aud of ['store', 'crm', 'erp', 'platform', 'nope'])
-      expect((await create(o.bearer, { audience: aud })).status).toBe(400);
+    for (const aud of ['store', 'crm', 'erp', 'platform', 'nope', 'constructor', '__proto__'])
+      expect((await create(o.bearer, { audience: aud })).status).toBeGreaterThanOrEqual(400);
+    expect(
+      (await env.DB.prepare(`SELECT count(*) AS n FROM clients WHERE store_id = ?1`)
+        .bind(STORE)
+        .first<{ n: number }>())!.n
+    ).toBe(0);
     expect((await create(o.bearer, { scopes: ['messages:send', 'admin:all'] })).status).toBe(400);
     expect((await create(o.bearer, { scopes: ['orders:events'] })).status).toBe(400);
     expect((await create(o.bearer, { scopes: [] })).status).toBe(400);
@@ -491,5 +496,124 @@ describe('store deletion and retention', () => {
       .bind(c.id)
       .all<{ event: string }>();
     expect(left.results.map(x => x.event)).toEqual(['created', 'issued', 'revoked', 'auth_failed']);
+  });
+});
+
+describe('management is bound to the integration product (audience)', () => {
+  const tokenFor = async (aud: string, storeId = STORE) => {
+    const u = await seedUser();
+    fakes.stores = [{ id: storeId, role: 'owner' }];
+    const s = await login(u, aud);
+    await env.DB.prepare(`UPDATE sessions SET amr = 'pwd,otp' WHERE user_id = ?1`).bind(u.id).run();
+    return s.body.access_token;
+  };
+
+  it('a store, crm or erp token cannot create, rotate or list whatsapp clients; a whatsapp token can', async () => {
+    const c = await newClient();
+    for (const aud of ['store', 'crm', 'erp']) {
+      const t = await tokenFor(aud);
+      const r = await create(t);
+      expect(r.status).toBe(403);
+      expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
+        'AUDIENCE_MISMATCH'
+      );
+      expect(
+        (await call(`/stores/${STORE}/clients/${c.id}/rotate`, { bearer: t, json: {} })).status
+      ).toBe(403);
+      expect((await call(`/stores/${STORE}/clients`, { bearer: t })).status).toBe(403);
+    }
+    expect((await call(`/stores/${STORE}/clients`, { bearer: c.bearer })).status).toBe(200);
+    expect((await token(c.id, c.secret)).status).toBe(200);
+  });
+
+  it('any audience of the owner may REVOKE (it only reduces access), still with a fresh second factor', async () => {
+    const c = await newClient();
+    const t = await tokenFor('store');
+    expect(
+      (await call(`/stores/${STORE}/clients/${c.id}`, { method: 'DELETE', bearer: t })).status
+    ).toBe(200);
+    expect((await token(c.id, c.secret)).status).toBe(401);
+  });
+
+  it('a browser Origin must belong to the token product, and only the integration origin gets CORS on these routes', async () => {
+    const c = await newClient();
+    const bad = await call(`/stores/${STORE}/clients`, {
+      bearer: c.bearer,
+      headers: { origin: 'https://store.ebda.app' },
+    });
+    expect(bad.status).toBe(403);
+    expect(bad.headers.get('access-control-allow-origin')).toBeNull();
+    const ok = await call(`/stores/${STORE}/clients`, {
+      bearer: c.bearer,
+      headers: { origin: WA },
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('access-control-allow-origin')).toBe(WA);
+    const pre = (origin: string) =>
+      call(`/stores/${STORE}/clients/cli_x`, { method: 'OPTIONS', headers: { origin } });
+    expect((await pre('https://store.ebda.app')).status).toBe(403);
+    expect((await pre(WA)).status).toBe(204);
+  });
+});
+
+describe('a deleted store ends its clients at once', () => {
+  it('token issue is refused (401) and isRevoked is true the moment the directory says the store is gone', async () => {
+    const c = await newClient();
+    const t = ((await ok(await token(c.id, c.secret))) as { access_token: string }).access_token;
+    expect(t).toBeTruthy();
+    expect(await rpc().isRevoked(c.id)).toBe(false);
+    fakes.deletedStores.add(STORE);
+    expect((await token(c.id, c.secret)).status).toBe(401);
+    expect(await rpc().isRevoked(c.id)).toBe(true);
+  });
+
+  it('a directory outage fails CLOSED: 503 at issue, and isRevoked throws instead of answering "not revoked"', async () => {
+    const c = await newClient();
+    fakes.directoryDown = true;
+    expect((await token(c.id, c.secret)).status).toBe(503);
+    await expect(rpc().isRevoked(c.id)).rejects.toThrow();
+  });
+
+  it('the hourly sweep removes clients of deleted stores, keeps live ones, and retries what the directory could not answer', async () => {
+    const gone = await newClient(STORE);
+    const live = await newClient(OTHER_STORE);
+    const dir = new Set<string>([STORE]);
+    let down = true;
+    const exists = async (id: string) => {
+      if (down) throw new Error('down');
+      return !dir.has(id);
+    };
+    expect(await sweepDeletedStoreClients(env.DB, exists)).toBe(0); // directory down: nothing removed
+    expect((await token(live.id, live.secret)).status).toBe(200);
+    down = false;
+    fakes.deletedStores.add(STORE);
+    expect(await sweepDeletedStoreClients(env.DB, exists)).toBeGreaterThanOrEqual(1);
+    const n = await env.DB.prepare(`SELECT count(*) AS n FROM clients WHERE id IN (?1, ?2)`)
+      .bind(gone.id, live.id)
+      .first<{ n: number }>();
+    expect(n!.n).toBe(1);
+    expect((await token(live.id, live.secret)).status).toBe(200);
+  });
+});
+
+describe('hardening', () => {
+  it('failed authentication leaves at most one trail row per client per minute', async () => {
+    const c = await newClient();
+    for (let i = 0; i < 6; i++)
+      await token(c.id, 'ebs_wrong' + i, undefined, { 'cf-connecting-ip': `198.51.100.${i}` });
+    const n = await env.DB.prepare(
+      `SELECT count(*) AS n FROM client_audit WHERE client_id = ?1 AND event = 'auth_failed'`
+    )
+      .bind(c.id)
+      .first<{ n: number }>();
+    expect(n!.n).toBe(1);
+  });
+
+  it('ipPrefix is a /24 and a real /64 even for compressed IPv6', () => {
+    expect(ipPrefix('203.0.113.77')).toBe('203.0.113.0/24');
+    expect(ipPrefix('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:1:2::/64');
+    expect(ipPrefix('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(ipPrefix('2001:db8::1')).toBe(ipPrefix('2001:db8::2'));
+    expect(ipPrefix('unknown')).toBe('unknown');
   });
 });

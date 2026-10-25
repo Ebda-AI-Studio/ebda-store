@@ -15,7 +15,7 @@ describe('identity client token contract v1.3 (aud=whatsapp)', () => {
   it('the real issuing path produces exactly the documented shape', async () => {
     fakes.stores = [{ id: STORE, role: 'owner' }];
     const u = await seedUser();
-    const s = await login(u);
+    const s = await login(u, 'whatsapp');
     await env.DB.prepare(`UPDATE sessions SET amr='pwd,otp' WHERE user_id=?1`).bind(u.id).run();
     const created = await call(`/stores/${STORE}/clients`, {
       bearer: s.body.access_token,

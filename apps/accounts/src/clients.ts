@@ -59,7 +59,21 @@ const newSecret = () => SECRET_PREFIX + randomToken();
 /** /24 for IPv4, /64 for IPv6: enough to see where a client calls from, not enough to identify a person. */
 export function ipPrefix(ip: string | undefined | null): string {
   if (!ip || ip === 'unknown') return 'unknown';
-  if (ip.includes(':')) return ip.split(':').slice(0, 4).join(':') + '::/64';
+  if (ip.includes(':')) {
+    // expand `::` first, or a compressed address keeps its interface id and the "prefix" is really one address
+    const [head, tail = ''] = ip.split('::');
+    const h = head ? head.split(':') : [];
+    const tl = tail ? tail.split(':') : [];
+    const groups = ip.includes('::')
+      ? [...h, ...Array(Math.max(0, 8 - h.length - tl.length)).fill('0'), ...tl]
+      : h;
+    return (
+      groups
+        .slice(0, 4)
+        .map(g => g.toLowerCase().replace(/^0+(?=.)/, ''))
+        .join(':') + '::/64'
+    );
+  }
   const p = ip.split('.');
   return p.length === 4 ? `${p[0]}.${p[1]}.${p[2]}.0/24` : 'unknown';
 }
@@ -104,6 +118,23 @@ export function audit(
       row.ip ? ipPrefix(row.ip) : null,
       row.scope ?? null
     );
+}
+
+/** A failed authentication leaves a trail row at most once a minute per client, so the public client id cannot be used to flood the table. */
+export async function auditAuthFailure(
+  db: D1Database,
+  client: ClientRow,
+  ip: string
+): Promise<void> {
+  const since = nowMs() - 60_000;
+  await db
+    .prepare(
+      `INSERT INTO client_audit (client_id, store_id, event, at, ip_prefix)
+       SELECT ?1, ?2, 'auth_failed', ?3, ?4
+       WHERE NOT EXISTS (SELECT 1 FROM client_audit WHERE client_id = ?1 AND event = 'auth_failed' AND at > ?5)`
+    )
+    .bind(client.id, client.store_id, nowMs(), ipPrefix(ip), since)
+    .run();
 }
 
 export type CreateResult =
@@ -229,23 +260,23 @@ export async function revokeClient(
   return 'revoked';
 }
 
-export async function listClients(db: D1Database, storeId: string) {
+export async function listClients(db: D1Database, storeId: string, audience: string) {
   const rows = (
     await db
       .prepare(
         `SELECT c.*, (SELECT max(at) FROM client_audit a WHERE a.client_id = c.id AND a.event = 'issued') AS last_used_at,
                 (SELECT ip_prefix FROM client_audit a WHERE a.client_id = c.id AND a.event = 'issued' ORDER BY a.id DESC LIMIT 1) AS last_ip_prefix
-           FROM clients c WHERE c.store_id = ?1 ORDER BY c.created_at`
+           FROM clients c WHERE c.store_id = ?1 AND c.audience = ?2 ORDER BY c.created_at`
       )
-      .bind(storeId)
+      .bind(storeId, audience)
       .all<ClientRow & { last_used_at: number | null; last_ip_prefix: string | null }>()
   ).results;
   const secrets = (
     await db
       .prepare(
-        `SELECT s.client_id, s.slot, s.created_at, s.expires_at FROM client_secrets s JOIN clients c ON c.id = s.client_id WHERE c.store_id = ?1`
+        `SELECT s.client_id, s.slot, s.created_at, s.expires_at FROM client_secrets s JOIN clients c ON c.id = s.client_id WHERE c.store_id = ?1 AND c.audience = ?2`
       )
-      .bind(storeId)
+      .bind(storeId, audience)
       .all<{ client_id: string; slot: number; created_at: number; expires_at: number | null }>()
   ).results;
   return rows.map(r => ({
@@ -335,4 +366,36 @@ export async function pruneClientAudit(db: D1Database, now: number = nowMs()): P
     .bind(now - AUDIT_RETENTION_MS)
     .run();
   return r.meta.changes ?? 0;
+}
+
+/** Directory seam (the Store's StoreDirectory binding): is the store still there? Errors propagate so callers fail CLOSED. */
+export type StoreExists = (storeId: string) => Promise<boolean>;
+
+/**
+ * Hourly: remove the clients of stores that no longer exist. This is the retry-until-success half of store deletion (the
+ * Store's best-effort `deleteStoreClients` call is the fast path); the other half is the live check at token issue and
+ * `isRevoked`, which ends access at the commit. A directory error skips that store until the next run.
+ */
+export async function sweepDeletedStoreClients(
+  db: D1Database,
+  storeExists: StoreExists,
+  limit = 100
+): Promise<number> {
+  const ids = (
+    await db
+      .prepare(`SELECT DISTINCT store_id FROM clients LIMIT ?1`)
+      .bind(limit)
+      .all<{ store_id: string }>()
+  ).results;
+  let removed = 0;
+  for (const { store_id } of ids) {
+    let live = true;
+    try {
+      live = await storeExists(store_id);
+    } catch {
+      continue;
+    }
+    if (!live) removed += (await deleteStoreClients(db, store_id)).clients;
+  }
+  return removed;
 }

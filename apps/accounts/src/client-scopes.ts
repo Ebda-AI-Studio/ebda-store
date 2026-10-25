@@ -20,7 +20,7 @@ export const RESERVED_SCOPES: readonly string[] = ['orders:events'];
 export type ScopeCheck = { ok: true; scopes: string[] } | { ok: false; reason: string };
 
 export function validateScopes(audience: string, requested: unknown): ScopeCheck {
-  const allowed = AUDIENCE_SCOPES[audience];
+  const allowed = Object.hasOwn(AUDIENCE_SCOPES, audience) ? AUDIENCE_SCOPES[audience] : undefined;
   if (!allowed) return { ok: false, reason: 'INVALID_AUDIENCE' };
   if (!Array.isArray(requested) || requested.length === 0 || requested.length > allowed.length)
     return { ok: false, reason: 'INVALID_SCOPE' };

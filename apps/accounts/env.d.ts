@@ -4,6 +4,8 @@ import type { D1Migration } from 'cloudflare:test';
 export interface StoreDirectoryRpc {
   /** The stores a user may act on: owner = Store.ownerId, staff = a StoreStaff row. */
   storesForUser(userId: string): Promise<Array<{ id: string; role: 'owner' | 'staff' }>>;
+  /** Is the store still in the directory (not deleted)? Integrator clients of a deleted store are refused. */
+  storeExists(storeId: string): Promise<boolean>;
 }
 export interface MailerRpc {
   /** Send a one-time code mail (verification or password reset) through the Store mail pipeline. */

@@ -5,7 +5,7 @@
  */
 import { withUser } from '@ebda/database';
 import { config } from '../config';
-import { ownedStoreIds } from './definer';
+import { lookupStore, ownedStoreIds } from './definer';
 import {
   sendMerchantPasswordResetEmail,
   sendStaffInviteEmail,
@@ -39,6 +39,15 @@ export async function storesForUser(userId: string): Promise<StoreClaim[]> {
     }
     return out;
   });
+}
+
+/**
+ * Is this store still in the directory (any status, not soft-deleted)? The identity service asks before it issues or honours an
+ * integrator client token (v1.3), so deleting a store ends its clients' access at the commit, whatever the cleanup does later.
+ */
+export async function storeLive(storeId: string): Promise<boolean> {
+  if (!UUID_RE.test(storeId)) return false;
+  return !!(await lookupStore({ id: storeId }, ['active', 'inactive', 'suspended']));
 }
 
 export interface CodeMail {
