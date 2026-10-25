@@ -170,10 +170,11 @@ function buildBaseline(ref, config) {
     return r.stdout;
   };
   const remoteRef = ref.replace(/^origin\//, '');
-  if (ref.startsWith('origin/'))
+  if (ref.startsWith('origin/')) {
     // Shallow only inside Actions (CI's checkout is shallow already); never on a developer/agent repo.
     const shallow = process.env.GITHUB_ACTIONS === 'true' ? ['--depth=1'] : [];
     sh('git', ['fetch', '--no-tags', ...shallow, 'origin', remoteRef]);
+  }
   const dir = mkdtempSync(path.join(tmpdir(), 'ebda-startup-base-'));
   sh('git', [
     'worktree',
