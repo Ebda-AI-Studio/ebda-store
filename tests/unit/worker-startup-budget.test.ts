@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { activeMs, budgetProblems, median } from '../../scripts/ci/worker-startup-budget.mjs';
+import {
+  activeMs,
+  budgetProblems,
+  median,
+  relativeProblems,
+} from '../../scripts/ci/worker-startup-budget.mjs';
 import budget from '../../scripts/ci/worker-startup-budget.json';
 
 const ok = { startupCpuMs: 90, bundleBytes: 14_244_673, bundleGzipBytes: 3_020_756 };
@@ -19,6 +24,22 @@ describe('API Worker startup budget verdict', () => {
   });
   it('a missing measurement (NaN) never passes', () => {
     expect(budgetProblems({ ...ok, startupCpuMs: NaN }, budget)).toHaveLength(1);
+  });
+  it('skipCpu leaves bundle gates in force but not the absolute CPU ceiling', () => {
+    expect(budgetProblems({ ...ok, startupCpuMs: 189 }, budget, { skipCpu: true })).toEqual([]);
+    expect(
+      budgetProblems({ ...ok, bundleBytes: budget.bundleBytes + 1 }, budget, { skipCpu: true })
+    ).toHaveLength(1);
+  });
+  it('relative: a loaded runner that slows both bundles equally passes', () => {
+    expect(relativeProblems(189, 180, budget.relative)).toEqual([]);
+  });
+  it('relative: a 100 ms top-level loop on a 90 ms base fails', () => {
+    expect(relativeProblems(190, 90, budget.relative)).toHaveLength(1);
+  });
+  it('relative: an unmeasured side never passes', () => {
+    expect(relativeProblems(NaN, 90, budget.relative)).toHaveLength(1);
+    expect(relativeProblems(90, 0, budget.relative)).toHaveLength(1);
   });
   it('activeMs sums every sample except (idle)', () => {
     const profile = {
