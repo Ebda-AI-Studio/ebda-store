@@ -1979,7 +1979,9 @@ export class AuthService {
     // its store (and the keys on them) are always erased; a buyer-key erase happens only for a phone the
     // account proved it holds (`eraseProvenBuyerKey`, the WA-CONSENT-1 proof) and only in the store that proof was made in. A buyer key is a hash of a phone
     // someone typed at checkout, so it never widens the scope on its own.
-    let ciScope: { storeId: string; orderIds: string[]; buyerKeys: string[] } | undefined;
+    let ciScope:
+      | { storeId: string; orderIds: string[]; buyerKeys: string[]; sinceDay?: string }
+      | undefined;
     let ciProven: { storeId: string; buyerKeys: string[] } | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
@@ -2017,12 +2019,18 @@ export class AuthService {
       });
       const ownOrders = await tx.order.findMany({
         where: { customerId: userId, storeId: eraseStoreId },
-        select: { id: true, buyerKey: true },
+        select: { id: true, buyerKey: true, createdAt: true },
       });
       ciScope = {
         storeId: eraseStoreId,
         orderIds: ownOrders.map(o => o.id),
         buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+        // The prefix pass starts at the day of the account's first order (partitions are by arrival day, never earlier).
+        sinceDay: ownOrders.length
+          ? new Date(Math.min(...ownOrders.map(o => o.createdAt.getTime())))
+              .toISOString()
+              .slice(0, 10)
+          : undefined,
       };
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }

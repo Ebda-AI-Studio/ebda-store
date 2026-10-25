@@ -169,11 +169,16 @@ async function eraseRows(
   storeId: string,
   indexKeys: string[],
   match: Match,
-  mode: EraseMode
+  mode: EraseMode,
+  sinceDay?: string
 ): Promise<{ erased: number; remaining: number }> {
   const parts =
     mode === 'prefix'
-      ? await listAll(ci, ciStorePartitionsPrefix(storeId))
+      ? (await listAll(ci, ciStorePartitionsPrefix(storeId))).filter(p => {
+          // names only: bodies of days before the account's first order are never fetched
+          const day = /\/dt=(\d{4}-\d{2}-\d{2})\//.exec(p)?.[1];
+          return !sinceDay || !day || day >= sinceDay;
+        })
       : [
           ...new Set(
             (await Promise.all(indexKeys.map(k => partitionsOf(ci, k))))
@@ -200,16 +205,22 @@ async function eraseRows(
 }
 
 /** Removes only the account's own orders' rows in this store; every other row survives, even under the same buyer key. */
-export async function eraseCiForOrders(ci: CiBucket, s: CiOrderScope, mode: EraseMode = 'index') {
+export async function eraseCiForOrders(
+  ci: CiBucket,
+  s: CiOrderScope,
+  mode: EraseMode = 'index',
+  sinceDay?: string
+) {
   for (const id of new Set(s.orderIds)) await ci.put(ciOrderTombstoneKey(id), '1');
-  return eraseRows(ci, s.storeId, s.buyerKeys, ownOrders(s), mode);
+  return eraseRows(ci, s.storeId, s.buyerKeys, ownOrders(s), mode, sinceDay);
 }
 
 /** A buyer-key erase for a phone the account proved it holds, IN THAT STORE only. Tombstone first. */
 export async function eraseCiBuyerInStore(
   ci: CiBucket,
   p: { storeId: string; buyerKeys: string[] },
-  mode: EraseMode = 'index'
+  mode: EraseMode = 'index',
+  sinceDay?: string
 ) {
   const keys = new Set(p.buyerKeys);
   for (const k of keys) await ci.put(ciBuyerTombstoneKey(p.storeId, k), '1');
@@ -218,6 +229,7 @@ export async function eraseCiBuyerInStore(
     p.storeId,
     [...keys],
     r => r.storeId === p.storeId && !!r.buyerKey && keys.has(r.buyerKey),
-    mode
+    mode,
+    sinceDay
   );
 }

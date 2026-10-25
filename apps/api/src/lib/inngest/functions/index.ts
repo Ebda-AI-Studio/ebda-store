@@ -87,6 +87,7 @@ import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 import { waStoreEvents, waPlanSync } from './wa-store-events';
 import { ciOutcomes } from './ci-outcomes';
+import { ciErasureSecondPassFn } from './ci-erasure-second-pass';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -242,6 +243,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   legalNoticeSend,
   waStoreEvents,
   ciOutcomes,
+  ciErasureSecondPassFn,
   waPlanSync,
   // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate
   // alerts (hourly). Both exit un-stepped on an empty tick (one execution).

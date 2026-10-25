@@ -40,6 +40,7 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
   },
   async ({ event, step }) => {
     const { userId, oneSignalPlayerIds, ciProven, ciScope } = event.data;
+    // (the CI second pass is its own function, ci-erasure-second-pass.ts: a failing sibling step here must never skip it)
 
     if (!userId) {
       logger.warn({ event: event.name }, 'account/erased fired without userId — skipping');
@@ -75,17 +76,6 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
         `account-erased-propagation: ${rejected.length}/${results.length} step(s) failed (${summary})`
       );
     }
-
-    // Customer Intelligence: a second pass after the queue's retry window, listing the store's partitions instead of trusting the index
-    // (it also catches a row whose index entry lost a race with the sink). Runs after the failure check above,
-    // so a OneSignal/PostHog/first-pass failure is reported at once; Inngest's retry then reaches this pass. A tombstone already blocks
-    // in-flight events; this removes anything a replay slipped in before the tombstone landed.
-    if (ciScope?.orderIds?.length || ciProven?.buyerKeys.length) {
-      await step.sleep('ci-erasure-settle', '2h');
-      await step.run('erase-ci-outcomes-second-pass', () =>
-        eraseCiOutcomes(userId, ciScope, ciProven, undefined, 'prefix')
-      );
-    }
   }
 );
 
@@ -96,7 +86,9 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
  */
 export async function eraseCiOutcomes(
   requestId: string,
-  scope: { storeId?: string; orderIds?: string[]; buyerKeys?: string[] } | undefined,
+  scope:
+    | { storeId?: string; orderIds?: string[]; buyerKeys?: string[]; sinceDay?: string }
+    | undefined,
   proven?: { storeId: string; buyerKeys: string[] },
   bucket: CiBucket | undefined = cfBindings()?.CI_BUCKET as unknown as CiBucket | undefined,
   mode: EraseMode = 'index'
@@ -114,14 +106,15 @@ export async function eraseCiOutcomes(
     const r = await eraseCiForOrders(
       bucket,
       { storeId: scope!.storeId!, orderIds: scope!.orderIds!, buyerKeys: scope!.buyerKeys ?? [] },
-      mode
+      mode,
+      scope!.sinceDay
     );
     if (r.remaining > 0)
       throw new Error(`CI erasure left ${r.remaining} row(s) of the account's orders`);
     erased += r.erased;
   }
   if (hasProven) {
-    const r = await eraseCiBuyerInStore(bucket, proven!, mode);
+    const r = await eraseCiBuyerInStore(bucket, proven!, mode, scope?.sinceDay);
     if (r.remaining > 0)
       throw new Error(`CI erasure left ${r.remaining} row(s) for a proven buyer key`);
     erased += r.erased;

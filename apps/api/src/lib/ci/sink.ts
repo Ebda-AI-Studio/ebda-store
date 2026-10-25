@@ -162,6 +162,17 @@ export async function handleCiEventsBatch(
       // Acking a DLQ message deletes it, so the body is parked in R2 first (`dlq/`, expires after 14 days;
       // it holds at most the pseudonymous envelope) and the message is only acked once that write landed.
       if (bucket) {
+        // An event for an order / buyer erased since it was queued is not parked (it would keep the key for 14 days).
+        const b = (msg.body ?? {}) as { orderId?: unknown; storeId?: unknown; buyerKey?: unknown };
+        if (
+          (typeof b.orderId === 'string' && (await bucket.get(ciOrderTombstoneKey(b.orderId)))) ||
+          (typeof b.storeId === 'string' &&
+            typeof b.buyerKey === 'string' &&
+            (await bucket.get(ciBuyerTombstoneKey(b.storeId, b.buyerKey))))
+        ) {
+          msg.ack();
+          continue;
+        }
         try {
           await bucket.put(
             ciDlqKey(msg.id),

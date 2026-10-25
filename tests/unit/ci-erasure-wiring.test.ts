@@ -335,3 +335,71 @@ describe('parked dead letters', () => {
     expect(r2.keys('dlq/')).toHaveLength(0); // replayed and refused bodies are not kept
   });
 });
+
+describe('second pass is its own job', () => {
+  it('a sibling failure cannot skip it: it is a separate function on account/erased, not a step after the aggregate throw', async () => {
+    const { readFileSync } = await import('node:fs');
+    const root = `${__dirname}/../../apps/api/src/lib/inngest/functions`;
+    expect(readFileSync(`${root}/account-erased-propagation.ts`, 'utf8')).not.toMatch(
+      /erase-ci-outcomes-second-pass|step\.sleep/
+    );
+    expect(readFileSync(`${root}/ci-erasure-second-pass.ts`, 'utf8')).toMatch(
+      /triggers: \[\{ event: 'account\/erased' \}\]/
+    );
+    expect(readFileSync(`${root}/index.ts`, 'utf8')).toContain('ciErasureSecondPassFn');
+  });
+
+  it('sleeps, then sweeps the store prefix from the first order day, finding a row the index never led to', async () => {
+    const { ciErasureSecondPass } =
+      await import('../../apps/api/src/lib/inngest/functions/ci-erasure-second-pass');
+    const r2 = new FakeR2();
+    const old = `outcomes/v1/store=${S1}/dt=2026-10-01/OLD.ndjson.gz`;
+    const late = `outcomes/v1/store=${S1}/dt=2026-11-04/LATE.ndjson.gz`;
+    await r2.put(old, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n')); // before the account's first order day
+    await r2.put(late, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n'));
+    const gets: string[] = [];
+    const realGet = r2.get.bind(r2);
+    r2.get = (async (k: string) => (gets.push(k), realGet(k))) as never;
+    setCfBindings({ HYPERDRIVE: { connectionString: '' }, CI_BUCKET: r2 as never });
+    const calls: string[] = [];
+    const step = {
+      sleep: async (id: string) => void calls.push(`sleep:${id}`),
+      run: async <T>(id: string, fn: () => Promise<T>) => (calls.push(`run:${id}`), fn()),
+    };
+    const out = await ciErasureSecondPass(
+      { data: { userId: 'u', ciScope: { ...scope, sinceDay: '2026-11-01' } } },
+      step
+    );
+    clearCfBindings();
+    expect(calls).toEqual(['sleep:ci-erasure-settle', 'run:erase-ci-outcomes-second-pass']);
+    expect(out).toMatchObject({ erased: 1 });
+    expect(await r2.get(late)).toBeNull();
+    expect(gets).not.toContain(old); // a day before the first order is never fetched
+    expect(await ciErasureSecondPass({ data: { userId: 'u' } }, step)).toEqual({ skipped: true });
+  });
+});
+
+describe('dead letter of an erased order', () => {
+  it('is acked without being parked', async () => {
+    const r2 = new FakeR2();
+    await r2.put(ciOrderTombstoneKey(MINE), '1');
+    const acked: string[] = [];
+    await handleCiEventsBatch(
+      {
+        queue: 'ebda-ci-events-dlq',
+        messages: [
+          {
+            id: 'd1',
+            body: row(S1, MINE),
+            attempts: 1,
+            ack: () => acked.push('d1'),
+            retry: () => undefined,
+          },
+        ],
+      },
+      { CI_BUCKET: r2 as never }
+    );
+    expect(acked).toEqual(['d1']);
+    expect(r2.keys('dlq/')).toHaveLength(0);
+  });
+});

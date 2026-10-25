@@ -221,7 +221,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         storeId: CUSTOMER.storeId,
         // Customer Intelligence: no proven phone here, and the scope is the account's own (zero) orders
         ciProven: undefined,
-        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [] },
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [], sinceDay: undefined },
       },
     });
   });
@@ -231,9 +231,9 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
       async (args: { select?: { buyerKey?: boolean } }) =>
         args?.select?.buyerKey
           ? [
-              { id: 'o1', buyerKey: 'k1' },
-              { id: 'o2', buyerKey: 'k1' },
-              { id: 'o3', buyerKey: null },
+              { id: 'o1', buyerKey: 'k1', createdAt: new Date('2026-11-03T10:00:00Z') },
+              { id: 'o2', buyerKey: 'k1', createdAt: new Date('2026-11-01T10:00:00Z') },
+              { id: 'o3', buyerKey: null, createdAt: new Date('2026-11-05T10:00:00Z') },
             ]
           : []
     );
@@ -243,6 +243,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
       storeId: CUSTOMER.storeId,
       orderIds: ['o1', 'o2', 'o3'],
       buyerKeys: ['k1'],
+      sinceDay: '2026-11-01',
     });
     expect(data.ciProven).toBeUndefined(); // no proven phone: no buyer-key erase
     expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(
@@ -302,7 +303,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         oneSignalPlayerIds: [],
         storeId: CUSTOMER.storeId,
         ciProven: undefined,
-        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [] },
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [], sinceDay: undefined },
       },
     });
   });
