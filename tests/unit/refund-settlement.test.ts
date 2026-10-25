@@ -26,6 +26,7 @@ import {
   isRefundEventAlreadySeen,
   recordRefundStatus,
   readRefundStatusById,
+  correlateSettleNotice,
 } from '@api/services/payment-providers/refund-settlement';
 
 const PAYMENT = 5000;
@@ -563,6 +564,77 @@ describe('heldUnaccountedEvent means "an unaccounted refund whose amount could n
       const r = resolveRefundSettlement({ ...base });
       expect(r.settledTotal).toBe(4000);
       expect(r.accountedThisEvent).toBe(true);
+    });
+  });
+
+  describe('Fawry amount-less settle notice', () => {
+    const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
+    const C = {
+      claimEvent: 'refund_initiated',
+      executedEvent: 'refund_completed',
+      releasedEvent: 'refund_failed',
+      now: NOW,
+      windowMs: 6 * 3600_000,
+    };
+    const claim = (id: string, ageMs: number) => ({
+      eventType: 'refund_initiated',
+      createdAt: NOW - ageMs,
+      details: { claimId: id, amount: 1000 },
+    });
+    const done = (id: string, ref: string) => ({
+      eventType: 'refund_completed',
+      createdAt: NOW - 1000,
+      details: { claimId: id, refundId: ref },
+    });
+    const gone = (id: string) => ({
+      eventType: 'refund_failed',
+      createdAt: NOW - 1000,
+      details: { claimId: id },
+    });
+    const notice = 'fawry-refund-F123-PARTIAL_REFUNDED';
+
+    it('a notice right after our in-band refund (same Fawry reference) is correlated: not held, no alert', () => {
+      const events = [claim('c1', 60_000), done('c1', 'fawry-refund-F123-3000')];
+      expect(correlateSettleNotice({ ...C, events, noticeRef: notice })).toBe(true);
+      const r = resolveRefundSettlement({
+        paymentAmount: PAYMENT,
+        alreadyRefunded: 3000,
+        reported: [0],
+        reportedEventId: notice,
+        accountedEventIds: ['fawry-refund-F123-3000'],
+        correlatedSettleNotice: true,
+      });
+      expect(r.heldUnaccountedEvent).toBe(false);
+      expect(r.settledTotal).toBe(3000);
+    });
+    it('a claim with no outcome yet matches on the window alone', () => {
+      expect(correlateSettleNotice({ ...C, events: [claim('c1', 5_000)], noticeRef: notice })).toBe(
+        true
+      );
+    });
+    it('no claim, an old claim, a released claim, or another Fawry reference: NOT correlated, so it alerts', () => {
+      expect(correlateSettleNotice({ ...C, events: [], noticeRef: notice })).toBe(false);
+      expect(
+        correlateSettleNotice({ ...C, events: [claim('c1', 7 * 3600_000)], noticeRef: notice })
+      ).toBe(false);
+      expect(
+        correlateSettleNotice({ ...C, events: [claim('c1', 1000), gone('c1')], noticeRef: notice })
+      ).toBe(false);
+      expect(
+        correlateSettleNotice({
+          ...C,
+          events: [claim('c1', 1000), done('c1', 'fawry-refund-OTHER-3000')],
+          noticeRef: notice,
+        })
+      ).toBe(false);
+      const r = resolveRefundSettlement({
+        paymentAmount: PAYMENT,
+        alreadyRefunded: 3000,
+        reported: [0],
+        reportedEventId: notice,
+        accountedEventIds: ['fawry-refund-F123-3000'],
+      });
+      expect(r.heldUnaccountedEvent).toBe(true);
     });
   });
 });

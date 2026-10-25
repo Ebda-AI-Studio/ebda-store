@@ -37,6 +37,7 @@ import type { PaymentStatus as DbPaymentStatus } from '@ebda/database';
 import {
   resolveRefundSettlement,
   readAccountedRefundEventIds,
+  correlateSettleNotice,
   appendRefundEventId,
   REFUND_EVENT_IDS_KEY,
   REFUND_STATUS_BY_ID_KEY,
@@ -544,6 +545,9 @@ function commitOnOwnTransaction<T>(storeId: string | undefined, fn: () => Promis
  * (the executed event and the id are written in one transaction), so a settle webhook that outruns that write must be
  * absorbed, not added again (see resolveRefundSettlement).
  */
+/** How long after an in-band refund a Fawry settle notice is still attributed to it. */
+export const FAWRY_SETTLE_WINDOW_MS = 6 * 60 * 60 * 1000;
+
 export async function findInFlightRefundClaimAmounts(
   paymentId: string,
   storeId: string
@@ -1816,6 +1820,33 @@ export class PaymentService {
       // Shared with the refresh-refund-status route — see resolveRefundSettlement
       // for the rule and for the two ways these copies diverged before it was
       // extracted.
+      // An amount-less settle notice (Fawry) for a refund WE sent is correlated by payment + time window + the
+      // provider reference, so it is neither held nor alerted; only an uncorrelated one is (a dashboard refund).
+      const noticeAmountless = !(
+        typeof webhookData.refund.amount === 'number' && webhookData.refund.amount > 0
+      );
+      const correlatedSettleNotice =
+        noticeAmountless && provider === 'fawry'
+          ? correlateSettleNotice({
+              events: await prisma.paymentEvent.findMany({
+                where: {
+                  paymentId: payment.id,
+                  storeId: payment.order?.storeId ?? storeId ?? '',
+                  eventType: {
+                    in: [REFUND_CLAIM_EVENT, REFUND_EXECUTED_EVENT, REFUND_RELEASED_EVENT],
+                  },
+                  createdAt: { gte: new Date(Date.now() - FAWRY_SETTLE_WINDOW_MS) },
+                },
+                select: { eventType: true, createdAt: true, details: true },
+              }),
+              noticeRef: webhookData.refund.refundId,
+              now: Date.now(),
+              windowMs: FAWRY_SETTLE_WINDOW_MS,
+              claimEvent: REFUND_CLAIM_EVENT,
+              executedEvent: REFUND_EXECUTED_EVENT,
+              releasedEvent: REFUND_RELEASED_EVENT,
+            })
+          : false;
       const {
         settledTotal: settledRefund,
         isFullRefund: refundIsFull,
@@ -1830,6 +1861,7 @@ export class PaymentService {
         // settle notice for one the in-band claim already applied.
         reportedEventId: webhookData.refund.refundId,
         accountedEventIds: readAccountedRefundEventIds(payment.metadata),
+        correlatedSettleNotice,
         inFlightClaimAmounts: await findInFlightRefundClaimAmounts(
           payment.id,
           payment.order?.storeId ?? storeId ?? ''

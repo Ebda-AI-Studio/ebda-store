@@ -42,7 +42,10 @@ import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
-import { PaymentService } from '../services/payment-providers/payment.factory';
+import {
+  PaymentService,
+  findInFlightRefundClaimAmounts,
+} from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { InstapayService } from '../services/payment-providers/instapay.service';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
@@ -1555,6 +1558,7 @@ router.post(
           // that adds to the total has to maintain it.
           reportedEventId: status.refundId,
           accountedEventIds: readAccountedRefundEventIds(payment.metadata),
+          inFlightClaimAmounts: await findInFlightRefundClaimAmounts(payment.id, storeId),
         });
         updateData.status = refundIsFullRefund ? 'refunded' : 'partially_refunded';
         updateData.refundedAmount = settledTotal;
