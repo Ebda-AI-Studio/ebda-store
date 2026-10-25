@@ -183,7 +183,10 @@ async function main() {
     `${equal}/${total} tables equal across ${results.length} target(s) in ${fmtMs(performance.now() - t0)}: ${ok ? 'PASS' : 'FAIL'}`
   );
   if (args.report)
-    fs.writeFileSync(args.report, JSON.stringify({ ok, at: new Date().toISOString(), equal, total, results }, null, 2));
+    fs.writeFileSync(
+      args.report,
+      JSON.stringify({ ok, at: new Date().toISOString(), equal, total, results }, null, 2)
+    );
   process.exit(ok ? 0 : 1);
 }
 

@@ -252,3 +252,11 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 | ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `STORE_DO_ENABLED_IDS` | `apps/api/wrangler.jsonc` `vars` | Comma list of store ids the SQLite Durable Object may serve. Default empty = nobody. A listed store is served from the DO only for requests that also send `x-ebda-backend: do`. Never list `qa-walk-store-1010`. |
 | `STORE_DO_SEED_TOKEN`  | `wrangler secret put`            | Authorises `/api/v1/internal/store-do/:storeId/{seed,counts}`. Unset = those routes 404.                                                                                                                          |
+
+### Cutover (Postgres to Cloudflare, `docs/runbooks/cutover-cf.md`) - temporary
+
+| Name                    | Where                                 | Meaning                                                                                                                                                                                              |
+| ----------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WRITES_FROZEN`         | `ebda-api` var                        | Exactly `1` = read-only window: every non-GET request answers 503 `READ_ONLY_WINDOW` (health probes and the alert webhook stay open). Anything else = off. Unset after the cutover window.           |
+| `CUTOVER_IMPORT_SECRET` | `ebda-api` secret, operator shell env | Bearer for the StoreDO `__import` / `__verify` / `__seal` admin surface. 24+ random chars. Set for the window, ROTATE (delete) right after the 7-day fallback period; never reuse.                   |
+| `CUTOVER_PG_URL`        | operator shell env only               | Source Postgres for `scripts/cf/*`: the scratch restore (rehearsal) or the window dump. Never a writable production URL; production Neon needs `--allow-prod-read` and is read-only by construction. |
