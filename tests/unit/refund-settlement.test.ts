@@ -665,74 +665,148 @@ describe('heldUnaccountedEvent means "an unaccounted refund whose amount could n
     });
   });
 
-  describe('Fawry amount-less settle notice', () => {
+  describe('Fawry amount-less settle notice (correlateSettleNotice)', () => {
     const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
     const C = {
+      now: NOW,
       claimEvent: 'refund_initiated',
       executedEvent: 'refund_completed',
-      releasedEvent: 'refund_failed',
-      now: NOW,
-      windowMs: 6 * 3600_000,
+      closingEvents: [
+        'refund_failed',
+        'refund_indeterminate',
+        'refund_reconciled',
+        'refund_webhook_absorbed',
+      ],
     };
-    const claim = (id: string, ageMs: number) => ({
+    const claim = (id: string, full = false) => ({
       eventType: 'refund_initiated',
-      createdAt: NOW - ageMs,
-      details: { claimId: id, amount: 1000 },
+      createdAt: NOW - 120_000,
+      details: { claimId: id, amount: 1000, isFullRefund: full },
     });
-    const done = (id: string, ref: string) => ({
+    const done = (id: string, ref: string, ageMs = 60_000) => ({
       eventType: 'refund_completed',
-      createdAt: NOW - 1000,
+      createdAt: NOW - ageMs,
       details: { claimId: id, refundId: ref },
-    });
-    const gone = (id: string) => ({
-      eventType: 'refund_failed',
-      createdAt: NOW - 1000,
-      details: { claimId: id },
     });
     const notice = 'fawry-refund-F123-PARTIAL_REFUNDED';
 
-    it('a notice right after our in-band refund (same Fawry reference) is correlated: not held, no alert', () => {
-      const events = [claim('c1', 60_000), done('c1', 'fawry-refund-F123-3000')];
-      expect(correlateSettleNotice({ ...C, events, noticeRef: notice })).toBe(true);
-      const r = resolveRefundSettlement({
-        paymentAmount: PAYMENT,
-        alreadyRefunded: 3000,
-        reported: [0],
-        reportedEventId: notice,
-        accountedEventIds: ['fawry-refund-F123-3000'],
-        correlatedSettleNotice: true,
-      });
-      expect(r.heldUnaccountedEvent).toBe(false);
-      expect(r.settledTotal).toBe(3000);
-    });
-    it('a claim with no outcome yet matches on the window alone', () => {
-      expect(correlateSettleNotice({ ...C, events: [claim('c1', 5_000)], noticeRef: notice })).toBe(
-        true
-      );
-    });
-    it('no claim, an old claim, a released claim, or another Fawry reference: NOT correlated, so it alerts', () => {
-      expect(correlateSettleNotice({ ...C, events: [], noticeRef: notice })).toBe(false);
-      expect(
-        correlateSettleNotice({ ...C, events: [claim('c1', 7 * 3600_000)], noticeRef: notice })
-      ).toBe(false);
-      expect(
-        correlateSettleNotice({ ...C, events: [claim('c1', 1000), gone('c1')], noticeRef: notice })
-      ).toBe(false);
+    it('attributes the notice to the ONE executed claim with the same Fawry reference and kind', () => {
       expect(
         correlateSettleNotice({
           ...C,
-          events: [claim('c1', 1000), done('c1', 'fawry-refund-OTHER-3000')],
+          events: [claim('c1'), done('c1', 'fawry-refund-F123-3000')],
           noticeRef: notice,
         })
-      ).toBe(false);
-      const r = resolveRefundSettlement({
+      ).toBe('c1');
+      expect(
+        correlateSettleNotice({
+          ...C,
+          events: [claim('c1', true), done('c1', 'fawry-refund-F123-5000')],
+          noticeRef: 'fawry-refund-F123-REFUNDED',
+        })
+      ).toBe('c1');
+    });
+    it('fails CLOSED: missing / unparseable reference, another reference, the wrong kind, no outcome, stale, closed or consumed', () => {
+      const ok = [claim('c1'), done('c1', 'fawry-refund-F123-3000')];
+      for (const bad of [
+        undefined,
+        null,
+        '',
+        'garbage',
+        'fawry-refund--PARTIAL_REFUNDED',
+        'fawry-refund-F123-SOMETHING',
+        'fawry-refund-F123-',
+      ]) {
+        expect(
+          correlateSettleNotice({ ...C, events: ok, noticeRef: bad as never }),
+          String(bad)
+        ).toBeNull();
+      }
+      expect(
+        correlateSettleNotice({
+          ...C,
+          events: ok,
+          noticeRef: 'fawry-refund-OTHER-PARTIAL_REFUNDED',
+        })
+      ).toBeNull();
+      expect(
+        correlateSettleNotice({ ...C, events: ok, noticeRef: 'fawry-refund-F123-REFUNDED' })
+      ).toBeNull(); // wrong kind
+      expect(correlateSettleNotice({ ...C, events: [claim('c1')], noticeRef: notice })).toBeNull(); // no outcome yet
+      expect(
+        correlateSettleNotice({
+          ...C,
+          events: [claim('c1'), done('c1', 'fawry-refund-F123-3000', 31 * 60_000)],
+          noticeRef: notice,
+        })
+      ).toBeNull(); // stale
+      for (const closing of C.closingEvents)
+        expect(
+          correlateSettleNotice({
+            ...C,
+            events: [...ok, { eventType: closing, createdAt: NOW, details: { claimId: 'c1' } }],
+            noticeRef: notice,
+          }),
+          closing
+        ).toBeNull();
+    });
+    it('two same-amount refunds: the oldest executed claim first; once it is consumed the next notice takes the other', () => {
+      const events = [
+        claim('a'),
+        done('a', 'fawry-refund-F123-3000', 90_000),
+        claim('b'),
+        done('b', 'fawry-refund-F123-4000', 30_000),
+      ];
+      expect(correlateSettleNotice({ ...C, events, noticeRef: notice })).toBe('a');
+      const consumed = [
+        ...events,
+        { eventType: 'refund_webhook_absorbed', createdAt: NOW, details: { claimId: 'a' } },
+      ];
+      expect(correlateSettleNotice({ ...C, events: consumed, noticeRef: notice })).toBe('b');
+    });
+    it('a correlated notice is not held or alerted; an uncorrelated one is', () => {
+      const base = {
         paymentAmount: PAYMENT,
         alreadyRefunded: 3000,
         reported: [0],
         reportedEventId: notice,
         accountedEventIds: ['fawry-refund-F123-3000'],
+      };
+      const ok = resolveRefundSettlement({ ...base, correlatedClaimId: 'c1' });
+      expect(ok.heldUnaccountedEvent).toBe(false);
+      expect(ok.settledTotal).toBe(3000);
+      expect(ok.absorbedClaimId).toBe('c1');
+      expect(resolveRefundSettlement({ ...base }).heldUnaccountedEvent).toBe(true);
+    });
+  });
+
+  describe('Kashier: unknown id while our own executed refund is open', () => {
+    const base = {
+      paymentAmount: PAYMENT,
+      alreadyRefunded: 3000,
+      reported: [1000],
+      reportedEventId: 'WEBHOOK-ID',
+      accountedEventIds: ['API-ID'],
+    };
+    it('is HELD, not added (it may be that refund under another id)', () => {
+      const r = resolveRefundSettlement({ ...base, openExecutedClaimWithUnverifiedId: true });
+      expect(r.heldOpenClaimIdUnverified).toBe(true);
+      expect(r.accountedThisEvent).toBe(false);
+      expect(r.settledTotal).toBe(3000);
+    });
+    it('is added as usual when no own claim is open', () => {
+      const r = resolveRefundSettlement({ ...base });
+      expect(r.heldOpenClaimIdUnverified).toBe(false);
+      expect(r.settledTotal).toBe(4000);
+    });
+    it('an event whose id IS on the ledger is untouched by the hold', () => {
+      const r = resolveRefundSettlement({
+        ...base,
+        reportedEventId: 'API-ID',
+        openExecutedClaimWithUnverifiedId: true,
       });
-      expect(r.heldUnaccountedEvent).toBe(true);
+      expect(r.heldOpenClaimIdUnverified).toBe(false);
+      expect(r.settledTotal).toBe(3000);
     });
   });
 });

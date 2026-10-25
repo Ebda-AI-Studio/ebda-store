@@ -50,7 +50,11 @@ vi.mock('@ebda/database', () => ({
       },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
-      findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
+      // lockPayment (refund-settle) and PaymentService.refund both re-read the payment: serve the current fixture
+      findUnique: async () => {
+        const r = (await paymentFindFirst()) as Record<string, unknown> | undefined;
+        return r ? { ...r, metadata: r.metadata ?? {} } : { metadata: {} };
+      },
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),

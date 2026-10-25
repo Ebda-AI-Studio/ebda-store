@@ -27,7 +27,11 @@ import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
  *    function) it runs inline, exactly as before.
  */
 export interface UnbookedRefundAlert {
-  kind: 'partial_no_gl' | 'held_unaccounted' | 'held_provenance_unknown';
+  kind:
+    | 'partial_no_gl'
+    | 'held_unaccounted'
+    | 'held_provenance_unknown'
+    | 'held_open_claim_id_unverified';
   store: { id: string; name: string };
   orderRef: string;
   body: string;
@@ -38,6 +42,7 @@ const TITLES: Record<UnbookedRefundAlert['kind'], string> = {
   partial_no_gl: 'Partial refund with no ledger entry',
   held_unaccounted: 'Refund reported without an amount',
   held_provenance_unknown: 'Refund on a pre-ledger payment not added',
+  held_open_claim_id_unverified: 'Refund webhook held: id unknown while our own refund is open',
 };
 
 export function unbookedRefundAlertOptions(a: UnbookedRefundAlert): AlertOptions {

@@ -75,6 +75,12 @@ export interface RefundSettlement {
    */
   heldUnaccountedEvent: boolean;
   /**
+   * True when a refund event with an UNKNOWN id and a usable amount was held because an own, already-executed claim is
+   * still open on the payment: the provider's refund id may differ from the id its API answered with (Kashier: unverified),
+   * and booking would then count one refund twice. Nothing is booked; an operator matches it to the claim.
+   */
+  heldOpenClaimIdUnverified: boolean;
+  /**
    * True when the payment PREDATES the per-refund ledger (a refund is
    * accounted but no refund ids are recorded) and this event names a refund
    * with a usable amount that was therefore NOT added. The rule cannot tell a
@@ -148,6 +154,42 @@ export function selectInFlightClaims(input: {
   return out;
 }
 
+/**
+ * Own claims that EXECUTED (their provider id is recorded) recently and are neither released, indeterminate, reconciled nor
+ * consumed. When a Kashier webhook arrives with an id we do not know while one exists, the two may be the same refund.
+ */
+export function selectOpenExecutedClaims(input: {
+  events: readonly RefundClaimEventRow[];
+  now: number;
+  windowMs?: number;
+  claimEvent: string;
+  executedEvent: string;
+  closingEvents: readonly string[];
+}): string[] {
+  const windowMs = input.windowMs ?? SETTLE_NOTICE_WINDOW_MS;
+  const at = (e: RefundClaimEventRow) =>
+    e.createdAt instanceof Date ? e.createdAt.getTime() : e.createdAt;
+  const det = (e: RefundClaimEventRow) =>
+    e.details && typeof e.details === 'object' ? (e.details as Record<string, unknown>) : {};
+  const closed = new Set<string>();
+  for (const e of input.events) {
+    const id = det(e).claimId;
+    if (typeof id === 'string' && input.closingEvents.includes(e.eventType)) closed.add(id);
+  }
+  return input.events
+    .filter(e => e.eventType === input.executedEvent)
+    .filter(e => {
+      const id = det(e).claimId;
+      return (
+        typeof id === 'string' &&
+        !closed.has(id) &&
+        input.now - at(e) <= windowMs &&
+        at(e) <= input.now + 60_000
+      );
+    })
+    .map(e => det(e).claimId as string);
+}
+
 /** One `payment_events` refund row, as `correlateSettleNotice` reads it. */
 export interface RefundClaimEventRow {
   eventType: string;
@@ -155,51 +197,69 @@ export interface RefundClaimEventRow {
   details: unknown;
 }
 
+/** Longest after OUR refund executed that a Fawry settle notice may still be attributed to it (Fawry documents no delay). */
+export const SETTLE_NOTICE_WINDOW_MS = 30 * 60 * 1000;
+
+const FAWRY_NOTICE_REF = /^fawry-refund-([A-Za-z0-9_.]{1,64})-(REFUNDED|PARTIAL_REFUNDED)$/;
+const FAWRY_INBAND_REF = /^fawry-refund-([A-Za-z0-9_.]{1,64})-(\d{1,12})$/;
+
 /**
- * Does an amount-less settle notice (Fawry reports none, and no field that says so is signed) belong to a refund WE
- * sent? Correlated by payment (the caller passes this payment's events only), a time window, and the provider's
- * reference when both sides have one: the executed event's `refundId` (`fawry-refund-<fawryRef>-<total>`) must share the
- * notice's `fawry-refund-<fawryRef>-` prefix. A claim with no outcome yet has no id to compare and matches on the
- * window alone. A released claim (the provider refused) never matches. When nothing matches the caller alerts: that is
- * a refund made in the provider's dashboard whose amount nobody reported.
+ * Which refund of OURS does an amount-less Fawry settle notice settle? Fawry reports no amount and nothing that says how
+ * much is signed, so the notice is attributed only on POSITIVE evidence specific to ONE claim, else the caller keeps the
+ * hold and alerts (fail closed):
+ *   - the notice's reference parses as `fawry-refund-<fawryRef>-(REFUNDED|PARTIAL_REFUNDED)`; anything else = no match;
+ *   - the claim has an EXECUTED event (an outcome we know) whose refund id is `fawry-refund-<SAME fawryRef>-<digits>`,
+ *     executed inside the window, and whose claim is a full refund for REFUNDED / a partial one for PARTIAL_REFUNDED;
+ *   - the claim is not released, indeterminate, reconciled, or already CONSUMED by an earlier notice (one claim, one notice).
+ * Returns the OLDEST such claim id; the caller consumes it (an absorbed event naming the notice id) in the same
+ * transaction as its writes. Claims without an outcome never match.
  */
 export function correlateSettleNotice(input: {
   events: readonly RefundClaimEventRow[];
   /** the notice's derived refund reference */
   noticeRef: string | null | undefined;
   now: number;
-  windowMs: number;
+  windowMs?: number;
   claimEvent: string;
   executedEvent: string;
-  releasedEvent: string;
-}): boolean {
+  /** every event that ends or consumes a claim OTHER than executed (released, indeterminate, reconciled, absorbed) */
+  closingEvents: readonly string[];
+}): string | null {
+  const m = typeof input.noticeRef === 'string' ? FAWRY_NOTICE_REF.exec(input.noticeRef) : null;
+  if (!m) return null;
+  const [, noticeFawryRef, noticeKind] = m;
+  const windowMs = input.windowMs ?? SETTLE_NOTICE_WINDOW_MS;
   const at = (e: RefundClaimEventRow) =>
     e.createdAt instanceof Date ? e.createdAt.getTime() : e.createdAt;
   const det = (e: RefundClaimEventRow) =>
     e.details && typeof e.details === 'object' ? (e.details as Record<string, unknown>) : {};
-  const released = new Set<string>();
-  const executedRef = new Map<string, string>();
+  const closed = new Set<string>();
+  const full = new Map<string, boolean>();
   for (const e of input.events) {
     const d = det(e);
     if (typeof d.claimId !== 'string') continue;
-    if (e.eventType === input.releasedEvent) released.add(d.claimId);
-    if (e.eventType === input.executedEvent && typeof d.refundId === 'string')
-      executedRef.set(d.claimId, d.refundId);
+    if (input.closingEvents.includes(e.eventType)) closed.add(d.claimId);
+    if (e.eventType === input.claimEvent && typeof d.isFullRefund === 'boolean')
+      full.set(d.claimId, d.isFullRefund);
   }
-  // `fawry-refund-<fawryRef>-<suffix>` -> `fawry-refund-<fawryRef>-`
-  const prefix = typeof input.noticeRef === 'string' ? input.noticeRef.replace(/[^-]*$/, '') : '';
-  return input.events.some(e => {
+  const candidates: Array<{ claimId: string; at: number }> = [];
+  for (const e of input.events) {
     const d = det(e);
     if (
-      e.eventType !== input.claimEvent ||
+      e.eventType !== input.executedEvent ||
       typeof d.claimId !== 'string' ||
-      released.has(d.claimId)
+      typeof d.refundId !== 'string'
     )
-      return false;
-    if (input.now - at(e) > input.windowMs || at(e) > input.now + 60_000) return false;
-    const ref = executedRef.get(d.claimId);
-    return ref === undefined || prefix.length === 0 || ref.startsWith(prefix);
-  });
+      continue;
+    if (closed.has(d.claimId)) continue;
+    const ref = FAWRY_INBAND_REF.exec(d.refundId);
+    if (!ref || ref[1] !== noticeFawryRef) continue;
+    if (full.get(d.claimId) !== (noticeKind === 'REFUNDED')) continue;
+    if (input.now - at(e) > windowMs || at(e) > input.now + 60_000) continue;
+    candidates.push({ claimId: d.claimId, at: at(e) });
+  }
+  candidates.sort((a, b) => a.at - b.at);
+  return candidates[0]?.claimId ?? null;
 }
 
 export function resolveRefundSettlement(input: {
@@ -231,8 +291,14 @@ export function resolveRefundSettlement(input: {
    * consume the claim (write the absorbed id on it) in the same transaction, so a second webhook cannot match it.
    */
   inFlightClaims?: readonly InFlightClaim[] | null;
-  /** The caller proved (correlateSettleNotice) this amount-less notice settles a refund WE sent: nothing to hold or alert. */
-  correlatedSettleNotice?: boolean;
+  /** The claim `correlateSettleNotice` proved this amount-less notice settles: nothing to hold or alert; the caller consumes it. */
+  correlatedClaimId?: string | null;
+  /**
+   * An own claim that already EXECUTED (its provider id is on the ledger) is still open and unconsumed on this payment,
+   * and the provider is one whose webhook id is not proven equal to its API refund id (Kashier). An event with an unknown
+   * id is then HELD instead of added: it may be that very refund under another id.
+   */
+  openExecutedClaimWithUnverifiedId?: boolean;
 }): RefundSettlement {
   const { paymentAmount, alreadyRefunded, reported, reportedEventId, accountedEventIds } = input;
 
@@ -297,8 +363,16 @@ export function resolveRefundSettlement(input: {
           .find(c => c.amount === credibleAmount) ?? null)
       : null;
   const absorbedByInFlightClaim = matchedClaim !== null;
+  const heldOpenClaimIdUnverified =
+    !!input.openExecutedClaimWithUnverifiedId &&
+    isUnaccountedEvent &&
+    credibleAmount !== null &&
+    !absorbedByInFlightClaim;
   const settled =
-    isUnaccountedEvent && credibleAmount !== null && !absorbedByInFlightClaim
+    isUnaccountedEvent &&
+    credibleAmount !== null &&
+    !absorbedByInFlightClaim &&
+    !heldOpenClaimIdUnverified
       ? accounted + credibleAmount
       : Math.max(accounted, credibleAmount ?? 0);
 
@@ -307,7 +381,10 @@ export function resolveRefundSettlement(input: {
   const isFullRefund = unknownMeansFull || paymentAmount <= 0 || settled >= paymentAmount;
 
   const accountedThisEvent =
-    isUnaccountedEvent && credibleAmount !== null && !absorbedByInFlightClaim;
+    isUnaccountedEvent &&
+    credibleAmount !== null &&
+    !absorbedByInFlightClaim &&
+    !heldOpenClaimIdUnverified;
   return {
     reportedAmount,
     // A full refund exhausts the payment even when nothing was reported.
@@ -319,15 +396,17 @@ export function resolveRefundSettlement(input: {
     // — heldProvenanceUnknown below — because it may be a benign settle notice
     // for the refund already counted OR a genuinely new refund (PR 2279 audit).
     absorbedByInFlightClaim,
-    absorbedClaimId: matchedClaim?.claimId ?? null,
+    absorbedClaimId:
+      matchedClaim?.claimId ?? (namedUncounted ? (input.correlatedClaimId ?? null) : null),
     warnProvenanceHeld:
       !absorbedByInFlightClaim &&
       !provenanceKnown &&
       credibleAmount !== null &&
       typeof reportedEventId === 'string' &&
       reportedEventId.length > 0,
+    heldOpenClaimIdUnverified,
     heldUnaccountedEvent:
-      !input.correlatedSettleNotice &&
+      !input.correlatedClaimId &&
       typeof reportedEventId === 'string' &&
       reportedEventId.length > 0 &&
       !ids.includes(reportedEventId) &&

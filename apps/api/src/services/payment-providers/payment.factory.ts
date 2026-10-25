@@ -37,10 +37,6 @@ import type { PaymentStatus as DbPaymentStatus } from '@ebda/database';
 import {
   resolveRefundSettlement,
   readAccountedRefundEventIds,
-  correlateSettleNotice,
-  selectInFlightClaims,
-  IN_FLIGHT_CLAIM_WINDOW_MS,
-  type InFlightClaim,
   appendRefundEventId,
   REFUND_EVENT_IDS_KEY,
   REFUND_STATUS_BY_ID_KEY,
@@ -55,9 +51,8 @@ import {
   REFUND_RELEASED_EVENT,
   REFUND_INDETERMINATE_EVENT,
   REFUND_RECONCILED_EVENT,
-  REFUND_ABSORBED_EVENT,
-  REFUND_REVIEW_EVENT,
 } from './refund-outcome';
+import { settleRefundEvent, settleClaimRelease } from './refund-settle';
 
 import { REGION } from '@ebda/shared';
 import { paymentWebhookUrl } from './webhook-url';
@@ -542,40 +537,6 @@ export async function alertIfDuplicateCapture(
  */
 function commitOnOwnTransaction<T>(storeId: string | undefined, fn: () => Promise<T>): Promise<T> {
   return runInTenantContext(storeId, fn);
-}
-
-/** How long after an in-band refund a Fawry settle notice is still attributed to it. */
-export const FAWRY_SETTLE_WINDOW_MS = 6 * 60 * 60 * 1000;
-
-/**
- * In-band refund claims a settle webhook may be reconciled with: committed (their amount is inside `refundedAmount`), YOUNG
- * (inside IN_FLIGHT_CLAIM_WINDOW_MS; the stuck-claim sweep flags at 15 min), with no outcome event yet (executed, released,
- * indeterminate, reconciled) and not already CONSUMED by an earlier webhook (REFUND_ABSORBED_EVENT). Newest data only: an
- * old unresolved claim never absorbs a later refund of the same amount.
- */
-export async function findInFlightRefundClaims(
-  paymentId: string,
-  storeId: string,
-  now: number = Date.now()
-): Promise<InFlightClaim[]> {
-  const closingEvents = [
-    REFUND_EXECUTED_EVENT,
-    REFUND_RELEASED_EVENT,
-    REFUND_INDETERMINATE_EVENT,
-    REFUND_RECONCILED_EVENT,
-    REFUND_ABSORBED_EVENT,
-  ];
-  const rows = await prisma.paymentEvent.findMany({
-    where: {
-      storeId,
-      paymentId,
-      eventType: { in: [REFUND_CLAIM_EVENT, ...closingEvents] },
-      // outcome events of a young claim are younger still, so the same lower bound keeps every row that matters
-      createdAt: { gte: new Date(now - IN_FLIGHT_CLAIM_WINDOW_MS - 60_000) },
-    },
-    select: { eventType: true, createdAt: true, details: true },
-  });
-  return selectInFlightClaims({ events: rows, now, claimEvent: REFUND_CLAIM_EVENT, closingEvents });
 }
 
 /**
@@ -1215,69 +1176,26 @@ export class PaymentService {
     // would silently fail to release anything.
     const releaseClaim = async (reason: string, err: unknown) => {
       try {
-        await commitOnOwnTransaction(moneyStoreId, async () => {
-          // A settle webhook already reported THIS claim's refund as completed: the gateway says the money left, so the
-          // balance must not be given back. Flag it for a human instead of releasing.
-          const absorbed = await prisma.paymentEvent.findFirst({
-            where: {
-              storeId: moneyStoreId,
-              paymentId: payment.id,
-              eventType: REFUND_ABSORBED_EVENT,
-              details: { path: ['claimId'], equals: claimId },
-            },
-            select: { id: true },
-          });
-          if (absorbed) {
-            await prisma.paymentEvent.create({
-              data: {
-                ...refundEvent(
-                  REFUND_REVIEW_EVENT,
-                  'claim_released_after_webhook_reported_it_completed',
-                  {
-                    error: err instanceof Error ? err.message : String(err),
-                  }
-                ),
-                fromStatus: claimedStatus,
-              },
-            });
-            logger.error(
-              { paymentId: payment.id, claimId },
-              '[PAYMENT] refund claim NOT released: a webhook already reported this refund completed — review with the provider'
-            );
-            return;
-          }
-          const released = await prisma.payment.updateMany({
-            where: { id: payment.id, refundedAmount: { gte: amountToRefund } },
-            data: { refundedAmount: { decrement: amountToRefund } },
-          });
-          if (released.count !== 1) {
-            throw new Error('refund claim no longer on the payment row');
-          }
-          const row = await prisma.payment.findUnique({
-            where: { id: payment.id },
-            select: { amount: true, refundedAmount: true },
-          });
-          const left = row?.refundedAmount ?? 0;
-          await prisma.payment.update({
-            where: { id: payment.id },
-            data: {
-              status:
-                left <= 0
-                  ? payment.status
-                  : left >= (row?.amount ?? payment.amount)
-                    ? 'refunded'
-                    : 'partially_refunded',
-            },
-          });
-          await prisma.paymentEvent.create({
-            data: {
-              ...refundEvent(REFUND_RELEASED_EVENT, reason, {
-                error: err instanceof Error ? err.message : String(err),
-              }),
-              fromStatus: claimedStatus,
-            },
-          });
-        });
+        // ONE function decides under the payment lock: released, or (a webhook already absorbed the claim) flagged for review
+        const outcome = await commitOnOwnTransaction(moneyStoreId, () =>
+          settleClaimRelease({
+            paymentId: payment.id,
+            storeId: moneyStoreId as string,
+            orderId: payment.orderId,
+            claimId,
+            amount: amountToRefund,
+            claimedStatus,
+            priorStatus: payment.status as string,
+            provider: payment.provider ?? null,
+            reason,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+        if (outcome === 'review')
+          logger.error(
+            { paymentId: payment.id, claimId },
+            '[PAYMENT] refund claim NOT released: a webhook already reported this refund completed — review with the provider'
+          );
       } catch (releaseError) {
         // The claim stays on the row and stays OUTSTANDING in the event log,
         // so the stuck-claim sweep reports it rather than it vanishing.
@@ -1762,34 +1680,29 @@ export class PaymentService {
     // `refund` field. Route them through a separate path so we don't
     // re-mutate the order's payment lifecycle every time a refund updates.
     if (webhookData.refund) {
-      // Serialise refund webhooks (and the in-band claim CAS) on this payment row, then read it FRESH: two deliveries
-      // racing for the same in-flight claim must not both absorb it, and the totals below must not be stale.
-      await prisma.$queryRaw`SELECT id FROM payments WHERE id = ${payment.id} FOR UPDATE`;
-      const fresh = await prisma.payment.findUnique({
-        where: { id: payment.id },
-        select: { refundedAmount: true, metadata: true, status: true },
+      // ONE function settles a refund event against the payment: it takes the payment row lock, re-reads the payment and its
+      // refund events, decides (absorb only a COMPLETED event; Kashier/Fawry hold rules) and returns the decision. The
+      // effects below run under that lock; `settle.commit` writes the payment patch and the consumed claim atomically.
+      const settle = await settleRefundEvent({
+        paymentId: payment.id,
+        storeId: payment.order?.storeId ?? storeId ?? '',
+        orderId: payment.orderId,
+        provider,
+        refund: {
+          refundId: webhookData.refund.refundId,
+          status: webhookData.refund.status,
+          amount: webhookData.refund.amount ?? null,
+          reference: webhookData.refund.refundReference ?? null,
+        },
       });
-      if (fresh && typeof fresh.refundedAmount === 'number') {
-        payment.refundedAmount = fresh.refundedAmount;
-        if (fresh.metadata && typeof fresh.metadata === 'object') payment.metadata = fresh.metadata;
-        payment.status = fresh.status;
-      }
-      const prevMeta = (payment.metadata as Record<string, unknown>) || {};
-      const prevRefundStatus = (prevMeta.refundStatus as string | undefined) || 'pending';
+      payment.refundedAmount = settle.payment.refundedAmount;
+      payment.metadata = settle.payment.metadata as typeof payment.metadata;
+      payment.status = settle.payment.status as typeof payment.status;
+      const prevMeta = settle.payment.metadata;
       const newStatus = webhookData.refund.status;
 
-      // Idempotent — a REDELIVERY of this same refund at this same state is a
-      // no-op. Keyed on the refund's identity: `refundStatus` is one scalar for
-      // the whole payment, so after any refund settled it matched every later
-      // refund's webhook and dropped it unread.
-      if (
-        isRefundEventAlreadySeen({
-          metadata: prevMeta,
-          refundId: webhookData.refund.refundId,
-          status: newStatus,
-          previousPaymentStatus: prevRefundStatus,
-        })
-      ) {
+      // Idempotent — a REDELIVERY of this same refund at this same state is a no-op (decided under the lock).
+      if (settle.seen) {
         logger.info(
           {
             paymentId: payment.id,
@@ -1856,57 +1769,14 @@ export class PaymentService {
       // webhook does not have. Same coupling order.routes.ts applies on the
       // manual refund-status refresh.
       //
-      // Shared with the refresh-refund-status route — see resolveRefundSettlement
-      // for the rule and for the two ways these copies diverged before it was
-      // extracted.
-      // An amount-less settle notice (Fawry) for a refund WE sent is correlated by payment + time window + the
-      // provider reference, so it is neither held nor alerted; only an uncorrelated one is (a dashboard refund).
-      const noticeAmountless = !(
-        typeof webhookData.refund.amount === 'number' && webhookData.refund.amount > 0
-      );
-      const correlatedSettleNotice =
-        noticeAmountless && provider === 'fawry'
-          ? correlateSettleNotice({
-              events: await prisma.paymentEvent.findMany({
-                where: {
-                  paymentId: payment.id,
-                  storeId: payment.order?.storeId ?? storeId ?? '',
-                  eventType: {
-                    in: [REFUND_CLAIM_EVENT, REFUND_EXECUTED_EVENT, REFUND_RELEASED_EVENT],
-                  },
-                  createdAt: { gte: new Date(Date.now() - FAWRY_SETTLE_WINDOW_MS) },
-                },
-                select: { eventType: true, createdAt: true, details: true },
-              }),
-              noticeRef: webhookData.refund.refundId,
-              now: Date.now(),
-              windowMs: FAWRY_SETTLE_WINDOW_MS,
-              claimEvent: REFUND_CLAIM_EVENT,
-              executedEvent: REFUND_EXECUTED_EVENT,
-              releasedEvent: REFUND_RELEASED_EVENT,
-            })
-          : false;
       const {
         settledTotal: settledRefund,
         isFullRefund: refundIsFull,
         accountedThisEvent,
-        absorbedClaimId,
         heldUnaccountedEvent,
         heldProvenanceUnknown,
-      } = resolveRefundSettlement({
-        paymentAmount: payment.amount,
-        alreadyRefunded: payment.refundedAmount,
-        reported: [webhookData.refund.amount],
-        // Distinguishes a refund nothing has counted from the provider's async
-        // settle notice for one the in-band claim already applied.
-        reportedEventId: webhookData.refund.refundId,
-        accountedEventIds: readAccountedRefundEventIds(payment.metadata),
-        correlatedSettleNotice,
-        inFlightClaims: await findInFlightRefundClaims(
-          payment.id,
-          payment.order?.storeId ?? storeId ?? ''
-        ),
-      });
+        heldOpenClaimIdUnverified,
+      } = settle.decision!;
 
       if (newStatus === 'completed' && !orderAlreadyReversed && refundIsFull && payment.order) {
         // Reject a stale/invalid order state before running ANY reversal
@@ -1975,8 +1845,7 @@ export class PaymentService {
       // Durable idempotency write LAST — only after the reversal side-effects
       // above have succeeded (or were legitimately skipped). Done in one
       // update so prevMeta + new fields land atomically.
-      await prisma.payment.update({
-        where: { id: payment.id },
+      await settle.commit({
         data: {
           metadata: {
             ...prevMeta,
@@ -2052,25 +1921,6 @@ export class PaymentService {
         },
       });
 
-      // CONSUME the in-flight claim this webhook was reconciled with, in this same transaction as the payment write:
-      // no second webhook can match it, and a claim released later is flagged for review (releaseClaim).
-      if (absorbedClaimId) {
-        await prisma.paymentEvent.create({
-          data: {
-            paymentId: payment.id,
-            storeId: payment.order?.storeId ?? '',
-            orderId: payment.orderId,
-            eventType: REFUND_ABSORBED_EVENT,
-            provider,
-            details: {
-              claimId: absorbedClaimId,
-              refundId: webhookData.refund.refundId,
-              amount: webhookData.refund.amount ?? null,
-            } as Prisma.InputJsonValue,
-          },
-        });
-      }
-
       // Append-only audit row — refund webhook receipt with raw payload.
       const refundToStatus =
         newStatus === 'completed' && payment.status !== 'refunded'
@@ -2092,11 +1942,13 @@ export class PaymentService {
           refundId: webhookData.refund.refundId,
           refundStatus: newStatus,
           refundReference: webhookData.refund.refundReference ?? null,
-          ...(newStatus === 'completed' && heldUnaccountedEvent
-            ? { heldUnaccountedRefund: true, reason: 'refund_amount_not_reported' }
-            : newStatus === 'completed' && heldProvenanceUnknown
-              ? { heldUnaccountedRefund: true, reason: 'refund_provenance_unknown' }
-              : {}),
+          ...(newStatus === 'completed' && heldOpenClaimIdUnverified
+            ? { heldUnaccountedRefund: true, reason: 'open_claim_id_unverified' }
+            : newStatus === 'completed' && heldUnaccountedEvent
+              ? { heldUnaccountedRefund: true, reason: 'refund_amount_not_reported' }
+              : newStatus === 'completed' && heldProvenanceUnknown
+                ? { heldUnaccountedRefund: true, reason: 'refund_provenance_unknown' }
+                : {}),
         },
       });
 
@@ -2109,7 +1961,22 @@ export class PaymentService {
           id: payment.order.storeId,
           name: payment.order.store?.name ?? payment.order.storeId,
         };
-        if (heldUnaccountedEvent) {
+        if (heldOpenClaimIdUnverified) {
+          // Kashier: the refund API's id is not proven equal to the webhook's transactionId. An own refund is open on this
+          // payment, so this event may be THAT refund under another id: booking it would count one refund twice. Held;
+          // an operator matches it to the claim (matchRefundToClaim) or books it by hand.
+          await alertUnbookedRefund({
+            kind: 'held_open_claim_id_unverified',
+            store: alertStore,
+            orderRef: payment.order.orderNumber,
+            body: `Order ${payment.order.orderNumber}: ${provider} reported refund ${webhookData.refund.refundId} (${webhookData.refund.amount ?? '?'} piastres) as completed with an id this system has not seen, while a refund sent from here is still open on the payment. NOT booked. If it is that refund (the provider uses a different id in the webhook), match it to the claim; if it is a separate refund, book it by hand.`,
+            context: {
+              paymentId: payment.id,
+              refundId: webhookData.refund.refundId,
+              reportedAmount: webhookData.refund.amount ?? null,
+            },
+          });
+        } else if (heldUnaccountedEvent) {
           // #1477: a refund nothing has counted, reported without a usable
           // amount. The balance was held, so if this is a real second refund
           // the payment still looks refundable by that much — and a later
