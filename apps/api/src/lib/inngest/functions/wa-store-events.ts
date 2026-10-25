@@ -73,7 +73,10 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
   const order = await runInTenantContext(storeId, () =>
     prisma.order.findUnique({ where: { id: orderId, storeId }, select: orderSelect })
   );
-  if (!order) return [];
+  // `order/created` can be sent from INSIDE the request transaction (Ruling WH-8): the order or its
+  // COD payment may not be visible yet. Throw so the job retries (as the other fan-outs do) instead
+  // of silently sending an order.created with no COD request, or nothing at all.
+  if (!order) throw new Error(`order ${orderId} not visible yet`);
   const phone = phoneOf(order.shippingAddress);
   if (!phone) {
     logger.info({ orderId, storeId }, '[wa-events] order has no usable phone, nothing sent');
@@ -111,6 +114,14 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
   // Ask for a COD confirmation only while it can still matter: the order is a real COD order that
   // is still pending and unpaid. A re-sent `order/created` after "mark paid" or delivery must not
   // ask the buyer to confirm an order that is already settled.
+  if (
+    method === 'cod' &&
+    order.status === 'pending' &&
+    order.paymentStatus === 'unpaid' &&
+    !order.payments.some(p => p.provider === 'cod')
+  ) {
+    throw new Error(`COD payment of order ${orderId} not visible yet`);
+  }
   const awaitingCod =
     method === 'cod' &&
     order.status === 'pending' &&
@@ -158,7 +169,8 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
     })
   );
   const phone = phoneOf(order?.shippingAddress);
-  const updatedAt = d.updatedAt ? new Date(d.updatedAt) : new Date();
+  const parsedAt = d.updatedAt ? new Date(d.updatedAt) : new Date();
+  const updatedAt = Number.isNaN(parsedAt.getTime()) ? new Date() : parsedAt;
   return [
     {
       seed: `shipment:${d.shipmentId}:${d.status}`,
@@ -185,18 +197,36 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
 }
 
 async function statusEvent(event: SourceEvent): Promise<Planned[]> {
-  const d = (event.data ?? {}) as { orderId?: string; storeId?: string; status?: string };
+  const d = (event.data ?? {}) as {
+    orderId?: string;
+    storeId?: string;
+    status?: string;
+    requestedAt?: string;
+  };
   if (!d.orderId || !d.storeId || !d.status) return [];
-  // `updatedAt` is when THIS transition was requested, not when this job ran: WhatsApp drops an
+  // `updatedAt` is when THIS transition was requested (carried in the event by updateStatus and
+  // the stuck sweep), not when this job ran and not the order's CURRENT stamp: WhatsApp drops an
   // older entity event by it, so two transitions processed out of order must keep their own times.
-  const order = await runInTenantContext(d.storeId, () =>
-    prisma.order.findUnique({
-      where: { id: d.orderId!, storeId: d.storeId! },
-      select: { statusFanoutRequestedAt: true, createdAt: true },
-    })
-  );
-  if (!order) return [];
-  const at = order.statusFanoutRequestedAt ?? order.createdAt;
+  // An event from an old sender without it falls back to the order's stamp only while that stamp is
+  // still for THIS status.
+  let at = d.requestedAt ? new Date(d.requestedAt) : null;
+  if (!at || Number.isNaN(at.getTime())) {
+    const order = await runInTenantContext(d.storeId, () =>
+      prisma.order.findUnique({
+        where: { id: d.orderId!, storeId: d.storeId! },
+        select: {
+          statusFanoutRequestedAt: true,
+          statusFanoutRequestedStatus: true,
+          updatedAt: true,
+        },
+      })
+    );
+    if (!order) throw new Error(`order ${d.orderId} not visible yet`);
+    at =
+      order.statusFanoutRequestedStatus === d.status && order.statusFanoutRequestedAt
+        ? order.statusFanoutRequestedAt
+        : order.updatedAt;
+  }
   return [
     {
       seed: `status:${d.orderId}:${d.status}:${at.getTime()}`,

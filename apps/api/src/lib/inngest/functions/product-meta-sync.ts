@@ -87,9 +87,10 @@ export const productMetaSync = async ({
         return { skipped: true };
       }
 
-      const settings = (store.settings ?? {}) as Record<string, unknown>;
-      const wbsBase =
-        (settings.wbsBaseUrl as string | undefined) ?? process.env.WBS_RECEIVER_BASE_URL;
+      // Platform config ONLY: a store-owner-writable `settings.wbsBaseUrl` here let any store point
+      // this request, which carries the platform-wide receiver secret, at a host it controls
+      // (secret exfiltration + SSRF). The key is reserved in SERVER_OWNED_SETTINGS_KEYS.
+      const wbsBase = process.env.WBS_RECEIVER_BASE_URL;
       if (!wbsBase) {
         logger.warn({ storeId }, 'product-meta-sync: no wbsBaseUrl configured');
         return { skipped: true, reason: 'no-wbs-url' };

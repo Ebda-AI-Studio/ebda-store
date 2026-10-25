@@ -20,6 +20,7 @@ import { redis } from '../../services/redis.service';
 import { OrderService } from '../../services/order.service';
 import { auditLog } from '../../middleware/security';
 import { AppError } from '../../middleware/error-handler';
+import { withDeferredWork } from '../after-tenant-commit';
 import { isWhatsAppLinked } from './link';
 import logger from '../logger';
 
@@ -62,44 +63,48 @@ async function applyCodOutcome(
 ): Promise<StoreEventResult> {
   const { storeId } = e;
   const { orderId, outcome } = e.data;
-  return runInTenantContext(storeId, async () => {
-    const order = await lockedOrder(storeId, orderId);
-    if (!order) return 'unknown_order';
-    // An answer that predates the order (clock skew, replay of an old id) is not about this order.
-    const stale = new Date(e.occurredAt).getTime() < order.createdAt.getTime();
+  // The deferral scope wraps the transaction: the cancel's follow-up work (refund fan-out, cache
+  // busts) fires AFTER COMMIT, never inside it, and is dropped if the transaction rolls back.
+  return withDeferredWork({ storeId }, () =>
+    runInTenantContext(storeId, async () => {
+      const order = await lockedOrder(storeId, orderId);
+      if (!order) return 'unknown_order';
+      // An answer that predates the order (clock skew, replay of an old id) is not about this order.
+      const stale = new Date(e.occurredAt).getTime() < order.createdAt.getTime();
 
-    let acted = false;
-    // Only an open COD order can be moved by an answer: an online-paid, shipped, delivered or
-    // already cancelled one has moved on (a late "yes"), and an unpaid card order is NOT a COD
-    // order, so "confirmed" must never make it shippable.
-    if (!stale && isOpenCodOrder(order)) {
-      if (outcome === 'confirmed' && order.status === 'pending') {
-        await OrderService.updateStatus(storeId, orderId, 'confirmed');
-        acted = true;
-      } else if (
-        outcome === 'refused' &&
-        (order.status === 'pending' || order.status === 'confirmed')
-      ) {
-        await OrderService.updateStatus(storeId, orderId, 'cancelled');
-        acted = true;
+      let acted = false;
+      // Only an open COD order can be moved by an answer: an online-paid, shipped, delivered or
+      // already cancelled one has moved on (a late "yes"), and an unpaid card order is NOT a COD
+      // order, so "confirmed" must never make it shippable.
+      if (!stale && isOpenCodOrder(order)) {
+        if (outcome === 'confirmed' && order.status === 'pending') {
+          await OrderService.updateStatus(storeId, orderId, 'confirmed');
+          acted = true;
+        } else if (
+          outcome === 'refused' &&
+          (order.status === 'pending' || order.status === 'confirmed')
+        ) {
+          await OrderService.updateStatus(storeId, orderId, 'cancelled');
+          acted = true;
+        }
       }
-    }
-    await auditLog({
-      action: 'order.cod_outcome',
-      resourceType: 'order',
-      resourceId: orderId,
-      storeId,
-      details: {
-        outcome,
-        source: e.data.source,
-        acted,
-        stale,
-        status: order.status,
-        eventId: e.id,
-      },
-    });
-    return acted || (outcome === 'no_reply' && !stale) ? 'applied' : 'ignored';
-  });
+      await auditLog({
+        action: 'order.cod_outcome',
+        resourceType: 'order',
+        resourceId: orderId,
+        storeId,
+        details: {
+          outcome,
+          source: e.data.source,
+          acted,
+          stale,
+          status: order.status,
+          eventId: e.id,
+        },
+      });
+      return acted || (outcome === 'no_reply' && !stale) ? 'applied' : 'ignored';
+    })
+  );
 }
 
 async function applyOrderAfterErasure(
@@ -107,23 +112,27 @@ async function applyOrderAfterErasure(
 ): Promise<StoreEventResult> {
   const { storeId } = e;
   const { orderId } = e.data;
-  return runInTenantContext(storeId, async () => {
-    const order = await lockedOrder(storeId, orderId);
-    if (!order) return 'unknown_order';
-    let acted = false;
-    if (order.status === 'pending' || order.status === 'confirmed') {
-      await OrderService.updateStatus(storeId, orderId, 'cancelled');
-      acted = true;
-    }
-    await auditLog({
-      action: 'order.cancelled_after_erasure',
-      resourceType: 'order',
-      resourceId: orderId,
-      storeId,
-      details: { acted, status: order.status, eventId: e.id },
-    });
-    return acted ? 'applied' : 'ignored';
-  });
+  // The deferral scope wraps the transaction: the cancel's follow-up work (refund fan-out, cache
+  // busts) fires AFTER COMMIT, never inside it, and is dropped if the transaction rolls back.
+  return withDeferredWork({ storeId }, () =>
+    runInTenantContext(storeId, async () => {
+      const order = await lockedOrder(storeId, orderId);
+      if (!order) return 'unknown_order';
+      let acted = false;
+      if (order.status === 'pending' || order.status === 'confirmed') {
+        await OrderService.updateStatus(storeId, orderId, 'cancelled');
+        acted = true;
+      }
+      await auditLog({
+        action: 'order.cancelled_after_erasure',
+        resourceType: 'order',
+        resourceId: orderId,
+        storeId,
+        details: { acted, status: order.status, eventId: e.id },
+      });
+      return acted ? 'applied' : 'ignored';
+    })
+  );
 }
 
 /**

@@ -33,6 +33,7 @@ import { featureService } from '@api/services/feature.service';
 
 describe('productMetaSync', () => {
   beforeEach(() => {
+    process.env.WBS_RECEIVER_BASE_URL = 'http://wbs:3001';
     vi.clearAllMocks();
     // Reset global fetch mock
     vi.stubGlobal('fetch', undefined);
@@ -52,7 +53,7 @@ describe('productMetaSync', () => {
     expect(mockPrisma.product.findUnique).not.toHaveBeenCalled();
   });
 
-  it('skips when store has no wbsBaseUrl', async () => {
+  it('skips when no WBS_RECEIVER_BASE_URL is configured', async () => {
     const event = { data: { storeId: 'store1', productId: 'prod1', action: 'upsert' as const } };
     const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
     const mockPrisma = {
@@ -71,7 +72,27 @@ describe('productMetaSync', () => {
     expect(result.reason).toBe('no-wbs-url');
   });
 
-  it('calls WBS receiver when store has meta_catalog_id + wbsBaseUrl', async () => {
+  it('NEVER posts the receiver secret to a store-supplied URL (settings.wbsBaseUrl is ignored)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    const event = { data: { storeId: 'store1', productId: 'prod1', action: 'delete' as const } };
+    const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
+    const mockPrisma = {
+      store: {
+        findUnique: vi.fn().mockResolvedValue({
+          metaCatalogId: 'cat123',
+          settings: { wbsBaseUrl: 'https://evil.test' },
+        }),
+      },
+      product: { findUnique: vi.fn() },
+    };
+    await productMetaSync({ event, step, prisma: mockPrisma as any });
+    const urls = fetchMock.mock.calls.map(c => String(c[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every(u => u.startsWith('http://wbs:3001'))).toBe(true);
+  });
+
+  it('calls WBS receiver when store has meta_catalog_id + the platform receiver URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -81,7 +102,7 @@ describe('productMetaSync', () => {
       store: {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
-          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          settings: {},
           name: 'Demo Shop',
           slug: 'demo-shop',
           domain: 'demo-shop.example',
@@ -130,7 +151,7 @@ describe('productMetaSync', () => {
       store: {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
-          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          settings: {},
         }),
       },
       product: { findUnique: vi.fn() },
@@ -163,7 +184,7 @@ describe('productMetaSync', () => {
       store: {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
-          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          settings: {},
           name: 'Demo Boutique',
           slug: 'demo-boutique',
           domain: null,
@@ -204,7 +225,7 @@ describe('productMetaSync', () => {
       store: {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
-          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          settings: {},
           name: 'Demo Boutique',
           slug: 'demo-boutique',
           domain: null,
@@ -244,7 +265,7 @@ describe('productMetaSync', () => {
       store: {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
-          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          settings: {},
           name: 'Demo Boutique',
           slug: 'demo-boutique',
           domain: null,
@@ -284,7 +305,7 @@ describe('productMetaSync', () => {
       store: {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
-          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          settings: {},
           name: 'Demo Boutique',
           slug: 'demo-boutique',
           domain: null,

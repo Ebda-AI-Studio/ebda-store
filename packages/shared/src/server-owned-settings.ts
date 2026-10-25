@@ -5,10 +5,12 @@
  *
  * `ebdaWhatsApp` was the (never shipped) home of the Ebda WhatsApp link flag; the link now lives in
  * the server-only `store_whatsapp_links` table. The key stays reserved so no client can plant it and
- * no old reader can be fooled by it. Swept 2026-10-25: no other server-owned flag lives in settings
- * (plan, limits, feature flags and verification state are columns / StoreFeature rows).
+ * no old reader can be fooled by it. `wbsBaseUrl` (the WBS receiver URL, which receives a platform
+ * secret) is reserved for the same reason and is read from the environment only. Swept 2026-10-25:
+ * no other server-owned flag lives in settings (plan, limits, feature flags and verification state
+ * are columns / StoreFeature rows).
  */
-export const SERVER_OWNED_SETTINGS_KEYS = ['ebdaWhatsApp'] as const;
+export const SERVER_OWNED_SETTINGS_KEYS = ['ebdaWhatsApp', 'wbsBaseUrl'] as const;
 
 export function reservedSettingsKeys(settings: unknown): string[] {
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return [];

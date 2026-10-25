@@ -2615,7 +2615,14 @@ export class OrderService {
     inngest
       .send({
         name: 'order/status-changed',
-        data: { orderId, storeId, status, hadCapturedPayment },
+        data: {
+          orderId,
+          storeId,
+          status,
+          hadCapturedPayment,
+          // When THIS transition was requested (ordering key for downstream consumers).
+          requestedAt: (statusData.statusFanoutRequestedAt as Date).toISOString(),
+        },
       })
       .catch((err: unknown) => {
         // A REJECTED enqueue (Inngest outage / mid-deploy) runs the fanout

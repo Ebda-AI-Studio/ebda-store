@@ -138,6 +138,22 @@ describe('order/created', () => {
     expect(new Set(first).size).toBe(2); // ...and the two event types differ
   });
 
+  it('an order or COD payment that is not visible yet (event sent inside the request transaction) throws so the job retries', async () => {
+    h.order.mockResolvedValue(null);
+    await expect(emitStoreEventsFor(ev('cod'))).rejects.toThrow(/not visible yet/);
+    h.order.mockResolvedValue({ ...ORDER, payments: [] });
+    await expect(emitStoreEventsFor(ev('cod'))).rejects.toThrow(/COD payment .* not visible yet/);
+    expect(h.send).not.toHaveBeenCalled();
+    // a settled COD order with no pending payment row is NOT "not visible": it just gets no request
+    h.order.mockResolvedValue({
+      ...ORDER,
+      status: 'delivered',
+      paymentStatus: 'paid',
+      payments: [],
+    });
+    await expect(emitStoreEventsFor(ev('cod'))).resolves.toBe(1);
+  });
+
   it('a store that has not linked WhatsApp sends nothing and reads no order', async () => {
     h.linked.mockResolvedValue(false);
     expect(await emitStoreEventsFor(ev('cod'))).toBe(0);
@@ -167,29 +183,61 @@ describe('order/created', () => {
 });
 
 describe('order/status-changed and shipment/status-updated', () => {
-  it('emits order.status_changed stamped with when the transition was REQUESTED, not when the job ran', async () => {
+  it('emits order.status_changed stamped with the transition time CARRIED in the event', async () => {
     await emitStoreEventsFor({
       id: 's2',
       name: 'order/status-changed',
-      data: { orderId: 'o1', storeId: STORE, status: 'cancelled' },
+      data: {
+        orderId: 'o1',
+        storeId: STORE,
+        status: 'confirmed',
+        requestedAt: '2026-10-25T10:01:00.000Z',
+      },
     });
     expect(sent()[0]).toMatchObject({
       type: 'order.status_changed',
-      data: { orderId: 'o1', status: 'cancelled', updatedAt: '2026-10-25T10:05:00.000Z' },
+      data: { orderId: 'o1', status: 'confirmed', updatedAt: '2026-10-25T10:01:00.000Z' },
     });
+    expect(h.order).not.toHaveBeenCalled(); // no read of the order's CURRENT stamp
+  });
+
+  it('an old event without the time uses the order stamp only while it is still for THIS status', async () => {
+    h.order.mockResolvedValue({
+      statusFanoutRequestedAt: new Date('2026-10-25T10:05:00Z'),
+      statusFanoutRequestedStatus: 'shipped',
+      updatedAt: new Date('2026-10-25T10:02:00Z'),
+    });
+    await emitStoreEventsFor({
+      name: 'order/status-changed',
+      data: { orderId: 'o1', storeId: STORE, status: 'confirmed' },
+    });
+    // `confirmed` must not borrow `shipped`'s newer stamp (WhatsApp would roll the status back)
+    expect(sent()[0]!.data.updatedAt).toBe('2026-10-25T10:02:00.000Z');
   });
 
   it('two transitions of one order get different ids (a later status is not deduped away)', async () => {
-    const mk = (status: string, at: string) => {
-      h.order.mockResolvedValue({ ...ORDER, statusFanoutRequestedAt: new Date(at) });
-      return emitStoreEventsFor({
+    const mk = (status: string, at: string) =>
+      emitStoreEventsFor({
         name: 'order/status-changed',
-        data: { orderId: 'o1', storeId: STORE, status },
+        data: { orderId: 'o1', storeId: STORE, status, requestedAt: at },
       });
-    };
     await mk('confirmed', '2026-10-25T10:01:00Z');
     await mk('cancelled', '2026-10-25T10:09:00Z');
     expect(new Set(sent().map(e => e.id)).size).toBe(2);
+  });
+
+  it('a malformed shipment updatedAt falls back instead of retrying forever', async () => {
+    await emitStoreEventsFor({
+      name: 'shipment/status-updated',
+      data: {
+        orderId: 'o1',
+        storeId: STORE,
+        shipmentId: 'sh1',
+        status: 'created',
+        updatedAt: 'garbage',
+      },
+    });
+    expect(storeEventSchema.safeParse(sent()[0]).success).toBe(true);
   });
 
   it('emits shipment.updated with the phone and tracking link when known, and drops a non-http link', async () => {

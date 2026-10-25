@@ -11,8 +11,11 @@ import {
 } from '@ebda/shared';
 
 describe('server-owned settings keys', () => {
-  it('reserves the WhatsApp link key', () => {
-    expect(SERVER_OWNED_SETTINGS_KEYS).toContain('ebdaWhatsApp');
+  it('reserves the WhatsApp link key and the WBS receiver URL (it receives a platform secret)', () => {
+    expect(SERVER_OWNED_SETTINGS_KEYS).toEqual(
+      expect.arrayContaining(['ebdaWhatsApp', 'wbsBaseUrl'])
+    );
+    expect(stripServerOwnedSettings({ wbsBaseUrl: 'https://evil.test', a: 1 })).toEqual({ a: 1 });
   });
 
   it('detects a reserved key (and only that)', () => {
