@@ -8,6 +8,7 @@
 // look's mix names `featured-collection` ONCE, and an unnamed or other-tagged one is simply left out
 // of the render). The "order again" carousel, the maker profile and the trust strip are untagged:
 // every look names them. The maker is FICTIONAL (Ruling B4-10).
+import { heroFile } from './mock-heroes.mjs';
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
@@ -45,7 +46,7 @@ export function buildLammaHome(base, ctx) {
         id: 'table-1',
         type: 'slide',
         settings: {
-          image: img('hero-table.webp'),
+          image: img(heroFile('lamma', 'table', 'hero-table.webp')),
           ctaHref: '/products',
           alt: 'A Friday table spread seen from above: stuffed vine leaves, molokhia, rice, salad and bread',
           headline: 'Friday lunch, like at home',

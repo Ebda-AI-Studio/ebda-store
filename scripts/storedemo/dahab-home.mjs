@@ -9,6 +9,7 @@
 // carousel, the reviews, the collection list, the trust badges, the story and the newsletter are
 // untagged: a look that does not name a type simply leaves it out of the render. Every photo is an
 // illustrative AI image (scripts/dahab-demo/CREDITS.md), unbranded.
+import { heroFile } from './mock-heroes.mjs';
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 
 /** Section types this document owns; legacy sections outside it are kept but hidden. */
@@ -66,7 +67,11 @@ export function buildDahabHome(base, ctx) {
         {
           id: `${key}-1`,
           type: 'slide',
-          settings: { image: img(`hero-${key}.webp`), ctaHref: '/products', ...slide },
+          settings: {
+            image: img(heroFile('dahab', key, `hero-${key}.webp`)),
+            ctaHref: '/products',
+            ...slide,
+          },
         },
       ],
       look
