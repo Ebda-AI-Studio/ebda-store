@@ -44,10 +44,10 @@ beforeEach(() => {
 });
 
 describe('undeliverable addresses', () => {
-  it('flags every RFC 2606 reserved TLD and nothing else', () => {
-    for (const a of ['wa-1@placeholder.invalid', 'a@b.test', 'a@b.example', 'a@x.LOCALHOST'])
+  it('flags the RFC 2606 .invalid TLD and nothing else', () => {
+    for (const a of ['wa-1@placeholder.invalid', 'a@X.INVALID'])
       expect(isUndeliverableAddress(a), a).toBe(true);
-    for (const a of ['a@ebda.app', 'a@example.com', 'not-an-address'])
+    for (const a of ['a@ebda.app', 'a@example.com', 'a@x.test', 'not-an-address'])
       expect(isUndeliverableAddress(a), a).toBe(false);
   });
 

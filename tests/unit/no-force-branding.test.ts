@@ -63,7 +63,13 @@ export function brandViolates(line: string, file = ''): boolean {
 }
 export const providerViolates = (line: string): boolean => PROVIDERS.test(line);
 
-const SIDECARS = ['tests/unit/branding-allowlist.json', 'tests/unit/applied-migrations.json'];
+const SIDECARS = [
+  'tests/unit/branding-allowlist.json',
+  'tests/unit/applied-migrations.json',
+  // Guard tests that must NAME the forbidden strings to forbid them.
+  'tests/unit/no-wbs-refs.test.ts',
+  'tests/unit/email-domain-allowlist.test.ts',
+];
 // sha1 prefixes of the migration directories already on origin/main (applied, immutable).
 // Hashed so the snapshot itself carries no migration name. A migration dir NOT in this set is new
 // and is scanned like any other file.
