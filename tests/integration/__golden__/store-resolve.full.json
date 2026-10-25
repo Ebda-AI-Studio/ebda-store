@@ -136,7 +136,10 @@
       "product_3d",
       "accounting.profit_anomaly"
     ],
-    "disabledCmsSlugs": ["privacy", "terms"],
+    "disabledCmsSlugs": [
+      "privacy",
+      "terms"
+    ],
     "locations": [
       {
         "id": "<uuid-6>",

@@ -50,7 +50,7 @@ if (!isWorkers) {
       }
     },
     5 * 60 * 1000
-  ); // Every 5 minutes
+  ).unref(); // Every 5 minutes. unref: merely importing this module (any script that reaches it through a service) must not keep the process alive.
 }
 
 /**

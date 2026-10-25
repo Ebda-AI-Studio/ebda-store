@@ -984,6 +984,8 @@ jobs:
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
           INNGEST_DRY_RUN: 'true'
+          # self-serve-onboarding-live picks InstaPay as the trial's payment method (go-live gate, EBDA-FUNNEL-5).
+          EBDA_INSTAPAY_HANDLE: ebda@instapay
 
       - name: Assert the API connected as ebda_app, not a bypass role
         # /health is a liveness probe: it answers 200 identically as the `test`
