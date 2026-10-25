@@ -1,3 +1,12 @@
+import {
+  applyPaymentEvent,
+  beginRefund,
+  completeRefund,
+  createPayment,
+  ensurePaymentSchema,
+  releaseRefund,
+  type PaymentWebhookInput,
+} from '../../src/do/payments';
 import { matchingCustomers } from '../../src/do/search-customers';
 import {
   applyGoldRates,
@@ -35,7 +44,10 @@ export class LiteDO extends DurableObject {
       });
     });
     // the StoreDO bootstrap: the search index schema + dirty-marking triggers (idempotent; backfills an existing store)
-    ctx.blockConcurrencyWhile(async () => ensureSearchIndex(doSyncSql(ctx.storage)));
+    ctx.blockConcurrencyWhile(async () => {
+      ensureSearchIndex(doSyncSql(ctx.storage));
+      ensurePaymentSchema(doSyncSql(ctx.storage));
+    });
     this.lite = createPrismaLite(meta as unknown as Meta, doSqlRunner(ctx.storage), 'store-do', {
       storeId: 's1',
     });
@@ -238,6 +250,77 @@ export class LiteDO extends DurableObject {
   }
   goldRepriceProduct(productId: string): number {
     return repriceGoldProduct(doSyncSql(this.ctx.storage), 's1', productId);
+  }
+
+  // ---- payments (Phase 3.3) ----------------------------------------------------------------------------------------
+  payCreate(a: { orderId: string; provider: string; transactionId?: string }): string {
+    const total = this.ctx.storage.sql
+      .exec('SELECT total FROM orders WHERE id = ?', a.orderId)
+      .one().total as number;
+    return createPayment(doSyncSql(this.ctx.storage), { storeId: 's1', amount: total, ...a })
+      .paymentId;
+  }
+  async payEvent(
+    input: Omit<PaymentWebhookInput, 'storeId'>,
+    confirm?: {
+      delayMs: number;
+      kind: 'payment' | 'refund' | 'authorize';
+      status: 'SUCCESS' | 'FAILURE' | 'PENDING';
+    }
+  ): Promise<{ ok: true; outcome: string } | { ok: false; code: string }> {
+    try {
+      const r = await applyPaymentEvent(
+        doSyncSql(this.ctx.storage),
+        { ...input, storeId: 's1' },
+        confirm
+          ? {
+              confirm: async () => {
+                await new Promise(r => setTimeout(r, confirm.delayMs)); // real I/O: other requests run meanwhile
+                return { kind: confirm.kind, status: confirm.status };
+              },
+            }
+          : {}
+      );
+      return { ok: true, outcome: r.outcome };
+    } catch (e) {
+      if (e instanceof MoneyError) return { ok: false, code: e.code };
+      throw e;
+    }
+  }
+  payBegin(a: {
+    paymentId: string;
+    amount?: number;
+    refundKey?: string;
+    now?: number;
+  }): { ok: true; claimId: string } | { ok: false; code: string } {
+    try {
+      return {
+        ok: true,
+        claimId: beginRefund(doSyncSql(this.ctx.storage), { storeId: 's1', ...a }).claimId,
+      };
+    } catch (e) {
+      if (e instanceof MoneyError) return { ok: false, code: e.code };
+      throw e;
+    }
+  }
+  payComplete(a: { claimId: string; refundId: string; now?: number }): {
+    ok: boolean;
+    code?: string;
+  } {
+    try {
+      completeRefund(doSyncSql(this.ctx.storage), { storeId: 's1', ...a });
+      return { ok: true };
+    } catch (e) {
+      if (e instanceof MoneyError) return { ok: false, code: e.code };
+      throw e;
+    }
+  }
+  payRelease(a: { claimId: string }): { released: boolean; review: boolean } {
+    return releaseRefund(doSyncSql(this.ctx.storage), {
+      storeId: 's1',
+      reason: 'provider_rejected',
+      ...a,
+    });
   }
 
   async seed(): Promise<void> {

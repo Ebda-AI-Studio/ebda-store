@@ -431,3 +431,168 @@ describe('search freshness and gold admin on a real Durable Object', () => {
     expect((await s.goldOrders())[0].rate).toBe(520_000);
   });
 });
+
+describe('payments on a real Durable Object: webhooks and refunds under races', () => {
+  const stub = async () => {
+    const s = env.LITE_DO.get(env.LITE_DO.idFromName(`pay-${Math.random()}`)) as any;
+    await s.seedMoney(100, 1000, 0);
+    return s;
+  };
+  const place = async (s: any, qty: number, i = 0) =>
+    s.placeRaw({
+      lines: [{ productId: 'sku', quantity: qty }],
+      shippingAddress: { phone: `010${String(i).padStart(8, '0')}` },
+      idempotencyKey: `p-${Math.random()}`,
+    });
+  const ev = (ref: string, id: string, extra: Record<string, unknown>) => ({
+    provider: 'paymob',
+    providerRef: ref,
+    eventId: id,
+    ...extra,
+  });
+  /** a paid order that already has one completed refund, so the payment carries a per-refund ledger (provenance known) */
+  const paidWithLedger = async (s: any, qty = 6) => {
+    const p = await paid(s, qty);
+    const c = await s.payBegin({ paymentId: p.paymentId, amount: 50 });
+    await s.payComplete({ claimId: c.claimId, refundId: 'R-seed' });
+    return p;
+  };
+  const paid = async (s: any, qty = 6) => {
+    const orderId = await place(s, qty);
+    const paymentId = await s.payCreate({ orderId, provider: 'paymob', transactionId: 'T1' });
+    const total = (await s.sqlOne('SELECT total AS n FROM orders WHERE id = ?', orderId))
+      .n as number;
+    expect(
+      (
+        await s.payEvent(
+          ev('T1', 'pay', { kind: 'payment', status: 'completed', amount: total, currency: 'EGP' })
+        )
+      ).ok
+    ).toBe(true);
+    return { orderId, paymentId, total };
+  };
+
+  it('the same webhook delivered 3x IN PARALLEL (with a slow gateway confirm in between) has ONE effect', async () => {
+    const s = await stub();
+    const orderId = await place(s, 2);
+    const total = (await s.sqlOne('SELECT total AS n FROM orders WHERE id = ?', orderId)).n;
+    await s.payCreate({ orderId, provider: 'kashier', transactionId: 'K1' });
+    const e = {
+      provider: 'kashier',
+      providerRef: 'K1',
+      eventId: 'k-1',
+      kind: 'payment',
+      status: 'completed',
+      amount: total,
+      currency: 'EGP',
+    };
+    const res = await Promise.all(
+      [1, 2, 3].map(() => s.payEvent(e, { delayMs: 30, kind: 'payment', status: 'SUCCESS' }))
+    );
+    expect(res.every(r => r.ok)).toBe(true);
+    expect(res.filter(r => r.outcome === 'applied')).toHaveLength(1);
+    expect(res.filter(r => r.outcome === 'replayed')).toHaveLength(2);
+    expect(
+      await s.sqlOne(`SELECT count(*) AS n FROM order_events WHERE to_status = 'confirmed'`)
+    ).toEqual({ n: 1 });
+    expect(
+      await s.sqlOne(`SELECT count(*) AS n FROM payment_events WHERE event_type = 'webhook'`)
+    ).toEqual({ n: 1 });
+  });
+
+  it('a refund webhook racing the in-band answer = ONE effect, in either arrival order (40 rounds)', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 8);
+    let expected = 50;
+    for (let round = 0; round < 40; round++) {
+      const begin = await s.payBegin({ paymentId, amount: 100 });
+      expect(JSON.stringify(begin)).toContain('claimId');
+      expected += 100;
+      const refundId = `R${round}`;
+      const hook = s.payEvent(
+        ev('T1', `rw-${round}`, {
+          kind: 'refund',
+          refund: { refundId, status: 'completed', amount: 100 },
+        })
+      );
+      const done = s.payComplete({ claimId: begin.claimId, refundId });
+      if (round % 2) await Promise.all([done, hook]);
+      else await Promise.all([hook, done]);
+      expect(await s.sqlOne('SELECT refunded_amount AS n FROM payments')).toEqual({ n: expected });
+    }
+    // 40 refunds booked exactly once each on the order
+    expect(
+      await s.sqlOne(
+        `SELECT count(*) AS n FROM order_events WHERE to_status = 'partial_refund_recorded'`
+      )
+    ).toEqual({ n: 41 });
+  });
+
+  it('30 parallel claims + their 30 webhooks (same amount) + 3 replays each: total = claims exactly, none lost, none doubled', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 40);
+    const claims: Array<{ claimId: string }> = [];
+    for (let i = 0; i < 30; i++) claims.push(await s.payBegin({ paymentId, amount: 100 }));
+    const calls: Promise<unknown>[] = [];
+    claims.forEach((c, i) => {
+      for (let r = 0; r < 3; r++)
+        calls.push(
+          s.payEvent(
+            ev('T1', `rw-${i}`, {
+              kind: 'refund',
+              refund: { refundId: `R${i}`, status: 'completed', amount: 100 },
+            })
+          )
+        );
+      calls.push(s.payComplete({ claimId: c.claimId, refundId: `R${i}` }));
+    });
+    await Promise.all(calls);
+    expect(await s.sqlOne('SELECT refunded_amount AS n FROM payments')).toEqual({ n: 3050 });
+    expect(
+      await s.sqlOne(
+        `SELECT count(*) AS n FROM payment_events WHERE event_type = 'refund_webhook_absorbed'`
+      )
+    ).toEqual({ n: 30 });
+  });
+
+  it('two genuine concurrent same-amount refunds (claim + dashboard) are BOTH booked', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 8);
+    const c = await s.payBegin({ paymentId, amount: 100 });
+    const res = await Promise.all([
+      s.payEvent(
+        ev('T1', 'rw-a', {
+          kind: 'refund',
+          refund: { refundId: 'RA', status: 'completed', amount: 100 },
+        })
+      ),
+      s.payEvent(
+        ev('T1', 'rw-b', {
+          kind: 'refund',
+          refund: { refundId: 'RB', status: 'completed', amount: 100 },
+        })
+      ),
+      s.payComplete({ claimId: c.claimId, refundId: 'RA' }),
+    ]);
+    expect(res.slice(0, 2).every((r: any) => r.ok)).toBe(true);
+    expect(await s.sqlOne('SELECT refunded_amount AS n FROM payments')).toEqual({ n: 250 });
+  });
+
+  it('release racing a webhook never un-books money the gateway reported', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 8);
+    const c = await s.payBegin({ paymentId, amount: 100 });
+    await Promise.all([
+      s.payEvent(
+        ev('T1', 'rw', {
+          kind: 'refund',
+          refund: { refundId: 'R1', status: 'completed', amount: 100 },
+        })
+      ),
+      s.payRelease({ claimId: c.claimId }),
+    ]);
+    const n = (await s.sqlOne('SELECT refunded_amount AS n FROM payments')).n;
+    // either order is safe: released first -> the webhook adds the real refund; absorbed first -> release becomes a review
+    expect(n).toBe(150);
+  });
+});
