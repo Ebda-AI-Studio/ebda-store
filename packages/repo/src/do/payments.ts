@@ -27,7 +27,7 @@ import {
   recordRefundStatus,
   resolveRefundSettlement,
   selectInFlightClaims,
-  IN_FLIGHT_CLAIM_WINDOW_MS,
+  selectOpenExecutedClaims,
 } from '../../../shared/src/refunds/refund-settlement';
 import { cancelOrder, refundOrder } from './refund';
 import { MoneyError, type SyncSql } from './sync-sql';
@@ -48,7 +48,6 @@ const CLOSING_EVENTS = [
   REFUND_ABSORBED_EVENT,
 ];
 const AMOUNT_TOLERANCE_FILS = 5;
-export const FAWRY_SETTLE_WINDOW_MS = 6 * 60 * 60 * 1000;
 /** Providers whose delivery leaves a money-deciding field unsigned: confirmed server-to-server before anything is applied. */
 export const CONFIRM_BEFORE_APPLY: ReadonlySet<string> = new Set(['kashier']);
 
@@ -56,6 +55,9 @@ export const PAYMENT_STATEMENTS: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS payment_event_log (
      provider TEXT NOT NULL, event_id TEXT NOT NULL, payment_id TEXT, outcome TEXT NOT NULL, applied_at INTEGER NOT NULL,
      PRIMARY KEY (provider, event_id)) WITHOUT ROWID`,
+  // one refund claim, one of absorbed / released (the Postgres twin is payment_events_claim_single_outcome_key)
+  `CREATE UNIQUE INDEX IF NOT EXISTS payment_events_claim_single_outcome_key ON payment_events (json_extract(details, '$.claimId'))
+     WHERE event_type IN ('refund_webhook_absorbed', 'refund_failed')`,
 ];
 export function ensurePaymentSchema(db: SyncSql): void {
   db.transactionSync(() => {
@@ -975,51 +977,74 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
 
   const events = db
     .all(
-      'SELECT event_type, created_at, details FROM payment_events WHERE payment_id = ? AND created_at >= ? AND event_type IN (' +
+      'SELECT event_type, created_at, details FROM payment_events WHERE payment_id = ? AND event_type IN (' +
         [REFUND_CLAIM_EVENT, ...CLOSING_EVENTS].map(() => '?').join(', ') +
         ')',
-      [
-        p.id,
-        now - Math.max(FAWRY_SETTLE_WINDOW_MS, IN_FLIGHT_CLAIM_WINDOW_MS),
-        REFUND_CLAIM_EVENT,
-        ...CLOSING_EVENTS,
-      ]
+      [p.id, REFUND_CLAIM_EVENT, ...CLOSING_EVENTS]
     )
     .map(e => ({
       eventType: e.event_type as string,
       createdAt: e.created_at as number,
       details: parse(e.details),
     }));
-  const inFlightClaims = selectInFlightClaims({
-    events,
-    now,
-    claimEvent: REFUND_CLAIM_EVENT,
-    closingEvents: CLOSING_EVENTS,
-  });
+  const completed = r.status === 'completed';
+  // only a COMPLETED refund can be reconciled with (and consume) a claim
+  const inFlightClaims = completed
+    ? selectInFlightClaims({
+        events,
+        now,
+        claimEvent: REFUND_CLAIM_EVENT,
+        closingEvents: CLOSING_EVENTS,
+      })
+    : [];
   const amountless = !(typeof r.amount === 'number' && r.amount > 0);
-  const correlatedSettleNotice =
-    amountless && input.provider === 'fawry'
+  // An amount-less Fawry notice is attributed to ONE executed claim of ours on positive evidence, else held + alerted.
+  const correlatedClaimId =
+    completed && amountless && input.provider === 'fawry'
       ? correlateSettleNotice({
           events,
           noticeRef: r.refundId,
           now,
-          windowMs: FAWRY_SETTLE_WINDOW_MS,
           claimEvent: REFUND_CLAIM_EVENT,
           executedEvent: REFUND_EXECUTED_EVENT,
-          releasedEvent: REFUND_RELEASED_EVENT,
+          closingEvents: [
+            REFUND_RELEASED_EVENT,
+            REFUND_INDETERMINATE_EVENT,
+            REFUND_RECONCILED_EVENT,
+            REFUND_ABSORBED_EVENT,
+          ],
         })
-      : false;
-  const s = resolveRefundSettlement({
+      : null;
+  const s0 = resolveRefundSettlement({
     paymentAmount: p.amount,
     alreadyRefunded: p.refunded_amount,
     reported: [r.amount],
     reportedEventId: r.refundId,
     accountedEventIds: readAccountedRefundEventIds(meta),
     inFlightClaims,
-    correlatedSettleNotice,
+    correlatedClaimId,
+    // Kashier: the refund API's id is not proven equal to the webhook's transactionId. With an own executed claim still
+    // open, an unknown id is HELD (never auto-booked); an operator matches it (matchRefundToClaim).
+    openExecutedClaimWithUnverifiedId:
+      completed &&
+      input.provider === 'kashier' &&
+      selectOpenExecutedClaims({
+        events,
+        now,
+        claimEvent: REFUND_CLAIM_EVENT,
+        executedEvent: REFUND_EXECUTED_EVENT,
+        closingEvents: [
+          REFUND_RELEASED_EVENT,
+          REFUND_INDETERMINATE_EVENT,
+          REFUND_RECONCILED_EVENT,
+          REFUND_ABSORBED_EVENT,
+        ],
+      }).length > 0,
   });
+  // only a COMPLETED refund is accounted: a pending / failed notice must not file its id (that would make the real, later
+  // completed refund look already counted and it would never be added)
+  const s = completed ? s0 : { ...s0, accountedThisEvent: false };
   const orderAlreadyReversed = o.status === 'refunded';
-  const completed = r.status === 'completed';
   if (completed && !orderAlreadyReversed && s.isFullRefund) {
     assertTransition(o.status, 'refunded');
     refundOrder(db, { storeId: input.storeId, orderId: o.id, now });
@@ -1049,7 +1074,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       });
     }
   }
-  if (s.absorbedClaimId) {
+  if (s.absorbedClaimId && completed) {
     // CONSUME the claim in this same section: no second webhook can match it
     addPaymentEvent(db, {
       storeId: input.storeId,
@@ -1092,16 +1117,25 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       refundId: r.refundId,
       refundStatus: r.status,
       absorbedClaimId: s.absorbedClaimId,
-      ...(completed && s.heldUnaccountedEvent
-        ? { heldUnaccountedRefund: true, reason: 'refund_amount_not_reported' }
-        : completed && s.heldProvenanceUnknown
-          ? { heldUnaccountedRefund: true, reason: 'refund_provenance_unknown' }
-          : {}),
+      ...(completed && s.heldOpenClaimIdUnverified
+        ? { heldUnaccountedRefund: true, reason: 'open_claim_id_unverified' }
+        : completed && s.heldUnaccountedEvent
+          ? { heldUnaccountedRefund: true, reason: 'refund_amount_not_reported' }
+          : completed && s.heldProvenanceUnknown
+            ? { heldUnaccountedRefund: true, reason: 'refund_provenance_unknown' }
+            : {}),
     },
     now,
   });
   indexEntity(db, input.storeId, 'refund', `${input.provider}:${r.refundId}`, now);
-  if (completed && s.heldUnaccountedEvent)
+  if (completed && s.heldOpenClaimIdUnverified)
+    alerts.push({
+      kind: 'held_open_claim_id_unverified',
+      paymentId: p.id,
+      orderId: p.order_id,
+      body: `Order ${o.order_number}: ${input.provider} reported refund ${r.refundId} (${r.amount ?? '?'} piastres) as completed with an id this system has not seen, while a refund sent from here is still open on the payment. NOT booked. Match it to the claim, or book it by hand.`,
+    });
+  else if (completed && s.heldUnaccountedEvent)
     alerts.push({
       kind: 'held_unaccounted',
       paymentId: p.id,
@@ -1248,5 +1282,69 @@ export function expireInstapay(
       });
     }
     return 'expired';
+  });
+}
+
+/**
+ * Operator action for a held refund webhook (Kashier: the webhook's id may differ from the id the refund API answered
+ * with): "this provider refund IS that claim's refund". Moves no money; consumes the claim, records the provider id as seen,
+ * audits the operator. Refuses a claim that did not execute or is already closed. Replay-safe.
+ */
+export function matchRefundToClaim(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    claimId: string;
+    providerRefundId: string;
+    actorUserId: string;
+    now?: number;
+  }
+): 'matched' | 'already_matched' {
+  need(a.providerRefundId, 'providerRefundId');
+  need(a.actorUserId, 'actorUserId');
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    const claim = findClaim(db, a.storeId, a.claimId);
+    const p = loadPayment(db, a.storeId, claim.paymentId);
+    const has = (type: string) =>
+      db.all(
+        "SELECT 1 AS x FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.claimId') = ?",
+        [p.id, type, a.claimId]
+      ).length > 0;
+    if (has(REFUND_ABSORBED_EVENT)) return 'already_matched';
+    if (!has(REFUND_EXECUTED_EVENT))
+      throw err('CLAIM_NOT_EXECUTED', 'claim has no executed refund to match', 409);
+    if (
+      has(REFUND_RELEASED_EVENT) ||
+      has(REFUND_INDETERMINATE_EVENT) ||
+      has(REFUND_RECONCILED_EVENT)
+    )
+      throw err('CLAIM_CLOSED', 'claim is already closed', 409);
+    addPaymentEvent(db, {
+      storeId: a.storeId,
+      paymentId: p.id,
+      orderId: p.order_id,
+      eventType: REFUND_ABSORBED_EVENT,
+      provider: p.provider,
+      userId: a.actorUserId,
+      details: {
+        claimId: a.claimId,
+        refundId: a.providerRefundId,
+        matchedBy: a.actorUserId,
+        via: 'operator_match',
+      },
+      now,
+    });
+    const meta = parse(p.metadata);
+    db.run('UPDATE payments SET metadata = ?, updated_at = ? WHERE id = ?', [
+      JSON.stringify({
+        ...meta,
+        [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, a.providerRefundId),
+        [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(meta, a.providerRefundId, 'completed'),
+      }),
+      now,
+      p.id,
+    ]);
+    return 'matched';
   });
 }
