@@ -2008,3 +2008,17 @@ html[lang='en'] [data-look] .font-display {
     display: none !important;
   }
 }
+
+/*
+ * Template-match PR6 (G7): a phone's default section padding comes from the look (--look-section-pad, the mock's
+ * own 14-28 px) instead of 2rem x density. Same marker as the rule above: only a section with no explicit
+ * merchant preset (.sp-top-default / .sp-bottom-default) moves, so presets still win.
+ */
+@media (max-width: 639.98px) {
+  [data-look] .sp-top-default {
+    padding-top: var(--look-section-pad, calc(2rem * var(--space-unit, 1)));
+  }
+  [data-look] .sp-bottom-default {
+    padding-bottom: var(--look-section-pad, calc(2rem * var(--space-unit, 1)));
+  }
+}
