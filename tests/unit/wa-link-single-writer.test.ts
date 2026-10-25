@@ -17,11 +17,16 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('store_whatsapp_links single writer', () => {
-  it('only lib/wa/link.ts references the model', () => {
-    const users = walk(SRC).filter(f =>
-      /storeWhatsAppLink|store_whatsapp_links/.test(readFileSync(f, 'utf8'))
-    );
-    expect(users.map(f => path.relative(SRC, f))).toEqual(['lib/wa/link.ts']);
+  it('only lib/wa/link.ts WRITES the model (reads, e.g. the plan-sync sweep, are fine)', () => {
+    const writers = walk(SRC).filter(f => {
+      const t = readFileSync(f, 'utf8');
+      return (
+        /storeWhatsAppLink\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)\b/.test(
+          t
+        ) || /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?store_whatsapp_links/.test(t)
+      );
+    });
+    expect(writers.map(f => path.relative(SRC, f))).toEqual(['lib/wa/link.ts']);
   });
   it('nothing reads settings.ebdaWhatsApp', () => {
     const users = walk(SRC).filter(f =>
