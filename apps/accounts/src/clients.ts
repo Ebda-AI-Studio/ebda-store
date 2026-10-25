@@ -303,23 +303,23 @@ export async function authenticateClient(
   secret: string
 ): Promise<{ client: ClientRow; slot: number } | { client: null; known: ClientRow | null }> {
   const presented = await hmacSecret(env, secret);
-  const client =
-    clientId.length <= 64
-      ? await db.prepare(`SELECT * FROM clients WHERE id = ?1`).bind(clientId).first<ClientRow>()
-      : null;
-  const secrets = client
-    ? (
-        await db
-          .prepare(`SELECT slot, hmac, expires_at FROM client_secrets WHERE client_id = ?1`)
-          .bind(clientId)
-          .all<{ slot: number; hmac: string; expires_at: number | null }>()
-      ).results
-    : [];
+  const client = await db
+    .prepare(`SELECT * FROM clients WHERE id = ?1`)
+    .bind(clientId.slice(0, 64))
+    .first<ClientRow>();
+  // The SAME queries run for an unknown id (they just return nothing), so known and unknown clients cost the same work.
+  const secrets = (
+    await db
+      .prepare(`SELECT slot, hmac, expires_at FROM client_secrets WHERE client_id = ?1`)
+      .bind(clientId.slice(0, 64))
+      .all<{ slot: number; hmac: string; expires_at: number | null }>()
+  ).results;
   const at = nowMs();
-  // an unknown client still pays exactly one comparison against a dummy
-  const candidates = secrets.length
-    ? secrets
-    : [{ slot: 0, hmac: '0'.repeat(64), expires_at: null }];
+  // Every request makes exactly TWO constant-time comparisons (a client holds at most two secrets), padding with a dummy, so the
+  // number of secrets, an unknown id and a revoked client do not change the work done here. (The failed-authentication trail
+  // row is written after the response, see the token route, so it is not part of the observable latency either.)
+  const dummy = { slot: 0, hmac: '0'.repeat(64), expires_at: null as number | null };
+  const candidates = [secrets[0] ?? dummy, secrets[1] ?? dummy];
   let hit = 0;
   for (const s of candidates) {
     const equal = safeEqual(presented, s.hmac);

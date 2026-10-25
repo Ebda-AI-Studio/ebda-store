@@ -1443,7 +1443,16 @@ export function createApp() {
       const auth = await authenticateClient(c.env.DB, c.env, id, secret);
       if (!auth.client) {
         // Only a KNOWN client gets a trail row (random ids cannot grow the table); the answer is the same either way.
-        if (auth.known) await auditAuthFailure(c.env.DB, auth.known, ip);
+        // After the response: the trail write must not make a known client's failure slower than an unknown one's.
+        if (auth.known) {
+          const known = auth.known;
+          const write = auditAuthFailure(c.env.DB, known, ip).catch(() => undefined);
+          try {
+            c.executionCtx.waitUntil(write);
+          } catch {
+            await write;
+          }
+        }
         return oauth(401, 'invalid_client');
       }
       await attempt.succeeded();
