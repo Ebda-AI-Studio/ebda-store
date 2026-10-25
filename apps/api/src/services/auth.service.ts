@@ -41,6 +41,7 @@ import {
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
+import { WhatsAppConsentService } from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -2210,6 +2211,13 @@ export class AuthService {
           OR: smsConsentOr,
         },
       });
+      // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
+      // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
+      if (buyerKey) {
+        await tx.storeWhatsAppConsent.deleteMany({
+          where: { storeId: opts.scopeStoreId ?? eraseStoreId, buyerKey },
+        });
+      }
 
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
@@ -2500,6 +2508,13 @@ export class AuthService {
         },
       }),
     ]);
+    // WhatsApp marketing consent (Ruling WA-CONSENT-1): what was ticked, when, where, and any withdrawal.
+    const exportBuyerKey = await buyerKeyForErasure(
+      typeof user.phone === 'string' ? user.phone : null
+    );
+    const whatsappMarketingConsent = exportBuyerKey
+      ? await WhatsAppConsentService.exportFor(storeId, exportBuyerKey)
+      : [];
 
     return {
       exportedAt: new Date().toISOString(),
@@ -2519,6 +2534,7 @@ export class AuthService {
       onesignalSubscriptions,
       passkeys,
       smsMarketingConsents,
+      whatsappMarketingConsent,
       wholesaleApplications,
     };
   }

@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   order: vi.fn(),
   linked: vi.fn(),
   send: vi.fn(),
+  consent: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {
@@ -21,6 +22,7 @@ vi.mock('@ebda/database', () => ({
   },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
+vi.mock('@api/lib/wa/consent', () => ({ WhatsAppConsentService: { hasConsent: h.consent } }));
 vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked, hasWhatsAppLinkRow: h.linkRow }));
 vi.mock('@api/lib/wa/plan-state', () => ({
   PLAN_CHANGED_EVENT: 'store/plan-changed',
@@ -59,6 +61,7 @@ beforeEach(() => {
   process.env.SUITE_BUYER_KEY_SECRET = SECRET;
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
+  h.consent.mockReset().mockResolvedValue(true);
   h.linkRow.mockReset().mockResolvedValue(true);
   h.cart.mockReset().mockResolvedValue({
     status: 'pending',
@@ -376,6 +379,20 @@ describe('cart/abandoned', () => {
     });
     expect(String(e.data.recoveryUrl)).toMatch(/^https:\/\/souq\.ebda\.app\/cart\?restore=/);
     expect(String(e.data.buyerKey)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('WA-CONSENT-1: no marketing consent, no cart.abandoned (checked at send time)', async () => {
+    h.consent.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    expect(h.send).not.toHaveBeenCalled();
+    expect(h.consent).toHaveBeenCalledWith(STORE, expect.stringMatching(/^[0-9a-f]{64}$/));
+  });
+
+  it('WA-CONSENT-1: a revoke between capture and send stops the reminder; a re-tick resumes it', async () => {
+    h.consent.mockResolvedValueOnce(false);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    h.consent.mockResolvedValueOnce(true);
+    expect(await emitStoreEventsFor(ev)).toBe(1);
   });
 
   it('a cart that was already recovered (the shopper ordered) is never chased', async () => {

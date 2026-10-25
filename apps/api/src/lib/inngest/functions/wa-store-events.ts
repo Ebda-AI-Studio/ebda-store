@@ -9,6 +9,8 @@ import { buildStoreEvent, sendStoreEvents, type StoreEventInput } from '../../wa
 import { isWhatsAppLinked, hasWhatsAppLinkRow } from '../../wa/link';
 import { PLAN_CHANGED_EVENT, planChangedInput } from '../../wa/plan-state';
 import { CATALOG_CHANGED_EVENT } from '../../wa/catalog-state';
+import { WhatsAppConsentService } from '../../wa/consent';
+import { CONSENT_CHANGED_EVENT, consentChangedInput } from '../../wa/consent-state';
 
 /**
  * Store -> Ebda WhatsApp events (contract 2026-10-24, section 4): order created, COD confirmation
@@ -222,6 +224,9 @@ async function cartEvent(event: SourceEvent): Promise<Planned[]> {
   if (!phone) return [];
   const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), phone);
   if (!buyerKey) return [];
+  // Ruling WA-CONSENT-1: a cart reminder is MARKETING. No active consent = no cart.abandoned.
+  // Checked here, at send time, so a revoke between capture and send also stops it.
+  if (!(await WhatsAppConsentService.hasConsent(storeId, buyerKey))) return [];
   const lang = (row.store.settings as { defaultLanguage?: unknown } | null)?.defaultLanguage;
   return [
     {
@@ -379,6 +384,17 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     await sendStoreEvents(events);
     return events.length;
   }
+  // Consent state goes to Ebda WhatsApp for every store it knows (a link row), also when unlinked:
+  // an opt-out must reach it either way.
+  if (event.name === CONSENT_CHANGED_EVENT) {
+    const buyerKey = (event.data as { buyerKey?: string }).buyerKey;
+    if (!buyerKey || !(await hasWhatsAppLinkRow(storeId))) return 0;
+    const p = await consentChangedInput(storeId, buyerKey);
+    await sendStoreEvents([
+      await buildStoreEvent(p.input, { seed: p.seed, occurredAt: p.occurredAt }),
+    ]);
+    return 1;
+  }
   if (!(await isWhatsAppLinked(storeId))) return 0;
   const planned =
     event.name === 'order/created'
@@ -413,6 +429,7 @@ export const waStoreEvents: InngestFunction.Any = inngest.createFunction(
       { event: 'cart/abandoned' },
       { event: 'account/erased' },
       { event: CATALOG_CHANGED_EVENT },
+      { event: CONSENT_CHANGED_EVENT },
     ],
   },
   async ({ event, step }) => {

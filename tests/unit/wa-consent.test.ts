@@ -1,0 +1,133 @@
+/**
+ * WA-CONSENT-1: WhatsApp marketing consent. Every write is attributed to a (store, buyer) by ONE
+ * observer; an STOP (opt_out_changed) revokes but never re-enables; versions are monotonic.
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const h = vi.hoisted(() => ({
+  find: vi.fn(),
+  upsert: vi.fn(),
+  update: vi.fn(),
+  send: vi.fn(),
+}));
+vi.mock('@ebda/database', () => ({
+  prisma: { storeWhatsAppConsent: { findUnique: h.find, upsert: h.upsert, update: h.update } },
+  runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+}));
+vi.mock('@api/lib/inngest/send-after-commit', () => ({ sendEventAfterCommit: h.send }));
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+import { buyerKeyFor } from '@ebda/shared';
+import { applyOptOutChanged, WhatsAppConsentService } from '@api/lib/wa/consent';
+import { consentChangeTarget, onConsentWrite } from '@api/lib/wa/consent-state';
+
+const S = '11111111-1111-4111-8111-111111111111';
+const K = 'e8771d4105457e95d06a8589827d6c09043f73bb1750f2ef525bccbc22d67edd';
+
+beforeEach(() => {
+  process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+  h.find.mockReset().mockResolvedValue(null);
+  h.upsert.mockReset().mockResolvedValue({});
+  h.update.mockReset().mockResolvedValue({});
+  h.send.mockReset().mockResolvedValue(undefined);
+});
+
+describe('consent writes are attributed and announced', () => {
+  it('names the store and buyer for every write shape the service uses', () => {
+    const w = { storeId_buyerKey: { storeId: S, buyerKey: K } };
+    for (const [operation, args] of [
+      ['upsert', { where: w }],
+      ['update', { where: w, data: { granted: false } }],
+      ['deleteMany', { where: { storeId: S, buyerKey: K } }],
+      ['create', { data: { storeId: S, buyerKey: K } }],
+    ] as const) {
+      expect(
+        consentChangeTarget({ model: 'StoreWhatsAppConsent', operation, args, result: null })
+      ).toEqual({
+        storeId: S,
+        buyerKey: K,
+      });
+    }
+  });
+
+  it('ignores other models, and an unattributable write is NOT announced silently wrong', () => {
+    onConsentWrite({ model: 'Order', operation: 'update', args: {}, result: {} });
+    expect(h.send).not.toHaveBeenCalled();
+    onConsentWrite({
+      model: 'StoreWhatsAppConsent',
+      operation: 'updateMany',
+      args: { where: {} },
+      result: {},
+    });
+    expect(h.send).not.toHaveBeenCalled();
+    onConsentWrite({
+      model: 'StoreWhatsAppConsent',
+      operation: 'deleteMany',
+      args: { where: { storeId: S, buyerKey: K } },
+      result: {},
+    });
+    expect(h.send).toHaveBeenCalledWith(
+      'wa-consent-changed',
+      { name: 'wa/consent-changed', data: { storeId: S, buyerKey: K } },
+      { ifUnhookable: 'send' }
+    );
+  });
+});
+
+describe('the service', () => {
+  it('a tick is stored with source, locale and time; unticking withdraws', async () => {
+    await WhatsAppConsentService.record(S, '+201001234567', {
+      consent: true,
+      source: 'checkout',
+      locale: 'ar',
+    });
+    const a = h.upsert.mock.calls[0]![0];
+    expect(a.where.storeId_buyerKey).toEqual({
+      storeId: S,
+      buyerKey: await buyerKeyFor(process.env.SUITE_BUYER_KEY_SECRET!, '+201001234567'),
+    });
+    expect(a.create).toMatchObject({ granted: true, grantedSource: 'checkout', locale: 'ar' });
+    expect(a.create.grantedAt).toBeInstanceOf(Date);
+    await WhatsAppConsentService.record(S, '+201001234567', { consent: false, source: 'checkout' });
+    expect(h.upsert.mock.calls[1]![0].update).toMatchObject({
+      granted: false,
+      revokedSource: 'checkout',
+    });
+  });
+
+  it('no phone, no row; no row means no consent', async () => {
+    expect(
+      await WhatsAppConsentService.record(S, 'n/a', { consent: true, source: 'checkout' })
+    ).toBeNull();
+    expect(h.upsert).not.toHaveBeenCalled();
+    expect(await WhatsAppConsentService.hasConsent(S, K)).toBe(false);
+    h.find.mockResolvedValue({ granted: true });
+    expect(await WhatsAppConsentService.hasConsent(S, K)).toBe(true);
+  });
+});
+
+describe('whatsapp.opt_out_changed (v1.1)', () => {
+  it('optedOut=true revokes, source whatsapp, and records the version', async () => {
+    h.find.mockResolvedValue({ optOutVersion: 1, granted: true });
+    expect(await applyOptOutChanged(S, K, true, 2)).toBe('applied');
+    expect(h.upsert.mock.calls[0]![0].update).toMatchObject({
+      granted: false,
+      revokedSource: 'whatsapp',
+      optOutVersion: 2,
+    });
+  });
+  it('a stale or replayed version is ignored', async () => {
+    h.find.mockResolvedValue({ optOutVersion: 3, granted: false });
+    expect(await applyOptOutChanged(S, K, true, 3)).toBe('ignored');
+    expect(await applyOptOutChanged(S, K, true, 2)).toBe('ignored');
+    expect(h.upsert).not.toHaveBeenCalled();
+  });
+  it('optedOut=false never re-enables consent', async () => {
+    h.find.mockResolvedValue({ optOutVersion: 1, granted: false });
+    expect(await applyOptOutChanged(S, K, false, 2)).toBe('ignored');
+    expect(h.upsert).not.toHaveBeenCalled();
+    expect(h.update.mock.calls[0]![0].data).toEqual({ optOutVersion: 2 });
+  });
+});

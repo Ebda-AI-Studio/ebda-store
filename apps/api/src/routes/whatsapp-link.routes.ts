@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -8,6 +9,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { buildStoreEvent, sendStoreEvents } from '../lib/wa/events';
 import { notifyPlanChanged } from '../lib/wa/plan-state';
 import { clearKnownStoreCache, notifyCatalogChanged } from '../lib/wa/catalog-state';
+import { WhatsAppConsentService } from '../lib/wa/consent';
 import { WhatsAppLinkService, canLinkWhatsApp, whatsAppLinkState } from '../lib/wa/link';
 
 /**
@@ -87,5 +89,35 @@ for (const [method, linked] of [
     }
   });
 }
+
+/**
+ * The merchant withdraws a buyer's WhatsApp marketing consent (Ruling WA-CONSENT-1: revocable by the
+ * buyer, the merchant, or a STOP on WhatsApp). Revoke only: a merchant can never GRANT a buyer's
+ * consent, only the buyer's own tick does. Ebda WhatsApp is told by the consent observer.
+ */
+router.post(
+  '/consent/revoke',
+  ...guards,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { phone } = z.object({ phone: z.string().trim().min(5).max(32) }).parse(req.body);
+      const result = await WhatsAppConsentService.record(req.params.storeId, phone, {
+        consent: false,
+        source: 'admin',
+      });
+      if (!result) throw new AppError(400, 'INVALID_PHONE', 'Invalid phone');
+      await auditLog({
+        action: 'whatsapp.consent_revoked',
+        resourceType: 'store',
+        resourceId: req.params.storeId,
+        storeId: req.params.storeId,
+        details: {},
+      });
+      res.json({ success: true, data: { granted: false } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;

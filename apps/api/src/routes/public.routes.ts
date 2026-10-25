@@ -52,6 +52,8 @@ import {
   restoreCartIntoSession,
   cartEmailOptInAvailable,
 } from '../services/cart-email-optin.service';
+import { isWhatsAppLinked } from '../lib/wa/link';
+import { WhatsAppConsentService } from '../lib/wa/consent';
 import { boundedCacheKey, getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
@@ -959,6 +961,48 @@ router.post(
         return;
       }
       res.json({ success: true, data: { status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /cart/whatsapp-optin - the checkout box "Send me offers and reminders on WhatsApp" (Ruling
+// WA-CONSENT-1). Cart reminders are marketing: the box is UNTICKED by default, nothing is recorded
+// until the shopper ticks it, and unticking withdraws it. Consent is stored against the suite buyer
+// key (never the phone) with time, source and the label language. Only offered on a store that has
+// Ebda WhatsApp linked; a grant on any other store is refused.
+const cartWhatsAppOptInSchema = z.object({
+  phone: z.string().trim().min(5).max(32),
+  consent: z.boolean(),
+  language: z.enum(['en', 'ar']).optional(),
+});
+router.post(
+  '/cart/whatsapp-optin',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = cartWhatsAppOptInSchema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      if (body.consent && !(await isWhatsAppLinked(storeId))) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'WHATSAPP_NOT_AVAILABLE', message: 'Not available' },
+        });
+        return;
+      }
+      const result = await WhatsAppConsentService.record(storeId, body.phone, {
+        consent: body.consent,
+        source: 'checkout',
+        locale: body.language,
+      });
+      if (!result) {
+        res
+          .status(400)
+          .json({ success: false, error: { code: 'INVALID_PHONE', message: 'Invalid phone' } });
+        return;
+      }
+      res.json({ success: true, data: { granted: result.granted } });
     } catch (error) {
       next(error);
     }
@@ -2188,6 +2232,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         // It is display-only — the send gate re-checks everything live.
         smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
         cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+        whatsappMarketingOptIn: await isWhatsAppLinked(store.id),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -2409,6 +2454,7 @@ router.get(
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
           cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+          whatsappMarketingOptIn: await isWhatsAppLinked(store.id),
         };
 
         const locations = await fetchFooterLocations(store);

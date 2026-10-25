@@ -1,5 +1,6 @@
 import { setModelWriteObserver } from '@ebda/database';
 import { onCatalogWrite } from './catalog-state';
+import { onConsentWrite } from './consent-state';
 import { onPlanWrite } from './plan-state';
 
 let installed = false;
@@ -14,5 +15,6 @@ export function installWaWriteObservers(): void {
   setModelWriteObserver(e => {
     onPlanWrite(e);
     onCatalogWrite(e);
+    onConsentWrite(e);
   });
 }

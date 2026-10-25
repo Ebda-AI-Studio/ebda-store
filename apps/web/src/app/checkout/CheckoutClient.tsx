@@ -500,6 +500,12 @@ export default function CheckoutClient() {
   const showCartEmailOptIn = store?.cartEmailOptIn === true;
   const cartEmailRecorded = useRef(false);
   const showSmsOptIn = store?.smsMarketingOptIn === true;
+  // "Send me offers and reminders on WhatsApp": MARKETING consent (Ruling WA-CONSENT-1). Unticked by
+  // default, shown only when the store has Ebda WhatsApp linked. Ticking records consent against
+  // the phone (server stores only the hashed buyer key); unticking withdraws it.
+  const [whatsAppOptIn, setWhatsAppOptIn] = useState(false);
+  const showWhatsAppOptIn = store?.whatsappMarketingOptIn === true;
+  const whatsAppRecorded = useRef(false);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -1088,6 +1094,24 @@ export default function CheckoutClient() {
     }, 600);
     return () => clearTimeout(timeoutId);
   }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
+
+  // Record / withdraw the WhatsApp marketing consent. Debounced; waits for a valid phone when
+  // ticking; only withdraws if a tick was actually recorded.
+  useEffect(() => {
+    if (!showWhatsAppOptIn) return;
+    const phone = formData.phone.trim();
+    if (whatsAppOptIn && !isValidEgyptianMobile(phone)) return;
+    if (!whatsAppOptIn && !whatsAppRecorded.current) return;
+    const timeoutId = setTimeout(() => {
+      api
+        .post('/public/cart/whatsapp-optin', { phone, consent: whatsAppOptIn, language })
+        .then(res => {
+          if (res.success) whatsAppRecorded.current = whatsAppOptIn;
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(timeoutId);
+  }, [showWhatsAppOptIn, whatsAppOptIn, formData.phone, language]);
 
   const autoAppliedPromoRef = useRef(false);
   useEffect(() => {
@@ -2361,6 +2385,33 @@ export default function CheckoutClient() {
                           error={formErrors.phone}
                           className={CHECKOUT_FIELD}
                         />
+                        {showWhatsAppOptIn && (
+                          <label
+                            data-whatsapp-marketing-optin
+                            className="mt-2 flex min-h-11 cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={whatsAppOptIn}
+                              onChange={e => setWhatsAppOptIn(e.target.checked)}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="text-sm text-foreground">
+                                {t(
+                                  'Send me offers and reminders on WhatsApp',
+                                  'ابعتلي عروض وتذكيرات على واتساب'
+                                )}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t(
+                                  'Marketing messages only. Order updates are separate. You can stop them anytime.',
+                                  'رسائل تسويقية بس، وتحديثات الطلب منفصلة. وتقدر توقفها في أي وقت.'
+                                )}
+                              </span>
+                            </span>
+                          </label>
+                        )}
                         {showSmsOptIn && (
                           <label
                             data-sms-marketing-optin
