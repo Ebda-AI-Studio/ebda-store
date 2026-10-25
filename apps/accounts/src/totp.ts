@@ -70,7 +70,7 @@ async function aes(keyB64: string): Promise<CryptoKey> {
 }
 
 /**
- * Sealed format `v2.<kid>.<iv>.<ciphertext+tag>` (base64url). `kid` = first 8 hex chars of sha256(key bytes), so a ciphertext names the
+ * Sealed format `v3.<kid>.<iv>.<ciphertext+tag>` (base64url), AES-GCM with AAD `v3|kid|userId`. `kid` = first 8 hex chars of sha256(key bytes), so a ciphertext names the
  * key that made it and a keyring (`MFA_KEY` current, `MFA_KEY_PREV` previous) can open it during a rotation. The legacy
  * `v1.<iv>.<ciphertext+tag>` (no kid) is still opened by trying each key in the ring, and is re-sealed as v2 by the re-encrypt job.
  */
@@ -81,7 +81,7 @@ export async function keyId(keyB64: string): Promise<string> {
 }
 
 /** AAD binds the ciphertext to its key id AND its owner: a sealed secret copied onto another user's row (or another kid) fails to open. */
-const aad = (kid: string, userId: string) => new TextEncoder().encode(`v2|${kid}|${userId}`);
+const aad = (kid: string, userId: string) => new TextEncoder().encode(`v3|${kid}|${userId}`);
 
 export async function seal(keyB64: string, plain: string, userId: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -93,7 +93,7 @@ export async function seal(keyB64: string, plain: string, userId: string): Promi
       new TextEncoder().encode(plain)
     )
   );
-  return `v2.${kid}.${b64urlEncode(iv)}.${b64urlEncode(ct)}`;
+  return `v3.${kid}.${b64urlEncode(iv)}.${b64urlEncode(ct)}`;
 }
 
 async function open(
@@ -114,6 +114,8 @@ async function open(
 export interface MfaKeyring {
   MFA_KEY?: string;
   MFA_KEY_PREV?: string;
+  /** 'true' once the re-encrypt job reports 0 remaining: refuse the legacy v1/v2 formats (they carry no owner binding). */
+  MFA_REJECT_LEGACY?: string;
 }
 const ring = (k: MfaKeyring): string[] =>
   [k.MFA_KEY, k.MFA_KEY_PREV].filter((x): x is string => !!x);
@@ -124,18 +126,29 @@ export async function sealCurrent(k: MfaKeyring, plain: string, userId: string):
   return seal(k.MFA_KEY, plain, userId);
 }
 
-/** Open with whichever key in the ring made it (by kid for v2, by trial for legacy v1, which has no AAD). */
+/**
+ * Open with whichever key in the ring made it. v3 = by kid, AAD-bound to the owner. v2 = by kid, NO AAD (legacy, never shipped to
+ * production but may exist in a mixed rollout). v1 = no kid, no AAD (tried against each ring key). Both legacy formats are
+ * refused once `MFA_REJECT_LEGACY=true`, so a ciphertext copied between rows cannot skip the owner binding after the migration.
+ */
 export async function unsealAny(k: MfaKeyring, sealed: string, userId: string): Promise<string> {
   const parts = sealed.split('.');
   const keys = ring(k);
-  if (parts[0] === 'v2' && parts.length === 4) {
+  const legacyOk = k.MFA_REJECT_LEGACY !== 'true';
+  if (parts[0] === 'v3' && parts.length === 4) {
     for (const key of keys) {
       if ((await keyId(key)) === parts[1])
         return open(key, parts[2], parts[3], aad(parts[1], userId));
     }
     throw new Error('sealed secret names a key that is not in the keyring');
   }
-  if (parts[0] === 'v1' && parts.length === 3) {
+  if (parts[0] === 'v2' && parts.length === 4 && legacyOk) {
+    for (const key of keys) {
+      if ((await keyId(key)) === parts[1]) return open(key, parts[2], parts[3]);
+    }
+    throw new Error('sealed secret names a key that is not in the keyring');
+  }
+  if (parts[0] === 'v1' && parts.length === 3 && legacyOk) {
     let last: unknown = new Error('no key');
     for (const key of keys) {
       try {
@@ -149,10 +162,10 @@ export async function unsealAny(k: MfaKeyring, sealed: string, userId: string): 
   throw new Error('unsupported sealed format');
 }
 
-/** Is this secret sealed with something other than the current key (v1, or a v2 of another kid)? */
+/** Is this secret NOT a v3 on the current key (legacy v1/v2, or another kid)? */
 export async function needsReseal(k: MfaKeyring, sealed: string): Promise<boolean> {
   if (!k.MFA_KEY) return false;
-  return !sealed.startsWith(`v2.${await keyId(k.MFA_KEY)}.`);
+  return !sealed.startsWith(`v3.${await keyId(k.MFA_KEY)}.`);
 }
 
 /** The code a device would show at `atMs` (exported for tests and the enrolment self-check). */

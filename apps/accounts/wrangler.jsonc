@@ -39,6 +39,8 @@
     "ALLOWED_ORIGINS": "https://store.ebda.app,https://orders.ebda.app,https://wa.ebda.app",
     "PASSKEY_ORIGINS": "https://store.ebda.app,https://orders.ebda.app",
     "BUILD_COMMIT_SHA": "",
+    // Verified 2026-10-25: no production secret is sealed in a legacy format (0 users with a TOTP), so legacy v1/v2 are refused from day one.
+    "MFA_REJECT_LEGACY": "true",
     "PRODUCTS": "store,whatsapp,crm,erp",
     // Least privilege: a browser origin may only obtain tokens for ITS product audience (an XSS on one product cannot mint another's).
     "ORIGIN_PRODUCTS": "https://store.ebda.app=store,https://orders.ebda.app=store,https://wa.ebda.app=whatsapp",

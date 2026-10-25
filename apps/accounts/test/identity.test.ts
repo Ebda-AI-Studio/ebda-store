@@ -381,7 +381,7 @@ describe('MFA (TOTP)', () => {
     await env.DB.prepare(`UPDATE users SET mfa_last_step = mfa_last_step - 5 WHERE id = ?1`)
       .bind(u.id)
       .run();
-    expect(row!.mfa_secret.startsWith('v2.')).toBe(true);
+    expect(row!.mfa_secret.startsWith('v3.')).toBe(true);
     expect(row!.mfa_secret).not.toContain(secret);
 
     const first = await call('/login', { json: { email: u.email, password: u.password } });

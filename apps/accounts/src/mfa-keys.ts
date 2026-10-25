@@ -1,5 +1,5 @@
 /**
- * MFA key rotation (pre-launch requirement): sealed TOTP secrets name their key (`v2.<kid>...`), a small keyring (`MFA_KEY` current,
+ * MFA key rotation (pre-launch requirement): sealed TOTP secrets name their key (`v3.<kid>...`), a small keyring (`MFA_KEY` current,
  * `MFA_KEY_PREV` previous) opens them, and this job re-seals every secret that is not on the current key. It is compare-and-set
  * per row, so a user enrolling or disabling MFA while it runs is never overwritten, and it can run any number of times.
  *
@@ -24,7 +24,7 @@ export async function reencryptMfaSecrets(
 ): Promise<ReencryptReport> {
   const report: ReencryptReport = { scanned: 0, resealed: 0, skipped: 0, failed: 0, remaining: 0 };
   if (!env.MFA_KEY) return report;
-  const current = `v2.${await keyId(env.MFA_KEY)}.%`;
+  const current = `v3.${await keyId(env.MFA_KEY)}.%`;
   // Paged by id so a row that can never be opened is stepped over (not re-picked forever) and cannot starve the rest.
   let after = '';
   while (report.scanned < limit) {

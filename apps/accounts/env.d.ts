@@ -50,6 +50,8 @@ declare global {
       MFA_KEY?: string;
       /** The previous MFA key while a rotation is in flight (opens old secrets; never used to seal). */
       MFA_KEY_PREV?: string;
+      /** 'true' after the re-encrypt job reports 0 remaining: refuse legacy v1/v2 sealed secrets. */
+      MFA_REJECT_LEGACY?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
       TEST_MIGRATIONS?: D1Migration[];

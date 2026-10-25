@@ -60,9 +60,9 @@ async function loginWithTotp(u: { email: string; password: string }, secret: str
 }
 
 describe('sealed format and keyring', () => {
-  it('seals as v2 naming the key; opens with that key; the kid is derived from the key bytes', async () => {
+  it('seals as v3 naming the key; opens with that key; the kid is derived from the key bytes', async () => {
     const sealed = await seal(K1, 'JBSWY3DPEHPK3PXP', U);
-    expect(sealed.startsWith(`v2.${await keyId(K1)}.`)).toBe(true);
+    expect(sealed.startsWith(`v3.${await keyId(K1)}.`)).toBe(true);
     expect(await unsealAny({ MFA_KEY: K1 }, sealed, U)).toBe('JBSWY3DPEHPK3PXP');
     expect(await keyId(K1)).not.toBe(await keyId(K2));
   });
@@ -89,12 +89,12 @@ describe('sealed format and keyring', () => {
         .replace(/=+$/, '');
     const v1 = `v1.${b64u(iv)}.${b64u(ct)}`;
     expect(await unsealAny({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, v1, U)).toBe('LEGACY');
-    expect(await needsReseal({ MFA_KEY: K1 }, v1)).toBe(true); // v1 is always re-sealed as v2
+    expect(await needsReseal({ MFA_KEY: K1 }, v1)).toBe(true); // v1 is always re-sealed as v3
   });
 
   it('encrypts with the CURRENT key only (the previous one never seals)', async () => {
     const s = await sealCurrent({ MFA_KEY: K2, MFA_KEY_PREV: K1 }, 'X', U);
-    expect(s.startsWith(`v2.${await keyId(K2)}.`)).toBe(true);
+    expect(s.startsWith(`v3.${await keyId(K2)}.`)).toBe(true);
   });
 });
 
@@ -103,7 +103,7 @@ describe('rotation mid-flight', () => {
     const u = await seedUser();
     const { bearer, secret } = await enrol(u);
     await finish(u, bearer, secret);
-    expect((await row(u.id))!.mfa_secret!.startsWith(`v2.${await keyId(K1)}.`)).toBe(true);
+    expect((await row(u.id))!.mfa_secret!.startsWith(`v3.${await keyId(K1)}.`)).toBe(true);
 
     // rotation starts: K2 current, K1 previous. Existing secrets still open.
     fakes.envOverride = { MFA_KEY: K2, MFA_KEY_PREV: K1 };
@@ -113,7 +113,7 @@ describe('rotation mid-flight', () => {
     const rep = await reencryptMfaSecrets({ ...env, MFA_KEY: K2, MFA_KEY_PREV: K1 } as never);
     expect(rep.resealed).toBeGreaterThanOrEqual(1);
     expect(rep.remaining).toBe(0);
-    expect((await row(u.id))!.mfa_secret!.startsWith(`v2.${await keyId(K2)}.`)).toBe(true);
+    expect((await row(u.id))!.mfa_secret!.startsWith(`v3.${await keyId(K2)}.`)).toBe(true);
 
     // the previous key is dropped: sign-in still works on K2 alone
     fakes.envOverride = { MFA_KEY: K2 };
@@ -235,10 +235,76 @@ describe('re-encrypt job', () => {
       .run();
     const rep = await reencryptMfaSecrets({ ...env, MFA_KEY: K2, MFA_KEY_PREV: K1 } as never, 1000);
     expect(rep.failed).toBeGreaterThanOrEqual(1);
-    expect((await row(second.id))!.mfa_secret!.startsWith(`v2.${await keyId(K2)}.`)).toBe(true);
+    expect((await row(second.id))!.mfa_secret!.startsWith(`v3.${await keyId(K2)}.`)).toBe(true);
     for (const x of [first, second])
       await env.DB.prepare(`UPDATE users SET mfa_secret = NULL, mfa_enabled = 0 WHERE id = ?1`)
         .bind(x.id)
         .run();
+  });
+
+  it('legacy v2 (kid, no AAD) still opens, is re-sealed as v3, and a v3 moved to another user fails', async () => {
+    const u = await seedUser();
+    const other = await seedUser();
+    // hand-build a v2: v2.<kid>.<iv>.<ct> with K1 and NO additional data
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const raw = Uint8Array.from(atob(K1), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+    const ct = new Uint8Array(
+      await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        new TextEncoder().encode('V2SECRET')
+      )
+    );
+    const b64u = (b: Uint8Array) =>
+      btoa(String.fromCharCode(...b))
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        .replace(/=+$/, '');
+    const v2 = `v2.${await keyId(K1)}.${b64u(iv)}.${b64u(ct)}`;
+    expect(await unsealAny({ MFA_KEY: K1 }, v2, u.id)).toBe('V2SECRET');
+    expect(await needsReseal({ MFA_KEY: K1 }, v2)).toBe(true);
+
+    await env.DB.prepare(`UPDATE users SET mfa_secret = ?2, mfa_enabled = 1 WHERE id = ?1`)
+      .bind(u.id, v2)
+      .run();
+    const rep = await reencryptMfaSecrets({
+      ...env,
+      MFA_KEY: K1,
+      MFA_REJECT_LEGACY: 'false',
+    } as never);
+    expect(rep.resealed).toBeGreaterThanOrEqual(1);
+    const v3 = (await row(u.id))!.mfa_secret!;
+    expect(v3.startsWith(`v3.${await keyId(K1)}.`)).toBe(true);
+    expect(await unsealAny({ MFA_KEY: K1 }, v3, u.id)).toBe('V2SECRET');
+    await expect(unsealAny({ MFA_KEY: K1 }, v3, other.id)).rejects.toThrow(); // moved to another owner
+    await env.DB.prepare(`UPDATE users SET mfa_secret = NULL, mfa_enabled = 0 WHERE id = ?1`)
+      .bind(u.id)
+      .run();
+  });
+
+  it('MFA_REJECT_LEGACY=true refuses v1 and v2 (no owner binding) but still opens v3', async () => {
+    const id = '00000000-0000-4000-8000-0000000000cc';
+    const v3 = await seal(K1, 'S3', id);
+    expect(await unsealAny({ MFA_KEY: K1, MFA_REJECT_LEGACY: 'true' }, v3, id)).toBe('S3');
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const raw = Uint8Array.from(atob(K1), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+    const ct = new Uint8Array(
+      await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode('OLD'))
+    );
+    const b64u = (b: Uint8Array) =>
+      btoa(String.fromCharCode(...b))
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        .replace(/=+$/, '');
+    const v2 = `v2.${await keyId(K1)}.${b64u(iv)}.${b64u(ct)}`;
+    const v1 = `v1.${b64u(iv)}.${b64u(ct)}`;
+    for (const legacy of [v2, v1]) {
+      await expect(
+        unsealAny({ MFA_KEY: K1, MFA_REJECT_LEGACY: 'true' }, legacy, id)
+      ).rejects.toThrow();
+      expect(await unsealAny({ MFA_KEY: K1 }, legacy, id)).toBe('OLD'); // accepted until the flag is set
+    }
   });
 });
