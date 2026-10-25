@@ -20,6 +20,7 @@ const { args } = cli({
   'd1-config': { type: 'string' },
   'persist-to': { type: 'string' },
   'skip-platform': { type: 'boolean', default: false },
+  'platform-only': { type: 'boolean', default: false },
 });
 
 async function verifyDoStore(client, bound, plan, store) {
@@ -148,16 +149,19 @@ async function verifyPlatform(client, bound, plan) {
 }
 
 async function main() {
-  if (!args.all && !args.store) throw new Error('pass --store <id|slug> or --all');
-  if (!args.doUrl) throw new Error('pass --do-url (or CUTOVER_DO_URL)');
-  if (!args.secret) throw new Error('set CUTOVER_IMPORT_SECRET');
+  if (!args.all && !args.store && !args['platform-only'])
+    throw new Error('pass --store <id|slug> or --all');
+  if (!args['platform-only'] && !args.doUrl) throw new Error('pass --do-url (or CUTOVER_DO_URL)');
+  if (!args['platform-only'] && !args.secret) throw new Error('set CUTOVER_IMPORT_SECRET');
   const t0 = performance.now();
   const plan = loadPlan();
   const client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
   const bound = await bindPlan(client, plan);
-  const stores = args.all
-    ? (await client.query('SELECT id, slug FROM stores ORDER BY slug')).rows
-    : [await resolveStore(client, args.store)];
+  const stores = args['platform-only']
+    ? []
+    : args.all
+      ? (await client.query('SELECT id, slug FROM stores ORDER BY slug')).rows
+      : [await resolveStore(client, args.store)];
   const results = [];
   for (const s of stores) results.push(await verifyDoStore(client, bound, plan, s));
   if (args.d1 && !args['skip-platform']) results.push(await verifyPlatform(client, bound, plan));
