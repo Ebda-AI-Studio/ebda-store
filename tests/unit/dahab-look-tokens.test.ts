@@ -54,15 +54,15 @@ describe('dahab looks: shape', () => {
       '#F6F6F6',
       '#121212',
       '#121212',
-      '#8F4F59',
+      '#8F713D',
     ]);
     const k = by('dahab.workshop');
     expect([k.page, k.surface, k.ink, k.primary, k.onPrimary, k.accent, k.line]).toEqual([
       '#0F4C4A',
       '#135957',
       '#FFFFFF',
-      '#E4E7EB',
-      '#0F4C4A',
+      '#FE9385',
+      '#10151C',
       '#9FD8CB',
       '#D8C9A8',
     ]);
@@ -109,6 +109,15 @@ describe('dahab looks: painted text pairs >= 4.5, UI pairs >= 3', () => {
       const t = by(id);
       expect(contrastRatio(t.page, t.line), id).toBeLessThan(3);
     }
+  });
+  it('Ruling PAL-2: Worn brass is METAL-1 brass and clears 4.5:1 on its page; the Workshop coral CTA sits outside the hue band', () => {
+    const w = by('dahab.worn');
+    expect(isMetal(w.accent)).toBe(true);
+    expect(contrastRatio(w.page, w.accent)).toBeGreaterThanOrEqual(4.5); // measured 4.57
+    const k = by('dahab.workshop');
+    expect(isOrangeFamily(k.primary)).toBe(false); // hue 7, under the 12-50 band
+    expect(contrastRatio(k.page, k.primary)).toBeGreaterThanOrEqual(4.5); // measured 4.52
+    expect(contrastRatio(k.primary, k.onPrimary)).toBeGreaterThanOrEqual(7); // measured 8.49
   });
   it('Workshop champagne reads on the teal page and the surface (hairlines, maker details)', () => {
     const t = by('dahab.workshop');

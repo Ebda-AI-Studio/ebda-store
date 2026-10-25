@@ -975,8 +975,9 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#5A5A5A',
       primary: '#121212',
       onPrimary: '#FFFFFF',
-      // Ruling B5-2: rose gold (hue 351), not the brass the first design used.
-      accent: '#8F4F59',
+      // Ruling PAL-2 (Ahmad, 2026-10-25): the mock-up's gold, as the deepest brass METAL-1 allows (hue 38, saturation
+      // 40%, lightness 40%: #8F713D, 4.57:1 on white). METAL-1 (2026-10-22) generalised the brass exception of B2-18.
+      accent: '#8F713D',
       onAccent: '#FFFFFF',
       line: '#E8E8E8',
       fonts: { display: 'Reem Kufi', body: 'IBM Plex Sans Arabic', latin: 'Bodoni Moda' },
@@ -1069,8 +1070,11 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#CFE2E0',
       // Ruling B5-2: the CTA is silver with teal ink (the coral #E2674A failed the no-orange gate and
       // was 2.91:1 on the page); enamel is the accent, champagne draws the hairlines.
-      primary: '#E4E7EB',
-      onPrimary: '#0F4C4A',
+      // Ruling PAL-2: the CTA is the mock-up's coral moved to hue 7 (outside the 12-50 band, so no exception is
+      // needed) and lightened until it also reads as TEXT on the teal page: #FE9385 is 4.52:1 on the page and carries
+      // ink #10151C at 8.49:1. A deeper coral was 3.2:1 and failed the painted-text bar.
+      primary: '#FE9385',
+      onPrimary: '#10151C',
       accent: '#9FD8CB',
       onAccent: '#0F4C4A',
       line: '#D8C9A8',
