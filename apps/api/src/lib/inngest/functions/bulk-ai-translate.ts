@@ -531,17 +531,19 @@ const bulkAiTranslateFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
 
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: 'completed',
-          processed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: 'completed',
+            processed,
+            filled,
+            skipped,
+            failed,
+            errors: errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
