@@ -99,6 +99,8 @@ describe('envelope', () => {
       /phone/
     );
     expect(() => assertNoPiiShapes({ n: { deep: ['call +20 100 123 4567'] } })).toThrow();
+    expect(() => assertNoPiiShapes({ n: '٠١٠١٢٣٤٥٦٧٨' })).toThrow();
+    expect(() => assertNoPiiShapes({ n: 'x ۰۱۰۱۲۳۴۵۶۷۸' })).toThrow();
     expect(() => assertNoPiiShapes({ areaKey: 'EG-GZ-6th-october' })).not.toThrow();
   });
 

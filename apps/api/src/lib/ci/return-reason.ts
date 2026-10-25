@@ -27,6 +27,13 @@ export type ReturnReasonCode = (typeof RETURN_REASON_CODES)[number];
 
 export const RETURN_REASON_RAW_MAX = 200;
 
+/** Arabic-Indic (٠-٩) and extended/Persian (۰-۹) digits -> ASCII, so a phone typed in Arabic digits is still a phone. */
+export function asciiDigits(s: string): string {
+  return s
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06f0));
+}
+
 const PHONE = /(?:\+|00)?\d[\d\s().-]{6,}\d/g;
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
 const URL_RE = /\bhttps?:\/\/\S+/gi;
@@ -37,7 +44,7 @@ const URL_RE = /\bhttps?:\/\/\S+/gi;
  */
 export function scrubFreeText(input: unknown, max = RETURN_REASON_RAW_MAX): string | null {
   if (typeof input !== 'string') return null;
-  const s = input
+  const s = asciiDigits(input)
     .replace(URL_RE, '[link]')
     .replace(EMAIL, '[email]')
     .replace(PHONE, '[phone]')

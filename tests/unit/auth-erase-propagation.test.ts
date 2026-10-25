@@ -219,19 +219,32 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         oneSignalPlayerIds: ['player-a', 'player-b'],
         // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
         storeId: CUSTOMER.storeId,
-        // Customer Intelligence: every buyer key to erase from R2 (none here: no phone, no keyed orders)
+        // Customer Intelligence: no proven phone here, and the scope is the account's own (zero) orders
         ciBuyerKeys: [],
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [] },
       },
     });
   });
 
-  it('hands every buyer key on the shopper\u2019s orders to the CI erasure, and nulls the keys on the orders', async () => {
+  it('scopes the CI erase to the shopper\u2019s OWN orders (ids + keys), never the key alone, and nulls the keys on the orders', async () => {
     mockPrisma.order.findMany.mockImplementation(
-      async (args: { where?: { buyerKey?: unknown } }) =>
-        args?.where?.buyerKey ? [{ buyerKey: 'k1' }, { buyerKey: 'k2' }] : []
+      async (args: { select?: { buyerKey?: boolean } }) =>
+        args?.select?.buyerKey
+          ? [
+              { id: 'o1', buyerKey: 'k1' },
+              { id: 'o2', buyerKey: 'k1' },
+              { id: 'o3', buyerKey: null },
+            ]
+          : []
     );
     await AuthService.eraseAccount(CUSTOMER.id);
-    expect(sendMock.mock.calls.at(-1)![0].data.ciBuyerKeys.sort()).toEqual(['k1', 'k2']);
+    const data = sendMock.mock.calls.at(-1)![0].data;
+    expect(data.ciScope).toEqual({
+      storeId: CUSTOMER.storeId,
+      orderIds: ['o1', 'o2', 'o3'],
+      buyerKeys: ['k1'],
+    });
+    expect(data.ciBuyerKeys).toEqual([]); // no proven phone: no buyer-key-wide erase
     expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ buyerKey: null, areaKey: null }) })
     );
@@ -289,6 +302,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         oneSignalPlayerIds: [],
         storeId: CUSTOMER.storeId,
         ciBuyerKeys: [],
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [] },
       },
     });
   });

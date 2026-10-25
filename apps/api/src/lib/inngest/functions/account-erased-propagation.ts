@@ -6,8 +6,7 @@ import {
 } from '../../../services/privacy-propagation.service';
 import logger from '../../logger';
 import { cfBindings } from '../../../cf/bindings';
-import { ciSurface } from '../../../cf/erasure/surfaces';
-import type { R2BucketLike } from '../../../cf/erasure/types';
+import { eraseCiBuyerKey, eraseCiForOrders, type CiBucket } from '../../ci/erase';
 import { inngest } from '../client';
 
 /**
@@ -35,7 +34,7 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
     triggers: [{ event: 'account/erased' }],
   },
   async ({ event, step }) => {
-    const { userId, oneSignalPlayerIds, ciBuyerKeys } = event.data;
+    const { userId, oneSignalPlayerIds, ciBuyerKeys, ciScope } = event.data;
 
     if (!userId) {
       logger.warn({ event: event.name }, 'account/erased fired without userId — skipping');
@@ -47,8 +46,17 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
       step.run('delete-posthog-person', () => deletePostHogPerson(userId)),
       // Customer Intelligence (PDPL): the buyer's rows in R2 `ebda-ci` and their index entries. Analytics
       // Engine holds no buyer key, so there is nothing to erase there. Not a Worker (Node)? no bucket.
-      step.run('erase-ci-outcomes', () => eraseCiOutcomes(userId, ciBuyerKeys ?? [])),
+      step.run('erase-ci-outcomes', () => eraseCiOutcomes(userId, ciScope, ciBuyerKeys ?? [])),
     ]);
+
+    // Customer Intelligence: a second pass after the queue's retry window. A tombstone already blocks
+    // in-flight events; this removes anything a replay slipped in before the tombstone landed.
+    if (ciScope?.orderIds?.length || ciBuyerKeys?.length) {
+      await step.sleep('ci-erasure-settle', '2h');
+      await step.run('erase-ci-outcomes-second-pass', () =>
+        eraseCiOutcomes(userId, ciScope, ciBuyerKeys ?? [])
+      );
+    }
 
     // Re-throw (aggregated) if a step ultimately failed after Inngest's
     // per-step retries, so `alerts-failure-watch` can dead-letter it —
@@ -74,21 +82,38 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
   }
 );
 
-/** Erases every given buyer key from CI; throws when any row survives (so the job retries and pages). */
+/**
+ * Erases the account's CI rows. `scope` = the account's own orders in its store (always); `provenKeys` =
+ * buyer keys of a phone the account PROVED it holds (WA-CONSENT-1), erased across every store. Throws
+ * when any row survives (so the job retries and pages). Tombstones are written first (lib/ci/erase.ts).
+ */
 export async function eraseCiOutcomes(
   requestId: string,
-  buyerKeys: string[],
-  bucket: R2BucketLike | undefined = cfBindings()?.CI_BUCKET as unknown as R2BucketLike | undefined
+  scope: { storeId?: string; orderIds?: string[]; buyerKeys?: string[] } | undefined,
+  provenKeys: string[] = [],
+  bucket: CiBucket | undefined = cfBindings()?.CI_BUCKET as unknown as CiBucket | undefined
 ): Promise<{ erased: number }> {
-  if (buyerKeys.length === 0) return { erased: 0 };
+  const hasScope = !!scope?.storeId && (scope.orderIds?.length ?? 0) > 0;
+  if (!hasScope && provenKeys.length === 0) return { erased: 0 };
   if (!bucket) {
     if (cfBindings()) throw new Error('CI_BUCKET binding missing: CI rows were not erased');
     return { erased: 0 };
   }
   let erased = 0;
-  for (const buyerKey of buyerKeys) {
-    const r = await ciSurface(bucket).eraseSubject({ kind: 'customer', requestId, buyerKey });
-    if (r.remaining > 0) throw new Error(`CI erasure left ${r.remaining} row(s) for a buyer key`);
+  if (hasScope) {
+    const r = await eraseCiForOrders(bucket, {
+      storeId: scope!.storeId!,
+      orderIds: scope!.orderIds!,
+      buyerKeys: scope!.buyerKeys ?? [],
+    });
+    if (r.remaining > 0)
+      throw new Error(`CI erasure left ${r.remaining} row(s) of the account's orders`);
+    erased += r.erased;
+  }
+  for (const buyerKey of provenKeys) {
+    const r = await eraseCiBuyerKey(bucket, buyerKey, requestId);
+    if (r.remaining > 0)
+      throw new Error(`CI erasure left ${r.remaining} row(s) for a proven buyer key`);
     erased += r.erased;
   }
   return { erased };

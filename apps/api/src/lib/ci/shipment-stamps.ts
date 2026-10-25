@@ -9,7 +9,7 @@
  * `marks` are the occurrences that are NEW in this call; they drive the first-time-only CI events.
  */
 import type { HistoryEntry } from '../shipment-tracking';
-import { mapReturnReason } from './return-reason';
+import { mapReturnReason, scrubFreeText } from './return-reason';
 import type { ShipmentCiMark } from './planner';
 
 export interface ShipmentStampState {
@@ -40,8 +40,9 @@ export function shipmentStamps(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
   // "Updated by the merchant" is not a carrier reason.
+  // Scrubbed HERE: the marks travel in an Inngest event payload, so no raw carrier text may leave this function.
   const textOf = (h?: HistoryEntry) =>
-    source === 'merchant_manual' ? null : (h?.description ?? null);
+    source === 'merchant_manual' ? null : scrubFreeText(h?.description);
   const first = (status: string) => sorted.find(h => h.status === status);
 
   const picked = first('picked_up');

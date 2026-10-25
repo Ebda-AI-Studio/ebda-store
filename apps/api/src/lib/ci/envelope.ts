@@ -6,7 +6,7 @@
  * Adding a key to `data` is a minor change (add it here, optional); renaming or removing one is `v: 2`.
  */
 import { z } from 'zod';
-import { RETURN_REASON_CODES, RETURN_REASON_RAW_MAX } from './return-reason';
+import { RETURN_REASON_CODES, RETURN_REASON_RAW_MAX, asciiDigits } from './return-reason';
 
 export const CI_PRODUCTS = ['store', 'whatsapp', 'crm', 'erp'] as const;
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -177,7 +177,8 @@ const EMAIL_SHAPE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
  */
 export function assertNoPiiShapes(data: unknown, path = 'data'): void {
   if (typeof data === 'string') {
-    if (PHONE_SHAPE.test(data) || EMAIL_SHAPE.test(data)) {
+    const t = asciiDigits(data);
+    if (PHONE_SHAPE.test(t) || EMAIL_SHAPE.test(t)) {
       throw new Error(`CI envelope refused: ${path} looks like a phone number or email`);
     }
   } else if (Array.isArray(data)) {

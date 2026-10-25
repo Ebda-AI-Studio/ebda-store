@@ -265,8 +265,10 @@ type AccountErasedEvent = EventPayload & {
     /** The erased customer's store and hashed phone, for Ebda WhatsApp's `customer.erased`. */
     storeId?: string;
     buyerKey?: string;
-    /** Every buyer key to erase from Customer Intelligence (R2 `ebda-ci`): the account phone's and the orders'. */
+    /** Buyer keys of a phone the account PROVED it holds: erased from CI across every store. */
     ciBuyerKeys?: string[];
+    /** The account's own orders in its store (and the keys on them): the default CI erase scope. */
+    ciScope?: { storeId: string; orderIds: string[]; buyerKeys: string[] };
   };
 };
 

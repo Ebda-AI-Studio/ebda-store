@@ -180,13 +180,19 @@ describe('sink', () => {
     expect(idx).toHaveLength(2);
   });
 
-  it('the DLQ pages and acks', async () => {
-    const m = msg({ whatever: 1 });
+  it('the DLQ parks the body in R2 before acking, pages, and retries if it cannot park', async () => {
+    const m = msg({ whatever: 1 }, 'dead-1');
     await handleCiEventsBatch(batch([m], 'ebda-ci-events-dlq'), E());
+    expect(JSON.parse(await (await r2.get('dlq/dead-1.json'))!.text())).toEqual({ whatever: 1 });
     expect(h.alert).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'p1', source: 'ci.dead_letter' })
     );
     expect(m.ack).toHaveBeenCalled();
+    r2.failPut = true;
+    const m2 = msg({ x: 1 }, 'dead-2');
+    await handleCiEventsBatch(batch([m2], 'ebda-ci-events-dlq'), E());
+    expect(m2.retry).toHaveBeenCalled();
+    expect(m2.ack).not.toHaveBeenCalled();
   });
 
   it('alerts once when "other" is over 20% of a carrier\'s returns', async () => {

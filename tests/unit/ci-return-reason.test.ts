@@ -63,4 +63,11 @@ describe('scrubFreeText', () => {
     expect(scrubFreeText('   ')).toBeNull();
     expect(scrubFreeText(42)).toBeNull();
   });
+
+  it('masks Arabic-Indic and Persian digit phones and mixed-digit phones (Egypt)', () => {
+    expect(scrubFreeText('اتصل ٠١٠١٢٣٤٥٦٧٨ دلوقتي')).toBe('اتصل [phone] دلوقتي');
+    expect(scrubFreeText('call ۰۱۰۱۲۳۴۵۶۷۸ now')).toBe('call [phone] now');
+    expect(scrubFreeText('01٠1234٥678')).toBe('[phone]');
+    expect(scrubFreeText('+٢٠ ١٠٠ ١٢٣ ٤٥٦٧')).toBe('[phone]');
+  });
 });

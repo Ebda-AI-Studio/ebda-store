@@ -1975,10 +1975,12 @@ export class AuthService {
     const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
-    // Customer Intelligence: every buyer key the person's orders carry (an order may have been placed with
-    // another phone than the account's), collected BEFORE the scrub nulls them; the account/erased
-    // consumer erases those keys' CI rows from R2 (cf/erasure `ciSurface`).
-    let ciBuyerKeys: string[] = [];
+    // Customer Intelligence erase scope, collected BEFORE the scrub nulls the keys: the account's OWN orders in
+    // its store (and the keys on them) are always erased; a buyer-key-wide erase happens only for a phone the
+    // account proved it holds (`eraseProvenBuyerKey`, the WA-CONSENT-1 proof). A buyer key is a hash of a phone
+    // someone typed at checkout, so it never widens the scope on its own.
+    let ciScope: { storeId: string; orderIds: string[]; buyerKeys: string[] } | undefined;
+    let ciProvenKeys: string[] = [];
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
@@ -2013,13 +2015,16 @@ export class AuthService {
         ).map(o => o.id),
         email: user.email,
       });
-      ciBuyerKeys = (
-        await tx.order.findMany({
-          where: { customerId: userId, storeId: eraseStoreId, buyerKey: { not: null } },
-          select: { buyerKey: true },
-          distinct: ['buyerKey'],
-        })
-      ).flatMap(o => (o.buyerKey ? [o.buyerKey] : []));
+      const ownOrders = await tx.order.findMany({
+        where: { customerId: userId, storeId: eraseStoreId },
+        select: { id: true, buyerKey: true },
+      });
+      ciScope = {
+        storeId: eraseStoreId,
+        orderIds: ownOrders.map(o => o.id),
+        buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+      };
+      ciProvenKeys = eraseProvenBuyerKey ? [eraseProvenBuyerKey] : [];
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -2405,7 +2410,8 @@ export class AuthService {
           oneSignalPlayerIds,
           storeId: user.storeId ?? undefined,
           buyerKey,
-          ciBuyerKeys: [...new Set([...(buyerKey ? [buyerKey] : []), ...ciBuyerKeys])],
+          ciBuyerKeys: ciProvenKeys,
+          ciScope,
         },
       })
     ).catch(err =>
@@ -2603,10 +2609,16 @@ export class AuthService {
     );
 
     // Customer Intelligence: the commerce outcomes recorded under this person's buyer key(s), pseudonymous.
-    const customerIntelligence = await exportCiOutcomes([
-      ...orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
-      ...(provenKey ? [provenKey] : []),
-    ]);
+    const customerIntelligence = await exportCiOutcomes({
+      storeId,
+      orderIds: orders.map(o => o.id),
+      buyerKeys: [
+        ...new Set([
+          ...orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
+          ...(provenKey ? [provenKey] : []),
+        ]),
+      ],
+    });
 
     return {
       exportedAt: new Date().toISOString(),

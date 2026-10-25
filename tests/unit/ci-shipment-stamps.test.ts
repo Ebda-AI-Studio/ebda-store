@@ -104,4 +104,16 @@ describe('shipmentStamps', () => {
     );
     expect(r.data.returnReasonRaw).toBe('Customer refused, call [phone]');
   });
+
+  it("an attempt's reason in the Inngest-bound mark is already scrubbed (no raw carrier text leaves)", () => {
+    const r = shipmentStamps(
+      [E('failed', '12:00:00', 'Not available, call ٠١٠١٢٣٤٥٦٧٨ or 01001234567')],
+      fresh,
+      'carrier_webhook'
+    );
+    expect(r.marks[0]).toMatchObject({
+      kind: 'attempted',
+      reasonRaw: 'Not available, call [phone] or [phone]',
+    });
+  });
 });

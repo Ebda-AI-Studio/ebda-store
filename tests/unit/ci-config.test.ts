@@ -176,7 +176,14 @@ describe('wrangler.jsonc and the Worker entry', () => {
     expect(CI_RAW_RETENTION_DAYS).toBe(730);
     const sh = read('scripts/ops/ci-capture-setup.sh');
     expect(sh).toContain(`RETENTION_SECONDS=${CI_RAW_RETENTION_DAYS * 86400}`);
-    expect(sh).toContain('"prefix\\":\\"outcomes/\\"');
+    for (const rule of [
+      'expire-ci-raw-24m',
+      'expire-ci-index-24m',
+      'expire-ci-tombstone-30d',
+      'expire-ci-dlq-30d',
+    ])
+      expect(sh).toContain(rule);
+    expect(sh).toMatch(/"outcomes\/"[^\n]*63072000/);
     expect(sh).not.toMatch(/allow-public|r2\.dev/);
   });
 });

@@ -15,6 +15,12 @@ import type { MessageBatchLike } from '../../cf/queues';
 import { sendAlert } from '../../services/alerts.service';
 import logger from '../logger';
 import { CI_EVENTS_DLQ } from './config';
+import {
+  ciBuyerIndexKey,
+  ciBuyerTombstoneKey,
+  ciOrderTombstoneKey,
+  ciPartitionPrefix,
+} from './layout';
 import { deterministicEventId, parseEnvelope, type CiEnvelope } from './envelope';
 
 /** Same curve as cf/queues.ts retryDelaySeconds (not imported: that module pulls the database into this one). */
@@ -25,10 +31,7 @@ const INDEX_CAS_ATTEMPTS = 6;
 const OTHER_RATE_MIN_RETURNS = 10;
 const OTHER_RATE_THRESHOLD = 0.2;
 
-export const ciBuyerIndexKey = (buyerKey: string) =>
-  `index/buyer/${buyerKey.slice(0, 2)}/${buyerKey}.json`;
-export const ciPartitionPrefix = (storeId: string, day: string) =>
-  `outcomes/v1/store=${storeId}/dt=${day}/`;
+export { ciBuyerIndexKey, ciPartitionPrefix };
 export const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 async function gzip(text: string): Promise<Uint8Array> {
@@ -153,14 +156,26 @@ export async function handleCiEventsBatch(
   env: Pick<CfBindings, 'CI_BUCKET' | 'CI_OUTCOMES' | 'KV_CACHE'> | undefined = cfBindings()
 ): Promise<void> {
   if (batch.queue === CI_EVENTS_DLQ) {
+    const bucket = env?.CI_BUCKET as R2BucketCasLike | undefined;
     for (const msg of batch.messages) {
+      // Acking a DLQ message deletes it, so the body is parked in R2 first (`dlq/`, expires after 30 days;
+      // it holds at most the pseudonymous envelope) and the message is only acked once that write landed.
+      if (bucket) {
+        try {
+          await bucket.put(`dlq/${msg.id}.json`, JSON.stringify(msg.body));
+        } catch (err) {
+          logger.error({ err, id: msg.id }, '[ci] could not park a dead-lettered event, retrying');
+          msg.retry({ delaySeconds: retryDelaySeconds(msg.attempts) });
+          continue;
+        }
+      }
       logger.error({ id: msg.id }, '[ci] dead-lettered outcome event (not captured)');
       await sendAlert({
         level: 'p1',
         scope: 'platform',
         source: 'ci.dead_letter',
         title: 'A Customer Intelligence outcome could not be captured',
-        body: `Message ${msg.id} on the CI events queue exhausted its retries. Capture is unrecoverable data: replay it from the DLQ after fixing the cause.`,
+        body: `Message ${msg.id} on the CI events queue exhausted its retries. Capture is unrecoverable data: the body is parked in R2 ebda-ci under dlq/ (30 days); replay it after fixing the cause.`,
       }).catch(() => undefined);
       msg.ack();
     }
@@ -181,6 +196,13 @@ export async function handleCiEventsBatch(
       msg.retry({ delaySeconds: retryDelaySeconds(msg.attempts) });
       continue;
     }
+    // Erased since this event was queued (retry / DLQ replay): an erased order's event is dropped, an
+    // erased buyer's key is removed (the outcome stays, anonymous).
+    if (await ci.get(ciOrderTombstoneKey(e.orderId))) {
+      msg.ack();
+      continue;
+    }
+    if (e.buyerKey && (await ci.get(ciBuyerTombstoneKey(e.buyerKey)))) e = { ...e, buyerKey: null };
     if (kv && (await kv.get(`ci-seen:${e.eventId}`).catch(() => null))) {
       msg.ack();
       continue;
