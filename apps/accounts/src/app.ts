@@ -56,6 +56,19 @@ function audOf(env: Env, raw: string | undefined | null): string {
   return aud;
 }
 
+/**
+ * A browser origin may only request tokens for the product it belongs to (ORIGIN_PRODUCTS). Requests with no Origin header
+ * (server-side) are not browser-bound and keep the cookie/CSRF rules unchanged.
+ */
+function originAudience(c: C, aud: string): void {
+  const origin = c.req.header('origin');
+  if (!origin) return;
+  const mapped = csv(c.env.ORIGIN_PRODUCTS)
+    .map(p => p.split('='))
+    .find(([o]) => o === origin)?.[1];
+  if (!mapped || mapped !== aud) throw err(403, 'ORIGIN_AUDIENCE_MISMATCH');
+}
+
 const cookieValue = (c: C): string => {
   const h = c.req.header('cookie') ?? '';
   for (const part of h.split(';')) {
@@ -676,6 +689,7 @@ export function createApp() {
   app.post('/login', async c => {
     const body = await json(c, loginBody);
     const aud = audOf(c.env, body.aud);
+    originAudience(c, aud);
     const ip = clientIp(c);
     // Counted BEFORE the password is checked (see throttle.ts): a parallel burst cannot out-run the budget.
     const attempt = await hit(c.env.DB, body.email, ip, LOGIN);
@@ -800,6 +814,7 @@ export function createApp() {
 
   app.get('/token', async c => {
     const aud = audOf(c.env, c.req.query('aud'));
+    originAudience(c, aud);
     const r = await cookieSession(c);
     return c.json({
       success: true,
@@ -809,6 +824,7 @@ export function createApp() {
 
   app.post('/refresh', async c => {
     const aud = audOf(c.env, c.req.query('aud'));
+    originAudience(c, aud);
     const r = await cookieSession(c, true);
     return c.json({
       success: true,
@@ -1090,6 +1106,7 @@ export function createApp() {
   app.post('/passkey/login/verify', async c => {
     const body = await json(c, z.object({ response: z.any(), aud: z.string().optional() }));
     const aud = audOf(c.env, body.aud);
+    originAudience(c, aud);
     const ip = clientIp(c);
     // per client: a global key would let anyone lock every passkey sign-in
     const attempt = await hit(c.env.DB, ip, ip, { ...LOGIN, name: 'passkey' });

@@ -41,6 +41,8 @@ declare global {
       PASSKEY_ORIGINS: string;
       /** Comma list of valid `aud` values. */
       PRODUCTS: string;
+      /** `origin=product` pairs: the only audience a browser origin may request. */
+      ORIGIN_PRODUCTS: string;
       /** AES-256-GCM key (base64) for TOTP secrets at rest (wrangler secret). */
       MFA_KEY?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;

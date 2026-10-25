@@ -54,4 +54,44 @@ describe('wa.ebda.app origin', () => {
     });
     expect(r.status).toBe(403);
   });
+
+  it('LEAST PRIVILEGE: wa.ebda.app can only get whatsapp tokens, never store (or super-admin) ones', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    for (const path of ['/token?aud=store', '/refresh?aud=store']) {
+      const r = await call(path, {
+        method: path.startsWith('/refresh') ? 'POST' : 'GET',
+        cookie: s.cookie,
+        headers: { origin: WA },
+      });
+      expect(r.status).toBe(403);
+      expect(((await r.json()) as { error: { code: string } }).error.code).toBe(
+        'ORIGIN_AUDIENCE_MISMATCH'
+      );
+    }
+    const login403 = await call('/login', {
+      json: { email: u.email, password: u.password, aud: 'store' },
+      headers: { origin: WA },
+    });
+    expect(login403.status).toBe(403);
+  });
+
+  it('store.ebda.app and orders.ebda.app get store tokens and not whatsapp ones', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    for (const origin of ['https://store.ebda.app', 'https://orders.ebda.app']) {
+      expect(
+        (await call('/token?aud=store', { cookie: s.cookie, headers: { origin } })).status
+      ).toBe(200);
+      expect(
+        (await call('/token?aud=whatsapp', { cookie: s.cookie, headers: { origin } })).status
+      ).toBe(403);
+    }
+  });
+
+  it('a request with no Origin header (server side) is not bound to an audience by this rule', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    expect((await call('/token?aud=whatsapp', { cookie: s.cookie })).status).toBe(200);
+  });
 });

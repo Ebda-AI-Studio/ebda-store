@@ -72,6 +72,7 @@ import {
   excelMoneyFormat,
   updatePlanSchema,
   assignSubscriptionSchema,
+  isReservedSlug,
 } from '@ebda/shared';
 import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
@@ -158,6 +159,8 @@ const updateStoreAdminSchema = z.object({
     .string()
     .regex(/^[a-z0-9-]+$/)
     .max(100)
+    // A platform host (`accounts`, `wa`, `api`...) must never become a merchant store, even by a super admin's slip.
+    .refine(s => !isReservedSlug(s), 'This slug is reserved for a platform host')
     .optional(),
   plan: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
   status: z.enum(['active', 'suspended']).optional(),

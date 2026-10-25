@@ -268,6 +268,19 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 
 - **Allowed browser origins** (`ALLOWED_ORIGINS`, exact match, https, no wildcard): `store.ebda.app`, `orders.ebda.app`, `wa.ebda.app` (Ebda WhatsApp, product audience `whatsapp`). `PASSKEY_ORIGINS` stays the Store hosts only.
 
+### Cutover order (Ruling ID-16): the identity service goes live BEFORE the Store stops accepting its own logins
+
+Merging the stage-3 PR deploys ebda-api (legacy login, refresh and session issue are CLOSED for every merchant/staff/admin account), admin and orders (they sign in only at accounts.ebda.app). They deploy in parallel and nothing orders them, so the identity service, its secrets and the migrated accounts must already exist:
+
+1. Deploy `ebda-accounts` (`apps/accounts`; the `accounts.ebda.app/*` ZONE route is required beside the custom domain, because zone routes run before custom domains and the storefront wildcard would otherwise answer the host).
+2. `wrangler secret put JWT_PRIVATE_JWK` and `MFA_KEY` for `ebda-accounts` (never in a file, never through an agent's chat).
+3. `wrangler d1 migrations apply ebda-identity --remote` (0001 identity, 0002 enrolment tokens).
+4. `node apps/accounts/scripts/migrate-from-pg.mjs --apply --remote` (read-only Postgres export; refuses users with MFA; verifies row counts and a checksum).
+5. Verify live: `/health`, `/.well-known/jwks.json`, one real login and token.
+6. ONLY THEN merge the PR. Every merchant re-logs in once (refresh rows are copied but can never match, Ruling ID-5).
+
+Each browser origin may only request ITS product audience (`ORIGIN_PRODUCTS`): store and orders get `store` tokens, `wa.ebda.app` only `whatsapp`.
+
 ### Platform administrators (Ruling ID-15)
 
 - **Create or promote one (you run it, you type the password):** `cd apps/accounts && CLOUDFLARE_ACCOUNT_ID=69188202efc4df480140dd76545aa3ab node scripts/upsert-super-admin.mjs --email=you@example.com --remote` shows the plan (dry run is the default and writes nothing); add `--apply` to be asked for the password twice at a hidden prompt (14+ characters, all four classes). The script refuses a `--password` argument and refuses to run `--apply` without a terminal, so the password never passes through an agent, a pipe or shell history. Only a bcrypt hash is written, through a 0600 temp file that is deleted afterwards. Idempotent: running it again re-sets the password and ends the account's sessions.
