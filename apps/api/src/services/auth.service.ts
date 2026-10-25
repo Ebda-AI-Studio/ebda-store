@@ -43,6 +43,7 @@ import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
 import { exportCiOutcomes } from '../lib/ci/export';
+import { ciSinceDay } from '../lib/ci/layout';
 import {
   WhatsAppConsentService,
   lockAccountConsent,
@@ -2025,12 +2026,8 @@ export class AuthService {
         storeId: eraseStoreId,
         orderIds: ownOrders.map(o => o.id),
         buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
-        // The prefix pass starts at the day of the account's first order (partitions are by arrival day, never earlier).
-        sinceDay: ownOrders.length
-          ? new Date(Math.min(...ownOrders.map(o => o.createdAt.getTime())))
-              .toISOString()
-              .slice(0, 10)
-          : undefined,
+        // The prefix pass starts at the sink's partition day of the first order minus a margin (lib/ci/layout.ts).
+        sinceDay: ciSinceDay(ownOrders.map(o => o.createdAt)),
       };
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }

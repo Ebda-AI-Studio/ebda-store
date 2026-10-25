@@ -14,3 +14,16 @@ export const CI_DLQ_DAYS = 14;
 /** Retry (<1 h) + a manual DLQ replay window, with margin. */
 export const CI_TOMBSTONE_DAYS = 30;
 export const ciStorePartitionsPrefix = (storeId: string) => `outcomes/v1/store=${storeId}/`;
+
+/** Days of margin below the first order's date for the prefix pass (clock skew, late events, Cairo vs UTC dates). */
+export const CI_SINCE_MARGIN_DAYS = 2;
+
+/**
+ * Lower bound (UTC `YYYY-MM-DD`, the same clock and zone the sink partitions by: `utcDay(recordedAt)`) for
+ * the erase's prefix pass: the earliest order date minus a safety margin. Undefined = no bound.
+ */
+export function ciSinceDay(orderDates: Date[]): string | undefined {
+  if (orderDates.length === 0) return undefined;
+  const min = Math.min(...orderDates.map(d => d.getTime()));
+  return new Date(min - CI_SINCE_MARGIN_DAYS * 86_400_000).toISOString().slice(0, 10);
+}

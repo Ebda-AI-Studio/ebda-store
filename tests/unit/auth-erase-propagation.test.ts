@@ -243,7 +243,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
       storeId: CUSTOMER.storeId,
       orderIds: ['o1', 'o2', 'o3'],
       buyerKeys: ['k1'],
-      sinceDay: '2026-11-01',
+      sinceDay: '2026-10-30', // first order 2026-11-01 minus the 2-day margin
     });
     expect(data.ciProven).toBeUndefined(); // no proven phone: no buyer-key erase
     expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(

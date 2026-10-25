@@ -15,6 +15,7 @@ import {
   ciBuyerTombstoneKey,
   ciDlqKey,
 } from '../../apps/api/src/lib/ci/layout';
+import { ciSinceDay } from '../../apps/api/src/lib/ci/layout';
 import { replayCiDlq } from '../../apps/api/src/lib/ci/replay';
 import { handleCiEventsBatch } from '../../apps/api/src/lib/ci/sink';
 import { buildEnvelope } from '../../apps/api/src/lib/ci/port';
@@ -401,5 +402,34 @@ describe('dead letter of an erased order', () => {
     );
     expect(acked).toEqual(['d1']);
     expect(r2.keys('dlq/')).toHaveLength(0);
+  });
+});
+
+describe('the prefix pass lower bound', () => {
+  it('is the first order date minus a 2-day margin, so an event stored a day BEFORE the order date is still erased', async () => {
+    expect(ciSinceDay([new Date('2026-11-03T22:30:00Z'), new Date('2026-11-05T01:00:00Z')])).toBe(
+      '2026-11-01'
+    );
+    expect(ciSinceDay([])).toBeUndefined();
+    const { ciErasureSecondPass } =
+      await import('../../apps/api/src/lib/inngest/functions/ci-erasure-second-pass');
+    const r2 = new FakeR2();
+    const dayBefore = `outcomes/v1/store=${S1}/dt=2026-11-02/B.ndjson.gz`; // the order was created on 2026-11-03
+    const tooOld = `outcomes/v1/store=${S1}/dt=2026-10-30/OLD.ndjson.gz`;
+    await r2.put(dayBefore, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n'));
+    await r2.put(tooOld, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n'));
+    setCfBindings({ HYPERDRIVE: { connectionString: '' }, CI_BUCKET: r2 as never });
+    const step = {
+      sleep: async () => undefined,
+      run: async <T>(_id: string, fn: () => Promise<T>) => fn(),
+    };
+    const since = ciSinceDay([new Date('2026-11-03T22:30:00Z')]);
+    await ciErasureSecondPass(
+      { data: { userId: 'u', ciScope: { ...scope, sinceDay: since } } },
+      step
+    );
+    clearCfBindings();
+    expect(await r2.get(dayBefore)).toBeNull(); // erased
+    expect(await r2.get(tooOld)).not.toBeNull(); // before the bound: never read
   });
 });
