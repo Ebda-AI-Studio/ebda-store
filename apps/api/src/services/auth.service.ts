@@ -1939,6 +1939,14 @@ export class AuthService {
     // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
     // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
     const buyerKey = await buyerKeyForErasure(user.phone);
+    // The consent row of the CURRENT number is erased only when that number is proven the account's
+    // (a delivered order); rows the account itself bound are erased by `userId` regardless.
+    const eraseProvenBuyerKey =
+      buyerKey &&
+      user.phone &&
+      (await phoneOnOwnOrder(user.storeId ?? currentStoreId(), userId, user.phone))
+        ? buyerKey
+        : undefined;
 
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
@@ -2229,7 +2237,7 @@ export class AuthService {
         tx,
         opts.scopeStoreId ?? eraseStoreId,
         userId,
-        buyerKey
+        eraseProvenBuyerKey
       );
 
       // Finally rewrite the user row itself. Password hash is regenerated

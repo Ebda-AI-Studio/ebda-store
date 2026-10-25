@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   orders: [] as Row[],
   consents: [] as Row[],
   upsert: vi.fn(),
+  find: vi.fn(),
   updateMany: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
@@ -38,7 +39,7 @@ vi.mock('@ebda/database', () => ({
         hit.forEach(r => h.consents.splice(h.consents.indexOf(r), 1));
         return { count: hit.length };
       },
-      findUnique: async () => ({ granted: true }),
+      findUnique: (a: any) => h.find(a),
     },
   },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
@@ -65,6 +66,7 @@ beforeEach(() => {
     status: 'delivered',
     shippingAddress: { phone: '01112345678' },
   });
+  h.find.mockReset().mockResolvedValue({ granted: true, userId: null });
   h.consents.length = 0;
   h.carts.length = 0;
   h.users.length = 0;

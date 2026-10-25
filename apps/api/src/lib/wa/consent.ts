@@ -14,8 +14,10 @@ export type ConsentSource = 'checkout' | 'cart' | 'admin' | 'whatsapp';
 
 export interface ConsentInput {
   consent: boolean;
-  /** The account behind the write (null/absent for a STOP or an admin action on a bare number). */
+  /** The account making the write (absent for a STOP or an admin action on a bare number). Never binds. */
   userId?: string;
+  /** Set ONLY on a PROVEN grant: the account becomes the row's owner (export/erasure scope). */
+  bindUserId?: string;
   source: ConsentSource;
   locale?: 'en' | 'ar';
 }
@@ -75,13 +77,23 @@ export const WhatsAppConsentService = {
     const now = new Date();
     // ONE writer per outcome; every write is seen by the database observer (consent-state.ts), which
     // tells Ebda WhatsApp (customer.consent_changed), so no path can change consent unannounced.
-    await runInTenantContext(storeId, () =>
-      prisma.storeWhatsAppConsent.upsert({
+    await runInTenantContext(storeId, async () => {
+      // Ownership (`userId`) is set ONLY by a PROVEN grant (`bindUserId`). A revoke, a STOP or an admin
+      // write never sets it; a write from a DIFFERENT account clears a stale owner instead of taking
+      // it over, so nobody can claim (and then export or erase) a row they did not prove.
+      const existing = await prisma.storeWhatsAppConsent.findUnique({
+        where: { storeId_buyerKey: { storeId, buyerKey } },
+        select: { userId: true },
+      });
+      let owner: string | null | undefined; // undefined = leave as is
+      if (input.bindUserId) owner = input.bindUserId;
+      else if (input.userId && existing?.userId && existing.userId !== input.userId) owner = null;
+      await prisma.storeWhatsAppConsent.upsert({
         where: { storeId_buyerKey: { storeId, buyerKey } },
         create: {
           storeId,
           buyerKey,
-          userId: input.userId ?? null,
+          userId: input.bindUserId ?? null,
           ...(input.consent
             ? {
                 granted: true,
@@ -92,7 +104,7 @@ export const WhatsAppConsentService = {
             : { granted: false, revokedAt: now, revokedSource: input.source }),
         },
         update: {
-          ...(input.userId ? { userId: input.userId } : {}),
+          ...(owner !== undefined ? { userId: owner } : {}),
           ...(input.consent
             ? {
                 granted: true,
@@ -104,8 +116,8 @@ export const WhatsAppConsentService = {
               }
             : { granted: false, revokedAt: now, revokedSource: input.source }),
         },
-      })
-    );
+      });
+    });
     return { granted: input.consent };
   },
 
@@ -145,6 +157,7 @@ export const WhatsAppConsentService = {
       source: 'checkout',
       locale: input.locale,
       userId,
+      ...(input.consent ? { bindUserId: userId } : {}),
     });
     if (!r) return { status: 'no_phone' };
     return { status: 'recorded', granted: r.granted, cartId: cart?.id ?? 'none' };
@@ -190,12 +203,25 @@ export const WhatsAppConsentService = {
     userId: string,
     buyerKey?: string
   ): Promise<number> {
+    // Scope: rows THIS account proved (userId set by a proven grant) plus the row of its CURRENT
+    // PROVEN number (`buyerKey` must be passed only when proven). A STOP-sourced opt-out on an older
+    // number is KEPT (owner cleared): an opt-out must survive for that number's real owner, and
+    // losing it could re-enable messages.
     const rows = await tx.storeWhatsAppConsent.findMany({
       where: { storeId, OR: [{ userId }, ...(buyerKey ? [{ buyerKey }] : [])] },
-      select: { buyerKey: true },
+      select: { buyerKey: true, granted: true, revokedSource: true },
     });
     for (const r of rows) {
-      await tx.storeWhatsAppConsent.deleteMany({ where: { storeId, buyerKey: r.buyerKey } });
+      const keepOptOut =
+        r.buyerKey !== buyerKey && r.granted === false && r.revokedSource === 'whatsapp';
+      if (keepOptOut) {
+        await tx.storeWhatsAppConsent.updateMany({
+          where: { storeId, buyerKey: r.buyerKey },
+          data: { userId: null },
+        });
+      } else {
+        await tx.storeWhatsAppConsent.deleteMany({ where: { storeId, buyerKey: r.buyerKey } });
+      }
     }
     return rows.length;
   },
