@@ -19,8 +19,7 @@
  * open for the FULL request, which is harmful for routers that:
  *   (a) already call `runInTenantContext` / `withRlsBypass` per-query
  *       internally (double-nests a second transaction / DB connection), or
- *   (b) do external I/O in-request (Gemini, courier APIs, Resend, WBS
- *       fetch) that can now blow the 30s tx timeout, or
+ *   (b) do external I/O in-request (Gemini, courier APIs, Resend) that can now blow the 30s tx timeout, or
  *   (c) do fire-and-forget work that outlives the response (the tx
  *       settles as soon as the handler is done — since 2026-09-08 that is
  *       BEFORE the response is flushed, see
@@ -135,8 +134,7 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
 
   // No router in the current kept-set uses the legacy ':id' param name or
   // needs BOTH ':id' and ':storeId' registered — every survivor above uses
-  // ':storeId' only. (wbs-integration/bot-analytics/store used ':id';
-  // feature.routes.ts used both — all four were REVERTED, see below.)
+  // ':storeId' only. (store used ':id'; feature.routes.ts used both — both were REVERTED, see below.)
 
   it.each(storeIdFixedFiles)('%s registers router.param(storeId, tenantContext)', file => {
     const source = readFileSync(path.join(ROUTES_DIR, file), 'utf-8');
@@ -156,14 +154,13 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
   // had `router.param(...)` wrapping added in Phase 1a, then reverted
   // because they either (a) already call runInTenantContext/withRlsBypass
   // per-query internally (double-nesting risk), (b) do external I/O
-  // in-request (Gemini, courier APIs, Resend, WBS fetch, SMS provider),
+  // in-request (Gemini, courier APIs, Resend, SMS provider),
   // or (c) do fire-and-forget work that can outlive the request tx. They
   // are CONTEXT-LESS today (same as before PR #499 — fail-open under the
   // current BYPASSRLS role) and are Phase 2 candidates: see the per-mount
   // comment in routes/index.ts for the specific reason each one is here.
   const phase2ContextLessFiles = [
     'insights.routes.ts', // (b) Gemini generateInsightNarration in-request
-    'wbs-integration.routes.ts', // (b) external fetch to WBS in-request
     'finance.routes.ts', // (a) accounting services self-manage context per-query
     'backorders.routes.ts', // (a) same
     'expenses.routes.ts', // (a) same
@@ -177,7 +174,6 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
     'notification.routes.ts', // (a)+(b) notificationConfigService.readFromDb withRlsBypass + testConnection external SMS API
     'store.routes.ts', // (b) domain provisioning calls Vercel/Cloudflare/Resend APIs in-request
     'newsletter.routes.ts', // (b) chunked loop of ResendService.sendBrandedEmail calls in-request
-    'bot-analytics.routes.ts', // (b) external fetch to WBS backend (10s timeout) in-request
   ];
 
   it.each(phase2ContextLessFiles)(
@@ -210,6 +206,6 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
     // mount) because it reuses ':id' for unrelated cross-tenant entities.
     expect(
       storeIdFixedFiles.length + phase2ContextLessFiles.length + scopedByOwnContextFiles.length
-    ).toBe(30);
+    ).toBe(28);
   });
 });

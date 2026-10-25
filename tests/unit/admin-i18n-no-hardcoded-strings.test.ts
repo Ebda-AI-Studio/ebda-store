@@ -93,13 +93,11 @@ const B2_FILES = [
   'app/stores/[id]/products/[productId]/edit/_components/ProductFaqSection.tsx',
   'app/stores/[id]/orders/[orderId]/_components/RefundButton.tsx',
   'lib/auth.tsx',
-  'components/whatsapp/BotCopyTab.tsx',
   'components/payment-events/PaymentEventsTimeline.tsx',
   'components/ColorField.tsx',
   'app/stores/[id]/customers/page.tsx',
   'app/stores/[id]/categories/CategoryForm.tsx',
   'app/answer-engine-providers/page.tsx',
-  'components/whatsapp/PaymentLinkTab.tsx',
   'components/mobile/BottomSheet.tsx',
   'components/admin-layout/SidebarHeader.tsx',
   'components/SectionPreview.tsx',
@@ -109,8 +107,6 @@ const B2_FILES = [
   'app/stores/[id]/bulk/_components/BulkExportPanel.tsx',
   'app/stores/[id]/affiliates/[affiliateId]/audit-trail/page.tsx',
   'app/account/security/page.tsx',
-  'components/whatsapp/TemplatesTab.tsx',
-  'components/whatsapp/ConnectionTab.tsx',
   'components/admin-layout/HubTabs.tsx',
   'components/SmartPaletteModal.tsx',
   'components/NavMenuEditor.tsx',
@@ -138,7 +134,7 @@ const B2_FILES = [
   // orders/[orderId]/ItemsCard, page-builder, stores/[id]/page,
   // ProductFaqSection, AreaRateEditor, stock/suppliers/new, StepIndicator,
   // FooterLinksEditor, ImageUpload, NavMenuEditor, PaymentEventsTimeline,
-  // whatsapp/PaymentLinkTab, lib/auth.tsx) were already covered by part 1
+  // lib/auth.tsx) were already covered by part 1
   // above and are NOT repeated here — their remaining hits were either
   // fixed in place or are pre-existing allowlisted exceptions.
   'app/ai-usage/page.tsx',
@@ -282,10 +278,10 @@ describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)',
 });
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
-  it('lists exactly the 94 files this guard covers', () => {
+  it('lists exactly the 90 files this guard covers', () => {
     // 81 + 9 visual builder files + the 3D model card + 3 policy-change notify files
-    expect(B2_FILES.length).toBe(94);
-    expect(new Set(B2_FILES).size).toBe(94); // no duplicates
+    expect(B2_FILES.length).toBe(90);
+    expect(new Set(B2_FILES).size).toBe(90); // no duplicates
   });
 
   it.each(B2_FILES)('%s has no un-allowlisted hardcoded strings', relativePath => {

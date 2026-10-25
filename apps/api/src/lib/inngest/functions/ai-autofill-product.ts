@@ -47,9 +47,8 @@ import { inngest } from '../client';
  * It used to run the whole fill inside ONE 30 s `runInTenantContext` transaction: a slow or
  * failing-over Gemini rolled back every write AND every usage row, and each retry re-billed.
  *
- * Multiple functions may listen to product.upserted (e.g. product-meta-sync
- * for the Meta Catalog bot) — Inngest runs all registered listeners in
- * parallel.
+ * Multiple functions may listen to product.upserted — Inngest runs all
+ * registered listeners in parallel.
  */
 interface AutofillEvent {
   data: {

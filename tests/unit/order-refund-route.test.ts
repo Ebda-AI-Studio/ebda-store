@@ -2,7 +2,7 @@
  * Route-level tests for POST /:orderId/refund-via-provider (money-integrity
  * Task 5). Boots a minimal Express app mounting only order.routes with every
  * auth/db/provider dependency mocked, then drives the route via supertest —
- * matching the app-bootstrap pattern in tests/unit/contract-wbs-bridge.test.ts.
+ * using the same minimal app-bootstrap pattern as the other route tests.
  *
  * Contract under test: any failure surfacing out of `PaymentService.refund`
  * (whatever the internal cause — provider call, DB flip, or the

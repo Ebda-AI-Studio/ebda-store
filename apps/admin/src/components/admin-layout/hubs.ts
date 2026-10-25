@@ -71,9 +71,6 @@ export type HubLabels = {
   // Marketing tabs
   aiTools: string;
   aiUsage: string;
-  whatsapp: string;
-  whatsappTemplates: string;
-  whatsappPaymentLink: string;
   marketingPixels: string;
   notifications: string;
   newsletter: string;
@@ -256,11 +253,6 @@ export const HUBS: HubDefinition[] = [
       '/agent-key',
       '/merchant-keys',
       '/webhooks',
-      '/whatsapp',
-      '/wa-bot',
-      '/wa-templates',
-      '/wa-order-updates',
-      '/payment-link',
       '/branding',
       '/seo',
       '/domain',

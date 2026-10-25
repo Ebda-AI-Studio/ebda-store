@@ -30,7 +30,6 @@ import webhookRoutes from './routes/webhook.routes';
 import billingWebhookRoutes from './routes/billing-webhook.routes';
 import { assertBillingConfigAtBoot } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
-import waBridgeRoutes from './routes/wa-bridge.routes';
 import { setupSwagger } from './docs/swagger';
 import { prisma, setDbHopObserver } from '@ebda/database';
 import { lookupStore } from './lib/definer';
@@ -400,12 +399,6 @@ app.use(express.urlencoded({ extended: true }));
 // out to the same Telegram chat via the internal alerts.service.
 // Protected by ALERTS_WEBHOOK_TOKEN env var (querystring or header).
 app.use('/api/v1/alerts/webhooks', alertWebhookRoutes);
-
-// Phase 6 (Option C) — WBS WhatsApp customer-DM ordering bridge inbound.
-// Mounted BEFORE CSRF because the caller is WBS (a server, not a
-// browser), authenticated via X-WBS-API-KEY header against the store's
-// encrypted wbsApiKey. See apps/api/src/middleware/wa-bridge-auth.ts.
-app.use('/api/v1/wa-bridge', express.json({ limit: '256kb' }), waBridgeRoutes);
 
 // Inngest serve handler. Mounted before auth/CSRF because Inngest's
 // platform calls this endpoint with its own request signature

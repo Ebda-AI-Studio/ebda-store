@@ -2597,19 +2597,11 @@ export class OrderService {
     // event is sent after COMMIT and swept if dropped, Ruling AP-2) and the
     // real-time socket ping (below — fast in-process) stay inline.
     if (status === 'delivered') {
-      // Existing event kept: 7-day review-request job + WBS delivered notify.
+      // Existing event kept: 7-day review-request job.
       inngest
         .send({ name: 'order/delivered', data: { orderId, storeId } })
         .catch((err: unknown) =>
           logger.error({ err, orderId }, 'Failed to enqueue order/delivered event')
-        );
-    }
-    if (status === 'shipped') {
-      // Existing event kept: WBS shipping notification.
-      inngest
-        .send({ name: 'order/shipped', data: { orderId, storeId } })
-        .catch((err: unknown) =>
-          logger.error({ err, orderId }, 'Failed to enqueue order/shipped event')
         );
     }
     inngest

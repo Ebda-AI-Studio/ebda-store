@@ -1,7 +1,7 @@
 /**
  * #1737 (S2-tenancy-rls, 2026-09-25): `merchantMcpLimiterKey`'s unauthenticated
  * branch returned `mmcp-ip:${req.ip}` raw — unlike every other custom
- * `keyGenerator` in this repo (security.ts, wa-bridge.routes.ts), which all
+ * `keyGenerator` in this repo (security.ts), which all
  * run the IP through `ipKeyGenerator()` first. `express-rate-limit` normalizes
  * IPv6 to its /64 prefix there; skipping it here meant an IPv6 attacker could
  * rotate the low 64 bits of their address to land in a fresh bucket on every

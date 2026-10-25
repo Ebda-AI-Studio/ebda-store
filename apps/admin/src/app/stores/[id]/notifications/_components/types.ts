@@ -3,8 +3,8 @@
  * so the page.tsx and its subcomponents import from the same module, avoiding
  * duplicate type declarations.
  *
- * WhatsApp is intentionally NOT a channel here — it flows through the Force
- * Store ↔ WBS bridge, configured at /stores/:id/integrations/wbs.
+ * WhatsApp is intentionally NOT a channel here (it is the separate Ebda
+ * WhatsApp product).
  */
 
 export interface ChannelConfig {

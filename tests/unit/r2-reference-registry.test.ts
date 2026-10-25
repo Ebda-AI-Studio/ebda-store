@@ -149,7 +149,15 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'Supplier.address': 'postal address',
   'Expense.ocrJson': 'OCR text extracted from the receipt (the file itself is receiptImageUrl)',
   'GscDailyMetric.topQueries': 'Search Console query stats',
-  'WhatsAppTemplate.body': 'Meta template body text; header media rides Store.wbsTemplates',
+  // WA-LEGACY-1: columns of the deleted WhatsApp bridge, kept only until the drop migration ships.
+  // Nothing reads or writes them any more. The migration PR removes these four lines.
+  'Store.wbsTemplates':
+    'legacy bridge column, no reader or writer, dropped by the follow-up migration',
+  'Store.botCopy': 'legacy bridge column, no reader or writer, dropped by the follow-up migration',
+  'Store.botServiceMenu':
+    'legacy bridge column, no reader or writer, dropped by the follow-up migration',
+  'WhatsAppTemplate.body':
+    'legacy bridge table, no reader or writer, dropped by the follow-up migration',
   'BankStatement.fileName': 'original upload filename only; the statement is parsed, not stored',
   'AnswerEngineCheck.citedUrls': 'third-party URLs an AI answer engine cited',
   'AnswerEngineCheck.competitorUrls': 'third-party competitor URLs',

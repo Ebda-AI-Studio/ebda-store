@@ -316,59 +316,12 @@ they bypass any client-side sanitization and render as stored XSS on the storefr
 
 ---
 
-## Cross-service tenant isolation: Ebda Store ↔ WBS bridge
+## Cross-service tenant isolation: Ebda Store and Ebda WhatsApp
 
-The Ebda AI Studio WhatsApp Business Platform (WBS) calls Ebda Store's `/api/v1/wa-bridge/*`
-endpoints to read catalog data, enumerate abandoned carts, toggle DM ordering,
-and proxy bot analytics. Every one of these endpoints must be scoped to a single
-Ebda Store tenant. This section documents how that scoping is enforced.
-
-**Feature gate (Ruling WHATSAPP-OFF-1, 2026-10-14).** The WhatsApp Business API
-integration is flagged OFF for every store. After the bridge key resolves the
-tenant, `waBridgeAuth` also requires the store's `whatsapp` feature to resolve ON
-(`middleware/wa-feature-gate.ts`, fail closed) and answers
-`403 { code: 'FEATURE_DISABLED', feature: 'whatsapp' }` otherwise; the key-less
-`POST /wa-bridge/cart/redeem` makes the same check after verifying its signed
-token. A super-admin `StoreFeature` `whatsapp` override re-enables one store.
-
-### The contract
-
-1. **Authentication is API-key based, not JWT-based.** WBS passes a per-store key
-   in the `x-wbs-api-key` request header. The bridge middleware resolves the key
-   to a `storeId` by looking it up in `wa_ordering_settings.encryptedFwbApiKey`.
-   This is the ONLY mechanism for establishing tenant scope on bridge endpoints.
-
-2. **Tenant scope is never passed as a query parameter or request body field.**
-   Even though some bridge endpoints accept a `storeId` in the request body (e.g.
-   abandoned-cart enumeration passes `clientId`), the Ebda Store endpoint does
-   NOT trust that value for scoping. The `storeId` is always derived from the
-   resolved API key. A WBS caller that passes a different `storeId` in the body
-   gets back data for the store the key belongs to, not the spoofed one.
-
-3. **WBS enforces symmetric scoping.** Every `/external/*` endpoint in WBS
-   also resolves the calling client from the `x-wbs-api-key` before touching
-   any data. The `CLIENT_SAFE_SELECT` projection ensures the response never
-   includes credentials or another client's data regardless of what the API
-   key resolves to.
-
-4. **No trust across service boundaries for query params.** Neither service
-   trusts `storeId` / `clientId` values in query strings on cross-service calls.
-   The binding is always key → tenant, enforced at the middleware layer.
-
-### Why this matters
-
-WBS is a multi-tenant platform. Each WBS client has one business WhatsApp number
-and may be connected to one Ebda Store. If tenant scoping were based on a
-caller-supplied `storeId`, a WBS client who knew another merchant's Ebda Store
-UUID could enumerate their products, read their abandoned carts, or toggle their
-DM ordering feature. The API-key → storeId resolution prevents this at the entry
-point before any handler code runs.
-
-### Where this lives
-
-- `apps/api/src/routes/wa-bridge.routes.ts` — bridge routes + key resolution
-  middleware (`requireWbsApiKey`, which resolves `storeId` from `x-wbs-api-key`)
-- `apps/api/src/services/wbs-bridge.service.ts` — bridge service calls
-- `backend/src/routes/external.js` in WBS — `CLIENT_SAFE_SELECT` + key lookup
-- `backend/src/middleware/clientScope.js` in WBS — client-scope middleware used
-  on all `/external/*` and `/api/v1/*` routes
+The legacy in-Store WhatsApp bridge (`/api/v1/wa-bridge/*`, the per-store bridge key
+and the `ebda_wbs_bridge_keys()` definer) was DELETED (Ruling WA-LEGACY-1, 2026-10-25).
+Ebda WhatsApp (wa.ebda.app) is a separate product that talks to the Store only through
+the Store contract (`business/ebda/plans/2026-10-24-ebda-whatsapp-store-contract.md`).
+The rule that carried over: a cross-service caller never names its own tenant in a
+query string or body; the tenant is derived from the credential, in the middleware,
+before any handler runs.

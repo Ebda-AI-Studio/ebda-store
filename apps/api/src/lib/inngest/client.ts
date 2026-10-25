@@ -72,14 +72,6 @@ type OrderDeliveredEvent = EventPayload & {
   };
 };
 
-type OrderShippedEvent = EventPayload & {
-  name: 'order/shipped';
-  data: {
-    orderId: string;
-    storeId: string;
-  };
-};
-
 type ReviewSubmittedEvent = EventPayload & {
   name: 'review/submitted';
   data: {
@@ -387,7 +379,6 @@ export type AppEvent =
   | BulkAiSeoEvent
   | BulkAiProductFaqsEvent
   | OrderDeliveredEvent
-  | OrderShippedEvent
   | ReviewSubmittedEvent
   | StockPoReceivedEvent
   | StockAdjustmentPostedEvent

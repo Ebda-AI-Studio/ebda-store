@@ -56,8 +56,8 @@ interface SweepStep {
 }
 
 /**
- * Extracted handler (testable in isolation — mirrors the order-whatsapp-notify
- * pattern). The `createFunction` wrapper below just forwards `step`.
+ * Extracted handler (testable in isolation — mirrors the other extracted
+ * Inngest handlers). The `createFunction` wrapper below just forwards `step`.
  */
 export async function handleOrderCreatedStuckSweep(
   step: SweepStep

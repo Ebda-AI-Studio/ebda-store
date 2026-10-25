@@ -98,7 +98,7 @@ describe('free tier makes no outbound HTTP call', () => {
         /\bfetch\s*\(|axios|XMLHttpRequest|node:https?|from ['"]https?['"]/
       );
       expect(src, f).not.toMatch(
-        /wbs-bridge|wbsBridge|whatsapp-web|baileys|venom-bot|Cloud API|graph\.facebook|whatsappAutomation/i
+        /whatsapp-web|baileys|venom-bot|Cloud API|graph\.facebook|whatsappAutomation/i
       );
     }
   });

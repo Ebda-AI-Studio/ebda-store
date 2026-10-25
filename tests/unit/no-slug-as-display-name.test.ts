@@ -26,7 +26,6 @@ const FALLBACK =
 const ALLOWED: Record<string, string> = {
   'apps/api/src/routes/customers.routes.ts': 'export filename',
   'apps/api/src/routes/order.routes.ts': 'export filename',
-  'apps/api/src/routes/wbs-integration.routes.ts': 'WhatsApp catalog label, brand name first',
 };
 
 describe('no slug as a display name', () => {

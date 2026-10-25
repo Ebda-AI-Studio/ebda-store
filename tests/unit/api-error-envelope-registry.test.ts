@@ -38,8 +38,7 @@ import path from 'node:path';
 const ROUTES = path.resolve(__dirname, '../../apps/api/src/routes');
 // Auth middleware answers requests directly (it can reject BEFORE a route
 // handler ever runs), so a bare-string error there is invisible to the same
-// client code the routes-only walk was checking — `wa-bridge-auth.ts`
-// (#1824) predates this registry the same way a routes file would.
+// client code the routes-only walk was checking.
 const MIDDLEWARE = path.resolve(__dirname, '../../apps/api/src/middleware');
 
 /** `res.…json({ … error: 'SOME_CODE' … })` — the shape a client cannot read. */
@@ -52,12 +51,7 @@ const BARE_STRING_ERROR = /error:\s*'[A-Za-z_]+'/g;
  * An entry here is a statement that someone checked. "Not looked at yet" goes
  * in the unreviewed list below, which is deliberately uncomfortable.
  */
-const DELIBERATE_FLAT_SHAPE: Record<string, string> = {
-  'wa-bridge.routes.ts':
-    'the WhatsApp bridge is an EXTERNAL consumer — its parser is not in this repo, so changing the shape breaks a client we cannot deploy with',
-  'wa-bridge-auth.ts':
-    'same WBS bridge, one layer earlier — this middleware rejects the request before a wa-bridge.routes.ts handler ever runs, for the same external, not-in-this-repo consumer',
-};
+const DELIBERATE_FLAT_SHAPE: Record<string, string> = {};
 
 /**
  * Files that predate this registry and have NOT been checked for a consumer.
@@ -73,12 +67,11 @@ const DELIBERATE_FLAT_SHAPE: Record<string, string> = {
  * any listed file's count goes UP.
  */
 const UNREVIEWED_PREDATING_THIS_REGISTRY: Record<string, number> = {
-  'wa-templates.routes.ts': 10,
   'public.routes.ts': 9,
   'inventory.routes.ts': 6,
   // The accounting / finance / insights surfaces (alert-webhooks, backorders,
   // expenses, finance, insights, purchase-orders, smart-layer,
-  // stock-adjustments, suppliers) and payment-links.routes.ts shared a
+  // stock-adjustments, suppliers) shared a
   // DIFFERENT convention — a flat lower-case discriminant
   // (`{ error: 'not_found' }`, `{ error: 'validation_failed', details }`) —
   // and were migrated onto the standard

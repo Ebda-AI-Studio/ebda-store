@@ -44,10 +44,9 @@ const STARTER_CORE: FeatureKey[] = [
   'shipping_carriers',
   'bulk_operations',
   'abandoned_cart',
-  // `whatsapp` (the WhatsApp Business API integration: WBS bridge, templates,
-  // bot, order-update sends) is deliberately in NO baseline. Flagged OFF
-  // 2026-10-14 (Ruling WHATSAPP-OFF-1): the code stays, no merchant sees it;
-  // it launches later with the WhatsApp product (whatsapp.ebda.app / WBS).
+  // `whatsapp` (the Ebda WhatsApp product, wa.ebda.app) is deliberately in NO
+  // baseline. Flagged OFF 2026-10-14 (Ruling WHATSAPP-OFF-1; the legacy in-Store
+  // bridge was deleted by WA-LEGACY-1): no merchant sees it until it launches.
   // A super-admin StoreFeature `whatsapp` override (enabled=true) turns it on
   // for one store. wa.me links never depend on this flag.
   // Basic inventory (granular sub-feature). The legacy `inventory` parent

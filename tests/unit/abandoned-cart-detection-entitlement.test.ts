@@ -13,11 +13,7 @@ const m = vi.hoisted(() => ({
   carts: [] as Record<string, any>[],
   findManyArgs: [] as any[],
   created: [] as any[],
-  directory: [
-    { id: 'baseline-only', wbsEnabled: false },
-    { id: 'row-only', wbsEnabled: false },
-    { id: 'free-no-entitlement', wbsEnabled: false },
-  ],
+  directory: [{ id: 'baseline-only' }, { id: 'row-only' }, { id: 'free-no-entitlement' }],
 }));
 
 vi.mock('@ebda/database', () => ({
@@ -73,11 +69,6 @@ vi.mock('@api/services/price-resolver.service', () => ({
   },
 }));
 vi.mock('@api/services/bundle.service', () => ({ resolveBundle: vi.fn() }));
-vi.mock('@api/services/wbs-bridge.service', () => ({
-  wbsBridgeService: {},
-  WbsUnauthorizedError: class extends Error {},
-}));
-vi.mock('@api/services/encryption.service', () => ({ encryption: {} }));
 vi.mock('@api/services/cart-recovery-email.service', () => ({
   sweepCartRecoveryEmails: vi.fn(),
   CART_EMAIL_DEFAULT_DELAY_MINUTES: 120,

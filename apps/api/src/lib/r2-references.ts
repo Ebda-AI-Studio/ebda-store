@@ -197,35 +197,11 @@ export const R2_REFERENCE_COLUMNS: readonly R2ReferenceColumn[] = [
   },
   {
     model: 'Store',
-    field: 'wbsTemplates',
-    table: 'stores',
-    column: 'wbs_templates',
-    kind: 'json',
-    why: 'WhatsApp template header media (logo header)',
-  },
-  {
-    model: 'Store',
-    field: 'botCopy',
-    table: 'stores',
-    column: 'bot_copy',
-    kind: 'json',
-    why: 'bot copy; may carry media URLs',
-  },
-  {
-    model: 'Store',
     field: 'aboutJson',
     table: 'stores',
     column: 'about_json',
     kind: 'json',
     why: 'about page content; may carry images',
-  },
-  {
-    model: 'Store',
-    field: 'botServiceMenu',
-    table: 'stores',
-    column: 'bot_service_menu',
-    kind: 'json',
-    why: 'bot service menu; may carry media URLs',
   },
   // ── Content ────────────────────────────────────────────────────────────────
   {

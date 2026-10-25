@@ -3,9 +3,8 @@
  * Orchestrates multi-channel notification delivery (SMS, Push)
  * based on feature flags, per-event config, and available credentials.
  *
- * WhatsApp is intentionally NOT a dispatcher channel — it flows through the
- * Ebda ↔ WBS bridge as a separate event-driven path
- * (`apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts`).
+ * WhatsApp is intentionally NOT a dispatcher channel (it is the separate
+ * Ebda WhatsApp product).
  *
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.
  */

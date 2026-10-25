@@ -31,9 +31,8 @@
  *
  * Only `apps/api/src/routes/**` and `apps/api/src/middleware/**` are scanned,
  * because there `res` is unambiguously the Express response. Scanning wider
- * produces a false positive on `lib/inngest/functions/product-meta-sync.ts`,
- * where `res` is a `fetch` Response and `res.json()` READS a body — the
- * opposite of sending one. Narrow scope beats an allowlist that would rot.
+ * produces false positives wherever `res` is a `fetch` Response and
+ * `res.json()` READS a body — the opposite of sending one. Narrow scope beats an allowlist that would rot.
  */
 
 import { describe, it, expect } from 'vitest';

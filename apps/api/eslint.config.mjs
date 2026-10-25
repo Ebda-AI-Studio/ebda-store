@@ -52,9 +52,7 @@ const ssrfSelectors = [
   {
     // Flags a non-literal URL, EXCEPT a template rooted at `config.*` or
     // `process.env.*` — those are deployment configuration and cannot be
-    // attacker-controlled. Verified 2026-08-31: the only three route-level
-    // hits were all `${config.wbsBaseUrl}/fixed/path`, so this exclusion takes
-    // the rule to zero false positives today while still catching
+    // attacker-controlled. This exclusion keeps the rule at zero false positives while still catching
     // `fetch(req.body.url)` / `fetch(userUrl)`.
     selector:
       "CallExpression[callee.name='fetch'] > :first-child:matches(Identifier, TemplateLiteral, MemberExpression):not(TemplateLiteral[expressions.0.object.name='config']):not(TemplateLiteral[expressions.0.object.object.name='process'])",

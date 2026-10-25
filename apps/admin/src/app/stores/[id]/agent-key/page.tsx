@@ -26,7 +26,7 @@ import { AgentKeyPanel, type AgentKeyStatus } from './_components/AgentKeyPanel'
  * a toggle in any case. It is a credential lifecycle with a one-time secret
  * reveal and an irreversible destructive action, none of which fits a switch.
  * It sits in the SETTINGS hub (its `/agent-key` prefix is registered in
- * `hubs.ts`) beside the WhatsApp bridge key, because it is integration
+ * `hubs.ts`) because it is integration
  * configuration, not a marketing surface. It is reachable from the Settings card
  * grid and the ⌘K palette, both gated on `agent_checkout`.
  *

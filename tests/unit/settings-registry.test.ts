@@ -107,16 +107,6 @@ describe('admin search registry: anchors', () => {
       found.set(m[1], [...(found.get(m[1]) ?? []), f]);
     }
   }
-  // The WhatsApp tabs set the attribute from a literal map (one id per tab) instead of a literal.
-  const waPage = join(STORE_DIR, 'whatsapp/page.tsx');
-  for (const s of SETTINGS.filter(s => s.id.startsWith('whatsapp.tab.'))) {
-    if (
-      read(waPage).includes(`'${s.id}'`) &&
-      /data-setting-id=\{TAB_SETTING_ID\[key\]\}/.test(read(waPage))
-    ) {
-      found.set(s.id, [waPage]);
-    }
-  }
 
   it('every registered setting is anchored exactly once, inside its own route directory', () => {
     const problems: string[] = [];
