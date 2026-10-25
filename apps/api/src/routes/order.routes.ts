@@ -42,10 +42,8 @@ import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
-import {
-  PaymentService,
-  findInFlightRefundClaims,
-} from '../services/payment-providers/payment.factory';
+import { PaymentService } from '../services/payment-providers/payment.factory';
+import { settleRefundEvent, matchRefundToClaim } from '../services/payment-providers/refund-settle';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { InstapayService } from '../services/payment-providers/instapay.service';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
@@ -1442,6 +1440,68 @@ router.post(
 );
 
 /**
+ * POST /stores/:storeId/orders/:orderId/refund-match-claim   { claimId, providerRefundId }
+ *
+ * Operator action for a HELD refund webhook (Kashier: the id in the webhook may differ from the id the refund API
+ * answered with, so an unknown id while our own refund is open is held, never auto-booked). "This provider refund IS
+ * that refund of ours." Moves no money; consumes the claim, records the provider id as seen, audits the operator.
+ */
+router.post(
+  '/:orderId/refund-match-claim',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requirePermission('orders:refund'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+      const body = z
+        .object({
+          claimId: z.string().min(1).max(100),
+          providerRefundId: z.string().min(1).max(200),
+        })
+        .strict()
+        .parse(req.body);
+      const payment = await prisma.payment.findFirst({
+        where: { orderId, order: { storeId } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (!payment) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'No payment for this order' },
+        });
+        return;
+      }
+      const result = await runInTenantContext(storeId, () =>
+        matchRefundToClaim({
+          paymentId: payment.id,
+          storeId,
+          orderId,
+          providerRefundId: body.providerRefundId,
+          claimId: body.claimId,
+          actorUserId: user.userId,
+        })
+      );
+      await auditLog({
+        action: 'refund.match_claim',
+        userId: user.userId,
+        storeId,
+        resourceType: 'payment',
+        resourceId: payment.id,
+        details: { claimId: body.claimId, providerRefundId: body.providerRefundId, result },
+      });
+      res.json({ success: true, data: { result } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /stores/:storeId/orders/:orderId/refresh-refund-status
  *
  * Manual sync — admin clicks "Refresh refund status" on the order detail
@@ -1509,7 +1569,7 @@ router.post(
       // Update Payment.metadata with the fresh status. If the provider
       // says the refund completed and our Payment row isn't marked
       // refunded yet (out-of-band path), promote it now.
-      let consumedClaimId: string | null = null;
+      let settleRes: Awaited<ReturnType<typeof settleRefundEvent>> | null = null;
       const updateData: Record<string, unknown> = {
         metadata: {
           ...prevMeta,
@@ -1545,24 +1605,25 @@ router.post(
         // and that falls short of the total, downgrades to partial; unknown
         // means FULL.
         // Shared with the refund-webhook branch — see resolveRefundSettlement.
-        const {
-          settledTotal,
-          isFullRefund: refundIsFullRefund,
-          accountedThisEvent,
-          absorbedClaimId,
-        } = resolveRefundSettlement({
-          paymentAmount: payment.amount ?? 0,
-          alreadyRefunded: payment.refundedAmount,
-          reported: [status.refundedAmount, status.amount],
-          // This route raised the total but recorded nothing, so the refund it
-          // counted could be counted a SECOND time by the webhook that arrives
-          // for the same refund afterwards. The ledger is shared; every path
-          // that adds to the total has to maintain it.
-          reportedEventId: status.refundId,
-          accountedEventIds: readAccountedRefundEventIds(payment.metadata),
-          inFlightClaims: await findInFlightRefundClaims(payment.id, storeId),
+        // ONE function settles it under the payment lock (shared with the webhook and the claim release): see
+        // refund-settle.ts. This route raised the total but recorded nothing, so the refund it counted could be counted a
+        // SECOND time by the webhook for the same refund; the ledger is maintained by the same code on every path.
+        settleRes = await settleRefundEvent({
+          paymentId: payment.id,
+          storeId,
+          orderId,
+          provider: payment.provider,
+          refund: {
+            refundId: status.refundId ?? payment.refundId ?? '',
+            status: status.status,
+            amount: status.refundedAmount ?? status.amount ?? null,
+          },
         });
-        consumedClaimId = absorbedClaimId;
+        const decision = settleRes.decision;
+        const settledTotal = decision?.settledTotal ?? settleRes.payment.refundedAmount;
+        const refundIsFullRefund =
+          decision?.isFullRefund ?? settleRes.payment.status === 'refunded';
+        const accountedThisEvent = decision?.accountedThisEvent ?? false;
         updateData.status = refundIsFullRefund ? 'refunded' : 'partially_refunded';
         updateData.refundedAmount = settledTotal;
         if (accountedThisEvent) {
@@ -1577,24 +1638,11 @@ router.post(
           };
         }
       }
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: updateData,
-      });
-      if (consumedClaimId)
-        await prisma.paymentEvent.create({
-          data: {
-            paymentId: payment.id,
-            storeId,
-            orderId,
-            eventType: 'refund_webhook_absorbed',
-            provider: payment.provider,
-            details: {
-              claimId: consumedClaimId,
-              refundId: status.refundId ?? null,
-              amount: status.refundedAmount ?? status.amount ?? null,
-            },
-          },
+      if (settleRes && !settleRes.seen) await settleRes.commit({ data: updateData });
+      else
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: updateData,
         });
 
       // Append-only audit row. Records the refund-status refresh — fromStatus
