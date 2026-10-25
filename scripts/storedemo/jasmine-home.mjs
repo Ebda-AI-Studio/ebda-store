@@ -7,6 +7,7 @@
 // is tagged Bloom; `steps` is read by Clinic only (a look that does not name a type simply leaves it
 // out of the render). The three step products are the SAME three the routine bundle holds, so the
 // routine's "add all" adds the real bundle and shows its live saving.
+import { heroFile } from './mock-heroes.mjs';
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 
 /** The real cleanse -> treat -> protect routine (also the routine bundle's components). */
@@ -80,7 +81,11 @@ export function buildJasmineHome(base, ctx) {
         {
           id: `${key}-1`,
           type: 'slide',
-          settings: { image: img(`hero-${key}.webp`), ctaHref: '/products', ...slide },
+          settings: {
+            image: img(heroFile('jasmine', key, `hero-${key}.webp`)),
+            ctaHref: '/products',
+            ...slide,
+          },
         },
       ],
       look

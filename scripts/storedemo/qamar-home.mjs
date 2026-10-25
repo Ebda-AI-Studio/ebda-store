@@ -7,6 +7,7 @@
 // One hero per look, tagged with `lookTag` (plan amendment C10), each with its own imagery; the
 // Atelier hero carries the hero clip. Shop-the-look (Task 7) is tagged for Lookbook; the occasion
 // list carries each band's tone (Task 8), used when a look sets `tileShape: 'band'` (Vitrine).
+import { heroFile } from './mock-heroes.mjs';
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 import { QAMAR_LOOKS_STORY, QAMAR_OCCASIONS, QAMAR_PAGE_IMAGES } from '../qamar-demo/catalogue.mjs';
 
@@ -63,7 +64,7 @@ export function buildQamarHome(base, ctx) {
     { mode: 'single' },
     [
       slide('atelier-1', {
-        image: img(QAMAR_PAGE_IMAGES.heroAtelier),
+        image: img(heroFile('qamar', 'atelier', QAMAR_PAGE_IMAGES.heroAtelier)),
         // The model stands at the top of the still: keep her head in the wide desktop crop (B1-32).
         focus: 'top',
         ...(video ? { video } : {}),

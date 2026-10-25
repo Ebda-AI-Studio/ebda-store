@@ -6,6 +6,7 @@
 // merchant store. One hero, tagged `souq.night` (only Night souq has one); the curated carousel is
 // tagged `souq.night` too, so Catalogue shows only its deals row; the three one-product stages
 // serve Showroom (a look that does not name a type simply leaves it out of the render).
+import { heroFile } from './mock-heroes.mjs';
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 
 /** Stage products (Showroom): distinct, photographed, buyable. */
@@ -71,7 +72,7 @@ export function buildSouqHome(base, ctx) {
         id: 'night-1',
         type: 'slide',
         settings: {
-          image: img('hero-night.webp'),
+          image: img(heroFile('souq', 'night', 'hero-night.webp')),
           alt: 'A covered souq arcade at night, lit by rows of champagne lanterns',
           headline: 'The souq is lit',
           headlineAr: 'السوق منوّر',
