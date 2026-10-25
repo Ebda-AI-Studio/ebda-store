@@ -22,7 +22,12 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
     triggers: [{ cron: `TZ=${REGION.timezone} 30 1 * * *` }],
   },
   async ({ step }) => {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // One window for the whole run: `now` is fixed in a step so a replay uses the same cutoff for
+    // the ops and GL sides (a per-replay cutoff made them disagree and raised false drift).
+    const sinceIso = await step.run('window', () =>
+      new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    );
+    const since = new Date(sinceIso);
 
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.

@@ -192,7 +192,9 @@ export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFun
     logger.info({ storeId, requestedBy }, 'stock-low-stock-alert-on-demand: starting');
 
     // Feature gate — skip when inventory.stock_alerts is disabled.
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.stock_alerts');
+    const enabled = await step.run('check-feature', () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.stock_alerts')
+    );
     if (!enabled) {
       logger.info(
         { storeId },
