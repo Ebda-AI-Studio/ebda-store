@@ -76,6 +76,8 @@ export default function SecurityPage() {
   const [verifyCode, setVerifyCode] = useState('');
   // Platform administrators: the first factor needs the operator's one-time token plus a code e-mailed to the account.
   const [passkeyCount, setPasskeyCount] = useState<number | null>(null);
+  // The server is the authority: when it asks for the e-mailed code the step is shown whatever the client guessed.
+  const [serverWantsCode, setServerWantsCode] = useState(false);
   const [bootToken, setBootToken] = useState('');
   const [bootCode, setBootCode] = useState('');
   const [bootPassword, setBootPassword] = useState('');
@@ -169,6 +171,8 @@ export default function SecurityPage() {
         true
       );
       if (error) {
+        if (error.code === 'EMAIL_CODE_REQUIRED' || error.code === 'EMAIL_CODE_INVALID')
+          setServerWantsCode(true);
         setEnrollError(error.message || t('errorVerify'));
         setVerifyCode('');
         return;
@@ -215,7 +219,8 @@ export default function SecurityPage() {
   }
 
   // A TOTP is a FIRST factor only when the account has neither a TOTP nor a passkey (super admins have no passkey panel).
-  const isFirstFactor = !status?.mfaEnabled && (user?.role === 'super_admin' || passkeyCount === 0);
+  const isFirstFactor =
+    !status?.mfaEnabled && (serverWantsCode || user?.role === 'super_admin' || passkeyCount === 0);
   const isFirstAdminFactor = user?.role === 'super_admin' && isFirstFactor;
 
   // ── Render ────────────────────────────────────────────────────────────────
