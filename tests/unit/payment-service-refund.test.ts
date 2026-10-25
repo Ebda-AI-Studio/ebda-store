@@ -34,6 +34,7 @@ const paymentConfigFindMany = vi.fn();
 // (`prisma.payment.update(...)`, `prisma.order.update(...)`), so those two
 // must resolve on their own before `$transaction` ever runs.
 const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
+const paymentEventFindFirst = vi.fn().mockResolvedValue(null);
 const paymentEventFindMany = vi.fn().mockResolvedValue([]);
 const paymentEventCreate = vi.fn().mockResolvedValue({});
 
@@ -41,6 +42,7 @@ let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = 
 
 vi.mock('@ebda/database', () => ({
   prisma: {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
       // refund() resolves by transactionId with findMany({ take: 2 }) and
@@ -67,6 +69,7 @@ vi.mock('@ebda/database', () => ({
     paymentEvent: {
       create: (...a: unknown[]) => paymentEventCreate(...a),
       findMany: (...a: unknown[]) => paymentEventFindMany(...a),
+      findFirst: (...a: unknown[]) => paymentEventFindFirst(...a),
     },
   },
   Prisma: {},
@@ -482,6 +485,31 @@ describe('PaymentService.refund — a provider failure keeps or releases the cla
     expect(err).toBeInstanceOf(ProviderRejectedError);
     expect(refundMayHaveExecuted(err)).toBe(false);
     expect(releaseWrites()).toHaveLength(1);
+  });
+});
+
+describe('PaymentService.refund — a claim a webhook already absorbed is never released', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    paymentEventFindMany.mockResolvedValue([]);
+    paymentEventFindFirst.mockResolvedValue(null);
+  });
+  it('the provider refuses AFTER a webhook reported the refund completed: no balance given back, a review event is written', async () => {
+    mockHappyPathUpToEffects();
+    const { ProviderRejectedError } =
+      await import('@api/services/payment-providers/refund-outcome');
+    providerRefund.mockRejectedValue(new ProviderRejectedError('Invalid amount', 400));
+    paymentUpdateMany.mockResolvedValue({ count: 1 });
+    paymentEventFindFirst.mockResolvedValue({ id: 'absorbed-event' });
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 }).catch(e => e);
+    const decrements = paymentUpdateMany.mock.calls.filter(
+      c => (c[0] as { data: { refundedAmount?: unknown } }).data.refundedAmount instanceof Object
+    );
+    expect(decrements).toEqual([]);
+    const types = paymentEventCreate.mock.calls.map(
+      c => (c[0] as { data: { eventType: string } }).data.eventType
+    );
+    expect(types).toContain('refund_reconcile_review');
   });
 });
 
