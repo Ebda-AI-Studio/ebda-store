@@ -10,7 +10,7 @@ import { cli, fmtMs } from './lib/cli.mjs';
 import { connectReadOnly, resolveStore } from './lib/pg.mjs';
 import { loadPlan, entityIndexQuery, ENTITY_KIND_TABLES } from './lib/plan.mjs';
 import { bindPlan, sourceAggs, sourceDigest, unmigratedTables } from './lib/source.mjs';
-import { d1Query } from './lib/d1.mjs';
+import { d1QueryMany } from './lib/d1.mjs';
 import { TableDigest } from '../../packages/cf-migrate/src/canon.mjs';
 import { RULED_UNMIGRATED_TABLES } from './lib/plan.mjs';
 
@@ -104,17 +104,22 @@ async function verifyPlatform(client, bound, plan) {
   const src = {};
   const dst = {};
   const names = [];
-  for (const bt of bound.platform.tables) {
+  const tables = bound.platform.tables;
+  // one wrangler call for every table, entity_index and the foreign-key check
+  const results = await d1QueryMany(d, [
+    ...tables.map(
+      bt =>
+        `SELECT ${bt.columns.map(c => `"${c.col}"`).join(', ')} FROM "${bt.name}" ORDER BY ${bt.pk.map(k => `"${k}"`).join(', ')}`
+    ),
+    'SELECT kind, id, store_id FROM entity_index ORDER BY kind, id',
+    'PRAGMA foreign_key_check',
+  ]);
+  for (const [i, bt] of tables.entries()) {
     names.push(bt.name);
     src[bt.name] = await sourceDigest(client, bt, plan.platform, 'all');
-    const cols = bt.columns.map(c => `"${c.col}"`).join(', ');
-    const rows = await d1Query(
-      d,
-      `SELECT ${cols} FROM "${bt.name}" ORDER BY ${bt.pk.map(k => `"${k}"`).join(', ')}`
-    );
     const dg = new TableDigest();
     const cn = bt.columns.map(c => c.col);
-    for (const r of rows)
+    for (const r of results[i])
       await dg.add(
         cn,
         cn.map(c => r[c]),
@@ -131,12 +136,11 @@ async function verifyPlatform(client, bound, plan) {
       await sd.add(['kind', 'id', 'store_id'], [x.kind, x.id, x.store_id], ['kind', 'id']);
   }
   src.entity_index = await sd.finish();
-  const rows = await d1Query(d, `SELECT kind, id, store_id FROM entity_index ORDER BY kind, id`);
   const dd = new TableDigest();
-  for (const x of rows)
+  for (const x of results[tables.length])
     await dd.add(['kind', 'id', 'store_id'], [x.kind, x.id, x.store_id], ['kind', 'id']);
   dst.entity_index = await dd.finish();
-  const fkRows = await d1Query(d, 'PRAGMA foreign_key_check');
+  const fkRows = results[tables.length + 1];
   return compare('platform D1', names, src, dst, {
     violations: fkRows.length,
     sample: fkRows.slice(0, 5),
@@ -179,7 +183,7 @@ async function main() {
     `${equal}/${total} tables equal across ${results.length} target(s) in ${fmtMs(performance.now() - t0)}: ${ok ? 'PASS' : 'FAIL'}`
   );
   if (args.report)
-    fs.writeFileSync(args.report, JSON.stringify({ ok, equal, total, results }, null, 2));
+    fs.writeFileSync(args.report, JSON.stringify({ ok, at: new Date().toISOString(), equal, total, results }, null, 2));
   process.exit(ok ? 0 : 1);
 }
 

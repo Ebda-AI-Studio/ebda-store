@@ -21,6 +21,19 @@ export async function d1Query(d, sql) {
   return j.at(-1).results ?? [];
 }
 
+/** several statements in ONE wrangler call (a call costs ~1 s); returns one result array per statement */
+export async function d1QueryMany(d, statements) {
+  const { stdout } = await run('npx', [...base(d), '--json', '--command', statements.join(';\n')], {
+    maxBuffer: 512 * 1024 * 1024,
+  });
+  const j = JSON.parse(stdout.slice(stdout.indexOf('[')));
+  const bad = j.find(x => x.success === false);
+  if (bad) throw new Error(`D1 query failed: ${JSON.stringify(bad).slice(0, 400)}`);
+  if (j.length !== statements.length)
+    throw new Error(`D1 returned ${j.length} result sets for ${statements.length} statements`);
+  return j.map(x => x.results ?? []);
+}
+
 export async function d1File(d, file) {
   await run('npx', [...base(d), '--yes', '--file', file], { maxBuffer: 512 * 1024 * 1024 });
 }

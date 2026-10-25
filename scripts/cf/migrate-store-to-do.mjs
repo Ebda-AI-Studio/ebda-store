@@ -62,6 +62,7 @@ async function migrateStore(client, bound, plan, store) {
     const digest = new TableDigest();
     let page = 0;
     let pages = 0;
+    let skipped = 0;
     for await (const rows of sourcePages(
       client,
       bt,
@@ -73,14 +74,15 @@ async function migrateStore(client, bound, plan, store) {
       for (const r of rows) await digest.add(names, r, bt.pk);
       if (!args['dry-run']) {
         const head = { batch: args.batch, table: bt.name, page, columns: names, pk: bt.pk };
-        await post(store.id, head, rows);
+        const res = await post(store.id, head, rows);
+        if (res.skipped) skipped++;
       }
       page++;
       pages++;
     }
     const { count } = await digest.finish();
     const ms = performance.now() - t1;
-    report.tables.push({ table: bt.name, rows: count, pages, ms: Math.round(ms) });
+    report.tables.push({ table: bt.name, rows: count, pages, skipped, ms: Math.round(ms) });
     if (count > 0)
       console.log(
         `  ${bt.name.padEnd(34)} ${String(count).padStart(7)} rows ${String(pages).padStart(3)} pages ${fmtMs(ms).padStart(8)}`
@@ -88,6 +90,8 @@ async function migrateStore(client, bound, plan, store) {
   }
   report.ms = Math.round(performance.now() - t0);
   report.rows = report.tables.reduce((a, t) => a + t.rows, 0);
+  report.pages = report.tables.reduce((a, t) => a + t.pages, 0);
+  report.skippedPages = report.tables.reduce((a, t) => a + t.skipped, 0);
   report.cfOnlyTables = bound.store.cfOnly;
   return report;
 }
@@ -114,7 +118,9 @@ async function main() {
   for (const s of stores) {
     console.log(`store ${s.slug} (${s.id})`);
     reports.push(await migrateStore(client, bound, plan, s));
-    console.log(`  -> ${reports.at(-1).rows} rows in ${fmtMs(reports.at(-1).ms)}`);
+    console.log(
+      `  -> ${reports.at(-1).rows} rows, ${reports.at(-1).pages} pages (${reports.at(-1).skippedPages} already applied) in ${fmtMs(reports.at(-1).ms)}`
+    );
   }
   await client.query('ROLLBACK');
   await client.end();
