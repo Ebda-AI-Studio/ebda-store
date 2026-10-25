@@ -1,3 +1,10 @@
+import { matchingCustomers } from '../../src/do/search-customers';
+import {
+  applyGoldRates,
+  decidePendingGoldRate,
+  updateGoldSettings,
+  repriceGoldProduct,
+} from '../../src/do/gold-rates';
 import { DurableObject } from 'cloudflare:workers';
 import store0001 from '../../../cf-schema/migrations/store/0001_init.sql';
 import store0002 from '../../../cf-schema/migrations/store/0002_invariants.sql';
@@ -5,7 +12,6 @@ import meta from '../../../cf-schema/generated/prisma-meta.json';
 import { createPrismaLite } from '../../src/prisma-lite/client';
 import { doSqlRunner, doSyncSql } from '../../src/prisma-lite/do-runner';
 import { placeOrder, type CheckoutInput } from '../../src/do/checkout';
-import { applyGoldRates } from '../../src/do/gold-rates';
 import {
   ensureSearchIndex,
   reindexStore,
@@ -28,6 +34,8 @@ export class LiteDO extends DurableObject {
           ctx.storage.sql.exec(stmt);
       });
     });
+    // the StoreDO bootstrap: the search index schema + dirty-marking triggers (idempotent; backfills an existing store)
+    ctx.blockConcurrencyWhile(async () => ensureSearchIndex(doSyncSql(ctx.storage)));
     this.lite = createPrismaLite(meta as unknown as Meta, doSqlRunner(ctx.storage), 'store-do', {
       storeId: 's1',
     });
@@ -193,6 +201,43 @@ export class LiteDO extends DurableObject {
       if (e instanceof MoneyError) return { ok: false, code: e.code };
       throw e;
     }
+  }
+
+  customerSearch(q: string): { userIds: string[]; guestOrderIds: string[] } {
+    const m = matchingCustomers(doSyncSql(this.ctx.storage), 's1', q);
+    return { userIds: m.userIds, guestOrderIds: m.guestOrderIds };
+  }
+  goldDecide(rateId: string, decision: 'confirm' | 'reject') {
+    return decidePendingGoldRate(doSyncSql(this.ctx.storage), 's1', rateId, decision, {
+      userId: 'owner',
+    });
+  }
+  goldApplyFeed(ratePerGram: number): { pending: Array<{ id: string }> } {
+    return applyGoldRates(
+      doSyncSql(this.ctx.storage),
+      's1',
+      { rates: [{ karat: 21, ratePerGram }] },
+      { feed: { src: 'test' } }
+    );
+  }
+  goldSettings(roundingStep: 1 | 100 | 500 | 1000): { repriced: number } {
+    return updateGoldSettings(
+      doSyncSql(this.ctx.storage),
+      's1',
+      {
+        enabled: true,
+        feedEnabled: false,
+        feedPremiumBps: 0,
+        maxAgeMinutes: 1560,
+        jumpConfirmBps: 500,
+        roundingStep,
+        showBreakdown: false,
+      },
+      { userId: 'owner' }
+    );
+  }
+  goldRepriceProduct(productId: string): number {
+    return repriceGoldProduct(doSyncSql(this.ctx.storage), 's1', productId);
   }
 
   async seed(): Promise<void> {
