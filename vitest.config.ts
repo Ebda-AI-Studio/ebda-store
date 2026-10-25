@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 import { perAppAtAlias, workspaceAliases } from './vitest.shared';
 
 export default defineConfig({
+  // Defence in depth with the per-runner TMPDIR (ci.yml "Private TMPDIR per runner"): on CI the Vite/Vitest
+  // cache lives in this runner's private RUNNER_TEMP, never in a directory another runner's job can touch.
+  cacheDir: process.env.RUNNER_TEMP ? `${process.env.RUNNER_TEMP}/vitest-cache` : undefined,
   // Every app's tsconfig sets `"jsx": "preserve"` (Next.js/its own bundler
   // owns the JSX transform at build time) — Vite's oxc transform reads that
   // same tsconfig for test transforms and, left on "preserve", leaves raw
