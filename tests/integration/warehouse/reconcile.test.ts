@@ -403,8 +403,58 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
 
       const warnSpy = vi.spyOn(logger, 'warn');
       try {
+        // MAKE THE INVERTED LOCK ORDER HAPPEN (2026-10-25). Racing 40 adjusts against reconcile
+        // only produced the deadlock when scheduling happened to interleave them; with the
+        // bounded 6-client pool (#161) reconcile finishes before the adjusts even reach their
+        // transaction, so no round ever overlapped and the retry path went unobserved (red on
+        // main since 2026-10-25, nothing in warehouse code had changed). Instead we play the
+        // adjustStock side by hand, deterministically:
+        //   1. `adjuster` locks the warehouse_stock row (what adjustStock does first),
+        //   2. reconcile locks the products row, then blocks on that warehouse_stock row,
+        //   3. after a pause shorter than deadlock_timeout (1 s) `adjuster` asks for the products
+        //      row. Reconcile has been waiting longer, so ITS deadlock check fires first and
+        //      Postgres aborts reconcile (40P01) -> `retryOnWriteConflict` must retry it.
+        // The real adjustStock calls still race on top, bare, exactly as the routes make them.
+        let adjusterLocked!: () => void;
+        const adjusterHoldsStock = new Promise<void>(r => (adjusterLocked = r));
+        let reconcileWaiting!: () => void;
+        const reconcileIsWaiting = new Promise<void>(r => (reconcileWaiting = r));
+        const adjuster = prisma
+          .$transaction(
+            async tx => {
+              await tx.$queryRaw`
+                SELECT 1 FROM "warehouse_stock"
+                WHERE "store_id" = ${storeId} AND "product_id" = ${productId} AND "variant_id" IS NULL
+                FOR UPDATE`;
+              adjusterLocked();
+              await reconcileIsWaiting;
+              await new Promise(r => setTimeout(r, 300));
+              await tx.$queryRaw`
+                SELECT 1 FROM "products" WHERE "id" = ${productId} AND "store_id" = ${storeId} FOR UPDATE`;
+            },
+            { timeout: 30000, maxWait: 10000 }
+          )
+          .catch((e: unknown) => e); // it can be the deadlock victim instead: then this round proves nothing, the loop goes on
+        await adjusterHoldsStock;
+
+        const reconcileCall = WarehouseService.reconcileWarehouseStockToAggregate(
+          storeId,
+          productId,
+          null
+        );
+        for (let i = 0; i < 100; i++) {
+          const rows = await prisma.$queryRaw<Array<{ n: number }>>`
+            SELECT count(*)::int AS n FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'
+              AND query ILIKE '%warehouse_stock%'`;
+          if ((rows[0]?.n ?? 0) > 0) break;
+          await new Promise(r => setTimeout(r, 50));
+        }
+        reconcileWaiting();
+
         const [reconcileResult] = await Promise.all([
-          WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null),
+          reconcileCall,
+          adjuster,
           ...Array.from({ length: CONCURRENT_ADJUSTS }, () =>
             WarehouseService.adjustStock(storeId, warehouseId, { productId, delta: 0 })
           ),

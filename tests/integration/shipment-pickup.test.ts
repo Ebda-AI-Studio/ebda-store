@@ -125,6 +125,8 @@ describe.skipIf(!hasDb)('PROVIDERS-18 shipment pickups (ebda_app, strict RLS)', 
           firstName: 'Mona',
           lastName: 'Adel',
           phone: '+201012345678',
+          // Aramex requires a customer email at booking (#194, manual REQ24); the shipper falls back to the owner's.
+          email: 'mona@example.com',
           address1: '5 Nile Corniche',
           city: 'Giza',
           state: 'Giza',
