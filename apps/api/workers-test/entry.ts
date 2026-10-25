@@ -25,8 +25,6 @@ export class TestSchedule extends StoreScheduleBase {
     kv.put('gaveUp', [...((kv.get('gaveUp') as string[] | undefined) ?? []), job]);
   }
 
-  protected override log(): void {}
-
   failNext(n: number): void {
     this.ctx.storage.kv.put('failures', n);
   }

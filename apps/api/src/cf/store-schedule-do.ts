@@ -1,6 +1,6 @@
 /** The deployed StoreSchedule: the alarm logic (store-schedule.ts) wired to the real job starter. */
 import { setCfBindings, type CfBindings } from './bindings';
-import { StoreScheduleBase, type AlarmEvent } from './store-schedule';
+import { StoreScheduleBase, type AlarmEvent, type LogFields } from './store-schedule';
 import { getJob } from '../lib/jobs/registry';
 import { startJob } from '../lib/jobs/start';
 import { dispatchEventsToAll } from '../lib/jobs/dispatch-all';
@@ -27,7 +27,10 @@ export class StoreSchedule extends StoreScheduleBase<CfBindings> {
     await dispatchEventsToAll(failedEvent(def, event, event.id, error));
   }
 
-  protected override log(level: 'warn' | 'error', obj: Record<string, unknown>, msg: string): void {
-    logger[level](obj, msg);
+  protected override log(level: 'warn' | 'error', f: LogFields, msg: string): void {
+    logger[level](
+      { job: f.job, storeId: f.storeId, due: f.due, attempts: f.attempts, err: f.err },
+      msg
+    );
   }
 }
