@@ -13,7 +13,9 @@ import {
   ciBuyerIndexKey,
   ciOrderTombstoneKey,
   ciBuyerTombstoneKey,
+  ciDlqKey,
 } from '../../apps/api/src/lib/ci/layout';
+import { replayCiDlq } from '../../apps/api/src/lib/ci/replay';
 import { handleCiEventsBatch } from '../../apps/api/src/lib/ci/sink';
 import { buildEnvelope } from '../../apps/api/src/lib/ci/port';
 import { gunzipText, gzipText } from '../../apps/api/src/cf/erasure/surfaces';
@@ -54,7 +56,7 @@ describe('scoped erase', () => {
   it("removes ONLY the account's orders in its store; another person under the same key and another store survive", async () => {
     const r2 = new FakeR2();
     await seed(r2);
-    expect(await eraseCiOutcomes('req', scope, [], r2 as never)).toEqual({ erased: 2 });
+    expect(await eraseCiOutcomes('req', scope, undefined, r2 as never)).toEqual({ erased: 2 });
     expect(await ids(r2, P1)).toEqual([THEIRS_SAME_STORE]);
     expect(await ids(r2, P2)).toEqual([OTHER_STORE]);
     // the key is still indexed for the rows that remain (P1 other person, P2 other store)
@@ -63,7 +65,7 @@ describe('scoped erase', () => {
       P2,
     ]);
     // idempotent
-    expect(await eraseCiOutcomes('req', scope, [], r2 as never)).toEqual({ erased: 0 });
+    expect(await eraseCiOutcomes('req', scope, undefined, r2 as never)).toEqual({ erased: 0 });
   });
 
   it('drops a partition and its index entry when nothing of the key is left in it', async () => {
@@ -72,23 +74,86 @@ describe('scoped erase', () => {
     await eraseCiOutcomes(
       'req',
       { ...scope, orderIds: [MINE, MINE_TOO, THEIRS_SAME_STORE] },
-      [],
+      undefined,
       r2 as never
     );
     expect(await r2.get(P1)).toBeNull();
     expect(JSON.parse(await (await r2.get(ciBuyerIndexKey(KEY)))!.text()).partitions).toEqual([P2]);
+    // emptied entries are rewritten (compare-and-set), never deleted: a delete cannot be conditional
+    await eraseCiOutcomes(
+      'req',
+      { storeId: S2, orderIds: [OTHER_STORE], buyerKeys: [KEY] },
+      undefined,
+      r2 as never
+    );
+    expect(JSON.parse(await (await r2.get(ciBuyerIndexKey(KEY)))!.text()).partitions).toEqual([]);
   });
 
-  it('writes order tombstones first; a buyer-key-wide erase happens only for a PROVEN key', async () => {
+  it("writes order tombstones first; a buyer-key erase runs only for a PROVEN key and only in the proof's store", async () => {
     const r2 = new FakeR2();
     await seed(r2);
-    await eraseCiOutcomes('req', scope, [], r2 as never);
+    await eraseCiOutcomes('req', scope, undefined, r2 as never);
     expect(await r2.get(ciOrderTombstoneKey(MINE))).not.toBeNull();
-    expect(await r2.get(ciBuyerTombstoneKey(KEY))).toBeNull();
-    await eraseCiOutcomes('req', scope, [KEY], r2 as never); // proven phone: every store, every order
-    expect(await r2.get(ciBuyerTombstoneKey(KEY))).not.toBeNull();
-    expect(await r2.get(ciBuyerIndexKey(KEY))).toBeNull();
-    expect(r2.keys('outcomes/')).toHaveLength(0);
+    expect(await r2.get(ciBuyerTombstoneKey(S1, KEY))).toBeNull();
+    await eraseCiOutcomes('req', scope, { storeId: S1, buyerKeys: [KEY] }, r2 as never);
+    // store 1: every row under the proven key is gone (including the other person's), store 2 is untouched
+    expect(await r2.get(P1)).toBeNull();
+    expect(await ids(r2, P2)).toEqual([OTHER_STORE]);
+    expect(await r2.get(ciBuyerTombstoneKey(S1, KEY))).not.toBeNull();
+    expect(await r2.get(ciBuyerTombstoneKey(S2, KEY))).toBeNull(); // no global tombstone from a single-store proof
+    expect(JSON.parse(await (await r2.get(ciBuyerIndexKey(KEY)))!.text()).partitions).toEqual([P2]);
+  });
+
+  it("a single-store proof does not de-key or drop another store's in-flight events", async () => {
+    const r2 = new FakeR2();
+    await r2.put(ciBuyerTombstoneKey(S1, KEY), '1');
+    const mk = (storeId: string, orderId: string) =>
+      buildEnvelope({
+        type: 'order.placed',
+        seed: `o:${orderId}`,
+        occurredAt: new Date(),
+        storeId,
+        orderId,
+        buyerKey: KEY,
+        xstore: false,
+        data: {
+          totalMinor: 1,
+          currency: 'EGP',
+          paymentMethod: 'cod',
+          channel: 'web',
+          itemCount: 1,
+          areaKey: null,
+          isFirstOrderForBuyerInStore: null,
+        },
+      });
+    const m = (body: unknown) => ({
+      id: Math.random().toString(),
+      body,
+      attempts: 1,
+      ack: () => undefined,
+      retry: () => undefined,
+    });
+    await handleCiEventsBatch(
+      {
+        queue: 'ebda-ci-events',
+        messages: [m(await mk(S1, THEIRS_SAME_STORE)), m(await mk(S2, OTHER_STORE))],
+      },
+      {
+        CI_BUCKET: r2 as never,
+        KV_CACHE: { get: async () => null, put: async () => undefined } as never,
+        CI_OUTCOMES: { writeDataPoint: () => undefined } as never,
+      }
+    );
+    const keyOf = async (store: string) =>
+      JSON.parse(
+        (
+          await gunzipText(
+            await (await r2.get(r2.keys(`outcomes/v1/store=${store}/`)[0]!))!.arrayBuffer()
+          )
+        ).trim()
+      ).buyerKey;
+    expect(await keyOf(S1)).toBeNull();
+    expect(await keyOf(S2)).toBe(KEY);
   });
 
   it('throws when a row survives (retry + page); nothing to do = no-op; no bucket: Node ok, Worker fails', async () => {
@@ -102,12 +167,14 @@ describe('scoped erase', () => {
             k,
             ...a
           )) as never;
-    await expect(eraseCiOutcomes('req', scope, [], r2 as never)).rejects.toThrow(/left 2 row/);
+    await expect(eraseCiOutcomes('req', scope, undefined, r2 as never)).rejects.toThrow(
+      /left 2 row/
+    );
     expect(await eraseCiOutcomes('r', undefined)).toEqual({ erased: 0 });
     clearCfBindings();
-    expect(await eraseCiOutcomes('r', scope, [], undefined)).toEqual({ erased: 0 });
+    expect(await eraseCiOutcomes('r', scope, undefined, undefined)).toEqual({ erased: 0 });
     setCfBindings({ HYPERDRIVE: { connectionString: '' } });
-    await expect(eraseCiOutcomes('r', scope, [], undefined)).rejects.toThrow(/CI_BUCKET/);
+    await expect(eraseCiOutcomes('r', scope, undefined, undefined)).rejects.toThrow(/CI_BUCKET/);
     clearCfBindings();
   });
 });
@@ -152,7 +219,7 @@ describe('in-flight events after an erase (tombstones)', () => {
         },
       });
     await r2.put(ciOrderTombstoneKey(MINE), '1');
-    await r2.put(ciBuyerTombstoneKey(KEY), '1');
+    await r2.put(ciBuyerTombstoneKey(S1, KEY), '1');
     const m = (body: unknown) => ({
       id: Math.random().toString(),
       body,
@@ -192,5 +259,79 @@ describe('redactOrderForCustomer', () => {
     expect(redactOrderForCustomer({ id: 'o', buyerKey: KEY, areaKey: 'EG-C' } as never)).toEqual({
       id: 'o',
     });
+  });
+});
+
+describe('races the index cannot see (second pass lists the store prefix)', () => {
+  it('an index entry written before its partition lands is KEPT; the prefix pass then removes the row the index never led to', async () => {
+    const r2 = new FakeR2();
+    const late = `outcomes/v1/store=${S1}/dt=2026-11-04/LATE.ndjson.gz`;
+    await r2.put(ciBuyerIndexKey(KEY), JSON.stringify({ partitions: [late] })); // index first, partition not there yet
+    await eraseCiOutcomes('req', scope, undefined, r2 as never);
+    expect(JSON.parse(await (await r2.get(ciBuyerIndexKey(KEY)))!.text()).partitions).toEqual([
+      late,
+    ]); // not dropped
+    // the sink's partition then lands, and the entry was lost / never indexed under this key either
+    await r2.put(late, await gzipText(JSON.stringify(row(S1, MINE, null)) + '\n'));
+    await r2.put(ciBuyerIndexKey(KEY), JSON.stringify({ partitions: [] }));
+    expect(await eraseCiOutcomes('req', scope, undefined, r2 as never)).toEqual({ erased: 0 }); // index pass is blind to it
+    expect(await eraseCiOutcomes('req', scope, undefined, r2 as never, 'prefix')).toEqual({
+      erased: 1,
+    }); // prefix pass finds it, even with a null key
+    expect(await r2.get(late)).toBeNull();
+  });
+});
+
+describe('parked dead letters', () => {
+  const park = (r2: FakeR2, id: string, body: unknown, parkedAt = Date.now()) =>
+    r2.put(ciDlqKey(id), JSON.stringify({ parkedAt, body }));
+
+  it('erasure deletes the in-scope bodies and leaves the others', async () => {
+    const r2 = new FakeR2();
+    await park(r2, 'a', row(S1, MINE));
+    await park(r2, 'b', row(S1, THEIRS_SAME_STORE));
+    await park(r2, 'c', row(S2, OTHER_STORE));
+    await eraseCiOutcomes('req', scope, undefined, r2 as never);
+    expect(r2.keys('dlq/').sort()).toEqual([ciDlqKey('b'), ciDlqKey('c')]);
+    await eraseCiOutcomes('req', scope, { storeId: S1, buyerKeys: [KEY] }, r2 as never);
+    expect(r2.keys('dlq/')).toEqual([ciDlqKey('c')]); // proven key: store 1 bodies go, store 2 stays
+  });
+
+  async function validBody(orderId: string, storeId = S1) {
+    return buildEnvelope({
+      type: 'order.placed',
+      seed: `o:${orderId}`,
+      occurredAt: new Date(),
+      storeId,
+      orderId,
+      buyerKey: KEY,
+      xstore: false,
+      data: {
+        totalMinor: 1,
+        currency: 'EGP',
+        paymentMethod: 'cod',
+        channel: 'web',
+        itemCount: 1,
+        areaKey: null,
+        isFirstOrderForBuyerInStore: null,
+      },
+    });
+  }
+
+  it('replay re-queues a fresh body, and refuses one older than the tombstone TTL or one that was erased', async () => {
+    const r2 = new FakeR2();
+    const sent: unknown[] = [];
+    const queue = { send: async (b: unknown) => void sent.push(b) };
+    const now = Date.now();
+    await park(r2, 'fresh', await validBody(THEIRS_SAME_STORE, S2), now - 86_400_000);
+    await park(r2, 'old', await validBody(OTHER_STORE, S2), now - 31 * 86_400_000);
+    await park(r2, 'erased', await validBody(MINE));
+    await r2.put(ciOrderTombstoneKey(MINE), '1');
+    await park(r2, 'proven', await validBody('0d8ea0f4-5a47-4c7d-9a49-6ff3d3b8f6a9'));
+    await r2.put(ciBuyerTombstoneKey(S1, KEY), '1');
+    const res = await replayCiDlq(r2 as never, queue as never, now);
+    expect(res).toEqual({ replayed: 1, refusedOld: 1, refusedErased: 2, unreadable: 0 });
+    expect(sent).toHaveLength(1);
+    expect(r2.keys('dlq/')).toHaveLength(0); // replayed and refused bodies are not kept
   });
 });

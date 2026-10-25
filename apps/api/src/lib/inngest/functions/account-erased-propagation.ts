@@ -6,7 +6,12 @@ import {
 } from '../../../services/privacy-propagation.service';
 import logger from '../../logger';
 import { cfBindings } from '../../../cf/bindings';
-import { eraseCiBuyerKey, eraseCiForOrders, type CiBucket } from '../../ci/erase';
+import {
+  eraseCiBuyerInStore,
+  eraseCiForOrders,
+  type CiBucket,
+  type EraseMode,
+} from '../../ci/erase';
 import { inngest } from '../client';
 
 /**
@@ -34,7 +39,7 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
     triggers: [{ event: 'account/erased' }],
   },
   async ({ event, step }) => {
-    const { userId, oneSignalPlayerIds, ciBuyerKeys, ciScope } = event.data;
+    const { userId, oneSignalPlayerIds, ciProven, ciScope } = event.data;
 
     if (!userId) {
       logger.warn({ event: event.name }, 'account/erased fired without userId — skipping');
@@ -46,17 +51,8 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
       step.run('delete-posthog-person', () => deletePostHogPerson(userId)),
       // Customer Intelligence (PDPL): the buyer's rows in R2 `ebda-ci` and their index entries. Analytics
       // Engine holds no buyer key, so there is nothing to erase there. Not a Worker (Node)? no bucket.
-      step.run('erase-ci-outcomes', () => eraseCiOutcomes(userId, ciScope, ciBuyerKeys ?? [])),
+      step.run('erase-ci-outcomes', () => eraseCiOutcomes(userId, ciScope, ciProven)),
     ]);
-
-    // Customer Intelligence: a second pass after the queue's retry window. A tombstone already blocks
-    // in-flight events; this removes anything a replay slipped in before the tombstone landed.
-    if (ciScope?.orderIds?.length || ciBuyerKeys?.length) {
-      await step.sleep('ci-erasure-settle', '2h');
-      await step.run('erase-ci-outcomes-second-pass', () =>
-        eraseCiOutcomes(userId, ciScope, ciBuyerKeys ?? [])
-      );
-    }
 
     // Re-throw (aggregated) if a step ultimately failed after Inngest's
     // per-step retries, so `alerts-failure-watch` can dead-letter it —
@@ -79,39 +75,53 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
         `account-erased-propagation: ${rejected.length}/${results.length} step(s) failed (${summary})`
       );
     }
+
+    // Customer Intelligence: a second pass after the queue's retry window, listing the store's partitions instead of trusting the index
+    // (it also catches a row whose index entry lost a race with the sink). Runs after the failure check above,
+    // so a OneSignal/PostHog/first-pass failure is reported at once; Inngest's retry then reaches this pass. A tombstone already blocks
+    // in-flight events; this removes anything a replay slipped in before the tombstone landed.
+    if (ciScope?.orderIds?.length || ciProven?.buyerKeys.length) {
+      await step.sleep('ci-erasure-settle', '2h');
+      await step.run('erase-ci-outcomes-second-pass', () =>
+        eraseCiOutcomes(userId, ciScope, ciProven, undefined, 'prefix')
+      );
+    }
   }
 );
 
 /**
- * Erases the account's CI rows. `scope` = the account's own orders in its store (always); `provenKeys` =
- * buyer keys of a phone the account PROVED it holds (WA-CONSENT-1), erased across every store. Throws
- * when any row survives (so the job retries and pages). Tombstones are written first (lib/ci/erase.ts).
+ * Erases the account's CI rows. `scope` = the account's own orders in its store (always); `proven` = buyer
+ * keys of a phone the account PROVED it holds (WA-CONSENT-1), erased in THAT store only. Throws when any
+ * row survives (so the job retries and pages). Tombstones are written first (lib/ci/erase.ts).
  */
 export async function eraseCiOutcomes(
   requestId: string,
   scope: { storeId?: string; orderIds?: string[]; buyerKeys?: string[] } | undefined,
-  provenKeys: string[] = [],
-  bucket: CiBucket | undefined = cfBindings()?.CI_BUCKET as unknown as CiBucket | undefined
+  proven?: { storeId: string; buyerKeys: string[] },
+  bucket: CiBucket | undefined = cfBindings()?.CI_BUCKET as unknown as CiBucket | undefined,
+  mode: EraseMode = 'index'
 ): Promise<{ erased: number }> {
+  void requestId;
   const hasScope = !!scope?.storeId && (scope.orderIds?.length ?? 0) > 0;
-  if (!hasScope && provenKeys.length === 0) return { erased: 0 };
+  const hasProven = !!proven && proven.buyerKeys.length > 0;
+  if (!hasScope && !hasProven) return { erased: 0 };
   if (!bucket) {
     if (cfBindings()) throw new Error('CI_BUCKET binding missing: CI rows were not erased');
     return { erased: 0 };
   }
   let erased = 0;
   if (hasScope) {
-    const r = await eraseCiForOrders(bucket, {
-      storeId: scope!.storeId!,
-      orderIds: scope!.orderIds!,
-      buyerKeys: scope!.buyerKeys ?? [],
-    });
+    const r = await eraseCiForOrders(
+      bucket,
+      { storeId: scope!.storeId!, orderIds: scope!.orderIds!, buyerKeys: scope!.buyerKeys ?? [] },
+      mode
+    );
     if (r.remaining > 0)
       throw new Error(`CI erasure left ${r.remaining} row(s) of the account's orders`);
     erased += r.erased;
   }
-  for (const buyerKey of provenKeys) {
-    const r = await eraseCiBuyerKey(bucket, buyerKey, requestId);
+  if (hasProven) {
+    const r = await eraseCiBuyerInStore(bucket, proven!, mode);
     if (r.remaining > 0)
       throw new Error(`CI erasure left ${r.remaining} row(s) for a proven buyer key`);
     erased += r.erased;

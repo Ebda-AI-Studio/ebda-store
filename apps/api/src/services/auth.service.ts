@@ -1976,11 +1976,11 @@ export class AuthService {
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
     // Customer Intelligence erase scope, collected BEFORE the scrub nulls the keys: the account's OWN orders in
-    // its store (and the keys on them) are always erased; a buyer-key-wide erase happens only for a phone the
-    // account proved it holds (`eraseProvenBuyerKey`, the WA-CONSENT-1 proof). A buyer key is a hash of a phone
+    // its store (and the keys on them) are always erased; a buyer-key erase happens only for a phone the
+    // account proved it holds (`eraseProvenBuyerKey`, the WA-CONSENT-1 proof) and only in the store that proof was made in. A buyer key is a hash of a phone
     // someone typed at checkout, so it never widens the scope on its own.
     let ciScope: { storeId: string; orderIds: string[]; buyerKeys: string[] } | undefined;
-    let ciProvenKeys: string[] = [];
+    let ciProven: { storeId: string; buyerKeys: string[] } | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
@@ -2024,7 +2024,9 @@ export class AuthService {
         orderIds: ownOrders.map(o => o.id),
         buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
       };
-      ciProvenKeys = eraseProvenBuyerKey ? [eraseProvenBuyerKey] : [];
+      ciProven = eraseProvenBuyerKey
+        ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
+        : undefined;
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -2410,7 +2412,7 @@ export class AuthService {
           oneSignalPlayerIds,
           storeId: user.storeId ?? undefined,
           buyerKey,
-          ciBuyerKeys: ciProvenKeys,
+          ciProven,
           ciScope,
         },
       })

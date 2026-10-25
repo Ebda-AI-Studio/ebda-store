@@ -128,6 +128,7 @@ const PUBLIC_SNAPSHOT_KEYS = [
  */
 export function redactOrderForCustomer<T extends { items?: unknown }>(input: T): T {
   // Customer Intelligence columns (CI-1) are the platform's, not the shopper's: never in a customer-facing order.
+  if (!('buyerKey' in input) && !('areaKey' in input) && !Array.isArray(input.items)) return input;
   const {
     buyerKey: _buyerKey,
     areaKey: _areaKey,

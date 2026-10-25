@@ -183,7 +183,10 @@ describe('sink', () => {
   it('the DLQ parks the body in R2 before acking, pages, and retries if it cannot park', async () => {
     const m = msg({ whatever: 1 }, 'dead-1');
     await handleCiEventsBatch(batch([m], 'ebda-ci-events-dlq'), E());
-    expect(JSON.parse(await (await r2.get('dlq/dead-1.json'))!.text())).toEqual({ whatever: 1 });
+    expect(JSON.parse(await (await r2.get('dlq/dead-1.json'))!.text())).toMatchObject({
+      body: { whatever: 1 },
+      parkedAt: expect.any(Number),
+    });
     expect(h.alert).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'p1', source: 'ci.dead_letter' })
     );

@@ -180,7 +180,7 @@ describe('wrangler.jsonc and the Worker entry', () => {
       'expire-ci-raw-24m',
       'expire-ci-index-24m',
       'expire-ci-tombstone-30d',
-      'expire-ci-dlq-30d',
+      'expire-ci-dlq-14d',
     ])
       expect(sh).toContain(rule);
     expect(sh).toMatch(/"outcomes\/"[^\n]*63072000/);

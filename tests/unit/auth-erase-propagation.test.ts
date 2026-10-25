@@ -220,7 +220,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
         storeId: CUSTOMER.storeId,
         // Customer Intelligence: no proven phone here, and the scope is the account's own (zero) orders
-        ciBuyerKeys: [],
+        ciProven: undefined,
         ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [] },
       },
     });
@@ -244,7 +244,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
       orderIds: ['o1', 'o2', 'o3'],
       buyerKeys: ['k1'],
     });
-    expect(data.ciBuyerKeys).toEqual([]); // no proven phone: no buyer-key-wide erase
+    expect(data.ciProven).toBeUndefined(); // no proven phone: no buyer-key erase
     expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ buyerKey: null, areaKey: null }) })
     );
@@ -301,7 +301,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         userId: CUSTOMER.id,
         oneSignalPlayerIds: [],
         storeId: CUSTOMER.storeId,
-        ciBuyerKeys: [],
+        ciProven: undefined,
         ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [] },
       },
     });

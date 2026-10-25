@@ -23,17 +23,17 @@ else
   call -X POST "$API/r2/buckets" -d '{"name":"ebda-ci"}' | ok; echo "  created (private: no public access, no custom domain)"
 fi
 
-echo "2/3 lifecycle: outcomes/ and index/ 730 days, tombstone/ and dlq/ 30 days"
+echo "2/3 lifecycle: outcomes/ and index/ 730 days, tombstone/ 30 days, dlq/ 14 days"
 RULES='[
  {"id":"Default Multipart Abort Rule","enabled":true,"conditions":{},"abortMultipartUploadsTransition":{"condition":{"type":"Age","maxAge":604800}}},
  {"id":"expire-ci-raw-24m","enabled":true,"conditions":{"prefix":"outcomes/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":63072000}}},
  {"id":"expire-ci-index-24m","enabled":true,"conditions":{"prefix":"index/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":63072000}}},
  {"id":"expire-ci-tombstone-30d","enabled":true,"conditions":{"prefix":"tombstone/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":2592000}}},
- {"id":"expire-ci-dlq-30d","enabled":true,"conditions":{"prefix":"dlq/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":2592000}}}]'
+ {"id":"expire-ci-dlq-14d","enabled":true,"conditions":{"prefix":"dlq/"},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":1209600}}}]'
 if call "$API/r2/buckets/ebda-ci/lifecycle" | python3 -c '
 import sys,json
 d=json.load(sys.stdin)
-want={("expire-ci-raw-24m","outcomes/",63072000),("expire-ci-index-24m","index/",63072000),("expire-ci-tombstone-30d","tombstone/",2592000),("expire-ci-dlq-30d","dlq/",2592000)}
+want={("expire-ci-raw-24m","outcomes/",63072000),("expire-ci-index-24m","index/",63072000),("expire-ci-tombstone-30d","tombstone/",2592000),("expire-ci-dlq-14d","dlq/",1209600)}
 got=set()
 for r in (d.get("result") or {}).get("rules") or []:
     t=(r.get("deleteObjectsTransition") or {}).get("condition") or {}

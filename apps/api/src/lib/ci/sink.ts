@@ -18,6 +18,7 @@ import { CI_EVENTS_DLQ } from './config';
 import {
   ciBuyerIndexKey,
   ciBuyerTombstoneKey,
+  ciDlqKey,
   ciOrderTombstoneKey,
   ciPartitionPrefix,
 } from './layout';
@@ -158,16 +159,23 @@ export async function handleCiEventsBatch(
   if (batch.queue === CI_EVENTS_DLQ) {
     const bucket = env?.CI_BUCKET as R2BucketCasLike | undefined;
     for (const msg of batch.messages) {
-      // Acking a DLQ message deletes it, so the body is parked in R2 first (`dlq/`, expires after 30 days;
+      // Acking a DLQ message deletes it, so the body is parked in R2 first (`dlq/`, expires after 14 days;
       // it holds at most the pseudonymous envelope) and the message is only acked once that write landed.
       if (bucket) {
         try {
-          await bucket.put(`dlq/${msg.id}.json`, JSON.stringify(msg.body));
+          await bucket.put(
+            ciDlqKey(msg.id),
+            JSON.stringify({ parkedAt: Date.now(), body: msg.body })
+          );
         } catch (err) {
           logger.error({ err, id: msg.id }, '[ci] could not park a dead-lettered event, retrying');
           msg.retry({ delaySeconds: retryDelaySeconds(msg.attempts) });
           continue;
         }
+      } else {
+        logger.error({ id: msg.id }, '[ci] no CI_BUCKET to park a dead letter in, retrying');
+        msg.retry({ delaySeconds: retryDelaySeconds(msg.attempts) });
+        continue;
       }
       logger.error({ id: msg.id }, '[ci] dead-lettered outcome event (not captured)');
       await sendAlert({
@@ -175,7 +183,7 @@ export async function handleCiEventsBatch(
         scope: 'platform',
         source: 'ci.dead_letter',
         title: 'A Customer Intelligence outcome could not be captured',
-        body: `Message ${msg.id} on the CI events queue exhausted its retries. Capture is unrecoverable data: the body is parked in R2 ebda-ci under dlq/ (30 days); replay it after fixing the cause.`,
+        body: `Message ${msg.id} on the CI events queue exhausted its retries. Capture is unrecoverable data: the body is parked in R2 ebda-ci under dlq/ (14 days); replay it after fixing the cause.`,
       }).catch(() => undefined);
       msg.ack();
     }
@@ -202,7 +210,8 @@ export async function handleCiEventsBatch(
       msg.ack();
       continue;
     }
-    if (e.buyerKey && (await ci.get(ciBuyerTombstoneKey(e.buyerKey)))) e = { ...e, buyerKey: null };
+    if (e.buyerKey && (await ci.get(ciBuyerTombstoneKey(e.storeId, e.buyerKey))))
+      e = { ...e, buyerKey: null };
     if (kv && (await kv.get(`ci-seen:${e.eventId}`).catch(() => null))) {
       msg.ack();
       continue;
