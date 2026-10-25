@@ -1,67 +1,26 @@
-// Regenerates src/lib/legal-wa-{ar,en}.ts from the Ebda WhatsApp legal markdown (docs/legal/{ar,en}/whatsapp-*.md in
+// Copies the source markdown verbatim into apps/marketing/legal-source/ (the drift test compares the published
+// pages to it) and regenerates src/lib/legal-wa-{ar,en}.ts from the Ebda WhatsApp legal markdown (docs/legal/{ar,en}/whatsapp-*.md in
 // the ebda-whatsapp repo). Read-only import: pass the directory that holds ar/ and en/.
 //   node apps/marketing/scripts/import-wa-legal.mjs <path-to>/docs/legal
 // Drops the review-pending HTML comments and markdown markup; headings become sections, bullets and table rows
 // become paragraphs. The output is committed; the marketing build never reads the markdown.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { DOCS, parse } from './wa-legal-lib.mjs';
 
 const src = process.argv[2];
 if (!src) throw new Error('usage: import-wa-legal.mjs <docs/legal dir>');
 const out = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'lib');
-const DOCS = [
-  ['terms', 'waTerms'],
-  ['privacy', 'waPrivacy'],
-  ['dpa', 'waDpa'],
-];
-const OVERVIEW = { ar: 'نظرة عامة', en: 'Overview' };
-
-function clean(t) {
-  return t
-    .replace(/<!--[\s\S]*?-->\s*/g, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .trim();
-}
-
-function parse(file, lang) {
-  const raw = readFileSync(file, 'utf8');
-  const fm = /^---\n([\s\S]*?)\n---\n/.exec(raw);
-  const meta = Object.fromEntries(fm[1].split('\n').map(l => l.split(/:\s*/, 2)));
-  const lines = raw.slice(fm[0].length).split('\n');
-  let title = '';
-  const sections = [];
-  let cur = { h: OVERVIEW[lang], p: [] };
-  let para = [];
-  const flush = () => {
-    if (para.length) cur.p.push(clean(para.join(' ')));
-    para = [];
-  };
-  for (const line of lines) {
-    if (line.startsWith('# ')) title = clean(line.slice(2));
-    else if (line.startsWith('## ')) {
-      flush();
-      if (cur.p.length) sections.push(cur);
-      cur = { h: clean(line.slice(3)), p: [] };
-    } else if (/^\|[\s|:-]+\|$/.test(line)) continue;
-    else if (line.startsWith('|')) {
-      flush();
-      const cells = line.split('|').slice(1, -1).map(clean);
-      if (cells.length >= 3) cur.p.push(`${cells[0]}: ${cells[1]}. ${cells[2]}`);
-      else cur.p.push(cells.join(': '));
-    } else if (line.startsWith('- ')) {
-      flush();
-      cur.p.push('• ' + clean(line.slice(2)));
-    } else if (line.trim() === '') flush();
-    else if (/^Arabic version prevails\.|^النسخة العربية هي الحاكمة\.$/.test(line.trim())) continue;
-    else para.push(line.trim());
+const srcDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'legal-source');
+for (const lang of ['ar', 'en']) {
+  mkdirSync(path.join(srcDir, lang), { recursive: true });
+  for (const [f] of DOCS) {
+    const name = `whatsapp-${f}.md`;
+    copyFileSync(path.join(src, lang, name), path.join(srcDir, lang, name));
   }
-  flush();
-  if (cur.p.length) sections.push(cur);
-  return { title, sections, updated: meta.updated };
 }
-
 for (const lang of ['ar', 'en']) {
   const docs = DOCS.map(([f, key]) => [key, parse(path.join(src, lang, `whatsapp-${f}.md`), lang)]);
   const body = docs
