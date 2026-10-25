@@ -7,7 +7,7 @@
  * erased with it. It is keyed by the suite buyer key, so it holds no raw phone.
  */
 import { prisma, runInTenantContext } from '@ebda/database';
-import { buyerKeyFor } from '@ebda/shared';
+import { buyerKeyFor, toE164 } from '@ebda/shared';
 import { suiteBuyerKeySecret } from './config';
 
 export type ConsentSource = 'checkout' | 'cart' | 'admin' | 'whatsapp';
@@ -16,6 +16,38 @@ export interface ConsentInput {
   consent: boolean;
   source: ConsentSource;
   locale?: 'en' | 'ar';
+}
+
+/** Is `phone` the delivery/contact number on an order this customer placed? */
+export async function phoneOnOwnOrder(
+  storeId: string,
+  userId: string,
+  phone: string
+): Promise<boolean> {
+  const want = toE164(phone);
+  if (!want) return false;
+  const orders = await prisma.order.findMany({
+    where: { storeId, customerId: userId, status: { not: 'cancelled' } },
+    select: { shippingAddress: true },
+    orderBy: { createdAt: 'desc' },
+    take: 25,
+  });
+  return orders.some(o => {
+    const p = (o.shippingAddress as { phone?: unknown } | null)?.phone;
+    return typeof p === 'string' && toE164(p) === want;
+  });
+}
+
+/** The customer changed their profile phone: the OLD number's consent ends; the new one needs a fresh tick. */
+export async function revokeForPhoneChange(storeId: string, oldPhone: string): Promise<void> {
+  const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), oldPhone);
+  if (!buyerKey) return;
+  await runInTenantContext(storeId, () =>
+    prisma.storeWhatsAppConsent.updateMany({
+      where: { storeId, buyerKey, granted: true },
+      data: { granted: false, revokedAt: new Date(), revokedSource: 'profile' },
+    })
+  );
 }
 
 export const WhatsAppConsentService = {
@@ -78,7 +110,8 @@ export const WhatsAppConsentService = {
     userId: string,
     input: { consent: boolean; locale?: 'en' | 'ar' }
   ): Promise<
-    { status: 'recorded'; granted: boolean; cartId: string } | { status: 'no_cart' | 'no_phone' }
+    | { status: 'recorded'; granted: boolean; cartId: string }
+    | { status: 'no_cart' | 'no_phone' | 'phone_unproven' }
   > {
     const cart = await prisma.cart.findFirst({
       where: { storeId, sessionId, customerId: userId },
@@ -90,6 +123,11 @@ export const WhatsAppConsentService = {
       select: { phone: true },
     });
     if (!user?.phone) return { status: 'no_phone' };
+    // A profile phone is self-declared, so GRANTING needs proof the number is theirs: it must be the
+    // number on an order THIS customer placed. Withdrawing needs no proof (revocation always works).
+    if (input.consent && !(await phoneOnOwnOrder(storeId, userId, user.phone))) {
+      return { status: 'phone_unproven' };
+    }
     const r = await this.record(storeId, user.phone, {
       consent: input.consent,
       source: 'checkout',

@@ -586,7 +586,7 @@ model StoreWhatsAppConsent {
   buyerKey    String    @map("buyer_key")
   granted     Boolean   @default(false)
   grantedAt   DateTime? @map("granted_at")
-  /// 'checkout' | 'cart' | 'admin' | 'whatsapp' (a STOP the buyer sent)
+  /// 'checkout' | 'cart' | 'admin' | 'whatsapp' (a STOP the buyer sent); revoke also 'erasure' | 'profile' (phone changed)
   grantedSource String? @map("granted_source")
   /// The language of the label the buyer saw when ticking.
   locale      String?

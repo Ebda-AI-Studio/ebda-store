@@ -41,7 +41,7 @@ import {
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
-import { WhatsAppConsentService } from '../lib/wa/consent';
+import { WhatsAppConsentService, revokeForPhoneChange } from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -1428,10 +1428,14 @@ export class AuthService {
     userId: string,
     data: { firstName?: string; lastName?: string; phone?: string }
   ) {
-    return withUser(userId, async () => {
+    let phoneChange: { storeId: string; oldPhone: string } | null = null;
+    const result = await withUser(userId, async () => {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
         throw new AppError(404, 'NOT_FOUND', 'User not found');
+      }
+      if (data.phone !== undefined && user.phone && user.storeId && data.phone !== user.phone) {
+        phoneChange = { storeId: user.storeId, oldPhone: user.phone };
       }
 
       const updated = await prisma.user.update({
@@ -1457,6 +1461,11 @@ export class AuthService {
 
       return updated;
     });
+    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number; the new one
+    // needs a fresh tick (and proof it is theirs). Announced to Ebda WhatsApp by the consent observer.
+    const change = phoneChange as { storeId: string; oldPhone: string } | null;
+    if (change) await revokeForPhoneChange(change.storeId, change.oldPhone);
+    return result;
   }
 
   static async changePassword(userId: string, currentPassword: string, newPassword: string) {

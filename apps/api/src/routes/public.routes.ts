@@ -983,8 +983,11 @@ router.post(
   '/cart/whatsapp-optin',
   cartLimiter,
   newsletterLimiter,
-  whatsappConsentStoreLimiter,
   optionalAuthenticate,
+  // The store-wide ceiling counts only SIGNED-IN GRANTS: anonymous calls (401) and every revocation
+  // bypass it, so a flood can never block a buyer's withdrawal (revocation must always succeed).
+  (req: Request, res: Response, next: NextFunction) =>
+    req.user && req.body?.consent === true ? whatsappConsentStoreLimiter(req, res, next) : next(),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.headers['x-session-id'] as string;
@@ -1020,7 +1023,12 @@ router.post(
         res.status(result.status === 'no_cart' ? 404 : 400).json({
           success: false,
           error: {
-            code: result.status === 'no_cart' ? 'NO_CART' : 'NO_PHONE',
+            code:
+              result.status === 'no_cart'
+                ? 'NO_CART'
+                : result.status === 'phone_unproven'
+                  ? 'PHONE_UNPROVEN'
+                  : 'NO_PHONE',
             message: 'Not recorded',
           },
         });

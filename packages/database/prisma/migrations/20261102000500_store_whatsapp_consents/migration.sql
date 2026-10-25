@@ -15,7 +15,7 @@ CREATE TABLE "store_whatsapp_consents" (
   CONSTRAINT "store_whatsapp_consents_pkey" PRIMARY KEY ("store_id", "buyer_key"),
   CONSTRAINT "store_whatsapp_consents_buyer_key_check" CHECK ("buyer_key" ~ '^[0-9a-f]{64}$'),
   CONSTRAINT "store_whatsapp_consents_granted_source_check" CHECK ("granted_source" IS NULL OR "granted_source" IN ('checkout', 'cart', 'admin', 'whatsapp')),
-  CONSTRAINT "store_whatsapp_consents_revoked_source_check" CHECK ("revoked_source" IS NULL OR "revoked_source" IN ('checkout', 'cart', 'admin', 'whatsapp', 'erasure'))
+  CONSTRAINT "store_whatsapp_consents_revoked_source_check" CHECK ("revoked_source" IS NULL OR "revoked_source" IN ('checkout', 'cart', 'admin', 'whatsapp', 'erasure', 'profile'))
 );
 CREATE INDEX "store_whatsapp_consents_buyer_key_idx" ON "store_whatsapp_consents"("buyer_key");
 ALTER TABLE "store_whatsapp_consents" ADD CONSTRAINT "store_whatsapp_consents_store_id_fkey"
