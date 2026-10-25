@@ -558,4 +558,109 @@ describe('wallet entries', () => {
       err(() => e({ customerId: 'x1', amount: 100, idempotencyKey: 'k4', type: 'credit' })).code
     ).toBe('CUSTOMER_NOT_FOUND');
   });
+
+  describe('cumulative refund bound and backorder-aware partial restock (controller findings)', () => {
+    const paid = (f: ReturnType<typeof fixture>) => {
+      // 1,500 paid in full from the wallet: confirmed + paid
+      const o = placeOrder(f.db, f.base({ customerId: 'cust', walletAmount: 1500 }));
+      expect(o.paymentStatus).toBe('paid');
+      return o;
+    };
+
+    it('two store credits of 60% each on one paid order: the second is refused', () => {
+      const f = fixture();
+      const o = paid(f);
+      refundOrder(f.db, { storeId: 's1', orderId: o.orderId, refundKey: 'r1', walletCredit: 900 });
+      expect(
+        err(() =>
+          refundOrder(f.db, {
+            storeId: 's1',
+            orderId: o.orderId,
+            refundKey: 'r2',
+            walletCredit: 900,
+          })
+        ).code
+      ).toBe('REFUND_EXCEEDS_ORDER');
+      refundOrder(f.db, { storeId: 's1', orderId: o.orderId, refundKey: 'r3', walletCredit: 600 }); // the exact remainder is allowed
+      expect(
+        err(() =>
+          refundOrder(f.db, { storeId: 's1', orderId: o.orderId, refundKey: 'r4', walletCredit: 1 })
+        ).code
+      ).toBe('REFUND_EXCEEDS_ORDER');
+    });
+
+    it('a provider amount and store credit share ONE ceiling (the sum of every channel cannot pass what was paid)', () => {
+      const f = fixture();
+      const o = paid(f);
+      refundOrder(f.db, { storeId: 's1', orderId: o.orderId, refundKey: 'a1', amount: 1000 });
+      expect(
+        err(() =>
+          refundOrder(f.db, {
+            storeId: 's1',
+            orderId: o.orderId,
+            refundKey: 'a2',
+            walletCredit: 600,
+          })
+        ).code
+      ).toBe('REFUND_EXCEEDS_ORDER');
+      refundOrder(f.db, { storeId: 's1', orderId: o.orderId, refundKey: 'a3', walletCredit: 500 });
+    });
+
+    it('partial store credit then a full reversal: the customer ends with exactly what they paid', () => {
+      const f = fixture();
+      const before = f.bal();
+      const o = paid(f);
+      expect(f.bal()).toBe(before - 1500);
+      refundOrder(f.db, { storeId: 's1', orderId: o.orderId, refundKey: 'p1', walletCredit: 600 });
+      refundOrder(f.db, { storeId: 's1', orderId: o.orderId });
+      expect(f.bal()).toBe(before); // 600 credited earlier + 900 on the reversal = the 1,500 paid
+    });
+
+    it('an unpaid (COD) order has nothing captured: no store credit can be created from it', () => {
+      const f = fixture();
+      const o = placeOrder(f.db, f.base({ customerId: 'cust' }));
+      f.x(`UPDATE orders SET status = 'confirmed' WHERE id = ?`, o.orderId);
+      expect(
+        err(() =>
+          refundOrder(f.db, {
+            storeId: 's1',
+            orderId: o.orderId,
+            refundKey: 'c1',
+            walletCredit: 100,
+          })
+        ).code
+      ).toBe('REFUND_EXCEEDS_ORDER');
+    });
+
+    it('a partial return of a backordered line restocks only what checkout took', () => {
+      const f = fixture();
+      const o = placeOrder(
+        f.db,
+        f.base({
+          lines: [{ productId: 'vprod', variantId: 'v2', quantity: 5 }],
+          backorderEnabled: true,
+        })
+      ); // 2 on hand, 5 ordered
+      expect(f.stock('product_variants', 'v2')).toBe(0);
+      f.x(`UPDATE orders SET status = 'confirmed' WHERE id = ?`, o.orderId);
+      const item = f.one<{ id: string }>(
+        `SELECT id FROM order_items WHERE order_id = ?`,
+        o.orderId
+      ).id;
+      refundOrder(f.db, {
+        storeId: 's1',
+        orderId: o.orderId,
+        refundKey: 'b1',
+        lines: [{ orderItemId: item, quantity: 5 }],
+      });
+      expect(f.stock('product_variants', 'v2')).toBe(2); // 3 units were never in stock
+      refundOrder(f.db, {
+        storeId: 's1',
+        orderId: o.orderId,
+        refundKey: 'b2',
+        lines: [{ orderItemId: item, quantity: 5 }],
+      });
+      expect(f.stock('product_variants', 'v2')).toBe(2); // and a second return adds nothing
+    });
+  });
 });
