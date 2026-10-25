@@ -210,7 +210,12 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
-      data: { userId: CUSTOMER.id, oneSignalPlayerIds: ['player-a', 'player-b'] },
+      data: {
+        userId: CUSTOMER.id,
+        oneSignalPlayerIds: ['player-a', 'player-b'],
+        // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
+        storeId: CUSTOMER.storeId,
+      },
     });
   });
 
@@ -260,7 +265,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
-      data: { userId: CUSTOMER.id, oneSignalPlayerIds: [] },
+      data: { userId: CUSTOMER.id, oneSignalPlayerIds: [], storeId: CUSTOMER.storeId },
     });
   });
 });

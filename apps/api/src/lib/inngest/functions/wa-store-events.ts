@@ -1,6 +1,7 @@
 import type { InngestFunction } from 'inngest';
 import { acrossStores, prisma, runInTenantContext } from '@ebda/database';
-import { BUYER_KEY_VERSION, buyerKeyFor, toE164 } from '@ebda/shared';
+import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
+import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
 import logger from '../../logger';
 import { suiteBuyerKeySecret } from '../../wa/config';
@@ -197,6 +198,62 @@ async function shipmentEvent(event: SourceEvent): Promise<Planned[]> {
   ];
 }
 
+/** `cart.abandoned`: the abandoned-cart rule fired (a row was created for a shopper with a phone). */
+async function cartEvent(event: SourceEvent): Promise<Planned[]> {
+  const { storeId, cartId } = (event.data ?? {}) as { storeId?: string; cartId?: string };
+  if (!storeId || !cartId) return [];
+  const row = await runInTenantContext(storeId, () =>
+    prisma.abandonedCart.findFirst({
+      where: { storeId, cartId },
+      select: {
+        status: true,
+        recoveredAt: true,
+        customerPhone: true,
+        createdAt: true,
+        store: { select: { slug: true, domain: true, settings: true } },
+      },
+    })
+  );
+  if (!row) throw new Error(`abandoned cart ${cartId} not visible yet`);
+  // Stop-on-convert: a shopper who already ordered must not be chased.
+  if (row.status === 'recovered' || row.recoveredAt) return [];
+  const phone = toE164(row.customerPhone);
+  if (!phone) return [];
+  const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), phone);
+  if (!buyerKey) return [];
+  const lang = (row.store.settings as { defaultLanguage?: unknown } | null)?.defaultLanguage;
+  return [
+    {
+      seed: `cart:${cartId}`,
+      occurredAt: row.createdAt,
+      input: {
+        type: 'cart.abandoned',
+        storeId,
+        data: {
+          cartId,
+          buyerKey,
+          phoneE164: phone,
+          locale: lang === 'en' ? 'en' : 'ar',
+          // Signed, expiring, store-scoped: re-attaches THIS cart for guests too (Ruling CART-RESTORE-1).
+          recoveryUrl: `${storefrontOrigin(row.store)}/cart?restore=${encodeURIComponent(signCartRestoreToken(storeId, cartId))}`,
+        },
+      },
+    },
+  ];
+}
+
+/** `customer.erased` (PDPL): Ebda WhatsApp deletes the contact and its messages. Only the hashed key travels. */
+async function erasedEvent(event: SourceEvent): Promise<Planned[]> {
+  const { storeId, buyerKey } = (event.data ?? {}) as { storeId?: string; buyerKey?: string };
+  if (!storeId || !buyerKey) return [];
+  return [
+    {
+      seed: `erased:${storeId}:${buyerKey}`,
+      input: { type: 'customer.erased', storeId, data: { buyerKey } },
+    },
+  ];
+}
+
 async function statusEvent(event: SourceEvent): Promise<Planned[]> {
   const d = (event.data ?? {}) as {
     orderId?: string;
@@ -252,6 +309,15 @@ async function planEvent(event: SourceEvent): Promise<Planned[]> {
 export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
   if (!storeId) return 0;
+  // An erasure goes to Ebda WhatsApp for any store it knows (a link row), linked or not: the
+  // contact may outlive an unlink, and it must be deleted either way.
+  if (event.name === 'account/erased') {
+    if (!(await hasWhatsAppLinkRow(storeId))) return 0;
+    const planned = await erasedEvent(event);
+    const events = await Promise.all(planned.map(p => buildStoreEvent(p.input, { seed: p.seed })));
+    await sendStoreEvents(events);
+    return events.length;
+  }
   // Plan state goes to Ebda WhatsApp for every store it knows (it holds a link row), including a
   // store that was unlinked or downgraded: that is exactly when the gate must hear about it.
   if (event.name === PLAN_CHANGED_EVENT) {
@@ -269,7 +335,9 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
         ? await shipmentEvent(event)
         : event.name === 'order/status-changed'
           ? await statusEvent(event)
-          : [];
+          : event.name === 'cart/abandoned'
+            ? await cartEvent(event)
+            : [];
   if (planned.length === 0) return 0;
   const events = await Promise.all(
     planned.map(p => buildStoreEvent(p.input, { seed: p.seed, occurredAt: p.occurredAt }))
@@ -288,6 +356,8 @@ export const waStoreEvents: InngestFunction.Any = inngest.createFunction(
       { event: 'order/status-changed' },
       { event: 'shipment/status-updated' },
       { event: PLAN_CHANGED_EVENT },
+      { event: 'cart/abandoned' },
+      { event: 'account/erased' },
     ],
   },
   async ({ event, step }) => {

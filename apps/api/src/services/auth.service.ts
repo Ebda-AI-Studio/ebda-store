@@ -40,6 +40,7 @@ import {
 } from '@ebda/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
+import { buyerKeyForErasure } from '../lib/wa/buyer-key';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -1922,6 +1923,10 @@ export class AuthService {
       )
     ).map(s => s.playerId);
 
+    // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
+    // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
+    const buyerKey = await buyerKeyForErasure(user.phone);
+
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
@@ -2314,7 +2319,12 @@ export class AuthService {
     // DROPS it if the transaction failed. Outside a request (self-service,
     // retention cron) it runs inline, unchanged.
     void deferAfterTenantCommit('auth.eraseAccount.propagate', () =>
-      inngest.send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })
+      inngest.send({
+        name: 'account/erased',
+        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
+        // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
+        data: { userId, oneSignalPlayerIds, storeId: user.storeId ?? undefined, buyerKey },
+      })
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );

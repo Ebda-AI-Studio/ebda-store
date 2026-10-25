@@ -34,6 +34,7 @@ import {
   CART_EMAIL_DEFAULT_DELAY_MINUTES,
 } from './cart-recovery-email.service';
 import logger from '../lib/logger';
+import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
 import crypto from 'crypto';
 import { config } from '../config';
 import type { NotificationData, NotificationEvent } from '@ebda/shared';
@@ -396,6 +397,16 @@ class AbandonedCartService {
                 nextStepAt,
               },
             });
+
+            // Ebda WhatsApp (contract section 4 `cart.abandoned`): the rule just fired for this cart.
+            // The job drops it unless the store linked WhatsApp; the envelope id is seeded by the cart.
+            if (customerPhone) {
+              await sendEventAfterCommit(
+                'wa-cart-abandoned',
+                { name: 'cart/abandoned', data: { storeId, cartId: cart.id } },
+                { ifUnhookable: 'send' }
+              );
+            }
 
             logger.info(
               { correlationId, storeId, cartId: cart.id, itemCount: cartItemCount },

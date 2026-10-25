@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
+  cart: vi.fn(),
   linkRow: vi.fn(),
   planInput: vi.fn(),
   order: vi.fn(),
@@ -12,7 +13,7 @@ const h = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
-  prisma: { order: { findUnique: h.order } },
+  prisma: { order: { findUnique: h.order }, abandonedCart: { findFirst: h.cart } },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked, hasWhatsAppLinkRow: h.linkRow }));
@@ -54,6 +55,13 @@ beforeEach(() => {
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
   h.linkRow.mockReset().mockResolvedValue(true);
+  h.cart.mockReset().mockResolvedValue({
+    status: 'pending',
+    recoveredAt: null,
+    customerPhone: '01001234567',
+    createdAt: new Date('2026-10-25T09:00:00Z'),
+    store: { slug: 'souq', domain: null, settings: { defaultLanguage: 'en' } },
+  });
   h.planInput.mockReset().mockResolvedValue({
     seed: 'plan:x',
     input: {
@@ -346,5 +354,73 @@ describe('store/plan-changed', () => {
     h.send.mockClear();
     await emitStoreEventsFor({ ...ev, id: 'another' });
     expect(sent()[0]!.id).toBe(first);
+  });
+});
+
+describe('cart/abandoned', () => {
+  const ev = { id: 'c1', name: 'cart/abandoned', data: { storeId: STORE, cartId: 'cart-1' } };
+
+  it('emits cart.abandoned with the buyer key, the store language and a signed restore link', async () => {
+    process.env.JWT_SECRET ??= 'test-jwt-secret-0123456789abcdef-0123456789';
+    expect(await emitStoreEventsFor(ev)).toBe(1);
+    const e = sent()[0]!;
+    expect(storeEventSchema.safeParse(e).success).toBe(true);
+    expect(e).toMatchObject({
+      type: 'cart.abandoned',
+      data: { cartId: 'cart-1', phoneE164: '+201001234567', locale: 'en' },
+    });
+    expect(String(e.data.recoveryUrl)).toMatch(/^https:\/\/souq\.ebda\.app\/cart\?restore=/);
+    expect(String(e.data.buyerKey)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('a cart that was already recovered (the shopper ordered) is never chased', async () => {
+    h.cart.mockResolvedValue({ ...(await h.cart()), status: 'recovered' });
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+  });
+
+  it('no usable phone, or a store that is not linked: nothing', async () => {
+    h.cart.mockResolvedValue({ ...(await h.cart()), customerPhone: 'n/a' });
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    h.linked.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+  });
+
+  it('a cart row that is not committed yet throws so the job retries; the id is stable per cart', async () => {
+    h.cart.mockResolvedValueOnce(null);
+    await expect(emitStoreEventsFor(ev)).rejects.toThrow(/not visible yet/);
+    await emitStoreEventsFor(ev);
+    const first = sent()[0]!.id;
+    h.send.mockClear();
+    await emitStoreEventsFor({ ...ev, id: 'another' });
+    expect(sent()[0]!.id).toBe(first);
+  });
+});
+
+describe('account/erased (customer.erased)', () => {
+  const KEY = 'b'.repeat(64);
+  const ev = {
+    id: 'e1',
+    name: 'account/erased',
+    data: { storeId: STORE, buyerKey: KEY, userId: 'u1' },
+  };
+
+  it('sends ONLY the hashed key, for any store Ebda WhatsApp knows, linked or not', async () => {
+    h.linked.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(1);
+    expect(sent()[0]).toMatchObject({
+      type: 'customer.erased',
+      storeId: STORE,
+      data: { buyerKey: KEY },
+    });
+    expect(Object.keys(sent()[0]!.data)).toEqual(['buyerKey']);
+    expect(JSON.stringify(sent()[0])).not.toMatch(/phone|u1/i);
+  });
+
+  it('a store WhatsApp never knew, or an erasure without a key (no phone / no secret), sends nothing', async () => {
+    h.linkRow.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
+    h.linkRow.mockResolvedValue(true);
+    expect(await emitStoreEventsFor({ ...ev, data: { storeId: STORE, userId: 'u1' } })).toBe(0);
+    expect(await emitStoreEventsFor({ ...ev, data: { buyerKey: KEY } })).toBe(0);
   });
 });
