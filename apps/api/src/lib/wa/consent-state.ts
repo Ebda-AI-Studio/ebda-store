@@ -79,11 +79,10 @@ export async function consentChangedInput(
   return {
     seed: `consent:${storeId}:${buyerKey}:${marketingOptIn}:${at.getTime()}`,
     occurredAt: at,
-    // v1.1 type: not in the vendored v1 schema until the controller forwards the pinned commit.
     input: {
       type: 'customer.consent_changed',
       storeId,
       data: { buyerKey, marketingOptIn, at: at.toISOString() },
-    } as unknown as StoreEventInput,
+    },
   };
 }

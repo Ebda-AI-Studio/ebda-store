@@ -3,6 +3,7 @@ import { acrossStores, prisma, runInTenantContext } from '@ebda/database';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
+import { redis } from '../../../services/redis.service';
 import logger from '../../logger';
 import { suiteBuyerKeySecret } from '../../wa/config';
 import { buildStoreEvent, sendStoreEvents, type StoreEventInput } from '../../wa/events';
@@ -374,6 +375,32 @@ async function planEvent(event: SourceEvent): Promise<Planned[]> {
   return p ? [{ input: p.input, seed: p.seed }] : [];
 }
 
+const CONSENT_BACKFILL_KEY = 'wa:consent-backfill:v1.1';
+
+/**
+ * Re-send the current consent state of this store's rows changed within `sinceMs` (0 = every row).
+ * Used by the 12-hourly reconcile and for the one-time v1.1 backfill. Idempotent by envelope id.
+ */
+export async function resendConsentFor(storeId: string, sinceMs: number): Promise<number> {
+  const rows = await runInTenantContext(storeId, () =>
+    prisma.storeWhatsAppConsent.findMany({
+      where: {
+        storeId,
+        ...(sinceMs > 0 ? { updatedAt: { gte: new Date(Date.now() - sinceMs) } } : {}),
+      },
+      select: { buyerKey: true },
+    })
+  );
+  let n = 0;
+  for (const r of rows) {
+    n += await emitStoreEventsFor({
+      name: CONSENT_CHANGED_EVENT,
+      data: { storeId, buyerKey: r.buyerKey },
+    });
+  }
+  return n;
+}
+
 export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
   if (!storeId) return 0;
@@ -473,11 +500,17 @@ export const waPlanSync: InngestFunction.Any = inngest.createFunction(
       .filter(r => r.value)
       .map(r => r.storeId);
     if (linked.length === 0) return { sent: 0 };
+    const backfill = !(await redis.exists(CONSENT_BACKFILL_KEY));
+    const sinceMs = backfill ? 0 : 36 * 3600 * 1000;
     const sent = await step.run('sweep', async () => {
       let n = 0;
       for (const storeId of linked) {
         n += await emitStoreEventsFor({ name: PLAN_CHANGED_EVENT, data: { storeId } });
+        // Net under the consent observer too: re-send the consent state that changed recently (and,
+        // ONCE, every row: the v1.1 backfill). Same state = same envelope id, so this is idempotent.
+        n += await resendConsentFor(storeId, sinceMs);
       }
+      if (backfill) await redis.set(CONSENT_BACKFILL_KEY, '1', 365 * 24 * 3600);
       return n;
     });
     return { sent };

@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {
+    $executeRaw: async () => 0,
     cart: { findFirst: async ({ where }: any) => h.carts.find(r => matches(r, where)) ?? null },
     user: { findFirst: async ({ where }: any) => h.users.find(r => matches(r, where)) ?? null },
     order: {
@@ -173,13 +174,5 @@ describe('a profile phone is self-declared: granting needs proof it is theirs', 
     expect(a.where).toMatchObject({ storeId: S, granted: true });
     expect(a.where.buyerKey).toMatch(/^[0-9a-f]{64}$/);
     expect(a.data).toMatchObject({ granted: false, revokedSource: 'profile' });
-  });
-  it('updateProfile calls it when the phone changes', () => {
-    const src = readFileSync('apps/api/src/services/auth.service.ts', 'utf8');
-    expect(src).toContain('revokeForPhoneChange(current.storeId, current.phone)');
-    // BEFORE the phone is written: a failed revoke leaves the phone unchanged.
-    expect(src.indexOf('revokeForPhoneChange(current.storeId')).toBeLessThan(
-      src.indexOf('...(data.phone !== undefined && { phone: data.phone })')
-    );
   });
 });

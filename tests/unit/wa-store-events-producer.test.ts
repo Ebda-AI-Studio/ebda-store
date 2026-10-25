@@ -14,12 +14,14 @@ const h = vi.hoisted(() => ({
   send: vi.fn(),
   consent: vi.fn(),
   owner: vi.fn(),
+  consentRow: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findUnique: h.order },
     abandonedCart: { findFirst: h.cart },
     user: { findFirst: h.owner },
+    storeWhatsAppConsent: { findUnique: h.consentRow },
     product: { findMany: h.products },
   },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
@@ -64,6 +66,7 @@ beforeEach(() => {
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
   h.consent.mockReset().mockResolvedValue(true);
+  h.consentRow.mockReset().mockResolvedValue(null);
   h.owner.mockReset().mockResolvedValue({ deletedAt: null });
   h.linkRow.mockReset().mockResolvedValue(true);
   h.cart.mockReset().mockResolvedValue({
@@ -515,5 +518,38 @@ describe('catalog/changed', () => {
     h.send.mockClear();
     await emitStoreEventsFor({ ...ev(['p1']), id: 'k2' });
     expect(sent()[0]!.id).toBe(first);
+  });
+});
+
+describe('customer.consent_changed (envelope v1.1)', () => {
+  const K = 'e'.repeat(64);
+  const ev = { name: 'wa/consent-changed', data: { storeId: STORE, buyerKey: K } };
+
+  it('sends the CURRENT state, valid against the pinned v1.1 schema, deterministic id', async () => {
+    h.consentRow.mockResolvedValue({
+      granted: true,
+      grantedAt: new Date('2026-10-25T10:00:00Z'),
+      revokedAt: null,
+      updatedAt: new Date('2026-10-25T10:00:00Z'),
+    });
+    expect(await emitStoreEventsFor(ev)).toBe(1);
+    const e = sent()[0]!;
+    expect(storeEventSchema.parse(e)).toMatchObject({
+      type: 'customer.consent_changed',
+      data: { buyerKey: K, marketingOptIn: true },
+    });
+    await emitStoreEventsFor(ev);
+    expect(sent()[1]!.id).toBe(e.id);
+  });
+
+  it('a removed row (erasure) is announced as marketingOptIn=false', async () => {
+    h.consentRow.mockResolvedValue(null);
+    await emitStoreEventsFor(ev);
+    expect(sent()[0]!.data.marketingOptIn).toBe(false);
+  });
+
+  it('a store that never linked WhatsApp is not told', async () => {
+    h.linkRow.mockResolvedValue(false);
+    expect(await emitStoreEventsFor(ev)).toBe(0);
   });
 });

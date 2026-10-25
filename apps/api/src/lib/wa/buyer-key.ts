@@ -1,5 +1,4 @@
 import { buyerKeyFor } from '@ebda/shared';
-import logger from '../logger';
 
 /**
  * The buyer key for an erasure: never throws (an erase must not fail because WhatsApp is not
@@ -11,10 +10,7 @@ export async function buyerKeyForErasure(
   if (!phone) return undefined;
   const secret = process.env.SUITE_BUYER_KEY_SECRET ?? '';
   if (secret.length < 32) return undefined;
-  try {
-    return (await buyerKeyFor(secret, phone)) ?? undefined;
-  } catch (err) {
-    logger.warn({ err }, '[wa] buyer key for erasure failed');
-    return undefined;
-  }
+  // No try/catch: a failure here must fail the erasure (and be retried), never silently skip the
+  // consent row and the `customer.erased` event (fail-open).
+  return (await buyerKeyFor(secret, phone)) ?? undefined;
 }

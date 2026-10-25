@@ -1145,7 +1145,7 @@ jobs:
         # `ebda_app` a CI-only login (ALTER ROLE ... LOGIN PASSWORD; the migration creates
         # it NOLOGIN) and to write fixtures. Every ASSERTION runs on an ebda_app connection.
         # REQUIRE_PGBOUNCER makes a missing pgbouncer a failure instead of a skip.
-        run: npx vitest run tests/integration/rls-ebda-app.test.ts tests/integration/rls-pooler-isolation.test.ts --reporter=verbose --retry=0
+        run: npx vitest run tests/integration/rls-ebda-app.test.ts tests/integration/rls-pooler-isolation.test.ts tests/integration/rls-wa-consent-erasure.test.ts --reporter=verbose --retry=0
         env:
           DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test

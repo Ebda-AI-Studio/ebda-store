@@ -147,6 +147,27 @@ describe('whatsapp.opt_out_changed (v1.1)', () => {
     expect(await applyOptOutChanged(S, K, true, 1)).toBe('applied');
     expect(get()).toMatchObject({ granted: false, optOutVersion: 1 });
   });
+  it('a forced P2002 on create still lands the opt-out via the version-guarded update', async () => {
+    let r: { optOutVersion: number; granted: boolean } | null = null;
+    h.find.mockImplementation(async () => r);
+    h.updateMany.mockImplementation(async ({ where, data }: any) => {
+      if (!r || !(r.optOutVersion < where.optOutVersion.lt)) return { count: 0 };
+      r = { ...r, ...data };
+      return { count: 1 };
+    });
+    h.create.mockImplementation(async () => {
+      // a concurrent event created the row first, with an OLDER version
+      r = { optOutVersion: 1, granted: true };
+      throw Object.assign(new Error('unique'), { code: 'P2002' });
+    });
+    expect(await applyOptOutChanged(S, K, true, 2)).toBe('applied');
+    expect(r).toMatchObject({ granted: false, optOutVersion: 2 });
+  });
+  it('any other create error is RETHROWN (the queue redelivers; a STOP is never dropped)', async () => {
+    table(null);
+    h.create.mockRejectedValue(new Error('connection reset'));
+    await expect(applyOptOutChanged(S, K, true, 1)).rejects.toThrow('connection reset');
+  });
   it('a stale or replayed version changes nothing, and the version never goes down', async () => {
     const get = table({ optOutVersion: 3, granted: false });
     expect(await applyOptOutChanged(S, K, true, 3)).toBe('ignored');

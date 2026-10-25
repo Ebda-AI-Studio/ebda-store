@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   exists: vi.fn(),
   set: vi.fn(),
   scope: vi.fn(),
+  optOut: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {
@@ -41,6 +42,7 @@ vi.mock('@ebda/database', () => ({
     }
   },
 }));
+vi.mock('@api/lib/wa/consent', () => ({ applyOptOutChanged: h.optOut }));
 vi.mock('@api/lib/wa/link', () => ({
   isWhatsAppLinked: h.linked,
   WhatsAppLinkService: { applyEntitlement: h.applyEntitlement },
@@ -97,6 +99,7 @@ beforeEach(() => {
   h.scope.mockReset();
   h.alert.mockReset().mockResolvedValue(undefined);
   h.applyEntitlement.mockReset().mockResolvedValue(true);
+  h.optOut.mockReset().mockResolvedValue('applied');
 });
 
 describe('whatsapp.cod_outcome', () => {
@@ -320,5 +323,33 @@ describe('whatsapp.entitlement_changed', () => {
   ])('%s is dropped as invalid', async (_n, extra) => {
     expect(await handleStoreEvent(ent(1, extra))).toBe('invalid');
     expect(h.applyEntitlement).not.toHaveBeenCalled();
+  });
+});
+
+describe('whatsapp.opt_out_changed (envelope v1.1)', () => {
+  const stop = (extra: object = {}) => ({
+    id: `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    type: 'whatsapp.opt_out_changed',
+    v: 1,
+    storeId: STORE,
+    occurredAt: '2026-10-25T10:00:00.000Z',
+    data: { buyerKey: BUYER, optedOut: true, at: '2026-10-25T10:00:00.000Z', version: 4, ...extra },
+  });
+
+  it('applies a STOP even for a store that is not linked, passing buyer key and version through', async () => {
+    h.linked.mockResolvedValue(false);
+    expect(await handleStoreEvent(stop())).toBe('applied');
+    expect(h.optOut).toHaveBeenCalledWith(STORE, BUYER, true, 4);
+    expect(h.order).not.toHaveBeenCalled();
+  });
+  it('a failure THROWS so the queue redelivers: a STOP is never dropped', async () => {
+    h.optOut.mockRejectedValue(new Error('db down'));
+    await expect(handleStoreEvent(stop())).rejects.toThrow('db down');
+    expect(h.set).not.toHaveBeenCalled(); // not marked seen
+  });
+  it('version 0 or a bad buyer key is dropped as invalid', async () => {
+    expect(await handleStoreEvent(stop({ version: 0 }))).toBe('invalid');
+    expect(await handleStoreEvent(stop({ buyerKey: 'short' }))).toBe('invalid');
+    expect(h.optOut).not.toHaveBeenCalled();
   });
 });

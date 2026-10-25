@@ -76,6 +76,71 @@ export async function revokeForAccount(
   });
 }
 
+/**
+ * The ONE consent upsert. Runs on the caller's current transaction (no scope of its own), so a caller
+ * that needs a lock held across check + write can do both in one tenant transaction.
+ * Every write is seen by the database observer (consent-state.ts), which tells Ebda WhatsApp
+ * (customer.consent_changed), so no path can change consent unannounced.
+ */
+async function writeConsent(storeId: string, buyerKey: string, input: ConsentInput): Promise<void> {
+  const now = new Date();
+  // Ownership (`userId`) is set ONLY by a PROVEN grant (`bindUserId`). A revoke, a STOP or an admin
+  // write NEVER sets, clears or overwrites it (an unproven account must not be able to strip
+  // another account's ownership and so make its erasure miss the row); only a proven grant by
+  // another account rebinds the row. `undefined` = leave the column as it is.
+  const owner: string | undefined = input.bindUserId;
+  await prisma.storeWhatsAppConsent.upsert({
+    where: { storeId_buyerKey: { storeId, buyerKey } },
+    create: {
+      storeId,
+      buyerKey,
+      userId: input.bindUserId ?? null,
+      ...(input.consent
+        ? {
+            granted: true,
+            grantedAt: now,
+            grantedSource: input.source,
+            locale: input.locale ?? null,
+          }
+        : { granted: false, revokedAt: now, revokedSource: input.source }),
+    },
+    update: {
+      ...(owner !== undefined ? { userId: owner } : {}),
+      ...(input.consent
+        ? {
+            granted: true,
+            grantedAt: now,
+            grantedSource: input.source,
+            locale: input.locale ?? null,
+            revokedAt: null,
+            revokedSource: null,
+          }
+        : { granted: false, revokedAt: now, revokedSource: input.source }),
+    },
+  });
+}
+
+/**
+ * Serialises a GRANT against a PHONE CHANGE of the same account. Both take this transaction-scoped
+ * lock first and hold it until they commit, so a grant that checked phone A either commits before the
+ * phone change (which then revokes A) or runs after it and sees phone B. Must run inside a tenant
+ * transaction. (An advisory lock rather than `SELECT ... FOR UPDATE`: same serialisation, and it does
+ * not depend on the app role holding an UPDATE policy on `users`.)
+ */
+export async function lockAccountConsent(userId: string): Promise<void> {
+  await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`wa-consent-account:${userId}`}, 0))`;
+}
+
+/** Revoke the old number's consent on the CURRENT transaction (see `lockAccountConsent`). */
+export async function revokeForPhoneChangeInTx(storeId: string, oldPhone: string): Promise<void> {
+  const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), oldPhone);
+  if (!buyerKey) return;
+  await prisma.storeWhatsAppConsent.updateMany({
+    where: { storeId, buyerKey, granted: true },
+    data: { granted: false, revokedAt: new Date(), revokedSource: 'profile' },
+  });
+}
+
 /** The customer changed their profile phone: the OLD number's consent ends; the new one needs a fresh tick. */
 export async function revokeForPhoneChange(storeId: string, oldPhone: string): Promise<void> {
   const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), oldPhone);
@@ -105,45 +170,7 @@ export const WhatsAppConsentService = {
     buyerKey: string,
     input: ConsentInput
   ): Promise<{ granted: boolean }> {
-    const now = new Date();
-    // ONE writer per outcome; every write is seen by the database observer (consent-state.ts), which
-    // tells Ebda WhatsApp (customer.consent_changed), so no path can change consent unannounced.
-    await runInTenantContext(storeId, async () => {
-      // Ownership (`userId`) is set ONLY by a PROVEN grant (`bindUserId`). A revoke, a STOP or an admin
-      // write NEVER sets, clears or overwrites it (an unproven account must not be able to strip
-      // another account's ownership and so make its erasure miss the row); only a proven grant by
-      // another account rebinds the row. `undefined` = leave the column as it is.
-      const owner: string | undefined = input.bindUserId;
-      await prisma.storeWhatsAppConsent.upsert({
-        where: { storeId_buyerKey: { storeId, buyerKey } },
-        create: {
-          storeId,
-          buyerKey,
-          userId: input.bindUserId ?? null,
-          ...(input.consent
-            ? {
-                granted: true,
-                grantedAt: now,
-                grantedSource: input.source,
-                locale: input.locale ?? null,
-              }
-            : { granted: false, revokedAt: now, revokedSource: input.source }),
-        },
-        update: {
-          ...(owner !== undefined ? { userId: owner } : {}),
-          ...(input.consent
-            ? {
-                granted: true,
-                grantedAt: now,
-                grantedSource: input.source,
-                locale: input.locale ?? null,
-                revokedAt: null,
-                revokedSource: null,
-              }
-            : { granted: false, revokedAt: now, revokedSource: input.source }),
-        },
-      });
-    });
+    await runInTenantContext(storeId, () => writeConsent(storeId, buyerKey, input));
     return { granted: input.consent };
   },
 
@@ -162,44 +189,42 @@ export const WhatsAppConsentService = {
     | { status: 'recorded'; granted: boolean; cartId: string }
     | { status: 'no_cart' | 'no_phone' | 'phone_unproven' }
   > {
-    const cart = await prisma.cart.findFirst({
-      where: { storeId, sessionId, customerId: userId },
-      select: { id: true },
-    });
-    // GRANTING is tied to this session's cart; WITHDRAWING needs no cart (any device, any time).
-    if (!cart && input.consent) return { status: 'no_cart' };
-    const user = await prisma.user.findFirst({
-      where: { id: userId, storeId },
-      select: { phone: true },
-    });
-    if (!user?.phone) return { status: 'no_phone' };
-    // A profile phone is self-declared, so GRANTING needs proof the number is theirs: it must be the
-    // number on an order THIS customer placed. Withdrawing needs no proof (revocation always works).
-    if (input.consent && !(await phoneOnOwnOrder(storeId, userId, user.phone))) {
-      return { status: 'phone_unproven' };
-    }
-    const r = await this.record(storeId, user.phone, {
-      consent: input.consent,
-      source: 'checkout',
-      locale: input.locale,
-      userId,
-      ...(input.consent ? { bindUserId: userId } : {}),
-    });
-    if (!r) return { status: 'no_phone' };
-    // A grant can race a phone change (updateProfile revokes the old number BEFORE it writes the new
-    // one): if the profile phone is no longer the one we checked, undo the grant so the old number is
-    // never left opted in.
-    if (input.consent) {
-      const after = await prisma.user.findFirst({
+    // ONE tenant transaction: lock the account's consent, read the phone, check the proof, write. A
+    // concurrent phone change (`updateProfile`) takes the same lock around its revoke + phone write, so
+    // a grant can never land on a number that was just replaced.
+    return runInTenantContext(storeId, async () => {
+      await lockAccountConsent(userId);
+      const cart = await prisma.cart.findFirst({
+        where: { storeId, sessionId, customerId: userId },
+        select: { id: true },
+      });
+      // GRANTING is tied to this session's cart; WITHDRAWING needs no cart (any device, any time).
+      if (!cart && input.consent) return { status: 'no_cart' as const };
+      const user = await prisma.user.findFirst({
         where: { id: userId, storeId },
         select: { phone: true },
       });
-      if (!after?.phone || toE164(after.phone) !== toE164(user.phone)) {
-        await revokeForPhoneChange(storeId, user.phone);
-        return { status: 'phone_unproven' };
+      if (!user?.phone) return { status: 'no_phone' as const };
+      // A profile phone is self-declared, so GRANTING needs proof the number is theirs: it must be the
+      // number on a delivered order THIS customer placed. Withdrawing needs no proof.
+      if (input.consent && !(await phoneOnOwnOrder(storeId, userId, user.phone))) {
+        return { status: 'phone_unproven' as const };
       }
-    }
-    return { status: 'recorded', granted: r.granted, cartId: cart?.id ?? 'none' };
+      const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), user.phone);
+      if (!buyerKey) return { status: 'no_phone' as const };
+      await writeConsent(storeId, buyerKey, {
+        consent: input.consent,
+        source: 'checkout',
+        locale: input.locale,
+        userId,
+        ...(input.consent ? { bindUserId: userId } : {}),
+      });
+      return {
+        status: 'recorded' as const,
+        granted: input.consent,
+        cartId: cart?.id ?? 'none',
+      };
+    });
   },
 
   /** The signed-in customer's current consent for their account number (so the box shows the truth). */
@@ -336,8 +361,16 @@ export async function applyOptOutChanged(
         },
       });
       return 'applied';
-    } catch {
-      return 'ignored'; // a concurrent event created the row first
+    } catch (err) {
+      // ONLY a unique-key collision means "a concurrent event created the row first": re-run the
+      // version-guarded update so the opt-out lands on the row that now exists. Anything else is a real
+      // failure and is RETHROWN so the queue redelivers (swallowing it would drop a buyer's STOP).
+      if ((err as { code?: string } | null)?.code !== 'P2002') throw err;
+      const again = await prisma.storeWhatsAppConsent.updateMany({
+        where: { storeId, buyerKey, optOutVersion: { lt: version } },
+        data: { granted: false, revokedAt: now, revokedSource: 'whatsapp', optOutVersion: version },
+      });
+      return again.count > 0 ? 'applied' : 'ignored';
     }
   });
 }

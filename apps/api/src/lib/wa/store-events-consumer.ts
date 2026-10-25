@@ -14,6 +14,7 @@
  * seen-marker is written AFTER the action, so a crash between them replays safely instead of
  * losing the event. Tenant-scoped: every read and write runs in the event's store context.
  */
+import { applyOptOutChanged } from './consent';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { outboundStoreEventSchema, type OutboundStoreEvent } from '../../contracts/wa-v1';
 import { redis } from '../../services/redis.service';
@@ -169,6 +170,24 @@ export async function handleStoreEvent(body: unknown): Promise<StoreEventResult>
       '[wa-store-events] entitlement'
     );
     return applied ? 'applied' : 'ignored';
+  }
+
+  // A STOP is the buyer's own withdrawal: applied even for a store that is not (or no longer) linked.
+  // Monotonic by `version`; optedOut=false never re-enables Store consent (that needs a new tick).
+  // Any failure THROWS so the queue redelivers: dropping a STOP would let marketing continue.
+  if (e.type === 'whatsapp.opt_out_changed') {
+    const result = await applyOptOutChanged(
+      e.storeId,
+      e.data.buyerKey,
+      e.data.optedOut,
+      e.data.version
+    );
+    await redis.set(seenKey, '1', SEEN_TTL_SECONDS);
+    logger.info(
+      { storeId: e.storeId, version: e.data.version, optedOut: e.data.optedOut, result },
+      '[wa-store-events] opt-out'
+    );
+    return result;
   }
 
   // Trust boundary: the queue is account-internal and unsigned, so the Store re-derives what it can.

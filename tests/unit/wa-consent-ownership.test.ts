@@ -38,6 +38,7 @@ const consentTable = {
   },
 };
 const fakePrisma = {
+  $executeRaw: async () => 0,
   cart: { findFirst: async ({ where }: any) => h.carts.find(r => matches(r, where)) ?? null },
   user: {
     findFirst: async ({ where }: any) => {
@@ -194,17 +195,6 @@ describe('PDPL export and erasure', () => {
 });
 
 describe('review follow-ups', () => {
-  it('a grant that races a phone change is undone: the OLD number is never left opted in', async () => {
-    const A = (await key('01001234567'))!;
-    // the profile phone changes to B right after the grant checked A
-    h.afterOrderRead = () => {
-      h.users[0]!.phone = '01112345678';
-    };
-    const r = await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: true });
-    expect(r).toEqual({ status: 'phone_unproven' });
-    expect(h.consents.find(c => c.buyerKey === A)).toMatchObject({ granted: false });
-  });
-
   it('erasing X does not delete a row owned by ANOTHER account that shares the number', async () => {
     const P = (await key('01001234567'))!;
     h.consents.push({ storeId: S, buyerKey: P, userId: 'user-y', granted: true });

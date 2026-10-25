@@ -42,7 +42,12 @@ import {
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
-import { WhatsAppConsentService, phoneOnOwnOrder, revokeForPhoneChange } from '../lib/wa/consent';
+import {
+  WhatsAppConsentService,
+  lockAccountConsent,
+  phoneOnOwnOrder,
+  revokeForPhoneChangeInTx,
+} from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -317,6 +322,19 @@ async function pushTokenVersion(userId: string, tv: number, source: string): Pro
     }
   }
 }
+
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  avatar: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
@@ -1429,16 +1447,42 @@ export class AuthService {
     userId: string,
     data: { firstName?: string; lastName?: string; phone?: string }
   ) {
-    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one
-    // needs a fresh tick and proof). Revoked BEFORE the phone is written: if the revoke fails the phone
-    // is unchanged and the caller retries, so the old number can never keep a live consent.
-    if (data.phone !== undefined) {
-      const current = await withUser(userId, () =>
-        prisma.user.findUnique({ where: { id: userId }, select: { phone: true, storeId: true } })
+    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one needs
+    // a fresh tick and proof). For a store customer the revoke and the phone write are ONE transaction
+    // holding the account's consent lock, the same lock a grant takes, so a grant can never land on a
+    // number that was just replaced. A failed revoke aborts the whole update: the phone is unchanged.
+    const scope =
+      data.phone !== undefined
+        ? await withUser(userId, () =>
+            prisma.user.findUnique({
+              where: { id: userId },
+              select: { phone: true, storeId: true },
+            })
+          )
+        : null;
+    if (scope?.storeId) {
+      const storeId = scope.storeId;
+      return runInTenantContext(
+        storeId,
+        async () => {
+          await lockAccountConsent(userId);
+          const user = await prisma.user.findUnique({ where: { id: userId } });
+          if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+          if (user.phone && toE164(user.phone) !== toE164(data.phone!)) {
+            await revokeForPhoneChangeInTx(storeId, user.phone);
+          }
+          return prisma.user.update({
+            where: { id: userId },
+            data: {
+              ...(data.firstName !== undefined && { firstName: data.firstName }),
+              ...(data.lastName !== undefined && { lastName: data.lastName }),
+              phone: data.phone,
+            },
+            select: PROFILE_SELECT,
+          });
+        },
+        userId
       );
-      if (current?.phone && current.storeId && toE164(current.phone) !== toE164(data.phone)) {
-        await revokeForPhoneChange(current.storeId, current.phone);
-      }
     }
     return withUser(userId, async () => {
       const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -1453,18 +1497,7 @@ export class AuthService {
           ...(data.lastName !== undefined && { lastName: data.lastName }),
           ...(data.phone !== undefined && { phone: data.phone }),
         },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          role: true,
-          avatar: true,
-          emailVerified: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: PROFILE_SELECT,
       });
 
       return updated;
