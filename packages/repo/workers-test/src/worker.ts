@@ -12,6 +12,7 @@ import {
   searchProductIdSet,
   verifyProductIndex,
 } from '../../src/do/search';
+import { cancelOrder, refundOrder } from '../../src/do/refund';
 import { MoneyError } from '../../src/do/sync-sql';
 import { splitSql } from '../../src/prisma-lite/split-sql';
 import type { Meta } from '../../src/prisma-lite/types';
@@ -174,6 +175,44 @@ export class LiteDO extends DurableObject {
   }
   searchDrift(): { missing: string[]; orphaned: string[]; stale: string[] } {
     return verifyProductIndex(doSyncSql(this.ctx.storage), 's1');
+  }
+
+  /** Generic fixtures/probes for the concurrency tests (the DO is the system under test, SQL is only setup + reading). */
+  sqlRun(q: string, ...p: unknown[]): void {
+    this.ctx.storage.sql.exec(q, ...p);
+  }
+  sqlOne(q: string, ...p: unknown[]): Record<string, number> {
+    return this.ctx.storage.sql.exec(q, ...p).one() as Record<string, number>;
+  }
+  placeRaw(input: CheckoutInput): string {
+    return placeOrder(doSyncSql(this.ctx.storage), { ...input, storeId: 's1' }).orderId;
+  }
+  cancel(orderId: string): { ok: true; replayed: boolean } | { ok: false; code: string } {
+    try {
+      return {
+        ok: true,
+        replayed: cancelOrder(doSyncSql(this.ctx.storage), { storeId: 's1', orderId }).replayed,
+      };
+    } catch (e) {
+      if (e instanceof MoneyError) return { ok: false, code: e.code };
+      throw e;
+    }
+  }
+  refund(a: {
+    orderId: string;
+    amount?: number;
+    lines?: Array<{ orderItemId: string; quantity: number }>;
+    refundKey?: string;
+  }): { ok: true; replayed: boolean } | { ok: false; code: string } {
+    try {
+      return {
+        ok: true,
+        replayed: refundOrder(doSyncSql(this.ctx.storage), { storeId: 's1', ...a }).replayed,
+      };
+    } catch (e) {
+      if (e instanceof MoneyError) return { ok: false, code: e.code };
+      throw e;
+    }
   }
 
   async seed(): Promise<void> {
