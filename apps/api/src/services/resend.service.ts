@@ -428,6 +428,8 @@ export class ResendService {
     // sent are reported (`ids`) so the caller never counts them as failed or re-sends them.
     const ids: string[] = [];
     for (const m of opts.messages) {
+      // A reserved-TLD placeholder is dropped (and logged) before it counts as a send.
+      if (deliverableOnly(m.to).length === 0) continue;
       try {
         const { id } = await sendMail({
           from: sender.from,

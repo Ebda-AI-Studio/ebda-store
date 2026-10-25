@@ -26,6 +26,7 @@ vi.mock('@ebda/database', () => ({
         findUnique: async () => ({
           id: 's1',
           name: 'S',
+          slug: 'souq',
           domain: null,
           email: null,
           emailSenderLocalPart: null,
@@ -86,9 +87,10 @@ describe('ResendService refuses *.invalid recipients', () => {
         { to: 'a@ebda.app', html: 'x' },
       ],
     });
-    expect(batch).toHaveBeenCalledTimes(1);
-    const sent = (batch.mock.calls[0] as unknown as [Array<{ to: string[] }>])[0];
-    expect(sent.map(m => m.to)).toEqual([['a@ebda.app']]);
+    // one message per address now (Cloudflare has no batch endpoint): only the deliverable one goes out
+    expect(send).toHaveBeenCalledTimes(1);
+    const sent = (send.mock.calls[0] as unknown as [{ to: string[] }])[0];
+    expect(sent.to).toEqual(['a@ebda.app']);
     const m = await ResendService.sendMarketingEmail({ id: 's1', name: 'S' } as never, {
       to: 'x@placeholder.invalid',
       subject: 's',

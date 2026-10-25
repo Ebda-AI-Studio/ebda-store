@@ -73,7 +73,6 @@ import {
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
-import { deliverableOnly } from '../lib/undeliverable-email';
 // ==========================================
 // Email Service
 // Transactional email handling

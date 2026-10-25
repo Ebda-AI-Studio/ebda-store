@@ -13,6 +13,7 @@
  */
 import { config } from '../config';
 import { cfBindings } from '../cf/bindings';
+import { deliverableOnly } from '../lib/undeliverable-email';
 
 export interface OutboundMail {
   /** `Name <addr@host>` or a bare address. */
@@ -109,7 +110,12 @@ export function parseAddress(from: string): string | { email: string; name: stri
 }
 
 export async function sendMail(msg: OutboundMail): Promise<{ id: string }> {
-  return emailProvider() === 'cloudflare' ? sendViaCloudflare(msg) : sendViaResend(msg);
+  // EVERY send path ends here, so the reserved-TLD (`.invalid`) recipient filter of Ruling WA-LEGACY-1
+  // sits here too: an undeliverable placeholder is dropped and logged, never handed to a provider.
+  const to = deliverableOnly(msg.to);
+  if (to.length === 0) return { id: 'skipped-undeliverable' };
+  const clean = { ...msg, to: Array.isArray(msg.to) ? to : to[0]! };
+  return emailProvider() === 'cloudflare' ? sendViaCloudflare(clean) : sendViaResend(clean);
 }
 
 async function sendViaCloudflare(msg: OutboundMail): Promise<{ id: string }> {
