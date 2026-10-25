@@ -5,6 +5,7 @@ import meta from '../../../cf-schema/generated/prisma-meta.json';
 import { createPrismaLite } from '../../src/prisma-lite/client';
 import { doSqlRunner, doSyncSql } from '../../src/prisma-lite/do-runner';
 import { placeOrder, type CheckoutInput } from '../../src/do/checkout';
+import { applyGoldRates } from '../../src/do/gold-rates';
 import { MoneyError } from '../../src/do/sync-sql';
 import { splitSql } from '../../src/prisma-lite/split-sql';
 import type { Meta } from '../../src/prisma-lite/types';
@@ -94,6 +95,57 @@ export class LiteDO extends DurableObject {
       wallet: one(`SELECT balance AS n FROM customer_wallets WHERE id = 'w'`),
       walletSpent: one(`SELECT coalesce(-sum(amount), 0) AS n FROM wallet_transactions`),
       orderNumbers: one('SELECT count(DISTINCT order_number) AS n FROM orders'),
+    };
+  }
+
+  /** Gold fixtures: one gold-priced piece (21k, 10 g, fixed making 50,000, 500 bps margin) with `stock` units, rate 300,000 */
+  seedGold(stock: number): void {
+    const sql = this.ctx.storage.sql;
+    sql.exec(
+      `INSERT INTO do_flags (name, value) VALUES ('gold_reprice', 1) ON CONFLICT (name) DO UPDATE SET value = 1`
+    );
+    sql.exec(
+      `INSERT INTO products (id, store_id, name, slug, price, inventory, status, pricing_mode, gold_karat, gold_weight_mg, making_charge_type, making_charge_value, gold_margin_bps) VALUES ('ring', 's1', 'Ring', 'ring', 1, ?, 'active', 'gold_rate', 21, 10000, 'fixed', 50000, 500)`,
+      stock
+    );
+    sql.exec(`UPDATE do_flags SET value = 0 WHERE name = 'gold_reprice'`);
+    sql.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+    );
+    this.applyRate(300_000);
+  }
+  applyRate(ratePerGram: number): { ok: true; repriced: number } | { ok: false; code: string } {
+    try {
+      const out = applyGoldRates(
+        doSyncSql(this.ctx.storage),
+        's1',
+        { rates: [{ karat: 21, ratePerGram }], confirm: true },
+        { userId: 'u' }
+      );
+      return { ok: true, repriced: out.repriced };
+    } catch (e) {
+      if (e instanceof MoneyError) return { ok: false, code: e.code };
+      throw e;
+    }
+  }
+  /** Every order of the gold piece: commit order (rowid), unit price, the rate stamped in its snapshot. */
+  goldOrders(): Array<{ price: number; rate: number; rateId: string }> {
+    return this.ctx.storage.sql
+      .exec(
+        `SELECT oi.price AS price, oi.gold_snapshot AS snap FROM order_items oi JOIN orders o ON o.id = oi.order_id ORDER BY o.rowid`
+      )
+      .toArray()
+      .map(r => {
+        const sn = JSON.parse(r.snap as string);
+        return { price: r.price as number, rate: sn.ratePerGram, rateId: sn.rateId };
+      });
+  }
+  goldState(): { stock: number; price: number; rate: number } {
+    const one = (q: string) => this.ctx.storage.sql.exec(q).one().n as number;
+    return {
+      stock: one(`SELECT inventory AS n FROM products WHERE id = 'ring'`),
+      price: one(`SELECT price AS n FROM products WHERE id = 'ring'`),
+      rate: one(`SELECT rate_per_gram AS n FROM gold_rates_current WHERE karat = 21`),
     };
   }
 

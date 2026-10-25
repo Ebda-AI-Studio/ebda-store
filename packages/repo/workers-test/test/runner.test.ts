@@ -1,3 +1,4 @@
+import { computeGoldUnitPrice } from '../../../shared/src/commerce/gold-price';
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
 
@@ -142,5 +143,83 @@ describe('phase 3 on a real Durable Object: money and stock under 100 parallel c
     for (const good of ['#a1b2c3', '#A1B2C3', null]) expect(await s.insertSwatch(good)).toBe('ok');
     for (const bad of ['#a1b2c', '#a1b2c3d', '#g1b2c3', 'a1b2c3d'])
       expect(await s.insertSwatch(bad)).toMatch(/CHECK|constraint/i);
+  });
+});
+
+describe('gold rate write concurrent with checkouts on a real Durable Object', () => {
+  const stub = () => env.LITE_DO.get(env.LITE_DO.idFromName(`gold-${Math.random()}`)) as any;
+  const unit = (rate: number) =>
+    computeGoldUnitPrice(
+      {
+        karat: 21,
+        weightMg: 10_000,
+        makingChargeType: 'fixed',
+        makingChargeValue: 50_000,
+        marginBps: 500,
+      },
+      rate,
+      100
+    ).unitPrice;
+
+  it('50 checkouts interleaved with 10 rate writes: every order is priced with a rate that was current at its commit', async () => {
+    const s = stub();
+    await s.seedGold(100);
+    const rates = Array.from({ length: 10 }, (_, i) => 300_000 + (i + 1) * 5_000); // +1.6% each, under the 5% gate
+    const calls: Promise<any>[] = [];
+    for (let i = 0; i < 50; i++) {
+      calls.push(
+        s.checkout({
+          lines: [{ productId: 'ring', quantity: 1 }],
+          customerId: 'cust',
+          shippingAddress: { i },
+          idempotencyKey: `g-${i}`,
+          goldRequireQuote: false,
+        })
+      );
+      if (i % 5 === 2) calls.push(s.applyRate(rates[Math.floor(i / 5)]));
+    }
+    const res = await Promise.all(calls);
+    expect(res.filter(r => r.ok === false).map(r => r.code)).toEqual([]);
+    const orders = await s.goldOrders();
+    expect(orders).toHaveLength(50);
+    // price == formula(rate stamped on the line), exact piastres
+    for (const o of orders) expect(o.price).toBe(unit(o.rate));
+    // rates only ever rose, so commit order must see a non-decreasing rate: no order priced with a rate that had already been replaced
+    for (let i = 1; i < orders.length; i++)
+      expect(orders[i].rate).toBeGreaterThanOrEqual(orders[i - 1].rate);
+    // non-vacuous: the writes really interleaved with the checkouts
+    expect(new Set(orders.map(o => o.rate)).size).toBeGreaterThanOrEqual(5);
+    // the rates seen are all real ones
+    const real = new Set([300_000, ...rates]);
+    for (const o of orders) expect(real.has(o.rate)).toBe(true);
+    const st = await s.goldState();
+    expect(st).toMatchObject({ stock: 50, rate: rates[9], price: unit(rates[9]) });
+  });
+
+  it('with a shopper quote: a rate write between quote and commit is refused PRICE_CHANGED, never charged the old price', async () => {
+    const s = stub();
+    await s.seedGold(100);
+    const quote = unit(300_000);
+    const calls: Promise<any>[] = [];
+    for (let i = 0; i < 50; i++) {
+      calls.push(
+        s.checkout({
+          lines: [{ productId: 'ring', quantity: 1, quotedUnitPrice: quote }],
+          customerId: 'cust',
+          shippingAddress: { i },
+          idempotencyKey: `q-${i}`,
+        })
+      );
+      if (i === 24) calls.push(s.applyRate(310_000));
+    }
+    const res = await Promise.all(calls);
+    const orders = await s.goldOrders();
+    const refused = res.filter(r => r.ok === false);
+    expect(refused.every(r => r.code === 'PRICE_CHANGED')).toBe(true);
+    expect(orders.length + refused.length).toBe(50);
+    for (const o of orders) {
+      expect(o.rate).toBe(300_000);
+      expect(o.price).toBe(quote);
+    }
   });
 });
