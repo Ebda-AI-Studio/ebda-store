@@ -74,4 +74,14 @@ describe('look mock tokens (template-match)', () => {
       Number.parseInt(mockCssVars('qamar.atelier')['--bottom-tab-h'], 10) - 1
     ).toBeGreaterThanOrEqual(44);
   });
+
+  it('card chrome markers are rendered for look stores only and hidden only inside home sections', () => {
+    const web = path.resolve(__dirname, '../../apps/web/src');
+    const card = readFileSync(path.join(web, 'templates/shared/StorefrontProductCard.tsx'), 'utf8');
+    expect(card.match(/onLook \? \{ 'data-chrome': '(heart|badge)' \} : \{\}/g)?.length).toBe(4);
+    expect(card).toContain("onLook ? 'mt-1 look-card-chrome' : 'mt-1'");
+    const css = readFileSync(path.join(web, 'styles/globals.css'), 'utf8');
+    expect(css).toContain('[data-look] [data-section] [data-chrome]');
+    expect(css).toContain('[data-look] [data-section] .look-card-chrome');
+  });
 });

@@ -89,7 +89,13 @@ describe('globals.css look rules', () => {
   });
   it('no global card-image or [data-section] rule (merchant presets win)', () => {
     expect(looksCss).not.toMatch(/group\\\/img/);
-    expect(looksCss).not.toMatch(/\[data-section\]/);
+    // Template-match PR5 is the one allowed [data-section] rule: it only hides look-store card CHROME (heart, chips,
+    // dots) inside home sections; it sizes nothing, so merchant presets (card width, image ratio) still win.
+    const withoutChromeRule = looksCss.replace(
+      /\[data-look\] \[data-section\] (?:\[data-chrome\]|\.look-card-chrome)/g,
+      ''
+    );
+    expect(withoutChromeRule).not.toMatch(/\[data-section\]/);
   });
   it('the retired dahab skin no longer overrides --font-display on <body> (Ruling B5-1)', () => {
     expect(looksCss).not.toMatch(/data-pack='dahab'\]\s*\{\s*--font-display/);

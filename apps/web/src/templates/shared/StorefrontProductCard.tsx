@@ -337,6 +337,7 @@ function StorefrontProductCardImpl({
         <button
           type="button"
           onClick={handleWishlist}
+          {...(onLook ? { 'data-chrome': 'heart' } : {})}
           aria-label={cardActionLabel('wishlist-add', isRtl, name)}
           aria-pressed={isWishlisted}
           // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
@@ -481,6 +482,7 @@ function StorefrontProductCardImpl({
               style={onLook ? LOOK_NEW_CHIP_STYLE : undefined}
               aria-hidden="true"
               data-badge="new"
+              {...(onLook ? { 'data-chrome': 'badge' } : {})}
             >
               {isRtl ? 'جديد' : 'NEW'}
             </span>
@@ -508,6 +510,7 @@ function StorefrontProductCardImpl({
                     )
               }
               style={discountChipStyle}
+              {...(onLook ? { 'data-chrome': 'badge' } : {})}
             >
               {discountBadgeText}
             </span>
@@ -529,6 +532,7 @@ function StorefrontProductCardImpl({
                   ? LOOK_CHIP_STYLE
                   : { backgroundColor: customBadgeColor, color: customBadgeTextColor }
               }
+              {...(onLook ? { 'data-chrome': 'badge' } : {})}
             >
               {customBadgeText}
             </span>
@@ -618,8 +622,12 @@ function StorefrontProductCardImpl({
               </div>
             )}
             {priceVisible && <TaxInclusiveLabel className="block text-xs text-muted-foreground" />}
-            <SwatchDots product={product} max={5} className="mt-1" />
-            <FactChips product={product} className="mt-1" />
+            <SwatchDots
+              product={product}
+              max={5}
+              className={onLook ? 'mt-1 look-card-chrome' : 'mt-1'}
+            />
+            <FactChips product={product} className={onLook ? 'mt-1 look-card-chrome' : 'mt-1'} />
           </>
         )}
 
