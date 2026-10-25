@@ -14,6 +14,8 @@ export type ConsentSource = 'checkout' | 'cart' | 'admin' | 'whatsapp';
 
 export interface ConsentInput {
   consent: boolean;
+  /** The account behind the write (null/absent for a STOP or an admin action on a bare number). */
+  userId?: string;
   source: ConsentSource;
   locale?: 'en' | 'ar';
 }
@@ -76,26 +78,32 @@ export const WhatsAppConsentService = {
     await runInTenantContext(storeId, () =>
       prisma.storeWhatsAppConsent.upsert({
         where: { storeId_buyerKey: { storeId, buyerKey } },
-        create: input.consent
-          ? {
-              storeId,
-              buyerKey,
-              granted: true,
-              grantedAt: now,
-              grantedSource: input.source,
-              locale: input.locale ?? null,
-            }
-          : { storeId, buyerKey, granted: false, revokedAt: now, revokedSource: input.source },
-        update: input.consent
-          ? {
-              granted: true,
-              grantedAt: now,
-              grantedSource: input.source,
-              locale: input.locale ?? null,
-              revokedAt: null,
-              revokedSource: null,
-            }
-          : { granted: false, revokedAt: now, revokedSource: input.source },
+        create: {
+          storeId,
+          buyerKey,
+          userId: input.userId ?? null,
+          ...(input.consent
+            ? {
+                granted: true,
+                grantedAt: now,
+                grantedSource: input.source,
+                locale: input.locale ?? null,
+              }
+            : { granted: false, revokedAt: now, revokedSource: input.source }),
+        },
+        update: {
+          ...(input.userId ? { userId: input.userId } : {}),
+          ...(input.consent
+            ? {
+                granted: true,
+                grantedAt: now,
+                grantedSource: input.source,
+                locale: input.locale ?? null,
+                revokedAt: null,
+                revokedSource: null,
+              }
+            : { granted: false, revokedAt: now, revokedSource: input.source }),
+        },
       })
     );
     return { granted: input.consent };
@@ -136,6 +144,7 @@ export const WhatsAppConsentService = {
       consent: input.consent,
       source: 'checkout',
       locale: input.locale,
+      userId,
     });
     if (!r) return { status: 'no_phone' };
     return { status: 'recorded', granted: r.granted, cartId: cart?.id ?? 'none' };
@@ -170,11 +179,35 @@ export const WhatsAppConsentService = {
     return row?.granted === true;
   },
 
-  /** The buyer's consent rows for the account export (no phone is stored, only the key). */
-  async exportFor(storeId: string, buyerKey: string) {
+  /**
+   * Erasure: delete EVERY row this account created (any earlier number, by `userId`) and the current
+   * number's row. One delete per key so the consent observer can attribute and announce each one.
+   * Runs on the caller's transaction client.
+   */
+  async eraseForAccount(
+    tx: Pick<typeof prisma, 'storeWhatsAppConsent'>,
+    storeId: string,
+    userId: string,
+    buyerKey?: string
+  ): Promise<number> {
+    const rows = await tx.storeWhatsAppConsent.findMany({
+      where: { storeId, OR: [{ userId }, ...(buyerKey ? [{ buyerKey }] : [])] },
+      select: { buyerKey: true },
+    });
+    for (const r of rows) {
+      await tx.storeWhatsAppConsent.deleteMany({ where: { storeId, buyerKey: r.buyerKey } });
+    }
+    return rows.length;
+  },
+
+  /**
+   * Every consent row this ACCOUNT ever created (any earlier phone, by `userId`), plus the row of the
+   * current number when it is proven theirs (`includeKey`). Hashes and timestamps only, never a phone.
+   */
+  async exportForAccount(storeId: string, userId: string, includeKey?: string) {
     return runInTenantContext(storeId, () =>
       prisma.storeWhatsAppConsent.findMany({
-        where: { storeId, buyerKey },
+        where: { storeId, OR: [{ userId }, ...(includeKey ? [{ buyerKey: includeKey }] : [])] },
         select: {
           granted: true,
           grantedAt: true,
@@ -184,13 +217,6 @@ export const WhatsAppConsentService = {
           revokedSource: true,
         },
       })
-    );
-  },
-
-  /** Erasure: the consent row goes with the account. */
-  async eraseFor(storeId: string, buyerKey: string): Promise<void> {
-    await runInTenantContext(storeId, () =>
-      prisma.storeWhatsAppConsent.deleteMany({ where: { storeId, buyerKey } })
     );
   },
 };

@@ -9,6 +9,7 @@ CREATE TABLE "store_whatsapp_consents" (
   "locale" TEXT,
   "revoked_at" TIMESTAMP(3),
   "revoked_source" TEXT,
+  "user_id" TEXT,
   "opt_out_version" INTEGER NOT NULL DEFAULT 0,
   "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -18,6 +19,7 @@ CREATE TABLE "store_whatsapp_consents" (
   CONSTRAINT "store_whatsapp_consents_revoked_source_check" CHECK ("revoked_source" IS NULL OR "revoked_source" IN ('checkout', 'cart', 'admin', 'whatsapp', 'erasure', 'profile'))
 );
 CREATE INDEX "store_whatsapp_consents_buyer_key_idx" ON "store_whatsapp_consents"("buyer_key");
+CREATE INDEX "store_whatsapp_consents_store_id_user_id_idx" ON "store_whatsapp_consents"("store_id", "user_id");
 ALTER TABLE "store_whatsapp_consents" ADD CONSTRAINT "store_whatsapp_consents_store_id_fkey"
   FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

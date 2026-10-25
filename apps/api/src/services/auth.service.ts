@@ -2225,11 +2225,12 @@ export class AuthService {
       });
       // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
       // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
-      if (buyerKey) {
-        await tx.storeWhatsAppConsent.deleteMany({
-          where: { storeId: opts.scopeStoreId ?? eraseStoreId, buyerKey },
-        });
-      }
+      await WhatsAppConsentService.eraseForAccount(
+        tx,
+        opts.scopeStoreId ?? eraseStoreId,
+        userId,
+        buyerKey
+      );
 
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
@@ -2526,12 +2527,18 @@ export class AuthService {
     );
     // Only for a PROVEN number: a profile phone is self-declared, and an export must not reveal whether
     // someone else's number opted in (same rule as the checkout box state).
-    const whatsappMarketingConsent =
+    const provenKey =
       exportBuyerKey &&
       typeof user.phone === 'string' &&
       (await phoneOnOwnOrder(storeId, userId, user.phone))
-        ? await WhatsAppConsentService.exportFor(storeId, exportBuyerKey)
-        : [];
+        ? exportBuyerKey
+        : undefined;
+    // Rows this account created (any earlier number) plus the current number's row when proven.
+    const whatsappMarketingConsent = await WhatsAppConsentService.exportForAccount(
+      storeId,
+      userId,
+      provenKey
+    );
 
     return {
       exportedAt: new Date().toISOString(),

@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   carts: [] as Row[],
   users: [] as Row[],
   orders: [] as Row[],
+  consents: [] as Row[],
   upsert: vi.fn(),
   updateMany: vi.fn(),
 }));
@@ -31,6 +32,12 @@ vi.mock('@ebda/database', () => ({
     storeWhatsAppConsent: {
       upsert: h.upsert,
       updateMany: h.updateMany,
+      findMany: async ({ where }: any) => h.consents.filter(r => matches(r, where)),
+      deleteMany: async ({ where }: any) => {
+        const hit = h.consents.filter(r => matches(r, where));
+        hit.forEach(r => h.consents.splice(h.consents.indexOf(r), 1));
+        return { count: hit.length };
+      },
       findUnique: async () => ({ granted: true }),
     },
   },
@@ -58,6 +65,7 @@ beforeEach(() => {
     status: 'delivered',
     shippingAddress: { phone: '01112345678' },
   });
+  h.consents.length = 0;
   h.carts.length = 0;
   h.users.length = 0;
   h.carts.push({ id: 'cart-a', storeId: S, sessionId: 'sess-a', customerId: 'user-a' });

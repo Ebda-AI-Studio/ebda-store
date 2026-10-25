@@ -592,6 +592,9 @@ model StoreWhatsAppConsent {
   locale      String?
   revokedAt   DateTime? @map("revoked_at")
   revokedSource String? @map("revoked_source")
+  /// The account that last granted/withdrew this row (null for a STOP sent on WhatsApp). Lets export and
+  /// erasure cover EVERY row an account ever created, also those of an earlier phone number.
+  userId      String?   @map("user_id")
   /// Highest `whatsapp.opt_out_changed` version applied (monotonic; a stale or replayed event is ignored).
   optOutVersion Int     @default(0) @map("opt_out_version")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -599,6 +602,7 @@ model StoreWhatsAppConsent {
   store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@id([storeId, buyerKey])
+  @@index([storeId, userId])
   @@map("store_whatsapp_consents")
 }
 

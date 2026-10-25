@@ -72,6 +72,10 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     review: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     address: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     smsMarketingConsent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    storeWhatsAppConsent: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     abandonedCart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     cart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     wishlist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
