@@ -58,6 +58,8 @@ export abstract class StoreScheduleBase<Env = unknown> extends DurableObject<Env
 
   /** Structured log line (the deployed class routes it to the app logger). */
   protected log(level: 'warn' | 'error', obj: Record<string, unknown>, msg: string): void {
+    // The base class stays free of the app logger (loads in a bare test worker); the deployed class overrides this.
+    // eslint-disable-next-line no-console
     console[level](
       JSON.stringify({ msg, ...obj, err: obj.err instanceof Error ? obj.err.message : obj.err })
     );
