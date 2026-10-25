@@ -63,7 +63,9 @@ async function acct<T>(
 export default function SecurityPage() {
   const t = useT('account.security');
   const tc = useT('common');
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  // A platform admin's FIRST factor ends every session (the password-only one included): sign in again with it.
+  const [signInAgain, setSignInAgain] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
   // Status
@@ -160,7 +162,7 @@ export default function SecurityPage() {
     setEnrollError('');
     setIsSubmitting(true);
     try {
-      const { data, error } = await acct<{ backupCodes: string[] }>(
+      const { data, error } = await acct<{ backupCodes: string[]; requiresSignIn?: boolean }>(
         '/mfa/enroll/verify',
         {
           code: verifyCode.trim(),
@@ -178,6 +180,7 @@ export default function SecurityPage() {
         return;
       }
       setBackupCodes(data?.backupCodes ?? []);
+      setSignInAgain(data?.requiresSignIn === true);
       setStep('backup');
       setStatus(prev =>
         prev ? { ...prev, mfaEnabled: true, mfaEnrolledAt: new Date().toISOString() } : prev
@@ -300,6 +303,9 @@ export default function SecurityPage() {
                   ))}
                 </div>
 
+                {signInAgain && (
+                  <p className="text-sm text-muted-foreground">{t('signInAgainAfterEnrol')}</p>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     type="button"
@@ -315,9 +321,10 @@ export default function SecurityPage() {
                     onClick={() => {
                       setStep('idle');
                       setBackupCodes([]);
+                      if (signInAgain) void logout();
                     }}
                   >
-                    {t('savedButton')}
+                    {signInAgain ? t('savedSignInAgainButton') : t('savedButton')}
                   </Button>
                 </div>
               </div>
@@ -673,6 +680,7 @@ export default function SecurityPage() {
             mfaEnabled={status.mfaEnabled}
             isAdmin={user?.role === 'super_admin'}
             onCount={setPasskeyCount}
+            onSignInAgain={() => void logout()}
           />
         )}
         <LegalAcceptancesPanel />

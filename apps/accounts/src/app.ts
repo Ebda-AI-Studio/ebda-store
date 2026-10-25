@@ -244,14 +244,13 @@ async function authorizeEnrolment(
   return t.mode;
 }
 
-/** After a factor is bound: drop every pending enrolment of the account; after a bootstrap also end the other sessions. */
+/** After a factor is bound: drop every pending enrolment of the account; after a bootstrap also end EVERY session. */
 async function finishEnrolment(
   c: C,
   user: UserRow,
-  sid: string,
   mode: EnrolMode,
   factor: 'totp' | 'passkey'
-): Promise<void> {
+): Promise<boolean> {
   const db = c.env.DB;
   const stmts = [
     db
@@ -265,14 +264,14 @@ async function finishEnrolment(
     stmts.push(
       db
         .prepare(
-          `UPDATE sessions SET revoked_at = ?3, revoked_reason = 'first-factor-enrolled' WHERE user_id = ?1 AND sid <> ?2 AND revoked_at IS NULL`
+          `UPDATE sessions SET revoked_at = ?2, revoked_reason = 'first-factor-enrolled' WHERE user_id = ?1 AND revoked_at IS NULL`
         )
-        .bind(user.id, sid, now),
+        .bind(user.id, now),
       db
         .prepare(
-          `UPDATE refresh_tokens SET revoked_at = ?3, revoked_reason = COALESCE(revoked_reason, 'first-factor-enrolled') WHERE user_id = ?1 AND (sid IS NULL OR sid <> ?2) AND revoked_at IS NULL`
+          `UPDATE refresh_tokens SET revoked_at = ?2, revoked_reason = COALESCE(revoked_reason, 'first-factor-enrolled') WHERE user_id = ?1 AND revoked_at IS NULL`
         )
-        .bind(user.id, sid, iso()),
+        .bind(user.id, iso()),
       // an unfinished TOTP secret must not outlive the factor that won
       db
         .prepare(`UPDATE users SET mfa_secret = NULL WHERE id = ?1 AND mfa_enabled = 0`)
@@ -291,6 +290,9 @@ async function finishEnrolment(
       firstName: user.first_name,
     }) ?? Promise.resolve()
   );
+  // A platform admin's FIRST factor ends EVERY session, the enrolling one included: it was a password-only session, and the
+  // person signs in again with the new factor (which is what carries admin power).
+  return mode === 'bootstrap';
 }
 
 async function requireBootstrapProof(
@@ -1047,8 +1049,8 @@ export function createApp() {
     )
       .bind(user.id, iso(), JSON.stringify(hashed))
       .run();
-    await finishEnrolment(c, user, sid, mode, 'totp');
-    return c.json({ success: true, data: { enabled: true, backupCodes: plain } });
+    const requiresSignIn = await finishEnrolment(c, user, mode, 'totp');
+    return c.json({ success: true, data: { enabled: true, backupCodes: plain, requiresSignIn } });
   });
 
   app.post('/mfa/disable', async c => {
@@ -1133,8 +1135,8 @@ export function createApp() {
     );
     const mode = await authorizeEnrolment(c, user, sid, body);
     const data = await passkeys.finishRegistration(c.env.DB, user, originHeader(c), body as never);
-    await finishEnrolment(c, user, sid, mode, 'passkey');
-    return c.json({ success: true, data }, 201);
+    const requiresSignIn = await finishEnrolment(c, user, mode, 'passkey');
+    return c.json({ success: true, data: { ...data, requiresSignIn } }, 201);
   });
 
   app.get('/passkeys', async c => {

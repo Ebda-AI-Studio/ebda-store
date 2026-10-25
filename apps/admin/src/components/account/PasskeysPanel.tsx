@@ -46,12 +46,15 @@ export function PasskeysPanel({
   mfaEnabled,
   isAdmin = false,
   onCount,
+  onSignInAgain,
 }: {
   mfaEnabled: boolean;
   /** A platform administrator's FIRST factor also needs the operator's one-time enrolment token. */
   isAdmin?: boolean;
   /** Reports how many passkeys the account has (the page needs it to know whether a TOTP would be a FIRST factor). */
   onCount?: (n: number) => void;
+  /** The first factor of a platform admin ends every session: the page signs them out to sign in again with it. */
+  onSignInAgain?: () => void;
 }) {
   const t = useT('account.security.passkeys');
   const ts = useT('account.security');
@@ -166,12 +169,17 @@ export function PasskeysPanel({
       const options = await acct<never>('/passkey/register/options', c);
       creds.current = null; // one use
       const response = await passkeyRegistration(options);
-      await acct('/passkey/register/verify', {
+      const done = await acct<{ requiresSignIn?: boolean }>('/passkey/register/verify', {
         response,
         name: name.trim() || undefined,
         ...(c.emailCode ? { emailCode: c.emailCode } : {}),
         ...(c.enrolmentToken ? { enrolmentToken: c.enrolmentToken } : {}),
       });
+      if (done?.requiresSignIn) {
+        toastSuccess(t('added'), undefined);
+        onSignInAgain?.();
+        return;
+      }
     } catch (e) {
       creds.current = null;
       throw e;

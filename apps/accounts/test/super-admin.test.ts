@@ -335,16 +335,22 @@ describe('first-factor bootstrap for a platform admin (Ruling ID-15)', () => {
       emailCode: await code(u, bearer),
     });
     expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { data: { requiresSignIn: boolean } }).data.requiresSignIn).toBe(
+      true
+    );
     expect(await factorCount(u.id)).toBe(1);
+    // the enrolling (password-only) session is ended too: the person signs in again with the new factor
+    expect((await call('/token?aud=store', { bearer })).status).toBeGreaterThanOrEqual(400);
     // factor removed (as an operator reset would), the SAME used token must still fail
     await env.DB.prepare(`UPDATE users SET mfa_enabled = 0, mfa_secret = NULL WHERE id = ?1`)
       .bind(u.id)
       .run();
-    const secret2 = await begin(u, bearer);
+    const bearer2 = (await login(u)).body.access_token;
+    const secret2 = await begin(u, bearer2);
     await env.DB.prepare(`UPDATE users SET mfa_last_step = NULL WHERE id = ?1`).bind(u.id).run();
-    const again = await verify(secret2, bearer, {
+    const again = await verify(secret2, bearer2, {
       enrolmentToken: t,
-      emailCode: await code(u, bearer),
+      emailCode: await code(u, bearer2),
     });
     expect(again.status).toBe(403);
     expect(await factorCount(u.id)).toBe(0);
@@ -649,7 +655,7 @@ describe('enrolment tickets and step-up for every factor (Ruling ID-15, review r
     expect(await count(`SELECT mfa_enabled AS n FROM users WHERE id = ?1`, u.id)).toBe(0);
   });
 
-  it('a successful first enrolment deletes every pending register challenge and ends the OTHER sessions', async () => {
+  it('a successful first enrolment deletes every pending register challenge and ends EVERY session, the enrolling one included', async () => {
     const u = await seedUser({ role: 'super_admin' });
     const a = await login(u);
     const b = await login(u);
@@ -685,8 +691,11 @@ describe('enrolment tickets and step-up for every factor (Ruling ID-15, review r
     const sb = await env.DB.prepare(`SELECT revoked_at FROM sessions WHERE sid = ?1`)
       .bind(sidOf(b.body.access_token))
       .first<{ revoked_at: number | null }>();
-    expect(sa!.revoked_at).toBeNull(); // the enrolling session survives
-    expect(sb!.revoked_at).not.toBeNull(); // every other session is ended
+    expect(sa!.revoked_at).not.toBeNull(); // the password-only enrolling session is ended too (sign in again)
+    expect(((await done.json()) as { data: { requiresSignIn: boolean } }).data.requiresSignIn).toBe(
+      true
+    );
+    expect(sb!.revoked_at).not.toBeNull(); // and every other session
     expect((await call('/token?aud=store', { cookie: b.cookie })).status).toBe(401);
   });
 

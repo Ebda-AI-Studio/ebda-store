@@ -9,6 +9,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const h = vi.hoisted(() => ({
   calls: [] as Array<{ path: string; json: Record<string, unknown> }>,
   passkeys: [] as unknown[],
+  requiresSignIn: false,
 }));
 
 vi.mock('next-intl', () => {
@@ -22,6 +23,7 @@ vi.mock('../../lib/accounts', () => ({
     h.calls.push({ path, json: init?.json ?? {} });
     if (path === '/passkeys') return { passkeys: h.passkeys };
     if (path === '/passkey/register/options') return { challenge: 'c' };
+    if (path === '/passkey/register/verify') return { requiresSignIn: h.requiresSignIn };
     return { ok: true };
   },
 }));
@@ -37,13 +39,14 @@ import { PasskeysPanel } from './PasskeysPanel';
 beforeEach(() => {
   h.calls = [];
   h.passkeys = [];
+  h.requiresSignIn = false;
 });
 afterEach(cleanup);
 
-async function openStepUp(isAdmin: boolean) {
+async function openStepUp(isAdmin: boolean, onSignInAgain?: () => void) {
   render(
     <ToastProvider>
-      <PasskeysPanel mfaEnabled={false} isAdmin={isAdmin} />
+      <PasskeysPanel mfaEnabled={false} isAdmin={isAdmin} onSignInAgain={onSignInAgain} />
     </ToastProvider>
   );
   await waitFor(() => expect(screen.getByText('empty')).toBeTruthy());
@@ -93,5 +96,18 @@ describe('PasskeysPanel first-factor step', () => {
     const verify = h.calls.find(c => c.path === '/passkey/register/verify')!;
     expect(verify.json).toMatchObject({ emailCode: '123456', enrolmentToken: 'operator-token' });
     expect(verify.json.password).toBeUndefined();
+  });
+
+  it("a platform admin's first passkey ends every session: the panel asks the page to sign them out", async () => {
+    h.requiresSignIn = true;
+    const signOut = vi.fn();
+    await openStepUp(true, signOut);
+    const type = (id: string, value: string) =>
+      fireEvent.change(document.getElementById(id) as HTMLInputElement, { target: { value } });
+    type('passkey-stepup-password', 'Correct-Horse-9!');
+    type('passkey-email-code', '123456');
+    type('passkey-enrol-token', 'operator-token');
+    fireEvent.click(screen.getByRole('button', { name: 'stepUpConfirm' }));
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
   });
 });

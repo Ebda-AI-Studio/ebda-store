@@ -7436,7 +7436,9 @@
       "bootstrapSend": "E-mail me the code",
       "bootstrapResend": "Send again",
       "bootstrapCodeLabel": "E-mailed code (6 digits)",
-      "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button)."
+      "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
+      "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
+      "savedSignInAgainButton": "Saved, sign me out"
     }
   },
   "answerEngine": {
