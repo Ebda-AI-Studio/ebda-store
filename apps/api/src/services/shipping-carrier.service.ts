@@ -4,6 +4,9 @@
 // ==========================================
 
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
+import { CI_SHIPMENT_BOOKED_EVENT, CI_SHIPMENT_TRACKED_EVENT } from '../lib/ci/events';
+import { shipmentStamps } from '../lib/ci/shipment-stamps';
+import { areaKeyFor } from '../lib/ci/area-key';
 import crypto from 'node:crypto';
 import {
   currentStoreId,
@@ -628,6 +631,7 @@ class ShippingCarrierService {
 
     // ---- record it (own short transaction) and move the order along
     const shipment = await runInTenantContext(storeId, () =>
+      // ci: emits ci/shipment-booked (below, after the booking is recorded)
       prisma.shipment.update({
         where: { id: claimedId, storeId },
         data: {
@@ -639,6 +643,13 @@ class ShippingCarrierService {
           carrierShipmentId: response.carrierShipmentId,
           carrierTransactionId: response.carrierTransactionId,
           estimatedDeliveryAt: response.estimatedDelivery,
+          // CI-1: the normalised destination only (never the street or building).
+          areaKey: areaKeyFor({
+            country: deliveryAddress.country,
+            state: deliveryAddress.state,
+            city: deliveryAddress.city,
+            area: deliveryAddress.area,
+          }).areaKey,
           statusHistory: [
             ...history0,
             {
@@ -649,6 +660,13 @@ class ShippingCarrierService {
           ],
         },
       })
+    );
+
+    // CI-1: the booking is an outcome (`shipment.created`). Never blocks or fails the booking.
+    await sendEventAfterCommit(
+      'ci-shipment-booked',
+      { name: CI_SHIPMENT_BOOKED_EVENT, data: { storeId, orderId, shipmentId: shipment.id } },
+      { ifUnhookable: 'send' }
     );
 
     try {
@@ -715,12 +733,14 @@ class ShippingCarrierService {
     try {
       return await runInTenantContext(storeId, async () => {
         if (!input.existingId) {
+          // ci: not-an-outcome (the booking claim; `shipment.created` is emitted once the carrier accepted it)
           const row = await prisma.shipment.create({
             data: { storeId, orderId: input.orderId, ...fields, createAttempts: 1 },
           });
           return row.id;
         }
         const staleBefore = new Date(Date.now() - CLAIM_STALE_MS);
+        // ci: not-an-outcome (re-claiming a failed or stale booking row)
         const r = await prisma.shipment.updateMany({
           where: {
             id: input.existingId,
@@ -745,6 +765,7 @@ class ShippingCarrierService {
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
     try {
       await runInTenantContext(storeId, () =>
+        // ci: not-an-outcome (a failed booking is counted in `attemptsToBook` of the eventual shipment.created)
         prisma.shipment.update({
           where: { id: shipmentId, storeId },
           data: { status: CREATION_FAILED, error: message },
@@ -832,6 +853,7 @@ class ShippingCarrierService {
     }
 
     const history = Array.isArray(shipment.statusHistory) ? (shipment.statusHistory as any[]) : [];
+    // ci: not-an-outcome (a merchant-cancelled shipment is not a delivery outcome; the order cancel is emitted from order/status-changed)
     const updatedShipment = await prisma.shipment.update({
       where: { id: shipmentId, storeId: currentStoreId() },
       data: {
@@ -1034,11 +1056,16 @@ class ShippingCarrierService {
     const nextStatus = merged.status;
 
     const prevStatus = shipment.status;
+    // Customer Intelligence (CI-1): first-time pick-up / attempt / delivery / return facts, stamped in
+    // the SAME update as the status so the columns and the events they guard cannot disagree.
+    const ci = shipmentStamps(merged.history, shipment, source);
+    // ci: emits ci/shipment-tracked (first-time pick-up / attempt / delivery / return, via shipmentStamps)
     const updated = await prisma.shipment.update({
       where: { id: shipmentId, storeId: currentStoreId() },
       data: {
         status: nextStatus,
         statusHistory: merged.history as unknown as Prisma.InputJsonValue,
+        ...ci.data,
         ...(extra.estimatedDelivery ? { estimatedDeliveryAt: extra.estimatedDelivery } : {}),
         ...(source === 'carrier_poll' ? { lastPolledAt: new Date() } : {}),
       },
@@ -1075,6 +1102,24 @@ class ShippingCarrierService {
             status: nextStatus,
             trackingUrl: updated.trackingUrl ?? null,
             updatedAt: new Date().toISOString(),
+          },
+        },
+        { ifUnhookable: 'send' }
+      );
+    }
+
+    // CI-1: one event per call that brought a NEW first-time fact (not per status change: two failed
+    // attempts keep the status `failed`). Enqueue failures are logged, never block tracking.
+    if (ci.marks.length > 0) {
+      await sendEventAfterCommit(
+        'ci-shipment-tracked',
+        {
+          name: CI_SHIPMENT_TRACKED_EVENT,
+          data: {
+            storeId: shipment.storeId,
+            orderId: shipment.orderId,
+            shipmentId,
+            ci: ci.marks,
           },
         },
         { ifUnhookable: 'send' }

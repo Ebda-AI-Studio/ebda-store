@@ -126,9 +126,20 @@ const PUBLIC_SNAPSHOT_KEYS = [
  * The full snapshot holds the margin, the making charge and the rate row id; those stay with the
  * merchant (Ruling B5-13). Used by every customer-facing order read; the admin read is unfiltered.
  */
-export function redactOrderForCustomer<T extends { items?: unknown }>(order: T): T {
+export function redactOrderForCustomer<T extends { items?: unknown }>(input: T): T {
+  // Customer Intelligence columns (CI-1) are the platform's, not the shopper's: never in a customer-facing order.
+  const {
+    buyerKey: _buyerKey,
+    areaKey: _areaKey,
+    ...order
+  } = input as T & {
+    buyerKey?: unknown;
+    areaKey?: unknown;
+  };
+  void _buyerKey;
+  void _areaKey;
   const items = (order.items ?? null) as Array<Record<string, unknown>> | null;
-  if (!Array.isArray(items)) return order;
+  if (!Array.isArray(items)) return order as T;
   return {
     ...order,
     items: items.map(item => {
@@ -143,7 +154,7 @@ export function redactOrderForCustomer<T extends { items?: unknown }>(order: T):
       }
       return { ...rest, goldSnapshot: goldSnapshot ?? null };
     }),
-  };
+  } as unknown as T;
 }
 
 /**

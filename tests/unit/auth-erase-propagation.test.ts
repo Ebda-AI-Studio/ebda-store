@@ -219,8 +219,23 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         oneSignalPlayerIds: ['player-a', 'player-b'],
         // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
         storeId: CUSTOMER.storeId,
+        // Customer Intelligence: every buyer key to erase from R2 (none here: no phone, no keyed orders)
+        ciBuyerKeys: [],
       },
     });
+  });
+
+  it('hands every buyer key on the shopper\u2019s orders to the CI erasure, and nulls the keys on the orders', async () => {
+    mockPrisma.order.findMany.mockImplementation(
+      async (args: { where?: { buyerKey?: unknown } }) =>
+        args?.where?.buyerKey ? [{ buyerKey: 'k1' }, { buyerKey: 'k2' }] : []
+    );
+    await AuthService.eraseAccount(CUSTOMER.id);
+    expect(sendMock.mock.calls.at(-1)![0].data.ciBuyerKeys.sort()).toEqual(['k1', 'k2']);
+    expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ buyerKey: null, areaKey: null }) })
+    );
+    mockPrisma.order.findMany.mockReset().mockResolvedValue([]);
   });
 
   it('erases the shopper\u2019s passkeys in the same transaction (Ruling PASSKEY-1)', async () => {
@@ -269,7 +284,12 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
-      data: { userId: CUSTOMER.id, oneSignalPlayerIds: [], storeId: CUSTOMER.storeId },
+      data: {
+        userId: CUSTOMER.id,
+        oneSignalPlayerIds: [],
+        storeId: CUSTOMER.storeId,
+        ciBuyerKeys: [],
+      },
     });
   });
 });

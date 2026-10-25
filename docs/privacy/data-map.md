@@ -159,6 +159,13 @@ design choice, not an oversight:
    between the shopper and Meta/TikTok as independent data controllers of
    their advertising data, not something reachable through Ebda Store's API.
 
+### Customer Intelligence outcomes (CI-1, capture only)
+
+What: one append-only record per commerce outcome (order placed/paid/cancelled/refunded, COD confirmed/unconfirmed, shipment created/picked up/attempted/delivered/returned) in the private R2 bucket `ebda-ci` (`outcomes/v1/store=<id>/dt=<day>/*.ndjson.gz`), plus one content-free point per event in Analytics Engine (`ebda_commerce_outcomes`: store id, type, carrier, area key, amounts, hours; NO buyer key, NO order id). The buyer appears only as `buyerKey` = HMAC-SHA256(secret, E.164 phone); never a name, phone, e-mail or address. The one free-text field is the carrier's return reason, scrubbed (phones, e-mails, links masked) and cut to 200 characters. `areaKey` is governorate plus district only (`EG-C-nasr-city`).
+Purpose: improving delivery, courier choice and fraud signals (internal first; merchant hints later behind minimum samples, advise-never-block). Basis and wording: the privacy-policy and terms update the controller drafts and Ahmad signs (not in this repo's code).
+Retention: raw envelopes 24 months (R2 lifecycle rule `expire-ci-raw-24m` on `outcomes/`, `scripts/ops/ci-capture-setup.sh`); Analytics Engine 90 days (Cloudflare); aggregates (later) indefinite and k-anonymous.
+Erasure/export: customer erasure removes that buyer key's rows from every partition via the buyer index (`index/buyer/`), nulls `orders.buyer_key`/`area_key`, and is verified by re-reading the partitions (`eraseCiOutcomes`, `cf/erasure/surfaces.ts`); merchant erasure deletes the store's whole prefix. The account export includes the buyer's own rows (`customerIntelligence`).
+
 ## 5. Deletion & backups — the honest erasure boundary
 
 `eraseAccount` (+ its third-party propagation, §3) only ever mutates the

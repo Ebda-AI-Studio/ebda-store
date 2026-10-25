@@ -86,6 +86,7 @@ import { webhookFanout, webhookDeliver, webhookDeliveryPurge } from './webhook-d
 import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 import { waStoreEvents, waPlanSync } from './wa-store-events';
+import { ciOutcomes } from './ci-outcomes';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -240,6 +241,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // only (a super admin pressing Send notice).
   legalNoticeSend,
   waStoreEvents,
+  ciOutcomes,
   waPlanSync,
   // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate
   // alerts (hourly). Both exit un-stepped on an empty tick (one execution).

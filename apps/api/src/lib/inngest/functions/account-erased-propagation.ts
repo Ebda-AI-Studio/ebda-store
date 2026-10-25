@@ -5,6 +5,9 @@ import {
   summarizePropagationFailures,
 } from '../../../services/privacy-propagation.service';
 import logger from '../../logger';
+import { cfBindings } from '../../../cf/bindings';
+import { ciSurface } from '../../../cf/erasure/surfaces';
+import type { R2BucketLike } from '../../../cf/erasure/types';
 import { inngest } from '../client';
 
 /**
@@ -32,7 +35,7 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
     triggers: [{ event: 'account/erased' }],
   },
   async ({ event, step }) => {
-    const { userId, oneSignalPlayerIds } = event.data;
+    const { userId, oneSignalPlayerIds, ciBuyerKeys } = event.data;
 
     if (!userId) {
       logger.warn({ event: event.name }, 'account/erased fired without userId — skipping');
@@ -42,6 +45,9 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
     const results = await Promise.allSettled([
       step.run('delete-onesignal-players', () => deleteOneSignalPlayers(oneSignalPlayerIds ?? [])),
       step.run('delete-posthog-person', () => deletePostHogPerson(userId)),
+      // Customer Intelligence (PDPL): the buyer's rows in R2 `ebda-ci` and their index entries. Analytics
+      // Engine holds no buyer key, so there is nothing to erase there. Not a Worker (Node)? no bucket.
+      step.run('erase-ci-outcomes', () => eraseCiOutcomes(userId, ciBuyerKeys ?? [])),
     ]);
 
     // Re-throw (aggregated) if a step ultimately failed after Inngest's
@@ -67,3 +73,23 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
     }
   }
 );
+
+/** Erases every given buyer key from CI; throws when any row survives (so the job retries and pages). */
+export async function eraseCiOutcomes(
+  requestId: string,
+  buyerKeys: string[],
+  bucket: R2BucketLike | undefined = cfBindings()?.CI_BUCKET as unknown as R2BucketLike | undefined
+): Promise<{ erased: number }> {
+  if (buyerKeys.length === 0) return { erased: 0 };
+  if (!bucket) {
+    if (cfBindings()) throw new Error('CI_BUCKET binding missing: CI rows were not erased');
+    return { erased: 0 };
+  }
+  let erased = 0;
+  for (const buyerKey of buyerKeys) {
+    const r = await ciSurface(bucket).eraseSubject({ kind: 'customer', requestId, buyerKey });
+    if (r.remaining > 0) throw new Error(`CI erasure left ${r.remaining} row(s) for a buyer key`);
+    erased += r.erased;
+  }
+  return { erased };
+}

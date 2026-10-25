@@ -42,6 +42,7 @@ import {
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
+import { exportCiOutcomes } from '../lib/ci/export';
 import {
   WhatsAppConsentService,
   lockAccountConsent,
@@ -1974,6 +1975,10 @@ export class AuthService {
     const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
+    // Customer Intelligence: every buyer key the person's orders carry (an order may have been placed with
+    // another phone than the account's), collected BEFORE the scrub nulls them; the account/erased
+    // consumer erases those keys' CI rows from R2 (cf/erasure `ciSurface`).
+    let ciBuyerKeys: string[] = [];
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
@@ -2008,6 +2013,13 @@ export class AuthService {
         ).map(o => o.id),
         email: user.email,
       });
+      ciBuyerKeys = (
+        await tx.order.findMany({
+          where: { customerId: userId, storeId: eraseStoreId, buyerKey: { not: null } },
+          select: { buyerKey: true },
+          distinct: ['buyerKey'],
+        })
+      ).flatMap(o => (o.buyerKey ? [o.buyerKey] : []));
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -2020,6 +2032,9 @@ export class AuthService {
           shippingAddress: anonymizedAddressJson,
           billingAddress: anonymizedAddressJson,
           customerNotes: null,
+          // CI-1: the pseudonymous buyer key and the coarse area go with the identity.
+          buyerKey: null,
+          areaKey: null,
         },
       });
 
@@ -2385,7 +2400,13 @@ export class AuthService {
         name: 'account/erased',
         // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
         // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
-        data: { userId, oneSignalPlayerIds, storeId: user.storeId ?? undefined, buyerKey },
+        data: {
+          userId,
+          oneSignalPlayerIds,
+          storeId: user.storeId ?? undefined,
+          buyerKey,
+          ciBuyerKeys: [...new Set([...(buyerKey ? [buyerKey] : []), ...ciBuyerKeys])],
+        },
       })
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
@@ -2581,6 +2602,12 @@ export class AuthService {
       provenKey
     );
 
+    // Customer Intelligence: the commerce outcomes recorded under this person's buyer key(s), pseudonymous.
+    const customerIntelligence = await exportCiOutcomes([
+      ...orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
+      ...(provenKey ? [provenKey] : []),
+    ]);
+
     return {
       exportedAt: new Date().toISOString(),
       user,
@@ -2600,6 +2627,7 @@ export class AuthService {
       passkeys,
       smsMarketingConsents,
       whatsappMarketingConsent,
+      customerIntelligence,
       wholesaleApplications,
     };
   }
