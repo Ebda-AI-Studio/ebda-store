@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { COPY } from '../../apps/marketing/src/lib/content';
@@ -8,7 +9,8 @@ import { COPY } from '../../apps/marketing/src/lib/content';
  * review-pending comments and markdown markup. The source is vendored verbatim in apps/marketing/legal-source/ by
  * `node apps/marketing/scripts/import-wa-legal.mjs <docs/legal>` (re-run it whenever the source changes; it also
  * regenerates src/lib/legal-wa-*.ts). The comparison is on the word sequence, so a clause edited or dropped in
- * either copy fails here; it cannot drift silently.
+ * either copy fails here; it cannot drift silently. PINNED_SHA256 pins the vendored files to the exact versions the
+ * WhatsApp session published: when they ship a new text, re-import and update the hashes together.
  */
 const ROOT = path.resolve(__dirname, '../../apps/marketing/legal-source');
 const DOCS = [
@@ -16,6 +18,14 @@ const DOCS = [
   ['privacy', 'waPrivacy'],
   ['dpa', 'waDpa'],
 ] as const;
+const PINNED_SHA256: Record<string, string> = {
+  'ar/whatsapp-terms': '83ff0b9a36f3fbda22adec3f1be5813190e855a8ce780587130c4ff93b0efbca',
+  'ar/whatsapp-privacy': '93cc40cde3913d7f0c31bcbe5c93a1b63e5676250528b282b8ff45a9f4e59cc8',
+  'ar/whatsapp-dpa': '43dfa98c3dc681bc047ff7f04738279a326d6e71d80d9c1afbb75bb2c0975e51',
+  'en/whatsapp-terms': 'c4d72c46ca6a74b57eabf2c5ec86e89edf08b94ac06ac07c4287da3eeea064d8',
+  'en/whatsapp-privacy': '139b5484f759014a0245ebbbf90b3a504aebf324717f98bbd3426397ade7008a',
+  'en/whatsapp-dpa': '8cfe9328d4478c1150c2c445835b0761c4a7f90849301d69dbe4e777b7f4a65a',
+};
 const PREVAILS = /^(Arabic version prevails\.|النسخة العربية هي الحاكمة\.)$/;
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];
 
@@ -46,6 +56,16 @@ describe('published Ebda WhatsApp legal pages equal their vendored source', () =
         expect(JSON.stringify(doc)).not.toMatch(/PENDING|<!--/);
       });
     }
+
+  it('the vendored source is the exact file the WhatsApp session signed off (pinned sha256)', () => {
+    for (const [name, sha] of Object.entries(PINNED_SHA256))
+      expect(
+        createHash('sha256')
+          .update(readFileSync(path.join(ROOT, `${name}.md`)))
+          .digest('hex'),
+        name
+      ).toBe(sha);
+  });
 
   it('negative control: dropping one word from the source is detected', () => {
     const raw = readFileSync(path.join(ROOT, 'en', 'whatsapp-terms.md'), 'utf8');
