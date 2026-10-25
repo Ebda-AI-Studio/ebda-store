@@ -3,7 +3,7 @@
     "db": "store-do",
     "class": "merchant-pii",
     "action": "delete",
-    "piiColumns": ["meta_access_token"],
+    "piiColumns": ["agent_api_key"],
     "subjectKeys": [],
     "note": "secret, destroyed on store close"
   },
@@ -813,14 +813,6 @@
     "subjectKeys": [],
     "note": "",
     "reviewedNotPii": ["session_id"]
-  },
-  "store-do:whatsapp_templates": {
-    "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
   },
   "store-do:bank_statements": {
     "db": "store-do",

@@ -608,51 +608,6 @@
           "optional": false,
           "default": "false"
         },
-        "wbsEnabled": {
-          "kind": "scalar",
-          "type": "Boolean",
-          "column": "wbs_enabled",
-          "list": false,
-          "optional": false,
-          "default": "false"
-        },
-        "wbsClientId": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "wbs_client_id",
-          "list": false,
-          "optional": true
-        },
-        "wbsTemplates": {
-          "kind": "scalar",
-          "type": "Json",
-          "column": "wbs_templates",
-          "list": false,
-          "optional": true
-        },
-        "wbsTemplateUseLogoHeader": {
-          "kind": "scalar",
-          "type": "Boolean",
-          "column": "wbs_template_use_logo_header",
-          "list": false,
-          "optional": false,
-          "default": "false"
-        },
-        "waCustomerOrderingEnabled": {
-          "kind": "scalar",
-          "type": "Boolean",
-          "column": "wa_customer_ordering_enabled",
-          "list": false,
-          "optional": false,
-          "default": "false"
-        },
-        "botCopy": {
-          "kind": "scalar",
-          "type": "Json",
-          "column": "bot_copy",
-          "list": false,
-          "optional": true
-        },
         "agentApiKeyRotatedAt": {
           "kind": "scalar",
           "type": "DateTime",
@@ -751,35 +706,6 @@
           "list": false,
           "optional": false,
           "default": "\"daily\""
-        },
-        "botMode": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "bot_mode",
-          "list": false,
-          "optional": false,
-          "default": "\"legacy_chat\""
-        },
-        "botServiceMenu": {
-          "kind": "scalar",
-          "type": "Json",
-          "column": "bot_service_menu",
-          "list": false,
-          "optional": true
-        },
-        "metaCatalogId": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "meta_catalog_id",
-          "list": false,
-          "optional": true
-        },
-        "metaBusinessId": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "meta_business_id",
-          "list": false,
-          "optional": true
         },
         "owner": {
           "kind": "relation",
@@ -1446,13 +1372,6 @@
           "optional": false,
           "external": true
         },
-        "whatsAppTemplates": {
-          "kind": "relation",
-          "type": "WhatsAppTemplate",
-          "list": true,
-          "optional": false,
-          "external": true
-        },
         "paymentEvents": {
           "kind": "relation",
           "type": "PaymentEvent",
@@ -1651,20 +1570,6 @@
           "list": false,
           "optional": false,
           "id": true
-        },
-        "wbsApiKey": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "wbs_api_key",
-          "list": false,
-          "optional": true
-        },
-        "metaAccessToken": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "meta_access_token",
-          "list": false,
-          "optional": true
         },
         "agentApiKey": {
           "kind": "scalar",
@@ -17074,123 +16979,6 @@
         }
       }
     },
-    "WhatsAppTemplate": {
-      "table": "whatsapp_templates",
-      "db": "store-do",
-      "pk": ["id"],
-      "uniques": [["storeId", "sourceKey", "language"]],
-      "fields": {
-        "id": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "id",
-          "list": false,
-          "optional": false,
-          "default": "uuid()",
-          "id": true
-        },
-        "storeId": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "store_id",
-          "list": false,
-          "optional": false
-        },
-        "sourceKey": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "source_key",
-          "list": false,
-          "optional": false
-        },
-        "language": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "language",
-          "list": false,
-          "optional": false
-        },
-        "metaName": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "meta_name",
-          "list": false,
-          "optional": false
-        },
-        "category": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "category",
-          "list": false,
-          "optional": false
-        },
-        "body": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "body",
-          "list": false,
-          "optional": false
-        },
-        "status": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "status",
-          "list": false,
-          "optional": false,
-          "default": "\"draft\""
-        },
-        "rejectionReason": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "rejection_reason",
-          "list": false,
-          "optional": true
-        },
-        "metaTemplateId": {
-          "kind": "scalar",
-          "type": "String",
-          "column": "meta_template_id",
-          "list": false,
-          "optional": true
-        },
-        "lastSyncedAt": {
-          "kind": "scalar",
-          "type": "DateTime",
-          "column": "last_synced_at",
-          "list": false,
-          "optional": true
-        },
-        "createdAt": {
-          "kind": "scalar",
-          "type": "DateTime",
-          "column": "created_at",
-          "list": false,
-          "optional": false,
-          "default": "now()"
-        },
-        "updatedAt": {
-          "kind": "scalar",
-          "type": "DateTime",
-          "column": "updated_at",
-          "list": false,
-          "optional": false,
-          "updatedAt": true
-        },
-        "store": {
-          "kind": "relation",
-          "type": "Store",
-          "list": false,
-          "optional": false,
-          "external": true,
-          "owner": true,
-          "from": ["store_id"],
-          "fromProps": ["storeId"],
-          "to": ["id"],
-          "toProps": ["id"],
-          "onDelete": "Cascade"
-        }
-      }
-    },
     "BankStatement": {
       "table": "bank_statements",
       "db": "store-do",
@@ -20613,6 +20401,6 @@
     "TaxDocumentKind": ["tax_card", "vat_certificate", "other"]
   },
   "omit": {
-    "StoreCredential": ["wbsApiKey", "metaAccessToken", "agentApiKey"]
+    "StoreCredential": ["agentApiKey"]
   }
 }
