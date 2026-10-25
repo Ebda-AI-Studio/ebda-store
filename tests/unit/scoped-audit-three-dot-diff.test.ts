@@ -13,32 +13,15 @@
  * trunk commit.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { cleanGitEnv, sandboxGit } from '../helpers/git-env';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const SCRIPT = join(__dirname, '../../scripts/scoped-audit.sh');
 
-/**
- * A clean environment for spawning git in a SCRATCH repo. The pre-push hook
- * (and some CI shells) run child processes with GIT_DIR/GIT_WORK_TREE/
- * GIT_INDEX_FILE already pointed at the OUTER repo — inherited by
- * execFileSync/spawnSync by default — which makes git operate on the wrong
- * repository ("fatal: this operation must be run in a work tree") instead of
- * the `cwd` scratch dir these fixtures create.
- */
-function cleanGitEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) {
-    if (key.startsWith('GIT_')) delete env[key];
-  }
-  return env;
-}
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', env: cleanGitEnv() }).trim();
-}
+const git = (cwd: string, ...args: string[]) => sandboxGit(cwd)(...args);
 
 const dirs: string[] = [];
 afterEach(() => {
