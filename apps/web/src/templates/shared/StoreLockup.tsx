@@ -51,7 +51,7 @@ export function StoreLockup({
     lineHeight: 1,
     color: lockup.latinColor === 'none' ? undefined : COLOR[lockup.latinColor],
     // the tracking adds trailing space after the last letter: pull it back so the line stays optically centred
-    marginInlineEnd: stack ? `-${lockup.latinTracking}em` : undefined,
+    marginInlineEnd: stack ? `calc(${lockup.latinTracking}em * -1)` : undefined,
   };
   return (
     <span
@@ -61,7 +61,7 @@ export function StoreLockup({
       translate="no"
       title={main}
     >
-      <span className="block max-w-full truncate" style={mainStyle}>
+      <span className="block max-w-full line-clamp-2 [text-wrap:balance]" style={mainStyle}>
         {main}
       </span>
       {latin && (
