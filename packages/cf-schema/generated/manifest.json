@@ -2,10 +2,10 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 119,
+      "tables": 118,
       "maxColumns": 62,
       "columnCounts": {
-        "store_credentials": 6,
+        "store_credentials": 4,
         "blog_posts": 14,
         "store_locations": 18,
         "store_pages": 12,
@@ -103,7 +103,6 @@
         "customer_rfm_snapshots": 11,
         "count_sessions": 10,
         "count_lines": 8,
-        "whatsapp_templates": 13,
         "bank_statements": 9,
         "bank_transactions": 13,
         "warehouses": 13,
@@ -120,7 +119,7 @@
         "gold_rates_current": 5,
         "gold_rate_settings": 10,
         "store_profile": 62,
-        "store_config": 32,
+        "store_config": 22,
         "commerce_outcomes": 14,
         "do_flags": 2,
         "d1_outbox": 7
@@ -1486,12 +1485,6 @@
       "pwaSettings",
       "blogEnabled",
       "locationsEnabled",
-      "wbsEnabled",
-      "wbsClientId",
-      "wbsTemplates",
-      "wbsTemplateUseLogoHeader",
-      "waCustomerOrderingEnabled",
-      "botCopy",
       "agentApiKeyRotatedAt",
       "returnWindowDays",
       "returnFeesPaidBy",
@@ -1502,11 +1495,7 @@
       "aiFeaturesEnabled",
       "aiBulkThrottleMs",
       "aiNarrationEnabled",
-      "insightsRollupCron",
-      "botMode",
-      "botServiceMenu",
-      "metaCatalogId",
-      "metaBusinessId"
+      "insightsRollupCron"
     ]
   }
 }

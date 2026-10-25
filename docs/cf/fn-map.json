@@ -306,9 +306,8 @@
     "test": "identity track"
   },
   "ebda_wbs_bridge_keys": {
-    "target": "d1",
-    "replacement": "dropped with the WBS bridge (WA-PKG-1: wa-bridge.routes.ts, wbs-bridge.service.ts are not ported)",
-    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+    "target": "deleted-by-construction",
+    "replacement": "dropped with the legacy WBS bridge by migration 20261103000100_drop_legacy_wa_bridge (#223); nothing to port, the DO/D1 schema never has it"
   },
   "ebda_webhook_inbox_get": {
     "target": "d1",

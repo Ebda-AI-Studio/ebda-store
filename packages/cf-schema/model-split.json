@@ -475,10 +475,6 @@
     "target": "store-do",
     "reason": "storeId-scoped, read only in one store context"
   },
-  "WhatsAppTemplate": {
-    "target": "store-do",
-    "reason": "storeId-scoped, read only in one store context"
-  },
   "BankStatement": {
     "target": "store-do",
     "reason": "storeId-scoped, read only in one store context"

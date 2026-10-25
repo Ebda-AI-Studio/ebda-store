@@ -2449,16 +2449,6 @@ export const storeConfig = sqliteTable('store_config', {
   pwaSettings: text('pwa_settings', { mode: 'json' }).$type<unknown>().notNull().default({}),
   blogEnabled: integer('blog_enabled', { mode: 'boolean' }).notNull().default(false),
   locationsEnabled: integer('locations_enabled', { mode: 'boolean' }).notNull().default(false),
-  wbsEnabled: integer('wbs_enabled', { mode: 'boolean' }).notNull().default(false),
-  wbsClientId: text('wbs_client_id'),
-  wbsTemplates: text('wbs_templates', { mode: 'json' }).$type<unknown>(),
-  wbsTemplateUseLogoHeader: integer('wbs_template_use_logo_header', { mode: 'boolean' })
-    .notNull()
-    .default(false),
-  waCustomerOrderingEnabled: integer('wa_customer_ordering_enabled', { mode: 'boolean' })
-    .notNull()
-    .default(false),
-  botCopy: text('bot_copy', { mode: 'json' }).$type<unknown>(),
   agentApiKeyRotatedAt: integer('agent_api_key_rotated_at', { mode: 'timestamp_ms' }),
   returnWindowDays: integer('return_window_days'),
   returnFeesPaidBy: text('return_fees_paid_by'),
@@ -2472,16 +2462,10 @@ export const storeConfig = sqliteTable('store_config', {
   aiBulkThrottleMs: integer('ai_bulk_throttle_ms').notNull().default(2500),
   aiNarrationEnabled: integer('ai_narration_enabled', { mode: 'boolean' }).notNull().default(true),
   insightsRollupCron: text('insights_rollup_cron').notNull().default('daily'),
-  botMode: text('bot_mode').notNull().default('legacy_chat'),
-  botServiceMenu: text('bot_service_menu', { mode: 'json' }).$type<unknown>(),
-  metaCatalogId: text('meta_catalog_id'),
-  metaBusinessId: text('meta_business_id'),
 });
 
 export const storeCredentials = sqliteTable('store_credentials', {
   storeId: text('store_id').primaryKey().notNull(),
-  wbsApiKey: text('wbs_api_key'),
-  metaAccessToken: text('meta_access_token'),
   agentApiKey: text('agent_api_key'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
@@ -2930,29 +2914,6 @@ export const webhookEndpoints = sqliteTable('webhook_endpoints', {
   lastSuccessAt: integer('last_success_at', { mode: 'timestamp_ms' }),
   lastFailureAt: integer('last_failure_at', { mode: 'timestamp_ms' }),
   createdBy: text('created_by'),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' })
-    .notNull()
-    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-    .notNull()
-    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
-});
-
-export const whatsappTemplates = sqliteTable('whatsapp_templates', {
-  id: text('id')
-    .primaryKey()
-    .notNull()
-    .$defaultFn(() => crypto.randomUUID()),
-  storeId: text('store_id').notNull(),
-  sourceKey: text('source_key').notNull(),
-  language: text('language').notNull(),
-  metaName: text('meta_name').notNull(),
-  category: text('category').notNull(),
-  body: text('body').notNull(),
-  status: text('status').notNull().default('draft'),
-  rejectionReason: text('rejection_reason'),
-  metaTemplateId: text('meta_template_id'),
-  lastSyncedAt: integer('last_synced_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

@@ -4,7 +4,7 @@
 //           (a settings change in the DO emits a D1 update for these fields only, through the `d1_outbox`).
 //   profile DO-only: branding, content, SEO, contact, pixels, theme.
 //   config  DO-only: commerce, flags, integrations, AI and accounting switches (everything else).
-// Cloudflare DO SQLite allows 100 columns per table (phase-0 memo, finding 1): Store has 105, so the
+// Cloudflare DO SQLite allows 100 columns per table (phase-0 memo, finding 1): Store had 105 (95 after #223), so the
 // split is column-count driven as well as semantic; the generator and the test both enforce <= 100.
 
 export const STORE_D1_ONLY = [
