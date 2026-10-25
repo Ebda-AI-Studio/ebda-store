@@ -16,7 +16,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/02-connect-your-own-number.md':
     '56ff1658d07af189e685b07b7da9ffd057a55ee7a7013c2c9179c6b13121cb4e',
   'ar/03-use-the-shared-number.md':
-    '53c7c97019c0c326ab828a26bd9d3ae0795dfb61087241afd3e99bd36cb027ea',
+    'e6ec68d17cb816ebdb056ec70d3b0489edf964d710fa541203e7e643ebf2c920',
   'ar/04-templates-and-the-24-hour-window.md':
     '0ca3f09794a10b4c84cac4187ad4caff8b478903f4d291ce676b61cd434c78e1',
   'ar/05-cod-confirmations.md': '91f62e3356718ef87dcc7d6461abf8aceab53f8cfa640762ae7685bf635711ef',
@@ -26,7 +26,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/08-campaigns-and-opt-out.md':
     'b9a1a485298695b57be76cf7511d6b1501931f15e49302813671b86017e92426',
   'ar/09-wallet-top-ups-and-refunds.md':
-    'e8b979651a8a26164ba466ab1e6cfcafacc97bbe72557e549728fea21b2a0e3b',
+    '939c25a80e56998cc62de259842444b57c29c6757c8b2ce93d32325cb0747bf9',
   'ar/10-meta-fees-explained.md':
     'a91a05bbb7ddbdc236b6b4f5c0557d5e8f763a43fae09c450498b90750a0659f',
   'ar/11-service-menu-hours-and-location.md':
@@ -36,7 +36,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/02-connect-your-own-number.md':
     '6ed621a4502388b4d98c152e469205c10b5f6cb9954250816b9c1305006a9e9d',
   'en/03-use-the-shared-number.md':
-    'f92ea39735dffcd6b5069d066b25baf0c0b832f4b40905b82f0eeff8a742dc7f',
+    'f8241dac63f9dc29d09219a15cbc677b19af45373630fe99c65d24828ddcef72',
   'en/04-templates-and-the-24-hour-window.md':
     '77ccada792ca49c7c6d3c34dd7d1641e6578d9f878b9d36655bed6bacbf84b38',
   'en/05-cod-confirmations.md': 'de265900d41f2ad2ac9797cd547dd8db723e49908f7a9557fb3d44c63d277e07',
@@ -46,7 +46,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/08-campaigns-and-opt-out.md':
     'a17efb005fd6feacb792967ddca19a9c80630d99f665f6381dc1096d13c0c389',
   'en/09-wallet-top-ups-and-refunds.md':
-    '5e62915108cd006d12c1689e5ae710543bea0dd99622bd14803abfeec4066d9c',
+    '76b0233b2f319b9f73032b288c525cc11690085a59309c31db06a36894f1ff99',
   'en/10-meta-fees-explained.md':
     '2f79f146fa6fc55f8c137d8a5af96dfcec0e50612f16062b15c69246aadd7693',
   'en/11-service-menu-hours-and-location.md':
