@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+// Phase 4.1/4.2 verification: per table, row count + digest of every migrated column on BOTH sides.
+//   node scripts/cf/verify-store.mjs --store <id|slug> --do-url <base>
+//   node scripts/cf/verify-store.mjs --all --do-url <base> [--d1 ebda-platform --d1-target local|remote ...]
+// Prints "N/N tables equal" per store, a grand total, and exits 0 only when every table is equal and the
+// DO reports zero foreign-key violations. The Postgres side is recomputed here, independent of the
+// migrate scripts' own bookkeeping.
+import fs from 'node:fs';
+import { cli, fmtMs } from './lib/cli.mjs';
+import { connectReadOnly, resolveStore } from './lib/pg.mjs';
+import { loadPlan, entityIndexQuery, ENTITY_KIND_TABLES } from './lib/plan.mjs';
+import { bindPlan, sourceAggs, sourceDigest, unmigratedTables } from './lib/source.mjs';
+import { d1Query } from './lib/d1.mjs';
+import { TableDigest } from '../../packages/cf-migrate/src/canon.mjs';
+import { RULED_UNMIGRATED_TABLES } from './lib/plan.mjs';
+
+const { args } = cli({
+  d1: { type: 'string' },
+  'd1-target': { type: 'string', default: 'local' },
+  'd1-config': { type: 'string' },
+  'persist-to': { type: 'string' },
+  'skip-platform': { type: 'boolean', default: false },
+});
+
+async function verifyDoStore(client, bound, plan, store) {
+  const tables = bound.store.tables;
+  const src = {};
+  const aggSrc = {};
+  for (const bt of tables) {
+    src[bt.name] = await sourceDigest(client, bt, plan.store, 'store', store.id);
+    aggSrc[bt.name] = await sourceAggs(client, bt, plan.store, 'store', store.id);
+  }
+  const res = await fetch(`${args.doUrl}/cutover/stores/${store.id}/__verify`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${args.secret}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      fk: true,
+      tables: tables.map(bt => ({
+        table: bt.name,
+        columns: bt.columns.map(c => c.col),
+        pk: bt.pk,
+        aggs: aggSrc[bt.name].specs.map(({ col, op }) => ({ col, op })),
+      })),
+    }),
+  });
+  const j = await res.json();
+  if (!res.ok) throw new Error(`__verify HTTP ${res.status}: ${j.error}`);
+  // fold the semantic aggregates into the per-table digest so a mismatch fails the table
+  let aggCols = 0;
+  for (const bt of tables) {
+    const want = aggSrc[bt.name].values;
+    const got = j.tables[bt.name]?.aggs ?? {};
+    for (const col of Object.keys(want)) {
+      aggCols++;
+      if ((want[col] ?? null) !== (got[col] ?? null)) {
+        console.log(`  SEMANTIC ${bt.name}.${col}: Postgres ${want[col]} vs target ${got[col]}`);
+        j.tables[bt.name].digest = `semantic-mismatch:${col}`;
+      }
+    }
+  }
+  if (aggCols)
+    console.log(
+      `  semantic aggregates (decimal, date, bool, list sums, recomputed in Postgres with different expressions): ${aggCols} columns checked`
+    );
+  const r = compare(
+    `store ${store.slug}`,
+    tables.map(t => t.name),
+    src,
+    j.tables,
+    j.fk
+  );
+  r.aggCols = aggCols;
+  return r;
+}
+
+function compare(label, names, src, dst, fk) {
+  let equal = 0;
+  const bad = [];
+  for (const n of names) {
+    const a = src[n];
+    const b = dst[n];
+    if (a && b && a.count === b.count && a.digest === b.digest) equal++;
+    else bad.push({ table: n, src: a, dst: b });
+  }
+  const fkBad = fk && fk.violations > 0;
+  console.log(
+    `${label}: ${equal}/${names.length} tables equal${fk ? `; foreign-key violations ${fk.violations}` : ''}`
+  );
+  for (const b of bad)
+    console.log(
+      `  MISMATCH ${b.table}: source ${b.src?.count} rows ${b.src?.digest?.slice(0, 12)} vs target ${b.dst?.count} rows ${b.dst?.digest?.slice(0, 12)}`
+    );
+  if (fkBad) console.log(`  FK sample ${JSON.stringify(fk.sample)}`);
+  return { label, equal, total: names.length, bad, fk };
+}
+
+async function verifyPlatform(client, bound, plan) {
+  const d = {
+    db: args.d1,
+    target: args['d1-target'],
+    config: args['d1-config'],
+    persistTo: args['persist-to'],
+  };
+  const src = {};
+  const dst = {};
+  const names = [];
+  for (const bt of bound.platform.tables) {
+    names.push(bt.name);
+    src[bt.name] = await sourceDigest(client, bt, plan.platform, 'all');
+    const cols = bt.columns.map(c => `"${c.col}"`).join(', ');
+    const rows = await d1Query(
+      d,
+      `SELECT ${cols} FROM "${bt.name}" ORDER BY ${bt.pk.map(k => `"${k}"`).join(', ')}`
+    );
+    const dg = new TableDigest();
+    const cn = bt.columns.map(c => c.col);
+    for (const r of rows)
+      await dg.add(
+        cn,
+        cn.map(c => r[c]),
+        bt.pk
+      );
+    dst[bt.name] = await dg.finish();
+  }
+  // entity_index is derived from the store tables (kind, id, store_id)
+  names.push('entity_index');
+  const sd = new TableDigest();
+  for (const [kind, table] of Object.entries(ENTITY_KIND_TABLES)) {
+    const r = await client.query(entityIndexQuery(kind, table, plan.store));
+    for (const x of r.rows)
+      await sd.add(['kind', 'id', 'store_id'], [x.kind, x.id, x.store_id], ['kind', 'id']);
+  }
+  src.entity_index = await sd.finish();
+  const rows = await d1Query(d, `SELECT kind, id, store_id FROM entity_index ORDER BY kind, id`);
+  const dd = new TableDigest();
+  for (const x of rows)
+    await dd.add(['kind', 'id', 'store_id'], [x.kind, x.id, x.store_id], ['kind', 'id']);
+  dst.entity_index = await dd.finish();
+  const fkRows = await d1Query(d, 'PRAGMA foreign_key_check');
+  return compare('platform D1', names, src, dst, {
+    violations: fkRows.length,
+    sample: fkRows.slice(0, 5),
+  });
+}
+
+async function main() {
+  if (!args.all && !args.store) throw new Error('pass --store <id|slug> or --all');
+  if (!args.doUrl) throw new Error('pass --do-url (or CUTOVER_DO_URL)');
+  if (!args.secret) throw new Error('set CUTOVER_IMPORT_SECRET');
+  const t0 = performance.now();
+  const plan = loadPlan();
+  const client = await connectReadOnly(args.pgUrl, { allowProd: args['allow-prod-read'] });
+  const bound = await bindPlan(client, plan);
+  const stores = args.all
+    ? (await client.query('SELECT id, slug FROM stores ORDER BY slug')).rows
+    : [await resolveStore(client, args.store)];
+  const results = [];
+  for (const s of stores) results.push(await verifyDoStore(client, bound, plan, s));
+  if (args.d1 && !args['skip-platform']) results.push(await verifyPlatform(client, bound, plan));
+  else console.log('platform D1: not checked (pass --d1 <name>)');
+
+  // tables in Postgres that no plan table reads must be empty or ruled
+  const orphans = [];
+  for (const n of await unmigratedTables(client, plan)) {
+    const c = Number((await client.query(`SELECT count(*) AS n FROM "${n}"`)).rows[0].n);
+    if (c > 0 && !RULED_UNMIGRATED_TABLES.has(n) && !plan.elsewhere.has(n))
+      orphans.push({ table: n, rows: c });
+  }
+  if (orphans.length)
+    console.log(`UNMIGRATED non-empty Postgres tables: ${JSON.stringify(orphans)}`);
+  await client.query('ROLLBACK');
+  await client.end();
+
+  const equal = results.reduce((a, r) => a + r.equal, 0);
+  const total = results.reduce((a, r) => a + r.total, 0);
+  const ok =
+    equal === total && results.every(r => !r.fk || r.fk.violations === 0) && orphans.length === 0;
+  console.log(
+    `${equal}/${total} tables equal across ${results.length} target(s) in ${fmtMs(performance.now() - t0)}: ${ok ? 'PASS' : 'FAIL'}`
+  );
+  if (args.report)
+    fs.writeFileSync(args.report, JSON.stringify({ ok, equal, total, results }, null, 2));
+  process.exit(ok ? 0 : 1);
+}
+
+main().catch(e => {
+  console.error(`FAILED: ${e.message}`);
+  process.exit(2);
+});

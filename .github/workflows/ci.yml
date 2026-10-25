@@ -706,7 +706,7 @@ jobs:
         # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
         # default, so a future config change can't silently re-mask
         # order-dependent state pollution on this required merge gate.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/cf-schema apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
+        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/cf-schema packages/cf-migrate apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
