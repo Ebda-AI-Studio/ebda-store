@@ -692,8 +692,8 @@ describe('enrolment tickets and step-up for every factor (Ruling ID-15, review r
 
   it('ONCE A FACTOR EXISTS, adding another needs a fresh second-factor session (a password session is refused: super admin)', async () => {
     const u = await seedUser({ role: 'super_admin' });
+    const s = await login(u); // signed in while factorless: amr 'pwd'
     await addPasskeyRow(u.id);
-    const s = await login(u); // password only: amr 'pwd'
     const opts = await call('/passkey/register/options', {
       headers: ORIGIN,
       json: { password: u.password },
@@ -773,30 +773,59 @@ describe('enrolment tickets and step-up for every factor (Ruling ID-15, review r
     expect((await begin(m, pw.body.access_token)).status).toBe(200);
   });
 
-  it('a passkey and no TOTP is a COMPLETE state for a super admin: a password sign-in says to use the passkey, a passkey session carries pa', async () => {
+  it('a passkey and no TOTP is a COMPLETE state for a super admin: a password sign-in creates NO session (no token, no cookie), a passkey session carries pa', async () => {
     const u = await seedUser({ role: 'super_admin' });
     await addPasskeyRow(u.id);
-    const pw = await login(u);
-    const body = pw.body as unknown as {
-      access_token: string;
-      mfaEnrollmentRequired?: boolean;
-      secondFactorRequired?: boolean;
-    };
-    expect(body.secondFactorRequired).toBe(true);
-    expect(body.mfaEnrollmentRequired).toBeUndefined();
-    expect(claims(body.access_token).pa).toBeUndefined();
-    // the same account through a session created by a passkey login (amr hwk) is a platform admin
-    await setAmr(sidOf(body.access_token), 'hwk');
-    const minted = (await (await call('/token?aud=store', { cookie: pw.cookie })).json()) as {
+    const res = await call('/login', { json: { email: u.email, password: u.password } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toBeNull(); // no refresh cookie
+    const body = (await res.json()) as { data: Record<string, unknown> };
+    expect(body.data).toEqual({ secondFactorRequired: true }); // no access_token, no user
+    expect(await count(`SELECT count(*) AS n FROM sessions WHERE user_id = ?1`, u.id)).toBe(0);
+    expect(await count(`SELECT count(*) AS n FROM refresh_tokens WHERE user_id = ?1`, u.id)).toBe(
+      0
+    );
+    // a wrong password is still the ordinary refusal (no oracle about the factor)
+    expect(
+      (await call('/login', { json: { email: u.email, password: 'nope-nope-nope' } })).status
+    ).toBe(401);
+  });
+
+  it('a passkey session (amr hwk) of that admin carries pa', async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    const s = await login(u); // signed in while factorless (enrolment session)
+    await addPasskeyRow(u.id);
+    await setAmr(sidOf(s.body.access_token), 'hwk'); // what a passkey login records
+    const minted = (await (await call('/token?aud=store', { cookie: s.cookie })).json()) as {
       data: { access_token: string };
     };
     expect(claims(minted.data.access_token).pa).toBe('super_admin');
   });
 
+  it("removing a platform admin's passkey needs a fresh second-factor session (a phished password cannot strip the only factor)", async () => {
+    const u = await seedUser({ role: 'super_admin' });
+    const s = await login(u); // a session with no second factor
+    await addPasskeyRow(u.id);
+    const id = (await env.DB.prepare(`SELECT id FROM passkey_credentials WHERE user_id = ?1`)
+      .bind(u.id)
+      .first<{ id: string }>())!.id;
+    const del = () =>
+      call(`/passkeys/${id}/delete`, {
+        json: { password: u.password },
+        bearer: s.body.access_token,
+      });
+    expect((await del()).status).toBe(403);
+    expect(
+      await count(`SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`, u.id)
+    ).toBe(1);
+    await setAmr(sidOf(s.body.access_token), 'hwk'); // a fresh passkey session may
+    expect((await del()).status).toBe(200);
+  });
+
   it('...and adding a TOTP to it needs a fresh passkey session, with NO operator token and NO e-mailed code', async () => {
     const u = await seedUser({ role: 'super_admin' });
+    const s = await login(u); // signed in while factorless
     await addPasskeyRow(u.id);
-    const s = await login(u);
     const bearer = s.body.access_token;
     // from a password-only session: refused
     expect((await begin(u, bearer)).status).toBe(403);

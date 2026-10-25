@@ -340,12 +340,9 @@ async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
     user: publicUser(user),
     ...(await mintFor(c.env, user, s.sid, aud, { created_at: nowMs(), amr })),
     // A platform admin without a second factor gets no admin power: the client must send them to enrol one.
+    // (A super admin WITH a factor never reaches this point on a password: /login answers secondFactorRequired and creates NO session.)
     ...(user.role === 'super_admin' && !hasSecondFactor(amr)
-      ? await (async () => {
-          const factor = await hasAnyFactor(c.env.DB, user);
-          // no factor yet: enrol one; a passkey but no TOTP: a password sign-in carries no admin power, use the passkey
-          return factor ? { secondFactorRequired: true } : { mfaEnrollmentRequired: true };
-        })()
+      ? { mfaEnrollmentRequired: true }
       : {}),
   };
 }
@@ -709,6 +706,10 @@ export function createApp() {
       ]);
       return c.json({ success: true, data: { mfaRequired: true, challenge } });
     }
+    // A platform admin who has a passkey but no TOTP cannot be signed in by the password alone: no session, no cookie, no token
+    // (a half-signed-in session could otherwise be used to remove the passkey, i.e. to lock the only admin out).
+    if (user.role === 'super_admin' && (await hasAnyFactor(c.env.DB, user)))
+      return c.json({ success: true, data: { secondFactorRequired: true } });
     return c.json({ success: true, data: await sessionResponse(c, user, 'pwd', aud) });
   });
 
@@ -1145,10 +1146,14 @@ export function createApp() {
   });
 
   app.post('/passkeys/:id/delete', async c => {
-    const { user } = await bearerAuth(c);
+    const { user, sid } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));
     await requirePassword(c, user, body.password);
     await requireSecondFactor(c, user, body.code);
+    // Removing a platform admin's factor needs the same fresh second-factor session as adding one (a phished password must not
+    // be able to strip the only admin's passkey).
+    if (user.role === 'super_admin' && !(await sessionFactorFresh(c, sid)))
+      throw err(403, 'STEP_UP_REQUIRED');
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
     return c.json({ success: true, data: { deleted: true } });

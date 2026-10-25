@@ -58,9 +58,11 @@ export type LoginResult =
   | ({
       mfaRequired?: false;
       mfaEnrollmentRequired?: boolean;
-      secondFactorRequired?: boolean;
+      secondFactorRequired?: false;
     } & AccessGrant)
-  | { mfaRequired: true; challenge: string };
+  | { mfaRequired: true; challenge: string }
+  /** A platform admin with a passkey signing in by password alone: the server created NO session. */
+  | { secondFactorRequired: true; mfaRequired?: false };
 
 export const accountsLogin = (email: string, password: string): Promise<LoginResult> =>
   accountsFetch('/login', { json: { email, password, aud: 'store' } });

@@ -30,13 +30,7 @@ import {
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { passkeyAssertion, type PasskeyMode } from './passkeys';
-import {
-  AccountsError,
-  accountsLogin,
-  accountsLoginMfa,
-  accountsLogout,
-  establishApiSession,
-} from './accounts';
+import { AccountsError, accountsLogin, accountsLoginMfa, establishApiSession } from './accounts';
 
 interface User {
   id: string;
@@ -279,11 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result.mfaRequired) {
       return { mfaRequired: true, challengeToken: result.challenge } as MfaChallenge;
     }
-    // A platform admin who has a passkey but signed in with the password alone gets no admin power: end that session and say so.
-    if (result.secondFactorRequired) {
-      await accountsLogout(result.access_token).catch(() => undefined);
-      throw new Error(t('adminNeedsSecondFactor'));
-    }
+    // A platform admin who has a passkey cannot sign in with the password alone: the server made no session; say so.
+    if (result.secondFactorRequired) throw new Error(t('adminNeedsSecondFactor'));
     await finishSignIn(result.access_token, result.mfaEnrollmentRequired === true);
   }
 
