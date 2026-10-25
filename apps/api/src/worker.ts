@@ -28,6 +28,8 @@ import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
+import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
+import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -338,7 +340,12 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
 }
 
 async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promise<void> {
-  await withWorkerContext(env, ctx, () => handleQueueBatch(batch));
+  await withWorkerContext(env, ctx, () =>
+    // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
+    batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ
+      ? handleStoreEventsBatch(batch)
+      : handleQueueBatch(batch)
+  );
 }
 
 async function scheduled(

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   inScope: { v: false },
   alert: vi.fn(),
+  applyEntitlement: vi.fn(),
   linked: vi.fn(),
   lock: vi.fn(),
   order: vi.fn(),
@@ -40,7 +41,10 @@ vi.mock('@ebda/database', () => ({
     }
   },
 }));
-vi.mock('@api/lib/wa/link', () => ({ isWhatsAppLinked: h.linked }));
+vi.mock('@api/lib/wa/link', () => ({
+  isWhatsAppLinked: h.linked,
+  WhatsAppLinkService: { applyEntitlement: h.applyEntitlement },
+}));
 vi.mock('@api/services/order.service', () => ({
   OrderService: {
     updateStatus: (...a: unknown[]) => {
@@ -57,7 +61,7 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import { handleStoreEvent } from '@api/lib/wa/store-events-consumer';
-import { handleQueueBatch } from '@api/cf/queues';
+import { handleStoreEventsBatch } from '@api/lib/wa/store-events-queue';
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const BUYER = 'a'.repeat(64);
@@ -92,6 +96,7 @@ beforeEach(() => {
   h.set.mockReset().mockResolvedValue(undefined);
   h.scope.mockReset();
   h.alert.mockReset().mockResolvedValue(undefined);
+  h.applyEntitlement.mockReset().mockResolvedValue(true);
 });
 
 describe('whatsapp.cod_outcome', () => {
@@ -235,7 +240,7 @@ describe('whatsapp.order_after_erasure', () => {
   });
 });
 
-describe('queue wiring (cf/queues.ts)', () => {
+describe('queue wiring (lib/wa/store-events-queue.ts, routed by worker.ts)', () => {
   const msg = (body: unknown, attempts = 1) => ({
     id: 'm1',
     body,
@@ -246,17 +251,17 @@ describe('queue wiring (cf/queues.ts)', () => {
 
   it('acks an applied message, retries a transient failure with backoff, acks the DLQ', async () => {
     const ok = msg(cod('confirmed'));
-    await handleQueueBatch({ queue: 'ebda-store-events', messages: [ok] });
+    await handleStoreEventsBatch({ queue: 'ebda-store-events', messages: [ok] });
     expect(ok.ack).toHaveBeenCalled();
 
     h.updateStatus.mockRejectedValueOnce(new Error('db'));
     const bad = msg(cod('confirmed'), 2);
-    await handleQueueBatch({ queue: 'ebda-store-events', messages: [bad] });
+    await handleStoreEventsBatch({ queue: 'ebda-store-events', messages: [bad] });
     expect(bad.retry).toHaveBeenCalledWith({ delaySeconds: 10 });
     expect(bad.ack).not.toHaveBeenCalled();
 
     const dead = msg(cod('confirmed'));
-    await handleQueueBatch({ queue: 'ebda-store-events-dlq', messages: [dead] });
+    await handleStoreEventsBatch({ queue: 'ebda-store-events-dlq', messages: [dead] });
     expect(dead.ack).toHaveBeenCalled();
     expect(h.alert).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'p1', source: 'wa.store_events.dead_letter' })
@@ -265,8 +270,55 @@ describe('queue wiring (cf/queues.ts)', () => {
 
   it('an unreadable message is acked, never retried', async () => {
     const m = msg({ junk: true });
-    await handleQueueBatch({ queue: 'ebda-store-events', messages: [m] });
+    await handleStoreEventsBatch({ queue: 'ebda-store-events', messages: [m] });
     expect(m.ack).toHaveBeenCalled();
     expect(m.retry).not.toHaveBeenCalled();
+  });
+});
+
+describe('whatsapp.entitlement_changed', () => {
+  const ent = (version: number, extra: object = {}) => ({
+    id: `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    type: 'whatsapp.entitlement_changed',
+    v: 1,
+    storeId: STORE,
+    occurredAt: '2026-10-25T10:00:00.000Z',
+    data: {
+      packageId: 'pkg-1',
+      automation: true,
+      status: 'active',
+      validUntil: '2027-01-01T00:00:00.000Z',
+      version,
+      ...extra,
+    },
+  });
+
+  it('is stored server-side, monotonic by version, even for a store that has not linked yet', async () => {
+    h.linked.mockResolvedValue(false);
+    expect(await handleStoreEvent(ent(4))).toBe('applied');
+    expect(h.applyEntitlement).toHaveBeenCalledWith(
+      STORE,
+      expect.objectContaining({
+        version: 4,
+        status: 'active',
+        validUntil: new Date('2027-01-01T00:00:00.000Z'),
+      })
+    );
+    expect(h.linked).not.toHaveBeenCalled();
+    expect(h.order).not.toHaveBeenCalled(); // never touches an order
+  });
+
+  it('an older or equal version is reported ignored (the writer says so)', async () => {
+    h.applyEntitlement.mockResolvedValue(false);
+    expect(await handleStoreEvent(ent(2))).toBe('ignored');
+  });
+
+  it.each([
+    ['version 0', { version: 0 }],
+    ['unknown status', { status: 'paused' }],
+    ['no validUntil', { validUntil: 'soon' }],
+  ])('%s is dropped as invalid', async (_n, extra) => {
+    expect(await handleStoreEvent(ent(1, extra))).toBe('invalid');
+    expect(h.applyEntitlement).not.toHaveBeenCalled();
   });
 });

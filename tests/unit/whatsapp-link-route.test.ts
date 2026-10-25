@@ -10,7 +10,7 @@ import request from 'supertest';
 const h = vi.hoisted(() => ({
   setLinked: vi.fn(),
   state: vi.fn(),
-  flags: vi.fn(),
+  can: vi.fn(),
   send: vi.fn(),
   audit: vi.fn(),
 }));
@@ -30,10 +30,10 @@ vi.mock('@api/middleware/store-access', () => ({
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: h.audit }));
 vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
-vi.mock('@api/services/plan-entitlements', () => ({ getAutomationFlags: h.flags }));
 vi.mock('@api/lib/wa/link', () => ({
   WhatsAppLinkService: { setLinked: h.setLinked },
   whatsAppLinkState: h.state,
+  canLinkWhatsApp: h.can,
 }));
 vi.mock('@api/lib/wa/events', async () => {
   const real = await vi.importActual<typeof import('@api/lib/wa/events')>('@api/lib/wa/events');
@@ -56,7 +56,7 @@ let a: express.Express;
 beforeEach(async () => {
   h.setLinked.mockReset().mockResolvedValue(undefined);
   h.state.mockReset().mockResolvedValue({ linked: true, entitled: true, active: true });
-  h.flags.mockReset().mockResolvedValue({ whatsappAutomation: true });
+  h.can.mockReset().mockResolvedValue(true);
   h.send.mockReset().mockResolvedValue(undefined);
   h.audit.mockReset().mockResolvedValue(undefined);
   a ??= await app();
@@ -80,7 +80,7 @@ describe('POST /whatsapp-link', () => {
   });
 
   it('a plan without WhatsApp is refused (403) and nothing is written or sent', async () => {
-    h.flags.mockResolvedValue({ whatsappAutomation: false });
+    h.can.mockResolvedValue(false);
     const res = await request(a).post(`/stores/${STORE}/whatsapp-link`);
     expect(res.status).toBe(403);
     expect(JSON.stringify(res.body)).toContain('WHATSAPP_NOT_INCLUDED');
@@ -89,7 +89,7 @@ describe('POST /whatsapp-link', () => {
   });
 
   it('an unknown plan decision fails closed', async () => {
-    h.flags.mockResolvedValue(null);
+    h.can.mockResolvedValue(false);
     expect((await request(a).post(`/stores/${STORE}/whatsapp-link`)).status).toBe(403);
   });
 
@@ -103,7 +103,7 @@ describe('POST /whatsapp-link', () => {
 
 describe('DELETE /whatsapp-link', () => {
   it('unlinks (also on a plan that no longer includes WhatsApp) and emits store.unlinked', async () => {
-    h.flags.mockResolvedValue({ whatsappAutomation: false });
+    h.can.mockResolvedValue(false);
     const res = await request(a).delete(`/stores/${STORE}/whatsapp-link`);
     expect(res.status).toBe(200);
     expect(h.setLinked).toHaveBeenCalledWith(STORE, false, 'owner-1');

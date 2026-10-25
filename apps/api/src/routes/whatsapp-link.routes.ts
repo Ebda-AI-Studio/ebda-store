@@ -5,9 +5,8 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 import { getAuthUser } from '../utils/store-helpers';
-import { getAutomationFlags } from '../services/plan-entitlements';
 import { buildStoreEvent, sendStoreEvents } from '../lib/wa/events';
-import { WhatsAppLinkService, whatsAppLinkState } from '../lib/wa/link';
+import { WhatsAppLinkService, canLinkWhatsApp, whatsAppLinkState } from '../lib/wa/link';
 
 /**
  * The merchant connects / disconnects Ebda WhatsApp in Store admin (contract 2026-10-24, sections 4
@@ -43,8 +42,7 @@ async function change(req: Request, linked: boolean): Promise<{ linked: boolean 
   const { storeId } = req.params;
   const userId = getAuthUser(req).userId;
   if (linked) {
-    const flags = await getAutomationFlags(storeId);
-    if (flags?.whatsappAutomation !== true) {
+    if (!(await canLinkWhatsApp(storeId))) {
       throw new AppError(
         403,
         'WHATSAPP_NOT_INCLUDED',

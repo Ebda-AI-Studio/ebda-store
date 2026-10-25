@@ -562,6 +562,14 @@ model StoreWhatsAppLink {
   linked      Boolean   @default(false)
   ownerUserId String?   @map("owner_user_id")
   linkedAt    DateTime? @map("linked_at")
+  /// The messaging package's standing, from Ebda WhatsApp's `whatsapp.entitlement_changed` (bought
+  /// there, included by the plan, or assigned by an operator). `entitlementVersion` only goes up:
+  /// an event that is not newer is ignored. Server-side only, like the link itself.
+  entitlementVersion    Int       @default(0) @map("entitlement_version")
+  entitlementPackageId  String?   @map("entitlement_package_id")
+  entitlementAutomation Boolean   @default(false) @map("entitlement_automation")
+  entitlementStatus     String?   @map("entitlement_status")
+  entitlementValidUntil DateTime? @map("entitlement_valid_until")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

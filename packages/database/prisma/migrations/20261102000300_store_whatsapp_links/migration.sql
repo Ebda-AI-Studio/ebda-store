@@ -6,8 +6,14 @@ CREATE TABLE "store_whatsapp_links" (
   "linked" BOOLEAN NOT NULL DEFAULT false,
   "owner_user_id" TEXT,
   "linked_at" TIMESTAMP(3),
+  "entitlement_version" INTEGER NOT NULL DEFAULT 0,
+  "entitlement_package_id" TEXT,
+  "entitlement_automation" BOOLEAN NOT NULL DEFAULT false,
+  "entitlement_status" TEXT,
+  "entitlement_valid_until" TIMESTAMP(3),
   "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "store_whatsapp_links_pkey" PRIMARY KEY ("store_id")
+  CONSTRAINT "store_whatsapp_links_pkey" PRIMARY KEY ("store_id"),
+  CONSTRAINT "store_whatsapp_links_entitlement_status_check" CHECK ("entitlement_status" IS NULL OR "entitlement_status" IN ('trialing', 'active', 'past_due', 'cancelled', 'expired'))
 );
 ALTER TABLE "store_whatsapp_links" ADD CONSTRAINT "store_whatsapp_links_store_id_fkey"
   FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;

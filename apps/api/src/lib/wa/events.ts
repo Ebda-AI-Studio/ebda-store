@@ -1,11 +1,11 @@
 /**
  * Store -> WhatsApp producer (contract section 4): builds the envelope, validates it with the
- * SHARED schema (contracts/ebda-wa-v1.ts, pinned to the WhatsApp repo's bytes) and enqueues it on
+ * SHARED schema (contracts/wa-v1.ts, pinned to the WhatsApp repo's bytes) and enqueues it on
  * `ebda-wa-events`. It throws on a bad payload or a failed enqueue: the callers are retried jobs
  * (lib/wa/store-events-job.ts), so a failure is visible and retried, never a silent drop.
  */
 import { cfBindings } from '../../cf/bindings';
-import { storeEventSchema, type StoreEvent } from '../../contracts/ebda-wa-v1';
+import { storeEventSchema, type StoreEvent } from '../../contracts/wa-v1';
 
 type Distribute<T> = T extends { type: infer K }
   ? Omit<T, 'id' | 'v' | 'occurredAt'> & { type: K }

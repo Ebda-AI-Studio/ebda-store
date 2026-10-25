@@ -19,7 +19,7 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import { clearCfBindings, setCfBindings } from '@api/cf/bindings';
-import { storeEventSchema } from '@api/contracts/ebda-wa-v1';
+import { storeEventSchema } from '@api/contracts/wa-v1';
 import {
   contractPaymentMethod,
   emitStoreEventsFor,

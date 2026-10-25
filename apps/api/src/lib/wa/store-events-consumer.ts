@@ -15,13 +15,13 @@
  * losing the event. Tenant-scoped: every read and write runs in the event's store context.
  */
 import { prisma, runInTenantContext } from '@ebda/database';
-import { outboundStoreEventSchema, type OutboundStoreEvent } from '../../contracts/ebda-wa-v1';
+import { outboundStoreEventSchema, type OutboundStoreEvent } from '../../contracts/wa-v1';
 import { redis } from '../../services/redis.service';
 import { OrderService } from '../../services/order.service';
 import { auditLog } from '../../middleware/security';
 import { AppError } from '../../middleware/error-handler';
 import { withDeferredWork } from '../after-tenant-commit';
-import { isWhatsAppLinked } from './link';
+import { WhatsAppLinkService, isWhatsAppLinked } from './link';
 import logger from '../logger';
 
 const SEEN_TTL_SECONDS = 7 * 24 * 3600;
@@ -155,6 +155,21 @@ export async function handleStoreEvent(body: unknown): Promise<StoreEventResult>
   const e = parsed.data;
   const seenKey = `wa-in:${e.id}`;
   if (await redis.exists(seenKey)) return 'duplicate';
+
+  // An entitlement is a fact about the store's package, not an action on an order: it is applied
+  // even before the merchant links (and never needs the link), monotonic by version.
+  if (e.type === 'whatsapp.entitlement_changed') {
+    const applied = await WhatsAppLinkService.applyEntitlement(e.storeId, {
+      ...e.data,
+      validUntil: new Date(e.data.validUntil),
+    });
+    await redis.set(seenKey, '1', SEEN_TTL_SECONDS);
+    logger.info(
+      { storeId: e.storeId, version: e.data.version, status: e.data.status, applied },
+      '[wa-store-events] entitlement'
+    );
+    return applied ? 'applied' : 'ignored';
+  }
 
   // Trust boundary: the queue is account-internal and unsigned, so the Store re-derives what it can.
   // A store that is not linked / not entitled gets no WhatsApp-driven order changes.
