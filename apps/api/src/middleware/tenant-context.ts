@@ -428,9 +428,14 @@ export function publicStoreContext(req: Request, res: Response, next: NextFuncti
  * Registered with `router.param('storeId', ...)` inside the router.
  */
 const PAYMENT_CONNECTION_TEST_PATH = /^\/store\/[^/]+\/[^/]+\/test\/?$/;
+/** PUT credentials also calls the gateway now (the automatic check on save, PROVIDERS-3). */
+const PAYMENT_CREDENTIALS_PATH = /^\/store\/[^/]+\/[^/]+\/credentials\/?$/;
 
 export function paymentSettingsRouteContext(req: Request, res: Response, next: NextFunction): void {
-  if (req.method === 'POST' && PAYMENT_CONNECTION_TEST_PATH.test(req.path)) {
+  if (
+    (req.method === 'POST' && PAYMENT_CONNECTION_TEST_PATH.test(req.path)) ||
+    (req.method === 'PUT' && PAYMENT_CREDENTIALS_PATH.test(req.path))
+  ) {
     storeScopeContext(req, res, next);
     return;
   }

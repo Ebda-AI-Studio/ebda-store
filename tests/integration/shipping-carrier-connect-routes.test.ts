@@ -561,8 +561,8 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
     ).toBe(1);
   });
 
-  describe('PROVIDERS-2 (relaxed by PROVIDERS-ACTIVATION): an unverified carrier', () => {
-    it('store_admin may save and test; nobody (store_admin or super admin) can enable it', async () => {
+  describe('PROVIDERS-3: an unverified carrier connects like any other', () => {
+    it('store_admin saves (the check runs on save), tests and enables it (PROVIDERS-3)', async () => {
       const s = await mkStore('soon');
       const op = await mkSuperAdmin();
       const fields = { apiKey: BOSTA_STUB.apiKey };
@@ -574,6 +574,8 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
           activate: true,
         });
         expect(save.status, JSON.stringify(save.body)).toBe(200);
+        expect(save.body.data.check.status).toBe('connected');
+        expect(save.body.data.check.messageAr).toBeTruthy();
         const test = await post(s, testUrl(s, 'bosta'));
         expect(test.status, JSON.stringify(test.body)).toBe(200);
         expect(test.body.data.test.ok).toBe(true);
@@ -589,23 +591,16 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         expect(opTest.status, JSON.stringify(opTest.body)).toBe(200);
         expect(opTest.body.data.test.ok).toBe(true);
 
-        // ...but nobody enables it, however well it tested
+        // PROVIDERS-3: it enables like any other once the check passed, for the merchant and the operator
         for (const who of [op, s]) {
           const on = await put(who, cfgUrl(s, 'bosta'), { enabled: true });
-          // both stop at the enable gate until the store is activated
-          expect(on.status).toBe(409);
-          expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
+          expect(on.status, JSON.stringify(on.body)).toBe(200);
         }
-        expect((await row(s, 'bosta')).enabled).toBe(false);
-        // and the default (which needs enabled) is out of reach too
-        expect((await post(op, defaultUrl(s, 'bosta'))).status).toBe(409);
+        expect((await row(s, 'bosta')).enabled).toBe(true);
       });
-
-      // the seam back on (the stub suites), the same, already-tested row enables
-      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
     });
 
-    it('a booking is refused for a carrier row that is not enabled, and for an enabled one the catalog does not verify (CARRIER_NOT_ENABLED)', async () => {
+    it('a booking is refused for a carrier that was never connected or is not enabled (CARRIER_NOT_ENABLED)', async () => {
       const s = await mkStore('book');
       const o = await mkOrder(s);
       const ship = () =>
@@ -630,19 +625,14 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(off.status).toBe(409);
       expect(off.body.error.code).toBe('CARRIER_NOT_ENABLED');
 
-      // enabled, then run as production: the row says enabled, the catalog says not verified
-      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
-      const gated = await asProduction(ship);
-      expect(gated.status).toBe(409);
-      expect(gated.body.error.code).toBe('CARRIER_NOT_ENABLED');
-
       // none of the refusals reached the carrier or left a shipment row
       expect(bosta.requests.length).toBe(callsAfterTest);
       expect(callsAfterTest).toBeGreaterThan(calls); // (the Test connection itself did)
       expect(await owner.shipment.count({ where: { orderId: o.id } })).toBe(0);
 
-      // sanity: with the seam on, this very order books. (Through the service: the 201 over HTTP
+      // sanity: once enabled, this very order books. (Through the service: the 201 over HTTP
       // books but its response never completes under ebda_app, see the report.)
+      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
       const ok = await asApp(() =>
         runInTenantContext(s.id, () =>
           shippingCarrierService.createShipmentForOrder(s.id, o.id, 'bosta')

@@ -30,7 +30,9 @@ import { callThroughBreaker } from './provider-health';
 import { withProviderDeadline } from './provider-call';
 import { getProviderV2, MANUAL_PROVIDERS } from './registry';
 import { toProviderCredentials } from './credentials';
-import { activatedProvidersForStore, isProviderUsable } from './provider-gate';
+import { isProviderUsable } from './provider-gate';
+import { recordPaymentSettled, recordProviderOperation } from '../provider-verification.service';
+import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
 import type { PaymentStatus as DbPaymentStatus } from '@ebda/database';
@@ -176,23 +178,20 @@ class PaymentFactory {
           '[PAYMENT] No paymentConfig rows for store; no online providers available'
         );
       } else {
-        // PROVIDERS-ACTIVATION: a provider Ebda activated for THIS store counts as verified.
-        const activated =
-          storeId === null ? new Set<string>() : await activatedProvidersForStore(storeId);
         // Initialize from database config
         for (const dbConfig of dbConfigs) {
           try {
             // COD and InstaPay have no gateway behind them: they are not factory providers.
             if (MANUAL_PROVIDERS.has(dbConfig.provider)) continue;
 
-            // PROVIDERS-2 runtime gate: a gateway the catalog does not list as verified against
-            // its real sandbox (and that Ebda did not activate for this store) is never offered, even if a row says enabled (a legacy row, or
-            // a write that bypassed the settings routes). The settings routes refuse to enable
-            // it; this is the second line.
-            if (!isProviderUsable(dbConfig.provider) && !activated.has(dbConfig.provider)) {
+            // PROVIDERS-3 runtime gate: any provider the catalog knows is offered (verified or
+            // not). The enable gate (`assertEnableAllowed`: a passing Test connection of exactly
+            // the stored credentials, and a credential edit disables the row) is what keeps an
+            // untested gateway from being enabled; this only drops a code the catalog no longer has.
+            if (!isProviderUsable(dbConfig.provider)) {
               logger.warn(
                 { provider: dbConfig.provider, storeId },
-                '[PAYMENT] Skipping provider: not verified in the provider catalog'
+                '[PAYMENT] Skipping provider: not in the provider catalog'
               );
               continue;
             }
@@ -643,6 +642,13 @@ export async function reconcileOutstandingRefundClaims(input: {
 // Unified Payment Service
 // ==========================================
 
+/** A short, secret-free code for an error (class code only, never a message or body). */
+function errorCodeOf(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && /^[A-Z0-9_]{2,60}$/.test(code)) return code;
+  return err instanceof Error ? err.name.slice(0, 60) : 'UNKNOWN';
+}
+
 export class PaymentService {
   /**
    * Get available payment providers
@@ -793,7 +799,38 @@ export class PaymentService {
     }
     const call = () =>
       withProviderDeadline(`${p.name}.createPayment`, () => p.createPayment(keyed));
-    const response = storeId ? await callThroughBreaker(storeId, p.name, call) : await call();
+    let response: PaymentResponse;
+    try {
+      response = storeId ? await callThroughBreaker(storeId, p.name, call) : await call();
+    } catch (err) {
+      // PROVIDERS-3: a failed real call of a not-yet-verified provider pages ops (never throws).
+      if (storeId) {
+        void deferAfterTenantCommit(
+          'provider-verify.create_payment.failed',
+          () =>
+            recordProviderOperation({
+              storeId,
+              provider: p.name,
+              op: 'create_payment',
+              ok: false,
+              errorCode: errorCodeOf(err),
+            }),
+          { runOnRollback: true }
+        );
+      }
+      throw err;
+    }
+    if (storeId) {
+      void deferAfterTenantCommit('provider-verify.create_payment', () =>
+        recordProviderOperation({
+          storeId,
+          provider: p.name,
+          op: 'create_payment',
+          ok: true,
+          ref: response.transactionId ?? null,
+        })
+      );
+    }
     return { providerName: p.name, response };
   }
 
@@ -2212,6 +2249,12 @@ export class PaymentService {
       'Customer';
 
     if (webhookData.status === 'completed') {
+      // PROVIDERS-3: a settled live payment is evidence for the provider (same call as the pull-side confirm).
+      void recordPaymentSettled({
+        storeId: order.storeId,
+        provider: payment.provider,
+        paymentId: payment.id,
+      });
       inngest
         .send({
           name: 'order/created',

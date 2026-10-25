@@ -127,6 +127,9 @@ export const GLOBAL_MODELS: readonly string[] = [
   // Ruling LEGAL-4: one row per announced policy version, read by every merchant.
   'LegalNoticeSend',
   'Plan',
+  // Ruling PROVIDERS-3: platform-wide provider verification evidence (no tenant data).
+  'ProviderVerification',
+  'ProviderVerificationEvent',
   'SystemSetting',
 ];
 

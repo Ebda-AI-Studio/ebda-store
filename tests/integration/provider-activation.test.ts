@@ -222,7 +222,7 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
     delete process.env.BOSTA_BASE_URL;
   });
 
-  it('an unverified provider: the merchant can save and test, but not enable', async () => {
+  it('an unverified provider (PROVIDERS-3): the merchant saves, tests and enables it; checkout offers it', async () => {
     const s = await mkStore('save');
     await asProduction(async () => {
       expect((await saveKashier(s)).status).toBe(200);
@@ -230,9 +230,8 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       expect(t.status).toBe(200);
       expect(t.body.data.test.ok).toBe(true);
       const on = await toggleKashier(s);
-      expect(on.status).toBe(409);
-      expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
-      expect((await offered(s)).includes('kashier' as never)).toBe(false);
+      expect(on.status, JSON.stringify(on.body)).toBe(200);
+      expect((await offered(s)).includes('kashier' as never)).toBe(true);
     });
   });
 
@@ -300,7 +299,8 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       const list = await call('get', s, '/api/v1/admin/provider-activation');
       expect(list.status).toBe(403);
       expect((await rows(s))[0].status).toBe('requested');
-      expect((await toggleKashier(s)).status).toBe(409);
+      // PROVIDERS-3: a request is not a gate any more; the passing test alone enables it
+      expect((await toggleKashier(s)).status).toBe(200);
       // another merchant cannot file a request for this store
       const other = await mkStore('self-other');
       const cross = await call('post', { jwt: other.jwt }, requestUrl(s, 'kashier'));
@@ -367,12 +367,11 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       expect(await offered(a)).toContain('kashier');
       expect(await asApp(() => isProviderUsableForStore('kashier', a.id))).toBe(true);
 
-      // store B: still refused, not offered
+      // store B (PROVIDERS-3): activation is no longer a gate, B enables on its own passing test
       const on = await toggleKashier(b);
-      expect(on.status).toBe(409);
-      expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
-      expect(await offered(b)).not.toContain('kashier');
-      expect(await asApp(() => isProviderUsableForStore('kashier', b.id))).toBe(false);
+      expect(on.status, JSON.stringify(on.body)).toBe(200);
+      expect(await offered(b)).toContain('kashier');
+      expect(await asApp(() => isProviderUsableForStore('kashier', b.id))).toBe(true);
       // and it cannot be activated without its own request
       expect((await call('post', op, adminUrl(b, 'kashier', 'activate'))).status).toBe(404);
 
@@ -425,9 +424,10 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
         status: 'rejected',
         note: 'Merchant ID is for another account',
       });
+      // PROVIDERS-3: a rejected request no longer blocks a connection whose test passed
       const on = await toggleKashier(s);
-      expect(on.status).toBe(409);
-      expect(await offered(s)).not.toContain('kashier');
+      expect(on.status).toBe(200);
+      expect(await offered(s)).toContain('kashier');
       // activating a rejected request is impossible; re-filing makes a new open one
       expect((await call('post', op, adminUrl(s, 'kashier', 'activate'))).status).toBe(404);
       expect((await call('post', s, requestUrl(s, 'kashier'))).status).toBe(201);
@@ -449,8 +449,7 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
         expect(save.status, JSON.stringify(save.body)).toBe(200);
         expect((await call('post', s, carrierTest(s))).body.data.test.ok).toBe(true);
         const on = await call('put', s, carrierCfg(s), { enabled: true });
-        expect(on.status).toBe(409);
-        expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
+        expect(on.status, JSON.stringify(on.body)).toBe(200); // PROVIDERS-3: no activation gate
       }
       expect((await call('post', a, requestUrl(a, 'bosta'))).status).toBe(201);
       const t = await call('post', op, adminUrl(a, 'bosta', 'test'));
@@ -460,9 +459,9 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       const onA = await call('put', a, carrierCfg(a), { enabled: true });
       expect(onA.status, JSON.stringify(onA.body)).toBe(200);
       const onB = await call('put', b, carrierCfg(b), { enabled: true });
-      expect(onB.status).toBe(409);
+      expect(onB.status).toBe(200);
       expect(await asApp(() => isProviderUsableForStore('bosta', a.id))).toBe(true);
-      expect(await asApp(() => isProviderUsableForStore('bosta', b.id))).toBe(false);
+      expect(await asApp(() => isProviderUsableForStore('bosta', b.id))).toBe(true);
     });
   });
 });

@@ -16,6 +16,7 @@ import { Badge, Button, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui
 import { PROVIDER_CATALOG, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
+import { ProviderVerificationSection } from '../../components/ProviderVerificationSection';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { apiGet, apiPost } from '../../lib/api';
 import { useT } from '../../i18n/useT';
@@ -335,6 +336,7 @@ export default function ProviderActivationPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="super_admin">
       <RequireSuperAdmin>
+        <ProviderVerificationSection />
         <ActivationRequestsInner />
       </RequireSuperAdmin>
     </AdminLayout>

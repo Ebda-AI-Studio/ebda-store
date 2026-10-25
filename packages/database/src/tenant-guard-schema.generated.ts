@@ -1471,6 +1471,18 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     },
   },
   {
+    name: 'ProviderVerification',
+    table: 'provider_verifications',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'ProviderVerificationEvent',
+    table: 'provider_verification_events',
+    storeId: false,
+    relations: {},
+  },
+  {
     name: 'FiscalDocument',
     table: 'fiscal_documents',
     storeId: true,

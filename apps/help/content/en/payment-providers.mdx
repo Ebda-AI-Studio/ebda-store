@@ -1,20 +1,20 @@
 ---
 title: Payment providers
-description: How to connect Paymob, Kashier or FawryPay to your store. Online payments open per provider once it is verified.
+description: How to connect Paymob, Kashier or FawryPay to your store with your own account. Ebda Store checks your keys the moment you save them.
 section: Selling
 order: 5
-status: soon
 keywords: cards wallets provider paymob fawry fawrypay kashier connect api keys webhook sandbox test connection
 ---
 
-<Callout type="soon" title="Coming soon">
-  Paymob, Kashier and FawryPay show as "Coming soon" until we finish testing each one against its
-  own test environment. You can read how connecting works below; the steps will not change.
+<Callout title="New connections: we watch the first order">
+  Ebda Store builds each provider from the provider's official documentation, and your own account is
+  what proves it works. When you save your keys we check them straight away. The first real payment through a
+  provider is watched by the Ebda Store team, so if anything is off we see it immediately and fix it.
 </Callout>
 
-## What works today
+## What is available
 
-[Cash on delivery](/en/orders-and-cod/) and [InstaPay](/en/instapay/) (confirmed by hand) are available for customers.
+[Cash on delivery](/en/orders-and-cod/) and [InstaPay](/en/instapay/) (confirmed by hand) work without any account. Paymob, Kashier and FawryPay work with your own account, as described below.
 
 ## How connecting works
 
@@ -26,10 +26,13 @@ only a credentials step in **Settings > Payments**:
 2. Paste each value. Every field has a **Where do I find this?** link that opens the exact page in the
    provider's dashboard. Secret keys are saved encrypted and are never shown again: the page only
    shows "Saved ••••" and the last 4 characters.
-3. Press **Test connection**. Ebda Store makes one harmless call to the provider with your keys; nothing is
-   charged.
-4. Once the test passes, switch the provider **on**. Changing a key later turns it off until you test
-   again.
+3. Press **Save**. Ebda Store immediately makes one harmless call to the provider with your keys (the mode
+   you just saved, Sandbox first); nothing is charged. You see one of: **Connected**, **Credentials
+   wrong** (the provider refused them: check and save again) or **Provider not reachable** (your keys are
+   saved; press **Test connection** again in a few minutes). A provider that has no safe test call is
+   marked **unverified**: it still connects, and your first real order confirms it.
+4. Once the check passes, switch the provider **on**. Changing a key later turns it off until it is
+   checked again (press **Test connection** to re-run the check any time).
 5. Copy the **webhook URL** shown on the card where the card asks you to (see below). That is how the
    provider tells your store a payment succeeded.
 
@@ -64,7 +67,7 @@ only a credentials step in **Settings > Payments**:
 
 - **Merchant code** and **Secure key:** the FawryPay team sends them by email when your account is set
   up (staging and production values differ). For a test account, register at FawryPay's staging
-  site; FawryPay contacts you to activate it.
+  site; FawryPay contacts you to activate it. Using your real account straight away is fine too.
 - **Webhook:** send the webhook URL to the FawryPay team as your notification (callback) URL.
 
 ## Need another provider?
