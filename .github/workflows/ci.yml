@@ -100,6 +100,8 @@ jobs:
       accounts_tests: ${{ steps.affected.outputs.accounts_tests }}
       workers: ${{ steps.affected.outputs.workers }}
       has_workers: ${{ steps.affected.outputs.has_workers }}
+      integration: ${{ steps.affected.outputs.integration }}
+      integration_paths: ${{ steps.affected.outputs.integration_paths }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -854,9 +856,16 @@ jobs:
 
   test-integration:
     name: Integration Tests
+    # Two lanes (2026-10-25, #227 merged four edited integration test files that never ran): the FULL/nightly lane runs
+    # the whole tier after `build`; a pull request runs it ONLY when scripts/ci-affected.mjs says an integration test
+    # or a service one imports changed (`changes.outputs.integration`), and then just those files.
+    if: >-
+      always() && !cancelled() && (
+        (github.event_name != 'pull_request' && needs.build.result == 'success') ||
+        (github.event_name == 'pull_request' && needs.changes.outputs.integration == 'true'))
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 25
-    needs: [build]
+    needs: [build, changes]
     services:
       postgres:
         image: pgvector/pgvector:0.8.0-pg17
@@ -1012,8 +1021,16 @@ jobs:
         # --retry=1 (#1248): this tier makes real network/DB calls against the
         # service containers above, unlike the unit tier which is retry:0 by
         # default (vitest.config.ts) to stop retry masking state pollution.
-        run: npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts --reporter=verbose --retry=1
+        run: |
+          targets="tests/integration apps/api/src"
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$INTEGRATION_PATHS" ] && [ "$INTEGRATION_PATHS" != "all" ]; then
+            targets="$INTEGRATION_PATHS"   # only the integration tests the planner selected for this PR
+          fi
+          echo "integration targets: $targets"
+          npx vitest run $targets --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts --reporter=verbose --retry=1
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          INTEGRATION_PATHS: ${{ needs.changes.outputs.integration_paths }}
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
           # (pointed at the ep-spring-dew preview branch) is retired with staging —
