@@ -72,6 +72,7 @@ import {
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
+import { deliverableOnly } from '../lib/undeliverable-email';
 // ==========================================
 // Email Service
 // Transactional email handling
@@ -476,10 +477,12 @@ export class EmailService {
       });
       return;
     }
+    const recipients = deliverableOnly(args.to);
+    if (recipients.length === 0) return;
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
       from: brandFrom(),
-      to: Array.isArray(args.to) ? args.to : [args.to],
+      to: recipients,
       subject: args.subject,
       html,
     };
@@ -513,10 +516,12 @@ export class EmailService {
    * Replay a queued email with no store context — platform sender.
    */
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
+    const recipients = deliverableOnly(options.to);
+    if (recipients.length === 0) return;
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
       from: brandFrom(),
-      to: Array.isArray(options.to) ? options.to : [options.to],
+      to: recipients,
       subject: options.subject,
       html: options.html,
     };
