@@ -17,7 +17,7 @@ import { b64urlDecode, b64urlEncode, csv, iso, nowMs } from './util';
 
 const CHALLENGE_TTL_MS = 5 * 60_000;
 export const MAX_PASSKEYS = 10;
-const RP_NAME = 'Ebda';
+const RP_NAME = 'Ebda AI Studio';
 
 export class PasskeyError extends Error {
   constructor(
