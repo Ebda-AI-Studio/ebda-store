@@ -50,10 +50,18 @@ function utcCandidates(utcExpr: string, after: number, days: number): number[] {
 /** Epoch ms of the next fire strictly after `after`; searches `horizonDays` ahead (yearly crons need > 366). */
 export function nextRunAfter(expr: string, after: number, horizonDays = 400): number {
   if (/^\s*TZ=/.test(expr)) parseCron(expr); // validates the zoned grammar
-  const hits = utcCronsFor(expr)
-    .flatMap(u => utcCandidates(u, after, horizonDays))
-    .filter(t => matchesLocal(expr, new Date(t)))
-    .sort((a, b) => a - b);
-  if (hits.length === 0) throw new Error(`cron never fires within ${horizonDays} days: ${expr}`);
-  return hits[0];
+  const utc = utcCronsFor(expr);
+  // Walk forward a few days at a time and stop at the first local match: the local-time guard
+  // (Intl) is the expensive part, so never test candidates beyond the answer.
+  const STEP = 4;
+  for (let from = 0; from <= horizonDays; from += STEP) {
+    const start = after + from * DAY_MS;
+    const hits = utc
+      .flatMap(u => utcCandidates(u, start, Math.min(STEP, horizonDays - from)))
+      .filter(t => t > after)
+      .sort((a, b) => a - b)
+      .filter((t, i, arr) => i === 0 || t !== arr[i - 1]);
+    for (const t of hits) if (matchesLocal(expr, new Date(t))) return t;
+  }
+  throw new Error(`cron never fires within ${horizonDays} days: ${expr}`);
 }
