@@ -13,6 +13,8 @@ export interface Fakes {
   directoryDown: boolean;
   /** Store ids the directory reports as deleted. */
   deletedStores: Set<string>;
+  /** Store ids the directory reports as suspended (they exist, but integrations stop). */
+  suspendedStores: Set<string>;
   /** Per-test overrides merged over the worker env (e.g. MFA_KEY / MFA_KEY_PREV during a rotation). */
   envOverride: Record<string, unknown>;
 }
@@ -22,6 +24,7 @@ export const fakes: Fakes = {
   mails: [],
   directoryDown: false,
   deletedStores: new Set<string>(),
+  suspendedStores: new Set<string>(),
   envOverride: {},
 };
 
@@ -40,6 +43,10 @@ export const testEnv = (): Cloudflare.Env =>
       storeExists: async (id: string) => {
         if (fakes.directoryDown) throw new Error('down');
         return !fakes.deletedStores.has(id);
+      },
+      storeActive: async (id: string) => {
+        if (fakes.directoryDown) throw new Error('down');
+        return !fakes.deletedStores.has(id) && !fakes.suspendedStores.has(id);
       },
     },
     MAILER: {

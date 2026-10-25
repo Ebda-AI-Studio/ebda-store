@@ -21,6 +21,8 @@ beforeEach(() => {
   fakes.stores = [];
   fakes.envOverride = {};
   fakes.directoryDown = false;
+  fakes.deletedStores = new Set();
+  fakes.suspendedStores = new Set();
 });
 
 /** An owner of STORE whose session was created with a second factor just now. */
@@ -479,7 +481,7 @@ describe('store deletion and retention', () => {
     await expect(rpc().deleteStoreClients('')).rejects.toThrow();
   });
 
-  it('the hourly prune drops issued rows older than 90 days and keeps lifecycle rows', async () => {
+  it('the hourly prune drops issued and failed-auth rows older than 90 days and keeps lifecycle rows', async () => {
     const c = await newClient();
     await token(c.id, c.secret);
     const old = Date.now() - 91 * 86_400_000;
@@ -489,13 +491,13 @@ describe('store deletion and retention', () => {
       .bind(c.id, STORE, old)
       .run();
     const removed = await pruneClientAudit(env.DB);
-    expect(removed).toBe(1);
+    expect(removed).toBe(2); // the old issued row and the old auth_failed row
     const left = await env.DB.prepare(
       `SELECT event FROM client_audit WHERE client_id=?1 ORDER BY id`
     )
       .bind(c.id)
       .all<{ event: string }>();
-    expect(left.results.map(x => x.event)).toEqual(['created', 'issued', 'revoked', 'auth_failed']);
+    expect(left.results.map(x => x.event)).toEqual(['created', 'issued', 'revoked']);
   });
 });
 
@@ -609,11 +611,55 @@ describe('hardening', () => {
     expect(n!.n).toBe(1);
   });
 
+  it('IPv4-mapped IPv6 addresses count as the IPv4 address they carry', () => {
+    expect(ipPrefix('::ffff:203.0.113.77')).toBe('203.0.113.0/24');
+  });
+
   it('ipPrefix is a /24 and a real /64 even for compressed IPv6', () => {
     expect(ipPrefix('203.0.113.77')).toBe('203.0.113.0/24');
     expect(ipPrefix('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:1:2::/64');
     expect(ipPrefix('2001:db8::1')).toBe('2001:db8:0:0::/64');
     expect(ipPrefix('2001:db8::1')).toBe(ipPrefix('2001:db8::2'));
     expect(ipPrefix('unknown')).toBe('unknown');
+  });
+});
+
+describe('suspended stores and sweep paging', () => {
+  it('a suspended store stops its integrations at once (issue refused, isRevoked true) but its clients are KEPT', async () => {
+    const c = await newClient();
+    expect((await token(c.id, c.secret)).status).toBe(200);
+    fakes.suspendedStores.add(STORE);
+    expect((await token(c.id, c.secret)).status).toBe(401);
+    expect(await rpc().isRevoked(c.id)).toBe(true);
+    // the sweep only removes DELETED stores: suspension is reversible
+    const removed = await sweepDeletedStoreClients(
+      env.DB,
+      async id => !fakes.deletedStores.has(id)
+    );
+    expect(removed).toBe(0);
+    fakes.suspendedStores.delete(STORE);
+    expect((await token(c.id, c.secret)).status).toBe(200);
+    expect(await rpc().isRevoked(c.id)).toBe(false);
+  });
+
+  it('the sweep pages through every store with a cursor and wraps around', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      ids.push((await newClient(`sweep-${crypto.randomUUID()}`)).id);
+    }
+    await env.DB.prepare(`DELETE FROM sweep_state`).run();
+    const all = (
+      await env.DB.prepare(`SELECT DISTINCT store_id FROM clients`).all<{ store_id: string }>()
+    ).results.map(r => r.store_id);
+    const dead = new Set(all.filter(s => s.startsWith('sweep-')));
+    let total = 0;
+    // page size 1: it takes as many runs as there are stores to see the last one
+    for (let i = 0; i < all.length + 1; i++)
+      total += await sweepDeletedStoreClients(env.DB, async id => !dead.has(id), 1);
+    expect(total).toBe(3);
+    const left = await env.DB.prepare(`SELECT count(*) AS n FROM clients WHERE id IN (?1,?2,?3)`)
+      .bind(...ids)
+      .first<{ n: number }>();
+    expect(left!.n).toBe(0);
   });
 });

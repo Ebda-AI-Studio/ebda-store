@@ -6,6 +6,8 @@ export interface StoreDirectoryRpc {
   storesForUser(userId: string): Promise<Array<{ id: string; role: 'owner' | 'staff' }>>;
   /** Is the store still in the directory (not deleted)? Integrator clients of a deleted store are refused. */
   storeExists(storeId: string): Promise<boolean>;
+  /** Not deleted AND not suspended: integrator clients may act only while this is true. */
+  storeActive(storeId: string): Promise<boolean>;
 }
 export interface MailerRpc {
   /** Send a one-time code mail (verification or password reset) through the Store mail pipeline. */

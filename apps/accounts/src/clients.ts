@@ -59,6 +59,8 @@ const newSecret = () => SECRET_PREFIX + randomToken();
 /** /24 for IPv4, /64 for IPv6: enough to see where a client calls from, not enough to identify a person. */
 export function ipPrefix(ip: string | undefined | null): string {
   if (!ip || ip === 'unknown') return 'unknown';
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return ipPrefix(mapped[1]);
   if (ip.includes(':')) {
     // expand `::` first, or a compressed address keeps its interface id and the "prefix" is really one address
     const [head, tail = ''] = ip.split('::');
@@ -359,10 +361,10 @@ export async function deleteStoreClients(
   return { clients: n?.n ?? 0 };
 }
 
-/** Hourly cron: issuance rows live 90 days, lifecycle rows live as long as the store. Returns the rows removed. */
+/** Hourly cron: issuance and failed-auth rows live 90 days, lifecycle rows (created, rotated, revoked) as long as the store. Returns the rows removed. */
 export async function pruneClientAudit(db: D1Database, now: number = nowMs()): Promise<number> {
   const r = await db
-    .prepare(`DELETE FROM client_audit WHERE event = 'issued' AND at < ?1`)
+    .prepare(`DELETE FROM client_audit WHERE event IN ('issued','auth_failed') AND at < ?1`)
     .bind(now - AUDIT_RETENTION_MS)
     .run();
   return r.meta.changes ?? 0;
@@ -381,12 +383,21 @@ export async function sweepDeletedStoreClients(
   storeExists: StoreExists,
   limit = 100
 ): Promise<number> {
+  // Page by store_id with a cursor kept in KV-less D1 state: the cursor is the last store id checked in the previous run.
+  const state = await db
+    .prepare(`SELECT value FROM sweep_state WHERE name = 'client_stores'`)
+    .first<{ value: string }>();
+  const after = state?.value ?? '';
   const ids = (
     await db
-      .prepare(`SELECT DISTINCT store_id FROM clients LIMIT ?1`)
-      .bind(limit)
+      .prepare(
+        `SELECT DISTINCT store_id FROM clients WHERE store_id > ?1 ORDER BY store_id LIMIT ?2`
+      )
+      .bind(after, limit)
       .all<{ store_id: string }>()
   ).results;
+  // wrapped past the end: start again from the beginning next time
+  const wrapped = ids.length < limit;
   let removed = 0;
   for (const { store_id } of ids) {
     let live = true;
@@ -397,5 +408,12 @@ export async function sweepDeletedStoreClients(
     }
     if (!live) removed += (await deleteStoreClients(db, store_id)).clients;
   }
+  const next = wrapped ? '' : (ids.at(-1)?.store_id ?? '');
+  await db
+    .prepare(
+      `INSERT INTO sweep_state (name, value) VALUES ('client_stores', ?1) ON CONFLICT(name) DO UPDATE SET value = ?1`
+    )
+    .bind(next)
+    .run();
   return removed;
 }

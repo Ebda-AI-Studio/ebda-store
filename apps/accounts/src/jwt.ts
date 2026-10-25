@@ -62,6 +62,8 @@ export async function verifyOwnAccessToken(
     typ: 'at+jwt',
   });
   void protectedHeader;
+  // An integrator client token (v1.3) is a machine principal and never a person's session.
+  if ('client' in payload) throw new Error('client token');
   if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string')
     throw new Error('token has no sub/sid');
   return { sub: payload.sub, sid: payload.sid, payload: payload as Record<string, unknown> };

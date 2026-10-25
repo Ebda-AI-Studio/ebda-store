@@ -1461,7 +1461,7 @@ export function createApp() {
       if (!c.env.STORE_DIRECTORY) return oauth(503, 'temporarily_unavailable');
       let live: boolean;
       try {
-        live = await c.env.STORE_DIRECTORY.storeExists(client.store_id);
+        live = await c.env.STORE_DIRECTORY.storeActive(client.store_id);
       } catch {
         return oauth(503, 'temporarily_unavailable');
       }

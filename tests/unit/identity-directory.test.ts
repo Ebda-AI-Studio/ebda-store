@@ -28,7 +28,12 @@ vi.mock('../../apps/api/src/services/platform-mailer', () => ({
 }));
 vi.mock('../../apps/api/src/config', () => ({ config: { adminUrl: 'https://store.ebda.app' } }));
 
-import { sendCodeMail, storeLive, storesForUser } from '../../apps/api/src/lib/identity-directory';
+import {
+  sendCodeMail,
+  storeActive,
+  storeLive,
+  storesForUser,
+} from '../../apps/api/src/lib/identity-directory';
 
 const U = '3f2b6c1e-9d4a-4c1e-8b7a-0a1b2c3d4e5f';
 
@@ -111,6 +116,20 @@ describe('storeLive (identity v1.3: integrator clients of a deleted store are re
   it('rejects a malformed id without touching the database', async () => {
     h.lookups = [];
     expect(await storeLive('not-a-uuid')).toBe(false);
+    expect(h.lookups).toEqual([]);
+  });
+});
+
+describe('storeActive (integrator clients stop on suspension, not on inactivity)', () => {
+  const S = '9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d';
+  it('asks only for active and inactive stores', async () => {
+    h.liveStores = new Set([S]);
+    expect(await storeActive(S)).toBe(true);
+    expect(h.lookups.at(-1)?.statuses).toEqual(['active', 'inactive']);
+    h.liveStores = new Set();
+    expect(await storeActive(S)).toBe(false);
+    h.lookups = [];
+    expect(await storeActive('nope')).toBe(false);
     expect(h.lookups).toEqual([]);
   });
 });

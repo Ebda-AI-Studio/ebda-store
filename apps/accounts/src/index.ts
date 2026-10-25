@@ -60,7 +60,7 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
         .bind(sid)
         .first<{ store_id: string }>();
       if (!row || !this.env.STORE_DIRECTORY) return true;
-      return !(await this.env.STORE_DIRECTORY.storeExists(row.store_id));
+      return !(await this.env.STORE_DIRECTORY.storeActive(row.store_id));
     }
     return isSessionRevoked(this.env.DB, sid);
   }
