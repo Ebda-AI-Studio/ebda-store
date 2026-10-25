@@ -100,16 +100,34 @@ async function storeKnown(storeId: string): Promise<boolean> {
   return value;
 }
 
+/**
+ * Never throws: it is called from inside stock and price writes (raw-SQL writers call it directly)
+ * and a notification problem must not fail the write. An unreadable "known" lookup fails OPEN
+ * (the event is sent; the job checks the link again).
+ */
 export async function notifyCatalogChanged(change: CatalogChange): Promise<void> {
-  if (!(await storeKnown(change.storeId))) return;
-  await sendEventAfterCommit(
-    'wa-catalog-changed',
-    {
-      name: CATALOG_CHANGED_EVENT,
-      data: { storeId: change.storeId, productIds: change.productIds },
-    },
-    { ifUnhookable: 'send' }
-  );
+  try {
+    let isKnown = true;
+    try {
+      isKnown = await storeKnown(change.storeId);
+    } catch (err) {
+      logger.warn(
+        { err, storeId: change.storeId },
+        '[wa] known-store lookup failed, sending anyway'
+      );
+    }
+    if (!isKnown) return;
+    await sendEventAfterCommit(
+      'wa-catalog-changed',
+      {
+        name: CATALOG_CHANGED_EVENT,
+        data: { storeId: change.storeId, productIds: change.productIds },
+      },
+      { ifUnhookable: 'send' }
+    );
+  } catch (err) {
+    logger.warn({ err, storeId: change.storeId }, '[wa] catalog change notify failed');
+  }
 }
 
 export function onCatalogWrite(e: ModelWriteEvent): void {

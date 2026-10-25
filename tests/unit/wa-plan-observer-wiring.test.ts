@@ -84,12 +84,19 @@ describe('wiring', () => {
   });
 
   it('no code writes catalog tables with raw SQL (it would bypass the catalog observer)', () => {
-    const raw = walk(SRC).filter(f =>
-      /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(products|product_variants|warehouse_stock)"?/i.test(
+    // Raw writers exist (stock upserts, the gold repricer): each must tell Ebda WhatsApp itself
+    // (`notifyCatalogChanged`) or carry the waiver `wa-catalog: not-catalog-data`.
+    const writers = walk(SRC).filter(f =>
+      /(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+"?(products|product_variants|warehouse_stock)"?/.test(
         readFileSync(f, 'utf8')
       )
     );
-    expect(raw.map(f => path.relative(SRC, f))).toEqual([]);
+    expect(writers.length).toBeGreaterThan(0); // the scan sees them
+    const unhandled = writers.filter(f => {
+      const t = readFileSync(f, 'utf8');
+      return !/notifyCatalogChanged\(/.test(t) && !/wa-catalog: not-catalog-data/.test(t);
+    });
+    expect(unhandled.map(f => path.relative(SRC, f))).toEqual([]);
   });
 
   it('no code writes subscription / plan state with raw SQL (it would bypass the observer)', () => {
