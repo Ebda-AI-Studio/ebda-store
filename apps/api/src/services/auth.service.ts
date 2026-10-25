@@ -42,7 +42,7 @@ import {
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
-import { WhatsAppConsentService, revokeForPhoneChange } from '../lib/wa/consent';
+import { WhatsAppConsentService, phoneOnOwnOrder, revokeForPhoneChange } from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -2524,9 +2524,14 @@ export class AuthService {
     const exportBuyerKey = await buyerKeyForErasure(
       typeof user.phone === 'string' ? user.phone : null
     );
-    const whatsappMarketingConsent = exportBuyerKey
-      ? await WhatsAppConsentService.exportFor(storeId, exportBuyerKey)
-      : [];
+    // Only for a PROVEN number: a profile phone is self-declared, and an export must not reveal whether
+    // someone else's number opted in (same rule as the checkout box state).
+    const whatsappMarketingConsent =
+      exportBuyerKey &&
+      typeof user.phone === 'string' &&
+      (await phoneOnOwnOrder(storeId, userId, user.phone))
+        ? await WhatsAppConsentService.exportFor(storeId, exportBuyerKey)
+        : [];
 
     return {
       exportedAt: new Date().toISOString(),

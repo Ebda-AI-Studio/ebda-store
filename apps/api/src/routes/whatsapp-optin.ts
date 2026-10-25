@@ -32,7 +32,7 @@ export interface WhatsAppOptInDeps {
     | { status: 'recorded'; granted: boolean; cartId: string }
     | { status: 'no_cart' | 'no_phone' | 'phone_unproven' }
   >;
-  state: (storeId: string, userId: string) => Promise<{ granted: boolean }>;
+  state: (storeId: string, userId: string) => Promise<{ granted: boolean; proven: boolean }>;
   audit: (entry: {
     action: string;
     resourceType: string;

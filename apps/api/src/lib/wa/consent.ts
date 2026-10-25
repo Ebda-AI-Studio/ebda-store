@@ -142,14 +142,21 @@ export const WhatsAppConsentService = {
   },
 
   /** The signed-in customer's current consent for their account number (so the box shows the truth). */
-  async stateForUser(storeId: string, userId: string): Promise<{ granted: boolean }> {
+  async stateForUser(
+    storeId: string,
+    userId: string
+  ): Promise<{ granted: boolean; proven: boolean }> {
     const user = await prisma.user.findFirst({
       where: { id: userId, storeId },
       select: { phone: true },
     });
-    if (!user?.phone) return { granted: false };
+    // The profile phone is self-declared: report consent ONLY for a proven number, otherwise a user
+    // could type someone else's number and learn whether that person opted in.
+    if (!user?.phone || !(await phoneOnOwnOrder(storeId, userId, user.phone))) {
+      return { granted: false, proven: false };
+    }
     const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), user.phone);
-    return { granted: buyerKey ? await this.hasConsent(storeId, buyerKey) : false };
+    return { granted: buyerKey ? await this.hasConsent(storeId, buyerKey) : false, proven: true };
   },
 
   /** True only for an active, un-revoked consent. Unknown buyer = no consent. */

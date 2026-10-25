@@ -47,7 +47,7 @@ function build(opts: { userMax?: number; storeMax?: number } = {}) {
       storeIdFor: async () => S,
       isLinked: async () => true,
       record,
-      state: async () => ({ granted: true }),
+      state: async () => ({ granted: true, proven: true }),
       audit,
     })
   );

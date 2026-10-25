@@ -28,7 +28,11 @@ vi.mock('@ebda/database', () => ({
             r.status === where.status
         ),
     },
-    storeWhatsAppConsent: { upsert: h.upsert, updateMany: h.updateMany },
+    storeWhatsAppConsent: {
+      upsert: h.upsert,
+      updateMany: h.updateMany,
+      findUnique: async () => ({ granted: true }),
+    },
   },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
@@ -104,6 +108,18 @@ describe('recordForCart', () => {
     await WhatsAppConsentService.recordForCart(S, 'sess-b', 'user-b', { consent: true });
     const k = h.upsert.mock.calls.map(c => c[0].where.storeId_buyerKey.buyerKey);
     expect(k[0]).not.toBe(k[1]);
+  });
+});
+
+describe("state read does not leak someone else's consent", () => {
+  it('an unproven profile phone reports granted:false even if that number has consent', async () => {
+    h.users[0]!.phone = '01112345678'; // user-b's number, never on user-a's orders
+    const r = await WhatsAppConsentService.stateForUser(S, 'user-a');
+    expect(r).toEqual({ granted: false, proven: false });
+  });
+  it('a proven phone reports the real state', async () => {
+    const r = await WhatsAppConsentService.stateForUser(S, 'user-a');
+    expect(r).toEqual({ granted: true, proven: true });
   });
 });
 

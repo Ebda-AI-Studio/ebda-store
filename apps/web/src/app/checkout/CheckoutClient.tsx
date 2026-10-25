@@ -1104,9 +1104,11 @@ export default function CheckoutClient() {
     if (!showWhatsAppOptIn) return;
     let cancelled = false;
     api
-      .get<{ granted: boolean }>('/public/cart/whatsapp-optin')
+      .get<{ granted: boolean; proven: boolean }>('/public/cart/whatsapp-optin')
       .then(res => {
-        if (cancelled || !res.success || res.data?.granted !== true) return;
+        if (cancelled || !res.success) return;
+        if (res.data?.proven === false) setWhatsAppUnproven(true);
+        if (res.data?.granted !== true) return;
         whatsAppRecorded.current = true;
         setWhatsAppOptIn(true);
       })
@@ -2439,7 +2441,7 @@ export default function CheckoutClient() {
                                 )}
                               </span>
                               {whatsAppUnproven && (
-                                <span role="status" className="text-xs text-destructive">
+                                <span role="status" className="text-xs font-medium text-foreground">
                                   {t(
                                     'WhatsApp offers turn on after your first order with this number',
                                     'نقدر نفعّل رسايل واتساب بعد أول طلب ليك بالرقم ده'
