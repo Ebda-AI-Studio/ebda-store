@@ -7,6 +7,7 @@ import { nodeSyncSql } from './node-sync-sql';
 import { createPayment, indexEntity } from '../src/do/payments';
 import { placeOrder } from '../src/do/checkout';
 import {
+  MAX_ATTEMPTS,
   backoffMs,
   drainEntityIndexOutbox,
   resolveStoreId,
@@ -132,5 +133,22 @@ describe('entity index', () => {
     expect(await resolveStoreId(d.like, 'order', '')).toBeNull();
     expect(await resolveStoreId(d.like, 'order', 'x'.repeat(400))).toBeNull();
     expect(await resolveStoreId(d.like, "x'; DROP TABLE entity_index;--" as never, 'a')).toBeNull();
+  });
+
+  it('a row that keeps failing is dead-lettered after MAX_ATTEMPTS: reported once, no longer retried', async () => {
+    const s = store();
+    const d = d1({ failFirst: 10_000 });
+    let now = Date.now() + 1000;
+    let dead = 0;
+    for (let i = 0; i < MAX_ATTEMPTS + 3; i++) {
+      const r = await drainEntityIndexOutbox(s.db, d.like, { now });
+      dead += r.deadLettered;
+      now += 2 * 3600_000;
+    }
+    expect(dead).toBe(2); // both queued rows hit the cap exactly once
+    expect(await drainEntityIndexOutbox(s.db, d.like, { now })).toMatchObject({
+      written: 0,
+      failed: 0,
+    });
   });
 });

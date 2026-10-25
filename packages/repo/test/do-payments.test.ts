@@ -897,6 +897,109 @@ describe('settlement rules (mirror of the Postgres settleRefund)', () => {
   });
 });
 
+describe('opus review fixes (DO)', () => {
+  const refundEv = (
+    ref: string,
+    id: string,
+    amount: number | null,
+    over: Partial<PaymentWebhookInput> = {}
+  ) =>
+    wh({
+      providerRef: ref,
+      eventId: `rw-${id}`,
+      kind: 'refund',
+      refund: { refundId: id, status: 'completed', amount },
+      ...over,
+    });
+
+  it('confirm-before-apply: a Kashier refund the GATEWAY records as FAILURE or PENDING is applied as such, never as completed', async () => {
+    for (const [gw, expected] of [
+      ['FAILURE', 'failed'],
+      ['PENDING', 'pending'],
+    ] as const) {
+      const f = fx();
+      const p = await f.paid(6, 'kashier');
+      await applyPaymentEvent(f.db, refundEv(p.ref, 'RF', 1000, { provider: 'kashier' }), {
+        confirm: async () => ({ kind: 'refund', status: gw }),
+      });
+      expect(f.one('SELECT refunded_amount a FROM payments').a, gw).toBe(0);
+      expect(
+        f.one(`SELECT count(*) n FROM payment_events WHERE event_type = 'webhook_corrected'`).n,
+        gw
+      ).toBe(1);
+      expect(
+        JSON.parse((f.one('SELECT metadata m FROM payments').m as unknown as string) ?? '{}')
+          .refundStatusById?.RF ?? expected
+      ).toBe(expected);
+    }
+  });
+  it('a delivery relabelled payment<->refund applies NOTHING and alerts', async () => {
+    const f = fx();
+    const p = await f.paid(6, 'kashier');
+    const r = await applyPaymentEvent(f.db, refundEv(p.ref, 'RF', 1000, { provider: 'kashier' }), {
+      confirm: async () => ({ kind: 'payment', status: 'SUCCESS' }),
+    });
+    expect(r.outcome).toBe('held');
+    expect(r.alerts.map(a => a.kind)).toEqual(['webhook_kind_mismatch']);
+    expect(f.one('SELECT refunded_amount a FROM payments').a).toBe(0);
+  });
+  it('a claim absorbed under one provider id that the provider then answers with a DIFFERENT id is marked for review (not silently merged)', async () => {
+    const f = fx();
+    const p = await f.paid(6);
+    const c0 = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 500, now: NOW });
+    completeRefund(f.db, { storeId: 's1', claimId: c0.claimId, refundId: 'R0', now: NOW });
+    const c = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 1000, now: NOW });
+    await applyPaymentEvent(f.db, refundEv(p.ref, 'X', 1000, { now: NOW + 10 })); // absorbed as X
+    const done = completeRefund(f.db, {
+      storeId: 's1',
+      claimId: c.claimId,
+      refundId: 'Y',
+      now: NOW + 20,
+    });
+    expect(done.review).toBe(true);
+    expect(
+      f.one(`SELECT count(*) n FROM payment_events WHERE event_type = 'refund_reconcile_review'`).n
+    ).toBe(1);
+  });
+  it('an absorbed id is FILED as accounted (a replay stays seen even if the status map entry is lost)', async () => {
+    const f = fx();
+    const p = await f.paid(6);
+    const c0 = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 500, now: NOW });
+    completeRefund(f.db, { storeId: 's1', claimId: c0.claimId, refundId: 'R0', now: NOW });
+    beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 1000, now: NOW });
+    await applyPaymentEvent(f.db, refundEv(p.ref, 'R1', 1000, { now: NOW + 10 }));
+    expect(
+      JSON.parse(f.one('SELECT metadata m FROM payments').m as unknown as string).refundEventIds
+    ).toContain('R1');
+  });
+  it('the operator match refuses an id no held webhook delivered, and an id already accounted', async () => {
+    const f = fx();
+    const p = await f.paid(6, 'kashier');
+    const c = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 1000, now: NOW });
+    completeRefund(f.db, { storeId: 's1', claimId: c.claimId, refundId: 'API-ID', now: NOW });
+    expect(
+      await code(() =>
+        matchRefundToClaim(f.db, {
+          storeId: 's1',
+          claimId: c.claimId,
+          providerRefundId: 'TYPO',
+          actorUserId: 'op',
+        })
+      )
+    ).toBe('NO_HELD_WEBHOOK');
+    expect(
+      await code(() =>
+        matchRefundToClaim(f.db, {
+          storeId: 's1',
+          claimId: c.claimId,
+          providerRefundId: 'API-ID',
+          actorUserId: 'op',
+        })
+      )
+    ).toBe('REFUND_ID_ACCOUNTED');
+  });
+});
+
 describe('InstaPay', () => {
   const awaiting = (f: ReturnType<typeof fx>, expiresAt: number) => {
     const o = f.order();
