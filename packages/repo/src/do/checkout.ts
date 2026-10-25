@@ -37,7 +37,7 @@ export interface CheckoutInput {
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
-  /** cod | instapay | any gateway label: selects the stock-hold cap. Omit for no hold cap (e.g. already paid). */
+  /** cod | instapay | any gateway label: selects the stock-hold cap. Omitted = the strictest (cod) cap. */
   paymentMethod?: string;
   holdCaps?: HoldCaps;
   /** the store's `inventory.backorder` feature (resolved by the caller from the platform database). */
@@ -222,34 +222,6 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       ])[0];
       if (!c) throw new MoneyError('CUSTOMER_NOT_FOUND', 'unknown customer for this store', 404);
       customerGroupId = (c.group_id as string | null) ?? null;
-    }
-
-    // stock-hold cap (lib/stock-hold-cap.ts): bounds unpaid holds per phone / email / IP. Race-free here: the DO is the
-    // only writer and this runs in the same synchronous transaction as the order insert.
-    if (input.paymentMethod && wantWallet === 0 && (who.phone || who.email || input.checkoutIp)) {
-      const manual = MANUAL.has(input.paymentMethod);
-      const cap = manual ? (input.holdCaps?.manual ?? 2) : (input.holdCaps?.gateway ?? 5);
-      const ipCap = input.holdCaps?.ip ?? 8;
-      if (who.phone || who.email) {
-        const n = db.all(
-          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND ((?1 IS NOT NULL AND json_extract(shipping_address, '$.phone') = ?1) OR (?2 IS NOT NULL AND lower(json_extract(shipping_address, '$.email')) = ?2))`
-            .replace('?1', '?')
-            .replace('?1', '?')
-            .replace('?2', '?')
-            .replace('?2', '?'),
-          [input.storeId, who.phone, who.phone, who.email, who.email]
-        )[0].n as number;
-        if (n >= cap)
-          throw new MoneyError('TOO_MANY_OPEN_ORDERS', 'too many unpaid open orders', 429);
-      }
-      if (input.checkoutIp) {
-        const n = db.all(
-          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND checkout_ip = ?`,
-          [input.storeId, input.checkoutIp]
-        )[0].n as number;
-        if (n >= ipCap)
-          throw new MoneyError('TOO_MANY_OPEN_ORDERS', 'too many unpaid open orders', 429);
-      }
     }
 
     const orderId = crypto.randomUUID();
@@ -503,6 +475,36 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
 
     const num = orderNumber(now);
     const fullyWalletPaid = walletAmount > 0 && walletAmount >= total;
+    // stock-hold cap (lib/stock-hold-cap.ts): bounds unpaid holds per phone / email / IP, decided from the FINAL payment
+    // state (a token wallet amount cannot buy an exemption; only an order the wallet pays IN FULL is exempt). Race-free:
+    // the DO is the only writer and this runs in the same synchronous transaction as the order insert.
+    if (!fullyWalletPaid && (who.phone || who.email || input.checkoutIp)) {
+      // an omitted payment method gets the STRICTEST cap: the client cannot opt out by leaving it out
+      const manual = MANUAL.has(input.paymentMethod ?? 'cod');
+      const cap = manual ? (input.holdCaps?.manual ?? 2) : (input.holdCaps?.gateway ?? 5);
+      const ipCap = input.holdCaps?.ip ?? 8;
+      if (who.phone || who.email) {
+        const n = db.all(
+          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND ((?1 IS NOT NULL AND json_extract(shipping_address, '$.phone') = ?1) OR (?2 IS NOT NULL AND lower(json_extract(shipping_address, '$.email')) = ?2))`
+            .replace('?1', '?')
+            .replace('?1', '?')
+            .replace('?2', '?')
+            .replace('?2', '?'),
+          [input.storeId, who.phone, who.phone, who.email, who.email]
+        )[0].n as number;
+        if (n >= cap)
+          throw new MoneyError('TOO_MANY_OPEN_ORDERS', 'too many unpaid open orders', 429);
+      }
+      if (input.checkoutIp) {
+        const n = db.all(
+          `SELECT count(*) AS n FROM orders WHERE store_id = ? AND ${OPEN} AND checkout_ip = ?`,
+          [input.storeId, input.checkoutIp]
+        )[0].n as number;
+        if (n >= ipCap)
+          throw new MoneyError('TOO_MANY_OPEN_ORDERS', 'too many unpaid open orders', 429);
+      }
+    }
+
     const paymentStatus = fullyWalletPaid ? 'paid' : 'unpaid';
     db.run(
       `INSERT INTO orders (id, store_id, customer_id, order_number, status, payment_status, subtotal, tax, shipping, discount, total, currency, coupon_code, coupon_discount, wallet_amount, shipping_address, billing_address, checkout_ip, idempotency_key, created_at, updated_at)
