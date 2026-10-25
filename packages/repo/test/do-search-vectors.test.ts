@@ -13,6 +13,7 @@ import {
   buildEmbedDoc,
   buildEmbedWords,
   embedQuery,
+  embedUsageToday,
   hasStaleVectors,
   semanticProductIds,
   syncProductVectors,
@@ -300,16 +301,46 @@ describe('sync + backfill', () => {
     expect(f2.state('x')).toBeUndefined();
   });
 
-  it('daily cap stops embedding and reports capped; a wrong-dimension provider answer is refused', async () => {
+  it('daily cap counts TEXTS SENT: 1,000 re-embeds of one product hit it; unchanged text is debounced; queries count; a wrong-dimension answer is refused', async () => {
+    const g = fx();
+    g.add('one', 'Ring 0');
+    const gi = fakeIndex();
+    const gp = fakeProvider();
+    let capped = false;
+    for (let i = 1; i <= 1000 && !capped; i++) {
+      g.raw.exec(`UPDATE products SET name = 'Ring ${i}' WHERE id = 'one'`);
+      capped = (await syncProductVectors(g.db, 's1', { provider: gp, index: gi, dailyCap: 50 }))
+        .capped;
+    }
+    expect(capped).toBe(true);
+    expect(gp.calls.flat().length).toBe(50); // spend stopped exactly at the cap, not 1,000
+    expect(embedUsageToday(g.db, 's1')).toBe(50);
+    g.raw.exec(`UPDATE products SET name = 'Ring z' WHERE id = 'one'`);
+    expect(
+      (await syncProductVectors(g.db, 's1', { provider: gp, index: gi, dailyCap: 50 })).embedded
+    ).toBe(0);
+    expect(gp.calls.flat().length).toBe(50);
+    await expect(embedQuery(gp, 'ring', { db: g.db, storeId: 's1', dailyCap: 50 })).rejects.toThrow(
+      'cap'
+    );
+    // debounce: touching a column that is not embedded text never calls the provider
+    const h = fx();
+    h.add('p', 'Ring');
+    const hp = fakeProvider();
+    await syncProductVectors(h.db, 's1', { provider: hp, index: fakeIndex() });
+    const before = hp.calls.length;
+    h.raw.exec(`UPDATE products SET price = 99, slug = 'zz' WHERE id = 'p'`);
+    h.raw.exec(`UPDATE products SET name = 'Ring' WHERE id = 'p'`);
+    await syncProductVectors(h.db, 's1', { provider: hp, index: fakeIndex() });
+    expect(hp.calls.length).toBe(before);
+
     const f = fx();
     const idx = fakeIndex();
     for (let i = 0; i < 5; i++) f.add(`p${i}`, `Item ${i}`);
-    const dayStart = Date.now() - 1000;
     const r1 = await syncProductVectors(f.db, 's1', {
       provider: fakeProvider(),
       index: idx,
       dailyCap: 3,
-      dayStart,
     });
     expect(r1).toMatchObject({ embedded: 3, capped: true });
     expect(
@@ -318,7 +349,6 @@ describe('sync + backfill', () => {
           provider: fakeProvider(),
           index: idx,
           dailyCap: 3,
-          dayStart,
         })
       ).embedded
     ).toBe(0);
