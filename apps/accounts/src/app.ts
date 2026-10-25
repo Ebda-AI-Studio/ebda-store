@@ -1057,6 +1057,14 @@ export function createApp() {
     await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    if (user.role === 'super_admin') {
+      const n = await c.env.DB.prepare(
+        `SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`
+      )
+        .bind(user.id)
+        .first<{ n: number }>();
+      if ((n?.n ?? 0) === 0) throw err(409, 'LAST_FACTOR'); // the TOTP is their only factor
+    }
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL WHERE id = ?1`
     )
@@ -1152,8 +1160,16 @@ export function createApp() {
     await requireSecondFactor(c, user, body.code);
     // Removing a platform admin's factor needs the same fresh second-factor session as adding one (a phished password must not
     // be able to strip the only admin's passkey).
-    if (user.role === 'super_admin' && !(await sessionFactorFresh(c, sid)))
-      throw err(403, 'STEP_UP_REQUIRED');
+    if (user.role === 'super_admin') {
+      if (!(await sessionFactorFresh(c, sid))) throw err(403, 'STEP_UP_REQUIRED');
+      // never let the only platform admin strip their LAST factor (recovery would need the operator script)
+      const n = await c.env.DB.prepare(
+        `SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`
+      )
+        .bind(user.id)
+        .first<{ n: number }>();
+      if ((n?.n ?? 0) <= 1 && !user.mfa_enabled) throw err(409, 'LAST_FACTOR');
+    }
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
     return c.json({ success: true, data: { deleted: true } });

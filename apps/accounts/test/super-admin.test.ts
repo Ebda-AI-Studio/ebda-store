@@ -818,7 +818,12 @@ describe('enrolment tickets and step-up for every factor (Ruling ID-15, review r
     expect(
       await count(`SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`, u.id)
     ).toBe(1);
-    await setAmr(sidOf(s.body.access_token), 'hwk'); // a fresh passkey session may
+    await setAmr(sidOf(s.body.access_token), 'hwk'); // a fresh passkey session may...
+    // ...but never remove the LAST factor of a platform admin
+    const last = await del();
+    expect(last.status).toBe(409);
+    expect(((await last.json()) as { error: { code: string } }).error.code).toBe('LAST_FACTOR');
+    await addPasskeyRow(u.id); // with a second factor in place, one may go
     expect((await del()).status).toBe(200);
   });
 
