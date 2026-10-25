@@ -617,3 +617,68 @@ describe('AuthService.eraseAccount — erasure scope (Ruling W-7)', () => {
     ]);
   });
 });
+
+describe('AuthService.eraseAccount — WhatsApp marketing consent (WA-CONSENT-1), whole flow', () => {
+  it('a number proven by a delivered order loses its consent row: the proof runs BEFORE the order scrub', async () => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    const { buyerKeyFor } = await import('@ebda/shared');
+    const { consentChangeTarget } = await import('@api/lib/wa/consent-state');
+    const key = (await buyerKeyFor(process.env.SUITE_BUYER_KEY_SECRET, '01001234567'))!;
+    const consents: Array<Record<string, unknown>> = [
+      { storeId: 'store-1', buyerKey: key, userId: null, granted: true },
+    ];
+    let scrubbed = false;
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...CUSTOMER,
+      phone: '01001234567',
+      email: 'a@b.co',
+    });
+    // The delivered order proves the phone, but ONLY until the erasure scrubs the orders.
+    mockPrisma.order.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === 'delivered' && !scrubbed
+        ? [{ shippingAddress: { phone: '+201001234567' } }]
+        : []
+    );
+    mockPrisma.order.updateMany.mockImplementation(async () => {
+      scrubbed = true;
+      return { count: 1 };
+    });
+    mockPrisma.storeWhatsAppConsent.findMany.mockImplementation(async ({ where }: any) =>
+      consents.filter(
+        r =>
+          r.storeId === where.storeId &&
+          where.OR.some(
+            (c: any) => c.buyerKey === r.buyerKey || (c.userId && c.userId === r.userId)
+          )
+      )
+    );
+    mockPrisma.storeWhatsAppConsent.deleteMany.mockImplementation(async ({ where }: any) => {
+      const i = consents.findIndex(
+        r => r.buyerKey === where.buyerKey && r.storeId === where.storeId
+      );
+      if (i >= 0) consents.splice(i, 1);
+      return { count: i >= 0 ? 1 : 0 };
+    });
+
+    await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(consents).toHaveLength(0);
+    // the proof read happened before the scrub
+    const proofCall = mockPrisma.order.findMany.mock.calls.findIndex(
+      (c: any[]) => c[0]?.where?.status === 'delivered'
+    );
+    expect(mockPrisma.order.findMany.mock.invocationCallOrder[proofCall]).toBeLessThan(
+      mockPrisma.order.updateMany.mock.invocationCallOrder[0]!
+    );
+    // the delete is exactly what the consent observer attributes and announces as consent_changed=false
+    const del = mockPrisma.storeWhatsAppConsent.deleteMany.mock.calls[0]![0];
+    expect(
+      consentChangeTarget({
+        model: 'StoreWhatsAppConsent',
+        operation: 'deleteMany',
+        args: del,
+        result: { count: 1 },
+      })
+    ).toEqual({ storeId: 'store-1', buyerKey: key });
+  });
+});

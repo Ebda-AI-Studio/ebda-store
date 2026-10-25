@@ -1949,6 +1949,19 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // ORDERING: the WhatsApp-consent ownership proof reads the shopper's delivered orders, so it MUST run
+      // before the order scrub below nulls `customerId` and the address snapshots (afterwards it would
+      // always be false and the current number's consent row would silently survive the erasure). It runs
+      // on THIS transaction (tenant + user context, ebda_app under RLS) with the same store id as the
+      // erase; a missing store id fails loud.
+      const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
+      if (!consentStoreId)
+        throw new Error('[auth.eraseAccount] no store id for the consent erasure');
+      const eraseProvenBuyerKey =
+        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
+          ? buyerKey
+          : undefined;
+
       // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
       // Must run before the orders lose their customer link below. Already-delivered payloads on
       // the merchant's own server cannot be recalled.
@@ -2224,16 +2237,7 @@ export class AuthService {
       });
       // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
       // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
-      // The current number's row goes too, but only when that number is PROVEN the account's. The proof
-      // runs on THIS transaction (tenant + user context, ebda_app under RLS) with the same store id as
-      // the erase, and a missing store id fails loud instead of silently skipping the row.
-      const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
-      if (!consentStoreId)
-        throw new Error('[auth.eraseAccount] no store id for the consent erasure');
-      const eraseProvenBuyerKey =
-        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
-          ? buyerKey
-          : undefined;
+      // (the proof, `eraseProvenBuyerKey`, was computed at the START of this transaction, before the order scrub)
       await WhatsAppConsentService.eraseForAccount(tx, consentStoreId, userId, eraseProvenBuyerKey);
 
       // Finally rewrite the user row itself. Password hash is regenerated
