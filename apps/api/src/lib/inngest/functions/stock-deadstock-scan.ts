@@ -94,7 +94,13 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
     logger.info({ storeId, requestedBy }, 'stock-deadstock-scan-on-demand: starting');
 
     // Feature gate — skip when inventory.basic is disabled.
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
+    // One step for both gates: on a Workflow only step bodies hold a database connection.
+    const { enabled, store } = await step.run('gates', async () => ({
+      enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
+      store: await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    }));
     if (!enabled) {
       logger.info(
         { storeId },
@@ -103,11 +109,8 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
     }
 
-    // Plan gate — inventory.basic is in the `free` baseline so a lapsed
-    // merchant can still see their stock; it must not buy them AI spend.
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    // Plan gate: inventory.basic is in the `free` baseline so a lapsed merchant can still see their
+    // stock; it must not buy them AI spend.
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },
