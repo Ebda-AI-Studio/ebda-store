@@ -44,7 +44,7 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import {
   PaymentService,
-  findInFlightRefundClaimAmounts,
+  findInFlightRefundClaims,
 } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { InstapayService } from '../services/payment-providers/instapay.service';
@@ -1509,6 +1509,7 @@ router.post(
       // Update Payment.metadata with the fresh status. If the provider
       // says the refund completed and our Payment row isn't marked
       // refunded yet (out-of-band path), promote it now.
+      let consumedClaimId: string | null = null;
       const updateData: Record<string, unknown> = {
         metadata: {
           ...prevMeta,
@@ -1548,6 +1549,7 @@ router.post(
           settledTotal,
           isFullRefund: refundIsFullRefund,
           accountedThisEvent,
+          absorbedClaimId,
         } = resolveRefundSettlement({
           paymentAmount: payment.amount ?? 0,
           alreadyRefunded: payment.refundedAmount,
@@ -1558,8 +1560,9 @@ router.post(
           // that adds to the total has to maintain it.
           reportedEventId: status.refundId,
           accountedEventIds: readAccountedRefundEventIds(payment.metadata),
-          inFlightClaimAmounts: await findInFlightRefundClaimAmounts(payment.id, storeId),
+          inFlightClaims: await findInFlightRefundClaims(payment.id, storeId),
         });
+        consumedClaimId = absorbedClaimId;
         updateData.status = refundIsFullRefund ? 'refunded' : 'partially_refunded';
         updateData.refundedAmount = settledTotal;
         if (accountedThisEvent) {
@@ -1578,6 +1581,21 @@ router.post(
         where: { id: payment.id },
         data: updateData,
       });
+      if (consumedClaimId)
+        await prisma.paymentEvent.create({
+          data: {
+            paymentId: payment.id,
+            storeId,
+            orderId,
+            eventType: 'refund_webhook_absorbed',
+            provider: payment.provider,
+            details: {
+              claimId: consumedClaimId,
+              refundId: status.refundId ?? null,
+              amount: status.refundedAmount ?? status.amount ?? null,
+            },
+          },
+        });
 
       // Append-only audit row. Records the refund-status refresh — fromStatus
       // is the pre-update payment status; toStatus is what we just wrote (or

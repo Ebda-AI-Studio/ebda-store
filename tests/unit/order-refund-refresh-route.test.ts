@@ -86,7 +86,7 @@ const getRefundStatus = vi.fn();
 const findInFlight = vi.fn().mockResolvedValue([]);
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { getRefundStatus: (...a: unknown[]) => getRefundStatus(...a) },
-  findInFlightRefundClaimAmounts: (...a: unknown[]) => findInFlight(...a),
+  findInFlightRefundClaims: (...a: unknown[]) => findInFlight(...a),
 }));
 
 const applyRefundEffects = vi.fn().mockResolvedValue(undefined);
@@ -315,7 +315,9 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
 
   it('an in-flight in-band claim of the same amount absorbs this refresh: the total is not raised twice', async () => {
     mockPaymentNeedingSideEffects();
-    findInFlight.mockResolvedValueOnce([2000]);
+    findInFlight.mockResolvedValueOnce([
+      { claimId: 'claim-1', amount: 2000, createdAt: Date.now() },
+    ]);
     getRefundStatus.mockResolvedValue({
       status: 'completed',
       refundId: 'rf_inflight',

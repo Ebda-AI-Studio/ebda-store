@@ -27,6 +27,8 @@ import {
   recordRefundStatus,
   readRefundStatusById,
   correlateSettleNotice,
+  selectInFlightClaims,
+  IN_FLIGHT_CLAIM_WINDOW_MS,
 } from '@api/services/payment-providers/refund-settlement';
 
 const PAYMENT = 5000;
@@ -533,7 +535,13 @@ describe('heldUnaccountedEvent means "an unaccounted refund whose amount could n
   describe('an in-flight in-band refund claim (webhook outruns the id write)', () => {
     // R1 (2000) is accounted with its id. An in-band refund of 1000 has CLAIMED its amount (alreadyRefunded 3000) and the
     // provider has answered, but the claim has not yet recorded its id. The provider's settle webhook for that SAME refund
-    // arrives first: id R2 is on no list. Without the in-flight list it reads as a brand-new refund and adds 1000 again.
+    // arrives first: id R2 is on no list. Without the claim list it reads as a brand-new refund and adds 1000 again.
+    const NOWMS = 1_000_000;
+    const claim = (claimId: string, amount = 1000, createdAt = NOWMS - 1000) => ({
+      claimId,
+      amount,
+      createdAt,
+    });
     const base = {
       paymentAmount: PAYMENT,
       alreadyRefunded: 3000,
@@ -541,29 +549,119 @@ describe('heldUnaccountedEvent means "an unaccounted refund whose amount could n
       reportedEventId: 'R2',
       accountedEventIds: ['R1'],
     };
-    it('absorbs the webhook into the claim: total stays 3000, nothing is added twice', () => {
-      const r = resolveRefundSettlement({ ...base, inFlightClaimAmounts: [1000] });
+    it('absorbs the webhook into the claim: total stays 3000, nothing added twice, the claim id is returned to be CONSUMED', () => {
+      const r = resolveRefundSettlement({ ...base, inFlightClaims: [claim('c1')] });
       expect(r.settledTotal).toBe(3000);
       expect(r.accountedThisEvent).toBe(false);
-      expect(r.absorbedByInFlightClaim).toBe(true);
+      expect(r.absorbedClaimId).toBe('c1');
       expect(r.heldUnaccountedEvent).toBe(false);
     });
+    it("absorbs even on the payment's FIRST refund (no ledger yet): no provenance alert for our own refund", () => {
+      const r = resolveRefundSettlement({
+        ...base,
+        alreadyRefunded: 1000,
+        accountedEventIds: [],
+        inFlightClaims: [claim('c1')],
+      });
+      expect(r.absorbedClaimId).toBe('c1');
+      expect(r.heldProvenanceUnknown).toBe(false);
+      expect(r.warnProvenanceHeld).toBe(false);
+      expect(r.settledTotal).toBe(1000);
+    });
     it('a genuinely different amount is still a new out-of-band refund and adds', () => {
-      const r = resolveRefundSettlement({ ...base, reported: [700], inFlightClaimAmounts: [1000] });
+      const r = resolveRefundSettlement({
+        ...base,
+        reported: [700],
+        inFlightClaims: [claim('c1')],
+      });
       expect(r.settledTotal).toBe(3700);
       expect(r.accountedThisEvent).toBe(true);
-      expect(r.absorbedByInFlightClaim).toBe(false);
+      expect(r.absorbedClaimId).toBeNull();
     });
-    it('one claim absorbs one webhook: two equal webhooks with one claim, the second adds', () => {
-      const first = resolveRefundSettlement({ ...base, inFlightClaimAmounts: [1000] });
-      expect(first.absorbedByInFlightClaim).toBe(true);
-      const second = resolveRefundSettlement({ ...base, inFlightClaimAmounts: [] });
-      expect(second.accountedThisEvent).toBe(true);
+    it('TWO concurrent same-amount refunds: each webhook consumes its OWN claim (oldest first), both are booked once', () => {
+      const claims = [claim('c-old', 1000, NOWMS - 5000), claim('c-new', 1000, NOWMS - 1000)];
+      const first = resolveRefundSettlement({ ...base, inFlightClaims: claims });
+      expect(first.absorbedClaimId).toBe('c-old');
+      // the caller consumed c-old: the second webhook (another id) sees only c-new
+      const second = resolveRefundSettlement({
+        ...base,
+        reportedEventId: 'R3',
+        inFlightClaims: claims.filter(c => c.claimId !== first.absorbedClaimId),
+      });
+      expect(second.absorbedClaimId).toBe('c-new');
+      expect(second.settledTotal).toBe(3000);
+    });
+    it('a GENUINE second refund of the same amount is added once the only claim is consumed (not swallowed)', () => {
+      const r = resolveRefundSettlement({ ...base, reportedEventId: 'R9', inFlightClaims: [] });
+      expect(r.absorbedClaimId).toBeNull();
+      expect(r.accountedThisEvent).toBe(true);
+      expect(r.settledTotal).toBe(4000);
+    });
+    it('a replayed webhook (its id already accounted/seen) never matches a claim', () => {
+      const r = resolveRefundSettlement({
+        ...base,
+        reportedEventId: 'R1',
+        inFlightClaims: [claim('c1')],
+      });
+      expect(r.absorbedClaimId).toBeNull();
+      expect(r.accountedThisEvent).toBe(false);
     });
     it('with no in-flight claim nothing changes (a dashboard refund applies exactly once)', () => {
       const r = resolveRefundSettlement({ ...base });
       expect(r.settledTotal).toBe(4000);
       expect(r.accountedThisEvent).toBe(true);
+    });
+
+    describe('selectInFlightClaims', () => {
+      const C = {
+        claimEvent: 'refund_initiated',
+        closingEvents: [
+          'refund_completed',
+          'refund_failed',
+          'refund_indeterminate',
+          'refund_reconciled',
+          'refund_webhook_absorbed',
+        ],
+        now: NOWMS,
+      };
+      const open = (id: string, ageMs: number, amount = 1000) => ({
+        eventType: 'refund_initiated',
+        createdAt: NOWMS - ageMs,
+        details: { claimId: id, amount },
+      });
+      const close = (id: string, type: string) => ({
+        eventType: type,
+        createdAt: NOWMS - 10,
+        details: { claimId: id },
+      });
+      it('keeps young open claims', () => {
+        expect(
+          selectInFlightClaims({ ...C, events: [open('a', 1000)] }).map(c => c.claimId)
+        ).toEqual(['a']);
+      });
+      it('a STALE claim (older than the window) never absorbs', () => {
+        expect(
+          selectInFlightClaims({ ...C, events: [open('a', IN_FLIGHT_CLAIM_WINDOW_MS + 1)] })
+        ).toEqual([]);
+      });
+      it.each([
+        'refund_completed',
+        'refund_failed',
+        'refund_indeterminate',
+        'refund_reconciled',
+        'refund_webhook_absorbed',
+      ])('a claim closed or CONSUMED by %s is gone', type => {
+        expect(selectInFlightClaims({ ...C, events: [open('a', 1000), close('a', type)] })).toEqual(
+          []
+        );
+      });
+      it('one consumed claim leaves the other', () => {
+        const got = selectInFlightClaims({
+          ...C,
+          events: [open('a', 2000), open('b', 1000), close('a', 'refund_webhook_absorbed')],
+        });
+        expect(got.map(c => c.claimId)).toEqual(['b']);
+      });
     });
   });
 
