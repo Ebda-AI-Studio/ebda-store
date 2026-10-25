@@ -103,4 +103,19 @@ describe('look mock tokens (template-match)', () => {
     expect(css).toContain('[data-look] [data-section] [data-chrome]');
     expect(css).toContain('[data-look] [data-section] .look-card-chrome');
   });
+
+  it("every built look has a phone section padding inside the mock-ups' 10-34 px range, and no merchant preset class is touched", () => {
+    for (const l of LOOKS) {
+      const pad = mockTokensFor(l.id).sectionPad;
+      expect(pad, l.id).toBeGreaterThanOrEqual(10);
+      expect(pad, l.id).toBeLessThanOrEqual(34);
+      expect(mockCssVars(l.id)['--look-section-pad']).toBe(`${pad}px`);
+    }
+    const css = readFileSync(
+      path.resolve(__dirname, '../../apps/web/src/styles/globals.css'),
+      'utf8'
+    );
+    expect(css).toContain('padding-top: var(--look-section-pad');
+    expect(css).not.toMatch(/\.py-12|\.pt-12|\.pb-12/);
+  });
 });

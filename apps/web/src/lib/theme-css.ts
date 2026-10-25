@@ -86,6 +86,7 @@ export const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
   '--bottom-tab-h': /^\d+px$/,
   '--look-tab-pad': /^\d+(?:\.\d+)?rem$/,
   '--look-tab-icon': /^\d+(?:\.\d+)?rem$/,
+  '--look-section-pad': /^\d+px$/,
   '--look-h-size': /^\d+px$/,
   '--look-h-weight': /^[1-9]00$/,
   '--look-name-size': /^\d+(?:\.\d+)?rem$/,

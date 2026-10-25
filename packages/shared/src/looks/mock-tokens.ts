@@ -14,27 +14,29 @@ export interface MockTokens {
   heroAspect?: string;
   /** PR4 (G5). Section heading size in px on a phone (the weight follows the display face, see `headingWeight`). */
   headingSize?: number;
+  /** PR6 (G7). Default section padding on a phone, px (top and bottom), replacing 2rem x density. */
+  sectionPad?: number;
 }
 
 const T = (t: MockTokens): MockTokens => t;
 
 /** One entry per built look: the mock-up's own numbers. */
 export const MOCK_TOKENS: Readonly<Partial<Record<LookId, MockTokens>>> = {
-  'qamar.atelier': T({ heroAspect: '3 / 4', headingSize: 28 }),
-  'qamar.lookbook': T({ headingSize: 28 }),
-  'qamar.vitrine': T({ heroAspect: '4 / 4.6', headingSize: 30 }),
-  'souq.catalogue': T({ headingSize: 20 }),
-  'souq.night': T({ heroAspect: '1 / 1.05', headingSize: 26 }),
-  'souq.showroom': T({ headingSize: 30 }),
-  'jasmine.apothecary': T({ headingSize: 28 }),
-  'jasmine.bloom': T({ heroAspect: '4 / 4.4', headingSize: 28 }),
-  'jasmine.clinic': T({ headingSize: 25 }),
-  'lamma.table': T({ heroAspect: '1 / 1', headingSize: 30 }),
-  'lamma.notebook': T({ headingSize: 30 }),
-  'lamma.market': T({ headingSize: 22 }),
-  'dahab.worn': T({ heroAspect: '4 / 5', headingSize: 28 }),
-  'dahab.workshop': T({ heroAspect: '4 / 3.4', headingSize: 34 }),
-  'dahab.giftbox': T({ heroAspect: '16 / 11', headingSize: 30 }),
+  'qamar.atelier': T({ heroAspect: '3 / 4', headingSize: 28, sectionPad: 20 }),
+  'qamar.lookbook': T({ headingSize: 28, sectionPad: 22 }),
+  'qamar.vitrine': T({ heroAspect: '4 / 4.6', headingSize: 30, sectionPad: 28 }),
+  'souq.catalogue': T({ headingSize: 20, sectionPad: 14 }),
+  'souq.night': T({ heroAspect: '1 / 1.05', headingSize: 26, sectionPad: 22 }),
+  'souq.showroom': T({ headingSize: 30, sectionPad: 28 }),
+  'jasmine.apothecary': T({ headingSize: 28, sectionPad: 22 }),
+  'jasmine.bloom': T({ heroAspect: '4 / 4.4', headingSize: 28, sectionPad: 22 }),
+  'jasmine.clinic': T({ headingSize: 25, sectionPad: 24 }),
+  'lamma.table': T({ heroAspect: '1 / 1', headingSize: 30, sectionPad: 22 }),
+  'lamma.notebook': T({ headingSize: 30, sectionPad: 26 }),
+  'lamma.market': T({ headingSize: 22, sectionPad: 14 }),
+  'dahab.worn': T({ heroAspect: '4 / 5', headingSize: 28, sectionPad: 24 }),
+  'dahab.workshop': T({ heroAspect: '4 / 3.4', headingSize: 34, sectionPad: 28 }),
+  'dahab.giftbox': T({ heroAspect: '16 / 11', headingSize: 30, sectionPad: 26 }),
 };
 
 export function mockTokensFor(lookId: string | null | undefined): MockTokens {
@@ -65,6 +67,7 @@ export function mockCssVars(lookId: string | null | undefined): Record<string, s
     '--look-tab-pad': '0.25rem',
     '--look-tab-icon': '1.75rem',
   };
+  v['--look-section-pad'] = `${t.sectionPad ?? 24}px`;
   // PR4 (G5): hierarchy on a phone. Card text is the mock's 13/500 name and 14/700 price, drawn at 360 px.
   v['--look-h-size'] = `${t.headingSize ?? 28}px`;
   v['--look-h-weight'] = String(headingWeight(lookId as string));
