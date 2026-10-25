@@ -10,8 +10,12 @@ describe('look mock tokens (template-match)', () => {
     for (const id of Object.keys(MOCK_TOKENS)) expect(getLook(id), id).toBeTruthy();
   });
 
-  it('a look without tokens, or no look, emits nothing (byte-identical to before)', () => {
-    expect(mockCssVars('qamar.lookbook')).toEqual({});
+  it('a look without hero tokens still slims the tab bar; no look emits nothing (byte-identical to before)', () => {
+    expect(mockCssVars('qamar.lookbook')).toEqual({
+      '--bottom-tab-h': '57px',
+      '--look-tab-pad': '0.25rem',
+      '--look-tab-icon': '1.75rem',
+    });
     expect(mockCssVars(null)).toEqual({});
     expect(mockCssVars('not.a.look')).toEqual({});
   });
@@ -48,5 +52,17 @@ describe('look mock tokens (template-match)', () => {
       expect(readFileSync(path.join(web, `templates/shared/${f}.tsx`), 'utf8')).toMatch(
         /aspect-\[var\(--hero-m-aspect\)\][^'`"]*max-h-\[45vh\]/
       );
+  });
+
+  it('the slimmed tab bar keeps 5 tabs, 12 px labels and a >= 44 px target', () => {
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/web/src/templates/shared/BottomTabBar.tsx'),
+      'utf8'
+    );
+    expect(src).toContain('grid-cols-5');
+    expect(src).toContain('text-xs');
+    expect(
+      Number.parseInt(mockCssVars('qamar.atelier')['--bottom-tab-h'], 10) - 1
+    ).toBeGreaterThanOrEqual(44);
   });
 });

@@ -1,3 +1,4 @@
+import { getLook } from './registry';
 import type { LookId } from './types';
 
 /**
@@ -30,10 +31,17 @@ export function mockTokensFor(lookId: string | null | undefined): MockTokens {
   return (lookId && MOCK_TOKENS[lookId as LookId]) || {};
 }
 
-/** The `--look-*` CSS variables of a look's mock tokens. Empty for a look with none. */
+/** The CSS variables of a look's mock tokens (the slim tab bar for every look, plus its own). Callers pass a registered look. */
 export function mockCssVars(lookId: string | null | undefined): Record<string, string> {
+  if (!getLook(lookId)) return {};
   const t = mockTokensFor(lookId);
-  const v: Record<string, string> = {};
+  // PR3 (G4): every look keeps the bottom tab bar (the only mobile cart entry for a real store) but slim:
+  // 57 px against 76, a 28 px icon well, 4 px padding. The label stays 12 px and the targets stay 56 px tall.
+  const v: Record<string, string> = {
+    '--bottom-tab-h': '57px',
+    '--look-tab-pad': '0.25rem',
+    '--look-tab-icon': '1.75rem',
+  };
   if (t.heroAspect) {
     v['--look-hero-aspect'] = t.heroAspect;
     // A portrait hero is taller than 45vh on a phone: lift the ceiling for looks that set a ratio.

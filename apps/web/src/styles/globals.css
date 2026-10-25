@@ -1961,3 +1961,15 @@ html[lang='en'] [data-look] .font-display {
     max-height: var(--look-hero-maxh, 45vh);
   }
 }
+
+/*
+ * Template-match PR3 (G4): a look slims the mobile bottom tab bar via --look-tab-pad / --look-tab-icon and
+ * --bottom-tab-h (mock-tokens.ts). Defaults are the utilities' own values (py-2.5, h-9), so a store with no look
+ * is unchanged. The bar keeps all five tabs.
+ */
+[data-look] [data-bottom-tab-bar] ul > li > :is(a, button) {
+  padding-block: var(--look-tab-pad, 0.625rem);
+}
+[data-look] [data-bottom-tab-bar] ul > li > :is(a, button) > span:first-child {
+  height: var(--look-tab-icon, 2.25rem);
+}
