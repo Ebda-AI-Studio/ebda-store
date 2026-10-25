@@ -166,7 +166,7 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   await r2.put(`ops-reports/backup-sweep/${report.day}.json`, JSON.stringify(report, null, 2));
   if (!report.ok)
     await deps.alert(
-      'Ebda nightly backup sweep FAILED',
+      'Ebda Store nightly backup sweep FAILED',
       JSON.stringify(
         {
           missingYesterday: report.stores.missingYesterday,
