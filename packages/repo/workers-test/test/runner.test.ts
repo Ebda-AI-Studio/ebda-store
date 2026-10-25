@@ -134,4 +134,13 @@ describe('phase 3 on a real Durable Object: money and stock under 100 parallel c
     expect(other.ok).toBe(true);
     expect(await s.snapshot()).toMatchObject({ orders: 2 });
   });
+
+  // 2026-10-25: a 67-byte GLOB in this CHECK failed EVERY swatch insert on a real DO ("pattern too complex",
+  // workerd caps LIKE/GLOB at 50 bytes) while node:sqlite accepted it. Only a real workerd run can see it.
+  it('the generated schema accepts a swatch colour on a real DO and still refuses a malformed one', async () => {
+    const s = await fresh('swatch');
+    for (const good of ['#a1b2c3', '#A1B2C3', null]) expect(await s.insertSwatch(good)).toBe('ok');
+    for (const bad of ['#a1b2c', '#a1b2c3d', '#g1b2c3', 'a1b2c3d'])
+      expect(await s.insertSwatch(bad)).toMatch(/CHECK|constraint/i);
+  });
 });
