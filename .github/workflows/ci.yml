@@ -97,6 +97,7 @@ jobs:
       typecheck: ${{ steps.affected.outputs.typecheck }}
       unit: ${{ steps.affected.outputs.unit }}
       status_tests: ${{ steps.affected.outputs.status_tests }}
+      accounts_tests: ${{ steps.affected.outputs.accounts_tests }}
       workers: ${{ steps.affected.outputs.workers }}
       has_workers: ${{ steps.affected.outputs.has_workers }}
     steps:
@@ -346,6 +347,11 @@ jobs:
         if: needs.changes.outputs.status_tests == 'true'
         run: npm run test:status
 
+      # apps/accounts (the shared identity service) runs on workerd with a local D1.
+      - name: Run accounts worker tests
+        if: needs.changes.outputs.accounts_tests == 'true'
+        run: npm run test:accounts
+
   # Visual builder editor E2E (Phase 2): the admin builder in a real Chromium,
   # Arabic (RTL) and English at 390 / 820 / 1280, against the in-memory API
   # (tests/builder-e2e/mock-api.mjs) and a contract fake of the storefront
@@ -458,13 +464,13 @@ jobs:
       # marketing (static export) and api build with their own script; status's
       # build script IS its dry-run, so it needs no second one.
       - name: Build ${{ matrix.app }}
-        if: contains(fromJSON('["marketing","api","status"]'), matrix.app)
+        if: contains(fromJSON('["marketing","api","status","accounts"]'), matrix.app)
         run: npm run build -w apps/${{ matrix.app }}
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
       - name: Dry-run the ${{ matrix.app }} deploy (wrangler starts on the deploy's Node)
-        if: matrix.app != 'status'
+        if: matrix.app != 'status' && matrix.app != 'accounts'
         working-directory: apps/${{ matrix.app }}
         run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/wrangler-dry-${{ matrix.app }}"
         env:
@@ -704,9 +710,12 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
-      # apps/status runs on workerd, outside the root vitest config.
+      # apps/status and apps/accounts run on workerd, outside the root vitest config.
       - name: Run status worker tests
         run: npm run test:status
+
+      - name: Run accounts worker tests
+        run: npm run test:accounts
 
       - name: Upload coverage artifact
         if: always()

@@ -1,0 +1,31 @@
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+
+/** Same policy as the Store register schema (auth.routes.ts registerSchema). */
+export const passwordPolicy = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(200)
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
+
+export const BCRYPT_COST = 12;
+
+/**
+ * A cost-12 hash of a value nobody can supply: compared against when the account does not exist, so a missing
+ * account costs the same wall time as a wrong password (no stopwatch enumeration).
+ */
+export const DUMMY_HASH = '$2b$12$fG8PP9O5RGPMiNPM8qnSGuf8W6QjNTyMUEITsE9qXgKBbrU9muUz2';
+
+export const hashPassword = (pw: string): Promise<string> => bcrypt.hash(pw, BCRYPT_COST);
+
+/** Legacy seed rows carry a `!seed-...` marker instead of a hash: they can never match. */
+export async function verifyPassword(pw: string, hash: string): Promise<boolean> {
+  if (!/^\$2[aby]\$\d{2}\$/.test(hash)) {
+    await bcrypt.compare(pw, DUMMY_HASH);
+    return false;
+  }
+  return bcrypt.compare(pw, hash);
+}

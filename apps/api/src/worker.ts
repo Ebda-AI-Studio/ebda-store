@@ -30,6 +30,13 @@ import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats'
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { runScheduled } from './cf/cron';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
+import { WorkerEntrypoint } from 'cloudflare:workers';
+import {
+  sendCodeMail,
+  storesForUser,
+  type CodeMail,
+  type StoreClaim,
+} from './lib/identity-directory';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import { assertEmbeddingConfig } from './lib/search/embedding-provider';
@@ -338,6 +345,22 @@ async function scheduled(
 }
 
 const handler = { fetch: handle, queue, scheduled };
+
+/**
+ * Service Binding RPC for the shared identity service (accounts.ebda.app, Ruling ID-1/ID-2). Wired only in
+ * ebda-accounts' wrangler config, so no other Worker (and no browser) can reach these. Each call runs inside
+ * withWorkerContext exactly like a request, queue message or cron: a leased database connection and the role guard.
+ */
+export class StoreDirectory extends WorkerEntrypoint<CfBindings> {
+  async storesForUser(userId: string): Promise<StoreClaim[]> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => storesForUser(userId));
+  }
+}
+export class IdentityMailer extends WorkerEntrypoint<CfBindings> {
+  async sendCode(input: CodeMail): Promise<void> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => sendCodeMail(input));
+  }
+}
 
 // Errors, cron and queue failures go to Sentry (`@sentry/cloudflare`); with no SENTRY_DSN the
 // client is disabled and this is a pass-through.
