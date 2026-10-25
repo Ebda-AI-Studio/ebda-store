@@ -402,7 +402,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         if (!hasIdentity)
           throw new MoneyError(
             'COUPON_NEEDS_CONTACT',
-            'this coupon needs a phone number or email (حسابك أو رقم الموبايل أو الإيميل مطلوب لاستخدام الكوبون)',
+            'this coupon is limited per customer: a phone number or email is required',
             400
           );
         const used = db.all(
