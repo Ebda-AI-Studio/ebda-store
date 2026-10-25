@@ -13,7 +13,13 @@
  *   - the unique index `payment_events_claim_single_outcome_key` makes "one claim, one of absorbed/released" a database fact.
  * The callers keep their own effects (order reversal, booking, alerts) and pass their payment-row patch to `commit`.
  */
-import { hasTenantContext, prisma, Prisma, runInTenantContext } from '@ebda/database';
+import {
+  currentTenantGucs,
+  hasTenantContext,
+  prisma,
+  Prisma,
+  runInTenantContext,
+} from '@ebda/database';
 import {
   correlateSettleNotice,
   executedClaimForRefundId,
@@ -59,8 +65,14 @@ const FAWRY_CLOSING = [
  * (Prisma has no nested interactive transactions) and would wait on locks the outer transaction already holds, so it is
  * never opened when one exists.
  */
-export function inSettlementTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
-  return hasTenantContext() ? fn() : runInTenantContext(storeId, fn);
+export async function inSettlementTx<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  if (!hasTenantContext()) return runInTenantContext(storeId, fn);
+  // an ambient transaction scoped to ANOTHER store (or to none) would read this payment's events as empty under RLS and
+  // make every claim/hold check fail OPEN: refuse instead
+  const scope = currentTenantGucs()?.storeId;
+  if (scope !== undefined && scope !== storeId)
+    throw new Error('settleRefund: ambient transaction is scoped to another store');
+  return fn();
 }
 
 export interface FreshPayment {
@@ -74,7 +86,7 @@ export interface FreshPayment {
 
 /** Lock the payment row for the rest of the caller's transaction and read it fresh. Null when it does not exist. */
 export async function lockPayment(paymentId: string): Promise<FreshPayment | null> {
-  await prisma.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+  await prisma.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR NO KEY UPDATE`;
   const row = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: {
@@ -221,10 +233,30 @@ export async function settleRefundEvent(input: SettleEventInput): Promise<Settle
     async commit(patch) {
       if (committed) throw new Error('settleRefund: commit called twice');
       committed = true;
-      if (patch.data && Object.keys(patch.data).length > 0)
+      let data: Record<string, unknown> = patch.data ?? {};
+      if (decision.absorbedClaimId && completed) {
+        // an absorbed id is FILED as accounted and its status recorded, whatever the caller's patch: callers must not
+        // diverge, or a replay after the claim closed would be booked as a new refund
+        const base = (
+          data.metadata && typeof data.metadata === 'object' ? data.metadata : payment.metadata
+        ) as Record<string, unknown>;
+        data = {
+          ...data,
+          metadata: {
+            ...base,
+            [REFUND_EVENT_IDS_KEY]: appendRefundEventId(base, input.refund.refundId),
+            [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
+              base,
+              input.refund.refundId,
+              input.refund.status
+            ),
+          },
+        };
+      }
+      if (Object.keys(data).length > 0)
         await prisma.payment.update({
           where: { id: input.paymentId },
-          data: patch.data as Prisma.PaymentUpdateInput,
+          data: data as Prisma.PaymentUpdateInput,
         });
       if (ownIdClaim && !decision.absorbedClaimId) await consumeOwnId();
       if (decision.absorbedClaimId && completed)
@@ -351,6 +383,7 @@ export async function matchRefundToClaim(input: MatchInput): Promise<MatchResult
   if (!forClaim.some(e => e.eventType === REFUND_CLAIM_EVENT))
     throw new Error('claim not found on this payment');
   if (forClaim.some(e => e.eventType === REFUND_ABSORBED_EVENT)) return 'already_matched';
+
   if (!forClaim.some(e => e.eventType === REFUND_EXECUTED_EVENT))
     throw new Error('claim has no executed refund to match');
   if (
@@ -361,6 +394,29 @@ export async function matchRefundToClaim(input: MatchInput): Promise<MatchResult
     )
   )
     throw new Error('claim is already closed');
+  // the id must be one a provider webhook actually delivered and we HELD on this payment, and not yet accounted: a typo
+  // must not pre-mark a future real refund as seen
+  if (readAccountedRefundEventIds(payment.metadata).includes(input.providerRefundId))
+    throw new Error('that refund id is already accounted');
+  const held = await prisma.paymentEvent.findMany({
+    where: { storeId: input.storeId, paymentId: input.paymentId, eventType: 'webhook' },
+    select: { eventType: true, createdAt: true, details: true },
+  });
+  if (
+    !held.some(e => {
+      const d = e.details as {
+        flavour?: string;
+        refundId?: string;
+        heldUnaccountedRefund?: boolean;
+      } | null;
+      return (
+        d?.flavour === 'refund' &&
+        d.refundId === input.providerRefundId &&
+        d.heldUnaccountedRefund === true
+      );
+    })
+  )
+    throw new Error('no held webhook for that refund id on this payment');
   await prisma.paymentEvent.create({
     data: {
       paymentId: input.paymentId,
@@ -391,4 +447,19 @@ export async function matchRefundToClaim(input: MatchInput): Promise<MatchResult
     },
   });
   return 'matched';
+}
+
+/** The provider refund id a settle webhook was reconciled with for this claim, or null. */
+export async function absorbedRefundIdFor(
+  paymentId: string,
+  storeId: string,
+  claimId: string
+): Promise<string | null> {
+  const events = await prisma.paymentEvent.findMany({
+    where: { storeId, paymentId, eventType: REFUND_ABSORBED_EVENT },
+    select: { eventType: true, createdAt: true, details: true },
+  });
+  const hit = events.find(e => (e.details as { claimId?: string } | null)?.claimId === claimId);
+  const refundId = (hit?.details as { refundId?: unknown } | null | undefined)?.refundId;
+  return typeof refundId === 'string' ? refundId : null;
 }

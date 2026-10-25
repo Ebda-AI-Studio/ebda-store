@@ -84,6 +84,7 @@ vi.mock('@ebda/database', () => ({
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
   hasTenantContext: () => true,
+  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
   // The factory reads a store's provider configs inside that store's scope.
   withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
@@ -494,6 +495,23 @@ describe('PaymentService.refund — a provider failure keeps or releases the cla
     expect(err).toBeInstanceOf(ProviderRejectedError);
     expect(refundMayHaveExecuted(err)).toBe(false);
     expect(releaseWrites()).toHaveLength(1);
+  });
+});
+
+describe('PaymentService.refund — the claim event carries what the settlement rules read back', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    paymentEventFindMany.mockResolvedValue([]);
+  });
+  it('isFullRefund / flipsOrder / priorStatus are on the claim event (Fawry kind matching needs isFullRefund)', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 }).catch(e => e);
+    const claim = paymentEventCreate.mock.calls
+      .map(c => (c[0] as { data: { eventType: string; details: Record<string, unknown> } }).data)
+      .find(d => d.eventType === 'refund_initiated');
+    expect(claim?.details).toMatchObject({ isFullRefund: false, flipsOrder: false });
+    expect(typeof claim?.details.priorStatus).toBe('string');
   });
 });
 

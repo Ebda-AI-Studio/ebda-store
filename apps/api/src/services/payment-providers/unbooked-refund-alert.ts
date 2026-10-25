@@ -31,7 +31,8 @@ export interface UnbookedRefundAlert {
     | 'partial_no_gl'
     | 'held_unaccounted'
     | 'held_provenance_unknown'
-    | 'held_open_claim_id_unverified';
+    | 'held_open_claim_id_unverified'
+    | 'absorbed_id_mismatch';
   store: { id: string; name: string };
   orderRef: string;
   body: string;
@@ -43,6 +44,7 @@ const TITLES: Record<UnbookedRefundAlert['kind'], string> = {
   held_unaccounted: 'Refund reported without an amount',
   held_provenance_unknown: 'Refund on a pre-ledger payment not added',
   held_open_claim_id_unverified: 'Refund webhook held: id unknown while our own refund is open',
+  absorbed_id_mismatch: 'Refund reconciled under a different provider id',
 };
 
 export function unbookedRefundAlertOptions(a: UnbookedRefundAlert): AlertOptions {
