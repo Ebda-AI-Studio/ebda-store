@@ -29,6 +29,23 @@ function fixture() {
   const count = (sql: string) => (raw.prepare(sql).get() as { n: number }).n;
   return { raw, db, base, stock, count };
 }
+/** Delivery fee (first-zone fallback) and a verified 2% VAT profile: the engines compute these now, the caller cannot. */
+function fees(raw: ReturnType<typeof openSqlite>, shipping: number, vatPercent = 0) {
+  if (shipping > 0)
+    raw.exec(
+      `INSERT INTO shipping_zones (id, store_id, name, areas, delivery_fee) VALUES ('z1', 's1', 'All', '[]', ${shipping})`
+    );
+  if (vatPercent > 0) {
+    raw.exec(`INSERT OR IGNORE INTO store_config (store_id) VALUES ('s1')`);
+    raw.exec(`UPDATE store_config SET tax_enabled = 1 WHERE store_id = 's1'`);
+    raw.exec(
+      `INSERT INTO tax_rates (id, store_id, name, rate) VALUES ('t1', 's1', 'VAT', ${vatPercent * 100})`
+    );
+    raw.exec(
+      `INSERT INTO store_tax_profiles (id, store_id, status, tax_registration_number, legal_name) VALUES ('p1', 's1', 'verified', '123456789', 'Seller LLC')`
+    );
+  }
+}
 const err = (fn: () => unknown): MoneyError => {
   try {
     fn();
@@ -40,11 +57,9 @@ const err = (fn: () => unknown): MoneyError => {
 
 describe('checkout core: stock', () => {
   it('prices come from the row, stock moves once, the ledger and the items agree', () => {
-    const { db, base, stock, count } = fixture();
-    const o = placeOrder(
-      db,
-      base({ lines: [{ productId: 'sku', quantity: 3 }], shipping: 500, tax: 100 })
-    );
+    const { raw, db, base, stock, count } = fixture();
+    fees(raw, 500, 2);
+    const o = placeOrder(db, base({ lines: [{ productId: 'sku', quantity: 3 }] }));
     expect(o).toMatchObject({
       subtotal: 4500,
       total: 5100,
@@ -106,8 +121,8 @@ describe('checkout core: stock', () => {
       expect(
         err(() => placeOrder(db, base({ lines: [{ productId: 'sku', quantity: q }] }))).code
       ).toBe('BAD_QUANTITY');
-    expect(err(() => placeOrder(db, base({ shipping: -5 }))).code).toBe('BAD_AMOUNT');
-    expect(err(() => placeOrder(db, base({ tax: 1.5 }))).code).toBe('BAD_AMOUNT');
+    expect(err(() => placeOrder(db, base({ walletAmount: -5 }))).code).toBe('BAD_AMOUNT');
+    expect(err(() => placeOrder(db, base({ walletAmount: 1.5 }))).code).toBe('BAD_AMOUNT');
     expect(err(() => placeOrder(db, base({ lines: [] }))).code).toBe('BAD_LINES');
     expect(
       err(() =>
@@ -145,7 +160,7 @@ describe('checkout core: coupon', () => {
     );
     expect(placeOrder(db, base({ couponCode: 'ten' })).couponDiscount).toBe(150); // case-insensitive code
     expect(placeOrder(db, base({ couponCode: 'BIG' })).couponDiscount).toBe(1500); // fixed: capped at the subtotal; max_discount is for percentages (Postgres parity)
-    expect(err(() => placeOrder(db, base({ couponCode: 'MIN' }))).code).toBe('COUPON_NOT_ELIGIBLE');
+    expect(err(() => placeOrder(db, base({ couponCode: 'MIN' }))).code).toBe('MIN_ORDER_NOT_MET');
     expect(err(() => placeOrder(db, base({ couponCode: 'OFF' }))).code).toBe('COUPON_INVALID');
     expect(err(() => placeOrder(db, base({ couponCode: 'OLD' }))).code).toBe('COUPON_EXPIRED');
     expect(err(() => placeOrder(db, base({ couponCode: 'NOPE' }))).code).toBe('COUPON_INVALID');
@@ -342,17 +357,16 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
 
   it('free_shipping zeroes the shipping line (and uses one redemption); expectedTotal gates a changed price', () => {
     const { raw, db, base } = fixture();
+    fees(raw, 4000);
     raw.exec(
       `INSERT INTO coupons (id, store_id, code, name, type, value, scope_product_ids, scope_category_ids) VALUES ('fs', 's1', 'SHIPFREE', 'x', 'free_shipping', 0, '[]', '[]')`
     );
-    expect(placeOrder(db, base({ couponCode: 'SHIPFREE', shipping: 4000 }))).toMatchObject({
+    expect(placeOrder(db, base({ couponCode: 'SHIPFREE' }))).toMatchObject({
       shipping: 0,
       total: 1500,
     });
-    expect(err(() => placeOrder(db, base({ shipping: 4000, expectedTotal: 1500 }))).code).toBe(
-      'PRICE_CHANGED'
-    );
-    expect(placeOrder(db, base({ shipping: 4000, expectedTotal: 5500 })).total).toBe(5500);
+    expect(err(() => placeOrder(db, base({ expectedTotal: 1500 }))).code).toBe('PRICE_CHANGED');
+    expect(placeOrder(db, base({ expectedTotal: 5500 })).total).toBe(5500);
   });
 
   it('a variant without its own price inherits the product price; untracked products are not decremented', () => {
