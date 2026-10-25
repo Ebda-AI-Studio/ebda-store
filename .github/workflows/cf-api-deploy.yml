@@ -1,6 +1,21 @@
 name: Deploy Ebda API to Cloudflare
 on:
   workflow_dispatch:
+  # Auto-deploy (Ahmad, 2026-10-25): a merge that changes anything the API Worker is built from deploys it,
+  # so main and production cannot drift (before this a push never redeployed the API and the frontends rolled
+  # on without it). Same gates as a manual run: workerd smoke, migrate, deploy, /health commit verify with
+  # automatic rollback, Inngest sync. The concurrency group below queues deploys and never cancels one.
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/ebda-cf-api-config.mjs'
+      - 'scripts/ci/deploy-guard.mjs'
+      - 'scripts/ci/workerd-smoke.*'
+      - '.github/workflows/cf-api-deploy.yml'
 permissions:
   contents: read
 concurrency:
