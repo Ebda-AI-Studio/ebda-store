@@ -486,6 +486,16 @@ Sentry / Axiom / PostHog each have their own native notification channels (email
   - **Axiom**: not used by Ebda Store.
 - **What this does NOT do**: it doesn't replace each service's dashboard — Sentry issues still live in Sentry, etc. It only adds Telegram as a parallel notification channel for high-signal events.
 
+### 7. Workers Logs + Logpush to R2 (Cloudflare-only logging, G7, INFRA-CF-1)
+
+Replaces the Axiom drain (section 5) at cutover: once the API is no longer on Railway nothing writes to that transport.
+
+- **Workers Logs (searchable, short retention):** `observability: { enabled: true, head_sampling_rate: 1 }` on all five Workers, `ebda-api`, `ebda-web`, `ebda-admin`, `ebda-marketing`, `ebda-orders` (`apps/*/wrangler.jsonc`; the OpenNext generator `scripts/cf-setup-local.sh` emits the same for web/admin/orders, which it regenerates at every deploy). Query them in the dashboard: Workers & Pages, the Worker, Logs. `ebda-marketing` is assets-only, so static hits run no script and produce no log lines; its flag keeps config parity. `tests/unit/ops/worker-logs-config.test.ts` fails a PR that drops either setting.
+- **Logpush (30 days, in our bucket):** `"logpush": true` on each Worker plus ONE account-level job `ebda-workers-trace` (dataset `workers_trace_events`, filter `ScriptName in [the five]`) writing to R2 bucket **`ebda-logs`**, prefix `workers/<date>/`. The bucket has a lifecycle rule that deletes objects after 30 days (created and read back 2026-10-24). Logs carry `console.log` lines and uncaught exceptions, never request bodies; the PII masking rules of section 5 still apply to what we log.
+- **Setup / re-run (idempotent):** `set -a; . ~/.whisky-services.env; set +a; bash scripts/ops/cf-logs-setup.sh`. Step 3 (the job) needs an API token with Account > Logs > Edit and an R2 token (Object Read & Write) scoped to `ebda-logs`, exported as `LOGPUSH_R2_ACCESS_KEY_ID` / `LOGPUSH_R2_SECRET_ACCESS_KEY`. The wrangler OAuth login has neither, and the stored `CF_API_TOKEN` lacks Logs and Notifications scopes (checked 2026-10-24).
+- **Reading old logs:** `rclone` against `ebda-logs` (read-only R2 token) and `zcat`/`jq` on the gzip NDJSON; or the Mac pull's copy.
+- **Sentry stays** as the error tracker (the one non-Cloudflare dependency besides payment, shipping and Meta providers). Alert route unchanged: Sentry, then the alert bridge (section 6), then Telegram.
+
 ### Verifying end-to-end
 
 ```bash
@@ -518,11 +528,28 @@ curl https://api.ebda.app/health
 
 Each hosting/data provider's billing dashboard fires an email to the account owner when spend or usage crosses a threshold. A runaway AI sweep, bot scrape, or cron loop can otherwise spike costs 10× silently. Verified per-provider:
 
-| Provider   | Alert                | Threshold                                                                                                                                                                                                                       |
-| ---------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Railway    | Budget alert         | spend > 80% of monthly budget                                                                                                                                                                                                   |
-| Neon       | Compute credits      | usage > 80% of monthly credits                                                                                                                                                                                                  |
-| Cloudflare | Spending/usage limit | verify a cap is configured in the Cloudflare dashboard for the Workers plan now hosting web/admin/orders (was previously tracked via Vercel's spending limit before the 2026-07 migration; needs re-verification on Cloudflare) |
+| Provider   | Alert                                  | Threshold                                                                                                        |
+| ---------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Railway    | Budget alert                           | spend > 80% of monthly budget                                                                                    |
+| Neon       | Compute credits                        | usage > 80% of monthly credits                                                                                   |
+| Cloudflare | Usage-based billing notifications (G9) | Workers requests, Durable Objects, D1, R2, Email; thresholds and the exact click-path are in the next subsection |
+
+#### Cloudflare usage notifications (G9)
+
+The wrangler OAuth login and the stored `CF_API_TOKEN` cannot create notification policies (the API answers "Authentication error", checked 2026-10-24), so this is a dashboard task, once, on the personal/Whisky 11 account (`as.montaseer@gmail.com`, account `69188202efc4df480140dd76545aa3ab`):
+
+1. dash.cloudflare.com, pick the account, then **Notifications** (left menu, under the account home), then **Add**.
+2. Choose **Usage Based Billing** (a Pay-as-you-go account feature; Workers Paid qualifies). Name it `ebda usage <product>`.
+3. Product and threshold, one notification each (80% of the Workers Paid included allowance, so the alert lands before the bill does):
+   - **Workers**: requests exceed **8,000,000** per month (10 M included)
+   - **Durable Objects**: requests exceed **800,000** (1 M included) and duration if offered
+   - **D1**: rows read exceed **20 billion**, rows written **40 million** (25 B / 50 M included)
+   - **R2**: Class A operations exceed **800,000** (1 M free), Class B **8,000,000** (10 M free), storage **8 GB** (10 GB free)
+   - **Email (Email Service)**: outbound messages exceed **2,400** per month (3,000 included)
+4. Notification method: **Email**, `as.montaseer@gmail.com`; add the Telegram webhook (`/api/v1/alerts/webhooks/generic?token=...`) as a second method if Webhooks is enabled on the account.
+5. Save, then **Notifications > History** is where a fired one shows. Re-check quarterly with the rest of this table.
+
+Included allowances are from developers.cloudflare.com pricing pages as read on 2026-10-24 and must be re-read before trusting the thresholds. If a product is missing from the Usage Based Billing product list, record it in the register and watch it in the billing page instead (Billing > Billable Usage).
 
 Renewal verification: re-check these in the per-provider dashboard quarterly — providers occasionally migrate billing UIs and silently drop alert rules.
 

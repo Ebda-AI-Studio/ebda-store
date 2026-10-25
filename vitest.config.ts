@@ -32,6 +32,8 @@ export default defineConfig({
       // apps/api/workers-test runs the BUILT Worker on workerd via @cloudflare/vitest-pool-workers
       // (npm run cf:test -w apps/api).
       'apps/api/workers-test/**',
+      // apps/api/workers-do runs the real StoreDO + D1 + R2 on local workerd (npm run cf:test:do -w apps/api).
+      'apps/api/workers-do/**',
     ],
     coverage: {
       provider: 'v8',

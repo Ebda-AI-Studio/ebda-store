@@ -114,7 +114,7 @@ const PAYMOB_DOCS = 'https://developers.paymob.com/paymob-docs';
 const KASHIER_DOCS = 'https://developers.kashier.io';
 const FAWRY_DOCS = 'https://developer.fawrystaging.com';
 const BOSTA_DOCS = 'https://docs.bosta.co';
-const ARAMEX_DEVELOPERS = 'https://www.aramex.com/developers/aramex-apis';
+const ARAMEX_DEVELOPERS = 'https://www.aramex.com/developers-solution-center/aramex-apis';
 const SHIPBLU_DOCS = 'https://docs.shipblu.com';
 const MYLERZ_SWAGGER = 'https://integration.mylerz.net/swagger/ui/index';
 
@@ -449,7 +449,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: false,
     verification: {
       sandboxVerifiedAt: null,
-      note: 'Built from the official OpenAPI (docs.bosta.co/api/api.yaml) and the how-to pages; not yet run against a Bosta test account (scripts/provider-sandbox-check.mjs bosta). stg-app.bosta.co is named only by Bosta’s SDK, not the docs. Unconfirmed: decimal COD, duplicate-reference error, webhook retries, which delivery states allow terminate.',
+      note: 'Built from the official OpenAPI (docs.bosta.co/api/api.yaml) and the how-to pages; not yet run against a Bosta test account (scripts/provider-sandbox-check.mjs bosta). Re-read 2026-10-24 against api.yaml and docs.bosta.co/docs/how-to/{get-delivery-status-via-webhook,create-your-first-delivery,get-your-api-key}: auth, endpoints, create body, 30,000 EGP COD cap, webhook payload and the 23-state table all match the adapter. Still unconfirmed (the docs are silent): decimal COD (the schema type is number, every example is an integer), duplicate-reference error, webhook retries, which delivery states allow terminate, and stg-app.bosta.co (named only by Bosta’s SDK README).',
     },
     capabilities: {
       methods: ['cod', 'label', 'quote', 'pickup', 'cancel', 'tracking-webhook'],
@@ -519,7 +519,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: false,
     verification: {
       sandboxVerifiedAt: null,
-      note: 'Built from docs.shipblu.com + the official OpenAPI (api.shipblu.com/docs/?format=openapi); no ShipBlu staging key yet (scripts/provider-sandbox-check.mjs shipblu). Unconfirmed in the docs: cancel, webhooks (none documented), COD unit, duplicate-reference behaviour.',
+      note: 'Built from docs.shipblu.com + the official OpenAPI (api.shipblu.com/docs/?format=openapi); no ShipBlu staging key yet (scripts/provider-sandbox-check.mjs shipblu). Re-read 2026-10-24 (docs.shipblu.com/{quick-start,tutorial,api-reference}, the OpenAPI, and the official Postman collection docs.shipblu.com/assets/js/ShipBluAPI.json): auth, endpoints, the 32-status enum and the create body match the adapter; the Postman create example omits address.what3words, so not sending it is consistent with the docs. Still unconfirmed (the docs are silent): cancel (no endpoint), webhooks (none documented), COD unit of cash_amount (example 100, unit unstated), duplicate-reference behaviour.',
     },
     capabilities: {
       methods: ['cod', 'label', 'quote', 'pickup'],
@@ -562,7 +562,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: false,
     verification: {
       sandboxVerifiedAt: null,
-      note: 'Built from the official Swagger (integration.mylerz.net/swagger/docs/v1). Mylerz publishes NO sandbox: sandbox mode needs a staging host from Mylerz (MYLERZ_BASE_URL outside production), so a live run needs a real merchant account. Unconfirmed: status table, COD unit, duplicate-reference behaviour, webhook payload.',
+      note: 'Built from the official Swagger (integration.mylerz.net/swagger/docs/v1). Mylerz publishes NO sandbox: sandbox mode needs a staging host from Mylerz (MYLERZ_BASE_URL outside production), so a live run needs a real merchant account. Re-read 2026-10-24: every endpoint and DTO the adapter uses still matches the Swagger (no other official Mylerz doc is reachable: mylerz.net/developers is a script-only page). Still unconfirmed (the Swagger carries no descriptions or examples): status table, COD unit (OrderDTO.COD_Value is typed string, the other COD fields are double), duplicate-reference behaviour, webhook payload (POST /api/Merchant registration DTO only).',
     },
     capabilities: {
       methods: ['cod', 'label', 'quote', 'pickup', 'cancel'],
@@ -639,7 +639,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     verified: false,
     verification: {
       sandboxVerifiedAt: null,
-      note: 'Built from the four public WSDLs on ws.aramex.net (SOAP element order from the schema). Aramex’s manual and developer pages return 403 to our tools, so product types, report ids, update-code table, EGP COD and the test host are UNVERIFIED (scripts/provider-sandbox-check.mjs aramex). The API has no cancel-shipment operation.',
+      note: 'Built from the four public WSDLs on ws.aramex.net (SOAP element order from the schema). Re-verified 2026-10-24 against the WSDLs (51 request types, no drift) and Aramex’s official Shipping Services API Manual (aramex.com/docs/default-source/resourses/resourcesdata/shipping-services-api-manual.pdf; 403 to plain HTTP clients, readable in a browser): Source 24, units KG/CM, PaymentType P, service code CODS, ReportID 9201 + URL, EGP as a valid currency code, test host ws.dev.aramex.net, no shipment-cancel operation (pickups only) and the Appendix F error codes are documented; pickup Status and volume were corrected to the manual. Still UNVERIFIED (scripts/provider-sandbox-check.mjs aramex): domestic-Egypt product types (Appendix A lists only EXP types), the tracking UpdateCode table (in no file we hold), EGP COD enablement on the account. Also checked against Ahmad-supplied official files (Shipments Tracking WSDL, createShipmentsPHP.txt sample): tracking request/response shape matches, duplicate bookings are now guarded by ForeignHAWB (manual Table 18, ERR30), unit case is not significant (sample uses cm/Kg); no supplied file lists the tracking UpdateCode table or any domestic product type.',
     },
     capabilities: {
       methods: ['cod', 'label', 'quote', 'pickup'],

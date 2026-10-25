@@ -17,7 +17,9 @@
   // Pinned to what the pinned wrangler's workerd supports (4.116.0 rejects 2026-09-01).
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
+  "logpush": true,
   // NO Smart Placement (tried 2026-10-22, PR #136, reverted): it placed the Worker at EWR
   // (`cf-placement: remote-EWR`) and API KV-hit calls got slower (median 1.2 s -> 2.3 s, n=6).
   // The serial Frankfurt/DO hops are the cost; fix them by removing hops, not by moving the Worker.

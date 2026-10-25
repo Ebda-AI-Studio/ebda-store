@@ -5,9 +5,13 @@
 // Built from the four public WSDLs on ws.aramex.net (Shipping, RateCalculator, Tracking,
 // Location; one namespace, WCF BasicHttpBinding). Aramex enforces xs:sequence ORDER, so every
 // request is assembled by a small builder that emits children in the schema's order, and every
-// schema-required element is present even when empty. Aramex's manual is unreadable to us:
-// anything the WSDL does not define (product types, report ids, update codes, EGP COD, the test
-// host) is marked `UNVERIFIED:` and handled safely, never guessed silently.
+// schema-required element is present even when empty. Re-verified 2026-10-24 against the official
+// "Shipping Services API Manual" (aramex.com/docs/default-source/resourses/resourcesdata/
+// shipping-services-api-manual.pdf, readable in a browser, 403 to plain HTTP clients): Source 24,
+// units KG / CM, PaymentType P, service code CODS, ReportID 9201 + URL, EGP currency code, test host
+// and Pickup.Status are now DOCUMENTED, as is the duplicate guard (ForeignHAWB, ERR30). Still
+// `UNVERIFIED:` (no manual/WSDL/sample we hold says): domestic product types, the tracking
+// UpdateCode table, EGP COD enablement.
 
 import logger from '../../lib/logger';
 import {
@@ -42,8 +46,9 @@ import { cairoWallClock } from './pickup-time';
 
 export const ARAMEX_BASE_URLS = {
   live: 'https://ws.aramex.net/ShippingAPI.V2',
-  // UNVERIFIED: the test host. It resolves but its WSDL could not be fetched from our network;
-  // whether it is IP-allow-listed is unknown. Aramex hands out test credentials with its docs.
+  // Manual Appendix G (testing URLs): ws.dev.aramex.net/shippingapi.v2/<service>/service_1_0.svc.
+  // UNVERIFIED: its WSDL could not be fetched from our network (no DNS answer 2026-10-24), so
+  // whether it is IP-allow-listed is unknown. The manual lists test credentials for it.
   sandbox: 'https://ws.dev.aramex.net/ShippingAPI.V2',
 };
 
@@ -163,19 +168,19 @@ function num(name: string, value: number, required = false): string {
 const money = (name: string, currency: string, value: number) =>
   el(name, t('CurrencyCode', currency, true) + num('Value', value, true));
 const weight = (name: string, kg: number) =>
-  el(name, t('Unit', 'KG', true) + num('Value', kg, true)); // UNVERIFIED: unit code "KG"
+  el(name, t('Unit', 'KG', true) + num('Value', kg, true)); // manual Table 28: KG | LB
 
 function clientInfo(c: AramexCredentials): string {
   return el(
     'ClientInfo',
     t('UserName', c.username, true) +
       t('Password', c.password, true) +
-      t('Version', 'v1.0', true) + // UNVERIFIED: version string
+      t('Version', 'v1.0', true) + // manual: "based on the WSDL version", max 4 chars (v1.0 is the WSDL's)
       t('AccountNumber', c.accountNumber, true) +
       t('AccountPin', c.accountPin, true) +
       t('AccountEntity', c.accountEntity, true) +
       t('AccountCountryCode', c.accountCountryCode, true) +
-      t('Source', 24) // UNVERIFIED: 24 is the commonly cited integration source id
+      t('Source', 24) // manual Table 16: Source, Default = 24
   );
 }
 
@@ -192,7 +197,7 @@ function transaction(ref1: string): string {
 }
 
 const labelInfo = () =>
-  // UNVERIFIED: report 9201 + type URL = a hosted label link.
+  // Manual Table 26: ReportID 9201; ReportType "URL by default" (or RPT = streamed file).
   el('LabelInfo', num('ReportID', 9201, true) + t('ReportType', 'URL', true));
 
 function addressBody(a: ShipmentAddress, line3 = '', allRequired = false): string {
@@ -351,7 +356,10 @@ const notificationsOf = (n: XNode | undefined): Notification[] =>
     message: val(x, 'Message'),
   }));
 
-// UNVERIFIED: Aramex's auth-failure codes/texts are not in any WSDL, so classify by wording.
+// Manual Appendix F: ERR01 "Invalid username or password", ERR02 "Invalid account information",
+// ERR03 "Account is blocked". Classified by CODE first; wording is only the fallback for SOAP faults
+// and unlisted texts (no WSDL carries auth codes).
+const AUTH_CODES = new Set(['ERR01', 'ERR02', 'ERR03']);
 const AUTH_LOOKING =
   /authenticat|authoriz|unauthori|credential|password|user ?name|login|invalid (user|account)|\bpin\b|account (number|pin|entity)/i;
 
@@ -374,7 +382,8 @@ function describe(ns: Notification[], c?: AramexCredentials): string {
   );
 }
 
-const looksLikeAuth = (ns: Notification[]) => ns.some(n => AUTH_LOOKING.test(n.message));
+const looksLikeAuth = (ns: Notification[]) =>
+  ns.some(n => AUTH_CODES.has(n.code.trim().toUpperCase()) || AUTH_LOOKING.test(n.message));
 
 function refusal(op: string, ns: Notification[], c?: AramexCredentials): CarrierError {
   if (looksLikeAuth(ns)) {
@@ -419,8 +428,8 @@ export class AramexCarrier implements ShippingCarrierProvider {
   };
 
   // Aramex documents no idempotency key and has no search-by-reference operation, so a lost
-  // response after a successful CreateShipments CANNOT be detected here. UNVERIFIED: whether
-  // Aramex rejects a repeated Reference1. This per-process cache (credential-scoped, keyed on the
+  // response after a successful CreateShipments CANNOT be looked up here; the retry is refused by
+  // Aramex itself with ERR30 because the reference rides in ForeignHAWB (manual Table 18). This per-process cache (credential-scoped, keyed on the
   // merchant reference) only stops in-process repeats; the service keeps one shipment row per
   // order, and retrying after an ambiguous failure is the merchant's / ops' decision.
   private readonly created = new IdempotencyCache<CarrierShipmentResponse>();
@@ -514,7 +523,8 @@ export class AramexCarrier implements ShippingCarrierProvider {
     }
     const group = ctx?.settings?.productGroup;
     return {
-      // UNVERIFIED: DOM for domestic Egypt, EXP otherwise
+      // Manual (ShipmentDetails): Product Group is EXP or DOM. The manual's Appendix A lists only EXP product
+      // types (PDX PPX PLX DDX DPX GDX GPX EPX): the DOM types stay UNVERIFIED, hence the setting.
       productGroup:
         typeof group === 'string' && group.trim() ? group.trim() : domestic ? 'DOM' : 'EXP',
       productType: productType.trim(),
@@ -552,7 +562,7 @@ export class AramexCarrier implements ShippingCarrierProvider {
         num('Length', d.length, true) +
           num('Width', d.width, true) +
           num('Height', d.height, true) +
-          t('Unit', 'CM', true) // UNVERIFIED: unit code
+          t('Unit', 'CM', true) // manual Table 27: CM | M
       ) +
       weight('ActualWeight', o.kg) +
       weight('ChargeableWeight', o.kg) +
@@ -561,10 +571,10 @@ export class AramexCarrier implements ShippingCarrierProvider {
       num('NumberOfPieces', 1, true) + // one parcel per shipment
       t('ProductGroup', o.group, true) +
       t('ProductType', o.type, true) +
-      t('PaymentType', 'P', true) + // UNVERIFIED: P = prepaid by the shipper
+      t('PaymentType', 'P', true) + // manual Appendix B: P = prepaid (shipper pays transport)
       t('PaymentOptions', '', true) +
       (o.cod > 0 ? money('CashOnDeliveryAmount', 'EGP', piastresToEgp(o.cod)) : '') +
-      (o.cod > 0 ? t('Services', 'CODS') : '') // UNVERIFIED: COD service code
+      (o.cod > 0 ? t('Services', 'CODS') : '') // manual Appendix C: CODS = Cash on Delivery
     );
   }
 
@@ -624,7 +634,11 @@ export class AramexCarrier implements ShippingCarrierProvider {
             dims: data.dimensions,
             cod,
           })
-        )
+        ) +
+        // Manual Table 18: ForeignHAWB (max 50) "must be unique for each shipment", else ERR30 "Another
+        // shipment with the same Foreign AWB Number already exists": Aramex's only server-side
+        // duplicate guard. Never truncated (a cut reference would stop being unique): over 50 = omitted.
+        (reference.length <= 50 ? t('ForeignHAWB', reference) : '')
     );
     const response = await this.call(
       'Shipping',
@@ -762,7 +776,9 @@ export class AramexCarrier implements ShippingCarrierProvider {
               t('PackageType', 'Box', true) + // UNVERIFIED
               t('Payment', 'P', true) + // UNVERIFIED
               weight('ShipmentWeight', kg) +
-              el('ShipmentVolume', t('Unit', 'CM3', true) + num('Value', 0, true)) + // UNVERIFIED
+              // Manual Table 30: Value must be > 0 (ERR23), unit written "Cm3"; we do not know the volume, so
+              // the smallest positive placeholder is sent (UNVERIFIED how Aramex uses it for a pickup).
+              el('ShipmentVolume', t('Unit', 'Cm3', true) + num('Value', 1, true)) +
               num('NumberOfPieces', input.pieces ?? input.shipments, true) +
               money('CashAmount', 'EGP', 0) +
               money('ExtraCharges', 'EGP', 0) +
@@ -775,7 +791,10 @@ export class AramexCarrier implements ShippingCarrierProvider {
               ) +
               t('Comments', '', true)
           )
-        )
+        ) +
+        // Manual Table 31: Status is mandatory, "Ready" or "Pending" (REQ27 "Status is empty").
+        // Schema order: Status follows PickupItems.
+        t('Status', 'Ready', true)
     );
     const response = await this.call(
       'Shipping',
@@ -979,3 +998,30 @@ function parseAramexDate(s: string): Date {
 }
 
 export const aramexCarrier = new AramexCarrier();
+
+/**
+ * Aramex requires an email for BOTH shipper and customer when a shipment is created (manual:
+ * REQ24 "Email Address is empty" otherwise). Shipper: the merchant's pickup email, else the
+ * store owner's account email. Customer: the order's email (customer account, else the one typed
+ * at checkout). If either is still missing the booking is refused here with a merchant-facing
+ * Arabic + English message, instead of sending an empty element Aramex rejects.
+ */
+export const ARAMEX_EMAIL_REQUIRED_MESSAGE =
+  'أراميكس تشترط بريدًا إلكترونيًا للمرسل والعميل: أضف بريد الاستلام في إعدادات أراميكس، أو تأكد أن الطلب يحتوي على بريد العميل. / Aramex requires an email for both the sender and the customer: add a pickup email in the Aramex settings, or make sure the order has a customer email.';
+
+export function withAramexEmails(
+  pickup: ShipmentAddress,
+  delivery: ShipmentAddress,
+  fallbacks: { ownerEmail?: string | null; orderEmail?: string | null }
+): { pickupAddress: ShipmentAddress; deliveryAddress: ShipmentAddress } {
+  const clean = (v?: string | null) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const shipper = clean(pickup.email) ?? clean(fallbacks.ownerEmail);
+  const customer = clean(delivery.email) ?? clean(fallbacks.orderEmail);
+  if (!shipper || !customer) {
+    throw new CarrierError('CARRIER_REJECTED', ARAMEX_EMAIL_REQUIRED_MESSAGE);
+  }
+  return {
+    pickupAddress: { ...pickup, email: shipper },
+    deliveryAddress: { ...delivery, email: customer },
+  };
+}

@@ -41,6 +41,7 @@ interface DurableObjectStateLike {
     setAlarm(time: number | Date): Promise<void>;
     getAlarm(): Promise<number | null>;
     deleteAlarm(): Promise<void>;
+    deleteAll(): Promise<void>;
   };
   acceptWebSocket(ws: WebSocket, tags?: string[]): void;
   getWebSockets(tag?: string): WebSocket[];
