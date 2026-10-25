@@ -1,7 +1,7 @@
 {
   "_doc": "Budget for the API Worker's startup, enforced by scripts/ci/worker-startup-budget.mjs (CI: Worker dry-run (api)). Cloudflare rejects a deploy whose global scope exceeds its startup CPU limit (error 10021, hit once after the B2B merge). Local workerd numbers are not Cloudflare's, so these are REGRESSION gates with headroom over the recorded baseline, not the platform limit. Raise one only with a Ruling that says why. The absolute startupCpuMs ceiling is enforced on main/nightly runs (quiet runner); pull requests compare against main's bundle measured in the same job (relative.ratio + relative.slackMs).",
   "startupCpuMs": 140,
-  "bundleBytes": 14800000,
+  "bundleBytes": 15000000,
   "bundleGzipBytes": 3200000,
   "baseline": {
     "recorded": "2026-10-22",
@@ -19,5 +19,6 @@
   "relative": {
     "ratio": 0.25,
     "slackMs": 15
-  }
+  },
+  "_ruling": "Ruling ID-17 (2026-10-25): bundleBytes 14800000 -> 15000000. The Store now verifies identity-service tokens (jose ES256 + JWKS cache), talks to the identity service over RPC, and carries the invitation, admin-control and factor/notice mail code (about +60 KB on 14855252 B measured). Cost if wrong: a further bundle regression hides inside the 145 KB headroom until the next ratchet."
 }
