@@ -94,6 +94,60 @@ export interface RefundSettlement {
   absorbedByInFlightClaim: boolean;
 }
 
+/** One `payment_events` refund row, as `correlateSettleNotice` reads it. */
+export interface RefundClaimEventRow {
+  eventType: string;
+  createdAt: Date | number;
+  details: unknown;
+}
+
+/**
+ * Does an amount-less settle notice (Fawry reports none, and no field that says so is signed) belong to a refund WE
+ * sent? Correlated by payment (the caller passes this payment's events only), a time window, and the provider's
+ * reference when both sides have one: the executed event's `refundId` (`fawry-refund-<fawryRef>-<total>`) must share the
+ * notice's `fawry-refund-<fawryRef>-` prefix. A claim with no outcome yet has no id to compare and matches on the
+ * window alone. A released claim (the provider refused) never matches. When nothing matches the caller alerts: that is
+ * a refund made in the provider's dashboard whose amount nobody reported.
+ */
+export function correlateSettleNotice(input: {
+  events: readonly RefundClaimEventRow[];
+  /** the notice's derived refund reference */
+  noticeRef: string | null | undefined;
+  now: number;
+  windowMs: number;
+  claimEvent: string;
+  executedEvent: string;
+  releasedEvent: string;
+}): boolean {
+  const at = (e: RefundClaimEventRow) =>
+    e.createdAt instanceof Date ? e.createdAt.getTime() : e.createdAt;
+  const det = (e: RefundClaimEventRow) =>
+    e.details && typeof e.details === 'object' ? (e.details as Record<string, unknown>) : {};
+  const released = new Set<string>();
+  const executedRef = new Map<string, string>();
+  for (const e of input.events) {
+    const d = det(e);
+    if (typeof d.claimId !== 'string') continue;
+    if (e.eventType === input.releasedEvent) released.add(d.claimId);
+    if (e.eventType === input.executedEvent && typeof d.refundId === 'string')
+      executedRef.set(d.claimId, d.refundId);
+  }
+  // `fawry-refund-<fawryRef>-<suffix>` -> `fawry-refund-<fawryRef>-`
+  const prefix = typeof input.noticeRef === 'string' ? input.noticeRef.replace(/[^-]*$/, '') : '';
+  return input.events.some(e => {
+    const d = det(e);
+    if (
+      e.eventType !== input.claimEvent ||
+      typeof d.claimId !== 'string' ||
+      released.has(d.claimId)
+    )
+      return false;
+    if (input.now - at(e) > input.windowMs || at(e) > input.now + 60_000) return false;
+    const ref = executedRef.get(d.claimId);
+    return ref === undefined || prefix.length === 0 || ref.startsWith(prefix);
+  });
+}
+
 export function resolveRefundSettlement(input: {
   /** The payment's total, in fils. */
   paymentAmount: number;
@@ -122,6 +176,8 @@ export function resolveRefundSettlement(input: {
    * equals one of them is that refund's own settle notice, not a second refund.
    */
   inFlightClaimAmounts?: readonly number[] | null;
+  /** The caller proved (correlateSettleNotice) this amount-less notice settles a refund WE sent: nothing to hold or alert. */
+  correlatedSettleNotice?: boolean;
 }): RefundSettlement {
   const { paymentAmount, alreadyRefunded, reported, reportedEventId, accountedEventIds } = input;
 
@@ -211,6 +267,7 @@ export function resolveRefundSettlement(input: {
     // for the refund already counted OR a genuinely new refund (PR 2279 audit).
     absorbedByInFlightClaim,
     heldUnaccountedEvent:
+      !input.correlatedSettleNotice &&
       typeof reportedEventId === 'string' &&
       reportedEventId.length > 0 &&
       !ids.includes(reportedEventId) &&
