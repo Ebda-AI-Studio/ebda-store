@@ -250,10 +250,15 @@ export function resolveCartPrices(db: SyncSql, ctx: PricingCtx): PricedCart {
       products.set(l.productId, p);
     }
     if (l.variantId && !variants.has(l.variantId)) {
-      const v = db.all('SELECT id, product_id, price FROM product_variants WHERE id = ?', [
-        l.variantId,
-      ])[0];
+      const v = db.all(
+        'SELECT id, product_id, price, is_active FROM product_variants WHERE id = ?',
+        [l.variantId]
+      )[0];
       if (!v || v.product_id !== l.productId) throw unavailable(l.productId);
+      if (v.is_active !== 1)
+        throw new MoneyError('VARIANT_INACTIVE', 'this variant is not available', 409, {
+          variantId: l.variantId,
+        });
       variants.set(l.variantId, v);
     }
     if (l.variantId && variants.get(l.variantId)!.product_id !== l.productId)

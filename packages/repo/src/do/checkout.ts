@@ -173,6 +173,14 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       ? { kind: 'merchant-selected', customerId: input.customerId }
       : { kind: 'anonymous' });
 
+  const bundleTotals = new Map<string, number>();
+  for (const b of input.bundles ?? [])
+    bundleTotals.set(b.bundleId, (bundleTotals.get(b.bundleId) ?? 0) + b.quantity);
+  const bundleKey = [...bundleTotals]
+    .map(([k, n]) => `${k}x${n}`)
+    .sort()
+    .join(',');
+
   return db.transactionSync(() => {
     const sameLines = (orderId: string): boolean => {
       const rows = db.all(
@@ -188,7 +196,16 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         .map(l => key(l.productId, l.variantId, l.quantity))
         .sort()
         .join(',');
-      return a === b;
+      if (a !== b) return false;
+      const boxes = db
+        .all(
+          'SELECT bundle_id, count(DISTINCT bundle_group_id) AS n FROM order_items WHERE order_id = ? AND bundle_id IS NOT NULL GROUP BY bundle_id',
+          [orderId]
+        )
+        .map(r => `${r.bundle_id}x${r.n}`)
+        .sort()
+        .join(',');
+      return boxes === bundleKey;
     };
     if (input.idempotencyKey) {
       const prev = db.all(
@@ -364,12 +381,38 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           available: r.newStock,
         });
       }
-      const r = decrementProduct(db, productId, qty);
-      if (!r.ok)
-        throw new MoneyError('OUT_OF_STOCK', 'not enough stock', 409, {
+      let r = decrementProduct(db, productId, qty);
+      if (!r.ok) {
+        // backorder on a product WITHOUT variants: both the store feature and the product flag; the stock goes negative
+        // (a real backorder debt, unlike a variant row which floors at 0) and the whole quantity counts as taken
+        if (input.backorderEnabled !== true || !p.allow_backorder)
+          throw new MoneyError('OUT_OF_STOCK', 'not enough stock', 409, {
+            productId,
+            available: r.newStock,
+          });
+        const cur = db.all('SELECT inventory FROM products WHERE id = ? AND store_id = ?', [
           productId,
-          available: r.newStock,
+          input.storeId,
+        ])[0].inventory as number;
+        db.run('UPDATE products SET inventory = ?1 WHERE id = ?2 AND store_id = ?3', [
+          cur - qty,
+          productId,
+          input.storeId,
+        ]);
+        r = { ok: true, previousStock: cur, newStock: cur - qty };
+        backorders.push({ lineIndex, productId, variantId: null, qty, stockTaken: qty });
+        recordMovement(db, {
+          storeId: input.storeId,
+          productId,
+          type: 'sale',
+          quantity: qty,
+          previousStock: r.previousStock,
+          newStock: r.newStock,
+          reference: orderId,
+          reason: 'backorder',
         });
+        return;
+      }
       recordMovement(db, {
         storeId: input.storeId,
         productId,
@@ -402,7 +445,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       const v = l.variantId
         ? db.all('SELECT title, title_ar, sku FROM product_variants WHERE id = ?', [l.variantId])[0]
         : undefined;
-      const unit = gold?.unitPrices.get(l.key) ?? l.resolved.unitMinor;
+      // the gate VALIDATES (stale rate, drift, quote) and supplies the snapshot; the charged price is the resolver's, so a
+      // group percent_off applies to gold exactly as in Postgres (order.service.ts:987-1016)
+      const unit = l.resolved.unitMinor;
       take(l.productId, l.variantId, l.qty, lines.length);
       lines.push({
         productId: l.productId,
@@ -442,18 +487,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
     }
 
-    const looseSubtotal =
-      priced.looseSubtotal -
-      (gold
-        ? priced.lines.reduce(
-            (s, l) =>
-              s +
-              (gold.unitPrices.has(l.key)
-                ? (l.resolved.unitMinor - (gold.unitPrices.get(l.key) as number)) * l.qty
-                : 0),
-            0
-          )
-        : 0);
+    const looseSubtotal = priced.looseSubtotal;
     const subtotal = looseSubtotal + bundles.bundlesSubtotal;
     if (subtotal > MAX_TOTAL) throw new MoneyError('TOTAL_TOO_LARGE', 'order total too large', 400);
 
@@ -524,7 +558,10 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           scopeProductIds: jsonList(c.scope_product_ids),
           scopeCategoryIds: jsonList(c.scope_category_ids),
         },
-        { ...ids, cartItems: freeShip ? cartItems : cartItems }
+        {
+          ...ids,
+          cartItems: freeShip ? cartItemsForTargeting(db, input.storeId, priced, true) : cartItems,
+        }
       );
       if (!t.eligible)
         throw new MoneyError(
@@ -768,7 +805,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         ]
       );
     }
-    for (const b of backorders)
+    for (const b of backorders) {
+      db.run('UPDATE order_items SET cost_price_deferred = 1 WHERE id = ?', [itemIds[b.lineIndex]]);
       db.run(
         'INSERT INTO backorder_lines (id, store_id, order_item_id, product_id, variant_id, qty, stock_taken) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
@@ -781,6 +819,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           b.stockTaken,
         ]
       );
+    }
     if (walletTx)
       db.run(
         'INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',

@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { openSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
-import { applyGoldRates } from '../src/do/gold-rates';
+import {
+  applyGoldRates,
+  decidePendingGoldRate,
+  repriceGoldProduct,
+  updateGoldSettings,
+} from '../src/do/gold-rates';
 import { assertGoldLinesPriceable } from '../src/do/gold';
 import { computeGoldUnitPrice } from '../../shared/src/commerce/gold-price';
 import type { MoneyError } from '../src/do/sync-sql';
@@ -383,5 +388,109 @@ describe('applyGoldRates', () => {
       { requireQuote: false, now: T0 + 60_000 }
     );
     expect(r.unitPrices.get('p1')).toBe(expectPrice(300_000));
+  });
+
+  it('a pending feed rate: reject leaves everything; confirm makes it current and reprices; a decided rate cannot be decided twice', () => {
+    const f = fx();
+    f.product('p1');
+    applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 300_000 }] },
+      { userId: 'u' },
+      { now: T0, newId: ids }
+    );
+    const a = applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 500_000 }] },
+      { feed: {} },
+      { now: T0 + 1, newId: ids }
+    ).pending[0];
+    const b = applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 520_000 }] },
+      { feed: {} },
+      { now: T0 + 2, newId: ids }
+    ).pending[0];
+    expect(decidePendingGoldRate(f.db, 's1', b.id, 'reject', { userId: 'o' })).toEqual({
+      status: 'rejected',
+      repriced: 0,
+    });
+    expect(f.rate(21).r).toBe(300_000);
+    expect(code(() => decidePendingGoldRate(f.db, 's1', a.id, 'confirm', { userId: 'o' }))).toBe(
+      'RATE_NOT_PENDING'
+    ); // superseded
+    const c = applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 530_000 }] },
+      { feed: {} },
+      { now: T0 + 3, newId: ids }
+    ).pending[0];
+    expect(
+      decidePendingGoldRate(f.db, 's1', c.id, 'confirm', { userId: 'o' }, { now: T0 + 4 }).repriced
+    ).toBe(1);
+    expect(f.rate(21).r).toBe(530_000);
+    expect(f.price('p1')).toBe(expectPrice(530_000));
+    expect(code(() => decidePendingGoldRate(f.db, 's1', c.id, 'reject', { userId: 'o' }))).toBe(
+      'RATE_NOT_PENDING'
+    );
+    expect(code(() => decidePendingGoldRate(f.db, 's2', c.id, 'confirm', { userId: 'o' }))).toBe(
+      'NOT_FOUND'
+    ); // other store
+  });
+
+  it('a changed rounding step reprices every gold row in the same section; an unchanged one does not; bad input is refused', () => {
+    const f = fx();
+    f.product('p1');
+    applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 300_123 }] },
+      { userId: 'u' },
+      { now: T0, newId: ids }
+    );
+    const s = {
+      enabled: true,
+      feedEnabled: false,
+      feedPremiumBps: 0,
+      maxAgeMinutes: 1560,
+      jumpConfirmBps: 500,
+      roundingStep: 100 as const,
+      showBreakdown: false,
+    };
+    expect(updateGoldSettings(f.db, 's1', s, { userId: 'o' }).repriced).toBe(0);
+    expect(
+      updateGoldSettings(f.db, 's1', { ...s, roundingStep: 1000 }, { userId: 'o' }).repriced
+    ).toBe(1);
+    expect(f.price('p1')).toBe(computeGoldUnitPrice(SPEC, 300_123, 1000).unitPrice);
+    expect(
+      code(() =>
+        updateGoldSettings(f.db, 's1', { ...s, roundingStep: 7 as never }, { userId: 'o' })
+      )
+    ).toBe('GOLD_SETTINGS_INVALID');
+  });
+
+  it('repriceGoldProduct reprices only that product after a spec edit', () => {
+    const f = fx();
+    f.product('a');
+    f.product('b');
+    applyGoldRates(
+      f.db,
+      's1',
+      { rates: [{ karat: 21, ratePerGram: 300_000 }] },
+      { userId: 'u' },
+      { now: T0, newId: ids }
+    );
+    f.raw.exec("INSERT OR REPLACE INTO do_flags (name, value) VALUES ('gold_reprice', 0)");
+    f.raw.exec("UPDATE products SET gold_weight_mg = 20000 WHERE id IN ('a', 'b')");
+    const pb = f.price('b');
+    expect(repriceGoldProduct(f.db, 's1', 'a')).toBe(1);
+    expect(f.price('a')).toBe(
+      computeGoldUnitPrice({ ...SPEC, weightMg: 20_000 }, 300_000, 100).unitPrice
+    );
+    expect(f.price('b')).toBe(pb);
   });
 });
