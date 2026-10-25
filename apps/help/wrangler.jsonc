@@ -3,6 +3,9 @@
 {
   "name": "ebda-help",
   "compatibility_date": "2025-08-16",
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
+  "logpush": true,
   "assets": {
     "directory": "./out",
     "not_found_handling": "404-page",
