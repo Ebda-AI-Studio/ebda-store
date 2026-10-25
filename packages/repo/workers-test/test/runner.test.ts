@@ -234,3 +234,133 @@ describe('product search on a real Durable Object (FTS5 trigram)', () => {
     expect(await s.searchDrift()).toEqual({ missing: [], orphaned: [], stale: [] });
   });
 });
+
+describe('refund, loyalty and hold-cap races on a real Durable Object', () => {
+  const stub = async () => {
+    const s = env.LITE_DO.get(env.LITE_DO.idFromName(`race-${Math.random()}`)) as any;
+    await s.seedMoney(10, 1000, 20_000); // sku x10 @1500, coupon SALE (-100), wallet 20,000 for cust
+    return s;
+  };
+  const base = { customerId: 'cust', shippingAddress: { name: 'A' } };
+
+  it('30 parallel cancel + full-refund calls on one order: stock back ONCE, coupon released ONCE, wallet reversed ONCE', async () => {
+    const s = await stub();
+    const orderId = await s.placeRaw({
+      ...base,
+      lines: [{ productId: 'sku', quantity: 3 }],
+      couponCode: 'SALE',
+      walletAmount: 1000,
+    });
+    expect(await s.sqlOne(`SELECT inventory AS n FROM products WHERE id='sku'`)).toEqual({ n: 7 });
+    const res = await Promise.all(
+      Array.from({ length: 30 }, (_, i) => (i % 2 ? s.cancel(orderId) : s.refund({ orderId })))
+    );
+    // cancelled -> refunded is legal, so some of these succeed and some are refused; the money effects never repeat
+    expect(res.some(r => r.ok)).toBe(true);
+    expect(await s.sqlOne(`SELECT inventory AS n FROM products WHERE id='sku'`)).toEqual({ n: 10 });
+    expect(await s.sqlOne(`SELECT usage_count AS n FROM coupons WHERE id='c'`)).toEqual({ n: 0 });
+    expect(await s.sqlOne(`SELECT balance AS n FROM customer_wallets WHERE id='w'`)).toEqual({
+      n: 20_000,
+    });
+    expect(
+      await s.sqlOne(
+        `SELECT count(*) AS n FROM wallet_transactions WHERE type='order_payment_reversal'`
+      )
+    ).toEqual({ n: 1 });
+    expect(
+      await s.sqlOne(`SELECT count(*) AS n FROM inventory_history WHERE type='return_stock'`)
+    ).toEqual({ n: 1 });
+  });
+
+  it('20 parallel one-unit partial returns (distinct keys) of a 5-unit line restock exactly 5 (never more); a repeated key is a replay', async () => {
+    const s = await stub();
+    const orderId = await s.placeRaw({ ...base, lines: [{ productId: 'sku', quantity: 5 }] });
+    await s.sqlRun(`UPDATE orders SET status = 'confirmed' WHERE id = ?`, orderId);
+    const itemId = (await s.sqlOne(
+      `SELECT id AS n FROM order_items WHERE order_id = ?`,
+      orderId
+    )) as any;
+    const res = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        s.refund({
+          orderId,
+          refundKey: `r-${i % 10}`,
+          lines: [{ orderItemId: itemId.n ?? itemId.id, quantity: 1 }],
+        })
+      )
+    );
+    // 10 distinct keys were processed once each (the other 10 calls are replays); only 5 units could ever come back
+    expect(res.filter(r => r.ok && !r.replayed).length).toBe(10);
+    expect(res.filter(r => r.ok && r.replayed).length).toBe(10);
+    expect(await s.sqlOne(`SELECT inventory AS n FROM products WHERE id='sku'`)).toEqual({ n: 10 });
+    expect(
+      await s.sqlOne(
+        `SELECT coalesce(sum(quantity),0) AS n FROM inventory_history WHERE type='return_stock'`
+      )
+    ).toEqual({ n: 5 });
+  });
+
+  it('amount-only partial refunds in parallel never exceed the order total (cumulative cap)', async () => {
+    const s = await stub();
+    const orderId = await s.placeRaw({ ...base, lines: [{ productId: 'sku', quantity: 2 }] }); // total 3000
+    await s.sqlRun(
+      `UPDATE orders SET status = 'confirmed', payment_status = 'paid' WHERE id = ?`,
+      orderId
+    );
+    const total = (await s.sqlOne(`SELECT total AS n FROM orders WHERE id = ?`, orderId)).n;
+    const res = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        s.refund({ orderId, refundKey: `a-${i}`, amount: Math.floor(total / 4) })
+      )
+    );
+    expect(res.filter(r => r.ok && !r.replayed).length).toBe(4);
+    expect(res.filter(r => !r.ok).length).toBe(16);
+  });
+
+  it('loyalty: 30 parallel checkouts each redeeming 1,000 of 5,000 points never overdraw; points burned == points on orders', async () => {
+    const s = await stub();
+    await s.sqlRun(`INSERT INTO store_config (store_id, loyalty_enabled) VALUES ('s1', 1)`);
+    await s.sqlRun(
+      `INSERT INTO loyalty_points (id, store_id, customer_id, points, total_earned) VALUES ('lp', 's1', 'cust', 5000, 5000)`
+    );
+    await s.sqlRun(`UPDATE products SET inventory = 1000 WHERE id = 'sku'`);
+    const res = await Promise.all(
+      Array.from({ length: 30 }, (_, i) =>
+        s.checkout({
+          ...base,
+          lines: [{ productId: 'sku', quantity: 4 }],
+          pointsToRedeem: 1000,
+          loyaltyFeatureEnabled: true,
+          idempotencyKey: `l-${i}`,
+        })
+      )
+    );
+    expect(res.filter(r => !r.ok).map(r => r.code)).toEqual([]);
+    const bal = await s.sqlOne(`SELECT points AS n FROM loyalty_points WHERE id='lp'`);
+    const onOrders = await s.sqlOne(
+      `SELECT coalesce(sum(loyalty_points_redeemed),0) AS n FROM orders`
+    );
+    expect(bal.n).toBeGreaterThanOrEqual(0);
+    expect(bal.n + onOrders.n).toBe(5000);
+    expect(onOrders.n).toBe(5000); // all 5 redemptions that fit were granted, none more
+  });
+
+  it('hold cap: 20 parallel COD checkouts from one phone admit exactly 2', async () => {
+    const s = await stub();
+    await s.sqlRun(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);
+    const res = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        s.checkout({
+          lines: [{ productId: 'sku', quantity: 1 }],
+          paymentMethod: 'cod',
+          shippingAddress: { phone: '01012345678', i },
+          idempotencyKey: `h-${i}`,
+        })
+      )
+    );
+    expect(res.filter(r => r.ok).length).toBe(2);
+    expect(new Set(res.filter(r => !r.ok).map(r => r.code))).toEqual(
+      new Set(['TOO_MANY_OPEN_ORDERS'])
+    );
+  });
+});
