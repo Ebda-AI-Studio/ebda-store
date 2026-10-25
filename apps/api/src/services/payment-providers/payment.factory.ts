@@ -32,6 +32,7 @@ import { getProviderV2, MANUAL_PROVIDERS } from './registry';
 import { toProviderCredentials } from './credentials';
 import { isProviderUsable } from './provider-gate';
 import { recordProviderOperation } from '../provider-verification.service';
+import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
 import type { PaymentStatus as DbPaymentStatus } from '@ebda/database';
@@ -804,24 +805,31 @@ export class PaymentService {
     } catch (err) {
       // PROVIDERS-3: a failed real call of a not-yet-verified provider pages ops (never throws).
       if (storeId) {
-        await recordProviderOperation({
-          storeId,
-          provider: p.name,
-          op: 'create_payment',
-          ok: false,
-          errorCode: errorCodeOf(err),
-        });
+        void deferAfterTenantCommit(
+          'provider-verify.create_payment.failed',
+          () =>
+            recordProviderOperation({
+              storeId,
+              provider: p.name,
+              op: 'create_payment',
+              ok: false,
+              errorCode: errorCodeOf(err),
+            }),
+          { runOnRollback: true }
+        );
       }
       throw err;
     }
     if (storeId) {
-      await recordProviderOperation({
-        storeId,
-        provider: p.name,
-        op: 'create_payment',
-        ok: true,
-        ref: response.transactionId ?? null,
-      });
+      void deferAfterTenantCommit('provider-verify.create_payment', () =>
+        recordProviderOperation({
+          storeId,
+          provider: p.name,
+          op: 'create_payment',
+          ok: true,
+          ref: response.transactionId ?? null,
+        })
+      );
     }
     return { providerName: p.name, response };
   }

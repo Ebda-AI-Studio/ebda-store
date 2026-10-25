@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge } from '@ebda/ui';
 import { PROVIDER_CATALOG, withNumerals } from '@ebda/shared';
-import { apiGet } from '../lib/api';
+import { apiGet, apiPost } from '../lib/api';
 import { useT } from '../i18n/useT';
 
 interface Row {
@@ -18,11 +18,15 @@ interface Row {
   catalogVerified: boolean;
   successCount: number;
   failureCount: number;
-  verifiedAt: string | null;
+  liveStores: number;
   needed: number;
+  readyAt: string | null;
+  verifiedAt: string | null;
   recent: Array<{
     storeId: string;
     op: string;
+    mode: string;
+    counted: boolean;
     ok: boolean;
     ref: string | null;
     errorCode: string | null;
@@ -35,6 +39,8 @@ export function ProviderVerificationSection() {
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [rows, setRows] = useState<Row[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -46,7 +52,15 @@ export function ProviderVerificationSection() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [reload]);
+
+  async function confirm(provider: string) {
+    setBusy(provider);
+    const { error } = await apiPost(`/api/v1/admin/provider-verification/${provider}/confirm`);
+    setBusy(null);
+    if (error) setFailed(true);
+    else setReload(k => k + 1);
+  }
 
   const name = (code: string) => PROVIDER_CATALOG.find(p => p.code === code)?.name[locale] ?? code;
   const fmt = (iso: string) =>
@@ -67,20 +81,36 @@ export function ProviderVerificationSection() {
             <details key={r.provider} className="rounded-lg border bg-card p-3">
               <summary className="flex cursor-pointer flex-wrap items-center gap-3">
                 <span className="font-medium">{name(r.provider)}</span>
-                <Badge variant={verified ? 'success' : 'warning'}>
+                <Badge variant={verified ? 'success' : r.readyAt ? 'info' : 'warning'}>
                   {verified
                     ? r.catalogVerified
                       ? t('verifiedCatalog')
-                      : t('verifiedAuto', { at: fmt(r.verifiedAt!) })
-                    : t('unverified')}
+                      : t('verifiedConfirmed', { at: fmt(r.verifiedAt!) })
+                    : r.readyAt
+                      ? t('ready')
+                      : t('unverified')}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
                   {t('counts', {
+                    stores: r.liveStores,
+                    needed: r.needed,
                     ok: r.successCount,
                     failed: r.failureCount,
-                    needed: r.needed,
                   })}
                 </span>
+                {!verified && r.readyAt && (
+                  <button
+                    type="button"
+                    className="rounded-md border px-2 py-1 text-sm"
+                    disabled={busy === r.provider}
+                    onClick={e => {
+                      e.preventDefault();
+                      void confirm(r.provider);
+                    }}
+                  >
+                    {t('confirm')}
+                  </button>
+                )}
               </summary>
               {r.recent.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">{t('noEvidence')}</p>
@@ -90,6 +120,10 @@ export function ProviderVerificationSection() {
                     <li key={`${e.at}-${i}`} className="flex flex-wrap gap-x-3">
                       <span>{fmt(e.at)}</span>
                       <span>{e.op}</span>
+                      <span>
+                        {e.mode}
+                        {e.counted ? ' ✓' : ''}
+                      </span>
                       <span className={e.ok ? 'text-success-ink' : 'text-destructive-ink'}>
                         {e.ok ? t('ok') : (e.errorCode ?? t('failedOp'))}
                       </span>

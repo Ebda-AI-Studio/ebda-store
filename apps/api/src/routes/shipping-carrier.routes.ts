@@ -256,7 +256,12 @@ router.put(
       // the carrier's one read-only call. Never a shipment. A failed check does not undo the save.
       let check = null;
       if (result.changed.length > 0 && body.mode) {
-        const tested = await shippingCarrierService.testConnection(storeId, carrier, body.mode);
+        const tested = await shippingCarrierService.testConnection(
+          storeId,
+          carrier,
+          body.mode,
+          (body.mode === 'sandbox') === result.config.testMode
+        );
         check = tested.check;
         await auditLog({
           action: 'shipping_carrier_config.connection_tested',

@@ -10209,15 +10209,17 @@
   },
   "providerVerification": {
     "title": "Provider verification",
-    "subtitle": "No test accounts: the first merchants' real credentials verify each provider. A provider flips to verified by itself after enough successful real operations.",
+    "subtitle": "No test accounts: the first merchants' real credentials verify each provider. A provider becomes READY when enough different stores settled real live operations; only you confirm it, and until then the first-use and failure alerts keep firing.",
     "loading": "Loading…",
     "loadFailed": "Could not load provider verification.",
     "verifiedCatalog": "Verified (catalog)",
-    "verifiedAuto": "Auto-verified {at}",
     "unverified": "Unverified",
-    "counts": "{ok} ok · {failed} failed · needs {needed} ok",
+    "counts": "{stores}/{needed} live stores · {ok} ok · {failed} failed",
     "noEvidence": "No real operations yet.",
     "ok": "ok",
-    "failedOp": "failed"
+    "failedOp": "failed",
+    "verifiedConfirmed": "Verified {at}",
+    "ready": "Ready to verify",
+    "confirm": "Confirm verified"
   }
 }

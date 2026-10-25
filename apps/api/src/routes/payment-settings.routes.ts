@@ -870,18 +870,22 @@ router.put(
       let check: ConnectionCheckView | null = null;
       if (update.changed.length > 0) {
         const { result, stored } = await runConnectionTest(config, body.mode);
-        finalConfig = await prisma.paymentConfig.update({
-          where: { id: config.id, storeId },
-          data: {
-            connectionTest: stored as unknown as Prisma.InputJsonValue,
-            healthStatus: result.ok
-              ? 'healthy'
-              : result.code === 'unreachable'
-                ? 'degraded'
-                : 'down',
-            lastHealthCheck: new Date(stored.at),
-          },
-        });
+        // Only the ACTIVE mode's proof is stored (the enable gate reads it); checking the other
+        // mode just reports, so it can neither void a live proof nor mark a live gateway down.
+        if ((body.mode === 'sandbox') === config.testMode) {
+          finalConfig = await prisma.paymentConfig.update({
+            where: { id: config.id, storeId },
+            data: {
+              connectionTest: stored as unknown as Prisma.InputJsonValue,
+              healthStatus: result.ok
+                ? 'healthy'
+                : result.code === 'unreachable'
+                  ? 'degraded'
+                  : 'down',
+              lastHealthCheck: new Date(stored.at),
+            },
+          });
+        }
         await auditLog({
           action: 'store_payment_config.connection_tested',
           storeId,

@@ -5452,7 +5452,11 @@ model ProviderVerification {
   kind         String
   successCount Int       @default(0) @map("success_count")
   failureCount Int       @default(0) @map("failure_count")
+  // Set automatically once enough DISTINCT stores settled real LIVE operations: "ready to verify".
+  readyAt      DateTime? @map("ready_at")
+  // Set only by a super admin confirm (verifiedAt gates the alerts, so no auto-flip).
   verifiedAt   DateTime? @map("verified_at")
+  verifiedById String?   @map("verified_by_id")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
@@ -5466,11 +5470,15 @@ model ProviderVerificationEvent {
   sourceStoreId String @map("source_store_id")
   op        String
   ok        Boolean
+  // sandbox | live, and whether it counts toward verification (live + settled + ok).
+  mode      String   @default("sandbox")
+  counted   Boolean  @default(false)
   ref       String?
   errorCode String?  @map("error_code")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([provider, createdAt])
+  @@index([provider, counted, sourceStoreId])
   @@index([provider, sourceStoreId])
   @@map("provider_verification_events")
 }

@@ -43,6 +43,7 @@ import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
 import { recordProviderOperation } from './provider-verification.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { cfWaitUntil } from '../cf/bindings';
 import { assertValidTransition } from './order-status-machine';
@@ -360,13 +361,15 @@ export async function confirmPaymentFromProviderStatus(
     );
 
     // PROVIDERS-3: a real payment settled through this provider (evidence for auto-verify).
-    await recordProviderOperation({
-      storeId: order.storeId,
-      provider: payment.provider,
-      op: 'payment_confirmed',
-      ok: true,
-      ref: payment.id,
-    });
+    void deferAfterTenantCommit('provider-verify.payment_confirmed', () =>
+      recordProviderOperation({
+        storeId: order.storeId,
+        provider: payment.provider,
+        op: 'payment_confirmed',
+        ok: true,
+        ref: payment.id,
+      })
+    );
     return { paymentStatus: 'paid', providerStatus: status, statusChanged: true };
   }
 

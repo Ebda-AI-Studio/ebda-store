@@ -1,18 +1,21 @@
 /**
- * Ruling PROVIDERS-3: the first merchant's own credentials are a provider's verification.
+ * Ruling PROVIDERS-3: the first merchants' own credentials are a provider's verification.
  *
  * `recordProviderOperation` is called at the real choke points (a payment invoice created or
  * confirmed paid, a shipment booked) and does three things for a provider the catalog does not yet
  * list as verified:
- *   1. appends evidence (store, op, outcome, reference, error CODE; never a credential or a body);
+ *   1. appends evidence (store, mode, op, outcome, reference, error CODE; never a credential or a body);
  *   2. pages ops (P1, store scope) on the FIRST real use of the provider by a store, and on every
- *      failed operation while the provider is still unverified (the alert service throttles
- *      repeats), so an integration error is fixed immediately;
- *   3. after PROVIDER_AUTO_VERIFY_AFTER successful operations sets `verified_at`.
+ *      failed operation while the provider is still unverified (the alert service throttles repeats);
+ *   3. marks the provider READY once enough DISTINCT stores each settled a LIVE operation
+ *      (payment confirmed paid, shipment booked; sandbox and invoice-only operations never count).
+ * Ready is not verified: only a super admin confirm (`confirmProviderVerification`) sets
+ * `verified_at`, because that is what silences the alerts for every store. A single merchant can
+ * therefore never verify a provider for the platform.
  *
- * It NEVER throws and never blocks the money path: bookkeeping failure is logged and swallowed.
- * `isProviderVerified` is BOUNDED-stale (60 s in-process cache): it drives bookkeeping and display
- * only, never an enable or charge gate, so a stale answer has no money consequence.
+ * It NEVER throws. Callers run it through `deferAfterTenantCommit` so it never shares (or poisons)
+ * a request transaction, and never delays the money path.
+ * `isProviderVerified` is BOUNDED-stale (60 s in-process cache): bookkeeping and display only.
  */
 import { prisma, withStore } from '@ebda/database';
 import {
@@ -22,9 +25,13 @@ import {
   type ProviderKind,
 } from '@ebda/shared';
 import logger from '../lib/logger';
+import { AppError } from '../middleware/error-handler';
 import { sendAlert } from './alerts.service';
 
 export type ProviderOp = 'create_payment' | 'payment_confirmed' | 'create_shipment';
+
+/** Operations that prove a flow end to end (money settled / parcel booked). */
+const SETTLED_OPS: ReadonlySet<ProviderOp> = new Set(['payment_confirmed', 'create_shipment']);
 
 export interface ProviderOperation {
   storeId: string;
@@ -35,12 +42,15 @@ export interface ProviderOperation {
   ref?: string | null;
   /** A short code (error class / provider code); never a raw provider body. */
   errorCode?: string | null;
+  /** Override the mode lookup (tests); normally read from the store's connection row. */
+  mode?: 'sandbox' | 'live';
 }
 
-/** Events kept per provider while it is unverified (the evidence is for humans, not analytics). */
+/** Events kept per provider besides first uses and counted successes (evidence for humans). */
 const EVENT_CAP = 200;
 const CACHE_TTL_MS = 60_000;
 
+/** DISTINCT stores that must each settle a live operation before a provider is "ready". */
 export function autoVerifyAfter(): number {
   const n = Number(process.env.PROVIDER_AUTO_VERIFY_AFTER);
   return Number.isInteger(n) && n > 0 ? n : AUTO_VERIFY_AFTER_DEFAULT;
@@ -64,7 +74,7 @@ async function verifiedCodes(): Promise<Set<string>> {
   return verifiedCache.codes;
 }
 
-/** Catalog-verified OR auto-verified from real traffic. */
+/** Catalog-verified OR confirmed by a super admin from real traffic. */
 export async function isProviderVerified(code: string): Promise<boolean> {
   const entry = getProviderEntry(code);
   if (!entry) return false;
@@ -74,6 +84,33 @@ export async function isProviderVerified(code: string): Promise<boolean> {
   } catch (err) {
     logger.warn({ err, provider: code }, '[PROVIDER-VERIFY] could not read verification state');
     return false;
+  }
+}
+
+/** The mode the store's connection runs in now. Unknown => sandbox (never counts). */
+async function modeOf(
+  storeId: string,
+  provider: string,
+  kind: ProviderKind
+): Promise<'sandbox' | 'live'> {
+  try {
+    const testMode = await withStore(storeId, async tx => {
+      if (kind === 'payments') {
+        const r = await tx.paymentConfig.findFirst({
+          where: { storeId, provider },
+          select: { testMode: true },
+        });
+        return r?.testMode;
+      }
+      const r = await tx.shippingCarrierConfig.findUnique({
+        where: { storeId_carrier: { storeId, carrier: provider } },
+        select: { testMode: true },
+      });
+      return r?.testMode;
+    });
+    return testMode === false ? 'live' : 'sandbox';
+  } catch {
+    return 'sandbox';
   }
 }
 
@@ -95,6 +132,9 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
     if (!entry || entry.manual || entry.verified) return;
     if ((await verifiedCodes()).has(input.provider)) return;
 
+    const mode = input.mode ?? (await modeOf(input.storeId, input.provider, entry.kind));
+    const counted = input.ok && mode === 'live' && SETTLED_OPS.has(input.op);
+
     const prior = await prisma.providerVerificationEvent.findFirst({
       where: { provider: input.provider, sourceStoreId: input.storeId },
       select: { id: true },
@@ -112,13 +152,15 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
       update: input.ok ? { successCount: { increment: 1 } } : { failureCount: { increment: 1 } },
     });
 
-    if (firstUse || counters.successCount + counters.failureCount <= EVENT_CAP) {
+    if (firstUse || counted || counters.successCount + counters.failureCount <= EVENT_CAP) {
       await prisma.providerVerificationEvent.create({
         data: {
           provider: input.provider,
           sourceStoreId: input.storeId,
           op: input.op,
           ok: input.ok,
+          mode,
+          counted,
           ref: input.ref ?? null,
           errorCode: input.errorCode ?? null,
         },
@@ -126,23 +168,28 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
     }
 
     if (firstUse || !input.ok) {
-      await alertUnverifiedUse(input, entry.kind, firstUse);
+      await alertUnverifiedUse(input, entry.kind, firstUse, mode);
     }
 
-    if (input.ok && !counters.verifiedAt && counters.successCount >= autoVerifyAfter()) {
-      const flipped = await prisma.providerVerification.updateMany({
-        where: { provider: input.provider, verifiedAt: null },
-        data: { verifiedAt: new Date() },
+    if (counted && !counters.readyAt) {
+      const stores = await prisma.providerVerificationEvent.groupBy({
+        by: ['sourceStoreId'],
+        where: { provider: input.provider, counted: true },
       });
-      if (flipped.count === 1) {
-        verifiedCache = null;
-        await sendAlert({
-          level: 'info',
-          source: 'provider.auto_verified',
-          title: `Provider auto-verified: ${input.provider}`,
-          body: `${input.provider} reached ${counters.successCount} successful real operations and is now flagged verified. Evidence: provider_verification_events.`,
-          context: { provider: input.provider, kind: entry.kind, successes: counters.successCount },
+      if (stores.length >= autoVerifyAfter()) {
+        const flipped = await prisma.providerVerification.updateMany({
+          where: { provider: input.provider, readyAt: null },
+          data: { readyAt: new Date() },
         });
+        if (flipped.count === 1) {
+          await sendAlert({
+            level: 'info',
+            source: 'provider.ready_to_verify',
+            title: `Provider ready to verify: ${input.provider}`,
+            body: `${stores.length} distinct stores settled real LIVE operations on ${input.provider}. Review the evidence on /provider-activation and confirm to mark it verified (until then first-use and failure alerts keep firing).`,
+            context: { provider: input.provider, kind: entry.kind, stores: stores.length },
+          });
+        }
       }
     }
   } catch (err) {
@@ -153,10 +200,42 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
   }
 }
 
+/**
+ * Super admin confirm: only a provider that reached "ready" (enough distinct stores settled live
+ * operations) can be marked verified. Sets `verified_at`, which silences the unverified alerts.
+ */
+export async function confirmProviderVerification(
+  provider: string,
+  actorUserId: string
+): Promise<{ provider: string; verifiedAt: string }> {
+  const entry = getProviderEntry(provider);
+  if (!entry || entry.manual) {
+    throw new AppError(404, 'UNKNOWN_PROVIDER', `Unknown provider "${provider}"`);
+  }
+  if (entry.verified) {
+    throw new AppError(409, 'ALREADY_VERIFIED', `${provider} is already verified in the catalog`);
+  }
+  const now = new Date();
+  const res = await prisma.providerVerification.updateMany({
+    where: { provider, readyAt: { not: null }, verifiedAt: null },
+    data: { verifiedAt: now, verifiedById: actorUserId },
+  });
+  if (res.count !== 1) {
+    throw new AppError(
+      409,
+      'NOT_READY',
+      `${provider} is not ready to verify yet (needs ${autoVerifyAfter()} distinct stores with settled live operations) or is already confirmed`
+    );
+  }
+  verifiedCache = null;
+  return { provider, verifiedAt: now.toISOString() };
+}
+
 async function alertUnverifiedUse(
   input: ProviderOperation,
   kind: ProviderKind,
-  firstUse: boolean
+  firstUse: boolean,
+  mode: 'sandbox' | 'live'
 ): Promise<void> {
   const store = await storeContext(input.storeId);
   const outcome = input.ok ? 'SUCCESS' : `FAILED${input.errorCode ? ` (${input.errorCode})` : ''}`;
@@ -169,11 +248,12 @@ async function alertUnverifiedUse(
       ? `First real use of unverified ${kind} provider ${input.provider}`
       : `Unverified ${kind} provider ${input.provider} operation failed`,
     body:
-      `${input.provider} (${input.op}) ${outcome} for store ${store.name}. ` +
+      `${input.provider} (${input.op}, ${mode}) ${outcome} for store ${store.name}. ` +
       'This provider has never been verified against a real account: fix any integration error now.',
     context: {
       provider: input.provider,
       op: input.op,
+      mode,
       outcome,
       ref: input.ref ?? null,
       storeId: input.storeId,
@@ -217,11 +297,16 @@ export interface ProviderVerificationRow {
   catalogVerified: boolean;
   successCount: number;
   failureCount: number;
-  verifiedAt: string | null;
+  /** Distinct stores that settled a real LIVE operation (the evidence that counts). */
+  liveStores: number;
   needed: number;
+  readyAt: string | null;
+  verifiedAt: string | null;
   recent: Array<{
     storeId: string;
     op: string;
+    mode: string;
+    counted: boolean;
     ok: boolean;
     ref: string | null;
     errorCode: string | null;
@@ -231,34 +316,45 @@ export interface ProviderVerificationRow {
 
 /** Super-admin view: every non-manual catalog provider with its counters and recent evidence. */
 export async function listProviderVerification(): Promise<ProviderVerificationRow[]> {
-  const rows = await prisma.providerVerification.findMany();
-  const byCode = new Map(rows.map(r => [r.provider, r]));
-  const out: ProviderVerificationRow[] = [];
-  for (const entry of PROVIDER_CATALOG) {
-    if (entry.manual) continue;
-    const r = byCode.get(entry.code);
-    const events = await prisma.providerVerificationEvent.findMany({
-      where: { provider: entry.code },
+  const codes = PROVIDER_CATALOG.filter(p => !p.manual).map(p => p.code);
+  const [rows, events, stores] = await Promise.all([
+    prisma.providerVerification.findMany(),
+    prisma.providerVerificationEvent.findMany({
+      where: { provider: { in: codes } },
       orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
-    out.push({
+      take: 500,
+    }),
+    prisma.providerVerificationEvent.groupBy({
+      by: ['provider', 'sourceStoreId'],
+      where: { provider: { in: codes }, counted: true },
+    }),
+  ]);
+  const byCode = new Map(rows.map(r => [r.provider, r]));
+  return PROVIDER_CATALOG.filter(p => !p.manual).map(entry => {
+    const r = byCode.get(entry.code);
+    return {
       provider: entry.code,
       kind: entry.kind,
       catalogVerified: entry.verified,
       successCount: r?.successCount ?? 0,
       failureCount: r?.failureCount ?? 0,
-      verifiedAt: r?.verifiedAt ? r.verifiedAt.toISOString() : null,
+      liveStores: stores.filter(x => x.provider === entry.code).length,
       needed: autoVerifyAfter(),
-      recent: events.map(e => ({
-        storeId: e.sourceStoreId,
-        op: e.op,
-        ok: e.ok,
-        ref: e.ref,
-        errorCode: e.errorCode,
-        at: e.createdAt.toISOString(),
-      })),
-    });
-  }
-  return out;
+      readyAt: r?.readyAt ? r.readyAt.toISOString() : null,
+      verifiedAt: r?.verifiedAt ? r.verifiedAt.toISOString() : null,
+      recent: events
+        .filter(e => e.provider === entry.code)
+        .slice(0, 10)
+        .map(e => ({
+          storeId: e.sourceStoreId,
+          op: e.op,
+          mode: e.mode,
+          counted: e.counted,
+          ok: e.ok,
+          ref: e.ref,
+          errorCode: e.errorCode,
+          at: e.createdAt.toISOString(),
+        })),
+    };
+  });
 }

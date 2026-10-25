@@ -196,12 +196,8 @@ export async function runCarrierConnectionTest(
   } else {
     const adapter = getCarrierAdapter(row.carrier);
     if (!adapter) {
-      // PROVIDERS-3: no safe read-only call; usable but explicitly UNVERIFIED.
-      result = {
-        ok: true,
-        code: 'no_check',
-        message: 'This carrier has no safe connection test; the connection is unverified',
-      };
+      // No adapter at all is NOT "no safe test call": nothing could ever book. Never usable.
+      result = { ok: false, code: 'unknown', message: 'This carrier has no adapter' };
     } else {
       try {
         const r = await adapter.testConnection(fields, {

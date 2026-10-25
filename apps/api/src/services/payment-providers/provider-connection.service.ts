@@ -235,7 +235,9 @@ export async function runConnectionTest(
     result = { ok: false, code: 'incomplete', message: `Missing: ${missing.join(', ')}` };
   } else {
     const adapter = getProviderV2(row.provider);
-    if (!adapter?.testConnection) {
+    if (!adapter) {
+      result = { ok: false, code: 'unknown', message: 'This provider has no adapter' };
+    } else if (!adapter.testConnection) {
       // PROVIDERS-3: no safe read-only call exists. Nothing is sent; the connection is usable but
       // explicitly UNVERIFIED (the merchant sees a warning, the first real use pages ops).
       result = {

@@ -35,6 +35,7 @@ vi.mock('@ebda/database', () => ({
         h.events.push(a);
       }),
       findMany: vi.fn(async () => []),
+      groupBy: vi.fn(async () => h.storeGroups),
     },
   },
   withStore: vi.fn(async (_id: string, fn: (tx: unknown) => unknown) =>
@@ -49,6 +50,7 @@ vi.mock('@api/services/alerts.service', () => ({
 }));
 
 import {
+  confirmProviderVerification,
   recordProviderOperation,
   reportConnectionCheck,
   resetProviderVerificationCache,
@@ -58,15 +60,25 @@ import {
 const op = (over: Record<string, unknown> = {}) => ({
   storeId: 'store-1',
   provider: 'paymob',
-  op: 'create_payment' as const,
+  op: 'payment_confirmed' as const,
   ok: true,
-  ref: 'inv-1',
+  ref: 'pay-1',
+  mode: 'live' as const,
   ...over,
 });
+const stores = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ sourceStoreId: `store-${i + 1}` }));
 
 beforeEach(() => {
   h.prior = null;
-  h.counters = { provider: 'paymob', successCount: 1, failureCount: 0, verifiedAt: null };
+  h.counters = {
+    provider: 'paymob',
+    successCount: 1,
+    failureCount: 0,
+    readyAt: null,
+    verifiedAt: null,
+  };
+  h.storeGroups = [];
   h.verifiedRows = [];
   h.flipCount = 1;
   h.events = [];
@@ -101,43 +113,71 @@ describe('recordProviderOperation', () => {
     expect(JSON.stringify(h.alerts[0])).toContain('PROVIDER_TIMEOUT');
   });
 
-  it('flips verified after N successes, once, with an info alert', async () => {
+  it('becomes READY (not verified) once N DISTINCT stores settled live operations; alerts info once', async () => {
     h.prior = { id: 'e1' };
-    h.counters = { ...h.counters, successCount: 3 };
+    h.storeGroups = stores(3);
     await recordProviderOperation(op());
-    expect(h.alerts.map(a => a.level)).toEqual(['info']);
-    expect(h.alerts[0].source).toBe('provider.auto_verified');
+    expect(h.alerts.map(a => a.source)).toEqual(['provider.ready_to_verify']);
+    const db = (await import('@ebda/database')).prisma as unknown as {
+      providerVerification: { updateMany: { mock: { calls: Array<[{ data: object }]> } } };
+    };
+    const data = db.providerVerification.updateMany.mock.calls.at(-1)![0].data;
+    expect(data).toHaveProperty('readyAt');
+    expect(data).not.toHaveProperty('verifiedAt');
   });
 
-  it('does not flip below N, nor when another request already flipped it', async () => {
+  it('N successes from ONE store never make it ready', async () => {
     h.prior = { id: 'e1' };
-    h.counters = { ...h.counters, successCount: 2 };
-    await recordProviderOperation(op());
-    expect(h.alerts).toHaveLength(0);
-    h.counters = { ...h.counters, successCount: 3 };
-    h.flipCount = 0;
-    await recordProviderOperation(op());
+    h.storeGroups = stores(1);
+    for (let i = 0; i < 5; i++) await recordProviderOperation(op());
     expect(h.alerts).toHaveLength(0);
   });
 
-  it('PROVIDER_AUTO_VERIFY_AFTER overrides N', async () => {
-    process.env.PROVIDER_AUTO_VERIFY_AFTER = '1';
+  it('sandbox successes do not count', async () => {
     h.prior = { id: 'e1' };
-    await recordProviderOperation(op());
-    expect(h.alerts.map(a => a.source)).toEqual(['provider.auto_verified']);
+    h.storeGroups = stores(3);
+    await recordProviderOperation(op({ mode: 'sandbox' }));
+    expect(h.alerts).toHaveLength(0);
+    const ev = h.events.at(-1) as { data: { counted: boolean; mode: string } };
+    expect(ev.data).toMatchObject({ counted: false, mode: 'sandbox' });
+  });
+
+  it('an unsettled operation (invoice created only) does not count, even live', async () => {
+    h.prior = { id: 'e1' };
+    h.storeGroups = stores(3);
+    await recordProviderOperation(op({ op: 'create_payment' }));
+    expect(h.alerts).toHaveLength(0);
+    expect((h.events.at(-1) as { data: { counted: boolean } }).data.counted).toBe(false);
+  });
+
+  it('a live settled success is recorded as counted evidence with its mode and store', async () => {
+    h.prior = { id: 'e1' };
+    await recordProviderOperation(op({ storeId: 'store-9' }));
+    expect((h.events.at(-1) as { data: object }).data).toMatchObject({
+      counted: true,
+      mode: 'live',
+      sourceStoreId: 'store-9',
+      op: 'payment_confirmed',
+    });
+  });
+
+  it('first-use and failure alerts keep firing while only READY, until a super admin confirms', async () => {
+    h.counters = { ...h.counters, readyAt: new Date() };
+    h.prior = { id: 'e1' };
+    await recordProviderOperation(op({ ok: false, errorCode: 'X_FAIL' }));
+    expect(h.alerts.map(a => a.source)).toEqual(['provider.unverified.failure']);
+  });
+
+  it('a confirmed (verified_at) provider is ignored entirely', async () => {
+    h.verifiedRows = [{ provider: 'paymob' }];
+    await recordProviderOperation(op({ ok: false }));
+    expect(h.alerts).toHaveLength(0);
   });
 
   it('ignores catalog-verified (kashier), manual (cod) and unknown providers entirely', async () => {
     for (const provider of ['kashier', 'cod', 'instapay', 'nope']) {
       await recordProviderOperation(op({ provider }));
     }
-    expect(h.alerts).toHaveLength(0);
-    expect(h.events).toHaveLength(0);
-  });
-
-  it('ignores an already auto-verified provider', async () => {
-    h.verifiedRows = [{ provider: 'paymob' }];
-    await recordProviderOperation(op());
     expect(h.alerts).toHaveLength(0);
     expect(h.events).toHaveLength(0);
   });
@@ -149,7 +189,7 @@ describe('recordProviderOperation', () => {
 });
 
 describe('isProviderVerified', () => {
-  it('catalog-verified and manual are verified; unverified is not until auto-verified', async () => {
+  it('catalog-verified and manual are verified; unverified is not until confirmed', async () => {
     expect(await isProviderVerified('kashier')).toBe(true);
     expect(await isProviderVerified('cod')).toBe(true);
     expect(await isProviderVerified('paymob')).toBe(false);
@@ -183,5 +223,31 @@ describe('reportConnectionCheck', () => {
     });
     expect(h.alerts).toHaveLength(1);
     expect(h.alerts[0].level).toBe('p1');
+  });
+});
+
+describe('confirmProviderVerification (super admin only sets verified_at)', () => {
+  it('confirms a READY provider', async () => {
+    h.flipCount = 1;
+    const r = await confirmProviderVerification('paymob', 'admin-1');
+    expect(r.provider).toBe('paymob');
+    expect(r.verifiedAt).toMatch(/T/);
+  });
+  it('refuses a provider that is not ready (or already confirmed)', async () => {
+    h.flipCount = 0;
+    await expect(confirmProviderVerification('paymob', 'admin-1')).rejects.toMatchObject({
+      code: 'NOT_READY',
+    });
+  });
+  it('refuses unknown, manual and catalog-verified providers', async () => {
+    await expect(confirmProviderVerification('nope', 'a')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    await expect(confirmProviderVerification('cod', 'a')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    await expect(confirmProviderVerification('kashier', 'a')).rejects.toMatchObject({
+      code: 'ALREADY_VERIFIED',
+    });
   });
 });

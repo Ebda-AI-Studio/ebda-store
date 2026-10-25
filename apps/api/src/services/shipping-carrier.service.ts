@@ -44,6 +44,7 @@ import {
 } from './carriers/carrier-connection.service';
 import { isProviderUsableForStore } from './payment-providers/provider-gate';
 import { recordProviderOperation, reportConnectionCheck } from './provider-verification.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { describeConnectionCheck, type CredentialMode } from '@ebda/shared';
 import {
   ShippingCarrierProvider,
@@ -350,7 +351,13 @@ class ShippingCarrierService {
    * Test connection: the adapter's ONE harmless authenticated call with the ACTIVE mode's stored
    * credentials. Records `{ok, code, mode, at, fingerprint}` on the row: the enable gate.
    */
-  async testConnection(storeId: string, carrier: CarrierCode, forMode?: CredentialMode) {
+  async testConnection(
+    storeId: string,
+    carrier: CarrierCode,
+    forMode?: CredentialMode,
+    /** false: report only (a non-active mode's check must not replace the active proof). */
+    persist = true
+  ) {
     const row = await prisma.shippingCarrierConfig.findUnique({
       where: { storeId_carrier: { storeId, carrier } },
     });
@@ -369,11 +376,13 @@ class ShippingCarrierService {
       forMode
     );
     const latency = Date.now() - startedAt;
-    await prisma.shippingCarrierConfig.update({
-      where: { id: row.id, storeId },
-      data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
-    });
-    await this.invalidateCarrierConfigCache(storeId);
+    if (persist) {
+      await prisma.shippingCarrierConfig.update({
+        where: { id: row.id, storeId },
+        data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
+      });
+      await this.invalidateCarrierConfigCache(storeId);
+    }
     await reportConnectionCheck({
       storeId,
       provider: carrier,
@@ -592,22 +601,29 @@ class ShippingCarrierService {
     } catch (err) {
       await this.recordCreationFailure(storeId, claimedId, err);
       // PROVIDERS-3: a failed real booking of a not-yet-verified carrier pages ops (never throws).
-      await recordProviderOperation({
+      void deferAfterTenantCommit(
+        'provider-verify.create_shipment.failed',
+        () =>
+          recordProviderOperation({
+            storeId,
+            provider: resolvedCarrierCode,
+            op: 'create_shipment',
+            ok: false,
+            errorCode: shipmentErrorCode(err),
+          }),
+        { runOnRollback: true }
+      );
+      throw err;
+    }
+    void deferAfterTenantCommit('provider-verify.create_shipment', () =>
+      recordProviderOperation({
         storeId,
         provider: resolvedCarrierCode,
         op: 'create_shipment',
-        ok: false,
-        errorCode: shipmentErrorCode(err),
-      });
-      throw err;
-    }
-    await recordProviderOperation({
-      storeId,
-      provider: resolvedCarrierCode,
-      op: 'create_shipment',
-      ok: true,
-      ref: response.trackingNumber ?? response.carrierShipmentId ?? null,
-    });
+        ok: true,
+        ref: response.trackingNumber ?? response.carrierShipmentId ?? null,
+      })
+    );
 
     // ---- record it (own short transaction) and move the order along
     const shipment = await runInTenantContext(storeId, () =>
