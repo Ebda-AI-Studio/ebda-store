@@ -24,7 +24,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
+import { createPrismaClient, Prisma, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { BRAND, getProviderEntry } from '@ebda/shared';
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
@@ -314,6 +314,11 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       // never tested
       const fresh = await mkStore('untested');
       await saveKashier(fresh);
+      // PROVIDERS-3: the save runs the check itself, so clear the proof to model "never tested"
+      await owner.paymentConfig.updateMany({
+        where: { storeId: fresh.id, provider: 'kashier' },
+        data: { connectionTest: Prisma.DbNull },
+      });
       await call('post', fresh, requestUrl(fresh, 'kashier'));
       const none = await call('post', op, adminUrl(fresh, 'kashier', 'activate'));
       expect(none.status).toBe(409);

@@ -16,7 +16,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
+import { createPrismaClient, Prisma, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import paymentSettingsRoutes from '@api/routes/payment-settings.routes';
@@ -207,6 +207,12 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
       secretKey: SECRET_KEY,
     });
 
+    // PROVIDERS-3: the save already ran the check, so a proof of exactly these credentials exists.
+    // Without a proof (cleared out of band) enabling is still refused.
+    await owner.paymentConfig.updateMany({
+      where: { storeId: s.id, provider: 'kashier' },
+      data: { connectionTest: Prisma.DbNull },
+    });
     const early = await post(s, `${base(s)}/toggle`, { enabled: true });
     expect(early.status).toBe(409);
     expect(early.body.error.code).toBe('CONNECTION_NOT_TESTED');
@@ -313,7 +319,9 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
         },
       },
     });
+    // PROVIDERS-3: the save's automatic check and the manual Test connection are both audited.
     expect(logs.map(l => l.action).sort()).toEqual([
+      'store_payment_config.connection_tested',
       'store_payment_config.connection_tested',
       'store_payment_config.credentials_updated',
     ]);
