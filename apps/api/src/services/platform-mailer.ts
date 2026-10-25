@@ -93,6 +93,8 @@ async function deliver(
 ): Promise<void> {
   if (shouldReallySend()) {
     await EmailService.sendPlatformRaw({
+      // Account mail comes from the studio (accounts.ebda.app), not the store product (BRAND-NAME-1).
+      fromName: BRAND.name,
       to: msg.to,
       subject: msg.subject,
       html: msg.html,

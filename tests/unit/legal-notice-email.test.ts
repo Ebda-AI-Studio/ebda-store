@@ -100,6 +100,7 @@ describe('production delivery path', () => {
     expect(raw).toHaveBeenCalledTimes(1);
     const sent = raw.mock.calls[0][0] as Record<string, unknown>;
     expect(sent.to).toBe('m@test.local');
+    expect(sent.fromName).toBe('Ebda AI Studio'); // account mail: the studio, not the store product
     expect(sent).not.toHaveProperty('headers');
     expect(JSON.stringify(sent)).not.toMatch(/List-Unsubscribe/i);
   });

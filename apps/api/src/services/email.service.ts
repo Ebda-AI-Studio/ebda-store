@@ -111,6 +111,8 @@ export interface EmailOptions {
   replyTo?: string;
   /** Extra message headers (RFC 8058 List-Unsubscribe / List-Unsubscribe-Post). Marketing and lifecycle mail only. */
   headers?: Record<string, string>;
+  /** Platform sends only: the From display name. Default = the product (`Ebda Store`); account mail passes `Ebda AI Studio`. */
+  fromName?: string;
 }
 
 export interface EmailStoreContext {
@@ -500,7 +502,7 @@ export class EmailService {
    */
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
     await sendMail({
-      from: brandFrom(),
+      from: brandFrom(options.fromName),
       to: options.to,
       subject: options.subject,
       html: options.html,
