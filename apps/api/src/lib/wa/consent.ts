@@ -29,11 +29,13 @@ export interface ConsentInput {
 export async function phoneOnOwnOrder(
   storeId: string,
   userId: string,
-  phone: string
+  phone: string,
+  // The caller's transaction client when it is inside a tenant scope (erasure); the ambient client otherwise.
+  client: Pick<typeof prisma, 'order'> = prisma
 ): Promise<boolean> {
   const want = toE164(phone);
   if (!want) return false;
-  const orders = await prisma.order.findMany({
+  const orders = await client.order.findMany({
     where: { storeId, customerId: userId, status: 'delivered' },
     select: { shippingAddress: true },
     orderBy: { createdAt: 'desc' },
@@ -79,15 +81,10 @@ export const WhatsAppConsentService = {
     // tells Ebda WhatsApp (customer.consent_changed), so no path can change consent unannounced.
     await runInTenantContext(storeId, async () => {
       // Ownership (`userId`) is set ONLY by a PROVEN grant (`bindUserId`). A revoke, a STOP or an admin
-      // write never sets it; a write from a DIFFERENT account clears a stale owner instead of taking
-      // it over, so nobody can claim (and then export or erase) a row they did not prove.
-      const existing = await prisma.storeWhatsAppConsent.findUnique({
-        where: { storeId_buyerKey: { storeId, buyerKey } },
-        select: { userId: true },
-      });
-      let owner: string | null | undefined; // undefined = leave as is
-      if (input.bindUserId) owner = input.bindUserId;
-      else if (input.userId && existing?.userId && existing.userId !== input.userId) owner = null;
+      // write NEVER sets, clears or overwrites it (an unproven account must not be able to strip
+      // another account's ownership and so make its erasure miss the row); only a proven grant by
+      // another account rebinds the row. `undefined` = leave the column as it is.
+      const owner: string | undefined = input.bindUserId;
       await prisma.storeWhatsAppConsent.upsert({
         where: { storeId_buyerKey: { storeId, buyerKey } },
         create: {

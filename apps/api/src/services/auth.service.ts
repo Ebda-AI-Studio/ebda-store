@@ -1939,15 +1939,6 @@ export class AuthService {
     // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
     // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
     const buyerKey = await buyerKeyForErasure(user.phone);
-    // The consent row of the CURRENT number is erased only when that number is proven the account's
-    // (a delivered order); rows the account itself bound are erased by `userId` regardless.
-    const eraseProvenBuyerKey =
-      buyerKey &&
-      user.phone &&
-      (await phoneOnOwnOrder(user.storeId ?? currentStoreId(), userId, user.phone))
-        ? buyerKey
-        : undefined;
-
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
@@ -2233,12 +2224,17 @@ export class AuthService {
       });
       // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
       // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
-      await WhatsAppConsentService.eraseForAccount(
-        tx,
-        opts.scopeStoreId ?? eraseStoreId,
-        userId,
-        eraseProvenBuyerKey
-      );
+      // The current number's row goes too, but only when that number is PROVEN the account's. The proof
+      // runs on THIS transaction (tenant + user context, ebda_app under RLS) with the same store id as
+      // the erase, and a missing store id fails loud instead of silently skipping the row.
+      const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
+      if (!consentStoreId)
+        throw new Error('[auth.eraseAccount] no store id for the consent erasure');
+      const eraseProvenBuyerKey =
+        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
+          ? buyerKey
+          : undefined;
+      await WhatsAppConsentService.eraseForAccount(tx, consentStoreId, userId, eraseProvenBuyerKey);
 
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
