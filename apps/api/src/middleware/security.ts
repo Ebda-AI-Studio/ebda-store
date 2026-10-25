@@ -1686,6 +1686,24 @@ export const newsletterLimiter = rateLimit({
   },
 });
 
+// WhatsApp marketing-consent writes: a per-STORE ceiling on top of the per-IP+session limiter, so a
+// distributed burst cannot mass-toggle consents for one store. Keyed on the raw tenant header (cheap),
+// falling back to the IP so a header-less request never shares a global bucket.
+export const whatsappConsentStoreLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-store'),
+  windowMs: 60 * 1000,
+  max: Number(process.env.WA_CONSENT_STORE_RATE_LIMIT_PER_MIN) || 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: publicTenantKey,
+});
+
 // Coupon validate limiter — public brute-force discovery protection.
 // 20 attempts per minute per IP is enough for a legitimate checkout flow
 // but prevents rapid enumeration of valid coupon codes.

@@ -504,7 +504,8 @@ export default function CheckoutClient() {
   // default, shown only when the store has Ebda WhatsApp linked. Ticking records consent against
   // the phone (server stores only the hashed buyer key); unticking withdraws it.
   const [whatsAppOptIn, setWhatsAppOptIn] = useState(false);
-  const showWhatsAppOptIn = store?.whatsappMarketingOptIn === true;
+  // Needs an account: the number comes from the account, never from this form (security review).
+  const showWhatsAppOptIn = store?.whatsappMarketingOptIn === true && isAuthenticated;
   const whatsAppRecorded = useRef(false);
 
   // Payment
@@ -1095,23 +1096,21 @@ export default function CheckoutClient() {
     return () => clearTimeout(timeoutId);
   }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
 
-  // Record / withdraw the WhatsApp marketing consent. Debounced; waits for a valid phone when
-  // ticking; only withdraws if a tick was actually recorded.
+  // Record / withdraw the WhatsApp marketing consent. Debounced; only withdraws if a tick was
+  // actually recorded. No phone is sent: the server uses the signed-in customer's own number.
   useEffect(() => {
     if (!showWhatsAppOptIn) return;
-    const phone = formData.phone.trim();
-    if (whatsAppOptIn && !isValidEgyptianMobile(phone)) return;
     if (!whatsAppOptIn && !whatsAppRecorded.current) return;
     const timeoutId = setTimeout(() => {
       api
-        .post('/public/cart/whatsapp-optin', { phone, consent: whatsAppOptIn, language })
+        .post('/public/cart/whatsapp-optin', { consent: whatsAppOptIn, language })
         .then(res => {
           if (res.success) whatsAppRecorded.current = whatsAppOptIn;
         })
         .catch(() => {});
     }, 600);
     return () => clearTimeout(timeoutId);
-  }, [showWhatsAppOptIn, whatsAppOptIn, formData.phone, language]);
+  }, [showWhatsAppOptIn, whatsAppOptIn, language]);
 
   const autoAppliedPromoRef = useRef(false);
   useEffect(() => {

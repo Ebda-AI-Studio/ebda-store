@@ -66,6 +66,39 @@ export const WhatsAppConsentService = {
     return { granted: input.consent };
   },
 
+  /**
+   * The checkout box (Ruling WA-CONSENT-1, security review): the phone is NEVER taken from the request.
+   * The caller is an authenticated customer, the cart must be THEIR session cart, and the number is the
+   * one on THEIR account (the same number the cart reminder is sent to). A different session, a
+   * guest, or a body-supplied phone can neither opt in nor revoke anybody.
+   */
+  async recordForCart(
+    storeId: string,
+    sessionId: string,
+    userId: string,
+    input: { consent: boolean; locale?: 'en' | 'ar' }
+  ): Promise<
+    { status: 'recorded'; granted: boolean; cartId: string } | { status: 'no_cart' | 'no_phone' }
+  > {
+    const cart = await prisma.cart.findFirst({
+      where: { storeId, sessionId, customerId: userId },
+      select: { id: true },
+    });
+    if (!cart) return { status: 'no_cart' };
+    const user = await prisma.user.findFirst({
+      where: { id: userId, storeId },
+      select: { phone: true },
+    });
+    if (!user?.phone) return { status: 'no_phone' };
+    const r = await this.record(storeId, user.phone, {
+      consent: input.consent,
+      source: 'checkout',
+      locale: input.locale,
+    });
+    if (!r) return { status: 'no_phone' };
+    return { status: 'recorded', granted: r.granted, cartId: cart.id };
+  },
+
   /** True only for an active, un-revoked consent. Unknown buyer = no consent. */
   async hasConsent(storeId: string, buyerKey: string): Promise<boolean> {
     const row = await runInTenantContext(storeId, () =>
