@@ -71,6 +71,14 @@ concurrency:
 env:
   # wrangler >= 4.110 needs Node >= 22, and cf-deploy runs wrangler on 22.
   NODE_VERSION: '22'
+  # npm on the Umbra runner (2026-10-25: `npm ci` sat 22 min with no output on a loaded guest, then the job was
+  # cancelled): use the runner's local ~/.npm first, skip the post-install audit and funding round-trips (each is
+  # a registry request that can stall), and bound a stalled fetch instead of waiting out the job.
+  NPM_CONFIG_PREFER_OFFLINE: 'true'
+  NPM_CONFIG_AUDIT: 'false'
+  NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_FETCH_TIMEOUT: '120000'
+  NPM_CONFIG_FETCH_RETRIES: '3'
 
 # Least-privilege default: the workflow GITHUB_TOKEN is read-only. No job here
 # needs write. A job that ever needs write must override upward itself.
@@ -518,7 +526,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d ebda_smoke"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -867,7 +875,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -1073,7 +1081,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -1185,7 +1193,7 @@ jobs:
           # Dynamic host port, same reasoning as the jobs above.
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -1262,7 +1270,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
