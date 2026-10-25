@@ -31,7 +31,7 @@ import { withProviderDeadline } from './provider-call';
 import { getProviderV2, MANUAL_PROVIDERS } from './registry';
 import { toProviderCredentials } from './credentials';
 import { isProviderUsable } from './provider-gate';
-import { recordProviderOperation } from '../provider-verification.service';
+import { recordPaymentSettled, recordProviderOperation } from '../provider-verification.service';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
@@ -2249,6 +2249,12 @@ export class PaymentService {
       'Customer';
 
     if (webhookData.status === 'completed') {
+      // PROVIDERS-3: a settled live payment is evidence for the provider (same call as the pull-side confirm).
+      void recordPaymentSettled({
+        storeId: order.storeId,
+        provider: payment.provider,
+        paymentId: payment.id,
+      });
       inngest
         .send({
           name: 'order/created',

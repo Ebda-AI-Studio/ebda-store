@@ -51,6 +51,7 @@ vi.mock('@api/services/alerts.service', () => ({
 
 import {
   confirmProviderVerification,
+  recordPaymentSettled,
   recordProviderOperation,
   reportConnectionCheck,
   resetProviderVerificationCache,
@@ -249,5 +250,24 @@ describe('confirmProviderVerification (super admin only sets verified_at)', () =
     await expect(confirmProviderVerification('kashier', 'a')).rejects.toMatchObject({
       code: 'ALREADY_VERIFIED',
     });
+  });
+});
+
+describe('recordPaymentSettled (one evidence call for the confirm AND webhook paths)', () => {
+  it('records a live settled payment_confirmed event for the store (counted)', async () => {
+    h.prior = { id: 'e1' };
+    // the mode lookup runs withStore(...) -> mocked store tx has no paymentConfig => sandbox,
+    // so the evidence is recorded but NOT counted until the connection is live
+    await recordPaymentSettled({ storeId: 'store-7', provider: 'paymob', paymentId: 'pay-7' });
+    const ev = h.events.at(-1) as { data: { op: string; sourceStoreId: string; ref: string } };
+    expect(ev.data).toMatchObject({
+      op: 'payment_confirmed',
+      sourceStoreId: 'store-7',
+      ref: 'pay-7',
+    });
+  });
+  it('is a no-op for a catalog-verified provider', async () => {
+    await recordPaymentSettled({ storeId: 'store-7', provider: 'kashier', paymentId: 'p' });
+    expect(h.events).toHaveLength(0);
   });
 });

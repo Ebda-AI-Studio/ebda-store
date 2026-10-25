@@ -27,6 +27,7 @@ import {
 import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';
 import { sendAlert } from './alerts.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 
 export type ProviderOp = 'create_payment' | 'payment_confirmed' | 'create_shipment';
 
@@ -198,6 +199,26 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
       '[PROVIDER-VERIFY] could not record provider operation'
     );
   }
+}
+
+/**
+ * The ONE evidence call for a payment that settled, used by every confirm path (the pull-side
+ * confirm service AND the provider webhook). Runs after the tenant commit, never throws.
+ */
+export function recordPaymentSettled(input: {
+  storeId: string;
+  provider: string;
+  paymentId: string;
+}): Promise<unknown> {
+  return deferAfterTenantCommit('provider-verify.payment_confirmed', () =>
+    recordProviderOperation({
+      storeId: input.storeId,
+      provider: input.provider,
+      op: 'payment_confirmed',
+      ok: true,
+      ref: input.paymentId,
+    })
+  );
 }
 
 /**
