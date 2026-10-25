@@ -47,6 +47,11 @@ export interface AiBindingLike {
   ): Promise<unknown>;
 }
 
+export interface WorkflowBindingLike {
+  /** Throws when an instance with this id already exists. */
+  create(opts: { id: string; params: unknown }): Promise<{ id: string }>;
+}
+
 export interface EmailBindingLike {
   send(message: {
     from: string | { email: string; name?: string };
@@ -73,6 +78,10 @@ export interface CfBindings {
   STORE_BACKUPS?: unknown;
   /** Cloudflare Email Service `send_email` binding (G6): every outbound email (services/mail-transport.ts). */
   EMAIL?: EmailBindingLike;
+  /** Background jobs (G5): Workflows binding, the jobs Queue and the concurrency/debounce gate DO. */
+  JOBS_WORKFLOW?: WorkflowBindingLike;
+  JOBS_QUEUE?: QueueProducerLike;
+  JOB_GATE?: DurableObjectNamespaceLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */
