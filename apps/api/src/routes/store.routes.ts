@@ -1540,18 +1540,17 @@ router.put(
 // POST /stores/:id/email-sender/provision and /verify: retired with Resend (G6). Mail is sent from
 // ebda.app by Cloudflare Email Service, so a merchant domain needs no email DNS records. The routes
 // stay so an older admin build gets a clean, empty answer instead of a 404.
-for (const action of ['provision', 'verify'] as const) {
-  router.post(
-    `/:id/email-sender/${action}`,
-    authenticate,
-    requireMfaEnrolled,
-    authorize('store_admin', 'super_admin'),
-    requireStoreAccess,
-    (_req: Request, res: Response) => {
-      res.json({ success: true, data: { status: 'unsupported', records: [] } });
-    }
-  );
-}
+const retiredEmailSender = [
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  (_req: Request, res: Response) => {
+    res.json({ success: true, data: { status: 'unsupported', records: [] } });
+  },
+];
+router.post('/:id/email-sender/provision', ...retiredEmailSender);
+router.post('/:id/email-sender/verify', ...retiredEmailSender);
 
 // ===== Store FAQ CRUD =====
 
