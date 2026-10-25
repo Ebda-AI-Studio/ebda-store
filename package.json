@@ -31,6 +31,7 @@
     "dev:status": "npm run dev -w apps/status",
     "test:status": "npm run test -w apps/status",
     "test:accounts": "npm run test -w apps/accounts",
+    "test:repo-workers": "npm run cf:test -w packages/repo",
     "test:api-workers": "npm run cf:test -w apps/api",
     "build": "npm run build --workspaces --if-present",
     "build:web": "npm run build -w apps/web",

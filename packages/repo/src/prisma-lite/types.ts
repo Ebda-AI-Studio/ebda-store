@@ -47,4 +47,6 @@ export interface SqlRunner {
    * await only prisma-lite calls (storage ops); awaiting network I/O inside it forfeits the single-writer guarantee.
    */
   transaction?<T>(fn: () => Promise<T>): Promise<T>;
+  /** Optional: run a SYNCHRONOUS unit atomically with no chance of interleaving (DO: `ctx.storage.transactionSync`). Preferred for single writes. */
+  transactionSync?<T>(fn: () => T): T;
 }
