@@ -1998,3 +1998,16 @@ html[lang='en'] [data-look] .font-display {
     font-weight: var(--look-price-weight, 700);
   }
 }
+
+/*
+ * Template-match PR5 (G6): the mock-ups' home cards are a photo, a name and a price. On a look store a card on a
+ * HOME section (inside a section wrapper) drops the heart, the sale / new / custom chips, the colour dots and the
+ * tag chips on phones; the listing and product pages keep them. The markers (data-chrome, .look-card-chrome) are
+ * only rendered for look stores, so legacy markup is unchanged.
+ */
+@media (max-width: 639.98px) {
+  [data-look] [data-section] [data-chrome],
+  [data-look] [data-section] .look-card-chrome {
+    display: none !important;
+  }
+}
