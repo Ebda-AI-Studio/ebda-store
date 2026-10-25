@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
@@ -29,7 +30,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * *` }], // 06:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     // runReorderScan already calls withRlsBypass internally for its per-store reads.
     const stores = await step.run('list-stores', () =>
@@ -40,7 +41,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
           s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
           isAiEligiblePlan(s.plan as StorePlan)
-      ).then(list => list.map(s => ({ id: s.id })))
+      ).then(list => list.filter(storeFilter(event)).map(s => ({ id: s.id })))
     );
 
     let totalSuggested = 0;

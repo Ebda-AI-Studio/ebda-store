@@ -4,13 +4,13 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 
 ## Primitives
 
-| Primitive                                   | Used for                                                                         | Why                                                                                                    |
-| ------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Workflow (`ebda-jobs`, class `JobWorkflow`) | sleeping, long-running or side-effecting multi-step jobs (emails, pushes, money) | one durable step per `step.run`; a retry never repeats an earlier step's side effect                   |
-| Queue (`ebda-jobs` + DLQ)                   | short, whole-run idempotent jobs (sweeps, retention, one-step jobs)              | whole handler in one DB context; retries with backoff, then the failure path                           |
-| Cron Trigger                                | every Inngest schedule                                                           | zoned (Africa/Cairo) crons get winter + summer UTC triggers and a local-time guard                     |
-| DO alarm                                    | per-store schedules (`alarm`)                                                    | marked here; moves with StoreDO (phases 2-3, other agents). Until then they run as Cron Trigger -> job |
-| `JobGate` Durable Object                    | Inngest `concurrency` (limit <= 3) and `debounce`                                | lease renewed before every step, fenced; released while sleeping                                       |
+| Primitive                                   | Used for                                                                         | Why                                                                                                         |
+| ------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Workflow (`ebda-jobs`, class `JobWorkflow`) | sleeping, long-running or side-effecting multi-step jobs (emails, pushes, money) | one durable step per `step.run`; a retry never repeats an earlier step's side effect                        |
+| Queue (`ebda-jobs` + DLQ)                   | short, whole-run idempotent jobs (sweeps, retention, one-step jobs)              | whole handler in one DB context; retries with backoff, then the failure path                                |
+| Cron Trigger                                | every Inngest schedule                                                           | zoned (Africa/Cairo) crons get winter + summer UTC triggers and a local-time guard                          |
+| DO alarm (`StoreSchedule`)                  | per-store schedules (`alarm`, 11 alarm-ready jobs)                               | one SQLite DO per store fires that store's jobs, scoped to it (`JOBS_CF_ALARMS`); the rest stay Cron -> job |
+| `JobGate` Durable Object                    | Inngest `concurrency` (limit <= 3) and `debounce`                                | lease renewed before every step, fenced; released while sleeping                                            |
 
 ## Inngest features and how they are reproduced
 
@@ -121,3 +121,15 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `refund-reversal-stuck-sweep`              | 7-money         | workflow | cron    |             |
 | `shipment-create`                          | 7-money         | queue    | event   |             |
 | `alerts-failure-watch`                     | 8-failure-watch | queue    | event   |             |
+
+## Per-store alarms (Ruling G5-2)
+
+`JOBS_CF_ALARMS` (wrangler var, comma list of function ids or `all`, empty = all cron) moves a per-store schedule from one global Cron Trigger run to one Durable Object alarm per store (`apps/api/src/cf/store-schedule.ts`).
+
+- Alarm-ready (handler sweeps only `event.data.storeId` for an alarm run): `abandoned-cart-purge-weekly`, `store-usage-snapshot`, `accounting-daily-close`, `accounting-period-reconciliation`, `accounting-profit-anomaly-cron`, `analytics-daily-rollup`, `stock-deadstock-scan-cron`, `stock-low-stock-alert-cron`, `stock-reorder-scan-cron`, `warehouse-reconcile-sweep-cron`, `wholesale-pending-nudge-cron`.
+- Stay crons on purpose: `audit-log-archive-weekly` (one cross-tenant table), `ai-autofill-sweep` (platform-wide leader lock + shared Gemini quota).
+- Arming: the hourly Cron Trigger `0 * * * *` runs `syncStoreSchedules` (every live store, bounded concurrency); it also removes entries for jobs switched back to cron. A new store is armed within the hour.
+- Exactly-once-ish: event id `alarm-<job>-<store>-<scheduledFor>` is the Workflow instance id (a re-fire is a no-op); the concurrency gate is `<job>|<store>`.
+- Failure: start errors retry 30 s .. 15 min, then the occurrence is skipped and `inngest/function.failed` reaches `alerts-failure-watch`. A fire later than 24 h is skipped, not replayed.
+- Cairo schedules are DST-safe: `next-run.ts` expands the zone's winter and summer UTC candidates and keeps the one whose local time matches.
+- Rollback: empty `JOBS_CF_ALARMS`; the next hourly sync clears the entries and the Cron Trigger resumes the job.

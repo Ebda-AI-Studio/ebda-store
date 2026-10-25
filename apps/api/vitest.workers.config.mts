@@ -74,10 +74,13 @@ export default defineConfig(async () => ({
         bindings: { E2E_DB: (await dbReachable()) ? '1' : '0', ...apiVars },
         serviceBindings: { API: 'api' },
         durableObjects: {
+          // Defined in the test worker itself (workers-test/entry.ts): runDurableObjectAlarm needs that.
+          TEST_SCHEDULE: { className: 'TestSchedule', useSQLite: true },
           AUTH_STATE: { className: 'AuthState', scriptName: 'api', useSQLite: true },
           STORE_REALTIME: { className: 'StoreRealtime', scriptName: 'api', useSQLite: true },
           STORE_DO: { className: 'StoreDO', scriptName: 'api', useSQLite: true },
           JOB_GATE: { className: 'JobGate', scriptName: 'api', useSQLite: true },
+          STORE_SCHEDULE: { className: 'StoreSchedule', scriptName: 'api', useSQLite: true },
         },
         kvNamespaces: { KV_CACHE: 'kv-cache' },
         // Background jobs (G5): the Workflow class and the gate DO live in the built `api` Worker.
@@ -107,6 +110,7 @@ export default defineConfig(async () => ({
               STORE_REALTIME: { className: 'StoreRealtime', useSQLite: true },
               STORE_DO: { className: 'StoreDO', useSQLite: true },
               JOB_GATE: { className: 'JobGate', useSQLite: true },
+              STORE_SCHEDULE: { className: 'StoreSchedule', useSQLite: true },
             },
             workflows: {
               JOBS_WORKFLOW: { name: 'ebda-jobs', className: 'JobWorkflow' },

@@ -56,6 +56,8 @@
       { "name": "STORE_DO", "class_name": "StoreDO" },
       // Concurrency leases and debounce for background jobs (G5, src/cf/job-gate.ts): one per function + key.
       { "name": "JOB_GATE", "class_name": "JobGate" },
+      // One per store: its recurring jobs as an alarm (G5, src/cf/store-schedule.ts).
+      { "name": "STORE_SCHEDULE", "class_name": "StoreSchedule" },
     ],
   },
   // StoreDO nightly backups (Ruling INFRA-CF-1 Phase 0): the EXISTING private bucket, prefix store-do-backups/.
@@ -82,6 +84,7 @@
     { "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] },
     { "tag": "v2", "new_sqlite_classes": ["StoreDO"] },
     { "tag": "v3", "new_sqlite_classes": ["JobGate"] },
+    { "tag": "v4", "new_sqlite_classes": ["StoreSchedule"] },
   ],
 
   // Background jobs (G5, src/lib/jobs): one Workflow class runs every multi-step job, one instance
@@ -226,6 +229,9 @@
     // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
     // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
     "JOBS_CF_GROUPS": "1,2,3",
+    // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
+    // comma list of function ids or "all"; "" = every schedule stays a cron.
+    "JOBS_CF_ALARMS": "",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",

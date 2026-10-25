@@ -82,6 +82,8 @@ export interface CfBindings {
   JOBS_WORKFLOW?: WorkflowBindingLike;
   JOBS_QUEUE?: QueueProducerLike;
   JOB_GATE?: DurableObjectNamespaceLike;
+  /** One SQLite Durable Object per store: its recurring jobs as an alarm (src/cf/store-schedule.ts). */
+  STORE_SCHEDULE?: DurableObjectNamespaceLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */
