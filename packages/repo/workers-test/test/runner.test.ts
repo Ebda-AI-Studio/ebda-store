@@ -111,4 +111,27 @@ describe('phase 3 on a real Durable Object: money and stock under 100 parallel c
     expect(new Set(results.map((r: any) => r.orderId)).size).toBe(1);
     expect(await s.snapshot()).toMatchObject({ orders: 1, stock: 9 });
   });
+
+  it('guest per-customer coupon at limit-1: 50 parallel redemptions by the SAME phone (spelled two ways) -> exactly one wins; other guests are unaffected', async () => {
+    const s = stub('guestcoupon');
+    await s.seedMoney(1000, 1000, 0);
+    await s.seedPerUserCoupon();
+    const phones = ['01012345678', '+201012345678'];
+    const results = await Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        s.checkout({ lines: [line], couponCode: 'ONCE', shippingAddress: { phone: phones[i % 2] } })
+      )
+    );
+    expect(results.filter((r: any) => r.ok).length).toBe(1);
+    expect(new Set(results.filter((r: any) => !r.ok).map((r: any) => r.code))).toEqual(
+      new Set(['COUPON_USER_LIMIT'])
+    );
+    const other = await s.checkout({
+      lines: [line],
+      couponCode: 'ONCE',
+      shippingAddress: { phone: '01099998888' },
+    });
+    expect(other.ok).toBe(true);
+    expect(await s.snapshot()).toMatchObject({ orders: 2 });
+  });
 });
