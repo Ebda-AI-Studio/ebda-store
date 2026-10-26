@@ -36,9 +36,9 @@ const arc = (cx, cy, r, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, i) =
 
 // ---------- Jasmine: a 30 ml dropper serum bottle (diameter 32 mm, 96 mm with the bulb) ----------
 const COLOURWAYS_J = [
-  { id: 'rose', serum: '#DE8F95', bulb: '#F1E6DC' },
-  { id: 'amber', serum: '#D18B1F', bulb: '#2A2522' },
-  { id: 'sage', serum: '#7FA383', bulb: '#F1E6DC' },
+  { id: 'rose', serum: '#DE8F95', bulb: '#E8E4DA' },
+  { id: 'amber', serum: '#D18B1F', bulb: '#E8E4DA' },
+  { id: 'sage', serum: '#7FA383', bulb: '#E8E4DA' },
 ];
 function jasmine() {
   const g = new THREE.Group();
@@ -51,13 +51,13 @@ function jasmine() {
   const serum = P('serum', { color: COLOURWAYS_J[0].serum, roughness: 0.18, clearcoat: 0.6 });
   g.add(mk(lathe(liquid), serum, 'serum'));
   g.add(mk(lathe(body), glass, 'bottle'));
-  const paper = P('label-paper', { color: '#CDBFA6', roughness: 0.9 });
-  g.add(mk(new THREE.CylinderGeometry(R + 0.0004, R + 0.0004, 0.026, 64, 1, true, -Math.PI * 0.55, Math.PI * 1.1), paper, 'label', [0, 0.027, 0]));
+  const paper = P('label-paper', { color: '#BFB095', roughness: 0.9 });
+  g.add(mk(new THREE.CylinderGeometry(R + 0.0004, R + 0.0004, 0.018, 64, 1, true, -Math.PI * 0.55, Math.PI * 1.1), paper, 'label', [0, 0.027, 0]));
   const goldMat = P('gold-collar', { color: '#B08D57', metalness: 1, roughness: 0.22 });
   const collar = [[0.0105, 0.066], [0.0105, 0.0785], [0.0095, 0.0785], [0.0095, 0.066]];
   g.add(mk(lathe(collar), goldMat, 'collar'));
   g.add(mk(new THREE.CylinderGeometry(0.0108, 0.0108, 0.0012, 64), goldMat, 'collar-top', [0, 0.0785, 0]));
-  const bulbMat = P('bulb', { color: COLOURWAYS_J[0].bulb, roughness: 0.55, clearcoat: 0.3 });
+  const bulbMat = P('bulb', { color: COLOURWAYS_J[0].bulb, roughness: 0.5, clearcoat: 0.3 });
   const bulb = [[0.0072, 0.0785], [0.0072, 0.083], [0.0070, 0.086], [0.0062, 0.0925], [0.0036, 0.0957], [0.0, 0.0962]];
   g.add(mk(lathe(bulb, 48), bulbMat, 'bulb'));
   return { root: g, variants: COLOURWAYS_J.map(c => ({ id: c.id, set: { serum: c.serum, bulb: c.bulb } })) };

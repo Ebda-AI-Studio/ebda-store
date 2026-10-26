@@ -1,8 +1,8 @@
 import type { Locale } from './site';
 import { HOME, absoluteUrl } from './site';
 
-/** The three verticals of the 3D section (Ruling MKT-2). Qamar shows the sneaker, Souq the brass lantern, Lamma its own clay pot (MKT-13). */
-export const MODEL3D_IDS = ['qamar', 'souq', 'lamma'] as const;
+/** The verticals of the 3D section (Ruling MKT-2). Qamar shows the sneaker, Souq the brass lantern, Lamma its own clay pot (MKT-13), Jasmine a serum bottle and Dahab a solitaire ring (ASSETS-AI-1: procedural models of our own). */
+export const MODEL3D_IDS = ['qamar', 'souq', 'lamma', 'jasmine', 'dahab'] as const;
 export type Model3dId = (typeof MODEL3D_IDS)[number];
 
 export interface Model3dDef {
@@ -66,14 +66,52 @@ export const MODEL3D: Record<Model3dId, Model3dDef> = {
       fb: 'Cairo',
     },
   },
+  jasmine: {
+    id: 'jasmine',
+    glb: '/3d/jasmine-serum.glb',
+    variants: [
+      { id: 'rose', hex: '#de8f95' },
+      { id: 'amber', hex: '#d18b1f' },
+      { id: 'sage', hex: '#7fa383' },
+    ],
+    skin: {
+      look: 'jasmine-a',
+      bg: '#2e2a22',
+      ink: '#f3efe6',
+      mut: '#cfc7b6',
+      ac: '#c9822b',
+      fd: 'Amiri',
+      fb: 'Noto Sans Arabic',
+    },
+  },
+  dahab: {
+    id: 'dahab',
+    glb: '/3d/dahab-solitaire.glb',
+    variants: [
+      { id: 'yellow-gold', hex: '#e0b552' },
+      { id: 'rose-gold', hex: '#d9a08a' },
+      { id: 'white-gold', hex: '#d8d9dc' },
+    ],
+    skin: {
+      look: 'dahab-a',
+      bg: '#fff',
+      ink: '#121212',
+      mut: '#5A5A5A',
+      ac: '#9a6e2a',
+      fd: 'Reem Kufi',
+      fb: 'IBM Plex Sans Arabic',
+    },
+  },
 };
 
 /**
  * Still image (no extension) shown before the model loads and instead of it for reduced motion,
- * Save-Data and no WebGL: one per sneaker colourway, one for the lantern, one for the clay pot.
+ * Save-Data and no WebGL: one per sneaker, serum and ring colourway, one for the lantern, one for the clay pot.
  */
 export function stillBase(id: Model3dId, variant: string | null): string {
   if (id === 'qamar') return `/3d/stills/qamar-${variant ?? 'midnight'}`;
+  if (id === 'jasmine') return `/3d/stills/jasmine-${variant ?? 'rose'}`;
+  if (id === 'dahab') return `/3d/stills/dahab-${variant ?? 'yellow-gold'}`;
   return id === 'lamma' ? '/3d/stills/clay-pot' : '/3d/stills/lantern';
 }
 

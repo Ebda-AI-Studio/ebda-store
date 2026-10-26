@@ -46,18 +46,20 @@ describe('3D assets', () => {
     for (const id of MODEL3D_IDS)
       for (const v of MODEL3D[id].variants.length ? MODEL3D[id].variants.map(x => x.id) : [null])
         bases.add(stillBase(id, v));
-    expect(bases.size).toBe(5); // three sneaker colourways + the lantern + the clay pot
+    expect(bases.size).toBe(11); // three colourways each for the sneaker, serum and ring + the lantern + the clay pot
     for (const b of bases)
       for (const ext of ['webp', 'avif']) expect(existsSync(pub(`${b}.${ext}`))).toBe(true);
   });
 });
 
 describe('licence credits (Ruling MKT-12)', () => {
-  it('CREDITS.md credits Shopify (CC BY 4.0) and Poly Haven (CC0) for all three models', () => {
+  it('CREDITS.md credits Shopify (CC BY 4.0) and Poly Haven (CC0) for all five models', () => {
     const c = readFileSync(pub('demo/CREDITS.md'), 'utf8');
     expect(c).toMatch(/qamar-sneaker\.glb.*Shopify.*CC BY 4\.0/);
     expect(c).toMatch(/brass-diya-lantern\.glb.*Bhargav Kubal.*CC0/);
     expect(c).toMatch(/lamma-clay-pot\.glb.*Aron Łyczek.*CC0/);
+    expect(c).toMatch(/jasmine-serum\.glb.*Ebda AI Studio.*CC0/);
+    expect(c).toMatch(/dahab-solitaire\.glb.*Ebda AI Studio.*CC0/);
   });
   it('every shipped model has a credit entry with author, licence link and a statement of changes', () => {
     for (const id of MODEL3D_IDS) {
@@ -100,7 +102,7 @@ describe('licence credits (Ruling MKT-12)', () => {
 
 describe('desktop QR codes', () => {
   it('are committed, fresh, and each encodes its locale + vertical page URL', async () => {
-    expect(qrTargets()).toHaveLength(6);
+    expect(qrTargets()).toHaveLength(10);
     for (const t of qrTargets()) {
       expect(readFileSync(pub(t.path), 'utf8')).toBe(await renderQr(t.url));
     }

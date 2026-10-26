@@ -17,7 +17,7 @@ mkdirSync(out, { recursive: true });
 
 const PHOTOS = {
   fashion: ['qa__hero', 'qb__dress', 'qc__window'],
-  electronics: ['sb__hero', 'sa__headphones', 'sc__watch'],
+  electronics: ['sa__laptop', 'sa__headphones', 'sc__watch'],
   beauty: ['ja__hero', 'jb__hero', 'jc__hero'],
   food: ['la__hero', 'lb__feteer', 'lc__tomatoes'],
   jewellery: ['da__hero', 'db__hero', 'dc__hero'],
@@ -36,12 +36,12 @@ const html = (slug, photos) => `<!doctype html><meta charset="utf-8">
 <style>
   *{margin:0;box-sizing:border-box}
   body{width:1200px;height:630px;background:#FAFAFA;position:relative;overflow:hidden;font-family:'Cairo',sans-serif}
-  .lock{position:absolute;right:60px;bottom:96px;height:104px}
-  .h{position:absolute;right:72px;top:92px;width:520px;direction:rtl;text-align:right;color:#121314;font-weight:700;font-size:50px;line-height:1.55;text-wrap:balance}
+  .lock{position:absolute;right:60px;bottom:92px;height:88px}
+  .h{position:absolute;right:72px;top:104px;width:540px;direction:rtl;text-align:right;color:#121314;font-weight:700;font-size:58px;line-height:1.5;text-wrap:balance}
   .rule{position:absolute;right:72px;top:70px;width:96px;height:4px;background:#B08D57}
-  .url{position:absolute;right:72px;bottom:44px;direction:ltr;color:#575C5D;font-size:26px;font-weight:700;letter-spacing:.2px}
-  .ph{position:absolute;width:150px;height:318px;border-radius:34px;background:#0D0E0F;padding:8px;box-shadow:0 16px 30px rgba(18,19,20,.22)}
-  .ph div{width:100%;height:100%;border-radius:27px;background-size:cover;background-position:center}
+  .url{position:absolute;right:72px;bottom:44px;direction:ltr;color:#575C5D;font-size:21px;font-weight:700;letter-spacing:.2px;opacity:.8}
+  .ph{position:absolute;width:150px;height:318px;border-radius:34px;background:#1C1C1E;padding:5px;box-shadow:0 14px 28px rgba(18,19,20,.18);outline:1px solid rgba(176,141,87,.45)}
+  .ph div{width:100%;height:100%;border-radius:30px;background-size:cover;background-position:center}
 </style>
 <div class="rule"></div><div class="h">${h1(slug)}</div>
 ${photos.map((p, i) => `<div class="ph" style="left:${72 + i * 172}px;top:${i === 1 ? 70 : 150}px"><div style="background-image:url(${uri(p)})"></div></div>`).join('')}
@@ -52,7 +52,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
 for (const [slug, photos] of Object.entries(PHOTOS)) {
   await page.setContent(html(slug, photos), { waitUntil: 'networkidle' });
-  await page.evaluate(() => document.fonts.load('700 50px Cairo'));
+  await page.evaluate(() => document.fonts.load('700 58px Cairo'));
   const png = await page.screenshot();
   const file = path.join(out, `${slug}.png`);
   await sharp(png).png({ palette: true, quality: 90, effort: 10, colours: 128, dither: 0.6 }).toFile(file);

@@ -44,7 +44,7 @@ if (process.argv[2] === 'stills') {
     for (const [i, v] of j.variants.entries()) {
       await hx.page.evaluate(a => window.draw(a), { az: j.az, el: j.el, fit: j.fit, variant: v });
       const png = await hx.page.locator('canvas').screenshot({ omitBackground: true });
-      const base = i === 0 ? `${j.name}` : `${j.name}-${v}`;
+      const base = `${j.name}-${v}`;
       await hx.sharp(png).webp({ quality: 82, alphaQuality: 90 }).toFile(path.join(out, `${base}.webp`));
       await hx.sharp(png).resize(1200).avif({ quality: 55 }).toFile(path.join(out, `${base}.avif`));
       console.log('still', base);

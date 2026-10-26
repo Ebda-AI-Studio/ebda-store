@@ -20,12 +20,12 @@ const stage = ({ w, h, lockupH, headline }) => `
   #fx{position:fixed;inset:0;pointer-events:none;font-family:'Cairo',sans-serif}
   #fx img{position:absolute;left:50%;transform:translateX(-50%);bottom:${Math.round(h * 0.055)}px;height:${lockupH}px}
   #fx .rule{position:absolute;left:50%;transform:translateX(-50%);bottom:${Math.round(h * 0.055) + lockupH + 18}px;width:72px;height:3px;background:#B08D57}
-  #fx .hl{position:absolute;left:0;right:0;top:${Math.round(h * 0.07)}px;text-align:center;direction:rtl;color:#FAF8F3;font-weight:700;font-size:${Math.round(w * 0.052)}px;line-height:1.5;padding:0 ${Math.round(w * 0.1)}px;text-wrap:balance}`;
+  #fx .hl{position:absolute;left:0;right:0;top:${Math.round(h * 0.085)}px;text-align:center;direction:rtl;color:#FAF8F3;font-weight:700;font-size:${Math.round(w * 0.06)}px;line-height:1.5;padding:0 ${Math.round(w * 0.1)}px;text-wrap:balance}`;
 
 async function render({ w, h, headline, outName }) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'lantern-'));
-  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 1.1, warmGlow: 0.5 });
-  const lockupH = Math.round(h * 0.1);
+  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 1.1, warmGlow: 0.5, litGlass: true });
+  const lockupH = Math.round(h * 0.115);
   await hx.page.addStyleTag({ content: stage({ w, h, lockupH }) });
   await hx.page.evaluate(([u, hl]) => {
     const d = document.createElement('div'); d.id = 'fx';
@@ -57,9 +57,9 @@ await mkdir(new URL('../../public/ads/', import.meta.url), { recursive: true });
 // 1200x630 poster = the OG image for the video: lantern left, the line and the lockup right (reads right-to-left).
 async function poster() {
   const w = 1200, h = 630;
-  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 1.1, warmGlow: 0.5 });
-  await hx.page.addStyleTag({ content: stage({ w, h, lockupH: 84 }) + `
-  #fx .hl{left:auto;right:70px;top:150px;width:520px;text-align:right;font-size:50px;padding:0}
+  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 1.1, warmGlow: 0.5, litGlass: true });
+  await hx.page.addStyleTag({ content: stage({ w, h, lockupH: 96 }) + `
+  #fx .hl{left:auto;right:70px;top:150px;width:520px;text-align:right;font-size:54px;padding:0}
   #fx .rule{left:auto;right:70px;transform:none;bottom:auto;top:118px}
   #fx img{left:auto;right:56px;transform:none;bottom:60px}` });
   await hx.page.evaluate(([u, hl]) => {

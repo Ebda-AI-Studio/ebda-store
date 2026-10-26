@@ -42,7 +42,7 @@ export interface Model3dVertical {
   product: { name: string; price: number; desc: string };
   /** Accessible name of the 3D canvas and alt of its still image. */
   alt: string;
-  /** Colour names for the model's glTF variants (qamar only), by variant id. */
+  /** Colour names for the model's glTF variants (qamar, jasmine, dahab), by variant id. */
   variants?: Record<string, string>;
 }
 
@@ -67,7 +67,7 @@ export interface Model3dCopy {
   load: string;
   qr: { title: string; hint: string; alt: string };
   footnote: string;
-  verticals: Record<'qamar' | 'souq' | 'lamma', Model3dVertical>;
+  verticals: Record<'qamar' | 'souq' | 'lamma' | 'jasmine' | 'dahab', Model3dVertical>;
 }
 
 /** The three hero features of the features section, each with a visual. */
@@ -363,6 +363,28 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'فخار مزجّج بيسوّي الأكل على نار هادية، وبيحافظ على سخونته على السفرة.',
           },
           alt: 'موديل 3D لحلة فخار بغطاها، اسحب عشان تلفّها',
+        },
+        jasmine: {
+          name: 'ياسمين',
+          kind: 'جمال وعناية بالبشرة',
+          product: {
+            name: 'سيروم ياسمين 30 مل',
+            price: 420,
+            desc: 'سيروم خفيف بقطّارة، ومتاح بـ3 ألوان.',
+          },
+          alt: 'موديل 3D لزجاجة سيروم بقطّارة، اسحب عشان تلفّها',
+          variants: { rose: 'وردي', amber: 'عنبري', sage: 'أخضر مريمية' },
+        },
+        dahab: {
+          name: 'دهب',
+          kind: 'مجوهرات وهدايا',
+          product: {
+            name: 'خاتم سوليتير',
+            price: 14500,
+            desc: 'خاتم رفيع بحجر واحد، ومتاح بـ3 درجات دهب.',
+          },
+          alt: 'موديل 3D لخاتم سوليتير، اسحب عشان تلفّه',
+          variants: { 'yellow-gold': 'دهب أصفر', 'rose-gold': 'دهب روز', 'white-gold': 'دهب أبيض' },
         },
       },
     },
@@ -757,6 +779,32 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'Glazed earthenware that cooks slowly and keeps the food hot at the table.',
           },
           alt: '3D model of a lidded clay cooking pot; drag to turn it',
+        },
+        jasmine: {
+          name: 'Jasmine',
+          kind: 'Beauty and skincare',
+          product: {
+            name: 'Jasmine serum 30 ml',
+            price: 420,
+            desc: 'A light serum with a dropper, in 3 colours.',
+          },
+          alt: '3D model of a dropper serum bottle; drag to turn it',
+          variants: { rose: 'Rose', amber: 'Amber', sage: 'Sage' },
+        },
+        dahab: {
+          name: 'Dahab',
+          kind: 'Jewellery and gifts',
+          product: {
+            name: 'Solitaire ring',
+            price: 14500,
+            desc: 'A slim ring with a single stone, in 3 shades of gold.',
+          },
+          alt: '3D model of a solitaire ring; drag to turn it',
+          variants: {
+            'yellow-gold': 'Yellow gold',
+            'rose-gold': 'Rose gold',
+            'white-gold': 'White gold',
+          },
         },
       },
     },

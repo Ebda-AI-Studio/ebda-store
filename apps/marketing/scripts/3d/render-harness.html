@@ -19,7 +19,7 @@
 
   // Deterministic offscreen renderer: the driver calls window.setup(...) once, then window.draw(...) per frame.
   let renderer, scene, camera, pivot, model, variantsExt;
-  window.setup = async ({ url, w, h, exposure = 1.0, key = 3.2, warmGlow = 0 }) => {
+  window.setup = async ({ url, w, h, exposure = 1.0, key = 3.2, warmGlow = 0, litGlass = false }) => {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(1);
     renderer.setSize(w, h);
@@ -42,6 +42,19 @@
     const gltf = await loader.loadAsync(url);
     model = gltf.scene;
     variantsExt = gltf.parser.json.extensions?.KHR_materials_variants?.variants?.map(v => v.name) ?? [];
+    // Lit glass (lantern ad): the shipped model's panes are near-black; here they glow warm like glass around a flame.
+    if (litGlass) model.traverse(o => {
+      if (o.isMesh && /glass/i.test(o.material?.name || '')) {
+        const m = o.material.clone();
+        m.map = null; m.color.set('#c98a3c'); m.emissive.set('#b8742a'); m.emissiveIntensity = 0.3;
+        m.transparent = true; m.opacity = 0.42; m.depthWrite = false; m.roughness = 0.12; m.metalness = 0;
+        o.material = m;
+      } else if (o.isMesh && /flame/i.test(o.material?.name || '')) {
+        const m = o.material.clone(); // the flame texture is a glow on black: only reads as light when added
+        m.blending = THREE.AdditiveBlending; m.depthWrite = false; m.transparent = true;
+        o.material = m; o.renderOrder = 2;
+      }
+    });
     // Resolve each KHR_materials_variants mapping to a ready material (GLTFLoader only keeps the indices).
     const jobs = [];
     model.traverse(o => {
