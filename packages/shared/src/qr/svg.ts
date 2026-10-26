@@ -40,8 +40,14 @@ export function sceneToSvg(scene: Scene, logoHref?: string): string {
   if (scene.label) {
     const t = scene.label;
     const size = Math.min(t.h * 0.42, 34);
+    // Same cap the canvas applies (fillText maxWidth): a long line is squeezed, never overflows the frame.
+    const maxW = t.w - 20;
+    const fit =
+      [...t.text].length * size * 0.62 > maxW
+        ? ` textLength="${n(maxW)}" lengthAdjust="spacingAndGlyphs"`
+        : '';
     parts.push(
-      `<text x="${n(t.x + t.w / 2)}" y="${n(t.y + t.h / 2)}" font-family="${FONT}" font-size="${n(size)}" font-weight="700" fill="${t.color}" text-anchor="middle" dominant-baseline="central" direction="${t.rtl ? 'rtl' : 'ltr'}">${xmlEscape(t.text)}</text>`
+      `<text x="${n(t.x + t.w / 2)}" y="${n(t.y + t.h / 2)}" font-family="${FONT}" font-size="${n(size)}" font-weight="700" fill="${t.color}" text-anchor="middle" dominant-baseline="central"${fit} direction="${t.rtl ? 'rtl' : 'ltr'}">${xmlEscape(t.text)}</text>`
     );
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(scene.width)} ${n(scene.height)}" width="${n(scene.width)}" height="${n(scene.height)}" shape-rendering="geometricPrecision">${parts.join('')}</svg>`;

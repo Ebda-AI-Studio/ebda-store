@@ -4,6 +4,7 @@
  * Stored under `Store.settings.qr`; edited at admin `/stores/[id]/qr`.
  */
 import { z } from 'zod';
+import { validateColours } from './contrast';
 
 export const QR_STYLES = ['square', 'rounded', 'dots'] as const;
 export const QR_FINDERS = ['square', 'rounded', 'circle'] as const;
@@ -35,7 +36,14 @@ export const qrDesignSchema = z
       .nullable(),
     logo: z.boolean(),
   })
-  .strict();
+  .strict()
+  // Same rule the page enforces, repeated at the API edge so a direct call cannot store a code
+  // that does not scan: dark on light, at least 4.5:1.
+  .superRefine((d, ctx) => {
+    for (const problem of validateColours(d.fg, d.bg)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fg'], message: problem });
+    }
+  });
 
 export type QrDesign = z.infer<typeof qrDesignSchema>;
 

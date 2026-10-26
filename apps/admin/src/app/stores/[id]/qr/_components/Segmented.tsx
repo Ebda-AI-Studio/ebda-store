@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { cn } from '@ebda/ui';
 
 type Props<T extends string> = {
@@ -18,13 +19,14 @@ export function Segmented<T extends string>({
   onChange,
   disabled,
 }: Props<T>) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
   return (
     <div
       role="radiogroup"
       aria-label={label}
       className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5"
     >
-      {options.map(o => {
+      {options.map((o, idx) => {
         const on = o.value === value;
         return (
           <button
@@ -35,14 +37,23 @@ export function Segmented<T extends string>({
             disabled={disabled}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(o.value)}
+            ref={el => {
+              refs.current[idx] = el;
+            }}
             onKeyDown={e => {
-              const i = options.findIndex(x => x.value === value);
-              const dir = document.dir === 'rtl' ? -1 : 1;
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                e.preventDefault();
-                const step = (e.key === 'ArrowRight' ? 1 : -1) * dir;
-                onChange(options[(i + step + options.length) % options.length].value);
-              }
+              const rtl = document.dir === 'rtl';
+              let next = -1;
+              if (e.key === 'ArrowRight') next = idx + (rtl ? -1 : 1);
+              else if (e.key === 'ArrowLeft') next = idx + (rtl ? 1 : -1);
+              else if (e.key === 'ArrowDown') next = idx + 1;
+              else if (e.key === 'ArrowUp') next = idx - 1;
+              else if (e.key === 'Home') next = 0;
+              else if (e.key === 'End') next = options.length - 1;
+              else return;
+              e.preventDefault();
+              next = (next + options.length) % options.length;
+              onChange(options[next].value);
+              refs.current[next]?.focus();
             }}
             className={cn(
               'h-9 min-w-[3.5rem] rounded-md px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50',

@@ -774,6 +774,8 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
 // server-to-server by the storefront `/q/*` redirect with the shopper's store host in
 // x-store-domain. Unknown store, unknown/foreign slug, or a WhatsApp code with no number is a
 // 404 and writes nothing. Never cacheable: a cached answer would skip the count.
+const QR_NON_SHOPPER_UA =
+  /bot|crawl|spider|preview|facebookexternalhit|whatsapp|slack|telegram|twitter|embed|curl|wget/i;
 const qrScanQuery = z.object({
   kind: z.enum(['store', 'product', 'category', 'whatsapp']),
   slug: z.string().min(1).max(200).optional(),
@@ -783,7 +785,11 @@ router.get('/qr/scan', async (req: Request, res: Response, next: NextFunction) =
     const { kind, slug } = qrScanQuery.parse(req.query);
     const storeId = await getStoreIdFromRequest(req);
     const resolved = await readInStoreContext(storeId, () => resolveQrScan(storeId, kind, slug));
-    await recordQrScan(storeId, resolved.kind, resolved.ref);
+    // Link-preview fetchers (WhatsApp, Facebook, Slack...), crawlers and HEAD probes are not shoppers.
+    const ua = String(req.headers['user-agent'] ?? '');
+    if (req.method !== 'HEAD' && !QR_NON_SHOPPER_UA.test(ua)) {
+      await recordQrScan(storeId, resolved.kind, resolved.ref);
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, data: { target: resolved.target, kind: resolved.kind } });
   } catch (err) {

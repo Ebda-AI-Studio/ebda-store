@@ -114,10 +114,13 @@ export function canvasToRgb(canvas: HTMLCanvasElement): Uint8Array {
   if (!ctx) throw new Error('canvas unavailable');
   const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const rgb = new Uint8Array(width * height * 3);
+  // Composite over white: the card frame has rounded corners that are transparent, and a PDF
+  // image has no alpha, so they would otherwise print black.
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-    rgb[j] = data[i];
-    rgb[j + 1] = data[i + 1];
-    rgb[j + 2] = data[i + 2];
+    const a = data[i + 3];
+    rgb[j] = Math.round((data[i] * a) / 255 + 255 - a);
+    rgb[j + 1] = Math.round((data[i + 1] * a) / 255 + 255 - a);
+    rgb[j + 2] = Math.round((data[i + 2] * a) / 255 + 255 - a);
   }
   return rgb;
 }

@@ -104,6 +104,18 @@ describe('qr svg + schema', () => {
     expect(ok).toContain('<image');
   });
 
+  it('rejects, at the API edge, a design that cannot scan (inverted or low contrast)', () => {
+    const bad = qrDesignSchema.safeParse({ ...DEFAULT_QR_DESIGN, fg: '#ffffff', bg: '#000000' });
+    expect(bad.success).toBe(false);
+    expect(qrDesignSchema.safeParse({ ...DEFAULT_QR_DESIGN, fg: '#bbbbbb' }).success).toBe(false);
+  });
+
+  it('caps a long call-to-action line to the frame width in the SVG', () => {
+    const long = d({ cta: { text: 'ا'.repeat(40), lang: 'ar' } });
+    expect(sceneToSvg(buildScene(URL1, long))).toContain('textLength=');
+    expect(sceneToSvg(buildScene(URL1, d()))).not.toContain('textLength=');
+  });
+
   it('rejects malformed colours and long call-to-action lines', () => {
     expect(qrDesignSchema.safeParse(DEFAULT_QR_DESIGN).success).toBe(true);
     expect(qrDesignSchema.safeParse({ ...DEFAULT_QR_DESIGN, fg: 'red' }).success).toBe(false);
