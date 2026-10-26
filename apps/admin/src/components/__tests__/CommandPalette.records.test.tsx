@@ -50,17 +50,19 @@ const flush = async (ms: number) => {
 };
 
 describe('CommandPalette record search (Task 18)', () => {
-  it('debounces 200 ms, then shows products, orders and customers under their headers', async () => {
+  it('debounces 150 ms, then shows products, orders and customers under their headers', async () => {
     apiGet.mockResolvedValue({ data: records });
     const input = open();
     type(input, 'احمد');
-    await flush(199);
+    await flush(149);
     expect(apiGet).not.toHaveBeenCalled();
     await flush(2);
     // the term rides in a header, NEVER the URL (Ruling SEARCH-P2-9)
-    expect(apiGet).toHaveBeenCalledWith('/api/v1/stores/store-1/search', {
-      'X-Search-Query': '%D8%A7%D8%AD%D9%85%D8%AF',
-    });
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/v1/stores/store-1/search',
+      { 'X-Search-Query': '%D8%A7%D8%AD%D9%85%D8%AF' },
+      expect.any(AbortSignal)
+    );
     expect(String(apiGet.mock.calls[0][0])).not.toMatch(/[?&]q=|search=/);
     for (const h of ['products', 'orders', 'customers']) expect(screen.getByText(h)).toBeTruthy();
     expect(screen.getByText('أحذية')).toBeTruthy(); // Arabic name in the Arabic locale
@@ -100,12 +102,15 @@ describe('CommandPalette record search (Task 18)', () => {
     expect(screen.queryByText('أحذية')).toBeNull();
   });
 
-  it('no store in the URL, or under two characters: no lookup', async () => {
+  it('one character already looks up (search as you type); no store in the URL: no lookup', async () => {
+    apiGet.mockResolvedValue({ data: records });
     const input = open();
     type(input, 'ا');
     await flush(300);
-    expect(apiGet).not.toHaveBeenCalled();
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(apiGet.mock.calls[0][2]).toBeInstanceOf(AbortSignal);
     cleanup();
+    apiGet.mockClear();
     storeParam = undefined;
     const input2 = open();
     type(input2, 'احمد');

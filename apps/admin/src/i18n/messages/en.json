@@ -54,6 +54,12 @@
       "previous": "Previous page",
       "next": "Next page",
       "pageOf": "Page {page} of {totalPages}"
+    },
+    "liveSearch": {
+      "loading": "Searching…",
+      "empty": "No results for “{q}”",
+      "error": "Search is unavailable right now. Try again.",
+      "count": "{n, plural, one {{n} result} other {{n} results}}"
     }
   },
   "nav": {

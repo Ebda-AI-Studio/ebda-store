@@ -25,13 +25,14 @@
  * see that function's doc comment for the bug this fixes.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 import { isVariantProduct } from '../../../../../lib/variant-product';
 import { formatPrice } from '@/lib/format';
 import { extractVariantOptions } from '../bundlePricing';
+import { SearchPicker } from '@/components/SearchPicker';
 
 // Mirrors bundle.routes.ts's MAX_BUNDLE_ITEMS — not importable from the
 // admin app (apps/api is a separate deployable); the server is the real
@@ -79,49 +80,34 @@ interface BundleItemPickerProps {
   onChange: (items: BundleItemRow[]) => void;
 }
 
-function useDebounced<T>(value: T, ms: number): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(timer);
-  }, [value, ms]);
-  return v;
-}
-
 export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerProps) {
   const t = useT('bundles.itemPicker');
   const locale = useLocale();
   const isRtl = locale === 'ar';
 
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<ProductSearchResult[]>([]);
   const [pendingVariantProduct, setPendingVariantProduct] = useState<ProductSearchResult | null>(
     null
   );
   const [variantOptions, setVariantOptions] = useState<ProductVariantResult[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
 
-  const debouncedSearch = useDebounced(search, 250);
   const atLimit = value.length >= MAX_BUNDLE_ITEMS;
 
   const displayName = (name: string, nameAr?: string | null) =>
     isRtl ? nameAr || name : name || nameAr || name;
 
-  useEffect(() => {
-    if (atLimit || debouncedSearch.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    let cancelled = false;
-    apiGet<{ products: ProductSearchResult[] }>(
-      `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(debouncedSearch)}&limit=10`
-    ).then(({ data }) => {
-      if (!cancelled && data?.products) setResults(data.products);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [storeId, debouncedSearch, atLimit]);
+  const searchProducts = useCallback(
+    async (q: string, signal: AbortSignal) => {
+      const { data, error } = await apiGet<{ products: ProductSearchResult[] }>(
+        `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`,
+        undefined,
+        signal
+      );
+      if (error) throw new Error(error.message);
+      return data?.products ?? [];
+    },
+    [storeId]
+  );
 
   function addLine(row: BundleItemRow) {
     const existing = value.find(
@@ -139,8 +125,6 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
   }
 
   async function selectProduct(p: ProductSearchResult) {
-    setSearch('');
-    setResults([]);
     if (!isVariantProduct(p)) {
       addLine({
         productId: p.id,
@@ -203,34 +187,23 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
         </p>
       ) : (
         <div className="relative">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <SearchPicker<ProductSearchResult>
+            search={searchProducts}
+            getKey={p => p.id}
+            onPick={p => void selectProduct(p)}
             placeholder={t('searchPlaceholder')}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
+            renderOption={(p, hl) => (
+              <>
+                <span className="font-medium">{hl(displayName(p.name, p.nameAr))}</span>
+                <span className="ms-2 text-muted-foreground">{formatPrice(p.price)}</span>
+                {p.trackInventory && (
+                  <span className="ms-2 text-xs text-muted-foreground">
+                    {t('stockCount', { count: p.totalInventory })}
+                  </span>
+                )}
+              </>
+            )}
           />
-          {results.length > 0 && (
-            <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-background shadow-lg">
-              {results.map(p => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={() => void selectProduct(p)}
-                    className="block w-full px-3 py-2 text-start text-sm hover:bg-muted"
-                  >
-                    <span className="font-medium">{displayName(p.name, p.nameAr)}</span>
-                    <span className="ms-2 text-muted-foreground">{formatPrice(p.price)}</span>
-                    {p.trackInventory && (
-                      <span className="ms-2 text-xs text-muted-foreground">
-                        {t('stockCount', { count: p.totalInventory })}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
           {loadingVariants && (
             <p className="mt-2 text-xs text-muted-foreground">{t('loadingVariants')}</p>
           )}
