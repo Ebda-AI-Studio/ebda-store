@@ -10434,8 +10434,10 @@
       "working": "Working…",
       "blocked": "Downloads are off until the barcode scans correctly.",
       "downloadError": "Could not create the file. Try again.",
-      "failedItems": "These labels do not scan, so nothing was created: {names}."
+      "failedItems": "These labels do not scan, so nothing was created: {names}.",
+      "tooMany": "That is more than {max} labels in one go. Print in smaller batches."
     },
-    "testNote": "Print one label and scan it with a phone before you print a whole sheet."
+    "testNote": "Print one label and scan it with a phone before you print a whole sheet.",
+    "loading": "Loading"
   }
 }

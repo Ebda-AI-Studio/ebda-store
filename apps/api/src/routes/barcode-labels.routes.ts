@@ -121,6 +121,16 @@ router.get(
                   { nameAr: { contains: search, mode: 'insensitive' } },
                   { sku: { contains: search, mode: 'insensitive' } },
                   { barcode: { contains: search } },
+                  {
+                    variants: {
+                      some: {
+                        OR: [
+                          { barcode: { contains: search } },
+                          { sku: { contains: search, mode: 'insensitive' } },
+                        ],
+                      },
+                    },
+                  },
                 ],
               }
             : {}),

@@ -46,6 +46,12 @@ export async function renderLabelCanvas({
   qrScene,
 }: LabelRenderInput): Promise<HTMLCanvasElement> {
   const k = PX_PER_MM;
+  // Cairo may not be loaded yet on the first render: wait so Arabic widths match the PDF.
+  try {
+    await document.fonts.load(`700 12px Cairo`);
+  } catch {
+    /* fall back to the system stack */
+  }
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(layout.widthMm * k);
   canvas.height = Math.round(layout.heightMm * k);

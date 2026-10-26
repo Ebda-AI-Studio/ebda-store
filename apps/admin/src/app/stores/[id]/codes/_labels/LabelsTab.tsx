@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { LABEL_PRESETS, layoutLabel, type LabelLayout } from '@ebda/shared';
+import { LABEL_PRESETS, layoutLabel } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import {
   canvasToRgb,
@@ -21,6 +21,8 @@ import { Segmented } from '../_qr/_components/Segmented';
 import { ShapePicker } from './_components/ShapePicker';
 import { SheetPreview } from './_components/SheetPreview';
 import { toLabelItem, useLabels } from './useLabels';
+
+const MAX_TOTAL_COPIES = 2000;
 
 type Status = 'checking' | 'ok' | 'notPrintable' | 'unreadable';
 
@@ -71,13 +73,13 @@ export function LabelsTab({ storeId }: { storeId: string }) {
   const perPage = preset.kind === 'sheet' ? preset.cols! * preset.rows! : 1;
   const pageCount =
     preset.kind === 'sheet' ? Math.max(1, Math.ceil(totalCopies / perPage)) : totalCopies;
-  const canOutput = status === 'ok' && printable.length > 0 && !busy;
+  const overCap = totalCopies > MAX_TOTAL_COPIES;
+  const canOutput = status === 'ok' && printable.length > 0 && !busy && !overCap;
 
   async function produce(mode: 'pdf' | 'print') {
     setBusy(mode);
     setOutError(null);
     try {
-      const layouts: LabelLayout[] = [];
       const images = [];
       const labels = [];
       const failed: string[] = [];
@@ -90,7 +92,6 @@ export function LabelsTab({ storeId }: { storeId: string }) {
           failed.push(li.nameAr && locale === 'ar' ? li.nameAr : li.name);
           continue;
         }
-        layouts.push(lay);
         images.push({
           widthPx: canvas.width,
           heightPx: canvas.height,
@@ -104,7 +105,9 @@ export function LabelsTab({ storeId }: { storeId: string }) {
         });
       }
       if (failed.length) {
-        setOutError(ta('failedItems', { names: failed.slice(0, 3).join('، ') }));
+        setOutError(
+          ta('failedItems', { names: failed.slice(0, 3).join(locale === 'ar' ? '، ' : ', ') })
+        );
         return;
       }
       const bytes = buildPagesPdf({
@@ -116,19 +119,12 @@ export function LabelsTab({ storeId }: { storeId: string }) {
       if (mode === 'pdf') {
         triggerDownload(blob, `${fileStem('labels')}.pdf`);
       } else {
+        // A blob PDF in a hidden iframe prints blank in Chrome/Firefox and has no viewer on iOS:
+        // open it in its own tab (the browser's PDF viewer has Print) and fall back to a download.
         const url = URL.createObjectURL(blob);
-        const frame = document.createElement('iframe');
-        frame.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden';
-        frame.src = url;
-        frame.onload = () => {
-          frame.contentWindow?.focus();
-          frame.contentWindow?.print();
-          setTimeout(() => {
-            frame.remove();
-            URL.revokeObjectURL(url);
-          }, 60_000);
-        };
-        document.body.appendChild(frame);
+        const w = window.open(url, '_blank');
+        if (!w) triggerDownload(blob, `${fileStem('labels')}.pdf`);
+        setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
       }
     } catch {
       setOutError(ta('downloadError'));
@@ -140,7 +136,11 @@ export function LabelsTab({ storeId }: { storeId: string }) {
   if (L.loading)
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+        <div
+          role="status"
+          aria-label={t('loading')}
+          className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
+        />
       </div>
     );
   if (L.loadError)
@@ -205,7 +205,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                           max={500}
                           value={pick.qty}
                           dir="ltr"
-                          aria-label={ti('qty')}
+                          aria-label={`${ti('qty')}: ${name}${variant ? ` / ${variant}` : ''}`}
                           onChange={e => L.setQty(i.id, Number(e.target.value))}
                           className="w-16 shrink-0 rounded-lg border border-border bg-card px-2 py-1 text-center text-sm"
                         />
@@ -358,7 +358,9 @@ export function LabelsTab({ storeId }: { storeId: string }) {
           </p>
           {layout.dropped.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              {tp('dropped', { parts: layout.dropped.map(d => tc(d)).join('، ') })}
+              {tp('dropped', {
+                parts: layout.dropped.map(d => tc(d)).join(locale === 'ar' ? '، ' : ', '),
+              })}
             </p>
           )}
 
@@ -399,6 +401,11 @@ export function LabelsTab({ storeId }: { storeId: string }) {
           <p className="text-xs text-muted-foreground">
             {status === 'ok' ? t('testNote') : ta('blocked')}
           </p>
+          {overCap && (
+            <p role="alert" className="text-sm text-destructive-ink">
+              {ta('tooMany', { max: MAX_TOTAL_COPIES })}
+            </p>
+          )}
           {outError && (
             <p role="alert" className="text-sm text-destructive-ink">
               {outError}

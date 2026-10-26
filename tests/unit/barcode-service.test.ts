@@ -34,6 +34,7 @@ vi.mock('@ebda/database', () => {
 vi.mock('../../apps/api/src/services/feature.service', () => ({
   featureService: { isFeatureEnabled: db.featureOn },
 }));
+vi.mock('../../apps/api/src/lib/savepoint', () => ({ withSavepoint: (fn: () => unknown) => fn() }));
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
@@ -43,6 +44,7 @@ import {
   assertBarcodeAvailable,
   ensureBarcode,
   generateMissingBarcodes,
+  barcodeSpellings,
   parseBarcodeOrThrow,
 } from '../../apps/api/src/services/barcode.service';
 import { isInStoreEan13 } from '../../packages/shared/src/barcode';
@@ -122,11 +124,11 @@ describe('assertBarcodeAvailable', () => {
     await assertBarcodeAvailable('s1', 'ABC');
     expect(db.product.findFirst.mock.calls[0][0].where).toMatchObject({
       storeId: 's1',
-      barcode: 'ABC',
+      barcode: { in: ['ABC'] },
       deletedAt: null,
     });
     expect(db.productVariant.findFirst.mock.calls[0][0].where).toMatchObject({
-      barcode: 'ABC',
+      barcode: { in: ['ABC'] },
       product: { storeId: 's1', deletedAt: null },
     });
   });
@@ -164,11 +166,11 @@ describe('generateMissingBarcodes', () => {
     db.productVariant.count.mockResolvedValue(4);
     const r = await generateMissingBarcodes('s1');
     expect(r).toEqual({ products: 2, variants: 1, remaining: 4 });
-    expect(db.product.update).toHaveBeenCalledTimes(2);
-    expect(db.productVariant.update).toHaveBeenCalledTimes(1);
+    expect(db.product.updateMany).toHaveBeenCalledTimes(2);
+    expect(db.productVariant.updateMany).toHaveBeenCalledTimes(1);
     const written = [
-      ...db.product.update.mock.calls.map(c => c[0].data.barcode),
-      ...db.productVariant.update.mock.calls.map(c => c[0].data.barcode),
+      ...db.product.updateMany.mock.calls.map(c => c[0].data.barcode),
+      ...db.productVariant.updateMany.mock.calls.map(c => c[0].data.barcode),
     ];
     expect(new Set(written).size).toBe(3);
     // only products WITHOUT variants get a product-level code
@@ -186,5 +188,38 @@ describe('generateMissingBarcodes', () => {
       remaining: 0,
     });
     expect(db.product.findMany.mock.calls[0][0].take).toBe(500);
+  });
+});
+
+describe('UPC-A / EAN-13 spellings and the lock order', () => {
+  it('treats a UPC-A and its leading-zero EAN-13 as one code', () => {
+    expect(barcodeSpellings('036000291452')).toEqual(['036000291452', '0036000291452']);
+    expect(barcodeSpellings('0036000291452')).toEqual(['0036000291452', '036000291452']);
+    expect(barcodeSpellings('4006381333931')).toEqual(['4006381333931']);
+    expect(barcodeSpellings('SKU-1')).toEqual(['SKU-1']);
+  });
+  it('looks up both spellings when checking availability', async () => {
+    await assertBarcodeAvailable('s1', '036000291452');
+    expect(db.product.findFirst.mock.calls[0][0].where.barcode).toEqual({
+      in: ['036000291452', '0036000291452'],
+    });
+  });
+  it('generateMissing takes the lock BEFORE choosing rows and only fills rows still empty', async () => {
+    db.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+    db.productVariant.findMany.mockResolvedValue([]);
+    db.product.count.mockResolvedValue(0);
+    db.productVariant.count.mockResolvedValue(0);
+    const order: string[] = [];
+    db.queryRaw.mockImplementation(async (...a: unknown[]) => {
+      order.push(String((a[0] as string[]).join(' ')).includes('advisory') ? 'lock' : 'query');
+      return [{ m: null }];
+    });
+    db.product.findMany.mockImplementation(async () => {
+      order.push('select');
+      return [{ id: 'p1' }];
+    });
+    await generateMissingBarcodes('s1');
+    expect(order.indexOf('lock')).toBeLessThan(order.indexOf('select'));
+    expect(db.product.updateMany.mock.calls[0][0].where).toMatchObject({ id: 'p1', barcode: null });
   });
 });

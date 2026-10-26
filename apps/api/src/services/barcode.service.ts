@@ -21,6 +21,7 @@ import { makeInStoreEan13, parseBarcodeInput } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
+import { withSavepoint } from '../lib/savepoint';
 
 type Db = Pick<typeof prisma, '$queryRaw' | '$executeRaw'> & {
   product: typeof prisma.product;
@@ -37,7 +38,7 @@ export function parseBarcodeOrThrow(raw: string): string {
   throw new AppError(422, 'BARCODE_INVALID', 'Barcode is not valid', { reason: parsed.reason });
 }
 
-async function lockStoreBarcodes(db: Db, storeId: string): Promise<void> {
+export async function lockStoreBarcodes(db: Db, storeId: string): Promise<void> {
   await db.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${storeId + ':barcode'}))`;
 }
 
@@ -49,19 +50,27 @@ export type BarcodeOwner = {
 };
 
 /** Who already holds `barcode` in this store (live products and their variants), if anyone. */
+/** A UPC-A and its EAN-13 form (leading 0) are the same physical code: look up both spellings. */
+export function barcodeSpellings(barcode: string): string[] {
+  if (/^\d{12}$/.test(barcode)) return [barcode, `0${barcode}`];
+  if (/^0\d{12}$/.test(barcode)) return [barcode, barcode.slice(1)];
+  return [barcode];
+}
+
 export async function findBarcodeOwner(
   storeId: string,
   barcode: string,
   db: Db = prisma as unknown as Db
 ): Promise<BarcodeOwner | null> {
+  const spellings = barcodeSpellings(barcode);
   const product = await db.product.findFirst({
-    where: { storeId, barcode, deletedAt: null },
+    where: { storeId, barcode: { in: spellings }, deletedAt: null },
     select: { id: true, name: true },
   });
   if (product)
     return { type: 'product', id: product.id, productId: product.id, name: product.name };
   const variant = await db.productVariant.findFirst({
-    where: { barcode, product: { storeId, deletedAt: null } },
+    where: { barcode: { in: spellings }, product: { storeId, deletedAt: null } },
     select: { id: true, title: true, productId: true, product: { select: { name: true } } },
   });
   return variant
@@ -140,19 +149,21 @@ export async function ensureBarcode(
 ): Promise<string | null> {
   try {
     if (!(await barcodeFeatureOn(storeId))) return null;
-    const [code] = await allocateBarcodes(storeId, 1, db);
-    if ('variantId' in target) {
-      const { count } = await db.productVariant.updateMany({
-        where: { id: target.variantId, barcode: null, product: { storeId } },
+    return await withSavepoint(async () => {
+      const [code] = await allocateBarcodes(storeId, 1, db);
+      if ('variantId' in target) {
+        const { count } = await db.productVariant.updateMany({
+          where: { id: target.variantId, barcode: null, product: { storeId } },
+          data: { barcode: code },
+        });
+        return count ? code : null;
+      }
+      const { count } = await db.product.updateMany({
+        where: { id: target.productId, storeId, barcode: null },
         data: { barcode: code },
       });
       return count ? code : null;
-    }
-    const { count } = await db.product.updateMany({
-      where: { id: target.productId, storeId, barcode: null },
-      data: { barcode: code },
     });
-    return count ? code : null;
   } catch (err) {
     logger.warn(
       { storeId, err: err instanceof Error ? err.message : 'unknown' },
@@ -172,6 +183,8 @@ export async function generateMissingBarcodes(
   const take = Math.min(Math.max(1, limit), GENERATE_BATCH_MAX);
   return withStore(storeId, async tx => {
     const db = tx as unknown as Db;
+    // Lock BEFORE choosing rows: two concurrent calls must not pick the same barcode-less rows.
+    await lockStoreBarcodes(db, storeId);
     const products = await tx.product.findMany({
       where: { storeId, deletedAt: null, barcode: null, variants: { none: {} } },
       select: { id: true },
@@ -189,10 +202,16 @@ export async function generateMissingBarcodes(
     const codes = await allocateBarcodes(storeId, total, db);
     let i = 0;
     for (const p of products) {
-      await tx.product.update({ where: { id: p.id, storeId }, data: { barcode: codes[i++] } });
+      await tx.product.updateMany({
+        where: { id: p.id, storeId, barcode: null },
+        data: { barcode: codes[i++] },
+      });
     }
     for (const v of variants) {
-      await tx.productVariant.update({ where: { id: v.id }, data: { barcode: codes[i++] } });
+      await tx.productVariant.updateMany({
+        where: { id: v.id, barcode: null },
+        data: { barcode: codes[i++] },
+      });
     }
     const remainingProducts = await tx.product.count({
       where: { storeId, deletedAt: null, barcode: null, variants: { none: {} } },
