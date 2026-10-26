@@ -518,6 +518,10 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # One Next/OpenNext production build at a time: each is ~2 GB resident and ~13 MB/s of I/O, and two at once on the 5 GiB
+      # guest repeated the 2026-10-26 swap storm. app-build is HEAVY-lane by design: its job id is not in the guest's
+      # light-jobs.conf, so it takes one of the 2 heavy slots (tests/unit/ci-lean-structure.test.ts pins both).
+      max-parallel: 1
       matrix:
         app: ${{ fromJSON(needs.changes.outputs.build_apps) }}
     steps:

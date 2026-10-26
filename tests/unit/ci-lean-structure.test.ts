@@ -380,3 +380,26 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
     ).toBeGreaterThanOrEqual(6);
   });
 });
+
+describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
+  const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const job = ci.slice(ci.indexOf('\n  app-build:\n'), ci.indexOf('\n  app-builds:\n'));
+  it('runs one production build at a time', () => expect(job).toMatch(/max-parallel: 1/));
+  it('is not a light-lane job id (umbra DefaultLightJobs globs)', () => {
+    const light = [
+      'notify-failure*',
+      'notify*',
+      'changes',
+      'detect-changes*',
+      'guards',
+      'repo-guards*',
+      'scan',
+      'gitleaks*',
+      'secret-scan*',
+      'client-secret-scan*',
+      'blast-radius*',
+    ];
+    const glob = (g: string) => new RegExp('^' + g.replace(/\*/g, '.*') + '$');
+    expect(light.some(g => glob(g).test('app-build'))).toBe(false);
+  });
+});
