@@ -118,6 +118,13 @@ export default function OrdersListPage() {
 
   // ── Search state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
+  // The 404's "Search orders" opens this list with the box focused (the term is typed here, never put in a URL).
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('focus') === 'search') {
+      searchInputRef.current?.focus();
+    }
+  }, []);
   // Search runs server-side over every order (it used to filter only the
   // fetched page), so it is debounced rather than sent per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -436,6 +443,7 @@ export default function OrdersListPage() {
             </svg>
           </span>
           <input
+            ref={searchInputRef}
             type="search"
             value={search}
             onChange={e => setSearch(e.target.value)}
