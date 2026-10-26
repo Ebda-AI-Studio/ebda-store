@@ -25,16 +25,18 @@ vi.mock('@ebda/database', () => {
   const prisma = { store: { findUnique } };
   return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
 });
-vi.mock('@api/config', () => ({ config: { resendApiKey: 're_test' } }));
+vi.mock('@api/config', () => ({ config: { resendApiKey: 're_test', emailProvider: 'resend' } }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { ResendService, ResendSendError } from '@api/services/resend.service';
+import { ResendService } from '@api/services/resend.service';
+import { EmailSendError as ResendSendError } from '@api/services/mail-transport';
 
 const STORE = {
   id: 's1',
   name: 'Shop',
+  slug: 'shop',
   domain: null,
   email: 'owner@shop.test',
   emailSenderLocalPart: null,
@@ -49,10 +51,10 @@ beforeEach(() => {
 
 describe('sendBrandedBatch', () => {
   it('sends one email per address — no address ever sees another', async () => {
-    batchSend.mockResolvedValue({
-      data: { data: [{ id: '1' }, { id: '2' }, { id: '3' }] },
-      error: null,
-    });
+    emailsSend
+      .mockResolvedValueOnce({ data: { id: '1' }, error: null })
+      .mockResolvedValueOnce({ data: { id: '2' }, error: null })
+      .mockResolvedValueOnce({ data: { id: '3' }, error: null });
     const to = ['a@x.test', 'b@x.test', 'c@x.test'];
 
     const { ids } = await ResendService.sendBrandedBatch('s1', {
@@ -60,19 +62,16 @@ describe('sendBrandedBatch', () => {
       messages: to.map(t => ({ to: t, html: '<p/>' })),
     });
 
-    expect(batchSend).toHaveBeenCalledOnce();
-    const payload = batchSend.mock.calls[0][0] as Array<{
-      to: string[];
-      bcc?: unknown;
-      cc?: unknown;
-    }>;
-    expect(payload).toHaveLength(3);
+    expect(emailsSend).toHaveBeenCalledTimes(3);
+    const payload = emailsSend.mock.calls.map(
+      c => c[0] as { to: string[]; bcc?: unknown; cc?: unknown }
+    );
     expect(payload.map(p => p.to)).toEqual([['a@x.test'], ['b@x.test'], ['c@x.test']]);
     expect(payload.every(p => p.cc === undefined && p.bcc === undefined)).toBe(true);
     expect(ids).toEqual(['1', '2', '3']);
   });
 
-  it('refuses more than Resend’s 100-per-batch limit', async () => {
+  it('refuses more than 100 per batch', async () => {
     const to = Array.from({ length: 101 }, (_, i) => `u${i}@x.test`);
     await expect(
       ResendService.sendBrandedBatch('s1', {
@@ -80,7 +79,7 @@ describe('sendBrandedBatch', () => {
         messages: to.map(t => ({ to: t, html: '<p/>' })),
       })
     ).rejects.toThrow(/at most 100/);
-    expect(batchSend).not.toHaveBeenCalled();
+    expect(emailsSend).not.toHaveBeenCalled();
   });
 });
 
@@ -100,7 +99,7 @@ describe('sendMarketingEmail', () => {
     const [payload, options] = emailsSend.mock.calls[0];
     expect(payload.to).toEqual(['a@x.test']);
     expect(payload.headers).toEqual(headers);
-    expect(payload.from).toBe('Shop <no-reply@ebda.app>');
+    expect(payload.from).toBe('Shop <orders.shop@ebda.app>');
     expect(options).toEqual({ idempotencyKey: 'campaign-recipient/r1' });
   });
 

@@ -6,7 +6,8 @@ import { inngest } from '../client';
 import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
-import { ResendService, ResendSendError } from '../../../services/resend.service';
+import { ResendService } from '../../../services/resend.service';
+import { EmailSendError } from '../../../services/mail-transport';
 import { storeHidesPoweredBy } from '../../../services/email.service';
 import { sendAlert } from '../../../services/alerts.service';
 import {
@@ -415,7 +416,7 @@ const campaignSendFn = inngest.createFunction(
           // A throttle is transient: rethrow so the step retries with
           // backoff. Everything already sent in this batch is `sent` and is
           // skipped on the retry.
-          if (err instanceof ResendSendError && err.code === 'rate_limit_exceeded') throw err;
+          if (err instanceof EmailSendError && err.isRateLimit) throw err;
           const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
           await runInTenantContext(storeId, () =>
             prisma.campaignRecipient.updateMany({
@@ -429,7 +430,7 @@ const campaignSendFn = inngest.createFunction(
               campaignId,
               storeId,
               recipientId: r.id,
-              code: err instanceof ResendSendError ? err.code : 'unknown',
+              code: err instanceof EmailSendError ? err.code : 'unknown',
             },
             '[CAMPAIGN] recipient send failed'
           );

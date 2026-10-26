@@ -7,7 +7,6 @@ import { apiGet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
 import { BRAND, providerRequestMailto, providersOfKind } from '@ebda/shared';
-import { useStoreActivations } from '../../../../lib/provider-activation';
 import { ShippingCarriersEmptyState } from './_components/ShippingCarriersEmptyState';
 import { CarrierConnectCard } from './_components/CarrierConnectCard';
 import { ManualCarrierCard } from './_components/ManualCarrierCard';
@@ -27,7 +26,6 @@ export default function ShippingCarriersPage() {
   const { isEnabled } = useFeatures();
   const tPage = useT('shipping.carriers.page');
   const tConnect = useT('shipping.carriers.connect');
-  const { requests: activations, refetch: refetchActivations } = useStoreActivations(storeId);
 
   const featureEnabled = isEnabled('shipping_carriers');
 
@@ -114,9 +112,8 @@ export default function ShippingCarriersPage() {
               entry={entry}
               config={configs.find(c => c.carrier === entry.code)}
               storeId={storeId}
-              activation={activations.find(r => r.provider === entry.code)}
               onChanged={async () => {
-                await Promise.all([fetchConfigs(), refetchActivations()]);
+                await fetchConfigs();
               }}
             />
           ))}

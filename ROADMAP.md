@@ -129,17 +129,11 @@ These items are sequenced from `docs/HANDOFF-2026-06-01.md`. Priority order is a
   - [ ] **SEARCH-P2-5 contract migration** (follow-up, not a launch gate) — after the P2 deploy is confirmed, drop the unused per-key trigram indexes (`orders_guest_first_name / last_name / phone_trgm_idx`, `users_first_name / last_name / phone_trgm_idx`) and the `ebda_order_search_ids` kinds `'guest'` / `'customers'`; never in the same deploy as the code that stopped calling them. Until then every write to orders and users pays for six redundant GIN indexes.
   - [ ] **SEARCH-P2 deprecated query forms** (follow-up) — remove the `?search=` / `?q=` fallbacks of the customers and orders routes one release after the header-sending admin and Orders-PWA builds ship (SEARCH-P2-9).
   - [x] **SEARCH-T5-9 residual** — DONE (Ruling PIXEL-CONSENT-1, `fix/launch-blockers-privacy`): no pixel loads or fires on a URL carrying a term, email, phone or one-time token; every `track*` helper is gated on the consented provider; the search URL carries no term. The Search event still sends a non-PII-shaped term as a parameter to consenting shoppers' pixels (SEARCH-T5-9).
-  - [ ] **wa-bridge tenant context** — `apps/api/src/routes/wa-bridge.routes.ts` never establishes a tenant context, so every product query there is refused/empty under strict RLS + the tenant guard. Harmless while WhatsApp is OFF (Ruling WHATSAPP-OFF-1); MUST be fixed with an `ebda_app` integration test before the `whatsapp` flag is ever turned on for any store.
 
 ### Infrastructure
 
 - [ ] **Horizontal scaling enablement** — Socket.io needs `@socket.io/redis-adapter` (cross-instance events currently break with >1 replica); 14 module-level `setInterval` crons need leader-election before replicas > 1 can be enabled; Railway replica config is ready
 - [ ] **RLS fail-closed** — drop the `IS NULL` policy escape; prerequisite is migrating all 28 super-admin cross-tenant reads to `withRlsBypass`, then rewriting the 41 `IS NULL` policies to explicit `app.bypass_rls` form
-
-### WBS / Cross-product
-
-- [ ] **WBS bot go-live** — set Bot Mode = `native_catalog` in admin settings + configure Meta env credentials for auto-provision; unblocked by Ahmad's Meta Business Manager access
-- [ ] **WBS audit backlog** — W2 O(N²) aggregate, W6 per-WABA pacing, W10 dead-letter, W11 RLS on contacts/messages, W12 opt-out, W13 recipient erasure, and more (see `whatsapp-bulk-sender/docs/audits/2026-05-30-master-audit.md`)
 
 ---
 

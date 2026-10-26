@@ -26,8 +26,8 @@ import { resolveOrderInvoiceRecipient } from '../../order-notification-address';
  *
  * Money reversal (`applyRefundEffects`) and the real-time socket ping stay
  * inline in `updateStatus` — the former is awaited money state, the latter is a
- * fast in-process emit. The existing `order/shipped` + `order/delivered` events
- * (consumed by the WhatsApp bridge + the 7-day review-request job) are unchanged;
+ * fast in-process emit. The existing `order/delivered` event
+ * (consumed by the 7-day review-request job) is unchanged;
  * this new `order/status-changed` event carries only the migrated side effects.
  */
 interface FanoutStep {

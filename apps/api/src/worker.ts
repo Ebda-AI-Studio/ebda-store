@@ -18,6 +18,8 @@
  *     StoreRealtime), and the WebSocket upgrade for realtime (`/socket.io/`).
  */
 import { handleAsNodeRequest } from 'cloudflare:node';
+import { WorkflowEntrypoint } from 'cloudflare:workers';
+import { NonRetryableError } from 'cloudflare:workflows';
 import { createServer } from 'node:http';
 import app from './app';
 import { ClientPoolTimeout, createIsolateDb, prisma, type IsolateDb } from '@ebda/database';
@@ -31,6 +33,8 @@ import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
 import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
+import { runJobWorkflow } from './lib/jobs/run-workflow';
+import type { JobParams } from './lib/jobs/start';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
@@ -49,6 +53,7 @@ import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 export { AuthState } from './cf/auth-state';
 export { StoreRealtime } from './cf/store-realtime';
 export { StoreDO } from './cf/store-do/store-do';
+export { JobGate } from './cf/job-gate';
 
 // The Worker's `process.on('unhandledRejection')` (index.ts, Node): a rejection nobody awaited
 // (a late socket error from a closing pg connection, a fire-and-forget that failed) is logged with
@@ -354,8 +359,30 @@ async function scheduled(
   ctx: Ctx
 ): Promise<void> {
   await withWorkerContext(env, ctx, async () => {
-    await runScheduled(controller.cron);
+    await runScheduled(controller.cron, controller.scheduledTime);
   });
+}
+
+/**
+ * Background jobs on Cloudflare Workflows (G5, lib/jobs): one instance per run. Every step body
+ * runs inside `withWorkerContext`, so it has the bindings and its own leased database client
+ * exactly like a request or a queue batch.
+ */
+export class JobWorkflow extends WorkflowEntrypoint<CfBindings, JobParams> {
+  async run(
+    event: { payload: Readonly<JobParams>; instanceId: string },
+    step: Parameters<typeof runJobWorkflow>[0]['step']
+  ): Promise<void> {
+    // Bindings for code that runs between steps (alerts, feature flags); step bodies get the full context.
+    setCfBindings(this.env);
+    await runJobWorkflow({
+      params: event.payload as JobParams,
+      instanceId: event.instanceId,
+      step,
+      withContext: fn => withWorkerContext(this.env, this.ctx, fn),
+      NonRetryable: NonRetryableError,
+    });
+  }
 }
 
 const handler = { fetch: handle, queue, scheduled };

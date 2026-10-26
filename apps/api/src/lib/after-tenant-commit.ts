@@ -150,6 +150,14 @@ export function deferAfterTenantCommit<T>(
   const scope = deferralStorage.getStore();
   if (!scope) {
     const inline = run();
+    // Track it like a drain, so `awaitDeferredWork` (graceful shutdown, a per-request database lease
+    // closing) waits for a detached inline task instead of pulling its connection mid-transaction.
+    const tracked: Promise<void> = inline.then(
+      () => undefined,
+      () => undefined
+    );
+    inFlightDrains.add(tracked);
+    void tracked.finally(() => inFlightDrains.delete(tracked));
     // On a Worker the caller usually `void`s this: keep the work (and the request's database lease)
     // alive until it settles instead of letting it be cancelled with the response. Node: untouched.
     if (cfBindings()) cfWaitUntil(inline);

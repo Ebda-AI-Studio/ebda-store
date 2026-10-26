@@ -25,8 +25,6 @@ const STOREFRONT_FILES = [
   'services/abandoned-cart.service.ts',
   'routes/public.routes.ts',
   'routes/wishlist.routes.ts',
-  'routes/wa-bridge.routes.ts',
-  'routes/payment-links.routes.ts',
   'routes/wholesale.routes.ts',
   // product names leave the platform as answer-engine prompts (ChatGPT / Perplexity citation scan): final review minor 1
   'services/answer-engine/prompts.ts',

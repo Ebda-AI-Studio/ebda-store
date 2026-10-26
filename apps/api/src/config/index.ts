@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import { BRAND, brandUrl } from '@ebda/shared';
+import { BRAND } from '@ebda/shared';
 import { isWorkers } from '../lib/runtime';
 
 import { REGION } from '@ebda/shared';
@@ -191,6 +191,11 @@ export const config = {
   // fallback bridges the migration without forcing an env-var rename
   // on Railway. When neither is set, ResendService gracefully degrades to
   // no-op + logs a warning so dev environments don't crash on every send.
+  // Outbound email provider (services/mail-transport.ts): `cloudflare` = the Email Service
+  // `send_email` binding (default), `resend` = the legacy SDK, the rollback path until decommission.
+  emailProvider: (process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'cloudflare') as
+    | 'cloudflare'
+    | 'resend',
   resendApiKey: process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || '',
 
   // Public origin Inngest Cloud must call to reach our serve endpoint
@@ -251,11 +256,6 @@ export const config = {
   // closes and Inngest can't invoke our functions.
   inngestEventKey: process.env.INNGEST_EVENT_KEY || '',
   inngestSigningKey: process.env.INNGEST_SIGNING_KEY || '',
-
-  // Ebda WhatsApp Business Platform bridge
-  // Base URL of the WBS backend. In production: https://whatsapp-api.ebda.app
-  // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.
-  wbsBaseUrl: process.env.WBS_BASE_URL || brandUrl(BRAND.domains.whatsapp),
 } as const;
 
 // Additional production validations (core secrets already validated above)

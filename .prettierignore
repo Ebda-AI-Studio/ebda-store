@@ -40,3 +40,7 @@ scripts/editor-audit/baseline.json
 scripts/editor-audit/parity-baseline.json
 # Vendored byte-for-byte from Ebda WhatsApp (sha256 pinned by tests/unit/wa-contract-pin.test.ts)
 apps/api/src/contracts/wa-v1.ts
+
+# Byte-for-byte goldens: tests compare the API serializer output (JSON.stringify, 2 spaces) to these files, so
+# prettier collapsing short arrays onto one line fails them.
+tests/integration/__golden__/

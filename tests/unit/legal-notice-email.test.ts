@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { BRAND } from '@ebda/shared';
 import { config } from '@api/config';
-import { ResendService } from '@api/services/resend.service';
+import * as transport from '@api/services/mail-transport';
 import { EmailService } from '@api/services/email.service';
 import {
   legalNoticeMailerReady,
@@ -85,7 +85,7 @@ describe('sendLegalNoticeEmail', () => {
 describe('production delivery path', () => {
   it('RESEND_NOT_CONFIGURED: production without a key throws and records nothing (I2)', async () => {
     (config as { nodeEnv: string }).nodeEnv = 'production';
-    vi.spyOn(ResendService, 'isConfigured').mockReturnValue(false);
+    vi.spyOn(transport, 'isMailTransportConfigured').mockReturnValue(false);
     expect(legalNoticeMailerReady()).toBe(false);
     await expect(sendLegalNoticeEmail(data)).rejects.toThrow('RESEND_NOT_CONFIGURED');
     expect(latestCapturedMailTo('m@test.local')).toBeFalsy();
@@ -93,13 +93,14 @@ describe('production delivery path', () => {
 
   it('sends through Resend with NO List-Unsubscribe header: a transactional legal notice (M16)', async () => {
     (config as { nodeEnv: string }).nodeEnv = 'production';
-    vi.spyOn(ResendService, 'isConfigured').mockReturnValue(true);
+    vi.spyOn(transport, 'isMailTransportConfigured').mockReturnValue(true);
     const raw = vi.spyOn(EmailService, 'sendPlatformRaw').mockResolvedValue(undefined);
     expect(legalNoticeMailerReady()).toBe(true);
     await sendLegalNoticeEmail(data);
     expect(raw).toHaveBeenCalledTimes(1);
     const sent = raw.mock.calls[0][0] as Record<string, unknown>;
     expect(sent.to).toBe('m@test.local');
+    expect(sent.fromName).toBe('Ebda AI Studio'); // account mail: the studio, not the store product
     expect(sent).not.toHaveProperty('headers');
     expect(JSON.stringify(sent)).not.toMatch(/List-Unsubscribe/i);
   });

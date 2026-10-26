@@ -149,7 +149,6 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'Supplier.address': 'postal address',
   'Expense.ocrJson': 'OCR text extracted from the receipt (the file itself is receiptImageUrl)',
   'GscDailyMetric.topQueries': 'Search Console query stats',
-  'WhatsAppTemplate.body': 'Meta template body text; header media rides Store.wbsTemplates',
   'BankStatement.fileName': 'original upload filename only; the statement is parsed, not stored',
   'AnswerEngineCheck.citedUrls': 'third-party URLs an AI answer engine cited',
   'AnswerEngineCheck.competitorUrls': 'third-party competitor URLs',

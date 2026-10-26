@@ -71,6 +71,14 @@ concurrency:
 env:
   # wrangler >= 4.110 needs Node >= 22, and cf-deploy runs wrangler on 22.
   NODE_VERSION: '22'
+  # npm on the Umbra runner (2026-10-25: `npm ci` sat 22 min with no output on a loaded guest, then the job was
+  # cancelled): use the runner's local ~/.npm first, skip the post-install audit and funding round-trips (each is
+  # a registry request that can stall), and bound a stalled fetch instead of waiting out the job.
+  NPM_CONFIG_PREFER_OFFLINE: 'true'
+  NPM_CONFIG_AUDIT: 'false'
+  NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_FETCH_TIMEOUT: '120000'
+  NPM_CONFIG_FETCH_RETRIES: '3'
 
 # Least-privilege default: the workflow GITHUB_TOKEN is read-only. No job here
 # needs write. A job that ever needs write must override upward itself.
@@ -482,7 +490,14 @@ jobs:
       - name: API Worker startup budget (startup CPU and bundle size)
         if: matrix.app == 'api'
         timeout-minutes: 10
-        run: node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
+        # PRs: compare with main's bundle profiled in this same job (a starved shared runner slows both
+        # alike; the absolute 140 ms ceiling flaked at 189 ms on one). main/nightly: absolute ceiling.
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/ci/worker-startup-budget.mjs --runs 5 --baseline-ref origin/main --record "$RUNNER_TEMP/worker-startup-budget.json"
+          else
+            node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
+          fi
       - name: Upload the startup measurement
         if: matrix.app == 'api' && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -511,7 +526,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d ebda_smoke"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -545,7 +560,7 @@ jobs:
       # the binding, so nothing else runs this path on workerd before production does. No database.
       - name: Embedding provider on workerd (fake AI binding)
         timeout-minutes: 10
-        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/buyer-key.test.ts
+        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts
 
   # G11 (Ruling INFRA-CF-1): the DB-less integration lane. The real StoreDO (SQLite), D1 and R2 bindings run on
   # LOCAL workerd (Miniflare via @cloudflare/vitest-pool-workers), no Postgres and no built bundle, so it
@@ -860,7 +875,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -969,6 +984,8 @@ jobs:
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
           INNGEST_DRY_RUN: 'true'
+          # self-serve-onboarding-live picks InstaPay as the trial's payment method (go-live gate, EBDA-FUNNEL-5).
+          EBDA_INSTAPAY_HANDLE: ebda@instapay
 
       - name: Assert the API connected as ebda_app, not a bypass role
         # /health is a liveness probe: it answers 200 identically as the `test`
@@ -1066,7 +1083,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -1178,7 +1195,7 @@ jobs:
           # Dynamic host port, same reasoning as the jobs above.
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -1255,7 +1272,7 @@ jobs:
         ports:
           - 5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10

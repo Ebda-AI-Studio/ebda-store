@@ -15,8 +15,11 @@
  */
 import { runInStoreScope } from '@ebda/database';
 import { emailQueue, isQueuedEmail } from '../services/email-queue.service';
+import { EmailSendError } from '../services/mail-transport';
 import { smsQueue, isQueuedSms } from '../services/sms-queue.service';
 import logger from '../lib/logger';
+import { handleJobsBatch } from '../lib/jobs/run-queue';
+import { JOBS_DLQ_NAME, JOBS_QUEUE_NAME } from '../lib/jobs/start';
 
 export const EMAIL_QUEUE_NAME = 'ebda-email';
 export const SMS_QUEUE_NAME = 'ebda-sms';
@@ -42,6 +45,11 @@ export interface MessageBatchLike {
 }
 
 export async function handleQueueBatch(batch: MessageBatchLike): Promise<void> {
+  // Background jobs (G5) own their ack/retry/failure handling.
+  if (batch.queue === JOBS_QUEUE_NAME || batch.queue === JOBS_DLQ_NAME) {
+    await handleJobsBatch(batch);
+    return;
+  }
   for (const msg of batch.messages) {
     try {
       switch (batch.queue) {
@@ -49,8 +57,24 @@ export async function handleQueueBatch(batch: MessageBatchLike): Promise<void> {
           if (!isQueuedEmail(msg.body)) throw new PoisonMessage('unreadable email message');
           const email = { ...msg.body, attempts: msg.attempts - 1 };
           // The sender reads the store's email settings: run it in that store's scope.
-          if (email.storeId) await runInStoreScope(email.storeId, () => emailQueue.deliver(email));
-          else await emailQueue.deliver(email);
+          try {
+            if (email.storeId)
+              await runInStoreScope(email.storeId, () => emailQueue.deliver(email));
+            else await emailQueue.deliver(email);
+          } catch (err) {
+            if (!(err instanceof EmailSendError && err.permanent)) throw err;
+            // A retry cannot fix this (bad payload, suppressed recipient). A suppressed recipient
+            // (hard bounce / complaint, Cloudflare's own list) is routine: no page. Anything else
+            // permanent is a bug: park it on the replay list and page once, now, not after 3 retries.
+            if (err.code === 'E_RECIPIENT_SUPPRESSED') {
+              logger.warn(
+                { id: msg.id, code: err.code },
+                '[queues] recipient suppressed, email dropped'
+              );
+            } else {
+              await emailQueue.parkDeadLetter(email, `permanent send error ${err.code}`);
+            }
+          }
           break;
         }
         case SMS_QUEUE_NAME: {

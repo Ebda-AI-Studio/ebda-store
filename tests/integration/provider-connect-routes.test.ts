@@ -16,7 +16,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
+import { createPrismaClient, Prisma, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import paymentSettingsRoutes from '@api/routes/payment-settings.routes';
@@ -207,6 +207,12 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
       secretKey: SECRET_KEY,
     });
 
+    // PROVIDERS-3: the save already ran the check, so a proof of exactly these credentials exists.
+    // Without a proof (cleared out of band) enabling is still refused.
+    await owner.paymentConfig.updateMany({
+      where: { storeId: s.id, provider: 'kashier' },
+      data: { connectionTest: Prisma.DbNull },
+    });
     const early = await post(s, `${base(s)}/toggle`, { enabled: true });
     expect(early.status).toBe(409);
     expect(early.body.error.code).toBe('CONNECTION_NOT_TESTED');
@@ -313,7 +319,9 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
         },
       },
     });
+    // PROVIDERS-3: the save's automatic check and the manual Test connection are both audited.
     expect(logs.map(l => l.action).sort()).toEqual([
+      'store_payment_config.connection_tested',
       'store_payment_config.connection_tested',
       'store_payment_config.credentials_updated',
     ]);
@@ -323,37 +331,34 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     expect(all).not.toContain(API_KEY);
   });
 
-  it('PROVIDERS-2 (relaxed): an unverified provider can be saved and tested by the merchant but never enabled', async () => {
+  it('PROVIDERS-3: an unverified provider connects, is checked on save, and enables on a passing check', async () => {
     const s = await mkStore('soon');
-    // Seed a fully tested row while the stub-suite seam is on...
-    await saveSandbox(s, {
-      merchantId: KASHIER_STUB.merchantId,
-      paymentApiKey: API_KEY,
-      secretKey: SECRET_KEY,
-    });
-    expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
-
-    // ...then run the routes as production does, with kashier marked unverified.
     const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
-    delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
+    delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED; // run as production does
     try {
       await asUnverifiedKashier(async () => {
-        const save = await saveSandbox(s, { secretKey: 'another-secret-value-123456' });
+        const save = await saveSandbox(s, {
+          merchantId: KASHIER_STUB.merchantId,
+          paymentApiKey: API_KEY,
+          secretKey: SECRET_KEY,
+        });
         expect(save.status).toBe(200);
-        // the edit voided the test; re-save the good key and test again: save + test both work
-        expect((await saveSandbox(s, { secretKey: SECRET_KEY })).status).toBe(200);
-        expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
+        // the automatic check ran on save: connected, in Arabic and English, no secret echoed
+        expect(save.body.data.check).toMatchObject({ status: 'connected', ok: true });
+        expect(save.body.data.check.messageAr).toBeTruthy();
+        expect(save.body.data.check.messageEn).toBeTruthy();
+        expect(JSON.stringify(save.body)).not.toContain(SECRET_KEY);
+        expect((await row(s)).connectionTest).toMatchObject({ ok: true, mode: 'sandbox' });
         const on = await post(s, `${base(s)}/toggle`, { enabled: true });
-        expect(on.status).toBe(409);
-        expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
-        expect((await row(s)).isEnabled).toBe(false);
+        expect(on.status, JSON.stringify(on.body)).toBe(200);
+        expect((await row(s)).isEnabled).toBe(true);
       });
     } finally {
       process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = prev;
     }
   });
 
-  it('PROVIDERS-2 at runtime: a row already enabled is still not offered at checkout', async () => {
+  it('PROVIDERS-3 at runtime: an enabled unverified row is offered at checkout', async () => {
     const s = await mkStore('runtime');
     await saveSandbox(s, {
       merchantId: KASHIER_STUB.merchantId,
@@ -363,18 +368,13 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
     expect((await post(s, `${base(s)}/toggle`, { enabled: true })).status).toBe(200);
 
-    PaymentService.clearCache(s.id);
-    expect(await asApp(() => PaymentService.getAvailableProviders(s.id))).toContain('kashier');
-
     const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     try {
-      PaymentService.clearCache(s.id);
-      await asUnverifiedKashier(async () =>
-        expect(await asApp(() => PaymentService.getAvailableProviders(s.id))).not.toContain(
-          'kashier'
-        )
-      );
+      await asUnverifiedKashier(async () => {
+        PaymentService.clearCache(s.id);
+        expect(await asApp(() => PaymentService.getAvailableProviders(s.id))).toContain('kashier');
+      });
     } finally {
       process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = prev;
       PaymentService.clearCache(s.id);

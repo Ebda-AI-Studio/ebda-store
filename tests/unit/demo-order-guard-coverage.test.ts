@@ -117,10 +117,9 @@ const { sites, otherWrites } = scan(
 );
 
 describe('demo store: every order-creating path calls assertOrderAllowed first (B1-13, C12)', () => {
-  it('the order create sites are exactly the three known owners', () => {
+  it('the order create sites are exactly the two known owners', () => {
     expect(sites.map(s => `${s.file} → ${s.owner}`).sort()).toEqual(
       [
-        "apps/api/src/routes/payment-links.routes.ts → router.post('/')",
         'apps/api/src/services/order.service.ts → OrderService.create',
         'apps/api/src/services/order.service.ts → OrderService.createAdminOrder',
       ].sort()

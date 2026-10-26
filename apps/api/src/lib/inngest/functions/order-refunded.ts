@@ -333,11 +333,60 @@ export async function handleOrderRefunded(
           });
           if (partialMarker) return { skipped: true };
 
+          // Units checkout never took (a backordered VARIANT line is floored at 0:
+          // 2 on hand, 5 ordered → took 2) were never on the shelf, so a partial
+          // return cannot put them there. Same bound as the whole-order restore
+          // below: ordered − never taken − already restored by earlier partials.
+          const partialBackorders = await tx.backorderLine.findMany({
+            where: { storeId, orderItem: { orderId } },
+            select: { orderItemId: true, qty: true, stockTaken: true, qtyFulfilled: true },
+          });
+          const partialNeverTaken = new Map<string, number>();
+          for (const bl of partialBackorders) {
+            const untaken = Math.max(
+              0,
+              bl.qty - (bl.stockTaken ?? bl.qty) - (bl.qtyFulfilled ?? 0)
+            );
+            if (untaken > 0) {
+              partialNeverTaken.set(
+                bl.orderItemId,
+                (partialNeverTaken.get(bl.orderItemId) ?? 0) + untaken
+              );
+            }
+          }
+          const priorPartials = await tx.orderEvent.findMany({
+            where: { storeId, orderId, toStatus: PARTIAL_RESTORE_MARKER },
+            select: { metadata: true },
+          });
+          const restoredBefore = new Map<string, number>();
+          for (const m of priorPartials) {
+            const prior = (
+              m.metadata as { items?: Array<{ orderItemId?: string; quantity?: number }> } | null
+            )?.items;
+            if (!Array.isArray(prior)) continue;
+            for (const it of prior) {
+              if (typeof it?.orderItemId !== 'string' || typeof it?.quantity !== 'number') continue;
+              restoredBefore.set(
+                it.orderItemId,
+                (restoredBefore.get(it.orderItemId) ?? 0) + it.quantity
+              );
+            }
+          }
+
           const restored: Array<{ orderItemId: string; quantity: number }> = [];
           for (const req of partial.items) {
             const line = order.items.find(i => i.id === req.orderItemId);
             if (!line) continue; // foreign/unknown line — never restore it
-            const qty = Math.min(Math.max(0, Math.floor(req.quantity)), line.quantity);
+            const room =
+              line.quantity -
+              (partialNeverTaken.get(line.id) ?? 0) -
+              (restoredBefore.get(line.id) ?? 0);
+            const qty = Math.min(
+              Math.max(0, Math.floor(req.quantity)),
+              line.quantity,
+              Math.max(0, room)
+            );
+            if (qty > 0) restoredBefore.set(line.id, (restoredBefore.get(line.id) ?? 0) + qty);
             if (qty === 0) continue;
             await restoreLine(line, qty, partial.refundKey, 'Return completed — partial restore');
             restored.push({ orderItemId: line.id, quantity: qty });

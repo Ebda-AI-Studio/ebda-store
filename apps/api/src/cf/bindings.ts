@@ -47,6 +47,23 @@ export interface AiBindingLike {
   ): Promise<unknown>;
 }
 
+export interface WorkflowBindingLike {
+  /** Throws when an instance with this id already exists. */
+  create(opts: { id: string; params: unknown }): Promise<{ id: string }>;
+}
+
+export interface EmailBindingLike {
+  send(message: {
+    from: string | { email: string; name?: string };
+    to: string | string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    replyTo?: string;
+    headers?: Record<string, string>;
+  }): Promise<{ messageId: string }>;
+}
+
 export interface CfBindings {
   HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
@@ -61,6 +78,12 @@ export interface CfBindings {
   STORE_BACKUPS?: unknown;
   /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */
   WA_EVENTS_QUEUE?: QueueProducerLike;
+  /** Cloudflare Email Service `send_email` binding (G6): every outbound email (services/mail-transport.ts). */
+  EMAIL?: EmailBindingLike;
+  /** Background jobs (G5): Workflows binding, the jobs Queue and the concurrency/debounce gate DO. */
+  JOBS_WORKFLOW?: WorkflowBindingLike;
+  JOBS_QUEUE?: QueueProducerLike;
+  JOB_GATE?: DurableObjectNamespaceLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */

@@ -153,7 +153,6 @@ describe('every server backorder decision goes through lineAllowsBackorder / isO
   it.each([
     'apps/api/src/services/cart.service.ts',
     'apps/api/src/services/order.service.ts',
-    'apps/api/src/routes/wa-bridge.routes.ts',
     'apps/api/src/routes/analytics.routes.ts',
   ])('%s has no hand-rolled `variant ? variant.allowBackorder : product.allowBackorder`', f => {
     const src = readFileSync(join(ROOT, f), 'utf8');

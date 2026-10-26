@@ -960,7 +960,7 @@ router.post(
       });
 
       // Fire the same post-payment fanout the webhook handler does —
-      // accounting journal + WhatsApp WBS notification both rely on this event.
+      // accounting journal relies on this event.
       inngest
         .send({
           name: 'order/created',
@@ -1269,8 +1269,8 @@ router.post(
         )
       );
 
-      // Fire one order/created event per updated order so accounting journal +
-      // WBS WhatsApp both receive the paid notification. Promise.allSettled so
+      // Fire one order/created event per updated order so the accounting journal
+      // receives the paid notification. Promise.allSettled so
       // one failed enqueue doesn't block the response or the others.
       await Promise.allSettled(
         codOrders.map(o =>

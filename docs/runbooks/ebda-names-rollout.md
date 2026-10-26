@@ -5,23 +5,16 @@ so deploys do not break live sessions. Names only below, never values.
 
 ## 1. Before deploying the API
 
-Create in the API worker (`wrangler secret put <NAME>` from `apps/api`), only if the Meta
-provisioner is configured today; copy the value from the previous variable:
-
-- `EBDA_META_ADMIN_TOKEN` (secret)
-- `EBDA_META_BM_ID`
-- `EBDA_META_PROVISIONER_USER_ID` (only if the previous variable of that role is set)
+Nothing to create in the API worker. (The Meta provisioner and its `EBDA_META_*` secrets were removed with the legacy WhatsApp bridge, Ruling WA-LEGACY-1.)
 
 GitHub: nothing new is required for these changes. `SENTRY_PROJECT_*`, `AXIOM_DATASET` and
 `OTEL_SERVICE_NAME` keep working as they are; see steps 5-7 for when to change them.
 
 ## 2. Deploy order
 
-1. API worker (accepts old + new JWT claims, new + old env names; sends both bridge id names).
+1. API worker (accepts old + new JWT claims, new + old env names).
 2. Admin and orders apps (write the new hint cookie, read and clear both).
-3. WBS: deploy its change to read and write `ebdaStoreId` / `ebdaOrderId`. Until then the
-   API keeps sending the previous field names alongside, so order matters little.
-4. Verify: sign in, refresh a session, hit `/health`, run one WhatsApp template send.
+3. Verify: sign in, refresh a session, hit `/health`.
 
 ## 3. Inngest (do right after the API deploy)
 

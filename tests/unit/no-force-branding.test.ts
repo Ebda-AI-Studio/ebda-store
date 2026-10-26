@@ -41,21 +41,9 @@ const ALLOWED: Record<string, { re: RegExp; why: string }> = {
     re: /(?<![A-Za-z0-9_])force-(?:api|app)\b/gi,
     why: 'JWT iss/aud claim values on every issued token (renaming logs every user out; needs a dual-accept rollout) and the live names of third-party resources (Railway service, Sentry project, Axiom dataset, Inngest app id, OTEL service name)',
   },
-  waTemplateNames: {
-    re: /force_[a-z_]+_v\d+/g,
-    why: 'WhatsApp template names (the old force_* order, cart and welcome names): renamed on fix/shopper-messages-egyptian; remove from allowlist after it merges',
-  },
   hintCookie: {
     re: /\bforce-session\b/g,
     why: 'live admin/orders hint cookie name (force-session=1) read by api.ts + middleware; renaming bounces every signed-in merchant through login once',
-  },
-  metaEnv: {
-    re: /FORCE_AI_META_[A-Z_]+/g,
-    why: 'Railway env var names for the Meta provisioner; renaming needs a coordinated env change on the deployed service',
-  },
-  wbsBridge: {
-    re: /fwb(?:StoreId|OrderId)|fwb_(?:store|order)_id/g,
-    why: 'WBS bridge wire contract (request field names + wa_carts columns owned by the WBS service)',
   },
 };
 const ALLOW_FILES: Record<string, string[]> = JSON.parse(
@@ -75,7 +63,13 @@ export function brandViolates(line: string, file = ''): boolean {
 }
 export const providerViolates = (line: string): boolean => PROVIDERS.test(line);
 
-const SIDECARS = ['tests/unit/branding-allowlist.json', 'tests/unit/applied-migrations.json'];
+const SIDECARS = [
+  'tests/unit/branding-allowlist.json',
+  'tests/unit/applied-migrations.json',
+  // Guard tests that must NAME the forbidden strings to forbid them.
+  'tests/unit/no-wbs-refs.test.ts',
+  'tests/unit/email-domain-allowlist.test.ts',
+];
 // sha1 prefixes of the migration directories already on origin/main (applied, immutable).
 // Hashed so the snapshot itself carries no migration name. A migration dir NOT in this set is new
 // and is scanned like any other file.
@@ -147,13 +141,7 @@ describe('no inherited branding anywhere in the repository', () => {
       'reinforce app',
     ])
       expect(brandViolates(s), s).toBe(false);
-    for (const s of [
-      "audience: 'ebda-app'",
-      "issuer: 'ebda-api'",
-      'FORCE_AI_META_BM_ID',
-      'body.fwbStoreId',
-      'cart.fwb_order_id',
-    ])
+    for (const s of ["audience: 'ebda-app'", "issuer: 'ebda-api'"])
       expect(brandViolates(s), s).toBe(false);
     for (const s of ['MyFatoorah', 'hesabe', 'UPayments', 'KNET'])
       expect(providerViolates(s), s).toBe(true);

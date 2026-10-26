@@ -498,7 +498,9 @@ export type ConnectionTestCode =
   /** Timeout / 5xx / network: try again later. Says nothing about the credentials. */
   | 'unreachable'
   /** The provider answered something the adapter does not recognise. */
-  | 'unknown';
+  | 'unknown'
+  /** The provider has no safe read-only call: nothing was sent, the connection is UNVERIFIED (PROVIDERS-3). */
+  | 'no_check';
 
 export interface ConnectionTestResult {
   ok: boolean;

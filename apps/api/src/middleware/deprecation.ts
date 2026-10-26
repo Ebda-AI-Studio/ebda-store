@@ -8,8 +8,8 @@ import { redactSensitiveQuery } from '@ebda/shared';
  *
  * `/api/v1` has been the prefix since launch, but a version prefix alone is not
  * a deprecation policy: it says which contract you are on, not that the one you
- * are on is going away. Consumers outside this repo — merchant integrations and
- * the WBS bridge — had no mechanism to learn that an endpoint was retiring
+ * are on is going away. Consumers outside this repo — merchant integrations —
+ * had no mechanism to learn that an endpoint was retiring
  * until it 404'd (audited 2026-08-31, lens L15,
  * `docs/audits/2026-08-31-reel-derived-lenses.md`).
  *

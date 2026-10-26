@@ -10,15 +10,12 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
-import { resolveSendTemplateName } from '../lib/wa-templates/legacy-names';
 import {
   prisma,
-  acrossStores,
   acrossStoresFlat,
   currentStoreId,
   runInStoreScope,
   storeDirectory,
-  withStore,
 } from '@ebda/database';
 import { storefrontOrigin } from '@ebda/shared';
 import { PriceResolver } from './price-resolver.service';
@@ -26,8 +23,6 @@ import { buyerFromCartOwner } from '../lib/buyer-identity';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { resolveBundle } from './bundle.service';
-import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
-import { encryption } from './encryption.service';
 import { featureService } from './feature.service';
 import {
   sweepCartRecoveryEmails,
@@ -39,7 +34,6 @@ import crypto from 'crypto';
 import { config } from '../config';
 import type { NotificationData, NotificationEvent } from '@ebda/shared';
 
-import { cartStoreId } from '../lib/wbs-wire';
 // ==========================================
 // Constants / Types
 // ==========================================
@@ -47,28 +41,6 @@ import { cartStoreId } from '../lib/wbs-wire';
 const LOCK_KEY = 'abandoned-cart:processing';
 const LOCK_TTL_SECONDS = 60;
 const ABANDONMENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
-
-// WA cart abandonment: 30-minute inactivity threshold for DM-origin carts.
-// Shorter than website carts (1h) because DM sessions go cold faster.
-const WA_ABANDONMENT_MINUTES = 30;
-
-// Multi-step WA cart abandoned reminder cadence.
-// Mirrors the website abandoned-cart default config (step1=60min, step2=240min, step3=1440min)
-// except the WBS inactivity trigger already implies 30 min has passed before step 1 fires.
-//   step1: fires when cart is detected as abandoned (≥30min inactivity).
-//   step2: fires 4h (240min) after step1 sentinel is written.
-//   step3: fires 24h (1440min) after step2 sentinel is written.
-const WA_CART_STEP1_DELAY_SECONDS = 0; // immediate on detection
-const WA_CART_STEP2_DELAY_SECONDS = 240 * 60; // 4 hours after step1
-const WA_CART_STEP3_DELAY_SECONDS = 1440 * 60; // 24 hours after step2
-
-// Redis sentinel TTL for each step.
-// Step-N sentinel lives long enough for step N+1 to check it exists, plus headroom.
-// Step3 sentinel = 25h so a re-abandoned cart can get a fresh sequence after that window.
-const WA_CART_STEP1_SENTINEL_TTL =
-  WA_CART_STEP2_DELAY_SECONDS + WA_CART_STEP3_DELAY_SECONDS + 2 * 60 * 60; // ~30h
-const WA_CART_STEP2_SENTINEL_TTL = WA_CART_STEP3_DELAY_SECONDS + 2 * 60 * 60; // ~26h
-const WA_CART_STEP3_SENTINEL_TTL = 25 * 60 * 60; // 25h
 
 interface AbandonedCartConfigDefaults {
   step1Enabled: boolean;
@@ -125,7 +97,7 @@ interface CartItemSnapshot {
  * email channel silently never fired for it. `storeDirectory` lists stores through the definer
  * (stores is under RLS); the feature map is cached 5 min per store (BOUNDED-stale).
  */
-async function storeIdsWithFeature(feature: 'abandoned_cart' | 'whatsapp'): Promise<string[]> {
+async function storeIdsWithFeature(feature: 'abandoned_cart'): Promise<string[]> {
   const stores = await storeDirectory();
   const out: string[] = [];
   const CHUNK = 20;
@@ -194,12 +166,7 @@ class AbandonedCartService {
     try {
       logger.info({ correlationId }, '[AbandonedCart] Processing started');
 
-      // Run website-cart detection + WA-cart notification in parallel.
-      // Both are independent; a WBS failure must not block website reminders.
-      await Promise.all([
-        this.detectNewAbandonments(correlationId),
-        this.detectAndNotifyAbandonedWaCarts(correlationId),
-      ]);
+      await this.detectNewAbandonments(correlationId);
 
       await this.processReminders(correlationId);
 
@@ -420,315 +387,6 @@ class AbandonedCartService {
           }
         }
       });
-    }
-  }
-
-  // ──────────────────────────────────────────
-  // WA Cart Detection + WhatsApp Notification
-  // ──────────────────────────────────────────
-
-  /**
-   * Fetch abandoned WhatsApp DM carts from WBS and fire the cartAbandoned
-   * WhatsApp template for each one.
-   *
-   * Architecture decision: we do NOT create AbandonedCart records for WA-origin
-   * carts (the model requires a foreign-key to a Ebda Cart row which doesn't
-   * exist for DM carts). Instead we send a single step-1 WhatsApp reminder
-   * directly via the WBS bridge and use a Redis sentinel key for dedup across
-   * sweep cycles.
-   *
-   * Per-store conditions to run:
-   *   1. Store.wbsEnabled = true
-   *   2. Store.wbsApiKey is set
-   *   3. wbsTemplates.cartAbandoned template is configured
-   *   4. abandoned_cart feature enabled for the store
-   *
-   * Source → channel mapping:
-   *   WA-origin cart → WhatsApp template only (email not applicable)
-   */
-  async detectAndNotifyAbandonedWaCarts(correlationId?: string): Promise<void> {
-    // Stores with BOTH effective entitlements (plan baseline OR override row).
-    const [cartIds, waIds] = await Promise.all([
-      storeIdsWithFeature('abandoned_cart'),
-      storeIdsWithFeature('whatsapp'),
-    ]);
-    const waStoreIds = new Set(waIds);
-    const eligibleStoreIds = cartIds.filter(id => waStoreIds.has(id));
-
-    if (eligibleStoreIds.length === 0) {
-      logger.debug(
-        { correlationId },
-        '[AbandonedCart:WA] No stores with both abandoned_cart + whatsapp features'
-      );
-      return;
-    }
-
-    // Load store WBS config for eligible stores. The directory picks the
-    // wbsEnabled + eligible stores; each store's config + credential is then
-    // read inside its own store scope.
-    const eligible = new Set(eligibleStoreIds);
-    const directory = await storeDirectory(s => s.wbsEnabled && eligible.has(s.id));
-    const loaded = await Promise.all(
-      directory.map(d =>
-        withStore(d.id, tx =>
-          tx.store.findUnique({
-            where: { id: d.id },
-            select: {
-              id: true,
-              name: true,
-              wbsTemplates: true,
-              credentials: { select: { wbsApiKey: true } },
-            },
-          })
-        )
-      )
-    );
-    const stores = loaded
-      .filter((s): s is NonNullable<typeof s> => s !== null && s.credentials?.wbsApiKey != null)
-      .map(s => ({
-        id: s.id,
-        name: s.name,
-        wbsApiKey: s.credentials!.wbsApiKey,
-        wbsTemplates: s.wbsTemplates,
-      }));
-
-    logger.info(
-      { correlationId, storeCount: stores.length },
-      '[AbandonedCart:WA] Scanning WBS clients for abandoned DM carts'
-    );
-
-    for (const store of stores) {
-      try {
-        await this.processWaAbandonedCartsForStore(store, correlationId);
-      } catch (err) {
-        logger.error(
-          { err, correlationId, storeId: store.id },
-          '[AbandonedCart:WA] Failed for store — skipping (non-fatal)'
-        );
-      }
-    }
-  }
-
-  private async processWaAbandonedCartsForStore(
-    store: { id: string; name: string; wbsApiKey: string | null; wbsTemplates: unknown },
-    correlationId?: string
-  ): Promise<void> {
-    if (!store.wbsApiKey) return;
-
-    // Resolve cartAbandoned template from wbsTemplates JSON.
-    // Shape: { cartAbandoned?: { name: string, languageCode: string, channels?: { whatsapp?: boolean, email?: boolean } } }
-    type TemplateEntry = {
-      name?: string;
-      languageCode?: string;
-      channels?: { whatsapp?: boolean; email?: boolean };
-    };
-    type WbsTemplatesShape = { cartAbandoned?: TemplateEntry };
-    const templates = store.wbsTemplates as WbsTemplatesShape | null;
-    const cartAbandonedTemplate = templates?.cartAbandoned;
-
-    if (!cartAbandonedTemplate?.name) {
-      logger.debug(
-        { storeId: store.id },
-        '[AbandonedCart:WA] No cartAbandoned template configured — skipping store'
-      );
-      return;
-    }
-
-    // Respect explicit channel disable (default ON when absent)
-    if (cartAbandonedTemplate.channels?.whatsapp === false) {
-      logger.debug(
-        { storeId: store.id },
-        '[AbandonedCart:WA] WhatsApp channel disabled for cartAbandoned — skipping store'
-      );
-      return;
-    }
-
-    // Decrypt the WBS API key
-    let plaintextKey: string;
-    try {
-      plaintextKey = encryption.decrypt(store.wbsApiKey);
-    } catch {
-      logger.warn(
-        { storeId: store.id },
-        '[AbandonedCart:WA] Failed to decrypt WBS API key — skipping'
-      );
-      return;
-    }
-
-    // Fetch abandoned WA carts from WBS (degraded mode: throws on 401, returns [] on 5xx)
-    let waCarts: AbandonedWaCart[];
-    try {
-      waCarts = await wbsBridgeService.fetchAbandonedWaCarts(plaintextKey, {
-        minutes: WA_ABANDONMENT_MINUTES,
-      });
-    } catch (err) {
-      if (err instanceof WbsUnauthorizedError) {
-        logger.warn({ storeId: store.id }, '[AbandonedCart:WA] WBS 401 — skipping store');
-      } else {
-        logger.error(
-          { err, storeId: store.id },
-          '[AbandonedCart:WA] Failed to fetch WA carts — skipping store'
-        );
-      }
-      return;
-    }
-
-    // Filter to carts that belong to this store (store id match or null as fallback)
-    const relevantCarts = waCarts.filter(
-      cart => cartStoreId(cart) === store.id || cartStoreId(cart) === null
-    );
-
-    logger.info(
-      { correlationId, storeId: store.id, total: waCarts.length, relevant: relevantCarts.length },
-      '[AbandonedCart:WA] Processing abandoned WA carts for store'
-    );
-
-    for (const cart of relevantCarts) {
-      try {
-        await this.sendWaCartAbandonedReminder(store, cart, cartAbandonedTemplate, correlationId);
-      } catch (err) {
-        logger.error(
-          { err, correlationId, storeId: store.id, waCartId: cart.waCartId },
-          '[AbandonedCart:WA] Failed to send reminder for cart — skipping'
-        );
-      }
-    }
-  }
-
-  /**
-   * Multi-step WA cart abandoned reminder sequence.
-   *
-   * Cadence (mirrors website AbandonedCartConfig defaults):
-   *   step1 — fires immediately when the cart is detected as abandoned (≥30min inactivity)
-   *   step2 — fires 4h after step1 sentinel was written
-   *   step3 — fires 24h after step2 sentinel was written
-   *
-   * Each step is deduped via a Redis sentinel key keyed by waCartId + step number.
-   * Sentinel value = Unix timestamp (ms) of when it was written — used by the
-   * next step to check if enough time has elapsed.
-   *
-   * Step N fires only when:
-   *   (a) step N sentinel does NOT yet exist (not already sent)
-   *   (b) for N>1: step N-1 sentinel EXISTS and its stored timestamp is ≥ step-N delay ago
-   *
-   * All 3 steps use the same Meta-approved template (ebda_cart_abandoned_v1).
-   * Variables are identical across steps; messaging variation is a future enhancement.
-   *
-   * Sentinel expiry ensures re-abandoned carts (recovered then abandoned again) get
-   * a fresh reminder sequence after the TTL window.
-   */
-  private async sendWaCartAbandonedReminder(
-    store: { id: string; name: string; wbsApiKey: string | null },
-    cart: AbandonedWaCart,
-    template: { name?: string; languageCode?: string },
-    correlationId?: string
-  ): Promise<void> {
-    if (!store.wbsApiKey) return;
-
-    // Pre-validate the encrypted key decrypts before attempting any send.
-    try {
-      encryption.decrypt(store.wbsApiKey);
-    } catch {
-      logger.warn({ storeId: store.id }, '[AbandonedCart:WA] decrypt failed — skipping cart');
-      return;
-    }
-
-    const step1Key = `wa-cart-abandoned:${cart.waCartId}:step1`;
-    const step2Key = `wa-cart-abandoned:${cart.waCartId}:step2`;
-    const step3Key = `wa-cart-abandoned:${cart.waCartId}:step3`;
-
-    // Read all sentinel values (stored as ms timestamps, or null if not yet fired)
-    const [step1Val, step2Val, step3Val] = await Promise.all([
-      redis.get<string>(step1Key),
-      redis.get<string>(step2Key),
-      redis.get<string>(step3Key),
-    ]);
-
-    const now = Date.now();
-
-    // Determine which step to fire.
-    // At most one step fires per cart per sweep; the next sweep advances further.
-    let stepToFire: 1 | 2 | 3 | null = null;
-
-    if (!step1Val) {
-      // Step 1: fire immediately — cart is newly detected as abandoned
-      stepToFire = 1;
-    } else if (!step2Val) {
-      // Step 2: fires ≥4h after step1
-      const step1SentAt = parseInt(step1Val, 10);
-      if (now - step1SentAt >= WA_CART_STEP2_DELAY_SECONDS * 1000) {
-        stepToFire = 2;
-      }
-    } else if (!step3Val) {
-      // Step 3: fires ≥24h after step2
-      const step2SentAt = parseInt(step2Val, 10);
-      if (now - step2SentAt >= WA_CART_STEP3_DELAY_SECONDS * 1000) {
-        stepToFire = 3;
-      }
-    }
-
-    if (stepToFire === null) {
-      logger.debug(
-        {
-          waCartId: cart.waCartId,
-          step1: Boolean(step1Val),
-          step2: Boolean(step2Val),
-          step3: Boolean(step3Val),
-        },
-        '[AbandonedCart:WA] All applicable steps already sent or not yet due — skipping'
-      );
-      return;
-    }
-
-    const languageCode = template.languageCode || (cart.language === 'ar' ? 'ar' : 'en');
-    const templateName = await resolveSendTemplateName(store.id, template.name!, languageCode);
-    const idempotencyKey = `wa-cart-${cart.waCartId}-step${stepToFire}`;
-
-    // Build variables for ebda_cart_abandoned_v1:
-    //   {{1}} customer name, {{2}} cart total, {{3}} store name
-    const cartTotalMajor = (cart.totalFils / 1000).toFixed(3);
-    const totalDisplay = `${cartTotalMajor} ${cart.currency}`;
-    const customerName = cart.customerName || 'Customer';
-
-    const variables = [customerName, totalDisplay, store.name];
-
-    try {
-      const result = await wbsBridgeService.sendOrderNotification({
-        encryptedApiKey: store.wbsApiKey, // sendOrderNotification decrypts internally
-        recipientPhone: cart.customerPhone,
-        templateName,
-        languageCode,
-        variables,
-        idempotencyKey,
-      });
-
-      // Write sentinel: value = ms timestamp so the next step can measure elapsed time
-      const sentinelKey = stepToFire === 1 ? step1Key : stepToFire === 2 ? step2Key : step3Key;
-      const sentinelTtl =
-        stepToFire === 1
-          ? WA_CART_STEP1_SENTINEL_TTL
-          : stepToFire === 2
-            ? WA_CART_STEP2_SENTINEL_TTL
-            : WA_CART_STEP3_SENTINEL_TTL;
-      await redis.set(sentinelKey, String(now), sentinelTtl);
-
-      logger.info(
-        {
-          correlationId,
-          storeId: store.id,
-          waCartId: cart.waCartId,
-          step: stepToFire,
-          messageId: result.messageId,
-        },
-        '[AbandonedCart:WA] WhatsApp reminder sent'
-      );
-    } catch (err) {
-      if (err instanceof WbsUnauthorizedError) {
-        logger.error({ storeId: store.id }, '[AbandonedCart:WA] WBS 401 on send — skipping');
-      } else {
-        // Re-throw so the caller can log + skip to the next cart
-        throw err;
-      }
     }
   }
 

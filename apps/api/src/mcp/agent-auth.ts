@@ -46,10 +46,9 @@ import logger from '../lib/logger';
  * ## The credential
  *
  * Per store, opt-in, presented as `X-Agent-Key`, stored AES-256-GCM-encrypted
- * in `Store.agentApiKey` with the SAME `encryption.service` scheme the WBS
- * bridge key uses — deliberately reusing that machinery rather than inventing
- * a second credential scheme. Two differences from `waBridgeAuth`, both
- * improvements it could not make:
+ * in `Store.agentApiKey` with the shared `encryption.service` scheme,
+ * deliberately reusing that machinery rather than inventing a second
+ * credential scheme. Two properties of this check:
  *
  *   - **Tenant-pinned by construction.** The store is already resolved from
  *     the URL slug, so exactly ONE row is read and compared. There is no

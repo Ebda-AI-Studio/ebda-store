@@ -11,6 +11,7 @@ import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
 import { ResendService } from '../services/resend.service';
+import { merchantSenderPrefixInput } from '../services/email-sender';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
@@ -350,18 +351,8 @@ const optionalEmail = z.preprocess(
   z.string().email().max(255).optional()
 );
 
-// Local-part for the from-line on per-store sender. Must be RFC-5321 safe.
-const optionalEmailLocalPart = z.preprocess(
-  v => (v === '' || v === null ? undefined : v),
-  z
-    .string()
-    .regex(
-      /^[a-z0-9._-]+$/,
-      'Sender prefix must be lowercase letters, numbers, dot/hyphen/underscore only'
-    )
-    .max(64)
-    .optional()
-);
+// Sender prefix of a store's mail: allowlist, see merchantSenderPrefixInput (services/email-sender.ts).
+const optionalEmailLocalPart = merchantSenderPrefixInput;
 
 const seoSchema = z
   .object({

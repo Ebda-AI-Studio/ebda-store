@@ -42,17 +42,7 @@ vi.mock('@ebda/database', () => ({
   withStore: (_storeId: string, fn: (tx: unknown) => unknown) => fn(holder.prisma),
 }));
 
-vi.mock('@api/services/resend.service', () => {
-  class ResendSendError extends Error {
-    constructor(
-      readonly code: string,
-      message: string
-    ) {
-      super(message);
-    }
-  }
-  return { ResendService: { sendMarketingEmail }, ResendSendError };
-});
+vi.mock('@api/services/resend.service', () => ({ ResendService: { sendMarketingEmail } }));
 
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: {
@@ -71,7 +61,7 @@ vi.mock('@api/lib/logger', () => ({
 const { sendAlert } = vi.hoisted(() => ({ sendAlert: vi.fn(async () => 'sent') }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
 
-import { ResendSendError } from '@api/services/resend.service';
+import { EmailSendError as ResendSendError } from '@api/services/mail-transport';
 import '@api/lib/inngest/functions/campaign-send';
 
 const THROTTLE = 7;

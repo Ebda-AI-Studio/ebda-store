@@ -1,5 +1,6 @@
 import { Inngest, type EventPayload } from 'inngest';
 import { config } from '../../config';
+import { attachJobs } from '../jobs/with-jobs';
 
 /**
  * Event registry — every event the API can fan out lives here so
@@ -66,14 +67,6 @@ type BulkAiProductFaqsEvent = EventPayload & {
 
 type OrderDeliveredEvent = EventPayload & {
   name: 'order/delivered';
-  data: {
-    orderId: string;
-    storeId: string;
-  };
-};
-
-type OrderShippedEvent = EventPayload & {
-  name: 'order/shipped';
   data: {
     orderId: string;
     storeId: string;
@@ -390,7 +383,6 @@ export type AppEvent =
   | BulkAiSeoEvent
   | BulkAiProductFaqsEvent
   | OrderDeliveredEvent
-  | OrderShippedEvent
   | ReviewSubmittedEvent
   | StockPoReceivedEvent
   | StockAdjustmentPostedEvent
@@ -479,3 +471,8 @@ if (isDryRun) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (inngest as any).send = async () => ({ ids: [] });
 }
+
+// G5: the job layer (lib/jobs). Registers every function for the Cloudflare runners, routes
+// `send` per rollout group (JOBS_CF_GROUPS) and makes a function that already moved a no-op
+// here. Applied AFTER the dry-run override so CI's no-op send stays the Inngest fallback.
+attachJobs(inngest);

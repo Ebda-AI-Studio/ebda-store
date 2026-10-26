@@ -336,7 +336,6 @@ const MERCHANT_EMAIL_TEMPLATES = [
 ];
 const SHOPPER_MESSAGE_FILES = [
   'packages/shared/src/notifications.ts',
-  'apps/api/src/lib/wa-templates/definitions.ts',
   'apps/api/src/lib/newsletter-broadcast.ts',
   'apps/api/src/services/campaign.service.ts',
   'apps/api/src/services/email.service.ts',
@@ -351,7 +350,7 @@ const shopperMessagePaths = () => [
   ...SHOPPER_MESSAGE_FILES.map(f => join(ROOT, f)),
 ];
 
-describe('shopper messages: email, SMS, web push, WhatsApp templates (Ruling FU46-Y02a, shopper voice)', () => {
+describe('shopper messages: email, SMS, web push (Ruling FU46-Y02a, shopper voice)', () => {
   it('no MSA sentence in any shopper-facing message source', () => {
     const paths = shopperMessagePaths();
     expect(paths.length).toBeGreaterThan(12);
@@ -371,7 +370,6 @@ describe('shopper messages: email, SMS, web push, WhatsApp templates (Ruling FU4
       ['apps/api/src/services/email-templates/order-confirmation.ts', 'طلبك اتسجل'],
       ['apps/api/src/services/email-templates/order-shipped.ts', 'طلبك اتشحن'],
       ['packages/shared/src/notifications.ts', 'طلبك رقم #{number} اتأكد'],
-      ['apps/api/src/lib/wa-templates/definitions.ts', 'اتسلّم. شكراً إنك اشتريت من عندنا'],
     ];
     const missing = PINNED.filter(([f, s]) => !readFileSync(join(ROOT, f), 'utf8').includes(s));
     expect(missing).toEqual([]);

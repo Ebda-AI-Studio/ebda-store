@@ -212,6 +212,16 @@ const nextConfig = {
         destination: '/stores/:id/builder',
         permanent: true,
       },
+      // The legacy in-Store WhatsApp bridge pages were deleted (Ruling WA-LEGACY-1);
+      // old bookmarks land on Settings. `/integrations/*` only ever held that bridge page.
+      ...[
+        '/stores/:id/whatsapp',
+        '/stores/:id/wa-bot',
+        '/stores/:id/wa-templates',
+        '/stores/:id/wa-order-updates',
+        '/stores/:id/payment-link',
+        '/stores/:id/integrations/:path*',
+      ].map(source => ({ source, destination: '/stores/:id/settings', permanent: true })),
     ];
   },
 

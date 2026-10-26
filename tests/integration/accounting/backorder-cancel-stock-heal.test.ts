@@ -358,6 +358,56 @@ describe.skipIf(!hasDb)('issue 2299 — the other two backorder stock paths', ()
     expect(await variantStock()).toBe(2); // was 5: three phantom units
   });
 
+  it('(b) a PARTIAL return of a variant backorder cannot restock units checkout never took', async () => {
+    const store = await backorderStore();
+    const suffix = uid();
+    const vp = await withRlsBypass(tx =>
+      tx.product.create({
+        data: {
+          storeId: store.storeId,
+          name: `heal-vpart-${suffix}`,
+          slug: `heal-vpart-${suffix}`,
+          price: 1000,
+          inventory: 0,
+          hasVariants: true,
+          status: 'active',
+          variants: {
+            create: [{ title: 'Only', price: 1000, inventory: 2, allowBackorder: true }],
+          },
+        },
+        include: { variants: true },
+      })
+    );
+    const variant = vp.variants[0];
+    const { order, backorders } = await checkout(store.storeId, [
+      { productId: vp.id, variantId: variant.id, quantity: 5 },
+    ]);
+    const variantStock = async () =>
+      (
+        await withRlsBypass(tx =>
+          tx.productVariant.findUniqueOrThrow({ where: { id: variant.id } })
+        )
+      ).inventory;
+    expect(await variantStock()).toBe(0);
+    const orderItemId = backorders[0].orderItemId;
+
+    // 4 of the 5 come back: only the 2 units checkout took exist to restock.
+    await handleOrderRefunded(order.id, store.storeId, true, false, stepStub, {
+      items: [{ orderItemId, quantity: 4 }],
+      refundKey: `ret-${uid()}`,
+    });
+    expect(await variantStock()).toBe(2); // was 4: two phantom units
+
+    // A second partial finds nothing left to restock, and so does the whole-order cancel.
+    await handleOrderRefunded(order.id, store.storeId, true, false, stepStub, {
+      items: [{ orderItemId, quantity: 1 }],
+      refundKey: `ret-${uid()}`,
+    });
+    expect(await variantStock()).toBe(2);
+    await handleOrderRefunded(order.id, store.storeId, true, false, stepStub);
+    expect(await variantStock()).toBe(2);
+  });
+
   // issue 2316 — PO-fulfilled units went to the customer without touching
   // the variant row, so on a whole-order cancel they come back and are real.
   it('(b) a variant backorder PO-fulfilled then cancelled restores every unit', async () => {

@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { prisma } from '@ebda/database';
+import { defaultNewStoreLook } from '@ebda/shared';
 import { API_BASE } from '../helpers/api-base';
 import { hasDb } from '../helpers/bundle-fixtures';
 
@@ -137,8 +138,15 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
     const host = `${slug}.ebda.app`;
     expect((await call('GET', '/public/products?limit=5', { host })).status).toBe(400); // not live yet
 
+    // Picking a style is now `applyLook` onto a BUILT look; a bare-skin switch like 'bold' is closed
+    // (Ruling B1-17, StoreService.updateTemplate -> 400 INVALID_TEMPLATE).
     expect(
-      (await call('PUT', `/stores/${storeId}/template`, { jwt, body: { template: 'bold' } })).status
+      (
+        await call('PUT', `/stores/${storeId}/look`, {
+          jwt,
+          body: { lookId: defaultNewStoreLook().id, design: 'reset' },
+        })
+      ).status
     ).toBe(200);
     const product = await call('POST', `/stores/${storeId}/products`, {
       jwt,
@@ -150,6 +158,19 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
         await call('PUT', `/onboarding/stores/${storeId}/payment-methods`, {
           jwt,
           body: { cod: true },
+        })
+      ).status
+    ).toBe(200);
+    // Billing gate (Ruling EBDA-FUNNEL-5): the 14-day trial needs a card or InstaPay chosen before go-live.
+    // Nothing is charged; InstaPay needs EBDA_INSTAPAY_HANDLE on the API server (ci.yml sets it).
+    const refused = await call('POST', `/onboarding/stores/${storeId}/go-live`, { jwt });
+    expect(refused.status).toBe(402);
+    expect(refused.body?.error?.code).toBe('PAYMENT_METHOD_REQUIRED');
+    expect(
+      (
+        await call('POST', `/stores/${storeId}/billing/payment-method`, {
+          jwt,
+          body: { method: 'instapay' },
         })
       ).status
     ).toBe(200);

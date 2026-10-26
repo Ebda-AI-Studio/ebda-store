@@ -164,7 +164,6 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       funnelSnapshots: 'FunnelSnapshot',
       customerRfmSnapshots: 'CustomerRfmSnapshot',
       productDailyViews: 'ProductDailyView',
-      whatsAppTemplates: 'WhatsAppTemplate',
       paymentEvents: 'PaymentEvent',
       orderEvents: 'OrderEvent',
       webhookEvents: 'WebhookEvent',
@@ -1330,14 +1329,6 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     },
   },
   {
-    name: 'WhatsAppTemplate',
-    table: 'whatsapp_templates',
-    storeId: true,
-    relations: {
-      store: 'Store',
-    },
-  },
-  {
     name: 'BankStatement',
     table: 'bank_statements',
     storeId: true,
@@ -1496,6 +1487,18 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
     },
+  },
+  {
+    name: 'ProviderVerification',
+    table: 'provider_verifications',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'ProviderVerificationEvent',
+    table: 'provider_verification_events',
+    storeId: false,
+    relations: {},
   },
   {
     name: 'FiscalDocument',

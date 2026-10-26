@@ -74,11 +74,8 @@ import pageBuilderRoutes from './page-builder.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
-import wbsIntegrationRoutes from './wbs-integration.routes';
 import agentCredentialRoutes from './agent-credential.routes';
 import merchantKeyRoutes from './merchant-key.routes';
-import waTemplatesRoutes from './wa-templates.routes';
-import paymentLinksRoutes from './payment-links.routes';
 import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
 import insightsRoutes from './insights.routes';
@@ -92,7 +89,6 @@ import warehouseRoutes from './warehouse.routes';
 import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
-import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
@@ -106,7 +102,6 @@ import {
   tenantContext,
   aiRouteContext,
   orderRouteContext,
-  storeScopeContext,
   publicStoreContext,
   billingRouteContext,
 } from '../middleware/tenant-context';
@@ -466,27 +461,13 @@ router.use('/stores/:storeId/webhooks', tenantContext, merchantWebhookRoutes);
 // Login-free opt-out link carried by every promotional SMS (issue 206).
 router.use('/public/sms-consent', smsConsentPublicRoutes);
 
-// WBS integration routes (Ebda ↔ WBS bridge config).
-// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers
-// call the external WBS backend via `fetch` in-request.
-router.use('/stores', tenantContext, wbsIntegrationRoutes);
-
 // Agent (MCP) write-credential admin — mint / rotate / revoke the per-store
-// `x-agent-key`. Mounted next to the WBS integration routes because it is the
-// same shape of per-store credential admin (`/stores/:id/integrations/...`).
+// `x-agent-key`. Per-store credential admin (`/stores/:id/integrations/...`).
 // `tenantContext` here is the same bare-mount no-op it is on every `/stores`
 // line above (Express only fills params declared in the MOUNT path); tenant
 // scoping comes from `requireStoreAccess` inside the router.
 router.use('/stores', tenantContext, agentCredentialRoutes);
 router.use('/stores', tenantContext, merchantKeyRoutes);
-
-// Phase 7: WhatsApp templates admin (generate / sync / status)
-router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);
-
-// Phase 7: merchant-initiated payment links via WhatsApp
-// Calls a payment gateway (and WhatsApp), so it runs under store scope (SP6b): no transaction
-// is held across those calls.
-router.use('/stores/:id/payment-links', storeScopeContext, paymentLinksRoutes);
 
 // Finance routes (COA tree + general ledger journal).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the
@@ -549,11 +530,6 @@ router.use('/stores', tenantContext, backordersRoutes);
 // SlugRedirect rows (recordSlugRedirect is the sole writer — see
 // docs/architecture/slug-redirects.md).
 router.use('/stores', tenantContext, slugRedirectsRoutes);
-
-// Phase 5 bot intelligence: proxy bot analytics from WBS to admin frontend.
-// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the handler
-// calls the external WBS backend via `fetch` (10s timeout) in-request.
-router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);

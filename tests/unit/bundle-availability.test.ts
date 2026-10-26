@@ -313,8 +313,7 @@ describe('resolveBundle', () => {
 
 // ─── listPurchasableBundles / describeBundleContents (Task 10) ─────────────
 //
-// These back the two advertising surfaces (AI product feed, WBS catalogue
-// bridge) — the contract under test is: only `isPurchasable` bundles are
+// This backs the advertising surface (AI product feed) — the contract under test is: only `isPurchasable` bundles are
 // ever returned, and component NAMES (never per-component prices) are
 // attached for surfaces that want to list contents.
 
@@ -487,7 +486,7 @@ describe('listPurchasableBundles', () => {
     expect(JSON.stringify(result[0].componentNames)).not.toMatch(/price/i);
   });
 
-  // P1: the AI product feed and the WBS catalogue bridge advertise whatever
+  // P1: the AI product feed advertises whatever
   // this returns. A bundle whose `fixed` discount outgrew its components
   // must vanish from them at the same instant it stops being sellable — one
   // predicate governs both.

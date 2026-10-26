@@ -88,7 +88,7 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   'routes/shipping.routes.ts':
     'area-rate upsert batches keyed on (storeId, country, governorate, area); reference only storeId; no prior write in the request',
   'routes/order.routes.ts':
-    'COD mark-paid / bulk-mark-paid flip existing payment + order rows. Its own commit is load-bearing today: the handler enqueues `order/created` BEFORE the request commits, and the accounting + WBS consumers must read the order as paid. Moving the flip into the request transaction needs that send moved behind deferAfterTenantCommit first — see Ruling M5-3',
+    'COD mark-paid / bulk-mark-paid flip existing payment + order rows. Its own commit is load-bearing today: the handler enqueues `order/created` BEFORE the request commits, and the accounting consumer must read the order as paid. Moving the flip into the request transaction needs that send moved behind deferAfterTenantCommit first — see Ruling M5-3',
 };
 
 /**

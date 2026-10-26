@@ -340,7 +340,7 @@ export async function resolveBundle(
 
 /**
  * A purchasable bundle plus the small set of extra display fields the
- * read-only advertising surfaces (AI product feed, WBS catalogue bridge)
+ * read-only advertising surfaces (AI product feed)
  * need but `ResolvedBundle` doesn't carry: `updatedAt` (freshness, mirrors
  * `FeedProductInput.updatedAt`) and `componentNames` (for a human-readable
  * "what's inside" line — see `describeBundleContents`).
@@ -359,7 +359,7 @@ export interface PurchasableBundleSummary extends ResolvedBundle {
 /**
  * Every bundle a store is currently allowed to SELL, for a read-only
  * advertising surface that lists a bundle as a sibling of a product entry
- * (AI product feed, WBS catalogue bridge). Reuses `resolveBundle` — the one
+ * (AI product feed). Reuses `resolveBundle` — the one
  * place `price`/`available`/`isPurchasable` is computed — rather than
  * re-deriving that math here, and filters to `isPurchasable` the same way
  * `GET /public/:storeId/bundles` in bundle.routes.ts does.

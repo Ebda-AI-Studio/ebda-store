@@ -255,7 +255,6 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'aiTools.jobKind.llmsTxt',
   'aiTools.geoResults.llmsTxt.label',
   'account.security.codePlaceholder',
-  'whatsappIntegration.orderUpdates.whatsapp',
   'blog.editor.slugPlaceholder',
   'checkoutDelivery.page.invoiceEmailPlaceholder',
   'zoneEditor.textAlignAriaLabel',

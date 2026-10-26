@@ -138,6 +138,9 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
           firstName: 'Mona',
           lastName: 'Adel',
           phone: '+201012345678',
+          // Aramex requires a consignee email (ARAMEX_EMAIL_REQUIRED, #194); the shipper side falls back
+          // to the store owner's email.
+          email: 'mona.adel@example.test',
           address1: '5 Nile Corniche',
           city: 'Giza',
           state: 'Giza',
@@ -366,35 +369,18 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
       expect(parcel).toMatchObject({ codCurrency: 'EGP', codMinor: 50_000 });
     });
 
-    it('an unverified carrier never books: an already-enabled row is refused at the point of use, before any carrier call', async () => {
+    it('an unverified carrier books once connected and enabled (PROVIDERS-3), in production mode too', async () => {
       const s = await mkStore('unverified');
-      await bostaConfig(s); // enabled + tested while the stub-suite seam is on
+      await bostaConfig(s); // enabled + tested
       const o = await mkOrder(s);
-      const calls = bosta.requests.length;
       const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
       delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED; // run as production does
       try {
-        await expect(book(s, o.id, 'bosta')).rejects.toMatchObject({
-          code: 'CARRIER_NOT_ENABLED',
-        });
-        const res = await asApp(async () =>
-          http()
-            .post(`/api/v1/stores/${s.id}/orders/${o.id}/ship`)
-            .set(auth(s.jwt))
-            .send({ carrier: 'bosta' })
-        );
-        expect(res.status).toBe(409);
-        expect(res.body.error.code).toBe('CARRIER_NOT_ENABLED');
+        expect((await book(s, o.id, 'bosta')).status).toBe('created');
       } finally {
         process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = prev;
       }
-      expect(bosta.requests.length).toBe(calls); // no carrier call at all
-      expect(await shipmentOf(o.id)).toBeNull();
-      expect((await owner.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe(
-        'confirmed'
-      );
-      // the seam back on, the same row books (the refusal was the gate, nothing else)
-      expect((await book(s, o.id, 'bosta')).status).toBe('created');
+      expect((await shipmentOf(o.id))?.status).toBe('created');
     });
 
     it('manual carrier: the merchant types the courier and the tracking number', async () => {

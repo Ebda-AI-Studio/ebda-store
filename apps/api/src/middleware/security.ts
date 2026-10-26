@@ -50,7 +50,7 @@ if (!isWorkers) {
       }
     },
     5 * 60 * 1000
-  ); // Every 5 minutes
+  ).unref(); // Every 5 minutes. unref: merely importing this module (any script that reaches it through a service) must not keep the process alive.
 }
 
 /**
@@ -607,7 +607,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // Anything the storefront POSTs with a RAW fetch — bypassing buildHeaders —
   // now 403s from a merchant custom domain unless its path returns early
   // above or its router is mounted before this middleware in index.ts
-  // (/webhooks, /alerts/webhooks, /wa-bridge, /inngest). That mount order is
+  // (/webhooks, /alerts/webhooks, /inngest). That mount order is
   // the only thing exempting them, so a raw write-fetch to one of those paths
   // is one `app.use` reorder away from breaking silently: keep storefront
   // writes on the ApiClient rather than relying on it.

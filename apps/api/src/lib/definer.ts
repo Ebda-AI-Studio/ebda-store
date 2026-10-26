@@ -778,17 +778,6 @@ export async function ownedStoreIds(ownerId: string): Promise<string[]> {
 }
 
 /**
- * The WhatsApp bridge's pre-scope key check: the CIPHERTEXT of every bridge-enabled
- * store's WBS key, for constant-time comparison after decryption in the API. Nothing
- * else may call this.
- */
-export async function wbsBridgeKeys(): Promise<Array<{ storeId: string; wbsApiKey: string }>> {
-  const rows = await prisma.$queryRaw<Array<{ store_id: string; wbs_api_key: string }>>`
-    SELECT store_id, wbs_api_key FROM public.ebda_wbs_bridge_keys()`;
-  return rows.map(r => ({ storeId: r.store_id, wbsApiKey: r.wbs_api_key }));
-}
-
-/**
  * OneSignal player ids of a store's owner (`'store_admin'`, only for the store the
  * transaction is scoped to: wrap in `withStore(storeId, ...)`) or of every active
  * super_admin (`'super_admin'`). Device ids only.
