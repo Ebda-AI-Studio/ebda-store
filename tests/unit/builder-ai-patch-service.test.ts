@@ -47,6 +47,7 @@ describe('proposeBuilderPatch', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.baseRev).toBe(4);
+    expect(r.value.candidate.sections.find(x => x.id === hero.id)!.settings.autoplayMs).toBe(9000);
     expect(r.value.ops).toHaveLength(1);
     expect(r.value.rejected).toHaveLength(1);
     expect(r.value.changes[0]).toMatchObject({ key: 'autoplayMs', after: 9000 });

@@ -15,6 +15,7 @@ import {
   type AiPatchChange,
   type AiPatchOp,
   type AiPatchResult,
+  type PageDefinition,
 } from '@ebda/shared';
 import { z } from 'zod';
 import { AIService } from './ai.service';
@@ -28,6 +29,8 @@ export interface BuilderPatchProposal {
   ops: AiPatchOp[];
   changes: AiPatchChange[];
   rejected: AiPatchResult['rejected'];
+  /** The page with the patch applied, for the canvas preview. Never saved by `propose`. */
+  candidate: PageDefinition;
 }
 
 const notFound = {
@@ -69,6 +72,7 @@ export async function proposeBuilderPatch(args: {
       ops: patch.ops.filter((_, i) => !dropped.has(i)),
       changes: applied.changes,
       rejected: applied.rejected,
+      candidate: applied.doc,
     },
   };
 }

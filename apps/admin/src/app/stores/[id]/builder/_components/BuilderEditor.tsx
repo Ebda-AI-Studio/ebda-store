@@ -68,6 +68,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { AddSectionDialog } from './AddSectionDialog';
 import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 import { RevisionsPanel } from './RevisionsPanel';
+import { AiPatchPane, type AiPatchProposal } from './AiPatchPane';
 import { PageSwitcher, type PreviewProduct } from './PageSwitcher';
 import { PageSettingsPanel } from './PageSettingsPanel';
 import { LookSwitchPane, type LookDesignChoice, type LookPreviewResult } from './LookSwitchPane';
@@ -83,7 +84,7 @@ interface StoreInfo {
   template?: string | null;
 }
 
-type StartTab = 'sections' | 'theme' | 'history';
+type StartTab = 'sections' | 'theme' | 'ai' | 'history';
 
 /** Smart Palette over a document (the modal's `ThemeUpdates` is a plain record of theme keys). */
 const applyPalette = (
@@ -144,6 +145,13 @@ export function BuilderEditor({
     (LookPreviewResult & { draft: PageDefinition; design: LookDesignChoice }) | null
   >(null);
   const [lookBusy, setLookBusy] = useState<'preview' | 'apply' | null>(null);
+  // Ask AI (Phase 5): a validated patch proposal shown in the canvas over the saved draft; nothing is
+  // written until Apply, and Apply writes the DRAFT only.
+  const [patchPreview, setPatchPreview] = useState<
+    (AiPatchProposal & { candidate: PageDefinition }) | null
+  >(null);
+  const [patchBusy, setPatchBusy] = useState<'ask' | 'apply' | null>(null);
+  const [patchError, setPatchError] = useState<string | null>(null);
 
   // The LIVE store (its theme is what the storefront shows). Re-read after a
   // publish or a restore, which are the only things that change it here.
@@ -310,7 +318,7 @@ export function BuilderEditor({
     if (selection) setLookOpen(false);
   }, [selection]);
   const previewingRef = useRef(false);
-  previewingRef.current = lookPreview !== null;
+  previewingRef.current = lookPreview !== null || patchPreview !== null;
   // A proposal is computed from the document as it was; if the draft moves under it (the tree,
   // a tab, autosave) the proposal is stale and Apply would only answer DRAFT_MOVED, so drop it.
   const previewBaseDoc = useRef<typeof b.doc>(null);
@@ -322,6 +330,15 @@ export function BuilderEditor({
     if (previewBaseDoc.current === null) previewBaseDoc.current = b.doc;
     else if (previewBaseDoc.current !== b.doc) setLookPreview(null);
   }, [lookPreview, b.doc]);
+  const patchBaseDoc = useRef<typeof b.doc>(null);
+  useEffect(() => {
+    if (!patchPreview) {
+      patchBaseDoc.current = null;
+      return;
+    }
+    if (patchBaseDoc.current === null) patchBaseDoc.current = b.doc;
+    else if (patchBaseDoc.current !== b.doc) setPatchPreview(null);
+  }, [patchPreview, b.doc]);
   const onCanvasMessage = useCallback(
     (msg: ChildToParent) => {
       // While a proposed look is shown the canvas is read-only: nothing it sends edits the real page.
@@ -466,6 +483,55 @@ export function BuilderEditor({
     }
   };
 
+  const askAiPatch = async (instruction: string) => {
+    setPatchBusy('ask');
+    setPatchError(null);
+    try {
+      if (!(await settleDraft())) return void setPatchError(t('aiPatch.saveFirst'));
+      const r = await apiPost<AiPatchProposal & { candidate: PageDefinition }>(
+        `/api/v1/stores/${storeId}/ai/builder-patch`,
+        { pageKey, instruction }
+      );
+      if (r.error || !r.data) {
+        const code = r.error?.code ?? '';
+        return void setPatchError(
+          code.startsWith('AI_QUOTA') || code === 'AI_BUDGET_EXCEEDED'
+            ? t('aiPatch.quota')
+            : t('aiPatch.failed')
+        );
+      }
+      setPatchPreview(r.data);
+      setDrawer(d => (d === 'start' ? null : d));
+    } finally {
+      setPatchBusy(null);
+    }
+  };
+
+  const applyAiPatchNow = async () => {
+    if (!patchPreview) return;
+    setPatchBusy('apply');
+    try {
+      const r = await apiPost(
+        `/api/v1/admin/stores/${storeId}/builder/pages/${pageKey}/ai-patch/apply`,
+        { baseRev: patchPreview.baseRev, ops: patchPreview.ops }
+      );
+      if (r.error) {
+        setPatchPreview(null);
+        return void setPatchError(
+          r.error.code === 'REV_CONFLICT' || r.error.code === 'PATCH_STALE'
+            ? t('aiPatch.moved')
+            : t('aiPatch.failed')
+        );
+      }
+      toastSuccess(t('aiPatch.applied'));
+      setPatchPreview(null);
+      await b.reload();
+      setReloadKey(k => k + 1);
+    } finally {
+      setPatchBusy(null);
+    }
+  };
+
   const applyLookNow = async () => {
     if (!lookPreview) return;
     setLookBusy('apply');
@@ -584,8 +650,8 @@ export function BuilderEditor({
         className="flex border-b border-border text-xs"
       >
         {(isHome
-          ? (['sections', 'theme', 'history'] as const)
-          : (['sections', 'history'] as const)
+          ? (['sections', 'theme', 'ai', 'history'] as const)
+          : (['sections', 'ai', 'history'] as const)
         ).map(k => (
           <button
             key={k}
@@ -687,6 +753,16 @@ export function BuilderEditor({
               // a single Undo takes the whole palette back and nothing is live before Publish.
               b.patchDocument(d => applyPalette(d, palette, updates), 'smart-palette');
             }}
+          />
+        )}
+        {tab === 'ai' && (
+          <AiPatchPane
+            busy={patchBusy}
+            proposal={patchPreview}
+            error={patchError}
+            onAsk={text => void askAiPatch(text)}
+            onApply={() => void applyAiPatchNow()}
+            onDiscard={() => setPatchPreview(null)}
           />
         )}
         {tab === 'history' && (
@@ -990,7 +1066,7 @@ export function BuilderEditor({
             storefrontUrl={getStoreHref(store)}
             path={canvasPath}
             token={token}
-            doc={lookPreview?.draft ?? b.doc}
+            doc={lookPreview?.draft ?? patchPreview?.candidate ?? b.doc}
             viewport={viewport}
             selectedId={selection?.sectionId ?? null}
             selectedBlockId={selection?.blockId ?? null}

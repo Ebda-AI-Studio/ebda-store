@@ -1,0 +1,191 @@
+'use client';
+
+/**
+ * Ask AI to edit the page (builder Phase 5). The merchant types a plain request; the server answers with a
+ * STRUCTURED, validated patch. The proposed page renders in the same canvas (over the merchant's own
+ * content) and this pane lists exactly what changes, before and after. Nothing is saved until Apply, and
+ * Apply only writes the DRAFT (Undo works, nothing goes live before Publish).
+ */
+import { useState } from 'react';
+import { useLocale } from 'next-intl';
+import { useT } from '@/i18n/useT';
+
+export interface AiPatchChangeRow {
+  op: string;
+  id?: string;
+  key?: string;
+  before?: unknown;
+  after?: unknown;
+  labelEn: string;
+  labelAr: string;
+}
+
+export interface AiPatchProposal {
+  baseRev: number;
+  summaryEn: string;
+  summaryAr: string;
+  ops: unknown[];
+  changes: AiPatchChangeRow[];
+  rejected: Array<{ index: number; reason: string }>;
+}
+
+function show(v: unknown, t: (k: string, p?: Record<string, string | number>) => string): string {
+  if (v === undefined || v === null || v === '') return '-';
+  if (typeof v === 'boolean') return v ? t('shown') : t('hidden');
+  return String(v);
+}
+
+export function AiPatchPane({
+  busy,
+  proposal,
+  error,
+  onAsk,
+  onApply,
+  onDiscard,
+}: {
+  busy: 'ask' | 'apply' | null;
+  proposal: AiPatchProposal | null;
+  error: string | null;
+  onAsk: (instruction: string) => void;
+  onApply: () => void;
+  onDiscard: () => void;
+}) {
+  const t = useT('builder.aiPatch');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
+  const [text, setText] = useState('');
+
+  return (
+    <div
+      className="flex h-full flex-col"
+      data-testid="ai-patch-pane"
+      data-setting-id="builder.ai-patch"
+    >
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold">{t('title')}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{t('intro')}</p>
+      </div>
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        {proposal ? (
+          <section aria-label={t('changesTitle')} className="space-y-3 text-sm">
+            <p className="font-medium">
+              {locale === 'ar' ? proposal.summaryAr : proposal.summaryEn}
+            </p>
+            {proposal.changes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t('none')}</p>
+            ) : (
+              <>
+                <h3 className="text-xs font-semibold text-muted-foreground">{t('changesTitle')}</h3>
+                <ul className="space-y-2">
+                  {proposal.changes.map((c, i) => (
+                    <li key={i} className="rounded-lg border border-border p-2 text-xs">
+                      <span className="block font-medium">
+                        {locale === 'ar' ? c.labelAr : c.labelEn}
+                      </span>
+                      {c.op === 'setSectionSetting' ||
+                      c.op === 'setBlockSetting' ||
+                      c.op === 'setTheme' ||
+                      c.op === 'setSectionHidden' ? (
+                        <span className="mt-1 flex flex-wrap items-center gap-1 text-muted-foreground">
+                          <span>{t('from')}</span>
+                          <bdi className="rounded bg-muted px-1">{show(c.before, t)}</bdi>
+                          <span>{t('to')}</span>
+                          <bdi className="rounded bg-primary/15 px-1 text-foreground">
+                            {show(c.after, t)}
+                          </bdi>
+                        </span>
+                      ) : (
+                        <span className="mt-1 block text-muted-foreground">
+                          {c.op === 'addSection'
+                            ? t('added')
+                            : c.op === 'removeSection'
+                              ? t('removed')
+                              : t('moved_to', { pos: Number(c.after ?? 0) + 1 })}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {proposal.rejected.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t('skipped', { count: proposal.rejected.length })}
+              </p>
+            )}
+            {proposal.changes.length > 0 && (
+              <p className="text-xs text-muted-foreground">{t('draftNote')}</p>
+            )}
+            <div className="flex gap-2 pt-1">
+              {proposal.changes.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onApply}
+                  disabled={busy !== null}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  data-testid="ai-patch-apply"
+                >
+                  {busy === 'apply' ? t('applying') : t('apply')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onDiscard}
+                disabled={busy !== null}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                data-testid="ai-patch-discard"
+              >
+                {t('discard')}
+              </button>
+            </div>
+          </section>
+        ) : (
+          <>
+            <label className="block text-xs font-medium" htmlFor="ai-patch-input">
+              {t('title')}
+            </label>
+            <textarea
+              id="ai-patch-input"
+              dir="auto"
+              rows={4}
+              maxLength={500}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder={t('placeholder')}
+              disabled={busy !== null}
+              className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+            />
+            <div className="flex flex-wrap gap-2">
+              {(['example1', 'example2'] as const).map(k => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setText(t(k))}
+                  className="rounded-full border border-border px-2.5 py-1 text-xs hover:bg-muted"
+                >
+                  {t(k)}
+                </button>
+              ))}
+            </div>
+            {error && (
+              <p role="alert" className="text-xs text-destructive-ink">
+                {error}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const v = text.trim();
+                if (v.length >= 2) onAsk(v);
+              }}
+              disabled={busy !== null}
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              data-testid="ai-patch-ask"
+            >
+              {busy === 'ask' ? t('asking') : t('ask')}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

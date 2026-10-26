@@ -1633,6 +1633,19 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.ai-patch",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Ask AI",
+    "ar": "اسأل الذكاء",
+    "synEn": "ask ai edit page change describe assistant patch",
+    "synAr": "اسأل الذكاء الاصطناعي تعديل الصفحة تغيير وصف مساعد",
+    "query": "select=ai",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.history",
     "kind": "setting",
     "route": "/builder",
