@@ -57,11 +57,31 @@ BEGIN
      OR NEW."created_at" IS DISTINCT FROM OLD."created_at" THEN
     RAISE EXCEPTION 'billing_grants is append-only (immutable column changed)';
   END IF;
-  IF OLD."status" = 'applied' THEN
+  -- every move is checked, whatever the old state
+  IF NEW."status" = 'revoked' AND (NEW."revoked_at" IS NULL OR NEW."revoke_reason" IS NULL) THEN
+    RAISE EXCEPTION 'billing_grants: a revoked grant needs revoked_at and revoke_reason';
+  END IF;
+  IF NEW."status" <> 'revoked' AND (NEW."revoked_at" IS NOT NULL OR NEW."restored_at" IS NOT NULL) THEN
+    RAISE EXCEPTION 'billing_grants: revoked_at / restored_at belong to a revoked grant only';
+  END IF;
+  IF NEW."status" = 'applied' AND (NEW."applied_at" IS NULL OR NEW."period_end_before" IS NULL OR NEW."period_end_after" IS NULL) THEN
+    RAISE EXCEPTION 'billing_grants: an applied grant needs its period bookkeeping';
+  END IF;
+  IF OLD."status" = 'pending' THEN
+    IF NEW."status" = 'revoked' AND (NEW."restored_at" IS NOT NULL OR NEW."applied_at" IS NOT NULL
+         OR NEW."period_end_before" IS NOT NULL OR NEW."period_end_after" IS NOT NULL) THEN
+      RAISE EXCEPTION 'billing_grants: a pending grant is revoked without period bookkeeping';
+    END IF;
+    IF NEW."status" = 'pending' AND (NEW."applied_at" IS NOT NULL OR NEW."period_end_before" IS NOT NULL
+         OR NEW."period_end_after" IS NOT NULL) THEN
+      RAISE EXCEPTION 'billing_grants: a pending grant has no period bookkeeping';
+    END IF;
+  ELSIF OLD."status" = 'applied' THEN
     IF NEW."status" NOT IN ('applied', 'revoked')
        OR NEW."period_end_before" IS DISTINCT FROM OLD."period_end_before"
        OR NEW."period_end_after" IS DISTINCT FROM OLD."period_end_after"
-       OR NEW."applied_at" IS DISTINCT FROM OLD."applied_at" THEN
+       OR NEW."applied_at" IS DISTINCT FROM OLD."applied_at"
+       OR NEW."restored_at" IS NOT NULL THEN
       RAISE EXCEPTION 'billing_grants: an applied grant can only be revoked';
     END IF;
   ELSIF OLD."status" = 'revoked' THEN

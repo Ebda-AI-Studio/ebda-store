@@ -27,10 +27,12 @@ import {
 } from '@ebda/database';
 import { resolveStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
-import { addInterval } from './period';
+import { addInterval, priceFor } from './period';
 
 export const FOUNDING_SLOTS = 20;
 export const REFERRER_MAX_GRANTS = 3;
+/** The daily sweep re-checks referral links this young; older ones that never paid are dropped from the scan. */
+const REFERRAL_SWEEP_DAYS = 120;
 export type GrantKind = 'founding' | 'referral_referrer' | 'referral_referred';
 
 type Tx = Prisma.TransactionClient;
@@ -60,7 +62,8 @@ async function monthValueMinor(tx: Tx, storeId: string): Promise<number> {
  */
 export async function firstQualifyingPayment(
   tx: Tx,
-  storeId: string
+  storeId: string,
+  plans?: PlanPrices
 ): Promise<{ id: string; createdAt: Date } | null> {
   const events = await tx.billingEvent.findMany({
     where: {
@@ -71,16 +74,29 @@ export async function firstQualifyingPayment(
     },
     orderBy: { createdAt: 'asc' },
     take: 20,
-    select: { id: true, amountMinor: true, planCode: true, createdAt: true },
+    select: { id: true, amountMinor: true, planCode: true, billingInterval: true, createdAt: true },
   });
   if (events.length === 0) return null;
-  const plans = await prisma.plan.findMany({ select: { code: true, priceMonthlyMinor: true } });
-  const monthly = new Map(plans.map(p => [p.code, p.priceMonthlyMinor ?? 0]));
+  const catalog = plans ?? (await loadPlanPrices());
   for (const e of events) {
-    const need = e.planCode ? (monthly.get(e.planCode) ?? 0) : 0;
+    const plan = e.planCode ? catalog.get(e.planCode) : undefined;
+    // a yearly payment is measured against the yearly price, anything else against the monthly one
+    const need = plan
+      ? (priceFor(plan, e.billingInterval === 'yearly' ? 'yearly' : 'monthly') ?? 0)
+      : 0;
     if (need > 0 && e.amountMinor >= need) return { id: e.id, createdAt: e.createdAt };
   }
   return null;
+}
+export type PlanPrices = Map<
+  string,
+  { priceMonthlyMinor: number | null; priceYearlyMinor: number | null }
+>;
+export async function loadPlanPrices(): Promise<PlanPrices> {
+  const plans = await prisma.plan.findMany({
+    select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
+  });
+  return new Map(plans.map(p => [p.code, p]));
 }
 export async function hasPaid(tx: Tx, storeId: string): Promise<boolean> {
   return (await firstQualifyingPayment(tx, storeId)) !== null;
@@ -105,6 +121,35 @@ export async function grantedPaidThrough(tx: Tx, storeId: string): Promise<Date 
     return g.periodEndAfter;
   }
   return null;
+}
+/**
+ * Free time a store still holds from APPLIED grants at `now`, in ms: the unconsumed part of each granted month
+ * (`periodEndAfter - max(periodEndBefore, now)`). A checkout/upgrade starts a fresh full period at `now` (no proration),
+ * so this is ADDED on top of it; otherwise the new period would swallow the free month (it would be a max, not a sum).
+ * A grant backed by the store's own payment counts only while that payment is still `succeeded`.
+ */
+export async function grantedCarryMs(tx: Tx, storeId: string, now: Date): Promise<number> {
+  const grants = await tx.billingGrant.findMany({
+    where: { beneficiaryId: storeId, status: 'applied', periodEndAfter: { gt: now } },
+    select: {
+      periodEndBefore: true,
+      periodEndAfter: true,
+      sourceEventId: true,
+      sourceStoreId: true,
+    },
+  });
+  let carry = 0;
+  for (const g of grants) {
+    if (!g.periodEndAfter || !g.periodEndBefore) continue;
+    if (g.sourceEventId && g.sourceStoreId === storeId) {
+      const ok = await tx.billingEvent.count({
+        where: { id: g.sourceEventId, storeId, status: 'succeeded' },
+      });
+      if (ok === 0) continue;
+    }
+    carry += g.periodEndAfter.getTime() - Math.max(g.periodEndBefore.getTime(), now.getTime());
+  }
+  return carry;
 }
 export const laterOf = (a: Date, b: Date | null): Date => (b && b.getTime() > a.getTime() ? b : a);
 
@@ -300,6 +345,19 @@ export async function revokeGrantsForEvent(
   now: Date,
   ownStoreId?: string
 ): Promise<string[]> {
+  // Lock order is subscription row THEN grant row everywhere (applyPendingGrants does the same): lock the own-store
+  // beneficiary's subscription before the UPDATE claims its grant rows, or a concurrent apply deadlocks with it.
+  if (ownStoreId) {
+    const own = await tx.billingGrant.count({
+      where: {
+        sourceEventId: eventId,
+        beneficiaryId: ownStoreId,
+        status: { in: ['pending', 'applied'] },
+      },
+    });
+    if (own > 0)
+      await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${ownStoreId} FOR UPDATE`;
+  }
   const rows = await tx.$queryRaw<Array<{ id: string; beneficiary_id: string }>>`
     UPDATE billing_grants SET status = 'revoked', revoked_at = ${now}, revoke_reason = ${reason}
     WHERE source_event_id = ${eventId} AND status IN ('pending', 'applied')
@@ -310,7 +368,11 @@ export async function revokeGrantsForEvent(
   return rows.map(r => r.id);
 }
 
-/** Take one revoked, applied grant's month back off the beneficiary's period (once, under the subscription lock). */
+/**
+ * Take one revoked, applied grant's UNCONSUMED free time back off the beneficiary's period (once, under the
+ * subscription lock): `periodEndAfter - max(periodEndBefore, now)`, capped at the granted span. Time already used up,
+ * and any later PAID period (an upgrade, a renewal), is not touched.
+ */
 async function restoreOne(tx: Tx, grantId: string, storeId: string, now: Date): Promise<void> {
   await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${storeId} FOR UPDATE`;
   const claimed = await tx.$queryRaw<
@@ -320,12 +382,17 @@ async function restoreOne(tx: Tx, grantId: string, storeId: string, now: Date): 
     RETURNING period_end_before, period_end_after`;
   if (claimed.length === 0) return;
   const span = claimed[0].period_end_after.getTime() - claimed[0].period_end_before.getTime();
+  const left =
+    claimed[0].period_end_after.getTime() -
+    Math.max(claimed[0].period_end_before.getTime(), now.getTime());
+  const take = Math.max(0, Math.min(span, left));
+  if (take === 0) return;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
   if (!sub) return;
   const base =
     sub.status === 'trialing' ? (sub.trialEndsAt ?? sub.currentPeriodEnd) : sub.currentPeriodEnd;
   if (!base) return;
-  const end = new Date(base.getTime() - span);
+  const end = new Date(base.getTime() - take);
   await tx.storeSubscription.update({
     where: { storeId },
     data: { currentPeriodEnd: end, ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}) },
@@ -421,7 +488,11 @@ export async function sweepFreeMonthGrants(
       err => (logger.error({ err, beneficiaryId }, '[billing] grant apply failed'), 0)
     );
 
-  const links = await prisma.billingReferral.findMany({ select: { referredStoreId: true } });
+  // Only recent links: a referred store that never pays must not cost two transactions a day for ever.
+  const links = await prisma.billingReferral.findMany({
+    where: { createdAt: { gt: new Date(now.getTime() - REFERRAL_SWEEP_DAYS * 86_400_000) } },
+    select: { referredStoreId: true },
+  });
   for (const { referredStoreId } of links) {
     const have = await prisma.billingGrant.count({
       where: { idempotencyKey: `referral:${referredStoreId}:referred` },
@@ -438,13 +509,14 @@ export async function sweepFreeMonthGrants(
     (await prisma.billingGrant.count({ where: { kind: 'founding', status: { not: 'revoked' } } })) <
     FOUNDING_SLOTS
   ) {
+    const plans = await loadPlanPrices();
     const parts = await acrossStores(
       async storeId => {
         const has = await prisma.billingGrant.count({
           where: { kind: 'founding', beneficiaryId: storeId },
         });
         if (has > 0) return null;
-        const at = await firstQualifyingPayment(prisma as unknown as Tx, storeId);
+        const at = await firstQualifyingPayment(prisma as unknown as Tx, storeId, plans);
         return at ? { storeId, at: at.createdAt } : null;
       },
       {
@@ -458,10 +530,16 @@ export async function sweepFreeMonthGrants(
       .filter((v): v is { storeId: string; at: Date } => v !== null)
       .sort((a, b) => a.at.getTime() - b.at.getTime());
     for (const { storeId } of queue) {
-      if ((await prisma.billingGrant.count({ where: { kind: 'founding' } })) >= FOUNDING_SLOTS)
-        break;
+      const live = () =>
+        prisma.billingGrant.count({ where: { kind: 'founding', status: { not: 'revoked' } } });
+      if ((await live()) >= FOUNDING_SLOTS) break;
+      const before = await prisma.billingGrant.count({
+        where: { kind: 'founding', beneficiaryId: storeId },
+      });
       await awardGrantsAfterPayment(storeId, now);
-      created += 1;
+      created +=
+        (await prisma.billingGrant.count({ where: { kind: 'founding', beneficiaryId: storeId } })) -
+        before;
     }
   }
   return { applied, created };

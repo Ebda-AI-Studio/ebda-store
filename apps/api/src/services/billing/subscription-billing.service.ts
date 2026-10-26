@@ -64,8 +64,7 @@ import {
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
 import {
-  grantedPaidThrough,
-  laterOf,
+  grantedCarryMs,
   restoreRevokedGrants,
   revokeGrantsForEvent,
   shiftedByGrants,
@@ -276,10 +275,9 @@ async function applySuccess(
       status: 'active' as const,
       billingInterval: interval,
       currentPeriodStart: now,
-      // never earlier than the end a free-month grant already moved the period to (FOUNDING-1)
-      currentPeriodEnd: laterOf(
-        addInterval(now, interval),
-        await grantedPaidThrough(tx, row.storeId)
+      // a fresh paid period PLUS the free months still unconsumed (additive: a max() would swallow the free month)
+      currentPeriodEnd: new Date(
+        addInterval(now, interval).getTime() + (await grantedCarryMs(tx, row.storeId, now))
       ),
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,

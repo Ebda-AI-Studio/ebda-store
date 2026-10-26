@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { prisma, runInStoreScope } from '@ebda/database';
 import {
   awardGrantsAfterPayment,
+  grantedCarryMs,
   grantedPaidThrough,
   restoreRevokedGrants,
   revokeGrantsForEvent,
@@ -333,6 +334,82 @@ describe.skipIf(!hasDb)('FOUNDING-1 free-month grants (real Postgres)', () => {
         },
       })
     ).toBe(0);
+  });
+
+  it('an upgrade ADDS the unconsumed free time to its fresh period instead of swallowing it (carry)', async () => {
+    const a = await mkStore();
+    await awardGrantsAfterPayment(a.storeId); // PERIOD_END -> PLUS_ONE_MONTH
+    const tx = prisma as never;
+    const before = new Date(PERIOD_END.getTime() - 5 * 86_400_000);
+    const span = PLUS_ONE_MONTH.getTime() - PERIOD_END.getTime();
+    expect(await grantedCarryMs(tx, a.storeId, before)).toBe(span); // all of it still ahead
+    const mid = new Date(PERIOD_END.getTime() + 10 * 86_400_000);
+    expect(await grantedCarryMs(tx, a.storeId, mid)).toBe(PLUS_ONE_MONTH.getTime() - mid.getTime());
+    expect(await grantedCarryMs(tx, a.storeId, new Date(PLUS_ONE_MONTH.getTime() + 1))).toBe(0);
+  });
+
+  it('a refund takes back only the unconsumed free time, never a later paid period', async () => {
+    const a = await mkStore({ paid: false });
+    const ev = await pay(a.storeId);
+    await awardGrantsAfterPayment(a.storeId); // PERIOD_END -> PLUS_ONE_MONTH
+    // an upgrade 10 days into the free month set a new paid period + the carry
+    const mid = new Date(PERIOD_END.getTime() + 10 * 86_400_000);
+    const newEnd = new Date(PLUS_ONE_MONTH.getTime() + 20 * 86_400_000);
+    await prisma.storeSubscription.update({
+      where: { storeId: a.storeId },
+      data: { currentPeriodEnd: newEnd },
+    });
+    await prisma.$executeRaw`UPDATE billing_events SET status = 'refunded' WHERE id = ${ev}`;
+    await prisma.$transaction(tx =>
+      revokeGrantsForEvent(tx as never, ev, 'payment_refunded', mid, a.storeId)
+    );
+    // 21 days of the granted month were left at `mid`: exactly those come off, the rest (the paid upgrade) stays
+    expect(await periodEnd(a.storeId)).toEqual(
+      new Date(newEnd.getTime() - (PLUS_ONE_MONTH.getTime() - mid.getTime()))
+    );
+  });
+
+  it('the ledger trigger guards pending rows too, and a yearly-only plan can qualify', async () => {
+    const a = await mkStore({ periodEnd: null });
+    await awardGrantsAfterPayment(a.storeId); // pending (no period)
+    await expect(
+      prisma.$executeRawUnsafe(
+        `UPDATE billing_grants SET restored_at = now() WHERE beneficiary_id = '${a.storeId}'`
+      )
+    ).rejects.toThrow();
+    await expect(
+      prisma.$executeRawUnsafe(
+        `UPDATE billing_grants SET status = 'revoked' WHERE beneficiary_id = '${a.storeId}'`
+      )
+    ).rejects.toThrow(); // no revoked_at / reason
+    const code = uid('yearly').replace(/[^a-z0-9-]/g, '');
+    await prisma.plan.create({
+      data: {
+        code,
+        nameEn: 'Y',
+        nameAr: 'س',
+        priceMonthlyMinor: null,
+        priceYearlyMinor: 1_000_000,
+        limits: {},
+        isPublic: false,
+        featureTier: 'professional' as never,
+      } as never,
+    });
+    const y = await mkStore({ paid: false });
+    await prisma.billingEvent.create({
+      data: {
+        storeId: y.storeId,
+        type: 'renewal',
+        planCode: code,
+        billingInterval: 'yearly',
+        amountMinor: 1_000_000,
+        provider: 'instapay',
+        idempotencyKey: uid('yev'),
+        status: 'succeeded',
+      },
+    });
+    await awardGrantsAfterPayment(y.storeId);
+    expect(await grantsOf('founding', y.storeId)).toHaveLength(1);
   });
 
   it('the ledger is append-only and the admin view reports the caps', async () => {
