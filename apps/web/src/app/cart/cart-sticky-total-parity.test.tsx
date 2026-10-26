@@ -12,7 +12,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { formatMoney, localizeDigits } from '@ebda/shared';
 
 let lang: 'en' | 'ar' = 'ar';
-let numerals: 'latn' = 'latn';
+let numerals = 'latn' as const;
 vi.mock('@/contexts/LanguageContext', () => ({
   useLanguage: () => ({
     language: lang,

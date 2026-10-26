@@ -15,7 +15,7 @@ vi.mock('@/contexts/LanguageContext', () => ({
 }));
 // The real useLocalePrice runs (shared formatPrice); only the store's digit
 // choice is stubbed, so one test can switch a store to Arabic-Indic.
-let numerals: 'latn' = 'latn';
+let numerals = 'latn' as const;
 vi.mock('@/hooks/useNumerals', () => ({
   useStoreNumerals: () => numerals,
   useNumerals: () => ({

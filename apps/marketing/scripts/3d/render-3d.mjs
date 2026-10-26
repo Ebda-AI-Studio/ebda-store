@@ -84,7 +84,7 @@ if (process.argv[2] === 'stills') {
       exposure: 1.6,
       fakeGlass: true,
     });
-    for (const [i, v] of j.variants.entries()) {
+    for (const v of j.variants) {
       await hx.page.evaluate(a => window.draw(a), { az: j.az, el: j.el, fit: j.fit, variant: v });
       const png = await hx.page.locator('canvas').screenshot({ omitBackground: true });
       const base = `${j.name}-${v}`;

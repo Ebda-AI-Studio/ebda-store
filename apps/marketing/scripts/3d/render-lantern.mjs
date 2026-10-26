@@ -20,7 +20,6 @@ const FPS = 30,
   TOTAL = TURN + HOLD + TAIL;
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const smooth = x => x * x * (3 - 2 * x);
-const NIGHT = '#0A0B0C';
 const lockup = readFileSync(
   new URL('../../../../brand/logo/svg/04a-product-store.svg', import.meta.url),
   'utf8'
@@ -28,7 +27,7 @@ const lockup = readFileSync(
 const lockupUri = 'data:image/svg+xml;base64,' + Buffer.from(lockup).toString('base64');
 
 // Night ground: a warm brass glow behind the lantern, falling off to the brand night.
-const stage = ({ w, h, lockupH, headline }) => `
+const stage = ({ w, h, lockupH }) => `
   html,body{background:#0A0B0C}
   #fx{position:fixed;inset:0;pointer-events:none;font-family:'Cairo',sans-serif}
   #fx img{position:absolute;left:50%;transform:translateX(-50%);bottom:${Math.round(h * 0.055)}px;height:${lockupH}px}

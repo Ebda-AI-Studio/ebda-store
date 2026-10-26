@@ -288,7 +288,7 @@ async function build(model, file) {
       .map(m => [m.getName(), m])
   );
   const clones = {}; // `${materialName}|${variantId}` -> material
-  for (const [vi, v] of variants.entries()) {
+  for (const v of variants) {
     for (const [mName, hex] of Object.entries(v.set)) {
       const base = matsByName[mName];
       const c = base.clone().setName(`${mName}-${v.id}`);
