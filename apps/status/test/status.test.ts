@@ -188,12 +188,43 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(snap.active[0].updates[0].body).toContain('timeout after 40ms');
   });
 
-  it('serves the page with no scripts and a restrictive CSP', async () => {
+  it('serves the page with ONE same-origin script (the optional search) and a restrictive CSP', async () => {
     const r = await get('/en');
     const html = await r.text();
-    expect(/<script/i.test(html)).toBe(false);
-    expect(r.headers.get('content-security-policy')).toContain("default-src 'none'");
+    expect(html.match(/<script/gi)).toHaveLength(1);
+    expect(has(html, '<script src="/assets/typeahead.js" defer></script>')).toBe(true);
+    const csp = r.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'self'");
+    expect(has(html, 'role="search"')).toBe(true);
     expect(has(html, 'lang="en"')).toBe(true);
+  });
+});
+
+describe('header search (components, incidents, help)', () => {
+  it('serves the search script itself, and the page data in both languages', async () => {
+    const js = await get('/assets/typeahead.js');
+    expect(js.status).toBe(200);
+    expect(js.headers.get('content-type')).toContain('javascript');
+    expect((await js.text()).length).toBeGreaterThan(5000);
+    for (const [lang, name] of [
+      ['en', 'Merchant dashboard'],
+      ['ar', 'لوحة التحكم'],
+    ] as const) {
+      const r = await get(`/search.json?lang=${lang}`);
+      expect(r.status).toBe(200);
+      const docs = (await r.json()) as { id: string; title: string; section: string }[];
+      const hit = docs.find(d => d.title === name);
+      expect(hit?.id.includes('#c-')).toBe(true);
+      expect(docs.every(d => d.id.startsWith(lang === 'ar' ? '/#' : '/en#'))).toBe(true);
+    }
+  });
+
+  it('the page carries anchors for the results and the form points at the help search', async () => {
+    const html = await (await get('/en')).text();
+    expect(has(html, 'id="c-admin"')).toBe(true);
+    expect(has(html, 'action="https://help.ebda.app/en/search/"')).toBe(true);
+    expect(has(html, '/search.json?lang=en||docs')).toBe(true);
   });
 });
 

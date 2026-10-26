@@ -1,4 +1,5 @@
-// Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
+// Public status page: server-rendered HTML and inline CSS; it works with NO JavaScript. The only script is the
+// optional live search box (served from this same Worker, /assets/typeahead.js): without it the box is a plain GET form.
 import {
   BRAND,
   SITE_NAV_CSS,
@@ -125,7 +126,7 @@ function component(c: ComponentSnapshot, lang: Lang): string {
   const checked = c.lastChecked
     ? ` · ${t.checked}: <time datetime="${new Date(c.lastChecked).toISOString()}">${fmt(c.lastChecked)}</time>`
     : '';
-  return `<li class="comp">
+  return `<li class="comp" id="c-${esc(c.id)}">
 <div class="comp-head"><h3>${esc(name)}</h3><span class="pill ${c.status}"><span class="dot" aria-hidden="true"></span>${esc(t.status[c.status])}</span></div>
 ${bars(c, lang)}
 <p class="muted small">${esc(t.uptime(up, HISTORY_DAYS))}${checked}</p>
@@ -136,7 +137,7 @@ function incident(i: Incident, lang: Lang): string {
   const t = T[lang];
   const title = lang === 'ar' && i.titleAr ? i.titleAr : i.title;
   const cfg = i.component ? COMPONENTS.find(c => c.id === i.component) : null;
-  return `<li class="inc inc-${i.impact}">
+  return `<li class="inc inc-${i.impact}" id="i-${i.id}">
 <h3>${esc(title)}</h3>
 <p class="muted small"><span class="tag">${esc(t.inc[i.status])}</span> ${cfg ? esc(cfg.name[lang]) + ' · ' : ''}<time datetime="${new Date(i.openedAt).toISOString()}">${fmt(i.openedAt)}</time></p>
 <ul class="upd">${i.updates
@@ -185,7 +186,69 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .tag{border:1px solid var(--gold);color:var(--lift);border-radius:999px;padding:0 8px;font-size:.78rem}
 .upd{margin-top:8px}.upd li{padding:6px 0;border-top:1px solid var(--line)}
 footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
+.sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.search{position:relative;display:flex;gap:6px;margin-inline-start:auto}
+.search input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0;width:190px;font:inherit}
+.search button{background:var(--gold);color:var(--night);border:0;border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.ta-list,.ta-note{position:absolute;inset-inline-end:0;top:calc(100% + 6px);z-index:30;inline-size:min(420px,calc(100vw - 32px));margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.45);text-align:start}
+.ta-note{padding:12px 14px;color:var(--muted)}
+.ta-list[hidden],.ta-note[hidden]{display:none}
+.ta-list a{display:flex;flex-direction:column;gap:2px;min-block-size:44px;justify-content:center;padding:8px 12px;border-radius:8px;color:var(--fg);text-decoration:none}
+.ta-list a[aria-selected=true],.ta-list a:hover{background:var(--raise);outline:1px solid var(--gold)}
+.ta-list mark{background:transparent;color:var(--lift);font-weight:700}
+.ta-sec{color:var(--muted);font-size:.8125rem}
+.ta-all{color:var(--muted)!important;font-size:.9rem}
 `.replace(/\n/g, '') + SITE_NAV_CSS;
+
+const SEARCH = {
+  ar: { label: 'بحث', placeholder: 'دوّر في الخدمات والأحداث والمساعدة' },
+  en: { label: 'Search', placeholder: 'Search services, incidents and help' },
+};
+const HELP = `https://${BRAND.domains.help}`;
+
+/** The header search: components + incidents from this Worker, and the help articles that mention the status page. */
+function searchForm(lang: Lang): string {
+  const c = SEARCH[lang];
+  const sources = [
+    `/search.json?lang=${lang}||docs`,
+    `${HELP}/search-index.${lang}.json|${HELP}|index|${lang === 'ar' ? 'حالة,انقطاع,status' : 'status,outage,incident'}`,
+  ].join(';');
+  return `<form class="search" role="search" action="${HELP}${lang === 'ar' ? '' : '/en'}/search/" method="get" data-sources="${esc(sources)}">
+<label class="sr-only" for="q">${esc(c.label)}</label>
+<input id="q" name="q" type="search" placeholder="${esc(c.placeholder)}" autocomplete="off" enterkeyhint="search">
+<button type="submit">${esc(c.label)}</button>
+</form>`;
+}
+
+/**
+ * The status page's own searchable content (components and incidents), localized: the live search loads it as
+ * `/search.json` and indexes it in the browser. Hrefs are on-page anchors, so a result scrolls to the item.
+ */
+export function statusSearchDocs(s: Snapshot, lang: Lang) {
+  const t = T[lang];
+  const home = lang === 'ar' ? '/' : '/en';
+  const comps = s.components.map(c => {
+    const cfg = COMPONENTS.find(x => x.id === c.id);
+    const product = PRODUCTS.find(p => p.id === cfg?.product);
+    return {
+      id: `${home}#c-${c.id}`,
+      title: cfg ? cfg.name[lang] : c.id,
+      section: product ? product.name[lang] : t.components,
+      snippet: t.status[c.status],
+    };
+  });
+  const incs = [...s.active, ...s.recent].map(i => ({
+    id: `${home}#i-${i.id}`,
+    title: lang === 'ar' && i.titleAr ? i.titleAr : i.title,
+    section: t.recentIncidents,
+    snippet:
+      `${t.inc[i.status]} ${i.updates.map(u => (lang === 'ar' && u.bodyAr ? u.bodyAr : u.body)).join(' ')}`.slice(
+        0,
+        200
+      ),
+  }));
+  return [...comps, ...incs];
+}
 
 export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): string {
   const t = T[lang];
@@ -217,6 +280,7 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <header class="site-header"><div class="wrap header-row">
 ${siteWordmarkHtml({ lang, href: home, siteLabel: t.site, markHtml: brandMarkSvg({ size: 28, cls: 'wm-mk' }) })}
 ${siteNavHtml(lang, 'status')}
+${searchForm(lang)}
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>
 <main id="main" class="wrap">
@@ -236,6 +300,7 @@ ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>
 </main>
 <footer><div class="wrap muted small">${esc(t.footer)} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
+<script src="/assets/typeahead.js" defer></script>
 </body>
 </html>
 `;

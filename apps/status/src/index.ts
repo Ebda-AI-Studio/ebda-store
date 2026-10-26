@@ -1,14 +1,16 @@
 import { BRAND, BRAND_MARKETING_URL } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
 import { probeAll, type Fetcher } from './probe';
-import { renderStatusPage } from './render';
+import { renderStatusPage, statusSearchDocs } from './render';
+import { TYPEAHEAD_JS } from './typeahead-bundle';
 import type { Impact, IncidentStatus, Thresholds } from './types';
 
 export { StatusStore } from './store';
 
 const SECURITY_HEADERS = {
   'content-security-policy':
-    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    // script: only this Worker's own typeahead (/assets/typeahead.js); connect: its own search.json plus the help indexes
+    `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'self' https://${BRAND.domains.help}; base-uri 'none'; form-action https://${BRAND.domains.help}; frame-ancestors 'none'`,
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
@@ -180,6 +182,20 @@ export default {
 
     if (path === '/healthz')
       return new Response('ok', { headers: { 'content-type': 'text/plain', ...SECURITY_HEADERS } });
+
+    if (path === '/assets/typeahead.js')
+      return new Response(TYPEAHEAD_JS, {
+        headers: {
+          'content-type': 'text/javascript; charset=utf-8',
+          'cache-control': 'public, max-age=3600',
+          ...SECURITY_HEADERS,
+        },
+      });
+    if (path === '/search.json') {
+      const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'ar';
+      const snap = await store(env).snapshot(Date.now());
+      return json(statusSearchDocs(snap, lang), 200, { 'cache-control': 'public, max-age=30' });
+    }
 
     if (path === '/api/status.json') {
       const snap = await store(env).snapshot(Date.now());

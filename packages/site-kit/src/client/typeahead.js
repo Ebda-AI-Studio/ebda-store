@@ -67,8 +67,10 @@ function init(form) {
       sources = raw.trim().startsWith('[')
         ? JSON.parse(raw)
         : raw.split(';').map(part => {
-            const [index, base = ''] = part.split('|');
-            return { index, base };
+            // index|base|kind|match: kind `docs` = a JSON list of pages indexed here (the status page's live data);
+            // match = comma-separated words: only hits mentioning one of them are kept (help articles about status).
+            const [index, base = '', kind = 'index', match = ''] = part.split('|');
+            return { index, base, kind, match };
           });
   } catch {
     /* keep the single index */
@@ -90,7 +92,30 @@ function init(form) {
             if (!r.ok) throw new Error(String(r.status));
             return r.text();
           })
-          .then(json => ({ mini: MiniSearch.loadJSON(json, searchOptions), base: src.base || '' }))
+          .then(body => {
+            let mini;
+            if (src.kind === 'docs') {
+              mini = new MiniSearch(searchOptions);
+              mini.addAll(
+                JSON.parse(body).map(d => ({
+                  headings: '',
+                  text: d.snippet || '',
+                  lang: '',
+                  section: '',
+                  snippet: '',
+                  ...d,
+                }))
+              );
+            } else mini = MiniSearch.loadJSON(body, searchOptions);
+            const words = (src.match || '')
+              .split(',')
+              .map(w => w.trim())
+              .filter(Boolean);
+            const keep = words.length
+              ? new RegExp(words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i')
+              : null;
+            return { mini, base: src.base || '', keep };
+          })
           .catch(() => null)
       )
     ).then(loaded => {
@@ -209,8 +234,11 @@ function init(form) {
     if (loadState === 'error') return show(q, 'error');
     // The index is per locale already (docs' Arabic pages point at the English one), so no lang filter.
     hits = minis
-      .flatMap(({ mini, base }) =>
-        mini.search(q, querySettings).map(h => ({ ...h, id: base + h.id }))
+      .flatMap(({ mini, base, keep }) =>
+        mini
+          .search(q, querySettings)
+          .filter(h => !keep || keep.test(`${h.title} ${h.snippet} ${h.section}`))
+          .map(h => ({ ...h, id: base + h.id }))
       )
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX);
