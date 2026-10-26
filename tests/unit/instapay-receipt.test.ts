@@ -233,6 +233,41 @@ describe('automatic checks flag, they never block', () => {
   it('a clean receipt has no flags', () => {
     expect(computeReceiptFlags(base())).toEqual([]);
   });
+  it('RECEIVER-CHECK-1: the model says the receiver is NOT the expected account -> RECEIVER_MISMATCH, even when the payer typed the right one', () => {
+    const b = base();
+    const f = computeReceiptFlags({ ...b, extraction: { ...b.extraction!, receiverMatch: false } });
+    expect(f).toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: the model confirms the receiver -> no receiver flag even if the payer left it blank', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      fields: { ...b.fields, receiverHandle: null, receiverMobile: null },
+      extraction: { ...b.extraction!, receiverMatch: true },
+    });
+    expect(f).not.toContain('RECEIVER_MISSING');
+    expect(f).not.toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: no expected receiver configured -> no MISMATCH flag from the model (null), typed check unchanged', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      expectedReceivers: [],
+      extraction: { ...b.extraction!, receiverMatch: null },
+    });
+    expect(f).not.toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: the AI failed -> AI_UNAVAILABLE and the typed check as today (manual review, nothing auto-approved)', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      extraction: null,
+      extractionStatus: 'failed',
+      expectedReceivers: ['other@instapay'],
+    });
+    expect(f).toContain('AI_UNAVAILABLE');
+    expect(f).toContain('RECEIVER_MISMATCH'); // the payer-typed comparison still runs
+  });
   it('each check raises its own flag', () => {
     const b = base();
     expect(computeReceiptFlags({ ...b, expectedAmountMinor: 100_000 })).toContain(

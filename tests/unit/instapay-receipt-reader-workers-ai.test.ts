@@ -17,6 +17,7 @@ import {
   INSTAPAY_RECEIPT_PROMPT,
   normalizeReceiptExtraction,
   readInstapayReceipt,
+  buildReceiptPrompt,
   unwrapWorkersAiAnswer,
 } from '@api/lib/ai/instapay-receipt-reader';
 import { clearCfBindings, setCfBindings } from '@api/cf/bindings';
@@ -161,5 +162,96 @@ describe('the Workers AI call', () => {
     } as never);
     await readInstapayReceipt({ storeId: 's1', image: img, mimeType: 'image/jpeg' });
     expect(run.mock.calls[0][0]).toBe('@cf/meta/llama-3.2-11b-vision-instruct');
+  });
+});
+
+describe('RECEIVER-CHECK-1: the model returns only a yes / no for the receiver', () => {
+  const bind = (run: ReturnType<typeof vi.fn>) => setCfBindings({ AI: { run } } as never);
+  const EXPECTED = ['ebda@instapay', '٠١٠١٢٣٤٥٦٧٨'];
+
+  it("the prompt carries the store's expected receivers (Western digits, lower case) and asks for a boolean only", () => {
+    const p = buildReceiptPrompt(['EBDA@InstaPay', '٠١٠١٢٣٤٥٦٧٨']);
+    expect(p).toContain('ebda@instapay');
+    expect(p).toContain('1012345678'); // the comparable 10-digit mobile, Western digits
+    expect(p).not.toMatch(/[٠-٩]/);
+    expect(p).toContain('"receiverMatches"');
+    expect(p).toMatch(/true or false or null/);
+    expect(p).toMatch(/never copy|do not return the receiver/i);
+  });
+
+  it('match: receiverMatches true is kept as receiverMatch true', async () => {
+    bind(
+      vi.fn().mockResolvedValue({ response: JSON.stringify({ ...ANSWER, receiverMatches: true }) })
+    );
+    const e = await readInstapayReceipt({
+      storeId: 's1',
+      image: img,
+      mimeType: 'image/png',
+      expectedReceivers: EXPECTED,
+    });
+    expect(e.receiverMatch).toBe(true);
+  });
+
+  it('mismatch: receiverMatches false is kept as false', async () => {
+    bind(
+      vi.fn().mockResolvedValue({ response: JSON.stringify({ ...ANSWER, receiverMatches: false }) })
+    );
+    const e = await readInstapayReceipt({
+      storeId: 's1',
+      image: img,
+      mimeType: 'image/png',
+      expectedReceivers: EXPECTED,
+    });
+    expect(e.receiverMatch).toBe(false);
+  });
+
+  it('missing expected receiver: the model is not asked about the receiver at all, receiverMatch is null', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValue({ response: JSON.stringify({ ...ANSWER, receiverMatches: true }) });
+    bind(run);
+    const e = await readInstapayReceipt({
+      storeId: 's1',
+      image: img,
+      mimeType: 'image/png',
+      expectedReceivers: [],
+    });
+    expect(e.receiverMatch).toBeNull(); // even if a model volunteers a yes, with nothing to compare against it is not a check
+    const input = run.mock.calls[0][1] as any;
+    expect(input.messages[0].content[0].text).not.toContain('receiverMatches');
+    expect(Object.keys(input.guided_json.properties)).not.toContain('receiverMatches');
+  });
+
+  it('a model that answers receiver TEXT instead of a boolean is ignored, and no receiver text is ever stored', async () => {
+    bind(
+      vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          ...ANSWER,
+          receiverMatches: 'ebda@instapay',
+          receiverName: 'Ebda LLC',
+          receiverMobile: '01012345678',
+        }),
+      })
+    );
+    const e = await readInstapayReceipt({
+      storeId: 's1',
+      image: img,
+      mimeType: 'image/png',
+      expectedReceivers: EXPECTED,
+    });
+    expect(e.receiverMatch).toBeNull();
+    expect(JSON.stringify(e)).not.toMatch(/ebda@instapay|Ebda LLC|01012345678/);
+  });
+
+  it('a model error propagates (the job turns it into manual review), nothing is guessed', async () => {
+    bind(vi.fn().mockRejectedValue(new Error('workers ai 500')));
+    await expect(
+      readInstapayReceipt({
+        storeId: 's1',
+        image: img,
+        mimeType: 'image/png',
+        expectedReceivers: EXPECTED,
+      })
+    ).rejects.toThrow(/workers ai 500/);
   });
 });

@@ -39,6 +39,7 @@ import { withSavepoint } from '../../lib/savepoint';
 import { StorageService } from '../storage.service';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { readInstapayReceipt } from '../../lib/ai/instapay-receipt-reader';
+import { instapayHandle } from '../billing/manual-config';
 
 export type ReceiptKind = 'subscription' | 'order';
 
@@ -112,7 +113,15 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
   const shown = [i.fields.receiverHandle, i.fields.receiverMobile]
     .map(r => normalizeInstapayReceiver(r))
     .filter((r): r is string => !!r);
-  if (shown.length === 0) flags.push('RECEIVER_MISSING');
+  // RECEIVER-CHECK-1: the model compared the screenshot's receiver with the store's expected account(s) and answered
+  // yes / no. A "no" flags RECEIVER_MISMATCH whatever the payer typed; a "yes" stands in for the typed fields (a payer who
+  // left them blank is not RECEIVER_MISSING). Without that answer (AI failed, no expected receiver) the check is the
+  // payer-typed comparison, as before.
+  const aiReceiver = i.extractionStatus === 'done' ? (i.extraction?.receiverMatch ?? null) : null;
+  if (aiReceiver === false) flags.push('RECEIVER_MISMATCH');
+  else if (aiReceiver === true) {
+    /* verified on the image */
+  } else if (shown.length === 0) flags.push('RECEIVER_MISSING');
   else if (expected.length > 0 && !shown.some(s => expected.includes(s))) {
     flags.push('RECEIVER_MISMATCH');
   }
@@ -285,10 +294,19 @@ export class InstapayReceiptService {
     if (!row || row.extractionStatus !== 'pending') return 'skipped';
     try {
       const { body } = await StorageService.getPrivate(row.storageKey);
+      const expectedReceivers = await this.expectedReceiversFor(storeId, row);
+      if (expectedReceivers.length === 0) {
+        // P2: nothing to compare the receiver with, so no receiver flag from the AI (the payer-typed check stays).
+        logger.warn(
+          { storeId, receiptId, kind: row.kind },
+          '[P2][instapay-receipt] no expected receiver configured; receiver check skipped'
+        );
+      }
       const extraction = await readInstapayReceipt({
         storeId,
         image: body,
         mimeType: row.mimeType,
+        expectedReceivers,
       });
       await withStore(storeId, () =>
         prisma.instapayReceipt.updateMany({
@@ -307,6 +325,39 @@ export class InstapayReceiptService {
       await this.markExtractionFailed(storeId, receiptId, String(code));
       return 'failed';
     }
+  }
+
+  /**
+   * The account(s) this receipt's money must have gone to: the order's InstaPay handle and mobile (frozen on its payment),
+   * or Ebda's own handle for a subscription receipt. The MERCHANT's details, normalised; empty = no receiver check.
+   */
+  static async expectedReceiversFor(
+    storeId: string,
+    row: { kind: string; orderId: string | null }
+  ): Promise<string[]> {
+    const raw: unknown[] = [];
+    if (row.kind === 'order' && row.orderId) {
+      const payment = await withStore(storeId, () =>
+        prisma.payment.findFirst({
+          where: { orderId: row.orderId!, provider: 'instapay' },
+          orderBy: { createdAt: 'desc' },
+          select: { metadata: true },
+        })
+      );
+      const m = (
+        payment?.metadata && typeof payment.metadata === 'object' ? payment.metadata : {}
+      ) as Record<string, unknown>;
+      raw.push(m.handle, m.phone);
+    } else if (row.kind === 'subscription') {
+      raw.push(instapayHandle());
+    }
+    return [
+      ...new Set(
+        raw
+          .map(v => (typeof v === 'string' ? normalizeInstapayReceiver(v) : null))
+          .filter((v): v is string => !!v)
+      ),
+    ];
   }
 
   static async get(

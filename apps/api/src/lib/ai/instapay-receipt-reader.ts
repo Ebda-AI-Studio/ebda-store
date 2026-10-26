@@ -18,6 +18,7 @@
 import { z } from 'zod';
 import {
   INSTAPAY_RECEIPT_REFERENCE_MAX,
+  normalizeInstapayReceiver,
   normalizeInstapayReference,
   toAsciiDigits,
   type InstapayReceiptExtraction,
@@ -42,6 +43,22 @@ Return ONLY a JSON object with exactly these keys (null when the screenshot does
 Do not read, copy or return any person's name, phone number, bank, account or InstaPay address.
 Convert Arabic-Indic digits to 0-9.`;
 
+/**
+ * The prompt for one read. With the store's expected receiver(s) (its InstaPay address and/or mobile: the MERCHANT's own
+ * details, not the payer's) it also asks ONE yes / no: is the receiver shown on the screenshot one of them. The model
+ * answers true / false / null and must not return the receiver itself, so no receiver text is stored or logged anywhere.
+ */
+export function buildReceiptPrompt(expectedReceivers: string[] = []): string {
+  const expected = [
+    ...new Set(
+      expectedReceivers.map(r => normalizeInstapayReceiver(r)).filter((r): r is string => !!r)
+    ),
+  ];
+  if (expected.length === 0) return INSTAPAY_RECEIPT_PROMPT;
+  return `${INSTAPAY_RECEIPT_PROMPT}
+- "receiverMatches": the payment must have gone to one of these accounts: ${expected.join(', ')}. Mobile numbers are given as their last 10 digits. Answer true if the RECEIVER shown on the screenshot (the account the money went to, by InstaPay address or mobile number; a partly masked number matches when its visible digits agree) is one of them, false if the screenshot shows a different receiver, null if it shows no receiver. Answer true or false or null only; never copy or return the receiver.`;
+}
+
 /** The JSON shape the model must answer in (Workers AI `response_format`). Only the fields above. */
 export const INSTAPAY_RECEIPT_JSON_SCHEMA = {
   type: 'object',
@@ -57,6 +74,18 @@ export const INSTAPAY_RECEIPT_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** The schema with the receiver yes / no, only when there is something to compare against. */
+export function receiptJsonSchema(withReceiver: boolean) {
+  if (!withReceiver) return INSTAPAY_RECEIPT_JSON_SCHEMA;
+  return {
+    ...INSTAPAY_RECEIPT_JSON_SCHEMA,
+    properties: {
+      ...INSTAPAY_RECEIPT_JSON_SCHEMA.properties,
+      receiverMatches: { type: ['boolean', 'null'] },
+    },
+  };
+}
+
 const loose = z
   .object({
     amount: z.union([z.number(), z.string()]).nullable().optional(),
@@ -65,6 +94,7 @@ const loose = z
     time: z.string().nullable().optional(),
     looksEdited: z.union([z.boolean(), z.string()]).nullable().optional(),
     confidence: z.union([z.number(), z.string()]).nullable().optional(),
+    receiverMatches: z.unknown().optional(),
   })
   // anything else the model volunteers is dropped on the floor, never stored
   .strip();
@@ -136,6 +166,9 @@ export function normalizeReceiptExtraction(raw: unknown): InstapayReceiptExtract
     direction: 'unknown',
     looksEdited: edited,
     confidence: Number.isFinite(conf) ? Math.min(1, Math.max(0, conf)) : 0,
+    // a strict boolean or nothing: receiver TEXT (or anything else) is dropped, never stored
+    receiverMatch:
+      r.receiverMatches === true || r.receiverMatches === false ? r.receiverMatches : null,
   };
 }
 
@@ -145,6 +178,8 @@ export type ReceiptModelCall = (args: {
   imageBase64: string;
   mimeType: string;
   signal?: AbortSignal;
+  /** the store's expected receivers, already normalised; empty = no receiver check */
+  expectedReceivers?: string[];
 }) => Promise<unknown>;
 
 /** What Workers AI answered, as the JSON object (it returns `{response}`, a chat completion, or the object itself). */
@@ -176,7 +211,13 @@ export function unwrapWorkersAiAnswer(out: unknown): unknown {
   return pick(out);
 }
 
-const defaultCall: ReceiptModelCall = async ({ storeId, imageBase64, mimeType, signal }) => {
+const defaultCall: ReceiptModelCall = async ({
+  storeId,
+  imageBase64,
+  mimeType,
+  signal,
+  expectedReceivers = [],
+}) => {
   const ai = cfBindings()?.AI;
   if (!ai) {
     // Node / local without the binding: manual entry (the payer types three fields).
@@ -195,13 +236,15 @@ const defaultCall: ReceiptModelCall = async ({ storeId, imageBase64, mimeType, s
         {
           role: 'user',
           content: [
-            { type: 'text', text: INSTAPAY_RECEIPT_PROMPT },
+            { type: 'text', text: buildReceiptPrompt(expectedReceivers) },
             { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
           ],
         },
       ],
       // Workers AI's name for a JSON schema on this model family (workers-types: `guided_json`)
-      guided_json: INSTAPAY_RECEIPT_JSON_SCHEMA,
+      guided_json: receiptJsonSchema(
+        expectedReceivers.some(r => normalizeInstapayReceiver(r) !== null)
+      ),
       max_tokens: 300,
       temperature: 0,
     },
@@ -235,6 +278,7 @@ export async function readInstapayReceipt(args: {
   image: Buffer;
   mimeType: string;
   timeoutMs?: number;
+  expectedReceivers?: string[];
 }): Promise<InstapayReceiptExtraction> {
   const timeoutMs = args.timeoutMs ?? INSTAPAY_RECEIPT_AI_TIMEOUT_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -252,10 +296,16 @@ export async function readInstapayReceipt(args: {
         imageBase64: args.image.toString('base64'),
         mimeType: args.mimeType,
         signal: ctl.signal,
+        expectedReceivers: args.expectedReceivers ?? [],
       }),
       timeout,
     ]);
-    return normalizeReceiptExtraction(raw);
+    const out = normalizeReceiptExtraction(raw);
+    // with nothing to compare against, a model's yes / no is not a check
+    if (!(args.expectedReceivers ?? []).some(r => normalizeInstapayReceiver(r) !== null)) {
+      out.receiverMatch = null;
+    }
+    return out;
   } finally {
     if (timer) clearTimeout(timer);
   }

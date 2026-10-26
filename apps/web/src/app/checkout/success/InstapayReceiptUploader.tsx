@@ -323,8 +323,8 @@ export function InstapayReceiptUploader({
           </p>
           <p className="mt-1 text-xs text-muted-foreground" data-testid="instapay-receipt-notice">
             {t(
-              'We read only the amount, reference and time from the image, on our own hosting provider (Cloudflare), never by a third-party AI service. The image is deleted once the store approves your payment.',
-              'بنقرا من الصورة المبلغ والرقم المرجعي والوقت بس، على مزوّد الاستضافة بتاعنا (Cloudflare)، ومن غير أي خدمة ذكاء اصطناعي تانية. الصورة بتتمسح أول ما المتجر يوافق على دفعتك.'
+              "We read only the amount, reference and time from the image, plus a yes or no on whether it was sent to the store's InstaPay account, on our own hosting provider (Cloudflare), never by a third-party AI service. The image is deleted once the store approves your payment.",
+              'بنقرا من الصورة المبلغ والرقم المرجعي والوقت بس، وكمان إجابة بنعم أو لأ: التحويل راح لحساب إنستاباي بتاع المتجر ولا لأ، على مزوّد الاستضافة بتاعنا (Cloudflare)، ومن غير أي خدمة ذكاء اصطناعي تانية. الصورة بتتمسح أول ما المتجر يوافق على دفعتك.'
             )}
           </p>
           {uploading && (
