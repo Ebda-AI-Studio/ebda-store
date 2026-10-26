@@ -55,6 +55,10 @@
     "./qr/schema": {
       "types": "./src/qr/schema.ts",
       "default": "./src/qr/schema.ts"
+    },
+    "./qr/links": {
+      "types": "./src/qr/links.ts",
+      "default": "./src/qr/links.ts"
     }
   },
   "files": [
