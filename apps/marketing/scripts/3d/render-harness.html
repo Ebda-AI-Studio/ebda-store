@@ -73,12 +73,12 @@
       if (litGlass && /glass/i.test(n)) { // lantern ad: the shipped panes are near-black; here they glow like glass around a flame
         const m = o.material.clone();
         m.map = null; m.color.set('#d49a4a'); m.emissive.set('#8a5a1e'); m.emissiveIntensity = 0.22;
-        m.transparent = true; m.opacity = 0.3; m.depthWrite = false; m.roughness = 0.45; m.metalness = 0; m.envMapIntensity = 0.9;
+        m.transparent = true; m.opacity = 0.25; m.depthWrite = false; m.roughness = 0.45; m.metalness = 0; m.envMapIntensity = 0.9;
         o.material = m;
       } else if (litGlass && /flame/i.test(n)) { // a glow texture on black: only reads as light when added
         const m = o.material.clone();
         m.blending = THREE.AdditiveBlending; m.depthWrite = false; m.transparent = true;
-        o.material = m; o.renderOrder = 2; flames.push(m);
+        o.material = m; o.renderOrder = 2; o.scale.multiplyScalar(1.5); flames.push(m);
       } else if (litGlass && /brass_diya_lantern$/.test(n)) {
         o.material = o.material.clone(); o.material.metalness = 1; o.material.roughness = Math.max(o.material.roughness, 0.7); o.material.envMapIntensity = 0.45;
       }
@@ -93,7 +93,7 @@
       const mats = [m0, ...Object.values(o.userData.__vmats || {})];
       for (const m of mats) {
         m.transmission = 0; m.transparent = true; m.depthWrite = !gem && m.name !== 'glass' ? true : false;
-        if (gem) { m.metalness = 0.92; m.roughness = 0.02; m.color.set('#e4eaff'); m.emissive.set('#7f8fb8'); m.emissiveIntensity = 0.2; m.opacity = 1; m.transparent = false; m.depthWrite = true; m.envMapIntensity = 3.2; }
+        if (gem) { m.metalness = 0.72; m.roughness = 0.02; m.color.set('#ffffff'); m.emissive.set('#8896bb'); m.emissiveIntensity = 0.3; m.opacity = 1; m.transparent = false; m.depthWrite = true; m.envMapIntensity = 3.4; }
         else if (m.name === 'glass') { m.opacity = 0.2; m.roughness = 0.03; m.envMapIntensity = 2.8; m.clearcoat = 1; m.sheen = 1; m.sheenColor.set('#ffffff'); m.sheenRoughness = 0.25; }
         else { m.opacity = 0.97; m.transparent = false; m.depthWrite = true; m.roughness = 0.1; m.clearcoat = 1; } // serum
       }
@@ -114,7 +114,7 @@
     if (fakeGlass) { // soft contact shadow so the object sits on the page instead of floating
       const c = document.createElement('canvas'); c.width = c.height = 128;
       const g = c.getContext('2d'), rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-      rg.addColorStop(0, 'rgba(0,0,0,0.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      rg.addColorStop(0, 'rgba(0,0,0,0.75)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
       const sh = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(size.x, size.z) * 1.5, Math.max(size.x, size.z) * 1.5), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
       sh.rotation.x = -Math.PI / 2; sh.position.y = -size.y / 2 - 0.0005; sh.renderOrder = -1;
@@ -132,7 +132,7 @@
     if (bloom) {
       composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
-      composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), bloom, 0.3, 1.5)); // strength, radius, threshold: only the flame and hottest highlights bloom
+      composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), bloom, 0.22, 1.5)); // strength, radius, threshold: only the flame and hottest highlights bloom
       composer.addPass(new OutputPass());
     }
     window.__size = size.toArray();

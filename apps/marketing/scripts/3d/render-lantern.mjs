@@ -40,15 +40,15 @@ async function render({ w, h, headline, outName }) {
     return document.fonts.load('700 40px Cairo');
   }, [lockupUri, headline || '']).catch(() => {});
   const frames = Math.round(TOTAL * FPS);
-  const base = w < h ? 0.48 : 0.8;
+  const base = w < h ? 0.5 : 0.8;
   for (let i = 0; i < frames; i++) {
     const t = i / FPS, u = clamp01(t / TURN), p = t / TOTAL;
     // Monotone and periodic in the turn (a < 1): a steady turn with a soft ease each quarter.
     const az = 2 * Math.PI * u + 0.55 * Math.sin(2 * Math.PI * u);
-    const fit = base * (1 + 0.06 * (1 - Math.cos(2 * Math.PI * p)) / 2);
+    const fit = base * (1 + 0.12 * (1 - Math.cos(2 * Math.PI * p)) / 2);
     const flame = 1 + 0.04 * Math.sin(2 * Math.PI * (9 * p) + 1) + 0.025 * Math.sin(2 * Math.PI * (17 * p) + 2.2) + 0.015 * Math.sin(2 * Math.PI * (31 * p));
     const text = 0.85 + 0.15 * smooth(clamp01((t - (TURN - 1)) / 1)) - 0.15 * smooth(clamp01((t - (TURN + HOLD)) / TAIL));
-    await hx.page.evaluate(([a, o]) => { window.draw(a); document.getElementById('fx').style.opacity = o; }, [{ az, el: 0.16 + 0.03 * Math.sin(2 * Math.PI * p), fit, flame }, text]);
+    await hx.page.evaluate(([a, o]) => { window.draw(a); document.getElementById('fx').style.opacity = o; }, [{ az, el: 0.16 + 0.03 * Math.sin(2 * Math.PI * p), fit, flame, bob: -0.04 }, text]);
     await hx.page.screenshot({ path: path.join(dir, `f${String(i).padStart(4, '0')}.png`) });
   }
   await hx.close();
@@ -74,7 +74,7 @@ async function poster() {
     document.body.appendChild(d);
     return document.fonts.load('700 40px Cairo');
   }, [lockupUri, HL]);
-  await hx.page.evaluate(a => window.draw(a), { az: 0.62, el: 0.16, fit: 0.64, shiftX: -0.2 });
+  await hx.page.evaluate(a => window.draw(a), { az: 0.62, el: 0.16, fit: 0.66, shiftX: -0.2, flame: 1.1 });
   const png = await hx.page.screenshot();
   const base = path.join(hx.root, 'apps/marketing/public/ads/lantern-poster');
   await hx.sharp(png).png({ palette: true, quality: 90, effort: 10, colours: 160, dither: 0.6 }).toFile(base + '.png');

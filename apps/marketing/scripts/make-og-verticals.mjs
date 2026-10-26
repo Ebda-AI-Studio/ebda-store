@@ -36,15 +36,15 @@ const html = (slug, photos) => `<!doctype html><meta charset="utf-8">
 <style>
   *{margin:0;box-sizing:border-box}
   body{width:1200px;height:630px;background:#FAFAFA;position:relative;overflow:hidden;font-family:'Cairo',sans-serif}
-  .lock{position:absolute;right:60px;bottom:92px;height:88px}
+  .lock{position:absolute;right:56px;bottom:88px;height:118px}
   .h{position:absolute;right:72px;top:104px;width:540px;direction:rtl;text-align:right;color:#121314;font-weight:700;font-size:58px;line-height:1.5;text-wrap:balance}
   .rule{position:absolute;right:72px;top:70px;width:96px;height:4px;background:#B08D57}
-  .url{position:absolute;right:72px;bottom:44px;direction:ltr;color:#4A4338;font-size:21px;font-weight:700;letter-spacing:.2px}
-  .ph{position:absolute;width:150px;height:318px;border-radius:34px;background:#1C1C1E;padding:5px;box-shadow:0 14px 28px rgba(18,19,20,.12);outline:1px solid rgba(176,141,87,.45)}
+  .url{position:absolute;right:72px;bottom:44px;direction:ltr;color:#4A4338;font-size:22px;font-weight:700;letter-spacing:.2px}
+  .ph{position:absolute;width:168px;height:356px;border-radius:34px;background:#1C1C1E;padding:3px;box-shadow:0 14px 28px rgba(18,19,20,.12);outline:1px solid rgba(176,141,87,.45)}
   .ph div{width:100%;height:100%;border-radius:30px;background-size:cover;background-position:center}
 </style>
 <div class="rule"></div><div class="h">${h1(slug)}</div>
-${photos.map((p, i) => `<div class="ph" style="left:${72 + i * 172}px;top:${i === 1 ? 70 : 150}px"><div style="background-image:url(${uri(p)})"></div></div>`).join('')}
+${photos.map((p, i) => `<div class="ph" style="left:${60 + i * 192}px;top:${i === 1 ? 56 : 138}px"><div style="background-image:url(${uri(p)})"></div></div>`).join('')}
 <img class="lock" src="${lockupUri}" alt="">
 <div class="url">ebda.app/for/${slug}</div>`;
 

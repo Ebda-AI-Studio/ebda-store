@@ -18,6 +18,10 @@ const { NodeIO } = req('@gltf-transform/core');
 const { KHRMaterialsVariants, ALL_EXTENSIONS } = req('@gltf-transform/extensions');
 const { meshopt, dedup, prune } = req('@gltf-transform/functions');
 const { MeshoptEncoder, MeshoptDecoder } = req('meshoptimizer');
+const sharp = req('sharp');
+
+// Jasmine's printed label: cream stock, brass hairlines, the template name in Arabic and a small Latin line.
+const LABEL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="334"><rect width="1024" height="334" fill="#EFE7D6"/><rect x="40" y="26" width="944" height="3" fill="#B08D57"/><rect x="40" y="305" width="944" height="3" fill="#B08D57"/><text x="512" y="165" font-family="Geeza Pro, Noto Naskh Arabic, sans-serif" font-size="118" font-weight="700" text-anchor="middle" fill="#2a2118">ياسمين</text><text x="512" y="242" font-family="Helvetica Neue, Arial" font-size="36" letter-spacing="10" text-anchor="middle" fill="#6b5a3e">SERUM · 30 ML</text></svg>`;
 
 // three's exporter reads blobs through FileReader, which Node does not have.
 globalThis.FileReader = class {
@@ -53,7 +57,7 @@ function jasmine() {
   const serum = P('serum', { color: COLOURWAYS_J[0].serum, roughness: 0.12, transmission: 0.55, thickness: 0.02, ior: 1.38 });
   g.add(mk(lathe(liquid), serum, 'serum'));
   g.add(mk(lathe([...outer, ...inner]), glass, 'bottle'));
-  const paper = P('label-paper', { color: '#BFB095', roughness: 0.9 });
+  const paper = P('label-paper', { color: '#FFFFFF', roughness: 0.85, side: THREE.DoubleSide });
   g.add(mk(new THREE.CylinderGeometry(R + 0.0004, R + 0.0004, 0.018, 64, 1, true, -Math.PI * 0.55, Math.PI * 1.1), paper, 'label', [0, 0.027, 0]));
   const goldMat = P('gold-collar', { color: '#B08D57', metalness: 1, roughness: 0.22 });
   const collar = [[0.0105, 0.066], [0.0105, 0.0785], [0.0095, 0.0785], [0.0095, 0.066]];
@@ -125,6 +129,11 @@ async function build(model, file) {
   const raw = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: true });
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
   const doc = await io.readBinary(new Uint8Array(raw));
+  const label = doc.getRoot().listMaterials().find(m => m.getName() === 'label-paper');
+  if (label) {
+    const png = await sharp(Buffer.from(LABEL_SVG)).flip().png({ compressionLevel: 9, palette: true }).toBuffer();
+    label.setBaseColorFactor([1, 1, 1, 1]).setBaseColorTexture(doc.createTexture('label').setImage(new Uint8Array(png)).setMimeType('image/png'));
+  }
   // Colourways = KHR_materials_variants: each variant maps the recoloured materials to a clone.
   const ext = doc.createExtension(KHRMaterialsVariants);
   const vs = variants.map(v => ext.createVariant().setName(v.id));

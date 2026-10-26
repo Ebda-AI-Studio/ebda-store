@@ -36,7 +36,7 @@ if (process.argv[2] === 'stills') {
   const out = path.join(root, 'apps/marketing/public/3d/stills');
   await mkdir(out, { recursive: true });
   const jobs = [
-    { file: 'jasmine-serum.glb', name: 'jasmine', variants: ['rose', 'amber', 'sage'], az: 0.5, el: 0.12, fit: 0.78 },
+    { file: 'jasmine-serum.glb', name: 'jasmine', variants: ['rose', 'amber', 'sage'], az: 0.12, el: 0.12, fit: 0.78 },
     { file: 'dahab-solitaire.glb', name: 'dahab', variants: ['yellow-gold', 'rose-gold', 'white-gold'], az: 0.55, el: 0.35, fit: 0.72 },
   ];
   for (const j of jobs) {
