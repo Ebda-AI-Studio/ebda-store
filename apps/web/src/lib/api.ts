@@ -1433,10 +1433,15 @@ class ApiClient {
   }
 
   // Orders (public endpoints)
-  async createOrder(data: CreateOrderData) {
+  /**
+   * `idempotencyKey` (audit M-012): one key per checkout attempt. A double tap or a timeout retry carries the same key and the
+   * server returns the order the first request created instead of creating a second.
+   */
+  async createOrder(data: CreateOrderData, opts: { idempotencyKey?: string } = {}) {
     return this.request<{ order: Order }>('/public/orders', {
       method: 'POST',
       body: JSON.stringify(data),
+      ...(opts.idempotencyKey ? { headers: { 'Idempotency-Key': opts.idempotencyKey } } : {}),
     });
   }
 

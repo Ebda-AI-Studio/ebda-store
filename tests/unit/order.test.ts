@@ -53,7 +53,12 @@ vi.mock('@ebda/database', () => ({
       create: vi.fn(),
     },
     cartItem: {
-      deleteMany: vi.fn(),
+      // the live cart rows are the fixture the test gave getOrCreate
+      findMany: vi.fn(
+        async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+      ),
+      count: vi.fn().mockResolvedValue(1),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     product: {
       findUnique: vi.fn(),
@@ -457,11 +462,22 @@ describe('OrderService', () => {
               update: vi.fn().mockResolvedValue({}),
             },
             cartItem: {
-              deleteMany: vi.fn().mockResolvedValue({}),
+              // the live cart rows are the fixture the test gave getOrCreate
+              findMany: vi.fn(
+                async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+              ),
+              count: vi.fn().mockResolvedValue(1),
+              deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
             },
             cartBundle: {
-              deleteMany: vi.fn().mockResolvedValue({}),
+              findMany: vi.fn(
+                async () =>
+                  ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+              ),
+              count: vi.fn().mockResolvedValue(0),
+              deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
             },
+            $queryRaw: vi.fn().mockResolvedValue([]),
             inventoryHistory: {
               // return_stock idempotency marker: null = not yet restored.
               findFirst: vi.fn().mockResolvedValue(null),
@@ -628,8 +644,23 @@ describe('OrderService', () => {
               update: vi.fn(),
               findUnique: vi.fn().mockResolvedValue({ allowBackorder: false }),
             },
-            cartItem: { deleteMany: vi.fn() },
-            cartBundle: { deleteMany: vi.fn() },
+            cartItem: {
+              // the live cart rows are the fixture the test gave getOrCreate
+              findMany: vi.fn(
+                async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+              ),
+              count: vi.fn().mockResolvedValue(1),
+              deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+            },
+            cartBundle: {
+              findMany: vi.fn(
+                async () =>
+                  ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+              ),
+              count: vi.fn().mockResolvedValue(0),
+              deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+            },
+            $queryRaw: vi.fn().mockResolvedValue([]),
             inventoryHistory: { create: vi.fn() },
             orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
             $executeRaw: vi.fn().mockResolvedValue(1),
@@ -727,8 +758,23 @@ describe('OrderService', () => {
             coupon: { updateMany: txCouponUpdateMany },
             product: { update: vi.fn().mockResolvedValue({}) },
             productVariant: { update: vi.fn().mockResolvedValue({}) },
-            cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
-            cartBundle: { deleteMany: vi.fn().mockResolvedValue({}) },
+            cartItem: {
+              // the live cart rows are the fixture the test gave getOrCreate
+              findMany: vi.fn(
+                async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+              ),
+              count: vi.fn().mockResolvedValue(1),
+              deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+            },
+            cartBundle: {
+              findMany: vi.fn(
+                async () =>
+                  ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+              ),
+              count: vi.fn().mockResolvedValue(0),
+              deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+            },
+            $queryRaw: vi.fn().mockResolvedValue([]),
             inventoryHistory: {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
@@ -954,8 +1000,24 @@ describe('OrderService', () => {
               coupon: { updateMany: txCouponUpdateMany },
               product: { update: vi.fn().mockResolvedValue({}) },
               productVariant: { update: vi.fn().mockResolvedValue({}) },
-              cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
-              cartBundle: { deleteMany: vi.fn().mockResolvedValue({}) },
+              cartItem: {
+                // the live cart rows are the fixture the test gave getOrCreate
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+                ),
+                count: vi.fn().mockResolvedValue(1),
+                deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+              },
+              cartBundle: {
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+                ),
+                count: vi.fn().mockResolvedValue(0),
+                deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+              },
+              $queryRaw: vi.fn().mockResolvedValue([]),
               inventoryHistory: {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
@@ -1060,8 +1122,24 @@ describe('OrderService', () => {
               coupon: { updateMany: txCouponUpdateMany },
               product: { update: vi.fn().mockResolvedValue({}) },
               productVariant: { update: vi.fn().mockResolvedValue({}) },
-              cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
-              cartBundle: { deleteMany: vi.fn().mockResolvedValue({}) },
+              cartItem: {
+                // the live cart rows are the fixture the test gave getOrCreate
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+                ),
+                count: vi.fn().mockResolvedValue(1),
+                deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+              },
+              cartBundle: {
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+                ),
+                count: vi.fn().mockResolvedValue(0),
+                deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+              },
+              $queryRaw: vi.fn().mockResolvedValue([]),
               inventoryHistory: {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
