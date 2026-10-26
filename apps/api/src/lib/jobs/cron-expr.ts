@@ -45,9 +45,35 @@ export function parseCron(expr: string): Parsed {
 /** UTC offsets (hours) a zone can have; the guard picks the real one at fire time. */
 const ZONE_OFFSETS: Record<string, number[]> = { 'Africa/Cairo': [2, 3] };
 
+const DOW_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+/**
+ * Cloudflare Cron Triggers number the weekday 1-7 with 1 = Sunday and REJECT 0 ("invalid cron string:
+ * 0 3 * * 0", code 10100 on the schedules PUT: the cause of every failed API deploy since #210). A
+ * numeric `1` is accepted but means Sunday there, not Monday. Standard cron numbers (0/7 = Sunday)
+ * are therefore always written as names, which mean the same everywhere.
+ */
+export function cfWeekday(field: string): string {
+  const name = (t: string): string => (/^\d+$/.test(t) ? (DOW_NAMES[Number(t) % 7] ?? t) : t);
+  return field
+    .split(',')
+    .map(part => {
+      const m = /^([^/]+)(\/.*)?$/.exec(part);
+      if (!m || m[1] === '*') return part;
+      return m[1].split('-').map(name).join('-') + (m[2] ?? '');
+    })
+    .join(',');
+}
+
+function withCfWeekday(cron: string): string {
+  const f = cron.trim().split(/\s+/);
+  if (f.length === 5) f[4] = cfWeekday(f[4]);
+  return f.join(' ');
+}
+
 /** The Cron Trigger strings (UTC) a job needs. `*` sub-hourly fields (`7 * * * *`) are not supported here. */
 export function utcCronsFor(expr: string): string[] {
-  if (!/^TZ=/.test(expr.trim())) return [expr.trim()];
+  if (!/^TZ=/.test(expr.trim())) return [withCfWeekday(expr)];
   const p = parseCron(expr);
   const offsets = p.tz ? ZONE_OFFSETS[p.tz] : undefined;
   if (!offsets) throw new Error(`no UTC offsets known for zone ${p.tz}`);
@@ -58,7 +84,7 @@ export function utcCronsFor(expr: string): string[] {
       h += 24;
       if (dow !== undefined) dow = (dow + 6) % 7;
     }
-    return `${p.min} ${h} ${p.dom ?? '*'} ${p.mon ?? '*'} ${dow ?? '*'}`;
+    return withCfWeekday(`${p.min} ${h} ${p.dom ?? '*'} ${p.mon ?? '*'} ${dow ?? '*'}`);
   });
 }
 

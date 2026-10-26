@@ -9,8 +9,19 @@ import { matchesLocal, parseCron, utcCronsFor } from './cron-expr';
 const DAY_MS = 86_400_000;
 
 // A field (star, n, a,b, a-b, star-slash-n, a-b/n) -> the matching values in [lo, hi].
+const DOW_INDEX: Record<string, number> = {
+  SUN: 0,
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
+};
+
 function expand(field: string, lo: number, hi: number): number[] | undefined {
   if (field === '*') return undefined; // unrestricted
+  field = field.replace(/SUN|MON|TUE|WED|THU|FRI|SAT/gi, m => String(DOW_INDEX[m.toUpperCase()]));
   const out = new Set<number>();
   for (const part of field.split(',')) {
     const m = /^(?:(\*)|(\d+)(?:-(\d+))?)(?:\/(\d+))?$/.exec(part);
