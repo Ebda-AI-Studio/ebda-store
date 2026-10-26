@@ -685,6 +685,10 @@ this branch. **Deploy order matters:** deploy `ebda-marketing` and `ebda-account
 (the `*/*`). Verify after each deploy (rule F): `curl -sI https://ebda.app/` and `https://accounts.ebda.app/health` still answer from
 marketing / accounts, `https://api.ebda.app/health` from the API, and a store subdomain from the storefront.
 
+**Dashboard state (set by the controller, 2026-10-27).** SSL for SaaS is active on `ebda.app`; the fallback origin is `cf.ebda.app`, a
+proxied `A` record to `192.0.2.0` (an originless record, as the Cloudflare docs require for a Worker fallback origin), and it stays
+"pending deployment" until `ebda-web` serves the `*/*` route from this change.
+
 **What the Worker must also do (not in this change).** `ebda-web` will now receive arbitrary `Host` headers. The storefront resolver
 must map a custom hostname to a store through a verified-domain lookup and 404 any unknown host (tenant resolvers throw/404, never
 default). That is the M-072 application work; until it ships, a custom hostname must not be attached.
