@@ -15,6 +15,7 @@ import { computeOrderTaxFields } from './tax';
 import { codFeeForCheckout } from './cod-fee';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { quoteRedemption, redeemPoints } from './loyalty';
+import { indexEntity } from './payments';
 
 export interface CheckoutLine {
   productId: string;
@@ -844,6 +845,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         featureEnabled: input.loyaltyFeatureEnabled === true,
         now,
       });
+    // entity index (audit DB-2): queued in the SAME section as the order; the Worker awaits it (awaitEntityIndexed) before
+    // it hands the order reference to a provider or a shopper
+    indexEntity(db, input.storeId, 'order', orderId, now);
     return {
       orderId,
       orderNumber: num,
