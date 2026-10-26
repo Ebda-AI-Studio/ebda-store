@@ -36,7 +36,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
   ar: {
     line: 'الصفحة اللي بتدوّر عليها مش موجودة.',
     hint: 'دوّر على اللي كنت تقصده، أو اختار قسم من تحت.',
-    searchLabel: 'دوّر في ابدأ',
+    searchLabel: 'دوّر في الموقع',
     searchPlaceholder: 'دوّر في الموقع والمساعدة والوثائق',
     searchButton: 'بحث',
     mapLabel: 'خريطة الموقع',
@@ -82,7 +82,7 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
   en: {
     line: "The page you're looking for can't be found.",
     hint: 'Search for what you meant, or pick a section below.',
-    searchLabel: 'Search Ebda',
+    searchLabel: 'Search the site',
     searchPlaceholder: 'Search the site, help and docs',
     searchButton: 'Search',
     mapLabel: 'Site map',

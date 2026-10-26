@@ -37,7 +37,7 @@ for (const file of htmlFiles(out)) {
   docs.push({
     url,
     title: title || headings[0] || url,
-    section: lang === 'ar' ? 'ابدأ' : 'Ebda',
+    section: lang === 'ar' ? 'الموقع' : 'Site',
     lang,
     headings,
     html: main,
