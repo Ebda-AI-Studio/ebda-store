@@ -42,7 +42,8 @@ export function PlanStep({
         interval: selection.interval,
       });
       setSaving(false);
-      if (apiError) {
+      // An extra store is included in the main store's plan: there is nothing to choose here.
+      if (apiError && apiError.code !== 'PAY_ON_PARENT_STORE') {
         setError(apiError.code === 'NOT_TRIALING' ? t('notTrialing') : t('saveFailed'));
         return;
       }

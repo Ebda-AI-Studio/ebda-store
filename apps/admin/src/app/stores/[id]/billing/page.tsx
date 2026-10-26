@@ -75,6 +75,8 @@ interface BillingData {
   billing?: BillingInfo;
   /** Set when this store is beyond the owner's store allowance: paying here buys nothing. */
   payOnStore?: string | null;
+  /** true: this store is a child INCLUDED in the main store's plan (not paused). */
+  payOnStoreIncluded?: boolean;
   storeStatus?: 'active' | 'inactive' | 'suspended';
   provider?: 'kashier' | 'stub' | null;
 }
@@ -536,8 +538,12 @@ export default function StoreBillingPage() {
               role="alert"
               className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
             >
-              <p className="font-semibold">{t('payOnStoreTitle')}</p>
-              <p className="mt-1">{t('payOnStoreBody')}</p>
+              <p className="font-semibold">
+                {t(data.payOnStoreIncluded ? 'payOnStoreIncludedTitle' : 'payOnStoreTitle')}
+              </p>
+              <p className="mt-1">
+                {t(data.payOnStoreIncluded ? 'payOnStoreIncludedBody' : 'payOnStoreBody')}
+              </p>
               <Link
                 href={`/stores/${payOnOtherStore}/billing`}
                 className="mt-2 inline-block font-medium underline"

@@ -29,4 +29,4 @@ Rulings: `docs/RULINGS.md`, R-EBDA-PRICING-1 to 10.
 
 ## Evidence and remaining work
 
-Unit and integration counts are in the PR body. Not exercised: live billing provider, browser UAT, production deploy. Open: merchant-facing upsell UI for 402 on gated analytics pages; parent/child billing for extra stores (R-EBDA-PRICING-6); Amelia is still on `comped`, not `founding_free`. No deployment was performed.
+Unit and integration counts are in the PR body. Not exercised: live billing provider, browser UAT, production deploy. Closed 2026-10-26 (PLANS-ALL-1): the 402 upsell (API `upgradeTo` on every plan 402, the admin dialog, and a 403 `FEATURE_DISABLED` upgrade target; only Basic / Growth / Business are named, EBDA-FUNNEL-14), parent/child billing for extra stores (EBDA-FUNNEL-18) and the Amelia move off `comped` (EBDA-FUNNEL-19, script written and reviewed, NOT yet run on production: the controller decides). No deployment was performed.

@@ -15,47 +15,14 @@
  *    that allows more than one store (Business) — that plan pays for it.
  * AND the store is within the owner's store allowance (oldest stores first).
  */
-import { withStore, withUser } from '@ebda/database';
+import { withStore } from '@ebda/database';
 import { AppError } from '../../middleware/error-handler';
-import { isGrantedPlan } from './period';
-import { resolveTrialCardMode, type TrialCardMode } from './index';
-import { storeRank } from './account.service';
+import { goLiveVerdict, type GateVerdict } from './go-live-verdict';
+import { resolveTrialCardMode } from './index';
+import { childStoreCoverage, storeRank } from './account.service';
 
-export interface GateSub {
-  status: string;
-  planCode: string;
-  trialEndsAt: Date | null;
-  provider: string | null;
-  providerPaymentMethodRef: string | null;
-  billingMethod?: string | null;
-}
-
-export type GateVerdict =
-  | { ok: true; reason: 'granted' | 'trial_with_card' | 'trial_instapay' | 'paid_active' }
-  | {
-      ok: false;
-      code: 'PAYMENT_METHOD_REQUIRED' | 'TRIAL_EXPIRED' | 'NO_SUBSCRIPTION' | 'STORE_LIMIT_REACHED';
-    };
-
-/** Pure decision for ONE store's own subscription. */
-export function goLiveVerdict(sub: GateSub | null, _mode: TrialCardMode, now: Date): GateVerdict {
-  if (!sub) return { ok: false, code: 'NO_SUBSCRIPTION' };
-  if (sub.status === 'comped' || isGrantedPlan(sub.planCode))
-    return { ok: true, reason: 'granted' };
-  const hasCard = !!sub.provider && !!sub.providerPaymentMethodRef;
-  if (sub.status === 'trialing') {
-    if (!sub.trialEndsAt || sub.trialEndsAt.getTime() <= now.getTime()) {
-      return { ok: false, code: 'TRIAL_EXPIRED' };
-    }
-    if (hasCard) return { ok: true, reason: 'trial_with_card' };
-    if (sub.billingMethod === 'instapay') return { ok: true, reason: 'trial_instapay' };
-    return { ok: false, code: 'PAYMENT_METHOD_REQUIRED' };
-  }
-  if (sub.status === 'active' && (hasCard || sub.billingMethod === 'instapay')) {
-    return { ok: true, reason: 'paid_active' };
-  }
-  return { ok: false, code: 'PAYMENT_METHOD_REQUIRED' };
-}
+export { goLiveVerdict } from './go-live-verdict';
+export type { GateSub, GateVerdict } from './go-live-verdict';
 
 const MESSAGES: Record<Exclude<GateVerdict, { ok: true }>['code'], string> = {
   PAYMENT_METHOD_REQUIRED: 'Choose InstaPay (or add a payment card) before your store goes live',
@@ -82,33 +49,16 @@ export async function assertStoreMayGoLive(storeId: string, now: Date = new Date
   // Store allowance first: a store beyond the owner's plan never goes live.
   const { rank, allowance } = await storeRank(storeId);
   if (rank >= allowance) throw gateError('STORE_LIMIT_REACHED');
+  if (rank > 0) {
+    // A CHILD store is decided ONLY by its billing parent (billing-parent.ts, fail closed):
+    // its own subscription row is never consulted, so a stale row cannot keep it live after
+    // the parent stops paying (EBDA-FUNNEL-18).
+    const cover = await childStoreCoverage(storeId, now);
+    if (cover.covered) return { ok: true as const, reason: 'paid_active' as const };
+    throw gateError(cover.parentVerdictCode ?? 'NO_SUBSCRIPTION');
+  }
   const verdict = await ownVerdict(storeId, now);
   if (verdict.ok) return verdict;
-
-  // An additional store (rank > 0, within an allowance > 1) rides the owner's
-  // OLDEST store — the billing parent whose plan granted the allowance.
-  if (rank > 0) {
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { ownerId: true },
-      })
-    );
-    // The owner's other stores are outside this store's scope: read them AS the owner.
-    const ownerId = store?.ownerId;
-    const parent = ownerId
-      ? await withUser(ownerId, tx =>
-          tx.store.findFirst({
-            where: { ownerId, deletedAt: null },
-            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-            select: { id: true },
-          })
-        )
-      : null;
-    if (parent && parent.id !== storeId && (await ownVerdict(parent.id, now)).ok) {
-      return { ok: true as const, reason: 'paid_active' as const };
-    }
-  }
   throw gateError(verdict.code);
 }
 

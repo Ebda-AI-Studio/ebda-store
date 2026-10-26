@@ -641,6 +641,25 @@ export class StoreService {
    */
   static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
+    // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
+    // owner still has other live stores would strand the paid period and re-parent the
+    // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
+    if (store.ownerId) {
+      const family = await withUser(store.ownerId, tx =>
+        tx.store.findMany({
+          where: { ownerId: store.ownerId!, deletedAt: null },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        })
+      );
+      if (family.length > 1 && family[0].id === storeId) {
+        throw new AppError(
+          409,
+          'STORE_IS_BILLING_PARENT',
+          'This is the main (billing) store and the owner has other stores. Move billing to another store first.'
+        );
+      }
+    }
 
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE

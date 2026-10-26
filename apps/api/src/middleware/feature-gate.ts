@@ -9,6 +9,7 @@ import {
   planLimitMessage,
   upgradePlanFor,
   planIncludesMerchantMcp,
+  upgradeTargetForDisabledFeature,
 } from '@ebda/shared';
 
 /** Features whose availability comes from the plan's boolean limits. */
@@ -117,11 +118,22 @@ export function requireFeature(featureKey: FeatureKey) {
             return;
           }
         }
+        // Off because the PLAN lacks it (not a toggle): say which sold plan unlocks it so the
+        // admin can show an upgrade prompt. Absent when the plan is not the cause.
+        const e = await getEntitlements(storeId);
+        const upgradeTo = e ? upgradeTargetForDisabledFeature(e.planCode, featureKey) : null;
         res.status(403).json({
           success: false,
           error: 'Feature not available',
           code: 'FEATURE_DISABLED',
           feature: featureKey,
+          ...(upgradeTo
+            ? {
+                upgradeTo,
+                messageEn: `This feature is available on the ${upgradeTo.nameEn} plan.`,
+                messageAr: `الميزة دي متاحة في باقة ${upgradeTo.nameAr}.`,
+              }
+            : {}),
         });
         return;
       }
