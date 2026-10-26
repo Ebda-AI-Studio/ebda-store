@@ -41,7 +41,7 @@ export const aiPatchOpSchema = z.discriminatedUnion('op', [
     .object({
       op: z.literal('addSection'),
       sectionType: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
-      presetIndex: z.number().int().min(0).max(10).default(0),
+      presetIndex: z.number().int().min(0).max(10),
       index: z.number().int().min(0).max(60).optional(),
     })
     .strict(),
