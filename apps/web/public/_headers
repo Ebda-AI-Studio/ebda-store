@@ -4,3 +4,11 @@
 /*
   X-Content-Type-Options: nosniff
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# SEO-4: content-hashed build output never changes under the same URL (staleness class: NEVER-changes).
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# SEO-5: self-hosted look fonts are named by Google's content hash.
+/fonts/look/*
+  Cache-Control: public, max-age=31536000, immutable

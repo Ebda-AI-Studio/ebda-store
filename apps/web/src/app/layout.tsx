@@ -503,8 +503,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
         {look && (
           <>
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-            <link rel="stylesheet" href={look.fontsHref} />
+            {/* SEO-5: self-hosted faces (inline, non-blocking) + preload of the two primary files. */}
+            {look.preloadFonts.map(href => (
+              <link
+                key={href}
+                rel="preload"
+                as="font"
+                type="font/woff2"
+                href={href}
+                crossOrigin=""
+              />
+            ))}
+            <style dangerouslySetInnerHTML={{ __html: look.fontFacesCss }} />
           </>
         )}
         {googleFontUrls.map(url => (
