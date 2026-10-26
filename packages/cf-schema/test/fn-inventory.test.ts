@@ -51,6 +51,27 @@ describe('docs/cf/fn-map.json', () => {
     }
   });
 
+  // Audit DB-3 / M-045 (2026-10-26): fn-map named 17 contract-test files that existed on no branch, so the map
+  // read as "every function has a test". A named test must exist and contain `it(`; everything else is on an
+  // explicit list that the cutover gate (scripts/ci/assert-fn-ported.mjs) refuses to run with.
+  const unportedFile = JSON.parse(
+    fs.readFileSync(path.join(REPO, 'docs/cf/fn-unported.json'), 'utf8')
+  ) as { unported: string[] };
+  const hasRealTest = (e: Entry) => {
+    if (!e.test) return false;
+    const p = path.join(REPO, e.test);
+    return fs.existsSync(p) && /\b(it|test)\(/.test(fs.readFileSync(p, 'utf8'));
+  };
+  const needsTest = (e: Entry) => !['identity', 'deleted-by-construction'].includes(e.target);
+
+  it('docs/cf/fn-unported.json is exactly the entries without a real test file (it only shrinks when a test lands)', () => {
+    const derived = Object.entries(fnMap)
+      .filter(([, e]) => needsTest(e) && !hasRealTest(e))
+      .map(([n]) => n)
+      .sort();
+    expect(unportedFile.unported).toEqual(derived);
+  });
+
   it('every entry whose test already exists in this package points at a real file', () => {
     for (const [name, e] of Object.entries(fnMap)) {
       if (e.test && e.test.startsWith('packages/cf-schema/'))
