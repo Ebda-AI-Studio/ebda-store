@@ -14,7 +14,7 @@ type Entry = {
 const cls = readJson<Record<string, Entry>>('erasure-classification.json');
 const DBS = { 'store-do': openDb('store'), d1: openDb('platform') } as const;
 const LOOKS_PERSONAL =
-  /(email|phone|first_?name|last_?name|full_?name|address|^ip$|_ip$|ip_address|buyer_key|user_id|customer_id|user_agent|birth|national|tax_registration|contact|whatsapp|session_id|player_id|endpoint|p256dh|payer|last4|token|author|guest_)/i;
+  /(email|phone|first_?name|last_?name|full_?name|address|^ip$|_ip$|ip_address|buyer_key|user_id|customer_id|user_agent|birth|national|tax_registration|contact|whatsapp|session_id|player_id|endpoint|p256dh|payer|last4|token|author|guest_|_by$|_by_id$|actor|_user_id$|owner_id|_name$)/i;
 
 describe('erasure classification', () => {
   it('classifies every table of both databases, and nothing else', () => {
@@ -54,6 +54,43 @@ describe('erasure classification', () => {
       }
     }
     expect(undecided).toEqual([]);
+  });
+
+  // OFFBOARD-1 (2026-10-26): `created_by` held a user id but was classed no-pii because the old pattern did not
+  // match it, so offboarding a staff member left their id on ~30 tables. A column shaped like a user id MUST be
+  // listed as personal; `reviewedNotPii` is NOT an accepted answer for it. The only escape is this list of columns
+  // that are shaped like one but hold something else, each with the reason.
+  const USER_ID_SHAPED = /(_by$|_by_id$|actor|_user_id$|^user_id$|owner_id$|^owner_id$)/i;
+  const NOT_A_USER: Record<string, string> = {
+    'store-do:journal_entries.reversed_by_id': 'id of the reversing journal entry',
+    'store-do:store_config.return_fees_paid_by': "'merchant' | 'customer', not an id",
+  };
+  it('a column shaped like a user id is classed personal (no reviewed-not-pii escape)', () => {
+    const missing: string[] = [];
+    for (const [id, e] of Object.entries(cls)) {
+      const table = id.split(':')[1];
+      if (e.piiColumns.includes('*')) continue;
+      for (const c of DBS[e.db].prepare(`PRAGMA table_info("${table}")`).all() as {
+        name: string;
+      }[]) {
+        const key = `${id}.${c.name}`;
+        if (USER_ID_SHAPED.test(c.name) && !(key in NOT_A_USER) && !e.piiColumns.includes(c.name))
+          missing.push(key);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('every NOT_A_USER exception names a real column (no stale exemption)', () => {
+    for (const key of Object.keys(NOT_A_USER)) {
+      const [id, col] = key.split('.');
+      const table = id.split(':')[1];
+      const e = cls[id];
+      const cols = (
+        DBS[e.db].prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]
+      ).map(c => c.name);
+      expect(cols, key).toContain(col);
+    }
   });
 
   it('personal tables carry an action; customer tables name how a subject is found', () => {

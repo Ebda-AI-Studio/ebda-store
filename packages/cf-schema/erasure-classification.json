@@ -76,11 +76,11 @@
   },
   "store-do:inventory_history": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:product_images": {
     "db": "store-do",
@@ -160,7 +160,7 @@
     "db": "store-do",
     "class": "customer-pii",
     "action": "delete",
-    "piiColumns": ["user_id", "phone"],
+    "piiColumns": ["user_id", "phone", "decided_by", "business_name"],
     "subjectKeys": ["userId", "phone"],
     "note": ""
   },
@@ -245,15 +245,19 @@
     ],
     "subjectKeys": ["email", "phone", "customerId", "buyerKey"],
     "note": "orders stay (money history); identity and addresses are overwritten",
-    "reviewedNotPii": ["seller_tax_registration_number"]
+    "reviewedNotPii": [
+      "seller_tax_registration_number",
+      "price_group_name",
+      "seller_tax_legal_name"
+    ]
   },
   "store-do:order_events": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["actor_id"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:order_items": {
     "db": "store-do",
@@ -261,7 +265,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": ["product_name", "variant_name", "bundle_name"]
   },
   "store-do:payments": {
     "db": "store-do",
@@ -273,37 +278,37 @@
   },
   "store-do:payment_events": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "",
-    "reviewedNotPii": ["triggered_by_user_id"]
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["triggered_by_user_id"],
+    "subjectKeys": ["userId"],
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
   },
   "store-do:returns": {
     "db": "store-do",
     "class": "customer-pii",
     "action": "scrub",
-    "piiColumns": ["customer_id"],
-    "subjectKeys": ["customerId"],
+    "piiColumns": ["customer_id", "approved_by", "rejected_by"],
+    "subjectKeys": ["customerId", "userId"],
     "note": "money history stays"
   },
   "store-do:return_items": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["adjustment_override_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "reviewedNotPii": ["product_name"]
   },
   "store-do:payment_configs": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "",
-    "reviewedNotPii": ["api_key_last4", "merchant_id_last4"]
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by", "updated_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "reviewedNotPii": ["api_key_last4", "merchant_id_last4", "display_name"]
   },
   "store-do:notification_configs": {
     "db": "store-do",
@@ -394,14 +399,15 @@
     "action": "scrub",
     "piiColumns": ["delivery_address", "pickup_address"],
     "subjectKeys": ["customerId"],
-    "note": "tracking and outcome stay; the address JSON is overwritten"
+    "note": "tracking and outcome stay; the address JSON is overwritten",
+    "reviewedNotPii": ["carrier_name"]
   },
   "store-do:shipment_pickups": {
     "db": "store-do",
     "class": "merchant-pii",
     "action": "delete",
-    "piiColumns": ["address"],
-    "subjectKeys": [],
+    "piiColumns": ["address", "requested_by_id"],
+    "subjectKeys": ["userId"],
     "note": "merchant pickup address"
   },
   "store-do:cod_remittances": {
@@ -416,8 +422,8 @@
     "db": "store-do",
     "class": "customer-pii",
     "action": "delete",
-    "piiColumns": ["name", "email", "phone"],
-    "subjectKeys": ["email", "phone"],
+    "piiColumns": ["name", "email", "phone", "approved_by"],
+    "subjectKeys": ["email", "phone", "userId"],
     "note": "third-party referrer, not a shopper"
   },
   "store-do:affiliate_referrals": {
@@ -446,12 +452,11 @@
   },
   "store-do:affiliate_events": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "",
-    "reviewedNotPii": ["triggered_by_user_id"]
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["triggered_by_user_id"],
+    "subjectKeys": ["userId"],
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
   },
   "store-do:audit_logs": {
     "db": "store-do",
@@ -558,8 +563,8 @@
     "db": "store-do",
     "class": "customer-pii",
     "action": "scrub",
-    "piiColumns": ["customer_id"],
-    "subjectKeys": ["customerId"],
+    "piiColumns": ["customer_id", "actor_id"],
+    "subjectKeys": ["customerId", "userId"],
     "note": "ledger rows kept without the customer link"
   },
   "store-do:newsletter_subscribers": {
@@ -605,21 +610,19 @@
   },
   "store-do:bulk_import_jobs": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "",
-    "reviewedNotPii": ["user_id"]
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["user_id"],
+    "subjectKeys": ["userId"],
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
   },
   "store-do:bulk_ai_jobs": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "",
-    "reviewedNotPii": ["user_id"]
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["user_id"],
+    "subjectKeys": ["userId"],
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
   },
   "store-do:store_faqs": {
     "db": "store-do",
@@ -663,11 +666,12 @@
   },
   "store-do:journal_entries": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["posted_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "reviewedNotPii": ["reversed_by_id"]
   },
   "store-do:journal_lines": {
     "db": "store-do",
@@ -679,11 +683,11 @@
   },
   "store-do:fx_rate_entries": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["recorded_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:suppliers": {
     "db": "store-do",
@@ -695,11 +699,11 @@
   },
   "store-do:purchase_orders": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by", "received_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:purchase_order_items": {
     "db": "store-do",
@@ -711,11 +715,11 @@
   },
   "store-do:stock_adjustments": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["posted_by", "created_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:stock_adjustment_items": {
     "db": "store-do",
@@ -743,35 +747,35 @@
   },
   "store-do:expenses": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["approved_by", "created_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:reorder_suggestions": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["dismissed_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:deadstock_flags": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["dismissed_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:profit_anomalies": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["acknowledged_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:customer_cohort_snapshots": {
     "db": "store-do",
@@ -799,11 +803,11 @@
   },
   "store-do:count_sessions": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:count_lines": {
     "db": "store-do",
@@ -820,7 +824,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": ["file_name"]
   },
   "store-do:bank_transactions": {
     "db": "store-do",
@@ -856,27 +861,28 @@
   },
   "store-do:store_page_revisions": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:store_tax_profiles": {
     "db": "store-do",
     "class": "merchant-pii",
     "action": "delete",
-    "piiColumns": ["tax_registration_number"],
-    "subjectKeys": [],
+    "piiColumns": ["tax_registration_number", "submitted_by", "reviewed_by", "legal_name"],
+    "subjectKeys": ["userId"],
     "note": "merchant tax identity"
   },
   "store-do:store_tax_documents": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["uploaded_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "reviewedNotPii": ["file_name"]
   },
   "store-do:fiscal_documents": {
     "db": "store-do",
@@ -896,11 +902,11 @@
   },
   "store-do:webhook_endpoints": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:webhook_deliveries": {
     "db": "store-do",
@@ -913,11 +919,11 @@
   },
   "store-do:gold_rates": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["created_by", "decided_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:gold_rates_current": {
     "db": "store-do",
@@ -929,18 +935,18 @@
   },
   "store-do:gold_rate_settings": {
     "db": "store-do",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["updated_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "store-do:store_profile": {
     "db": "store-do",
     "class": "merchant-pii",
     "action": "delete",
-    "piiColumns": ["email", "phone", "phone_ar", "whatsapp", "address", "address_ar"],
-    "subjectKeys": [],
+    "piiColumns": ["email", "phone", "phone_ar", "whatsapp", "address", "address_ar", "owner_id"],
+    "subjectKeys": ["userId"],
     "note": "merchant business contact; goes with deleteAll()"
   },
   "store-do:store_config": {
@@ -949,7 +955,8 @@
     "action": "none",
     "piiColumns": [],
     "subjectKeys": [],
-    "note": ""
+    "note": "",
+    "reviewedNotPii": ["return_fees_paid_by"]
   },
   "store-do:commerce_outcomes": {
     "db": "store-do",
@@ -1017,11 +1024,11 @@
   },
   "d1:legal_notice_sends": {
     "db": "d1",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["sent_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
     "reviewedNotPii": ["recipient_count"]
   },
   "d1:legal_notice_deliveries": {
@@ -1034,11 +1041,11 @@
   },
   "d1:store_features": {
     "db": "d1",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["enabled_by"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "d1:store_usage_snapshots": {
     "db": "d1",
@@ -1093,16 +1100,23 @@
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["payer_name", "payer_address", "payer_mobile", "payer_bank"],
-    "subjectKeys": [],
+    "piiColumns": [
+      "payer_name",
+      "payer_address",
+      "payer_mobile",
+      "payer_bank",
+      "reviewed_by",
+      "receiver_name"
+    ],
+    "subjectKeys": ["userId"],
     "note": "payer details of a merchant subscription payment; kept for accounting without the payer fields after the retention window"
   },
   "d1:manual_payment_claims": {
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["payer_reference"],
-    "subjectKeys": [],
+    "piiColumns": ["payer_reference", "reviewed_by"],
+    "subjectKeys": ["userId"],
     "note": ""
   },
   "d1:billing_reminders": {
@@ -1131,19 +1145,19 @@
   },
   "d1:provider_activation_requests": {
     "db": "d1",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": ""
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["requested_by_id", "decided_by_id"],
+    "subjectKeys": ["userId"],
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
   },
   "d1:stores": {
     "db": "d1",
-    "class": "no-pii",
-    "action": "none",
-    "piiColumns": [],
-    "subjectKeys": [],
-    "note": "directory row: business name, slug, domain; contact details live only in the StoreDO store_profile",
+    "class": "merchant-pii",
+    "action": "retain",
+    "piiColumns": ["owner_id"],
+    "subjectKeys": ["userId"],
+    "note": "owner_id is a pseudonymous user id on a billing record that is kept; the owner-closure flow (M-024) removes the store, not a column scrub",
     "reviewedNotPii": [
       "email_sender_local_part",
       "email_domain_id",
