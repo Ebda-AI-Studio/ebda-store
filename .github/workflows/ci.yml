@@ -592,6 +592,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d ebda_smoke"
           --health-interval 10s
           --health-timeout 5s
@@ -941,6 +942,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -952,6 +954,7 @@ jobs:
           # Dynamic host port: same reasoning as postgres above.
           - 6379
         options: >-
+          --tmpfs /data:rw,size=256m
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
@@ -1149,6 +1152,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -1261,6 +1265,7 @@ jobs:
           # Dynamic host port, same reasoning as the jobs above.
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -1338,6 +1343,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -1349,6 +1355,7 @@ jobs:
           # Dynamic host port: same reasoning as postgres above.
           - 6379
         options: >-
+          --tmpfs /data:rw,size=256m
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s

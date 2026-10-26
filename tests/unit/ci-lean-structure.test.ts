@@ -352,3 +352,31 @@ describe('OPS-5: a failed deploy reaches a human', () => {
     expect(raw).toContain('secrets.TELEGRAM_ALERT_CHAT_ID');
   });
 });
+
+describe('service containers leave no anonymous docker volumes (guest disk leak 2026-10-26)', () => {
+  const dir = path.join(ROOT, '.github/workflows');
+  const files = readdirSync(dir).filter(f => /\.ya?ml$/.test(f));
+  for (const f of files) {
+    const raw = readFileSync(path.join(dir, f), 'utf8');
+    const blocks = [
+      ...raw.matchAll(
+        /image: (pgvector\/\S+|postgres\S*|redis\S*)\n([\s\S]*?)(?=\n\s{4,6}\w[\w-]*:|\n\s{2}\w)/g
+      ),
+    ];
+    for (const b of blocks) {
+      const image = b[1];
+      const opts =
+        /options: >-\n((?:\s+--.*\n?)+)/.exec(raw.slice(b.index!, b.index! + 1200))?.[1] ?? '';
+      it(`${f}: ${image} mounts its data dir on tmpfs`, () => {
+        if (image.startsWith('redis')) expect(opts).toContain('--tmpfs /data');
+        else expect(opts).toContain('--tmpfs /var/lib/postgresql/data');
+      });
+    }
+  }
+  it('finds the service containers', () => {
+    const all = files.map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
+    expect(
+      [...all.matchAll(/--tmpfs \/var\/lib\/postgresql\/data/g)].length
+    ).toBeGreaterThanOrEqual(6);
+  });
+});
