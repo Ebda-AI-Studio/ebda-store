@@ -257,6 +257,8 @@ The last test fails until SKIN-DEL-2 is decided (Souq/Dahab looks still say `ski
 
 ### Task 4: The migration for any store still on an old skin (PR A, run is STOP 1)
 
+> **SUPERSEDED (2026-10-26) by Ruling SKIN-DEL-3 (as amended on #209, `docs/RULINGS.md`).** No migration script and no publish-on-migrate step ship: production has 6 stores (5 demo stores on qamar, souq, lamma, dahab and jasmine, and `qa-walk-store-1010`) and none is on an old skin, so there is nothing to migrate. A retired value found in a stored row is mapped at read time (`normalizeLegacyTemplate`, with `mapRetiredSkin` from Task 2). The text below is kept as history only; do not build it. Accepted by the controller 2026-10-26.
+
 **Files:**
 
 - Create: `scripts/skins/migrate-old-skins.mjs`
@@ -348,6 +350,8 @@ The new text (write it from the post-Dahab, post-Souq tree; names below are the 
 ---
 
 ### Task 8: Enum contract migration (PR C)
+
+> **SUPERSEDED (2026-10-26) by Ruling SKIN-DEL-8 (as amended on #209, `docs/RULINGS.md`).** The Postgres `StoreTemplate` enum and `schema.prisma` keep the five old values: there is no enum-contract migration. `qa-walk-store-1010` holds `modern` and must not be touched, so the value cannot be dropped, and Postgres is retired by INFRA-CF-1 (store data moves to a `StoreDO` per store, platform data to D1, where enums become CHECK constraints), so a Postgres contract would be throwaway work. The D1 schema only has to allow the five live templates; old values stay parseable by the reader. The text below is kept as history only; do not build it. Accepted by the controller 2026-10-26.
 
 **Files:**
 
