@@ -5283,6 +5283,28 @@
       "inactive": "Inactive",
       "activeOnly": "Active only",
       "hiddenInactive": "{count} inactive hidden (still kept in order)"
+    },
+    "suggest": {
+      "title": "Let the assistant suggest your categories",
+      "intro": "Your store has no categories yet. The assistant reads your product names and descriptions and proposes a grouping. You review it, rename or remove anything, and nothing is created until you press Create.",
+      "ask": "Suggest categories",
+      "asking": "Looking at your products…",
+      "reviewTitle": "Suggested categories",
+      "reviewHint": "Rename a category, remove it, or untick products. Only what you see here is created.",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "products": "{count} products",
+      "remove": "Remove this category",
+      "unassigned": "{count} products are not in any suggested category. You can add them later.",
+      "create": "Create these categories",
+      "creating": "Creating…",
+      "discard": "Discard",
+      "none": "The assistant could not group your products. Add a few more products or create categories by hand.",
+      "noProducts": "Add some products first; the suggestion is built from them.",
+      "exist": "You already have categories, so there is nothing to suggest.",
+      "aiOff": "AI is turned off for your store. Turn it on in AI usage to use this.",
+      "quota": "The daily AI limit was reached. Try again tomorrow.",
+      "failed": "The suggestion did not work. Try again in a moment."
     }
   },
   "reviews": {

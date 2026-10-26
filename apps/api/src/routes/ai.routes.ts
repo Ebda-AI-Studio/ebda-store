@@ -14,6 +14,10 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { isStoreAiEnabled, requireAiEnabled } from '../lib/store-ai-switch';
 import { requireFeature } from '../middleware/feature-gate';
 import { AIService } from '../services/ai.service';
+import {
+  applyStoreCategories,
+  proposeStoreCategories,
+} from '../services/store-category-suggest.service';
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
@@ -163,6 +167,60 @@ router.post(
       });
 
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /stores/:storeId/ai/suggest-store-categories
+ * A store with NO categories gets a proposal grouped from its products (the model sees product text only).
+ * Nothing is written: the merchant accepts or edits it, then calls apply-store-categories.
+ */
+router.post(
+  '/suggest-store-categories',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      z.object({})
+        .strict()
+        .parse(req.body ?? {});
+      const r = await proposeStoreCategories(req.params.storeId);
+      if (!r.ok) {
+        res.status(r.status).json({
+          success: false,
+          error: { code: r.code, message: r.message },
+        });
+        return;
+      }
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ success: true, data: r.value });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** POST /stores/:storeId/ai/apply-store-categories — creates what the merchant approved (their edits included). */
+router.post(
+  '/apply-store-categories',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const r = await applyStoreCategories({
+        storeId: req.params.storeId,
+        userId: req.user!.userId,
+        categories: (req.body as { categories?: unknown } | undefined)?.categories,
+      });
+      if (!r.ok) {
+        res.status(r.status).json({
+          success: false,
+          error: { code: r.code, message: r.message },
+        });
+        return;
+      }
+      res.status(201).json({ success: true, data: r.value });
     } catch (error) {
       next(error);
     }

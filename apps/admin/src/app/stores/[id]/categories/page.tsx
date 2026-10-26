@@ -14,6 +14,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { textFieldValue } from '../../../../lib/form-text';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
+import { CategorySuggestionPanel } from './CategorySuggestionPanel';
 import { useT } from '@/i18n/useT';
 import type { SizeChartOption } from '../../../../components/SizeChartSelect';
 
@@ -598,6 +599,11 @@ export default function StoreCategoriesPage() {
           </span>
         </div>
       </div>
+
+      {/* A store with no categories: let the assistant propose some from its products. */}
+      {!isLoading && !error && categories.length === 0 && (
+        <CategorySuggestionPanel storeId={storeId} onCreated={fetchCategories} />
+      )}
 
       {/* Categories List */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
