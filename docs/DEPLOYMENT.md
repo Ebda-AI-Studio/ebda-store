@@ -648,3 +648,49 @@ async event handler registration as a post-import listener.
 **When adding a new service worker or updating `OneSignalSDKWorker.js`:**
 preserve this pre-registration block. Removing it restores the deprecation
 warning on Chromium 133+.
+
+## Merchant custom domains (Cloudflare for SaaS, M-072): the route change
+
+**Goal.** A merchant's own domain (`shop.example.com`, CNAME to the fallback origin `cf.ebda.app`) is added as a Cloudflare for SaaS
+custom hostname on the `ebda.app` zone. Its traffic enters THIS zone and is matched against this zone's Workers routes
+([Workers as your fallback origin](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/start/advanced-settings/worker-as-origin/):
+"Any Worker routes configured on your zone will match this incoming traffic", and the recommended route is `*/*`). The storefront
+Worker (`ebda-web`) today only owns `*.ebda.app/*`, which cannot match `shop.example.com`.
+
+**Change (code only, NOT deployed).**
+
+| Where                           | Change                                                                                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/cf-routes.cjs` (web)   | add `{ pattern: "*/*", zone_name: "ebda.app" }` after `*.ebda.app/*`                                                                            |
+| `apps/marketing/wrangler.jsonc` | add the explicit apex route `ebda.app/*` (besides the custom domain)                                                                            |
+| `apps/accounts/wrangler.jsonc`  | add the explicit route `accounts.ebda.app/*` (besides the custom domain)                                                                        |
+| already explicit                | `api.`, `store.`, `orders.` (generated), `docs.`, `help.`, `status.` have a `<host>/*` zone route; `media.` has its Worker-less exclusion route |
+
+**Why it is safe: precedence.** Cloudflare's rule ([Routes, matching behavior](https://developers.cloudflare.com/workers/configuration/routing/routes/#matching-behavior)):
+"When more than one route pattern could match a request URL, the most specific route pattern wins" (`www.example.com/*` beats
+`*.example.com/*`), and "a route can be specified without being associated with a Worker. This will act to negate any less
+specific patterns" (the `media.` exclusion). The same page for Cloudflare for SaaS: "More specific routes take precedence over
+wildcard routes." `*/*` is the least specific pattern there is, so every named-host route out-ranks it.
+
+**The one thing the docs do not settle, and how the plan avoids it.** `scripts/cf-routes.cjs` records that a wildcard zone route is
+evaluated BEFORE Custom Domains. If that is also true of `*/*`, a host protected only by a Custom Domain would be taken by the
+storefront. Today `ebda.app` (marketing) and `accounts.ebda.app` have ONLY a custom domain, so they get explicit zone routes in
+this change. The test deliberately ignores custom-domain entries and proves every named host has a zone route.
+`tests/unit/cf-route-precedence.test.ts` checks each host resolves to its own Worker (and fails if the apex or accounts route is
+removed), using a model of the documented rules (`scripts/ci/cf-route-resolve.mjs`).
+
+**Before the dashboard step (Ahmad's browser):** enable SSL for SaaS on `ebda.app`, set the fallback origin to `cf.ebda.app` (already
+resolves through the wildcard; the docs want it proxied and originless, which the wildcard-to-Worker setup satisfies), then deploy
+this branch. **Deploy order matters:** deploy `ebda-marketing` and `ebda-accounts` FIRST (their explicit routes), then `ebda-web`
+(the `*/*`). Verify after each deploy (rule F): `curl -sI https://ebda.app/` and `https://accounts.ebda.app/health` still answer from
+marketing / accounts, `https://api.ebda.app/health` from the API, and a store subdomain from the storefront.
+
+**What the Worker must also do (not in this change).** `ebda-web` will now receive arbitrary `Host` headers. The storefront resolver
+must map a custom hostname to a store through a verified-domain lookup and 404 any unknown host (tenant resolvers throw/404, never
+default). That is the M-072 application work; until it ships, a custom hostname must not be attached.
+
+**Rollback.** Instant, no redeploy of the other Workers: delete the `*/*` route. Dashboard: Workers & Pages, `ebda.app` zone,
+Workers Routes, delete `*/*` (ebda-web). API: `curl -X GET -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes`
+to find the route id, then `curl -X DELETE ... /zones/$ZONE/workers/routes/$ID`. Then revert the PR and redeploy ebda-web so the
+next deploy does not re-add it. Store subdomains (`*.ebda.app/*`) are unaffected throughout; the explicit apex/accounts routes are
+harmless to leave in place.
