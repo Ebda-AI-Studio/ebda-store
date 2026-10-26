@@ -5181,6 +5181,10 @@ model InstapayReceipt {
   reviewNote          String?   @map("review_note")
   reviewedBy          String?   @map("reviewed_by")
   reviewedAt          DateTime? @map("reviewed_at")
+  /// The screenshot (private R2) was deleted: on approval, or by the retention sweep. Null = the object may still exist.
+  imageDeletedAt      DateTime? @map("image_deleted_at")
+  /// payer / receiver / note / AI-read personal fields were scrubbed (retention sweep, or the shopper's erasure).
+  personalScrubbedAt  DateTime? @map("personal_scrubbed_at")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 

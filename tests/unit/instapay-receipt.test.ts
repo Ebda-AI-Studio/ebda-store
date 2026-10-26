@@ -43,7 +43,7 @@ const png = (name: string) => readFileSync(path.join(FIX, `${name}.png`));
 
 afterEach(() => setReceiptModelCallForTests(null));
 
-describe('the AI read (recorded Gemini responses, two real layouts)', () => {
+describe('the AI read (recorded answers, two real layouts; personal fields dropped)', () => {
   it('"sent" layout: the payer\'s own receipt', () => {
     const e = normalizeReceiptExtraction(recorded('receipt-sent'));
     expect(e).toMatchObject({
@@ -51,30 +51,36 @@ describe('the AI read (recorded Gemini responses, two real layouts)', () => {
       reference: '482193377105',
       transferDate: '2026-10-05',
       transferTime: '15:15',
-      payerName: 'SYNTH TEST PAYER',
-      payerAddress: 'synthpayer@instapay',
-      payerBank: 'CIB',
-      receiverName: 'DEMO STORE LLC',
-      receiverHandle: 'demostore@instapay',
-      note: 'Order SYN-1001',
-      direction: 'sent',
       looksEdited: false,
+    });
+    // The recorded (old Gemini) answer ALSO carried names, bank, handle and note; the Workers AI reader never asks for
+    // them and DROPS them if a model volunteers them (M-003): nothing personal survives normalisation.
+    expect(e).toMatchObject({
+      payerName: null,
+      payerAddress: null,
+      payerMobile: null,
+      payerBank: null,
+      receiverName: null,
+      receiverHandle: null,
+      receiverMobile: null,
+      note: null,
+      direction: 'unknown',
     });
     expect(e.confidence).toBeGreaterThan(0.7);
   });
 
-  it('"received" layout: the masked payer name is kept exactly as shown', () => {
+  it('"received" layout: amount, reference and time are read; the masked payer details are NOT kept', () => {
     const e = normalizeReceiptExtraction(recorded('receipt-received'));
     expect(e).toMatchObject({
       amountMinor: 349_000,
       reference: '771034829156',
       transferDate: '2026-10-07',
       transferTime: '21:40',
-      payerName: 'SYN*** T*** P***',
-      payerMobile: '010****4321',
+      payerName: null,
+      payerMobile: null,
       payerAddress: null,
-      receiverHandle: 'ebdatest@instapay',
-      direction: 'received',
+      receiverHandle: null,
+      direction: 'unknown',
     });
   });
 
