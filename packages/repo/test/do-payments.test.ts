@@ -111,6 +111,7 @@ describe('payment rows', () => {
       .rows("SELECT payload FROM d1_outbox WHERE kind = 'entity_index'")
       .map(r => JSON.parse(r.payload));
     expect(q.map(x => `${x.kind}:${x.id.includes(':') ? x.id : 'pay'}`).sort()).toEqual([
+      'order:pay', // queued by the checkout in the same section as the order (audit DB-2)
       'payment:pay',
       'webhook:paymob:I1',
       'webhook:paymob:T1',

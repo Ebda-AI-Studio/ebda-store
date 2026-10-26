@@ -3,7 +3,8 @@
 // that creates the entity (see payments.ts `indexEntity`); `drainEntityIndexOutbox` (called from the DO alarm) writes them
 // to D1 `entity_index` and retries with backoff until D1 acknowledges. The D1 side is write-once per (kind, id): an id can
 // never be re-pointed at another store (a hostile or buggy second writer is reported, not applied).
-import type { SyncSql } from '../do/sync-sql';
+import { createPayment } from '../do/payments';
+import { MoneyError, type SyncSql } from '../do/sync-sql';
 
 export const ENTITY_KINDS = [
   'order',
@@ -109,11 +110,18 @@ export async function resolveStoreId(
   return r?.store_id ?? null;
 }
 
-export type WebhookRoute = { storeId: string } | { noop: true; reason: 'unknown_reference' };
+/**
+ * `retry`: the reference is not (yet) in the index. NEVER answer the gateway 2xx for this: a callback that outruns the
+ * D1 write (alarm lag, a D1 blip) would be acknowledged and dropped, the gateway would never retry and the order would
+ * stay unpaid although the customer paid (audit DB-2). The route answers non-2xx (`webhookHttpResponse`) so the gateway
+ * retries, and alerts so an operator sees a reference that never resolves.
+ */
+export type WebhookRoute = { storeId: string } | { retry: true; reason: 'unresolved_reference' };
+
 /**
  * Route a provider webhook to its store from the payment reference it carries (transaction / invoice / merchant ref,
- * indexed as `webhook` `<provider>:<ref>`, or a payment id). An unknown reference is a 200 no-op for the provider
- * (the caller adds a breadcrumb), never a crash and never a default store (tenant-resolver rule).
+ * indexed as `webhook` `<provider>:<ref>`, or a payment id). An unresolved reference is `retry`, never a default store
+ * (tenant-resolver rule) and never a silent 2xx.
  */
 export async function routePaymentWebhook(
   d1: D1Like,
@@ -123,5 +131,97 @@ export async function routePaymentWebhook(
   const storeId =
     (await resolveStoreId(d1, 'webhook', `${provider}:${ref}`)) ??
     (await resolveStoreId(d1, 'payment', ref));
-  return storeId ? { storeId } : { noop: true, reason: 'unknown_reference' };
+  return storeId ? { storeId } : { retry: true, reason: 'unresolved_reference' };
+}
+
+export interface WebhookHttpResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: { status: 'retry' };
+  /** raise this (P1 after the gateway has retried a few times): the reference never resolved */
+  alert: { kind: 'webhook_unresolved_reference'; provider: string };
+}
+/** The HTTP answer for an unresolved route: 503 + Retry-After so the gateway retries; nothing about the store is revealed. */
+export function webhookHttpResponse(
+  route: Extract<WebhookRoute, { retry: true }>,
+  provider: string
+): WebhookHttpResponse {
+  void route;
+  return {
+    status: 503,
+    headers: { 'Retry-After': '30' },
+    body: { status: 'retry' },
+    alert: { kind: 'webhook_unresolved_reference', provider },
+  };
+}
+
+/**
+ * Make the entity-index rows for `ids` visible in D1 NOW (not on the next alarm): drain the outbox, then verify every id is
+ * done. Call it BEFORE the payment url / provider reference is handed out, so a callback can never outrun the index. Throws a
+ * 503 `ENTITY_INDEX_UNAVAILABLE` when D1 cannot take the rows (the caller must then not hand the reference out; the rows stay
+ * queued and the alarm keeps retrying).
+ */
+export async function awaitEntityIndexed(
+  db: SyncSql,
+  d1: D1Like,
+  storeId: string,
+  ids: ReadonlyArray<{ kind: EntityKind; id: string }>,
+  opts: { now?: number } = {}
+): Promise<void> {
+  if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
+  const now = opts.now ?? Date.now();
+  const drained = await drainEntityIndexOutbox(db, d1, { now: now + 1 });
+  // an id already owned by ANOTHER store is a conflict, not "done": routing it would deliver this payment to the wrong tenant
+  const conflicted = ids.filter(w =>
+    drained.conflicts.some(c => c.kind === w.kind && c.id === w.id)
+  );
+  if (conflicted.length > 0)
+    throw new MoneyError(
+      'ENTITY_INDEX_CONFLICT',
+      'an entity id is already owned by another store',
+      409,
+      {
+        conflicts: conflicted.length,
+      }
+    );
+  const pending = db
+    .all("SELECT payload FROM d1_outbox WHERE kind = 'entity_index' AND done_at IS NULL", [])
+    .map(r => JSON.parse(r.payload as string) as { kind: string; id: string });
+  const missing = ids.filter(w => pending.some(p => p.kind === w.kind && p.id === w.id));
+  if (missing.length > 0)
+    throw new MoneyError(
+      'ENTITY_INDEX_UNAVAILABLE',
+      'the entity index could not be written; try again',
+      503,
+      {
+        missing: missing.length,
+      }
+    );
+  // fail closed: read every id back from D1 and require it to resolve to THIS store (covers a conflict recorded by an earlier
+  // drain, and an id that was never queued)
+  for (const w of ids) {
+    const owner = await resolveStoreId(d1, w.kind, w.id);
+    if (owner !== storeId)
+      throw new MoneyError(
+        owner === null ? 'ENTITY_INDEX_UNAVAILABLE' : 'ENTITY_INDEX_CONFLICT',
+        owner === null
+          ? 'the entity index has no row for this id'
+          : 'an entity id is owned by another store',
+        owner === null ? 503 : 409
+      );
+  }
+}
+
+/** Create the payment AND make it routable before returning (the caller then hands the provider reference out). */
+export async function createPaymentIndexed(
+  db: SyncSql,
+  d1: D1Like,
+  args: Parameters<typeof createPayment>[1]
+): Promise<{ paymentId: string }> {
+  const { paymentId } = createPayment(db, args);
+  const ids: Array<{ kind: EntityKind; id: string }> = [{ kind: 'payment', id: paymentId }];
+  for (const ref of [args.transactionId, args.invoiceId])
+    if (ref) ids.push({ kind: 'webhook', id: `${args.provider}:${ref}` });
+  await awaitEntityIndexed(db, d1, args.storeId, ids, { now: args.now });
+  return { paymentId };
 }
