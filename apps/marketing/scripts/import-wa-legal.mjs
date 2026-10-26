@@ -8,7 +8,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DOCS, parse } from './wa-legal-lib.mjs';
+import { DOCS, PROVISIONAL_NOTE, parse } from './wa-legal-lib.mjs';
 
 const src = process.argv[2];
 if (!src) throw new Error('usage: import-wa-legal.mjs <docs/legal dir>');
@@ -30,6 +30,7 @@ for (const lang of ['ar', 'en']) {
           {
             title: d.title,
             meta: { version: '1.0', publishedAt: d.updated },
+            ...(d.provisional ? { note: PROVISIONAL_NOTE[lang] } : {}),
             sections: d.sections,
           },
           null,

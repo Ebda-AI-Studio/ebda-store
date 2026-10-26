@@ -5,6 +5,8 @@ export interface LegalDoc {
    * page and the Ebda WhatsApp documents). Store documents take theirs from LEGAL_POLICIES.
    */
   meta?: { version: string; publishedAt: string };
+  /** A visible note under the title (a document with clauses still under legal review says so). */
+  note?: string;
   sections: { h: string; p: string[] }[];
 }
 

@@ -50,12 +50,12 @@ function firstVersion(): LegalVersion {
   });
 }
 
-/** v1.1, 2026-10-25 (LEGAL-1): published before launch, so effective on publication. */
+/** v1.1 (LEGAL-1), dated the day it is published (never backdated; set it to the merge day). No fee changes: prices stay final amounts, no VAT (Ruling VAT-0), so `feeChange` is false and no 30-day notice applies. */
 function v11(material: boolean, summary: { ar: string; en: string }): LegalVersion {
   return Object.freeze({
     version: '1.1',
-    publishedAt: '2026-10-25',
-    effectiveAt: '2026-10-25',
+    publishedAt: '2026-10-26',
+    effectiveAt: '2026-10-26',
     material,
     feeChange: false,
     summary: Object.freeze(summary),
@@ -84,8 +84,8 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
   terms: doc(
     firstVersion(),
     v11(true, {
-      ar: 'ضريبة القيمة المضافة (14%) على رسومنا تُضاف وتُعرض منفصلة، وإشارة إلى شروط ابدأ واتساب.',
-      en: 'VAT (14%) on our fees is added and shown separately, and a pointer to the Ebda WhatsApp terms.',
+      ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ واتساب.',
+      en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda WhatsApp terms.',
     })
   ),
   acceptableUse: doc(
@@ -98,11 +98,19 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
   merchant: doc(
     firstVersion(),
     v11(true, {
-      ar: 'ضريبة القيمة المضافة على رسومنا، وإخطار التاجر بالاختراق خلال 72 ساعة، وضمانات النقل خارج مصر.',
-      en: 'VAT on our fees, notice of a data breach to the merchant within 72 hours, and safeguards for transfers outside Egypt.',
+      ar: 'الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإخطار التاجر بالاختراق خلال 72 ساعة، وضمانات النقل خارج مصر.',
+      en: 'Prices are final amounts with no VAT, notice of a data breach to the merchant within 72 hours, and safeguards for transfers outside Egypt.',
     })
   ),
 });
+
+/**
+ * Which processor stack the privacy policy's sections 5 and 6 describe (DOC-2). 'current' = Neon, Resend, Inngest and
+ * the rest as live today; 'cloudflare' = the post-cutover text (apps/marketing/src/lib/legal-privacy-stack.ts). The
+ * cutover PR flips this AND appends a material `privacy` 1.2 entry to LEGAL_POLICIES in the same commit; the policy
+ * must change the day the processors do, never before (it would be false) and never after.
+ */
+export const PRIVACY_STACK: 'current' | 'cloudflare' = 'current';
 
 /** Document titles, identical to the marketing pages' titles (parity-tested in marketing-site.test.tsx). */
 export const LEGAL_DOC_TITLE: Readonly<Record<LegalDocKey, { ar: string; en: string }>> = {

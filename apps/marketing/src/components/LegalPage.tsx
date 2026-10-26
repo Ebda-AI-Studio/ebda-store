@@ -47,6 +47,11 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
             · {c.updated.versionLabel} {current.version}
           </p>
           <p className="legal-notice">{c.notice}</p>
+          {doc.note && (
+            <p className="legal-notice" role="note">
+              {doc.note}
+            </p>
+          )}
         </header>
         <div className="legal-body">
           <nav className="legal-toc" aria-labelledby="toc-h">

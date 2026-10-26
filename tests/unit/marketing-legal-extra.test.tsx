@@ -74,11 +74,25 @@ describe('LEGAL-1 extra legal pages', () => {
         expect(urls).toContain(`https://ebda.app${pagePath(locale, slug)}/`);
   });
 
-  it('terms and merchant agreement state the 14% VAT, the 72-hour breach notice and the WhatsApp pointer', () => {
-    expect(allText('en', ['terms'])).toContain('14%');
+  it('terms and merchant agreement: prices are final amounts, no VAT (Ruling VAT-0), 72-hour breach notice, WhatsApp pointer', () => {
+    for (const k of ['terms', 'merchant'] as const) {
+      expect(allText('en', [k])).not.toContain('14%');
+      expect(allText('ar', [k])).not.toContain('14%');
+    }
+    expect(allText('en', ['terms'])).toContain('not registered for VAT');
+    expect(allText('en', ['terms'])).toContain('at least 30 days of notice'); // VAT would arrive as a fee change
     expect(allText('en', ['terms'])).toContain('/legal/whatsapp-terms/');
     expect(allText('en', ['merchant'])).toContain('72 hours');
     expect(allText('ar', ['merchant'])).toContain('72 ساعة');
     expect(allText('en', ['acceptableUse'])).toContain('prescription drugs');
+  });
+
+  it('DOC-1: no page promises a dashboard flow for closing the account or deleting the store (it does not exist)', () => {
+    for (const l of LOCALES) {
+      const t = allText(l, ['terms', 'dataDeletion', 'privacy']);
+      expect(t).not.toMatch(/close (your|the) account[^.]*from the dashboard/i);
+      expect(t).not.toMatch(/إغلاق حسابك[^.]*من لوحة التحكم|أغلق الحساب من لوحة التحكم/);
+      expect(t).toContain('privacy@ebda.app');
+    }
   });
 });

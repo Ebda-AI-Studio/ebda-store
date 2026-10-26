@@ -46,14 +46,28 @@ describe('published Ebda WhatsApp legal pages equal their vendored source', () =
         const raw = readFileSync(path.join(ROOT, lang, `whatsapp-${file}.md`), 'utf8');
         const doc = COPY[lang].legalPages[key];
         const overview = lang === 'ar' ? 'نظرة عامة' : 'Overview';
+        const MARK =
+          lang === 'ar' ? '[مبدئي، قيد المراجعة القانونية]' : '[Provisional, under legal review]';
+        const pending = (raw.match(/<!--\s*PENDING LEGAL REVIEW/g) ?? []).length;
         const published = tokens(
-          [doc.title, ...doc.sections.flatMap(s => [s.h === overview ? '' : s.h, ...s.p])].join(
-            '\n'
-          )
+          [doc.title, ...doc.sections.flatMap(s => [s.h === overview ? '' : s.h, ...s.p])]
+            .join('\n')
+            .split(MARK)
+            .join('')
         );
         expect(published).toEqual(sourceTokens(raw));
+        // DOC-3: every clause the source marks PENDING LEGAL REVIEW is published visibly provisional, never as final
+        const allText = doc.sections.flatMap(s => s.p).join('\n');
+        expect(allText.split(MARK).length - 1, 'one visible marker per pending clause').toBe(
+          pending
+        );
+        if (pending)
+          expect(
+            doc.note,
+            'a document with provisional clauses says so under its title'
+          ).toBeTruthy();
         expect(doc.meta?.publishedAt).toBe(/^updated:\s*(\S+)/m.exec(raw)?.[1]);
-        expect(JSON.stringify(doc)).not.toMatch(/PENDING|<!--/);
+        expect(JSON.stringify(doc)).not.toMatch(/PENDING|<!--/); // the raw HTML comment never reaches the page
       });
     }
 

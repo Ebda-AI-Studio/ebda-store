@@ -28,7 +28,7 @@ export const DELETION_EN: LegalDoc = {
       h: '3. If you are a merchant',
       p: [
         "Your customers: open the customer in your dashboard to export or erase their data (store owners and admins only; erasing asks you to confirm by typing). You are the controller of your customers' data, so you answer their requests; we help on reasonable request.",
-        'Your store or account: close the account from the dashboard, or write to privacy@ebda.app from the email address on the account and say that you want the store and its data deleted. We delete or anonymise the store and its data within 90 days of the request, except what is listed in section 6.',
+        'Your store or account: write to privacy@ebda.app from the email address on the account and say that you want the store and its data deleted. We delete or anonymise the store and its data within 90 days of the request, except what is listed in section 6.',
       ],
     },
     {
@@ -93,7 +93,7 @@ export const DELETION_AR: LegalDoc = {
       h: '3. إذا كنت تاجرًا',
       p: [
         'عملاؤك: افتح العميل في لوحة التحكم لتصدير بياناته أو حذفها (لمالكي المتاجر ومديريها فقط، ويطلب الحذف تأكيدًا بالكتابة). أنت المتحكّم في بيانات عملائك فتجيب أنت عن طلباتهم، ونساعدك عند الطلب المعقول.',
-        'متجرك أو حسابك: أغلق الحساب من لوحة التحكم، أو راسلنا على privacy@ebda.app من البريد المسجّل في الحساب واذكر أنك تريد حذف المتجر وبياناته. نحذف المتجر وبياناته أو نجعلها مجهولة الهوية خلال 90 يومًا من الطلب، عدا ما ورد في البند 6.',
+        'متجرك أو حسابك: راسلنا على privacy@ebda.app من البريد المسجّل في الحساب واذكر أنك تريد حذف المتجر وبياناته. نحذف المتجر وبياناته أو نجعلها مجهولة الهوية خلال 90 يومًا من الطلب، عدا ما ورد في البند 6.',
       ],
     },
     {

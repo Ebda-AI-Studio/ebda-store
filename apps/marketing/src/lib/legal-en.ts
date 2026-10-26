@@ -1,4 +1,6 @@
 import { BRAND } from '@ebda/shared/brand';
+import { PRIVACY_STACK } from '@ebda/shared/legal';
+import { POST_CUTOVER } from './legal-privacy-stack';
 import { DELETION_EN } from './legal-deletion';
 import { LEGAL_WA_EN } from './legal-wa-en';
 import type { LegalPages } from './legal-types';
@@ -87,7 +89,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '4. Plans, fees and payment',
         p: [
-          'Paid plans, prices and billing rules are in the Merchant Agreement and the Pricing section of the website. Fees are charged in advance, in Egyptian pounds, and are non-refundable except where mandatory law says otherwise. Our fees are stated before value-added tax: where VAT applies to them (currently 14% in Egypt) we add it and show it as a separate line on the invoice, and the prices shown on this website do not include it.',
+          'Paid plans, prices and billing rules are in the Merchant Agreement and the Pricing section of the website. Fees are charged in advance, in Egyptian pounds, and are non-refundable except where mandatory law says otherwise. Prices are final amounts in Egyptian pounds: we are not registered for VAT and charge none. If that changes, we will introduce VAT only with at least 30 days of notice, as a fee change under section 15, and show it as a separate line.',
           'Ebda WhatsApp is a separate service with its own terms (https://ebda.app/legal/whatsapp-terms/). If you use it, those terms apply to it in addition to these.',
         ],
       },
@@ -146,7 +148,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '13. Suspension and termination',
         p: [
-          'You may stop using the Service and close your account at any time from the dashboard, or by writing to ahlan@ebda.app; fees already paid are not refunded.',
+          'You may stop using the Service at any time. To close your account and have your store and its data deleted, write to privacy@ebda.app from the email address on the account; we delete or anonymise them within 90 days of your request (Privacy Policy, section 7). Fees already paid are not refunded.',
           'We may suspend, restrict or terminate an account, a store or any feature, with or without notice, if we reasonably believe you breached these terms, the Merchant Agreement or the Acceptable Use Policy; if a store is, or appears to be, unlawful, fraudulent or harmful; if required by law or an authority; if fees are unpaid; or to protect the Service, our users or third parties. We will try to give notice where it is practical and lawful. Where fees are unpaid, the process in the Merchant Agreement applies.',
           'On termination your right to use the Service ends, unpaid fees become due, and your store and data are then deleted as described in the Merchant Agreement and the Privacy Policy. Sections that by their nature should survive (including 5, 10, 11, 12, 14 and 16) survive.',
         ],
@@ -203,7 +205,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '4. Taxes and VAT',
         p: [
-          "The Merchant alone is responsible for all taxes, duties and filing obligations on its sales and income, including VAT, income tax, e-invoicing and customs. Ebda Store does not give tax advice, does not act as a tax agent and does not collect or remit tax for the Merchant. The VAT feature is available only to Merchants whose VAT registration has been verified by us; it is a tool, and the Merchant remains responsible for the accuracy of the rates, registration details, invoices and returns. Ebda Store's own fees are stated before VAT; where VAT applies to them (currently 14%) it is added and shown as a separate line on the invoice.",
+          "The Merchant alone is responsible for all taxes, duties and filing obligations on its sales and income, including VAT, income tax, e-invoicing and customs. Ebda Store does not give tax advice, does not act as a tax agent and does not collect or remit tax for the Merchant. The VAT feature is available only to Merchants whose VAT registration has been verified by us; it is a tool, and the Merchant remains responsible for the accuracy of the rates, registration details, invoices and returns. Ebda Store's fees are final amounts: it is not registered for VAT and charges none. If that changes, VAT is introduced only with at least 30 days' notice, as a fee change under the Terms of Service, and shown as a separate line.",
         ],
       },
       {
@@ -235,7 +237,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '9. Plans and fees',
         p: [
-          "Ebda Store offers monthly and yearly plans: Basic (EGP 1,490), Growth (EGP 3,490) and Business (EGP 9,990) per month, or the same plans billed yearly at 25% off (EGP 13,410, 31,410 and 89,910 per year), with no commission charged by Ebda Store on orders. New stores may try the Growth plan free for 14 days; nothing is charged during the trial, and when it ends the store moves to a paid plan only once you choose and pay for one. Prices, features and limits are shown on the Pricing section and may change with 30 days' notice; a change takes effect from the next billing period. Plan prices are in Egyptian pounds and do not include value-added tax: 14% VAT is added to our fees where it applies, and shown as a separate line on the invoice.",
+          "Ebda Store offers monthly and yearly plans: Basic (EGP 1,490), Growth (EGP 3,490) and Business (EGP 9,990) per month, or the same plans billed yearly at 25% off (EGP 13,410, 31,410 and 89,910 per year), with no commission charged by Ebda Store on orders. New stores may try the Growth plan free for 14 days; nothing is charged during the trial, and when it ends the store moves to a paid plan only once you choose and pay for one. Prices, features and limits are shown on the Pricing section and may change with 30 days' notice; a change takes effect from the next billing period. Plan prices are final amounts in Egyptian pounds; no VAT is charged (see Taxes and VAT above).",
         ],
       },
       {
@@ -362,17 +364,23 @@ export const LEGAL_EN: LegalPages = {
       },
       {
         h: '5. Service providers (sub-processors)',
-        p: [
-          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email; being replaced by the Cloudflare email service); Sentry (error and performance monitoring, EU region); Inngest (background job processing; being replaced by the Cloudflare job runtime); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
-          'When a merchant uses Ebda WhatsApp, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda WhatsApp Privacy Policy (https://ebda.app/legal/whatsapp-privacy/).',
-          'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
-        ],
+        p:
+          PRIVACY_STACK === 'cloudflare'
+            ? POST_CUTOVER.en.providers
+            : [
+                'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email; being replaced by the Cloudflare email service); Sentry (error and performance monitoring, EU region); Inngest (background job processing; being replaced by the Cloudflare job runtime); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
+                'When a merchant uses Ebda WhatsApp, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda WhatsApp Privacy Policy (https://ebda.app/legal/whatsapp-privacy/).',
+                'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
+              ],
       },
       {
         h: '6. Transfers abroad',
-        p: [
-          'Some providers process data outside Egypt, including in the EU and the United States. Where the law requires, we rely on appropriate contractual and technical safeguards, and we choose EU regions for the database and monitoring services above. The recipients outside Egypt are the providers listed in section 5 (Cloudflare, Neon, Resend, Sentry, Inngest, Google, PostHog, Meta and OneSignal, in the EU, the United States or both) and, for Ebda WhatsApp, Meta.',
-        ],
+        p:
+          PRIVACY_STACK === 'cloudflare'
+            ? POST_CUTOVER.en.transfers
+            : [
+                'Some providers process data outside Egypt, including in the EU and the United States. Where the law requires, we rely on appropriate contractual and technical safeguards, and we choose EU regions for the database and monitoring services above. The recipients outside Egypt are the providers listed in section 5 (Cloudflare, Neon, Resend, Sentry, Inngest, Google, PostHog, Meta and OneSignal, in the EU, the United States or both) and, for Ebda WhatsApp, Meta.',
+              ],
       },
       {
         h: '7. Retention',
