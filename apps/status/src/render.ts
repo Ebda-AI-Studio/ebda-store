@@ -1,6 +1,7 @@
 // Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
 import {
   BRAND,
+  BRAND_MARKETING_URL,
   SITE_NAV_CSS,
   brandMarkSvg,
   brandAppIconSvg,
@@ -187,6 +188,45 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
 `.replace(/\n/g, '') + SITE_NAV_CSS;
 
+/** Social card (og + twitter) and JSON-LD for the status page: the shared 1200x630 card, the studio as publisher. */
+function socialHead(
+  t: { title: string; explain: string; site: string },
+  lang: Lang,
+  origin: string,
+  home: string
+): string {
+  const url = origin + (home === '/' ? '/' : home);
+  const image = `${BRAND_MARKETING_URL}/og.png`;
+  const ld = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${BRAND_MARKETING_URL}/#organization`,
+        name: lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+        url: BRAND_MARKETING_URL,
+        logo: `${BRAND_MARKETING_URL}/icon-512.png`,
+      },
+      {
+        '@type': 'WebSite',
+        url,
+        name: t.site,
+        inLanguage: lang,
+        publisher: { '@id': `${BRAND_MARKETING_URL}/#organization` },
+      },
+    ],
+  }).replace(/</g, '\\u003c');
+  return (
+    `<meta property="og:title" content="${esc(t.title)}"><meta property="og:description" content="${esc(t.explain)}">` +
+    `<meta property="og:url" content="${url}"><meta property="og:type" content="website">` +
+    `<meta property="og:site_name" content="${esc(t.site)}"><meta property="og:locale" content="${lang === 'ar' ? 'ar_EG' : 'en_US'}">` +
+    `<meta property="og:image" content="${image}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` +
+    `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(t.title)}">` +
+    `<meta name="twitter:description" content="${esc(t.explain)}"><meta name="twitter:image" content="${image}">` +
+    `<script type="application/ld+json">${ld}</script>`
+  );
+}
+
 export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): string {
   const t = T[lang];
   const home = lang === 'ar' ? '/' : '/en';
@@ -210,6 +250,7 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <link rel="alternate" hreflang="ar" href="${origin}/">
 <link rel="alternate" hreflang="en" href="${origin}/en">
 <link rel="icon" href="${icon}">
+${socialHead(t, lang, origin, home)}
 <style>${CSS}</style>
 </head>
 <body>

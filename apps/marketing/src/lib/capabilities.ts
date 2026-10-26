@@ -521,7 +521,7 @@ export const FEATURES_PAGE: Record<
   },
   en: {
     title: 'Ebda Store features',
-    desc: 'Templates and a page builder, custom domain, AI tools, Egyptian Arabic and Franco search, SEO, abandoned-cart recovery, loyalty, reviews, analytics, and payments and shipping for Egypt. 0% commission.',
+    desc: 'Templates, page builder, custom domain, AI tools, Egyptian Arabic search, SEO, cart recovery, loyalty, reviews, analytics, payments and shipping. 0% commission.',
     h1: 'Everything Ebda Store does.',
     lead: 'This is what exists in Ebda Store today, from Ebda AI Studio. What is not there yet is listed honestly on the comparison pages.',
     planLabel: 'Available on',

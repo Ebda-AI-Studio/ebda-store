@@ -592,7 +592,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     creditsPage: {
       title: 'حقوق الصور والموديلات',
-      desc: 'الموديلات ثلاثية الأبعاد والصور اللي في ابدأ ستور، ومين عملها وتحت أي رخصة.',
+      desc: 'الموديلات ثلاثية الأبعاد والصور اللي في ابدأ ستور، ومين عملها وتحت أي رخصة استخدام، عشان حق كل صاحب شغل يتحفظ.',
       intro:
         'المتاجر اللي بتشوفها على الموقع أمثلة توضيحية. الموديلات ثلاثية الأبعاد اللي في صفحة المنتج مأخوذة من مصادر مفتوحة، وده نسبها كاملة.',
       modelsH: 'موديلات 3D',
@@ -610,7 +610,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'عن ابدأ استوديو للذكاء الاصطناعي',
-      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي.',
+      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي، بالعربي أولًا وبواجهة بسيطة.',
       brandLine: 'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
       company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
       storyH: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
@@ -680,7 +680,7 @@ export const COPY: Record<Locale, Copy> = {
     meta: {
       title: `${PN.nameEn} — Open your store online in minutes`,
       description:
-        'Ebda Store, from Ebda AI Studio — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
+        'Ebda Store, from Ebda AI Studio: open your online store in minutes with your own link, online payments, cash and InstaPay, and shipping with Bosta and Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -990,7 +990,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     creditsPage: {
       title: 'Credits',
-      desc: 'The 3D models and images on Ebda Store: who made them and under which licence.',
+      desc: 'The 3D models and images on Ebda Store: who made them and under which licence, so every creator gets the credit they are due.',
       intro:
         'The stores you see on this site are illustrations. The 3D models on the product page come from openly licensed sources; here is the full attribution.',
       modelsH: '3D models',
@@ -1009,7 +1009,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'About Ebda AI Studio',
-      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
+      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio: Arabic first, simple, and built for the local market.',
       brandLine: 'Ebda AI Studio — Your doorway to business.',
       company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
       storyH: 'The Ebda AI Studio story',
