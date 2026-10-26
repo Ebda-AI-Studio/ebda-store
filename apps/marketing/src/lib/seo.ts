@@ -56,6 +56,11 @@ export function pageMetadata(
   const lead = (title ?? c.meta.title).replace(new RegExp(`^${name} — `), '');
   const t = title ? `${lead} | ${shortBrand(locale)}` : c.meta.title;
   const d = description ?? c.meta.description;
+  // The five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs); everything else the shared one.
+  const vertical = page.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
+  const ogImage = vertical
+    ? { ...OG_IMAGE, url: `/og/${vertical}.png`, alt: `${t} · ${BRAND.domains.marketing}` }
+    : OG_IMAGE;
   const languages: Record<string, string> = {
     ar: pagePath('ar', page),
     en: pagePath('en', page),
@@ -75,9 +80,9 @@ export function pageMetadata(
       url: pagePath(locale, page),
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       alternateLocale: locale === 'ar' ? ['en_US'] : ['ar_EG'],
-      images: [OG_IMAGE],
+      images: [ogImage],
     },
-    twitter: { card: 'summary_large_image', title: t, description: d, images: [OG_IMAGE.url] },
+    twitter: { card: 'summary_large_image', title: t, description: d, images: [ogImage.url] },
     icons: {
       icon: [
         { url: '/icon.svg', type: 'image/svg+xml' },

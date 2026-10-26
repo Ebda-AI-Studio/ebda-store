@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Ebda 3D render harness</title>
+<style>
+  html, body { margin: 0; background: transparent; }
+  canvas { display: block; }
+</style>
+<script type="importmap">
+  { "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  } }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  // Deterministic offscreen renderer: the driver calls window.setup(...) once, then window.draw(...) per frame.
+  let renderer, scene, camera, pivot, model, variantsExt;
+  window.setup = async ({ url, w, h, exposure = 1.0, key = 3.2, warmGlow = 0 }) => {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(w, h);
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = exposure;
+    document.body.appendChild(renderer.domElement);
+    scene = new THREE.Scene();
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.7;
+    const k = new THREE.DirectionalLight(0xfff1dc, key);
+    k.position.set(2, 3, 2.5);
+    scene.add(k);
+    const rim = new THREE.DirectionalLight(0xb8c8ff, 1.2);
+    rim.position.set(-3, 1.5, -2.5);
+    scene.add(rim);
+    camera = new THREE.PerspectiveCamera(28, w / h, 0.001, 50);
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    const gltf = await loader.loadAsync(url);
+    model = gltf.scene;
+    variantsExt = gltf.parser.json.extensions?.KHR_materials_variants?.variants?.map(v => v.name) ?? [];
+    // Resolve each KHR_materials_variants mapping to a ready material (GLTFLoader only keeps the indices).
+    const jobs = [];
+    model.traverse(o => {
+      const maps = o.isMesh && o.userData.gltfExtensions?.KHR_materials_variants?.mappings;
+      if (!maps) return;
+      o.userData.__v = {};
+      for (const m of maps) for (const vi of m.variants) jobs.push(gltf.parser.getDependency('material', m.material).then(mat => { o.userData.__v[vi] = mat; }));
+    });
+    await Promise.all(jobs);
+    // Re-centre on the bounding box so any model frames the same way.
+    const box = new THREE.Box3().setFromObject(model);
+    const c = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    model.position.sub(c);
+    pivot = new THREE.Group();
+    pivot.add(model);
+    scene.add(pivot);
+    if (warmGlow) {
+      const l = new THREE.PointLight(0xffb45a, warmGlow, 0.6, 1.5);
+      l.position.set(0, 0, 0);
+      pivot.add(l);
+    }
+    window.__size = size.toArray();
+    return { size: size.toArray(), variants: variantsExt };
+  };
+  // az/el in radians, fit = fraction of frame height the model's largest dimension fills.
+  window.draw = ({ az = 0.6, el = 0.18, fit = 0.8, variant = null, bob = 0, shiftX = 0 }) => {
+    if (variant) {
+      const idx = variantsExt.indexOf(variant);
+      model.traverse(o => { if (o.isMesh && o.userData.__v?.[idx]) o.material = o.userData.__v[idx]; });
+    }
+    pivot.rotation.y = az;
+    const d = Math.max(...window.__size);
+    const dist = (d / fit / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    camera.position.set(0, Math.sin(el) * dist + bob * d, Math.cos(el) * dist);
+    camera.lookAt(0, 0, 0);
+    // shiftX: move the subject sideways by that fraction of the frame width (poster layouts).
+    const W = renderer.domElement.width, H = renderer.domElement.height;
+    if (shiftX) camera.setViewOffset(W, H, -shiftX * W, 0, W, H); else camera.clearViewOffset();
+    renderer.render(scene, camera);
+  };
+  window.ready = true;
+</script>
