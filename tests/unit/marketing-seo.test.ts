@@ -142,7 +142,26 @@ describe('every page exports metadata with a canonical', () => {
       expect(Object.keys(meta.alternates.languages).sort()).toEqual(['ar', 'en', 'x-default']);
       // the five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs): 1200x630 PNG under 300 KB
       const vertical = page?.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
-      expect(meta.openGraph.images[0].url).toBe(vertical ? `/og/${vertical}.png` : '/og.png');
+      const card = vertical ? `/og/${vertical}.png` : '/og.png';
+      // electronics leads with the lantern ad poster and carries the video; the vertical card follows
+      if (vertical === 'electronics') {
+        expect(meta.openGraph.images.map((i: { url: string }) => i.url)).toEqual([
+          '/ads/lantern-poster.png',
+          card,
+        ]);
+        expect(meta.openGraph.videos[0].url).toBe('/ads/lantern-1080x1350.mp4');
+        expect(
+          statSync(path.resolve(__dirname, '../../apps/marketing/public/ads/lantern-poster.png'))
+            .size
+        ).toBeLessThan(300 * 1024);
+        expect(
+          statSync(path.resolve(__dirname, '../../apps/marketing/public/ads/lantern-1080x1350.mp4'))
+            .size
+        ).toBeLessThan(4 * 1024 * 1024);
+      } else {
+        expect(meta.openGraph.images[0].url).toBe(card);
+        expect(meta.openGraph.videos).toBeUndefined();
+      }
       expect(meta.twitter.images[0]).toBe(meta.openGraph.images[0].url);
       if (vertical) {
         const file = path.resolve(__dirname, `../../apps/marketing/public/og/${vertical}.png`);

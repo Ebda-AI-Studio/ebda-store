@@ -32,6 +32,19 @@ export const brandLine = () =>
 export const shortBrand = (locale: Locale) =>
   `${productLabel(locale)} (${BRAND.domains.marketing})`;
 
+const LANTERN_POSTER = {
+  url: '/ads/lantern-poster.png',
+  width: 1200,
+  height: 630,
+  alt: 'فانوس نحاس مضيء، وجملة «شوف منتجك من كل زاوية قبل ما يشتريه.»',
+};
+const LANTERN_VIDEO = {
+  url: '/ads/lantern-1080x1350.mp4',
+  width: 1080,
+  height: 1350,
+  type: 'video/mp4',
+};
+
 const OG_IMAGE = {
   url: '/og.png',
   width: 1200,
@@ -61,6 +74,7 @@ export function pageMetadata(
   const ogImage = vertical
     ? { ...OG_IMAGE, url: `/og/${vertical}.png`, alt: `${t} · ${BRAND.domains.marketing}` }
     : OG_IMAGE;
+  const lanternAd = vertical === 'electronics';
   const languages: Record<string, string> = {
     ar: pagePath('ar', page),
     en: pagePath('en', page),
@@ -80,9 +94,17 @@ export function pageMetadata(
       url: pagePath(locale, page),
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       alternateLocale: locale === 'ar' ? ['en_US'] : ['ar_EG'],
-      images: [ogImage],
+      // Electronics (the Souq look, whose hero product is the brass lantern) leads with the lantern ad poster and
+      // offers the 8 s turn as og:video; the vertical card follows for scrapers that skip video.
+      images: lanternAd ? [LANTERN_POSTER, ogImage] : [ogImage],
+      ...(lanternAd ? { videos: [LANTERN_VIDEO] } : {}),
     },
-    twitter: { card: 'summary_large_image', title: t, description: d, images: [ogImage.url] },
+    twitter: {
+      card: 'summary_large_image',
+      title: t,
+      description: d,
+      images: [lanternAd ? LANTERN_POSTER.url : ogImage.url],
+    },
     icons: {
       icon: [
         { url: '/icon.svg', type: 'image/svg+xml' },
