@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { SiteLink } from '@/components/SiteLink';
 import { Phone } from '@/components/Devices';
 import { NotFoundLang } from '@/components/NotFoundLang';
 import { RootShell } from '@/components/RootShell';
@@ -64,7 +65,9 @@ function Body({ locale }: { locale: Locale }) {
                       {l.label} <b>{c.soon}</b>
                     </span>
                   ) : (
-                    <a href={l.href}>{l.label}</a>
+                    <SiteLink href={l.href} locale={locale}>
+                      {l.label}
+                    </SiteLink>
                   )}
                 </li>
               ))}
@@ -72,7 +75,12 @@ function Body({ locale }: { locale: Locale }) {
           </div>
         ))}
       </nav>
-      <a className="nf-phone" href={demoLookUrl('souq', 'catalogue')} aria-label={c.phoneCaption}>
+      <SiteLink
+        className="nf-phone"
+        href={demoLookUrl('souq', 'catalogue')}
+        locale={locale}
+        aria-label={c.phoneCaption}
+      >
         <Phone className="nf-phone-frame">
           <picture>
             <source srcSet="/devices/dahab-story-4-900.avif" type="image/avif" />
@@ -87,7 +95,7 @@ function Body({ locale }: { locale: Locale }) {
           </picture>
         </Phone>
         <span>{c.phoneCaption}</span>
-      </a>
+      </SiteLink>
     </div>
   );
 }

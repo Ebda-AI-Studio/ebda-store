@@ -50,7 +50,9 @@ describe('marketing 404', () => {
   });
 
   it('has a tappable demo phone that links to a live demo store, and no orange', () => {
-    expect(html).toMatch(/class="nf-phone" href="https:\/\/storedemo-souq\.ebda\.app\//);
+    expect(html).toMatch(
+      /<a [^>]*href="https:\/\/storedemo-souq\.ebda\.app\/[^>]*class="nf-phone"|<a [^>]*class="nf-phone"[^>]*href="https:\/\/storedemo-souq\.ebda\.app\//
+    );
     expect(html.toLowerCase()).not.toMatch(/#ff6e01|orange/);
   });
 });
