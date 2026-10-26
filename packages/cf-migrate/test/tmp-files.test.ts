@@ -14,7 +14,11 @@ describe('scripts/cf temp files', () => {
   it('only lib/d1.mjs touches the temp dir, and it uses mkdtemp + an exclusive 0600 file', () => {
     for (const f of files) {
       const src = fs.readFileSync(path.join(dir, f), 'utf8');
-      if (f === 'lib/d1.mjs') {
+      if (f === 'decommission-neon.mjs') {
+        // the dump scratch dir is a private mkdtemp (0700) removed in finally; the key material is mode 0600
+        expect(src).toMatch(/mkdtempSync\(/);
+        expect(src).toMatch(/mode: 0o600/);
+      } else if (f === 'lib/d1.mjs') {
         expect(src).toMatch(/mkdtempSync\(/);
         expect(src).toMatch(/flag: 'wx'/);
         expect(src).toMatch(/mode: 0o600/);
