@@ -45,6 +45,18 @@ const waLabel = (locale: Locale) =>
   locale === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn;
 export const whatsappBrandLine = () =>
   `${BRAND.productWhatsapp.nameEn} — ${BRAND.productWhatsapp.nameAr}, by ${BRAND.company.shortNameEn} (${BRAND.domains.marketing})`;
+const LANTERN_POSTER = {
+  url: '/ads/lantern-poster.png',
+  width: 1200,
+  height: 630,
+  alt: 'فانوس نحاس مضيء، وجملة «شوف منتجك من كل زاوية قبل ما يشتريه.»',
+};
+const LANTERN_VIDEO = {
+  url: '/ads/lantern-1080x1350.mp4',
+  width: 1080,
+  height: 1350,
+  type: 'video/mp4',
+};
 
 const OG_IMAGE = {
   url: '/og.png',
@@ -73,6 +85,12 @@ export function pageMetadata(
   const tail = wa ? `${name} (${BRAND.domains.marketing})` : shortBrand(locale);
   const t = title ? `${lead} | ${tail}` : c.meta.title;
   const d = description ?? c.meta.description;
+  // The five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs); everything else the shared one.
+  const vertical = page.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
+  const ogImage = vertical
+    ? { ...OG_IMAGE, url: `/og/${vertical}.png`, alt: `${t} · ${BRAND.domains.marketing}` }
+    : OG_IMAGE;
+  const lanternAd = vertical === 'electronics';
   const languages: Record<string, string> = {
     ar: pagePath('ar', page),
     en: pagePath('en', page),
@@ -92,13 +110,15 @@ export function pageMetadata(
       url: pagePath(locale, page),
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       alternateLocale: locale === 'ar' ? ['en_US'] : ['ar_EG'],
-      images: [wa ? WA_OG_IMAGE : OG_IMAGE],
+      // The WhatsApp page keeps its own card.
+      images: wa ? [WA_OG_IMAGE] : lanternAd ? [LANTERN_POSTER, ogImage] : [ogImage],
+      ...(!wa && lanternAd ? { videos: [LANTERN_VIDEO] } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title: t,
       description: d,
-      images: [(wa ? WA_OG_IMAGE : OG_IMAGE).url],
+      images: [wa ? WA_OG_IMAGE.url : lanternAd ? LANTERN_POSTER.url : ogImage.url],
     },
     icons: {
       icon: [

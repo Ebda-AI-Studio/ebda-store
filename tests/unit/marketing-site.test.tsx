@@ -358,7 +358,7 @@ describe('marketing honesty', () => {
     ] as const) {
       const sec = html.match(/<section id="model3d".*?<\/section>/s)![0];
       expect(sec).toContain('/3d/stills/qamar-midnight.webp'); // the still is the server-rendered first paint
-      expect(sec.match(/role="tab"/g)).toHaveLength(3);
+      expect(sec.match(/role="tab"/g)).toHaveLength(5);
       expect(sec).toContain(`/3d/qr/qamar-${locale}.svg`);
       // the three glTF colourways are real buttons with a pressed state and visible text
       expect(sec.match(/class="m3d-swatch"/g)).toHaveLength(3);
