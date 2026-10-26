@@ -24,11 +24,24 @@ describe('toE164 (Egypt default +20)', () => {
     expect(toE164(raw)).toBe('+201001234567');
   });
 
-  it('a foreign number needs + or 00: national-looking foreign numbers are NOT turned into Egyptian ones', () => {
-    expect(toE164('07911123456')).toBeNull(); // UK mobile
-    expect(toE164('0501234567')).toBeNull(); // Saudi national
-    expect(toE164('0212345678')).toBeNull(); // Cairo landline
+  it("is Ebda WhatsApp's normaliser, including its Egypt-first reading of a national 0... number", () => {
+    // Same output on both sides is the point (audit CODE-10): WhatsApp reads ANY national 0xxxxxxxxx as Egyptian,
+    // so the Store must too, or one customer gets two keys. A foreign number must carry + or 00 to stay foreign.
+    expect(toE164('07911123456')).toBe('+207911123456');
+    expect(toE164('0501234567')).toBe('+20501234567');
+    expect(toE164('0212345678')).toBe('+20212345678');
+    expect(toE164('0100123456')).toBe('+20100123456');
     expect(toE164('2012345678901')).toBeNull();
+  });
+
+  it('does not strip arbitrary text the way the old Store normaliser did', () => {
+    expect(toE164('tel:+201001234567')).toBeNull();
+    expect(toE164('+20 100 123 4567 x12')).toBeNull();
+  });
+
+  it('drops the bidi marks WhatsApp adds around a number', () => {
+    expect(toE164('\u200E+20 100 123 4567\u200F')).toBe('+201001234567');
+    expect(toE164('\u202A01001234567\u202C')).toBe('+201001234567');
   });
 
   it('keeps another country code as given', () => {
@@ -36,19 +49,12 @@ describe('toE164 (Egypt default +20)', () => {
     expect(toE164('00966501234567')).toBe('+966501234567');
   });
 
-  it.each([
-    null,
-    undefined,
-    '',
-    '   ',
-    'abc',
-    '123',
-    '+0123456789',
-    '0100123456',
-    '+2010012345678901',
-  ])('%j is not a phone', raw => {
-    expect(toE164(raw as string | null | undefined)).toBeNull();
-  });
+  it.each([null, undefined, '', '   ', 'abc', '123', '+0123456789', '+2010012345678901'])(
+    '%j is not a phone',
+    raw => {
+      expect(toE164(raw as string | null | undefined)).toBeNull();
+    }
+  );
 });
 
 describe('buyerKeyFor', () => {

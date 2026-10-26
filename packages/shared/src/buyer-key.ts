@@ -7,41 +7,45 @@
  * `tests/unit/buyer-key.test.ts` pins the contract's test vector.
  */
 
-const ARABIC_INDIC = /[٠-٩]/g; // ٠-٩
-const EXTENDED_ARABIC_INDIC = /[۰-۹]/g; // ۰-۹
 const E164 = /^\+[1-9]\d{7,14}$/;
+// LRM/RLM, ALM, embeddings/overrides and isolates that WhatsApp's RTL UI adds around numbers.
+const BIDI_MARKS = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
+
+function asciiDigits(s: string): string {
+  return s
+    .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06f0));
+}
 
 /** Bumped when SUITE_BUYER_KEY_SECRET is rotated (CI envelope `keyVersion`). */
 export const BUYER_KEY_VERSION = 1;
 
 /**
- * Any phone a shopper typed -> E.164, or null when it cannot be one. Egypt (+20) is the default
- * country, and ONLY Egyptian mobile shapes are accepted without an explicit country prefix:
- * `01001234567`, `1001234567`, `201001234567`, `+20 100 123 4567`, `+20 0100 123 4567` (trunk 0
- * dropped), `00201001234567` and Arabic-Indic digits all become `+201001234567`. A foreign number
- * must carry `+` or `00` (a UK `07911123456` is NOT turned into an Egyptian number: it is null).
+ * Any phone a shopper typed -> E.164, or null when it cannot be one. THIS IS EBDA WHATSAPP'S
+ * `normaliseE164` (src/core/phone.ts), line for line: two normalisers that differ give one customer two
+ * keys (audit CODE-10). Do not "improve" it here; change both repos together and re-run the shared
+ * vectors (tests/unit/buyer-key-vectors.test.ts).
+ *
+ * Without a `+`/`00` prefix only Egyptian forms are accepted: national `0...`, `20...` (12 digits) or a
+ * 10-digit mobile typed without its leading 0. Anything else returns null rather than guessing a
+ * country. (The Store's STORAGE format, `normalizePhoneForStorage`, is a different thing and unchanged,
+ * Ruling FDN-PHONE-1; only the buyer-key input goes through this.)
  */
-export function toE164(raw: string | null | undefined): string | null {
+export function toE164(raw: string | null | undefined, defaultCountry: '20' = '20'): string | null {
   if (!raw) return null;
-  const ascii = raw
-    .replace(ARABIC_INDIC, d => String(d.charCodeAt(0) - 0x0660))
-    .replace(EXTENDED_ARABIC_INDIC, d => String(d.charCodeAt(0) - 0x06f0));
-  const trimmed = ascii.trim();
-  const digits = trimmed.replace(/\D/g, '');
-  if (!digits) return null;
-  let e164: string | null = null;
-  const explicit = trimmed.startsWith('+')
-    ? digits
-    : digits.startsWith('00')
-      ? digits.slice(2)
-      : null;
-  if (explicit !== null) {
-    // `+20 0100...`: people type the national trunk 0 after the country code; it is not part of E.164.
-    e164 = `+${explicit.startsWith('200') ? `20${explicit.slice(3)}` : explicit}`;
-  } else if (/^01[0125]\d{8}$/.test(digits)) e164 = `+20${digits.slice(1)}`;
-  else if (/^1[0125]\d{8}$/.test(digits)) e164 = `+20${digits}`;
-  else if (/^201[0125]\d{8}$/.test(digits)) e164 = `+${digits}`;
-  return e164 && E164.test(e164) ? e164 : null;
+  let s = asciiDigits(raw.replace(BIDI_MARKS, '')).replace(/[\s\-().]/g, '');
+  if (s.startsWith('00')) s = '+' + s.slice(2);
+  if (!s.startsWith('+')) {
+    if (s.startsWith('0')) s = `+${defaultCountry}${s.slice(1)}`;
+    else if (s.startsWith(defaultCountry) && s.length === 12) s = '+' + s;
+    else if (/^1\d{9}$/.test(s)) s = `+${defaultCountry}${s}`;
+    else return null;
+  }
+  // A trunk 0 kept after the country code (+20 0100...) is dropped.
+  if (s.startsWith(`+${defaultCountry}0`)) {
+    s = `+${defaultCountry}${s.slice(defaultCountry.length + 2)}`;
+  }
+  return E164.test(s) ? s : null;
 }
 
 /** `HMAC-SHA256(secret, e164)` as lowercase hex, or null for a phone that is not E.164. */
