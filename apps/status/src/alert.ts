@@ -21,7 +21,7 @@ export function composeAlert(
     ...outcome.opened.map(id => `DOWN: ${title(id)}`),
     ...outcome.resolved.map(id => `RECOVERED: ${title(id)}`),
   ];
-  return lines.length ? `Ebda status\n${lines.join('\n')}\nhttps://status.ebda.app/en` : null;
+  return lines.length ? `Ebda Store status\n${lines.join('\n')}\nhttps://status.ebda.app/en` : null;
 }
 
 export async function sendTelegram(
