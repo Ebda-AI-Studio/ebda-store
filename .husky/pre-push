@@ -23,7 +23,7 @@ if [ "$current_branch" = "main" ]; then
   fi
 fi
 
-echo "-> Ebda pre-push CI gate: prettier + lint + typecheck + unit tests (one at a time, host-wide)"
+echo "-> Ebda pre-push CI gate: cheap checks + affected lint/typecheck/related tests, full gate when the planner cannot narrow (one at a time, host-wide)"
 
 # Worktrees created by new-task-worktree.sh have no node_modules of their own, so
 # every command below exits 127 ("command not found") and husky aborts the push
