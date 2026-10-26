@@ -207,6 +207,21 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         `This purchase order can no longer be received (status: ${po.status}).`
       );
 
+    // Lock the PRODUCTS being received (sorted, so two receives cannot deadlock) before anything about them is read:
+    // a receive of a DIFFERENT PO for the same product would otherwise read the same open backorder lines and the same
+    // on-hand / cost, and both would write absolute values (backorder `qtyFulfilled`, the weighted-average cost).
+    const lockIds = [
+      ...new Set(
+        input.receipts
+          .filter(r => r.qtyReceived > 0)
+          .map(r => po.items.find(i => i.id === r.poItemId)?.productId)
+          .filter((x): x is string => !!x)
+      ),
+    ].sort();
+    if (lockIds.length > 0) {
+      await tx.$queryRaw`SELECT id FROM products WHERE id = ANY(${lockIds}::text[]) AND store_id = ${input.storeId} ORDER BY id FOR UPDATE`;
+    }
+
     for (const receipt of input.receipts) {
       if (receipt.qtyReceived <= 0) continue;
       const item = po.items.find(i => i.id === receipt.poItemId);
@@ -517,13 +532,19 @@ export async function getPurchaseOrder(storeId: string, id: string) {
 export async function cancelPurchaseOrder(storeId: string, id: string) {
   const po = await prisma.purchaseOrder.findFirst({ where: { id, storeId } });
   if (!po) throw new AppError(404, 'PO_NOT_FOUND', 'Purchase order not found.');
-  if (po.status === 'received')
+  // ONE conditional update (it row-locks the PO, so a receive that is committing `received` is waited for and then
+  // re-judged): a fully received PO - stock and accounts payable already posted - is never overwritten to cancelled.
+  const done = await prisma.purchaseOrder.updateMany({
+    where: { id, storeId, status: { not: 'received' } },
+    data: { status: 'cancelled' },
+  });
+  if (done.count !== 1)
     throw new AppError(
       409,
       'PO_ALREADY_RECEIVED',
       'A fully-received purchase order cannot be cancelled.'
     );
-  return prisma.purchaseOrder.update({ where: { id, storeId }, data: { status: 'cancelled' } });
+  return prisma.purchaseOrder.findFirstOrThrow({ where: { id, storeId } });
 }
 
 /**

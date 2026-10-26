@@ -10,6 +10,7 @@ import { createSupplier } from '../../../apps/api/src/services/accounting/suppli
 import {
   createPurchaseOrder,
   receivePurchaseOrder,
+  cancelPurchaseOrder,
 } from '../../../apps/api/src/services/accounting/purchase-order.service';
 import { hasDb } from '../../helpers/bundle-fixtures';
 
@@ -58,6 +59,9 @@ describe.skipIf(!hasDb)('P09 PO receive concurrency (real Postgres)', () => {
   });
 
   afterAll(async () => {
+    await prisma.backorderLine.deleteMany({ where: { storeId } });
+    await prisma.orderItem.deleteMany({ where: { order: { storeId } } });
+    await prisma.order.deleteMany({ where: { storeId } });
     await prisma.journalLine.deleteMany({ where: { entry: { storeId } } });
     await prisma.journalEntry.deleteMany({ where: { storeId } });
     await prisma.sequence.deleteMany({ where: { storeId } });
@@ -132,6 +136,85 @@ describe.skipIf(!hasDb)('P09 PO receive concurrency (real Postgres)', () => {
       ]);
       // 100 on the shelf, 25 sold, 10 received
       expect((await prisma.product.findUnique({ where: { id: p.id } }))!.inventory).toBe(85);
+    }
+  });
+
+  it('two POs for the SAME product received at once fulfil an open backorder exactly once', async () => {
+    for (let n = 0; n < 4; n++) {
+      const p = await mkProduct(-5); // 5 units of backorder debt (checkout force-decrements a non-variant line)
+      const order = await prisma.order.create({
+        data: {
+          storeId,
+          orderNumber: `BO-${Date.now()}-${n}-${Math.random().toString(36).slice(2, 6)}`,
+          status: 'confirmed',
+          paymentStatus: 'paid',
+          subtotal: 25000,
+          total: 25000,
+          shippingAddress: {},
+          billingAddress: {},
+        },
+      });
+      const oi = await prisma.orderItem.create({
+        data: {
+          orderId: order.id,
+          productId: p.id,
+          productName: 'PO Race',
+          quantity: 5,
+          price: 5000,
+          total: 25000,
+          costPriceDeferred: true,
+        },
+      });
+      const bo = await prisma.backorderLine.create({
+        data: { storeId, orderItemId: oi.id, productId: p.id, qty: 5, stockTaken: 5 },
+      });
+      const mk = async () =>
+        createPurchaseOrder({
+          storeId,
+          supplierId,
+          items: [{ productId: p.id, qty: 5, unitCost: 2400 }],
+        });
+      const [po1, po2] = await Promise.all([mk(), mk()]);
+      const results = await Promise.all(
+        [po1, po2].map(po =>
+          receivePurchaseOrder({
+            storeId,
+            poId: po.id,
+            receipts: [{ poItemId: po.items[0].id, qtyReceived: 5 }],
+          })
+        )
+      );
+      const cleared = results.flatMap(r => r.clearedBackorders).reduce((a, c) => a + c.qty, 0);
+      expect(cleared).toBe(5); // the customer's 5 units are cleared once, not twice
+      const line = await prisma.backorderLine.findUnique({ where: { id: bo.id } });
+      expect(line!.qtyFulfilled).toBe(5);
+      // 5 units went to the customer (debt healed to 0), the other PO's 5 reached the shelf
+      expect((await prisma.product.findUnique({ where: { id: p.id } }))!.inventory).toBe(5);
+    }
+  });
+
+  it('cancelling a PO while it is being received never overwrites a received PO', async () => {
+    for (let n = 0; n < 6; n++) {
+      const p = await mkProduct(10);
+      const po = await createPurchaseOrder({
+        storeId,
+        supplierId,
+        items: [{ productId: p.id, qty: 5, unitCost: 2400 }],
+      });
+      const [rec, can] = await Promise.all([
+        settle(
+          receivePurchaseOrder({
+            storeId,
+            poId: po.id,
+            receipts: [{ poItemId: po.items[0].id, qtyReceived: 5 }],
+          })
+        ),
+        settle(cancelPurchaseOrder(storeId, po.id)),
+      ]);
+      const row = await prisma.purchaseOrder.findUnique({ where: { id: po.id } });
+      const item = await prisma.purchaseOrderItem.findUnique({ where: { id: po.items[0].id } });
+      if (item!.qtyReceived === 5) expect(row!.status).toBe('received'); // stock + AP posted: never "cancelled"
+      expect(rec.ok || can.ok).toBe(true);
     }
   });
 });
