@@ -23,6 +23,7 @@ import {
   buildSaleReceipt,
   EtaMapError,
   type EtaOrderInput,
+  type LineQty,
 } from '../lib/eta/receipt-mapper';
 import {
   applySubmitOutcome,
@@ -42,6 +43,14 @@ import { BridgeSigner, NoopSigner, type ReceiptSigner } from '../lib/eta/signer'
  */
 const FEATURE = 'eta_ereceipt' as const;
 type Actor = { userId: string; ip?: string; userAgent?: string };
+
+/** `partial` of the order/refunded event (OrderService.applyRefundEffects). */
+export interface ReturnEvent {
+  items?: Array<{ orderItemId: string; quantity: number }>;
+  refundKey?: string;
+  refundAmount?: number;
+  amountOnly?: boolean;
+}
 
 interface StoredSecrets {
   clientId: string;
@@ -223,20 +232,34 @@ export const EtaReceiptService = {
     );
     // Only orders sold under a VERIFIED VAT registration are tax invoices (Ruling TAX-2).
     if (!order?.sellerTaxRegistrationNumber) return 'skipped';
+    const existing = await withStore(storeId, tx =>
+      tx.etaReceipt.findFirst({ where: { storeId, orderId, kind: 'sale' }, select: { id: true } })
+    );
+    if (existing) return 'queued'; // the same order event delivered twice
     return this.createRowAndSend(storeId, orderId, 'sale', conn.environment);
   },
 
-  /** Whole-order refund -> return receipt; a partial refund needs a human (`manual`). */
+  /**
+   * order/refunded -> Return Receipt. `partial.items` (the Return's own lines, carried on the event) become
+   * a partial return receipt; no `partial` = a whole-order refund (every unit not yet returned, plus the fee
+   * lines once). A refund with no goods lines (`amountOnly`: a provider-dashboard price adjustment) is not
+   * a return of goods; an ETA Return Receipt Without Reference needs reason codes we do not collect, so it is
+   * parked `manual` (Ruling ETA-1). Idempotent per refundKey.
+   */
   async enqueueReturn(
     storeId: string,
     orderId: string,
-    partial: boolean
+    partial?: ReturnEvent | null
   ): Promise<'queued' | 'manual' | 'skipped'> {
     const sale = await withStore(storeId, tx =>
       tx.etaReceipt.findFirst({ where: { storeId, orderId, kind: 'sale' } })
     );
     if (!sale || sale.status === 'failed' || sale.status === 'rejected') return 'skipped';
-    if (partial) {
+    const goods = partial?.items?.filter(i => i.quantity > 0) ?? [];
+    const refundKey = partial ? partial.refundKey || '' : 'full';
+    if (partial && (partial.amountOnly || goods.length === 0 || !refundKey)) {
+      const key = refundKey || `amount:${Date.now()}`;
+      const seq = await this.nextSeq(storeId, orderId, 'return');
       await withStore(storeId, tx =>
         tx.etaReceipt
           .create({
@@ -244,12 +267,13 @@ export const EtaReceiptService = {
               storeId,
               orderId,
               kind: 'return',
-              seq: 1,
+              seq,
+              refundKey: key,
               status: 'manual',
               environment: sale.environment,
-              errorCode: 'partial_return',
+              errorCode: 'amount_only_refund',
               errorMessage:
-                'A partial return needs a Return Receipt issued by hand in the ETA portal.',
+                'A price-only refund has no goods lines; issue the credit in the ETA portal.',
             },
           })
           .catch(() => null)
@@ -257,12 +281,33 @@ export const EtaReceiptService = {
       await sendAlert({
         level: 'info',
         source: 'eta.return.manual',
-        title: 'ETA partial return needs a manual return receipt',
+        title: 'ETA price-only refund needs a manual credit',
         context: { storeId, orderId },
       });
       return 'manual';
     }
-    return this.createRowAndSend(storeId, orderId, 'return', sale.environment);
+    const done = await withStore(storeId, tx =>
+      tx.etaReceipt.findFirst({
+        where: { storeId, orderId, kind: 'return', refundKey },
+        select: { id: true },
+      })
+    );
+    if (done) return 'queued';
+    return this.createRowAndSend(storeId, orderId, 'return', sale.environment, {
+      refundKey,
+      lineMap: partial ? { items: goods, refundAmount: partial.refundAmount ?? null } : null,
+    });
+  },
+
+  async nextSeq(storeId: string, orderId: string, kind: string): Promise<number> {
+    const last = await withStore(storeId, tx =>
+      tx.etaReceipt.findFirst({
+        where: { storeId, orderId, kind },
+        orderBy: { seq: 'desc' },
+        select: { seq: true },
+      })
+    );
+    return (last?.seq ?? 0) + 1;
   },
 
   async createRowAndSend(
@@ -270,18 +315,28 @@ export const EtaReceiptService = {
     orderId: string,
     kind: 'sale' | 'return',
     environment: string,
-    seq = 1
+    extra: { refundKey?: string | null; lineMap?: unknown } = {}
   ) {
+    const seq = await this.nextSeq(storeId, orderId, kind);
     let id: string | null = null;
     try {
       const row = await withStore(storeId, tx =>
         tx.etaReceipt.create({
-          data: { storeId, orderId, kind, seq, status: 'queued', environment },
+          data: {
+            storeId,
+            orderId,
+            kind,
+            seq,
+            status: 'queued',
+            environment,
+            ...(extra.refundKey ? { refundKey: extra.refundKey } : {}),
+            ...(extra.lineMap ? { lineMap: extra.lineMap as never } : {}),
+          },
         })
       );
       id = row.id;
     } catch (err) {
-      // Unique (store, order, kind, seq): already queued by an earlier delivery of the same event.
+      // Unique (store, order, kind, seq): the same event delivered twice raced us to this seq.
       const dup = await withStore(storeId, tx =>
         tx.etaReceipt.findFirst({ where: { storeId, orderId, kind, seq }, select: { id: true } })
       );
@@ -360,6 +415,7 @@ export const EtaReceiptService = {
               issuedAt: now,
               deadlineAt: new Date(now.getTime() + ETA_SUBMISSION_WINDOW_MS),
               totalPiastres: Math.round((doc!.totalAmount as number) * 100),
+              ...(built.lineMap ? { lineMap: built.lineMap as never } : {}),
             },
           })
         );
@@ -412,7 +468,14 @@ export const EtaReceiptService = {
 
   async build(
     storeId: string,
-    row: { id: string; orderId: string; kind: string; seq: number },
+    row: {
+      id: string;
+      orderId: string;
+      kind: string;
+      seq: number;
+      refundKey: string | null;
+      lineMap: unknown;
+    },
     conn: {
       branchCode: string;
       activityCode: string;
@@ -442,7 +505,15 @@ export const EtaReceiptService = {
           sellerTaxLegalName: true,
           shippingAddress: true,
           items: {
-            select: { productId: true, productName: true, sku: true, quantity: true, total: true },
+            select: {
+              id: true,
+              productId: true,
+              productName: true,
+              sku: true,
+              quantity: true,
+              total: true,
+            },
+            orderBy: [{ id: 'asc' }],
           },
           payments: { select: { provider: true }, take: 1 },
         },
@@ -469,7 +540,15 @@ export const EtaReceiptService = {
       row.seq > 1
         ? await withStore(storeId, tx =>
             tx.etaReceipt.findFirst({
-              where: { storeId, orderId: row.orderId, kind: row.kind, seq: row.seq - 1 },
+              where: {
+                storeId,
+                orderId: row.orderId,
+                kind: row.kind,
+                seq: { lt: row.seq },
+                ...(row.kind === 'return' ? { refundKey: row.refundKey } : {}),
+                uuid: { not: null },
+              },
+              orderBy: { seq: 'desc' },
               select: { uuid: true },
             })
           )
@@ -487,19 +566,68 @@ export const EtaReceiptService = {
       const sale = await withStore(storeId, tx =>
         tx.etaReceipt.findFirst({
           where: { storeId, orderId: row.orderId, kind: 'sale' },
-          select: { document: true, status: true },
+          select: { document: true, status: true, lineMap: true },
         })
       );
-      if (!sale?.document || !['accepted', 'submitted'].includes(sale.status))
+      if (!sale?.document || !sale.lineMap || !['accepted', 'submitted'].includes(sale.status))
         throw new EtaMapError('ETA_NO_LINES', 'no issued sale receipt to return');
+      const saleLines = sale.lineMap as unknown as LineQty[];
+      // Earlier return receipts that were not refused count as already returned.
+      const earlier = await withStore(storeId, tx =>
+        tx.etaReceipt.findMany({
+          where: {
+            storeId,
+            orderId: row.orderId,
+            kind: 'return',
+            id: { not: row.id },
+            status: { notIn: ['failed', 'rejected', 'manual'] },
+          },
+          select: { refundKey: true, lineMap: true, seq: true },
+        })
+      );
+      const alreadyReturned: Record<string, number> = {};
+      let fullBefore = false;
+      for (const e of earlier) {
+        // A re-issue of THIS return (same refundKey) replaces it, it does not add to it.
+        if (e.refundKey === row.refundKey) continue;
+        if (e.refundKey === 'full') fullBefore = true;
+        const items = ((e.lineMap as { items?: LineQty[] } | null)?.items ?? []) as LineQty[];
+        for (const it of items)
+          alreadyReturned[it.orderItemId] = (alreadyReturned[it.orderItemId] ?? 0) + it.quantity;
+      }
+      const isFull = row.refundKey === 'full';
+      const requested = ((row.lineMap as { items?: LineQty[] } | null)?.items ?? []) as LineQty[];
+      // A whole-order refund returns every unit not already returned.
+      const returned: LineQty[] = isFull
+        ? saleLines
+            .map(l => ({
+              orderItemId: l.orderItemId,
+              quantity: l.quantity - (alreadyReturned[l.orderItemId] ?? 0),
+            }))
+            .filter(l => l.quantity > 0)
+        : requested;
       const doc = buildReturnReceipt({
         sale: sale.document as never,
+        saleLines,
+        alreadyReturned,
+        returned,
+        includeFees: isFull && !fullBefore,
         previousUuid: prev?.uuid ?? '',
         receiptNumber: `${order.orderNumber}-R${row.seq}`,
         issuedAt: now,
         referenceOldUuid,
       });
-      return { doc };
+      // The receipt must agree with what the Store refunded (within a piastre per line of rounding).
+      const refunded = (row.lineMap as { refundAmount?: number | null } | null)?.refundAmount;
+      if (!isFull && typeof refunded === 'number') {
+        const total = Math.round((doc.totalAmount as number) * 100);
+        if (Math.abs(total - refunded) > (doc.itemData as unknown[]).length)
+          throw new EtaMapError(
+            'ETA_RETURN_TOTAL_MISMATCH',
+            `return receipt ${total} != refund ${refunded}`
+          );
+      }
+      return { doc, lineMap: undefined };
     }
     const addr = (order.shippingAddress ?? {}) as Record<string, unknown>;
     const str = (k: string) => (typeof addr[k] === 'string' ? (addr[k] as string) : '');
@@ -531,7 +659,7 @@ export const EtaReceiptService = {
       issuedAt: now,
       referenceOldUuid,
     });
-    return { doc };
+    return { doc, lineMap: order.items.map(i => ({ orderItemId: i.id, quantity: i.quantity })) };
   },
 
   async finish(
@@ -633,7 +761,13 @@ export const EtaReceiptService = {
     if (!row || !['failed', 'rejected'].includes(row.status)) return false;
     const newer = await withStore(storeId, tx =>
       tx.etaReceipt.findFirst({
-        where: { storeId, orderId: row.orderId, kind: row.kind, seq: { gt: row.seq } },
+        where: {
+          storeId,
+          orderId: row.orderId,
+          kind: row.kind,
+          seq: { gt: row.seq },
+          ...(row.kind === 'return' ? { refundKey: row.refundKey } : {}),
+        },
         select: { id: true },
       })
     );
@@ -643,7 +777,10 @@ export const EtaReceiptService = {
       row.orderId,
       row.kind as 'sale' | 'return',
       row.environment,
-      row.seq + 1
+      {
+        refundKey: row.refundKey,
+        lineMap: row.kind === 'return' ? row.lineMap : null,
+      }
     );
     return true;
   },

@@ -1,7 +1,7 @@
 import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
-import { EtaReceiptService } from '../../../services/eta-receipt.service';
+import { EtaReceiptService, type ReturnEvent } from '../../../services/eta-receipt.service';
 import { withStore } from '@ebda/database';
 
 /**
@@ -36,7 +36,7 @@ export const etaReceiptEnqueue: InngestFunction.Any = inngest.createFunction(
         return EtaReceiptService.enqueueReturn(
           storeId,
           orderId,
-          !!(event.data as { partial?: unknown }).partial
+          (event.data as { partial?: ReturnEvent }).partial ?? null
         );
       }
       return EtaReceiptService.enqueueSale(storeId, orderId);

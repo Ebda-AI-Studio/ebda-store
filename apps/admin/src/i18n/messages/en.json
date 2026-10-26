@@ -10277,7 +10277,7 @@
         "rejected": "Rejected",
         "failed": "Failed",
         "late": "Late (24 h passed)",
-        "manual": "Needs a manual return receipt"
+        "manual": "Price-only refund: issue the credit in the ETA portal"
       }
     }
   }

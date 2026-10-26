@@ -23,11 +23,20 @@ const match = (row: any, where: any): boolean =>
       if ('notIn' in o) return !o.notIn.includes(row[k]);
       if ('in' in o) return o.in.includes(row[k]);
       if ('gt' in o) return row[k] > o.gt;
+      if ('lt' in o) return row[k] < o.lt;
     }
     return row[k] === v;
   });
 const table = (rows: any[]) => ({
-  findFirst: async ({ where }: any = {}) => rows.find(r => match(r, where)) ?? null,
+  findFirst: async ({ where, orderBy }: any = {}) => {
+    const hit = rows.filter(r => match(r, where));
+    const ob = Array.isArray(orderBy) ? orderBy[0] : orderBy;
+    if (ob) {
+      const [k, dir] = Object.entries(ob)[0] as [string, string];
+      hit.sort((a, b) => (dir === 'desc' ? -1 : 1) * (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0));
+    }
+    return hit[0] ?? null;
+  },
   findMany: async ({ where }: any = {}) => rows.filter(r => match(r, where)),
   create: async ({ data }: any) => {
     if (
@@ -115,7 +124,10 @@ const order = (o: any = {}) => ({
   sellerTaxRegistrationNumber: '674859545',
   sellerTaxLegalName: 'Nile Shop',
   shippingAddress: { firstName: 'Mona', lastName: 'Ali', phone: '010' },
-  items: [{ productId: 'p1', productName: 'Lamp', sku: 'L1', quantity: 2, total: 20000 }],
+  items: [
+    { id: 'i1', productId: 'p1', productName: 'Lamp', sku: 'L1', quantity: 2, total: 10000 },
+    { id: 'i2', productId: 'p2', productName: 'Rug', sku: null, quantity: 1, total: 10000 },
+  ],
   payments: [{ provider: 'paymob' }],
   ...o,
 });
@@ -334,12 +346,138 @@ describe('processReceipt', () => {
 });
 
 describe('returns', () => {
-  it('whole-order refund queues a return; partial refund is manual and alerts', async () => {
+  const now = new Date('2026-10-26T10:00:00Z');
+  const okClient = () =>
+    fakeClient({ kind: 'ok', submissionUuid: 'S', accepted: [], rejected: [] });
+  const issuedSale = async () => {
     await EtaReceiptService.saveConnection(S, input, { userId: 'u' });
     await EtaReceiptService.enqueueSale(S, 'o1');
-    expect(await EtaReceiptService.enqueueReturn(S, 'o1', true)).toBe('manual');
-    expect(h.rec.find(r => r.kind === 'return').status).toBe('manual');
-    h.rec.splice(1, 1);
-    expect(await EtaReceiptService.enqueueReturn(S, 'o1', false)).toBe('queued');
+    await EtaReceiptService.processReceipt(S, h.rec[0].id, now, undefined, okClient());
+  };
+
+  it('a partial refund builds a partial return receipt from the event lines, once per refundKey', async () => {
+    await issuedSale();
+    const ev = {
+      items: [{ orderItemId: 'i1', quantity: 1 }],
+      refundKey: 'ret-1',
+      refundAmount: 5700,
+    };
+    expect(await EtaReceiptService.enqueueReturn(S, 'o1', ev)).toBe('queued');
+    expect(await EtaReceiptService.enqueueReturn(S, 'o1', ev)).toBe('queued'); // duplicate delivery
+    const rows = h.rec.filter(r => r.kind === 'return');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ refundKey: 'ret-1', seq: 1 });
+    expect(
+      await EtaReceiptService.processReceipt(
+        S,
+        rows[0].id,
+        new Date(now.getTime() + 60_000),
+        undefined,
+        okClient()
+      )
+    ).toBe('submitted');
+    const doc = rows[0].document;
+    expect(doc.documentType.receiptType).toBe('r');
+    expect(doc.header.referenceUUID).toBe(h.rec[0].uuid);
+    expect(doc.itemData).toHaveLength(1);
+    expect(doc.itemData[0].quantity).toBe(1);
+    expect(Math.round(doc.totalAmount * 100)).toBe(5700);
+  });
+
+  it('refuses a receipt that disagrees with the refund the Store made', async () => {
+    await issuedSale();
+    await EtaReceiptService.enqueueReturn(S, 'o1', {
+      items: [{ orderItemId: 'i1', quantity: 1 }],
+      refundKey: 'ret-1',
+      refundAmount: 5000,
+    });
+    const row = h.rec.find(r => r.kind === 'return');
+    const c = okClient();
+    expect(
+      await EtaReceiptService.processReceipt(
+        S,
+        row.id,
+        new Date(now.getTime() + 60_000),
+        undefined,
+        c
+      )
+    ).toBe('failed');
+    expect(row.errorCode).toBe('ETA_RETURN_TOTAL_MISMATCH');
+    expect((c as any).submitReceipts).not.toHaveBeenCalled();
+  });
+
+  it('a second partial return does not re-return units; a later full refund returns only the rest', async () => {
+    await issuedSale();
+    await EtaReceiptService.enqueueReturn(S, 'o1', {
+      items: [{ orderItemId: 'i1', quantity: 1 }],
+      refundKey: 'ret-1',
+      refundAmount: 5700,
+    });
+    const t1 = new Date(now.getTime() + 60_000);
+    await EtaReceiptService.processReceipt(S, h.rec[1].id, t1, undefined, okClient());
+    await EtaReceiptService.enqueueReturn(S, 'o1', null);
+    const full = h.rec.find(r => r.refundKey === 'full');
+    expect(full.seq).toBe(2);
+    await EtaReceiptService.processReceipt(
+      S,
+      full.id,
+      new Date(t1.getTime() + 60_000),
+      undefined,
+      okClient()
+    );
+    const units = full.document.itemData.reduce((n: number, l: any) => n + l.quantity, 0);
+    expect(units).toBe(2); // 1 lamp left + 1 rug
+    expect(full.document.header.previousUUID).toBe(h.rec[1].uuid);
+  });
+
+  it('a price-only refund (no goods lines) is parked manual with an alert', async () => {
+    await issuedSale();
+    expect(
+      await EtaReceiptService.enqueueReturn(S, 'o1', {
+        items: [],
+        refundKey: 'refund:abc',
+        refundAmount: 500,
+        amountOnly: true,
+      })
+    ).toBe('manual');
+    expect(h.rec.find(r => r.kind === 'return')).toMatchObject({
+      status: 'manual',
+      errorCode: 'amount_only_refund',
+    });
+    expect(h.alerts.length).toBeGreaterThan(0);
+  });
+
+  it('re-issuing a refused partial return keeps its refundKey and lines', async () => {
+    await issuedSale();
+    await EtaReceiptService.enqueueReturn(S, 'o1', {
+      items: [{ orderItemId: 'i2', quantity: 1 }],
+      refundKey: 'ret-9',
+      refundAmount: 11400,
+    });
+    const r1 = h.rec.find(r => r.kind === 'return');
+    await EtaReceiptService.processReceipt(
+      S,
+      r1.id,
+      new Date(now.getTime() + 60_000),
+      undefined,
+      fakeClient(() => ({
+        kind: 'ok',
+        submissionUuid: 'S',
+        accepted: [],
+        rejected: [{ uuid: r1.uuid, receiptNumber: 'x', error: 'bad' }],
+      }))
+    );
+    expect(await EtaReceiptService.retry(S, r1.id)).toBe(true);
+    const r2 = h.rec.filter(r => r.kind === 'return')[1];
+    expect(r2).toMatchObject({ refundKey: 'ret-9', seq: 2 });
+    await EtaReceiptService.processReceipt(
+      S,
+      r2.id,
+      new Date(now.getTime() + 120_000),
+      undefined,
+      okClient()
+    );
+    expect(r2.document.header.referenceOldUUID).toBe(r1.uuid);
+    expect(r2.document.itemData[0].quantity).toBe(1);
   });
 });

@@ -5749,6 +5749,13 @@ model EtaReceipt {
   /// 'sale' | 'return'
   kind           String
   seq            Int       @default(1)
+  /// Return receipts: the Return id that caused it (order/refunded `partial.refundKey`), or 'full' for a whole-order
+  /// refund. Identifies one logical return across re-issues (seq grows, refundKey stays). NULL for sales.
+  refundKey      String?   @map("refund_key")
+  /// Sale: [{orderItemId, quantity}] aligned with document.itemData (goods lines first; fee lines have no entry).
+  /// Return: { items: [{orderItemId, quantity}], refundAmount } as carried by order/refunded. Lets a partial return be
+  /// built from the order's own lines.
+  lineMap        Json?     @map("line_map")
   /// queued | retrying | submitted | accepted | rejected | failed | late | manual (@ebda/shared ETA_RECEIPT_STATUSES)
   status         String    @default("queued")
   environment    String
@@ -5776,6 +5783,7 @@ model EtaReceipt {
   @@unique([storeId, orderId, kind, seq])
   @@index([storeId, status, nextAttemptAt])
   @@index([storeId, orderId])
+  @@index([storeId, orderId, refundKey])
   @@index([status, nextAttemptAt])
   @@map("eta_receipts")
 }

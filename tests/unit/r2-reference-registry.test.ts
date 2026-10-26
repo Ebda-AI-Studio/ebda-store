@@ -89,6 +89,7 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'EtaConnection.signingBridgeUrl':
     'merchant-side signing service endpoint, never one of our uploads',
   'EtaReceipt.receiptNumber': 'the order number used as the ETA receipt number, never a URL',
+  'EtaReceipt.lineMap': 'order item ids and quantities for partial returns, no media',
   'EtaReceipt.document': 'the ETA Receipt v1.2 JSON (seller, buyer, lines, totals), no media',
   'FiscalDocument.originalDocumentId': 'id of the invoice a credit note adjusts, never a URL',
   'FiscalDocument.payload':

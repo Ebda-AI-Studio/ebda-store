@@ -32,8 +32,8 @@ const base: EtaOrderInput = {
   paymentProvider: 'paymob',
   buyer: { name: 'Mona Ali', mobile: '01000000000' },
   items: [
-    { productId: 'p1', productName: 'Lamp', sku: 'LAMP-1', quantity: 2, total: 10000 },
-    { productId: 'p2', productName: 'Rug', sku: null, quantity: 1, total: 10000 },
+    { id: 'i1', productId: 'p1', productName: 'Lamp', sku: 'LAMP-1', quantity: 2, total: 10000 },
+    { id: 'i2', productId: 'p2', productName: 'Rug', sku: null, quantity: 1, total: 10000 },
   ],
 };
 const args = (o: Partial<EtaOrderInput> = {}) => ({
@@ -128,19 +128,89 @@ describe('buildSaleReceipt', () => {
 });
 
 describe('buildReturnReceipt', () => {
-  it('references the sale uuid and chains previousUUID', () => {
-    const sale = buildSaleReceipt(args()) as any;
-    const ret = buildReturnReceipt({
-      sale,
-      previousUuid: sale.header.uuid,
+  const twoLines = () => {
+    const sale = buildSaleReceipt(
+      args({
+        shipping: 5000,
+        taxableAmount: 25000,
+        tax: 3500,
+        total: 28500,
+        items: [
+          { id: 'i1', productId: 'p1', productName: 'Lamp', sku: 'L1', quantity: 2, total: 10000 },
+          { id: 'i2', productId: 'p2', productName: 'Rug', sku: null, quantity: 1, total: 10000 },
+        ],
+      })
+    ) as any;
+    const saleLines = [
+      { orderItemId: 'i1', quantity: 2 },
+      { orderItemId: 'i2', quantity: 1 },
+    ];
+    return { sale, saleLines };
+  };
+  const ret = (o: any) =>
+    buildReturnReceipt({
+      alreadyReturned: {},
+      includeFees: false,
+      previousUuid: 'PREV',
       receiptNumber: 'EB-1001-R1',
       issuedAt: new Date('2026-10-27T09:00:00.000Z'),
+      ...o,
     }) as any;
-    expect(ret.documentType).toEqual({ receiptType: 'r', typeVersion: '1.2' });
-    expect(ret.header.referenceUUID).toBe(sale.header.uuid);
-    expect(ret.header.previousUUID).toBe(sale.header.uuid);
-    expect(ret.header.uuid).not.toBe(sale.header.uuid);
-    expect(ret.totalAmount).toBe(sale.totalAmount);
+
+  it('a partial return carries only the returned units, scaled from the sale lines', () => {
+    const { sale, saleLines } = twoLines();
+    const r = ret({ sale, saleLines, returned: [{ orderItemId: 'i1', quantity: 1 }] });
+    expect(r.documentType).toEqual({ receiptType: 'r', typeVersion: '1.2' });
+    expect(r.header.referenceUUID).toBe(sale.header.uuid);
+    expect(r.header.previousUUID).toBe('PREV');
+    expect(r.itemData).toHaveLength(1);
+    expect(r.itemData[0].quantity).toBe(1);
+    expect(r.itemData[0].netSale).toBe(50);
+    expect(r.itemData[0].taxableItems[0].amount).toBe(7);
+    expect(r.totalAmount).toBe(57); // 50 + 14% VAT on one lamp
+    expect(r.taxTotals).toEqual([{ taxType: 'T1', amount: 7 }]);
+    expect(r.header.uuid).toBe(receiptUuid(r));
+    expect(r.itemData.some((l: any) => l.internalCode === 'SHIPPING')).toBe(false);
+  });
+
+  it('several partial returns add up to exactly the sale line (no rounding drift)', () => {
+    const { sale, saleLines } = twoLines();
+    const first = ret({ sale, saleLines, returned: [{ orderItemId: 'i1', quantity: 1 }] });
+    const second = ret({
+      sale,
+      saleLines,
+      alreadyReturned: { i1: 1 },
+      returned: [{ orderItemId: 'i1', quantity: 1 }],
+    });
+    const saleLine = sale.itemData[0];
+    expect(Math.round((first.itemData[0].total + second.itemData[0].total) * 100)).toBe(
+      Math.round(saleLine.total * 100)
+    );
+    expect(
+      Math.round(
+        (first.itemData[0].taxableItems[0].amount + second.itemData[0].taxableItems[0].amount) * 100
+      )
+    ).toBe(Math.round(saleLine.taxableItems[0].amount * 100));
+  });
+
+  it('refuses to return more than was sold and not yet returned', () => {
+    const { sale, saleLines } = twoLines();
+    expect(() =>
+      ret({
+        sale,
+        saleLines,
+        alreadyReturned: { i1: 2 },
+        returned: [{ orderItemId: 'i1', quantity: 1 }],
+      })
+    ).toThrow(/exceeds/);
+    expect(() => ret({ sale, saleLines, returned: [] })).toThrow(/nothing left/);
+  });
+
+  it('a whole-order return with fees mirrors the sale total', () => {
+    const { sale, saleLines } = twoLines();
+    const r = ret({ sale, saleLines, includeFees: true, returned: saleLines });
+    expect(r.totalAmount).toBe(sale.totalAmount);
+    expect(r.itemData).toHaveLength(sale.itemData.length);
   });
 });
 

@@ -19,7 +19,9 @@ export class EtaMapError extends Error {
       | 'ETA_TOTAL_MISMATCH'
       | 'ETA_BUYER_ID_REQUIRED'
       | 'ETA_NO_LINES'
-      | 'ETA_NO_ITEM_CODE',
+      | 'ETA_NO_ITEM_CODE'
+      | 'ETA_RETURN_EXCEEDS'
+      | 'ETA_RETURN_TOTAL_MISMATCH',
     message: string
   ) {
     super(message);
@@ -27,6 +29,7 @@ export class EtaMapError extends Error {
 }
 
 export interface EtaOrderItem {
+  id: string;
   productId: string;
   productName: string;
   sku: string | null;
@@ -250,20 +253,78 @@ function buyerBlock(order: EtaOrderInput): Json {
   };
 }
 
+export interface LineQty {
+  orderItemId: string;
+  quantity: number;
+}
+
+type SaleDoc = { [k: string]: Json } & { header: { [k: string]: Json; uuid: string } };
+
+const toP = (egp: unknown): number => Math.round(Number(egp) * 100);
+
 /**
- * Whole-order return: mirrors the original sale document line for line (full refunds only; a
- * partial return is `manual`, see Ruling ETA-1). `referenceUUID` points at the sale receipt.
+ * Return Receipt v1.2 (`receiptType "r"`, `referenceUUID` = the sale) for part or all of a sale, built from
+ * the SALE DOCUMENT's own lines so the returned amounts always agree with what was receipted.
+ *
+ *  - `saleLines`   the sale's goods lines, aligned with `sale.itemData` (index i <-> saleLines[i]).
+ *  - `alreadyReturned`  quantity per orderItemId on earlier return receipts that were not refused.
+ *  - `returned`    what THIS receipt returns. A line's value is proportional to the units returned and
+ *    cumulative (value(cum) - value(cumBefore), rounded in piastres) so the pieces of several partial
+ *    returns add up to exactly the sale line.
+ *  - `includeFees` also return the non-goods lines (shipping, COD fee, extra charge): only on a
+ *    whole-order refund that has no earlier whole-order return.
+ * Throws EtaMapError('ETA_RETURN_EXCEEDS') when more units are returned than were sold and not yet returned.
  */
 export function buildReturnReceipt(a: {
-  sale: { [k: string]: Json } & { header: { [k: string]: Json; uuid: string } };
+  sale: SaleDoc;
+  saleLines: LineQty[];
+  alreadyReturned: Record<string, number>;
+  returned: LineQty[];
+  includeFees: boolean;
   previousUuid: string;
   receiptNumber: string;
   issuedAt: Date;
   referenceOldUuid?: string;
 }) {
-  const sale = JSON.parse(JSON.stringify(a.sale)) as typeof a.sale;
-  const doc: typeof a.sale = {
-    ...sale,
+  const sale = JSON.parse(JSON.stringify(a.sale)) as SaleDoc;
+  const lines = sale.itemData as Array<{ [k: string]: Json }>;
+  const want = new Map(a.returned.map(r => [r.orderItemId, r.quantity]));
+  const out: Array<{ [k: string]: Json }> = [];
+  const piece = (value: number, cum: number, before: number, q: number) =>
+    Math.round((value * cum) / q) - Math.round((value * before) / q);
+
+  a.saleLines.forEach((sl, i) => {
+    const take = want.get(sl.orderItemId) ?? 0;
+    if (take <= 0) return;
+    const before = a.alreadyReturned[sl.orderItemId] ?? 0;
+    if (before + take > sl.quantity)
+      throw new EtaMapError(
+        'ETA_RETURN_EXCEEDS',
+        `returning ${take} of line ${i} exceeds what was sold`
+      );
+    out.push(scaleLine(lines[i], sl.quantity, before, before + take, take, piece));
+  });
+  if (a.includeFees)
+    for (let i = a.saleLines.length; i < lines.length; i++)
+      out.push(scaleLine(lines[i], 1, 0, 1, 1, piece));
+  if (out.length === 0) throw new EtaMapError('ETA_NO_LINES', 'nothing left to return');
+
+  const sum = (k: string) => out.reduce((t, l) => t + toP(l[k]), 0);
+  const tax = out.reduce(
+    (t, l) =>
+      t +
+      (Array.isArray(l.taxableItems) ? toP((l.taxableItems[0] as { amount: number }).amount) : 0),
+    0
+  );
+  const disc = out.reduce(
+    (t, l) =>
+      t +
+      (Array.isArray(l.commercialDiscountData)
+        ? toP((l.commercialDiscountData[0] as { amount: number }).amount)
+        : 0),
+    0
+  );
+  const doc: SaleDoc = {
     header: {
       dateTimeIssued: etaTime(a.issuedAt),
       receiptNumber: a.receiptNumber.slice(0, 50),
@@ -275,7 +336,50 @@ export function buildReturnReceipt(a: {
       ...(a.referenceOldUuid ? { referenceOldUUID: a.referenceOldUuid } : {}),
     },
     documentType: { receiptType: 'r', typeVersion: '1.2' },
+    seller: sale.seller,
+    buyer: sale.buyer,
+    itemData: out,
+    totalSales: sum('totalSale') / 100,
+    ...(disc > 0 ? { totalCommercialDiscount: disc / 100 } : {}),
+    netAmount: sum('netSale') / 100,
+    totalAmount: sum('total') / 100,
+    ...(tax > 0 ? { taxTotals: [{ taxType: 'T1', amount: tax / 100 }] } : {}),
+    paymentMethod: sale.paymentMethod,
   };
   doc.header.uuid = receiptUuid(doc);
   return doc;
+}
+
+function scaleLine(
+  line: { [k: string]: Json },
+  soldQty: number,
+  before: number,
+  cum: number,
+  take: number,
+  piece: (value: number, cum: number, before: number, q: number) => number
+): { [k: string]: Json } {
+  const net = piece(toP(line.netSale), cum, before, soldQty);
+  const totalSale = piece(toP(line.totalSale), cum, before, soldQty);
+  const total = piece(toP(line.total), cum, before, soldQty);
+  const out: { [k: string]: Json } = {
+    ...line,
+    quantity: take,
+    unitPrice: round5(totalSale / 100 / take),
+    netSale: net / 100,
+    totalSale: totalSale / 100,
+    total: total / 100,
+  };
+  const d = Array.isArray(line.commercialDiscountData)
+    ? (line.commercialDiscountData[0] as { amount: number; description: string })
+    : null;
+  if (d) {
+    const amt = piece(toP(d.amount), cum, before, soldQty);
+    if (amt > 0) out.commercialDiscountData = [{ amount: amt / 100, description: d.description }];
+    else delete out.commercialDiscountData;
+  }
+  const t = Array.isArray(line.taxableItems)
+    ? (line.taxableItems[0] as { taxType: string; amount: number; subType: string; rate: number })
+    : null;
+  if (t) out.taxableItems = [{ ...t, amount: piece(toP(t.amount), cum, before, soldQty) / 100 }];
+  return out;
 }

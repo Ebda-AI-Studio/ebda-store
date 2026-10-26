@@ -34,6 +34,8 @@ CREATE TABLE "eta_receipts" (
     "order_id" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
     "seq" INTEGER NOT NULL DEFAULT 1,
+    "refund_key" TEXT,
+    "line_map" JSONB,
     "status" TEXT NOT NULL DEFAULT 'queued',
     "environment" TEXT NOT NULL,
     "receipt_number" TEXT,
@@ -63,6 +65,7 @@ CREATE UNIQUE INDEX "eta_connections_store_id_key" ON "eta_connections"("store_i
 CREATE UNIQUE INDEX "eta_receipts_store_id_order_id_kind_seq_key" ON "eta_receipts"("store_id", "order_id", "kind", "seq");
 CREATE INDEX "eta_receipts_store_id_status_next_attempt_at_idx" ON "eta_receipts"("store_id", "status", "next_attempt_at");
 CREATE INDEX "eta_receipts_store_id_order_id_idx" ON "eta_receipts"("store_id", "order_id");
+CREATE INDEX "eta_receipts_store_id_order_id_refund_key_idx" ON "eta_receipts"("store_id", "order_id", "refund_key");
 CREATE INDEX "eta_receipts_status_next_attempt_at_idx" ON "eta_receipts"("status", "next_attempt_at");
 
 ALTER TABLE "eta_connections" ADD CONSTRAINT "eta_connections_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
