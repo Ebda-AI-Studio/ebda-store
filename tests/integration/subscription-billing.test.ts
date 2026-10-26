@@ -813,6 +813,28 @@ describe.skipIf(!hasDb)('refunds and the append-only ledger', () => {
     ).toBe('NOT_REFUNDABLE');
   });
 
+  it('a rejected refund can be retried: the retry gets a NEW attempt key, not a blocked old one (M-062)', async () => {
+    const { storeId } = await subscribedStore({});
+    await cycleFor(T0, storeId);
+    const charge = (await ledger(storeId))[0];
+    stub.failNextRefunds(1);
+    const rejected = await refundCharge({ eventId: charge.id, provider: stub });
+    expect(rejected.status).toBe('failed');
+    const retry = await refundCharge({ eventId: charge.id, provider: stub });
+    expect(retry.status).toBe('succeeded');
+    const refunds = (await ledger(storeId)).filter(r => r.type === 'refund');
+    expect(refunds.map(r => [r.idempotencyKey, r.status])).toEqual([
+      [`refund:${charge.id}:1`, 'failed'],
+      [`refund:${charge.id}:2`, 'succeeded'],
+    ]);
+    // only the succeeded attempt holds money: the charge is fully refunded exactly once
+    expect((await ledger(storeId)).find(r => r.id === charge.id)!.status).toBe('refunded');
+    expect(
+      (await refundCharge({ eventId: charge.id, amountMinor: 1, provider: stub }).catch(e => e))
+        .code
+    ).toBe('NOT_REFUNDABLE');
+  });
+
   it('cannot refund a failed or pending charge', async () => {
     const storeId = await makeStore();
     const { billingEventId } = await startCheckout({ storeId, planCode: PRO, provider: stub });

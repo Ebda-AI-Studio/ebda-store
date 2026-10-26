@@ -5,18 +5,26 @@
  * compare the slice against the ORIGINAL amount, so the final slice of a
  * piecewise refund was audited as partially_refunded on a refunded payment.
  */
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
 const h = vi.hoisted(() => ({
   paymentFindFirst: vi.fn(),
+  paymentFindUnique: vi.fn(),
+  auditLog: vi.fn(),
+  sendAlert: vi.fn(),
   refund: vi.fn(),
   recordPaymentEvent: vi.fn(),
 }));
 
 vi.mock('@ebda/database', () => ({
-  prisma: { payment: { findFirst: (...a: unknown[]) => h.paymentFindFirst(...a) } },
+  prisma: {
+    payment: {
+      findFirst: (...a: unknown[]) => h.paymentFindFirst(...a),
+      findUnique: (...a: unknown[]) => h.paymentFindUnique(...a),
+    },
+  },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   withStore: (_s: string, fn: () => unknown) => fn(),
 }));
@@ -42,7 +50,10 @@ vi.mock('@api/middleware/security', () => ({
   paymentLimiter: (_req: any, _res: any, next: any) => next(),
   uploadLimiter: (_req: any, _res: any, next: any) => next(),
   dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
-  auditLog: vi.fn().mockResolvedValue(undefined),
+  auditLog: (...a: unknown[]) => h.auditLog(...a),
+}));
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: (...a: unknown[]) => h.sendAlert(...a),
 }));
 vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
@@ -67,6 +78,11 @@ beforeAll(async () => {
   app.use(errorHandler);
 });
 afterEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  h.auditLog.mockResolvedValue(undefined);
+  h.sendAlert.mockResolvedValue(undefined);
+  h.recordPaymentEvent.mockResolvedValue(undefined);
+});
 
 function paymentRow(refundedAmount: number) {
   return {
@@ -84,6 +100,7 @@ describe('POST /payments/refund — audit toStatus', () => {
   it('audits the final slice of a piecewise refund as refunded', async () => {
     h.paymentFindFirst.mockResolvedValue(paymentRow(2000));
     h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_2', amount: 3000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'refunded' });
 
     const res = await request(app)
       .post('/api/v1/payments/refund')
@@ -98,6 +115,7 @@ describe('POST /payments/refund — audit toStatus', () => {
   it('audits a first partial slice as partially_refunded (control)', async () => {
     h.paymentFindFirst.mockResolvedValue(paymentRow(0));
     h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
 
     await request(app)
       .post('/api/v1/payments/refund')
@@ -106,5 +124,35 @@ describe('POST /payments/refund — audit toStatus', () => {
     expect(h.recordPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({ toStatus: 'partially_refunded' })
     );
+  });
+
+  it('a failing audit write AFTER the money moved still answers 200 and raises a P1 alert (M-128)', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
+    h.auditLog.mockRejectedValue(new Error('audit db down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.refund.refundId).toBe('rf_1');
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'payment.refund.audit_failed' })
+    );
+  });
+
+  it('a failing REFUND still surfaces as an error and writes no audit row', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockRejectedValue(new Error('provider down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(h.auditLog).not.toHaveBeenCalled();
+    expect(h.recordPaymentEvent).not.toHaveBeenCalled();
   });
 });

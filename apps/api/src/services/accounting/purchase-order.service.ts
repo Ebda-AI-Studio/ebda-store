@@ -191,6 +191,9 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
   }> = [];
 
   const po = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+    // Serialise receives of ONE purchase order (M-022): the PO row lock first, the PO read AFTER it, so a double
+    // click / two staff see each other's receipt (the qty guard and `qtyReceived` are judged on the locked state).
+    await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${input.poId} AND store_id = ${input.storeId} FOR UPDATE`;
     const po = await tx.purchaseOrder.findUnique({
       where: { id: input.poId, storeId: input.storeId },
       include: { items: true },
@@ -398,7 +401,9 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
           const pRes = await tx.product.updateMany({
             where: { id: item.productId, storeId: input.storeId },
             data: {
-              inventory: onHandBefore + remainingToProcess,
+              // a relative write: an absolute `onHandBefore + n` (built from an earlier read) overwrote a customer
+              // order that decremented the shelf in between, bringing the sold unit back as stock (M-022)
+              inventory: { increment: remainingToProcess },
               costPrice: newCost,
               lastCostUpdateAt: new Date(),
             },

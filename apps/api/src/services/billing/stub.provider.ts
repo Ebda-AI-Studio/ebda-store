@@ -60,6 +60,7 @@ export class StubBillingProvider implements BillingProvider {
   declineAll = false;
   private failRemaining = 0;
   private pendingRemaining = 0;
+  private refundFailRemaining = 0;
   /** Every NEW charge the stub processed (replays of a key are not counted). */
   readonly chargeCalls: ChargeRequest[] = [];
   /**
@@ -79,6 +80,10 @@ export class StubBillingProvider implements BillingProvider {
   failNextCharges(n: number): void {
     this.failRemaining = n;
   }
+  /** The next `n` NEW refund requests come back rejected by the gateway. */
+  failNextRefunds(n: number): void {
+    this.refundFailRemaining = n;
+  }
   pendingNextCharges(n: number): void {
     this.pendingRemaining = n;
   }
@@ -86,6 +91,7 @@ export class StubBillingProvider implements BillingProvider {
     this.declineAll = false;
     this.failRemaining = 0;
     this.pendingRemaining = 0;
+    this.refundFailRemaining = 0;
     this.chargeCalls.length = 0;
     this.chargeRequests.length = 0;
     this.refundCalls.length = 0;
@@ -142,11 +148,20 @@ export class StubBillingProvider implements BillingProvider {
     const seen = this.refunds.get(req.idempotencyKey);
     if (seen) return seen;
     this.refundCalls.push(req);
-    const result: RefundResult = {
-      status: 'succeeded',
-      refundId: `stub_rf_${short(req.idempotencyKey)}`,
-      raw: { stub: true },
-    };
+    const rejected = this.refundFailRemaining > 0;
+    if (rejected) this.refundFailRemaining--;
+    const result: RefundResult = rejected
+      ? {
+          status: 'failed',
+          refundId: `stub_rf_${short(req.idempotencyKey)}`,
+          failureReason: 'stub: refund rejected',
+          raw: { stub: true, state: 'rejected' },
+        }
+      : {
+          status: 'succeeded',
+          refundId: `stub_rf_${short(req.idempotencyKey)}`,
+          raw: { stub: true },
+        };
     this.refunds.set(req.idempotencyKey, result);
     return result;
   }

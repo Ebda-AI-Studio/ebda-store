@@ -23,6 +23,7 @@ import {
 } from '../lib/definer';
 import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
+import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
@@ -1138,52 +1139,72 @@ router.post(
 
       const refundStoreId = paymentRow.order.store.id;
 
-      const refund = await runInTenantContext(refundStoreId, async () => {
-        const r = await PaymentService.refund({
+      // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
+      // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
+      const refund = await runInTenantContext(refundStoreId, () =>
+        PaymentService.refund({
           transactionId: data.transactionId,
           amount: data.amount,
           reason: data.reason,
-        });
+        })
+      );
 
+      // The audit trail, on its OWN transaction after the money moved, best effort + alert: a failing audit write
+      // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
+      // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
+      // a pre-refund snapshot.
+      await runInTenantContext(refundStoreId, async () => {
         await auditLog({
           action: 'payment.refunded',
           userId: user.userId,
           resourceType: 'payment',
-          resourceId: r.transactionId,
+          resourceId: refund.transactionId,
           details: {
-            refundId: r.refundId,
-            amount: r.amount,
+            refundId: refund.refundId,
+            amount: refund.amount,
             reason: data.reason || null,
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
-
-        // Append-only audit row.
+        const after = await prisma.payment.findUnique({
+          where: { id: paymentRow.id },
+          select: { status: true },
+        });
         await recordPaymentEvent({
           paymentId: paymentRow.id,
           storeId: refundStoreId,
           orderId: paymentRow.orderId,
           eventType: 'refund',
           fromStatus: paymentRow.status,
-          // Against the REMAINING balance, as PaymentService.refund decides
-          // it (#1360): the last slice of a piecewise refund settles the
-          // payment even though it is smaller than the original amount.
           toStatus:
-            (paymentRow.refundedAmount ?? 0) + r.amount >= paymentRow.amount
+            after?.status ??
+            ((paymentRow.refundedAmount ?? 0) + refund.amount >= paymentRow.amount
               ? 'refunded'
-              : 'partially_refunded',
+              : 'partially_refunded'),
           provider: paymentRow.provider,
           triggeredByUserId: user.userId,
           details: {
-            refundId: r.refundId,
-            amount: r.amount,
+            refundId: refund.refundId,
+            amount: refund.amount,
             reason: data.reason ?? null,
             initiatedBy: user.role,
           },
         });
-
-        return r;
+      }).catch(err => {
+        logger.error(
+          { err, paymentId: paymentRow.id, refundId: refund.refundId },
+          '[payments] refund committed but its audit rows failed'
+        );
+        void sendAlert({
+          level: 'p1',
+          scope: 'store',
+          store: { id: refundStoreId, name: refundStoreId },
+          source: 'payment.refund.audit_failed',
+          title: 'payment.refund.audit_failed',
+          body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made, but its audit rows could not be written. Add them by hand.`,
+          context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount },
+        }).catch(() => undefined);
       });
 
       res.json({

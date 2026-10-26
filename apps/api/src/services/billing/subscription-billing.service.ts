@@ -1513,21 +1513,21 @@ export async function refundCharge(args: {
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
   }
-  const prior = await withStore(charge.storeId, tx =>
+  // EVERY attempt, whatever its outcome: the key below is numbered by attempts, so a failed / rejected refund
+  // must still count or its retry regenerates the same key and is blocked for good (M-062). Only pending
+  // and succeeded rows hold money, so only they count toward `remaining`.
+  const attempts = await withStore(charge.storeId, tx =>
     tx.billingEvent.findMany({
-      where: {
-        storeId: charge.storeId,
-        relatedEventId: charge.id,
-        type: 'refund',
-        status: { in: ['pending', 'succeeded'] },
-      },
+      where: { storeId: charge.storeId, relatedEventId: charge.id, type: 'refund' },
       select: { amountMinor: true, status: true },
     })
   );
-  if (prior.some(p => p.status === 'pending')) {
+  if (attempts.some(p => p.status === 'pending')) {
     throw new AppError(409, 'REFUND_IN_PROGRESS', 'A refund is already pending for this charge');
   }
-  const remaining = charge.amountMinor - prior.reduce((s, p) => s + p.amountMinor, 0);
+  const remaining =
+    charge.amountMinor -
+    attempts.filter(p => p.status === 'succeeded').reduce((s, p) => s + p.amountMinor, 0);
   const amount = args.amountMinor ?? remaining;
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remaining) {
     throw new AppError(
@@ -1536,7 +1536,7 @@ export async function refundCharge(args: {
       `Refund must be between 1 and ${remaining} piastres`
     );
   }
-  const key = `refund:${charge.id}:${prior.length + 1}`;
+  const key = `refund:${charge.id}:${attempts.length + 1}`;
   const refundId = await claimEvent({
     storeId: charge.storeId,
     subscriptionId: charge.subscriptionId,
