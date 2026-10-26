@@ -37,7 +37,7 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
       expect(p.limits.customDomain).toBe(true);
       expect(p.limits.maxProducts).toBeNull();
       // wa.me only, EXCEPT Business, which includes the Ebda WhatsApp package (Ruling WA-PKG-1,
-      // Ahmad 2026-10-24; migration 20261102000400 and its pin below).
+      // Ahmad 2026-10-24; migration 20261104000200 and its pin below).
       expect(p.limits.whatsappAutomation).toBe(p.code === 'business');
     }
   });
@@ -77,7 +77,7 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
       const json = values.match(/'(\{.*\})'::jsonb/)![1];
       // `wholesalePricing` arrived later (20261028000200_b2b_product_columns_order_snapshots UPDATEs it onto the rows,
       // pinned in tests/unit/b2b-plan-gate.test.ts); this migration predates it, so compare every OTHER lever.
-      // `whatsappAutomation` for Business was set later by 20261102000400 (WA-PKG-1); pinned below.
+      // `whatsappAutomation` for Business was set later by 20261104000200 (WA-PKG-1); pinned below.
       const { wholesalePricing: _w, whatsappAutomation: _wa, ...seedLimits } = p.limits;
       const {
         wholesalePricing: _m,
@@ -108,7 +108,7 @@ describe('Business includes the Ebda WhatsApp package (Ruling WA-PKG-1)', () => 
     const sql = readFileSync(
       join(
         __dirname,
-        '../../packages/database/prisma/migrations/20261102000400_business_plan_includes_whatsapp/migration.sql'
+        '../../packages/database/prisma/migrations/20261104000200_business_plan_includes_whatsapp/migration.sql'
       ),
       'utf8'
     );
