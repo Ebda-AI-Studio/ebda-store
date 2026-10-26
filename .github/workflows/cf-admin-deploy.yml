@@ -90,3 +90,25 @@ jobs:
             --probe "https://store.ebda.app/login|200" \
             --rollback-probe "https://store.ebda.app/signup|200" \
             --rollback-probe "https://store.ebda.app/login|200"
+
+  # OPS-5: a failed deploy used to be silent (the storefront stayed on an old build for days). Alerts the Telegram bridge;
+  # no secrets configured = skip, never fail.
+  notify-failure:
+    name: Notify on deploy failure
+    needs: [deploy]
+    if: always() && needs.deploy.result == 'failure'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 2
+    steps:
+      - name: Send Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+          WORKFLOW: ${{ github.workflow }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_ALERT_CHAT_ID:-}" ] || { echo "no telegram secrets - skip"; exit 0; }
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+            --data-urlencode text="DEPLOY FAILED: ${WORKFLOW} at ${SHA:0:9}. Production did not change (or rolled back). ${RUN_URL}" >/dev/null || true
