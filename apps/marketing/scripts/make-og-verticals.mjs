@@ -29,7 +29,9 @@ const h1 = slug => {
 };
 const lockup = readFileSync(path.join(root, 'brand/logo/svg/04a-product-store.svg'), 'utf8');
 const lockupUri = 'data:image/svg+xml;base64,' + Buffer.from(lockup).toString('base64');
-const uri = f => 'data:image/webp;base64,' + readFileSync(path.join(here, '..', 'public', 'looks', 'img', f + '.webp')).toString('base64');
+const uri = f =>
+  'data:image/webp;base64,' +
+  readFileSync(path.join(here, '..', 'public', 'looks', 'img', f + '.webp')).toString('base64');
 
 const html = (slug, photos) => `<!doctype html><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=block" rel="stylesheet">
@@ -55,7 +57,9 @@ for (const [slug, photos] of Object.entries(PHOTOS)) {
   await page.evaluate(() => document.fonts.load('700 58px Cairo'));
   const png = await page.screenshot();
   const file = path.join(out, `${slug}.png`);
-  await sharp(png).png({ palette: true, quality: 90, effort: 10, colours: 128, dither: 0.6 }).toFile(file);
+  await sharp(png)
+    .png({ palette: true, quality: 90, effort: 10, colours: 128, dither: 0.6 })
+    .toFile(file);
   console.log(slug, Math.round(statSync(file).size / 1024) + ' KB');
 }
 await browser.close();

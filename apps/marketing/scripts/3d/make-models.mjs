@@ -13,7 +13,9 @@ import { mkdirSync } from 'node:fs';
 const req = createRequire(path.join(process.env.GT_TOOLS || process.cwd(), 'noop.js'));
 const threeDir = path.join(process.env.GT_TOOLS || process.cwd(), 'node_modules', 'three');
 const THREE = await import(pathToFileURL(path.join(threeDir, 'build/three.module.js')).href);
-const { GLTFExporter } = await import(pathToFileURL(path.join(threeDir, 'examples/jsm/exporters/GLTFExporter.js')).href);
+const { GLTFExporter } = await import(
+  pathToFileURL(path.join(threeDir, 'examples/jsm/exporters/GLTFExporter.js')).href
+);
 const { NodeIO } = req('@gltf-transform/core');
 const { KHRMaterialsVariants, ALL_EXTENSIONS } = req('@gltf-transform/extensions');
 const { meshopt, dedup, prune } = req('@gltf-transform/functions');
@@ -25,18 +27,41 @@ const LABEL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="
 
 // three's exporter reads blobs through FileReader, which Node does not have.
 globalThis.FileReader = class {
-  readAsArrayBuffer(b) { b.arrayBuffer().then(r => { this.result = r; this.onloadend?.(); }); }
-  readAsDataURL(b) { b.arrayBuffer().then(r => { this.result = 'data:application/octet-stream;base64,' + Buffer.from(r).toString('base64'); this.onloadend?.(); }); }
+  readAsArrayBuffer(b) {
+    b.arrayBuffer().then(r => {
+      this.result = r;
+      this.onloadend?.();
+    });
+  }
+  readAsDataURL(b) {
+    b.arrayBuffer().then(r => {
+      this.result = 'data:application/octet-stream;base64,' + Buffer.from(r).toString('base64');
+      this.onloadend?.();
+    });
+  }
 };
 
 const out = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public', '3d');
 mkdirSync(out, { recursive: true });
 
 const P = (name, o) => new THREE.MeshPhysicalMaterial({ ...o, name });
-const lathe = (pts, seg = 64) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+const lathe = (pts, seg = 64) =>
+  new THREE.LatheGeometry(
+    pts.map(([r, y]) => new THREE.Vector2(r, y)),
+    seg
+  );
 /** A rounded rectangle-ish silhouette: points from base centre outwards, up the side, to the neck. */
-const mk = (geo, mat, name, [x, y, z] = [0, 0, 0]) => { const m = new THREE.Mesh(geo, mat); m.name = name; m.position.set(x, y, z); return m; };
-const arc = (cx, cy, r, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / n; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; });
+const mk = (geo, mat, name, [x, y, z] = [0, 0, 0]) => {
+  const m = new THREE.Mesh(geo, mat);
+  m.name = name;
+  m.position.set(x, y, z);
+  return m;
+};
+const arc = (cx, cy, r, a0, a1, n = 8) =>
+  Array.from({ length: n + 1 }, (_, i) => {
+    const a = a0 + ((a1 - a0) * i) / n;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  });
 
 // ---------- Jasmine: a 30 ml dropper serum bottle (diameter 32 mm, 96 mm with the bulb) ----------
 const COLOURWAYS_J = [
@@ -47,26 +72,104 @@ const COLOURWAYS_J = [
 function jasmine() {
   const g = new THREE.Group();
   g.name = 'jasmine-serum';
-  const R = 0.016, T = 0.0022; // outer radius, glass wall
+  const R = 0.016,
+    T = 0.0022; // outer radius, glass wall
   // One closed profile: outside from the base up to the lip, then back down the inside to the floor, so the glass
   // has real thickness for refraction. DoubleSide because the inner wall faces the cavity.
-  const outer = [[0, 0], ...arc(R - 0.004, 0.004, 0.004, -Math.PI / 2, 0, 6), [R, 0.052], ...arc(R - 0.006, 0.052, 0.006, 0, Math.PI / 2 * 0.9, 6), [0.0075, 0.0625], [0.0075, 0.068]];
-  const inner = [[0.0075 - T, 0.068], [0.0075 - T, 0.0625], ...arc(R - 0.006, 0.052, 0.006 - T, Math.PI / 2 * 0.9, 0, 6), [R - T, 0.052], ...arc(R - 0.004, 0.004, 0.004 - T, 0, -Math.PI / 2, 6).map(([x, y]) => [x, Math.max(y, 0.0035)]), [0, 0.0035]];
-  const glass = P('glass', { color: '#FFFFFF', roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.004, ior: 1.5, clearcoat: 0.6, clearcoatRoughness: 0.03, side: THREE.DoubleSide });
-  const liquid = [[0, 0.0045], [R - T - 0.0006, 0.0045], [R - T - 0.0006, 0.044], [R - 0.0095, 0.054], [0, 0.054]];
-  const serum = P('serum', { color: COLOURWAYS_J[0].serum, roughness: 0.12, transmission: 0.55, thickness: 0.02, ior: 1.38 });
+  const outer = [
+    [0, 0],
+    ...arc(R - 0.004, 0.004, 0.004, -Math.PI / 2, 0, 6),
+    [R, 0.052],
+    ...arc(R - 0.006, 0.052, 0.006, 0, (Math.PI / 2) * 0.9, 6),
+    [0.0075, 0.0625],
+    [0.0075, 0.068],
+  ];
+  const inner = [
+    [0.0075 - T, 0.068],
+    [0.0075 - T, 0.0625],
+    ...arc(R - 0.006, 0.052, 0.006 - T, (Math.PI / 2) * 0.9, 0, 6),
+    [R - T, 0.052],
+    ...arc(R - 0.004, 0.004, 0.004 - T, 0, -Math.PI / 2, 6).map(([x, y]) => [
+      x,
+      Math.max(y, 0.0035),
+    ]),
+    [0, 0.0035],
+  ];
+  const glass = P('glass', {
+    color: '#FFFFFF',
+    roughness: 0.04,
+    metalness: 0,
+    transmission: 1,
+    thickness: 0.004,
+    ior: 1.5,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.03,
+    side: THREE.DoubleSide,
+  });
+  const liquid = [
+    [0, 0.0045],
+    [R - T - 0.0006, 0.0045],
+    [R - T - 0.0006, 0.044],
+    [R - 0.0095, 0.054],
+    [0, 0.054],
+  ];
+  const serum = P('serum', {
+    color: COLOURWAYS_J[0].serum,
+    roughness: 0.12,
+    transmission: 0.55,
+    thickness: 0.02,
+    ior: 1.38,
+  });
   g.add(mk(lathe(liquid), serum, 'serum'));
   g.add(mk(lathe([...outer, ...inner]), glass, 'bottle'));
   const paper = P('label-paper', { color: '#FFFFFF', roughness: 0.85, side: THREE.DoubleSide });
-  g.add(mk(new THREE.CylinderGeometry(R + 0.0004, R + 0.0004, 0.018, 64, 1, true, -Math.PI * 0.55, Math.PI * 1.1), paper, 'label', [0, 0.027, 0]));
+  g.add(
+    mk(
+      new THREE.CylinderGeometry(
+        R + 0.0004,
+        R + 0.0004,
+        0.018,
+        64,
+        1,
+        true,
+        -Math.PI * 0.55,
+        Math.PI * 1.1
+      ),
+      paper,
+      'label',
+      [0, 0.027, 0]
+    )
+  );
   const goldMat = P('gold-collar', { color: '#B08D57', metalness: 1, roughness: 0.22 });
-  const collar = [[0.0105, 0.066], [0.0105, 0.0785], [0.0095, 0.0785], [0.0095, 0.066]];
+  const collar = [
+    [0.0105, 0.066],
+    [0.0105, 0.0785],
+    [0.0095, 0.0785],
+    [0.0095, 0.066],
+  ];
   g.add(mk(lathe(collar), goldMat, 'collar'));
-  g.add(mk(new THREE.CylinderGeometry(0.0108, 0.0108, 0.0012, 64), goldMat, 'collar-top', [0, 0.0785, 0]));
+  g.add(
+    mk(
+      new THREE.CylinderGeometry(0.0108, 0.0108, 0.0012, 64),
+      goldMat,
+      'collar-top',
+      [0, 0.0785, 0]
+    )
+  );
   const bulbMat = P('bulb', { color: COLOURWAYS_J[0].bulb, roughness: 0.7, clearcoat: 0.1 });
-  const bulb = [[0.0072, 0.0785], [0.0072, 0.083], [0.0070, 0.086], [0.0062, 0.0925], [0.0036, 0.0957], [0.0, 0.0962]];
+  const bulb = [
+    [0.0072, 0.0785],
+    [0.0072, 0.083],
+    [0.007, 0.086],
+    [0.0062, 0.0925],
+    [0.0036, 0.0957],
+    [0.0, 0.0962],
+  ];
   g.add(mk(lathe(bulb, 48), bulbMat, 'bulb'));
-  return { root: g, variants: COLOURWAYS_J.map(c => ({ id: c.id, set: { serum: c.serum, bulb: c.bulb } })) };
+  return {
+    root: g,
+    variants: COLOURWAYS_J.map(c => ({ id: c.id, set: { serum: c.serum, bulb: c.bulb } })),
+  };
 }
 
 // ---------- Dahab: a solitaire ring (inner diameter 17 mm), stands upright on its band ----------
@@ -78,16 +181,24 @@ const COLOURWAYS_D = [
 function dahab() {
   const g = new THREE.Group();
   g.name = 'dahab-solitaire';
-  const Ri = 0.0085, tube = new THREE.Vector2(0.0016, 0.0011);
+  const Ri = 0.0085,
+    tube = new THREE.Vector2(0.0016, 0.0011);
   const metal = P('metal', { color: COLOURWAYS_D[0].metal, metalness: 1, roughness: 0.14 });
   // Band: a torus squashed to a comfort-fit profile (wider than thick), standing on its edge.
   const band = new THREE.Mesh(new THREE.TorusGeometry(Ri + tube.y, 1, 24, 128), metal);
   band.geometry.dispose();
   band.geometry = (() => {
-    const shape = [], n = 24;
-    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; shape.push([Ri + tube.y + Math.cos(a) * tube.y, Math.sin(a) * tube.x]); }
+    const shape = [],
+      n = 24;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      shape.push([Ri + tube.y + Math.cos(a) * tube.y, Math.sin(a) * tube.x]);
+    }
     shape.push(shape[0]);
-    return lathe(shape.map(([r, z]) => [r, z]), 128);
+    return lathe(
+      shape.map(([r, z]) => [r, z]),
+      128
+    );
   })();
   band.rotation.x = Math.PI / 2; // lathe axis (y) -> ring axis (z); the band lies in the XY plane
   band.name = 'band';
@@ -98,9 +209,30 @@ function dahab() {
   // Head: six prongs and a brilliant-cut stone on top of the band (+y).
   const topY = Ri + tube.y * 2;
   const R = 0.0028;
-  const gem = P('stone-diamond', { color: '#FFFFFF', metalness: 0, roughness: 0, transmission: 1, thickness: 0.004, ior: 2.4, specularIntensity: 1, attenuationColor: '#FFFFFF' });
+  const gem = P('stone-diamond', {
+    color: '#FFFFFF',
+    metalness: 0,
+    roughness: 0,
+    transmission: 1,
+    thickness: 0.004,
+    ior: 2.4,
+    specularIntensity: 1,
+    attenuationColor: '#FFFFFF',
+  });
   // Brilliant-cut proportions: table 55 %, crown 15 %, pavilion 43 % of the girdle width; 16 flat facets round, two bands each side.
-  const gemGeo = lathe([[0, -0.0024], [R * 0.58, -0.0013], [R, -0.0001], [R, 0.0001], [R * 0.82, 0.0007], [R * 0.64, 0.0011], [R * 0.55, 0.0013], [0, 0.0013]], 16).toNonIndexed();
+  const gemGeo = lathe(
+    [
+      [0, -0.0024],
+      [R * 0.58, -0.0013],
+      [R, -0.0001],
+      [R, 0.0001],
+      [R * 0.82, 0.0007],
+      [R * 0.64, 0.0011],
+      [R * 0.55, 0.0013],
+      [0, 0.0013],
+    ],
+    16
+  ).toNonIndexed();
   gemGeo.computeVertexNormals();
   const stone = new THREE.Mesh(gemGeo, gem);
   stone.name = 'stone';
@@ -127,17 +259,34 @@ async function build(model, file) {
   const scene = new THREE.Scene();
   scene.add(root);
   const raw = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: true });
-  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
+  const io = new NodeIO()
+    .registerExtensions(ALL_EXTENSIONS)
+    .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
   const doc = await io.readBinary(new Uint8Array(raw));
-  const label = doc.getRoot().listMaterials().find(m => m.getName() === 'label-paper');
+  const label = doc
+    .getRoot()
+    .listMaterials()
+    .find(m => m.getName() === 'label-paper');
   if (label) {
-    const png = await sharp(Buffer.from(LABEL_SVG)).flip().png({ compressionLevel: 9, palette: true }).toBuffer();
-    label.setBaseColorFactor([1, 1, 1, 1]).setBaseColorTexture(doc.createTexture('label').setImage(new Uint8Array(png)).setMimeType('image/png'));
+    const png = await sharp(Buffer.from(LABEL_SVG))
+      .flip()
+      .png({ compressionLevel: 9, palette: true })
+      .toBuffer();
+    label
+      .setBaseColorFactor([1, 1, 1, 1])
+      .setBaseColorTexture(
+        doc.createTexture('label').setImage(new Uint8Array(png)).setMimeType('image/png')
+      );
   }
   // Colourways = KHR_materials_variants: each variant maps the recoloured materials to a clone.
   const ext = doc.createExtension(KHRMaterialsVariants);
   const vs = variants.map(v => ext.createVariant().setName(v.id));
-  const matsByName = Object.fromEntries(doc.getRoot().listMaterials().map(m => [m.getName(), m]));
+  const matsByName = Object.fromEntries(
+    doc
+      .getRoot()
+      .listMaterials()
+      .map(m => [m.getName(), m])
+  );
   const clones = {}; // `${materialName}|${variantId}` -> material
   for (const [vi, v] of variants.entries()) {
     for (const [mName, hex] of Object.entries(v.set)) {
@@ -154,7 +303,11 @@ async function build(model, file) {
       const bn = base.getName();
       if (!Object.values(variants).some(v => v.set[bn])) continue;
       const list = ext.createMappingList();
-      vs.forEach((vr, i) => list.addMapping(ext.createMapping().setMaterial(clones[`${bn}|${variants[i].id}`]).addVariant(vr)));
+      vs.forEach((vr, i) =>
+        list.addMapping(
+          ext.createMapping().setMaterial(clones[`${bn}|${variants[i].id}`]).addVariant(vr)
+        )
+      );
       prim.setExtension('KHR_materials_variants', list);
       prim.setMaterial(clones[`${bn}|${variants[0].id}`]);
     }

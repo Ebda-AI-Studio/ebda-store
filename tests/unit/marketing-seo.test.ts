@@ -140,7 +140,14 @@ describe('every page exports metadata with a canonical', () => {
       expect(meta.description).toBeTruthy();
       expect(meta.alternates.canonical).toBe(pagePath(isEn ? 'en' : 'ar', page));
       expect(Object.keys(meta.alternates.languages).sort()).toEqual(['ar', 'en', 'x-default']);
-      expect(meta.openGraph.images[0].url).toBe('/og.png');
+      // the five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs): 1200x630 PNG under 300 KB
+      const vertical = page?.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
+      expect(meta.openGraph.images[0].url).toBe(vertical ? `/og/${vertical}.png` : '/og.png');
+      expect(meta.twitter.images[0]).toBe(meta.openGraph.images[0].url);
+      if (vertical) {
+        const file = path.resolve(__dirname, `../../apps/marketing/public/og/${vertical}.png`);
+        expect(statSync(file).size).toBeLessThan(300 * 1024);
+      }
       expect(meta.twitter.card).toBe('summary_large_image');
     });
   }
