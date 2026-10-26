@@ -736,6 +736,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       where: { idempotencyKey: key, storeId: input.storeId },
     });
     if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
+    // period computed below is never from a read a grant is about to change.
+    await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${input.storeId} FOR UPDATE`;
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }

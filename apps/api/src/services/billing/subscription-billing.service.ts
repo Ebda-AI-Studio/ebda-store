@@ -63,6 +63,12 @@ import {
   type BillingInterval,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
+import {
+  grantedPaidThrough,
+  laterOf,
+  shiftedByGrants,
+  sweepFreeMonthGrants,
+} from './grants.service';
 import { suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
@@ -268,7 +274,11 @@ async function applySuccess(
       status: 'active' as const,
       billingInterval: interval,
       currentPeriodStart: now,
-      currentPeriodEnd: addInterval(now, interval),
+      // never earlier than the end a free-month grant already moved the period to (FOUNDING-1)
+      currentPeriodEnd: laterOf(
+        addInterval(now, interval),
+        await grantedPaidThrough(tx, row.storeId)
+      ),
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,
       dunningAttempts: 0,
@@ -295,7 +305,9 @@ async function applySuccess(
       sub &&
       row.forPeriodEnd &&
       periodEndOf(sub) &&
-      periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() &&
+      (periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() ||
+        // a free-month grant moved the end after this charge was claimed: same period, shifted (FOUNDING-1)
+        (await shiftedByGrants(tx, row.storeId, row.forPeriodEnd, periodEndOf(sub)!))) &&
       ['active', 'trialing', 'past_due'].includes(sub.status);
     if (!sub || !renewable) {
       // Money was taken but the subscription is not in a renewable state for
@@ -313,7 +325,7 @@ async function applySuccess(
     }
     const interval = isInterval(row.billingInterval) ? row.billingInterval : 'monthly';
     const planCode = row.planCode ?? sub.planCode;
-    let start = row.forPeriodEnd!;
+    let start = periodEndOf(sub)!; // = forPeriodEnd, or that end shifted by free-month grants
     // A long-lapsed period must not leave the new one already expired
     // (that would charge again on the very next cron run).
     if (addInterval(start, interval).getTime() <= now.getTime()) start = now;
@@ -1070,6 +1082,13 @@ export async function runBillingCycle(
         logger.error({ err, subscriptionId: id }, '[billing] reminder threw');
       }
     }
+  }
+  if (!only) {
+    // FOUNDING-1: apply pending free months / re-create lost ones before the due list is read (a granted month
+    // moves a store's due date). Never blocks the renewals below.
+    await sweepFreeMonthGrants(now).catch(err =>
+      logger.error({ err }, '[billing] free-month grant sweep failed')
+    );
   }
   const ids = await findDueSubscriptionIds(now, only);
   for (const id of ids) {

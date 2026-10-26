@@ -17,7 +17,14 @@
  * stays `pending` and is applied by the next call, which runs on every subscription payment.
  */
 import crypto from 'crypto';
-import { prisma, withStore, storeDirectory, type Prisma } from '@ebda/database';
+import {
+  prisma,
+  acrossStores,
+  runInTenantContext,
+  storeDirectory,
+  withStore,
+  type Prisma,
+} from '@ebda/database';
 import { resolveStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
 import { addInterval } from './period';
@@ -45,17 +52,68 @@ async function monthValueMinor(tx: Tx, storeId: string): Promise<number> {
   return plan?.priceMonthlyMinor && plan.priceMonthlyMinor > 0 ? plan.priceMonthlyMinor : 0;
 }
 
-/** Has this store made at least one real (non-zero) subscription payment? */
-export async function hasPaid(tx: Tx, storeId: string): Promise<boolean> {
-  const n = await tx.billingEvent.count({
+/**
+ * When did this store first make a REAL paid month? A succeeded subscription payment (checkout, renewal, upgrade,
+ * manual) that covers at least one month of the plan it was for. A 1-piastre charge does not count (referral
+ * farming), and a payment that was later refunded is `refunded`, not `succeeded`, so it does not count either.
+ */
+export async function firstQualifyingPayment(tx: Tx, storeId: string): Promise<Date | null> {
+  const events = await tx.billingEvent.findMany({
     where: {
       storeId,
       status: 'succeeded',
       amountMinor: { gt: 0 },
       type: { in: ['checkout', 'renewal', 'upgrade', 'manual_payment'] },
     },
+    orderBy: { createdAt: 'asc' },
+    take: 20,
+    select: { amountMinor: true, planCode: true, createdAt: true },
   });
-  return n > 0;
+  if (events.length === 0) return null;
+  const plans = await prisma.plan.findMany({ select: { code: true, priceMonthlyMinor: true } });
+  const monthly = new Map(plans.map(p => [p.code, p.priceMonthlyMinor ?? 0]));
+  for (const e of events) {
+    const need = e.planCode ? (monthly.get(e.planCode) ?? 0) : 0;
+    if (e.amountMinor >= need) return e.createdAt;
+  }
+  return null;
+}
+export async function hasPaid(tx: Tx, storeId: string): Promise<boolean> {
+  return (await firstQualifyingPayment(tx, storeId)) !== null;
+}
+
+/** The latest end date an APPLIED grant moved this store's period to (null = none). */
+export async function grantedPaidThrough(tx: Tx, storeId: string): Promise<Date | null> {
+  const g = await tx.billingGrant.findFirst({
+    where: { beneficiaryId: storeId, status: 'applied', periodEndAfter: { not: null } },
+    orderBy: { periodEndAfter: 'desc' },
+    select: { periodEndAfter: true },
+  });
+  return g?.periodEndAfter ?? null;
+}
+export const laterOf = (a: Date, b: Date | null): Date => (b && b.getTime() > a.getTime() ? b : a);
+
+/**
+ * Is `currentEnd` the charge's `forPeriodEnd` moved forward by applied grants only (a chain of
+ * periodEndBefore -> periodEndAfter)? A renewal claimed before a grant landed must still settle.
+ */
+export async function shiftedByGrants(
+  tx: Tx,
+  storeId: string,
+  forPeriodEnd: Date,
+  currentEnd: Date
+): Promise<boolean> {
+  let end = forPeriodEnd;
+  for (let i = 0; i < 12; i++) {
+    const g = await tx.billingGrant.findFirst({
+      where: { beneficiaryId: storeId, status: 'applied', periodEndBefore: end },
+      select: { periodEndAfter: true },
+    });
+    if (!g?.periodEndAfter) return false;
+    end = g.periodEndAfter;
+    if (end.getTime() === currentEnd.getTime()) return true;
+  }
+  return false;
 }
 
 async function insertGrant(
@@ -160,12 +218,15 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
     SELECT id FROM store_subscriptions WHERE store_id = ${storeId} FOR UPDATE`;
   if (locked.length === 0) return 0;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
-  if (!sub?.currentPeriodEnd || !['active', 'trialing'].includes(sub.status)) return 0;
+  // the same "paid through" the billing cycle reads: the trial end while trialing, else the period end
+  const base =
+    sub?.status === 'trialing' ? (sub.trialEndsAt ?? sub.currentPeriodEnd) : sub?.currentPeriodEnd;
+  if (!sub || !base || !['active', 'trialing'].includes(sub.status)) return 0;
   const inFlight = await tx.billingEvent.count({
     where: { storeId, status: 'pending', type: { in: ['renewal', 'upgrade', 'checkout'] } },
   });
   if (inFlight > 0) return 0;
-  let end = sub.currentPeriodEnd;
+  let end = base;
   let applied = 0;
   for (const g of pending) {
     const next = addInterval(end, 'monthly');
@@ -183,28 +244,102 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
       where: { storeId },
       data: {
         currentPeriodEnd: end,
-        ...(sub.status === 'trialing' && sub.trialEndsAt ? { trialEndsAt: end } : {}),
+        ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}),
       },
     });
   }
   return applied;
 }
 
-/** Entry point after a subscription payment settles (post-commit effect). Never throws. */
+/**
+ * Run `fn` in its OWN real transaction scoped to `storeId`. `withStore` reuses the caller's context, and inside
+ * `runInStoreScope` (the billing routes) that context has NO transaction: every statement autocommits, so an
+ * advisory/row lock taken there is released at once and the caps would not hold. The lock-then-count logic below
+ * needs one transaction from the lock to the commit.
+ */
+const inOwnTx = <T>(storeId: string, fn: (tx: Tx) => Promise<T>): Promise<T> =>
+  runInTenantContext(storeId, () => fn(prisma as unknown as Tx));
+
+/** Create the grants a payment earns, then apply every pending grant of each side (separate stores, separate transactions). */
 export async function awardGrantsAfterPayment(
   paidStoreId: string,
   now = new Date()
 ): Promise<void> {
   try {
-    const { beneficiaries } = await withStore(paidStoreId, tx =>
+    const { beneficiaries } = await inOwnTx(paidStoreId, tx =>
       createGrantsForPayment(tx, paidStoreId)
     );
-    // Each beneficiary is its own store scope (the referrer is a different tenant).
     const all = new Set<string>([paidStoreId, ...beneficiaries]);
-    for (const id of all) await withStore(id, tx => applyPendingGrants(tx, id, now));
+    for (const id of all) await inOwnTx(id, tx => applyPendingGrants(tx, id, now));
   } catch (err) {
+    // The daily sweep (sweepFreeMonthGrants) re-creates and re-applies anything this missed.
     logger.error({ err, paidStoreId }, '[billing] awarding free-month grants failed');
   }
+}
+
+/**
+ * Daily catch-up (runs in the billing cycle): (1) apply pending grants (a store that had no period or a charge in
+ * flight), (2) re-create referral grants whose creation was lost, (3) while founding slots remain, award them in
+ * first-payment order to qualifying stores that never got one (paid before this shipped, or a lost effect).
+ */
+export async function sweepFreeMonthGrants(
+  now = new Date(),
+  /** Restrict the founding scan to these stores (operator re-run / tests). */
+  only?: { storeIds?: string[] }
+): Promise<{ applied: number; created: number }> {
+  let applied = 0;
+  let created = 0;
+  const pending = await prisma.billingGrant.findMany({
+    where: { status: 'pending' },
+    distinct: ['beneficiaryId'],
+    select: { beneficiaryId: true },
+  });
+  for (const { beneficiaryId } of pending)
+    applied += await inOwnTx(beneficiaryId, tx => applyPendingGrants(tx, beneficiaryId, now)).catch(
+      err => (logger.error({ err, beneficiaryId }, '[billing] grant apply failed'), 0)
+    );
+
+  const links = await prisma.billingReferral.findMany({ select: { referredStoreId: true } });
+  for (const { referredStoreId } of links) {
+    const have = await prisma.billingGrant.count({
+      where: { idempotencyKey: `referral:${referredStoreId}:referred` },
+    });
+    if (have === 0) {
+      await awardGrantsAfterPayment(referredStoreId, now);
+      created += await prisma.billingGrant.count({
+        where: { idempotencyKey: `referral:${referredStoreId}:referred` },
+      });
+    }
+  }
+
+  if ((await prisma.billingGrant.count({ where: { kind: 'founding' } })) < FOUNDING_SLOTS) {
+    const parts = await acrossStores(
+      async storeId => {
+        const has = await prisma.billingGrant.count({
+          where: { kind: 'founding', beneficiaryId: storeId },
+        });
+        if (has > 0) return null;
+        const at = await firstQualifyingPayment(prisma as unknown as Tx, storeId);
+        return at ? { storeId, at } : null;
+      },
+      {
+        ...(only?.storeIds ? { storeIds: only.storeIds } : {}),
+        onStoreError: (storeId, err) =>
+          logger.error({ err, storeId }, '[billing] founding scan failed'),
+      }
+    );
+    const queue = parts
+      .map(p => p.value)
+      .filter((v): v is { storeId: string; at: Date } => v !== null)
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
+    for (const { storeId } of queue) {
+      if ((await prisma.billingGrant.count({ where: { kind: 'founding' } })) >= FOUNDING_SLOTS)
+        break;
+      await awardGrantsAfterPayment(storeId, now);
+      created += 1;
+    }
+  }
+  return { applied, created };
 }
 
 /**
@@ -234,7 +369,8 @@ export async function listGrants(limit = 200) {
   const idSet = new Set(ids);
   const stores = (await storeDirectory()).filter(x => idSet.has(x.id));
   const name = new Map(stores.map(s => [s.id, s]));
-  const [founding, referral] = await Promise.all([
+  const [total, founding, referral] = await Promise.all([
+    prisma.billingGrant.aggregate({ _sum: { valueMinor: true } }),
     prisma.billingGrant.count({ where: { kind: 'founding' } }),
     prisma.billingGrant.count({ where: { kind: { startsWith: 'referral' } } }),
   ]);
@@ -243,7 +379,7 @@ export async function listGrants(limit = 200) {
     foundingSlots: FOUNDING_SLOTS,
     referralGrants: referral,
     referrerMax: REFERRER_MAX_GRANTS,
-    totalValueMinor: rows.reduce((a, r) => a + r.valueMinor, 0),
+    totalValueMinor: total._sum.valueMinor ?? 0,
     grants: rows.map(r => ({
       id: r.id,
       kind: r.kind,

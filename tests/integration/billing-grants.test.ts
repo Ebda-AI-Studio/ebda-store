@@ -6,9 +6,12 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import crypto from 'node:crypto';
-import { prisma } from '@ebda/database';
+import { prisma, runInStoreScope } from '@ebda/database';
 import {
   awardGrantsAfterPayment,
+  grantedPaidThrough,
+  shiftedByGrants,
+  sweepFreeMonthGrants,
   recordReferral,
   listGrants,
   FOUNDING_SLOTS,
@@ -56,11 +59,12 @@ async function mkStore(
   if (opts.paid !== false) await pay(store.id);
   return { storeId: store.id, ownerId };
 }
-async function pay(storeId: string, amountMinor = 50_000) {
+async function pay(storeId: string, amountMinor = 349_000) {
   await prisma.billingEvent.create({
     data: {
       storeId,
       type: 'renewal',
+      planCode: 'growth',
       amountMinor,
       provider: 'instapay',
       idempotencyKey: uid('ev'),
@@ -177,7 +181,7 @@ describe.skipIf(!hasDb)('FOUNDING-1 free-month grants (real Postgres)', () => {
       data: {
         storeId: noPeriod.storeId,
         type: 'renewal',
-        amountMinor: 50_000,
+        amountMinor: 349_000,
         provider: 'instapay',
         idempotencyKey: uid('inflight'),
         status: 'pending',
@@ -193,6 +197,62 @@ describe.skipIf(!hasDb)('FOUNDING-1 free-month grants (real Postgres)', () => {
     await awardGrantsAfterPayment(noPeriod.storeId);
     expect((await grantsOf('founding', noPeriod.storeId))[0].status).toBe('applied');
     expect(await periodEnd(noPeriod.storeId)).toEqual(PLUS_ONE_MONTH);
+  });
+
+  it('inside runInStoreScope (the billing routes: no ambient transaction) the founding cap still holds', async () => {
+    for (let i = 0; i < FOUNDING_SLOTS - 1; i++)
+      await prisma.$executeRaw`INSERT INTO billing_grants (id, kind, beneficiary_id, months, status, idempotency_key)
+        VALUES (${crypto.randomUUID()}, 'founding', ${`filler-${i}`}, 1, 'applied', ${`founding:filler-${i}`})`;
+    const stores = await Promise.all(Array.from({ length: 6 }, () => mkStore()));
+    await Promise.all(
+      stores.map(s => runInStoreScope(s.storeId, () => awardGrantsAfterPayment(s.storeId)))
+    );
+    expect(await grantsOf('founding')).toHaveLength(FOUNDING_SLOTS);
+  });
+
+  it('a payment smaller than one month of its plan does not earn or farm a grant', async () => {
+    const referrer = await mkStore();
+    const slug = (await prisma.store.findUnique({ where: { id: referrer.storeId } }))!.slug;
+    const farm = await mkStore({ paid: false });
+    expect(await recordReferral(farm.storeId, slug)).toBe(true);
+    await pay(farm.storeId, 100); // 1 EGP on a 3,490 EGP plan
+    await awardGrantsAfterPayment(farm.storeId);
+    expect(await grantsOf('referral_referrer', referrer.storeId)).toHaveLength(0);
+    expect(await grantsOf('founding', farm.storeId)).toHaveLength(0);
+  });
+
+  it('the sweep applies a pending grant and awards a qualifying store that never got one, oldest payment first', async () => {
+    for (let i = 0; i < FOUNDING_SLOTS - 1; i++)
+      await prisma.$executeRaw`INSERT INTO billing_grants (id, kind, beneficiary_id, months, status, idempotency_key)
+        VALUES (${crypto.randomUUID()}, 'founding', ${`filler-${i}`}, 1, 'applied', ${`founding:filler-${i}`})`;
+    const older = await mkStore();
+    await new Promise(r => setTimeout(r, 20));
+    const newer = await mkStore();
+    await sweepFreeMonthGrants(new Date(), { storeIds: [older.storeId, newer.storeId] });
+    expect(await grantsOf('founding', older.storeId)).toHaveLength(1);
+    expect(await grantsOf('founding', newer.storeId)).toHaveLength(0); // slot 20 went to the earlier payer
+    expect(await periodEnd(older.storeId)).toEqual(PLUS_ONE_MONTH);
+    // a pending grant (no period yet) is applied by the next sweep
+    const late = await mkStore({ periodEnd: null });
+    await prisma.$executeRaw`INSERT INTO billing_grants (id, kind, beneficiary_id, months, status, idempotency_key)
+      VALUES (${crypto.randomUUID()}, 'referral_referrer', ${late.storeId}, 1, 'pending', ${`referral:x-${late.storeId}:referrer`})`;
+    await prisma.storeSubscription.update({
+      where: { storeId: late.storeId },
+      data: { currentPeriodEnd: PERIOD_END },
+    });
+    await sweepFreeMonthGrants();
+    expect(await periodEnd(late.storeId)).toEqual(PLUS_ONE_MONTH);
+  });
+
+  it('a charge claimed before a grant landed is recognised as the same period (chain), and the floor survives an upgrade', async () => {
+    const a = await mkStore();
+    await awardGrantsAfterPayment(a.storeId);
+    const tx = prisma as never;
+    expect(await shiftedByGrants(tx, a.storeId, PERIOD_END, PLUS_ONE_MONTH)).toBe(true);
+    expect(
+      await shiftedByGrants(tx, a.storeId, new Date(PERIOD_END.getTime() + 1), PLUS_ONE_MONTH)
+    ).toBe(false);
+    expect(await grantedPaidThrough(tx, a.storeId)).toEqual(PLUS_ONE_MONTH);
   });
 
   it('the ledger is append-only and the admin view reports the caps', async () => {
