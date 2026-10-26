@@ -248,7 +248,7 @@ const NF = {
     hint: 'دوّر على اللي كنت تقصده، أو اختار قسم من تحت.',
     mapLabel: 'أقسام مركز المساعدة',
     sections: 'أقسام المساعدة',
-    ebda: 'ابدأ',
+    ebda: BRAND.company.shortNameAr,
     links: { home: 'الصفحة الرئيسية للمساعدة', docs: 'وثائق المطوّرين', contact: 'تواصل معانا' },
   },
   en: {
@@ -256,7 +256,7 @@ const NF = {
     hint: 'Search for what you meant, or pick a section below.',
     mapLabel: 'Help sections',
     sections: 'Help sections',
-    ebda: 'Ebda',
+    ebda: BRAND.company.shortNameEn,
     links: { home: 'Help home', docs: 'Developer docs', contact: 'Contact' },
   },
 };

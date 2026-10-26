@@ -28,10 +28,11 @@ const MSG = {
 };
 const MAX = 6;
 
-const form = document.querySelector('form.search');
-const input = form && form.querySelector('input[type="search"]');
-if (form && input && !document.getElementById('search-root')) {
-  const lang = document.documentElement.lang === 'ar' ? 'ar' : 'en';
+function init(form) {
+  const input = form.querySelector('input[type="search"]');
+  if (!input) return;
+  const pageLang = form.closest('[lang]')?.getAttribute('lang') ?? document.documentElement.lang;
+  const lang = pageLang === 'ar' ? 'ar' : 'en';
   const m = MSG[lang];
   const id = 'ta-' + Math.random().toString(36).slice(2, 8);
   const list = document.createElement('ul');
@@ -243,3 +244,6 @@ if (form && input && !document.getElementById('search-root')) {
   });
   list.addEventListener('mousedown', e => e.preventDefault()); // keep focus in the input
 }
+
+// Every search box on the page (a 404 page carries one per language; only the visible one is used).
+if (!document.getElementById('search-root')) document.querySelectorAll('form.search').forEach(init);
