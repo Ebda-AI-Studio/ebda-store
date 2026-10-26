@@ -190,3 +190,134 @@ export function poweredByBrand(locale?: string | null): string {
     ? `مدعوم من ${BRAND.product.nameAr}`
     : `Powered by ${BRAND.product.nameEn}`;
 }
+
+// ---- shared header navigation of the support sites (docs, help, status) ----
+/**
+ * The ONE header navigation of the three Ebda AI Studio support sites (docs, help, status): the wordmark lockup, the
+ * Products menu, the five site links and the mobile menu. docs and help render it through packages/site-kit's page
+ * shell, status through its own Worker renderer; both call these functions, so the three always show the same links,
+ * in the same order, with the same labels in ar and en. Pure strings, no imports beyond the brand module (the status
+ * Worker may import nothing else). It lives inside the brand module on purpose: the docs and help builders load it as bare TypeScript through Node, which
+ * cannot resolve an extensionless sibling import, and the status Worker may import this module only.
+ */
+export type NavLang = 'ar' | 'en';
+/** The site a page belongs to: its link gets `aria-current="page"`. `null` = none (a page of another site). */
+export type NavSite = 'studio' | 'dashboard' | 'docs' | 'help' | 'status';
+
+export interface SiteNavItem {
+  id: NavSite;
+  href: string;
+  label: string;
+}
+export interface SiteNavProduct {
+  id: 'store';
+  href: string;
+  label: string;
+  blurb: string;
+}
+
+const L = (lang: NavLang, ar: string, en: string) => (lang === 'ar' ? ar : en);
+const marketing = (lang: NavLang) => `${BRAND_MARKETING_URL}${lang === 'ar' ? '/' : '/en/'}`;
+
+/** The five site links, in the one order every support site shows them. */
+export function siteNavItems(lang: NavLang): SiteNavItem[] {
+  const d = BRAND.domains;
+  return [
+    {
+      id: 'studio',
+      href: marketing(lang),
+      label: lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+    },
+    { id: 'dashboard', href: BRAND_STORE_APP_URL, label: L(lang, 'لوحة التحكم', 'Dashboard') },
+    // docs: English at the root, Arabic under /ar/. help and status: Arabic at the root, English under /en.
+    {
+      id: 'docs',
+      href: `https://${d.docs}/${lang === 'ar' ? 'ar/' : ''}`,
+      label: L(lang, 'الوثائق', 'Docs'),
+    },
+    {
+      id: 'help',
+      href: `https://${d.help}/${lang === 'ar' ? '' : 'en/'}`,
+      label: L(lang, 'مركز المساعدة', 'Help centre'),
+    },
+    {
+      id: 'status',
+      href: `https://${d.status}/${lang === 'ar' ? '' : 'en'}`,
+      label: L(lang, 'حالة الخدمة', 'Status'),
+    },
+  ];
+}
+
+/** The Products menu: only live products (BRAND-ARCH-1). Same entry as the marketing header's menu. */
+export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
+  return [
+    {
+      id: 'store',
+      href: marketing(lang),
+      label: lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
+      // the marketing header's own storeBlurb (apps/marketing content.ts); tests/unit/site-nav-shared.test.ts keeps them equal
+      blurb: L(lang, 'متجرك أونلاين في دقايق', 'Your online store in minutes'),
+    },
+  ];
+}
+
+export const siteNavLabels = (lang: NavLang) => ({
+  nav: L(lang, 'التنقل الرئيسي', 'Main navigation'),
+  products: L(lang, 'المنتجات', 'Products'),
+  menu: L(lang, 'القائمة', 'Menu'),
+});
+
+const esc = (s: string) =>
+  s.replace(
+    /[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
+  );
+
+/** The studio lockup: mark + the master brand name + the site name. `markHtml` is the caller's icon (an <img> or inline SVG). */
+export function siteWordmarkHtml(p: {
+  lang: NavLang;
+  href: string;
+  siteLabel: string;
+  markHtml: string;
+}): string {
+  const studio = p.lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
+  return `<a class="wordmark" href="${esc(p.href)}">${p.markHtml}<span>${esc(studio)}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>`;
+}
+
+/** The header nav: desktop link row with the Products disclosure, and the mobile menu (below 1180px it collapses into the menu button; wider, it is its own row under the wordmark, search and language switch). */
+export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
+  const t = siteNavLabels(lang);
+  const items = siteNavItems(lang);
+  const products = siteNavProducts(lang);
+  const link = (i: SiteNavItem) =>
+    `<li><a href="${esc(i.href)}"${i.id === active ? ' aria-current="page"' : ''}>${esc(i.label)}</a></li>`;
+  const prod = (p: SiteNavProduct) =>
+    `<li><a href="${esc(p.href)}"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></a></li>`;
+  return (
+    `<nav class="top-nav" aria-label="${esc(t.nav)}">` +
+    `<ul class="nav-links"><li class="nav-products"><details><summary>${esc(t.products)}</summary><ul>${products.map(prod).join('')}</ul></details></li>${items.map(link).join('')}</ul>` +
+    `<details class="nav-menu"><summary><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>${esc(t.menu)}</span></summary>` +
+    `<ul>${products.map(p => `<li><a href="${esc(p.href)}">${esc(p.label)}</a></li>`).join('')}${items.map(link).join('')}</ul></details>` +
+    `</nav>`
+  );
+}
+
+/** Stylesheet for the wordmark and the nav above. Uses the sites' shared tokens (--fg --muted --line --lift --panel --night). */
+export const SITE_NAV_CSS = `
+.top-nav{order:3;flex:1 1 100%;min-width:0;position:relative}
+.top-nav ul{list-style:none;margin:0;padding:0}
+.top-nav .nav-links{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 16px;white-space:nowrap}
+.top-nav a{color:var(--fg);text-decoration:none;padding:6px 2px;display:inline-block}
+.top-nav a:hover{color:var(--lift)}
+.top-nav a[aria-current=page]{color:var(--lift);border-bottom:2px solid var(--lift)}
+.top-nav summary{cursor:pointer;list-style:none;color:var(--fg);padding:6px 2px;display:inline-flex;align-items:center;gap:6px}
+.top-nav summary::-webkit-details-marker{display:none}
+.nav-products>details>summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);margin-block-start:-3px}
+.nav-products>details>ul,.nav-menu>ul{position:absolute;z-index:60;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin-block-start:6px}
+.nav-products li a{display:block;padding:8px 10px;border-radius:8px}
+.nav-products li a b{display:block}
+.nav-products li a span{display:block;color:var(--muted);font-size:.85rem}
+.nav-menu{display:none}
+.nav-menu>ul a{display:block;padding:10px;min-height:44px}
+@media (max-width:1179px){.top-nav{order:0;flex:0 0 auto;margin-inline-start:auto}.top-nav .nav-links{display:none}.nav-menu{display:block}}
+`.replace(/\n/g, '');

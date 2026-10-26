@@ -3,7 +3,7 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -30,12 +30,6 @@ const PRODUCT = BRAND.product.nameEn;
 const EN = {
   site: `${BRAND.company.shortNameEn} Docs`,
   skip: 'Skip to content',
-  nav: [
-    { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameEn },
-    { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
-    { href: `https://${BRAND.domains.help}`, label: 'Help centre' },
-    { href: `https://${BRAND.domains.status}`, label: 'Status' },
-  ],
   search: { action: '/search/', label: 'Search', placeholder: 'Search the docs' },
   footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. ${BRAND.product.nameEn} developer documentation.`,
   sidebarLabel: 'Documentation',
@@ -123,7 +117,7 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
     ],
     siteLabel: EN.site,
     homeHref: '/',
-    nav: EN.nav,
+    active: 'docs',
     langSwitch: { href: '/ar/', label: 'العربية', lang: 'ar' },
     search: EN.search,
     sidebar: sidebarFor(slug),
@@ -204,13 +198,8 @@ for (const p of pages) {
       { hreflang: 'ar', href: ORIGIN + '/ar/' },
     ],
     siteLabel: 'وثائق المطوّرين',
+    active: 'docs',
     homeHref: '/ar/',
-    nav: [
-      { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
-      { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
-      { href: `https://${BRAND.domains.help}`, label: 'مركز المساعدة' },
-      { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
-    ],
     langSwitch: { href: '/', label: 'English', lang: 'en' },
     search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
     main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${cards}</article>`,
@@ -234,7 +223,7 @@ writePage(
     canonical: ORIGIN + '/search/',
     siteLabel: EN.site,
     homeHref: '/',
-    nav: EN.nav,
+    active: 'docs',
     langSwitch: { href: '/ar/', label: 'العربية', lang: 'ar' },
     search: EN.search,
     sidebar: sidebarFor(''),
@@ -268,7 +257,7 @@ writeFileSync(
     canonical: ORIGIN + '/',
     siteLabel: EN.site,
     homeHref: '/',
-    nav: EN.nav,
+    active: 'docs',
     search: EN.search,
     main: `<h1>Page not found</h1><p>That page does not exist. Start from the <a href="/">docs home</a>.</p>`,
     footer,
