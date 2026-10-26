@@ -3,6 +3,7 @@ import {
   BRAND,
   pickStudioLang,
   renderStudioPage,
+  STUDIO_PAGE_HEADERS,
   studioHostPlan,
   type StudioHostPlan,
 } from '@ebda/shared';
@@ -35,27 +36,7 @@ export function studioHostResponse(
   });
   const response = new NextResponse(html, {
     status: plan.status,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      // Nothing cacheable on an unserved host (tests/unit/web-cross-tenant-cache.test.ts): the page is
-      // tiny and static, so rendering it per request costs nothing and no cache can ever misfile it.
-      'Cache-Control': 'no-store',
-      Vary: 'Accept-Language',
-      'X-Robots-Tag': 'noindex, nofollow',
-      'X-Content-Type-Options': 'nosniff',
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Content-Security-Policy': [
-        "default-src 'none'",
-        `script-src https://${BRAND.domains.help}`,
-        "style-src 'unsafe-inline'",
-        `connect-src https://${BRAND.domains.help} https://${BRAND.domains.docs}`,
-        `img-src https://${BRAND.domains.marketing} data:`,
-        `form-action https://${BRAND.domains.help}`,
-        "base-uri 'none'",
-        "frame-ancestors 'none'",
-      ].join('; '),
-    },
+    headers: STUDIO_PAGE_HEADERS,
   });
   return { response, plan };
 }
