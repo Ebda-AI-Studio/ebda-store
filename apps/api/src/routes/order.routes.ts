@@ -1480,7 +1480,7 @@ router.post(
         });
         return;
       }
-      const result = await runInTenantContext(storeId, () =>
+      const result = await inSettlementTx(storeId, () =>
         matchRefundToClaim({
           paymentId: payment.id,
           storeId,
@@ -1500,6 +1500,13 @@ router.post(
       });
       res.json({ success: true, data: { result } });
     } catch (error) {
+      // the settle module throws plain Errors for refusals (claim not executed, id not held, amount differs): 409, not 500
+      if (
+        error instanceof Error &&
+        error.constructor === Error &&
+        /claim|refund id|held webhook|amount/.test(error.message)
+      )
+        return next(new AppError(409, 'REFUND_MATCH_REFUSED', error.message));
       next(error);
     }
   }
@@ -1633,7 +1640,10 @@ router.post(
           if (d.accountedThisEvent) {
             updateData.metadata = {
               ...(updateData.metadata as Record<string, unknown>),
-              [REFUND_EVENT_IDS_KEY]: appendRefundEventId(locked.metadata, status.refundId),
+              [REFUND_EVENT_IDS_KEY]: appendRefundEventId(
+                locked.metadata,
+                status.refundId ?? payment.refundId
+              ),
               [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
                 locked.metadata,
                 status.refundId,

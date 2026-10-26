@@ -54,6 +54,7 @@ import {
   REFUND_INDETERMINATE_EVENT,
   REFUND_RECONCILED_EVENT,
   REFUND_REVIEW_EVENT,
+  REFUND_ABSORBED_EVENT,
 } from './refund-outcome';
 import {
   settleRefundEvent,
@@ -1354,6 +1355,22 @@ export class PaymentService {
             context: { paymentId: payment.id, claimId, absorbedAs, answeredAs: response.refundId },
           }).catch(() => undefined);
         }
+        // The answered id was ALREADY filed as accounted (a webhook with this id was absorbed by ANOTHER same-amount claim):
+        // this claim would stay open forever and hold every later Kashier refund. Close it on that evidence, audited.
+        if (
+          !absorbedAs &&
+          readAccountedRefundEventIds(currentMetadata).includes(response.refundId)
+        ) {
+          await prisma.paymentEvent.create({
+            data: {
+              ...refundEvent(REFUND_ABSORBED_EVENT, 'id_match_reassigned', {
+                refundId: response.refundId,
+                via: 'id_match_reassigned',
+              }),
+              fromStatus: claimedStatus,
+            },
+          });
+        }
         await prisma.payment.update({
           where: { id: payment.id },
           data: {
@@ -2017,6 +2034,8 @@ export class PaymentService {
             refundId: refundEvent.refundId,
             refundStatus: newStatus,
             refundReference: refundEvent.refundReference ?? null,
+            // read back by the operator match (it must equal the claim's amount)
+            reportedAmount: refundEvent.amount ?? null,
             ...(newStatus === 'completed' && heldOpenClaimIdUnverified
               ? { heldUnaccountedRefund: true, reason: 'open_claim_id_unverified' }
               : newStatus === 'completed' && heldUnaccountedEvent

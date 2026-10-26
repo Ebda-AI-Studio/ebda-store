@@ -169,12 +169,20 @@ export async function settleRefundEvent(input: SettleEventInput): Promise<Settle
         } as Prisma.InputJsonValue,
       },
     });
-  const seen = isRefundEventAlreadySeen({
-    metadata: payment.metadata,
-    refundId: input.refund.refundId,
-    status: input.refund.status,
-    previousPaymentStatus: prevRefundStatus,
-  });
+  // Fawry's amount-less notice ref is NOT proven unique per refund (paymentRefrenceNumber may be per payment): a repeat is
+  // never silently 'seen'; it goes through the settlement rules (consume a claim on positive evidence, else held + alerted).
+  // A true redelivery of the SAME notice is stopped upstream by the webhook inbox's provider event id.
+  const fawryAmountless =
+    input.provider === 'fawry' &&
+    !(typeof input.refund.amount === 'number' && input.refund.amount > 0);
+  const seen =
+    !fawryAmountless &&
+    isRefundEventAlreadySeen({
+      metadata: payment.metadata,
+      refundId: input.refund.refundId,
+      status: input.refund.status,
+      previousPaymentStatus: prevRefundStatus,
+    });
   if (seen) {
     if (ownIdClaim) await consumeOwnId();
     return { payment, seen: true, decision: null, commit: async () => undefined };
@@ -234,7 +242,9 @@ export async function settleRefundEvent(input: SettleEventInput): Promise<Settle
       if (committed) throw new Error('settleRefund: commit called twice');
       committed = true;
       let data: Record<string, unknown> = patch.data ?? {};
-      if (decision.absorbedClaimId && completed) {
+      // (not for a Fawry amount-less notice: its ref is not proven unique per refund, so filing it would make the NEXT notice with
+      // the same ref look already counted)
+      if (decision.absorbedClaimId && completed && !fawryAmountless) {
         // an absorbed id is FILED as accounted and its status recorded, whatever the caller's patch: callers must not
         // diverge, or a replay after the claim closed would be booked as a new refund
         const base = (
@@ -402,21 +412,27 @@ export async function matchRefundToClaim(input: MatchInput): Promise<MatchResult
     where: { storeId: input.storeId, paymentId: input.paymentId, eventType: 'webhook' },
     select: { eventType: true, createdAt: true, details: true },
   });
-  if (
-    !held.some(e => {
-      const d = e.details as {
-        flavour?: string;
-        refundId?: string;
-        heldUnaccountedRefund?: boolean;
-      } | null;
-      return (
-        d?.flavour === 'refund' &&
-        d.refundId === input.providerRefundId &&
-        d.heldUnaccountedRefund === true
-      );
-    })
-  )
-    throw new Error('no held webhook for that refund id on this payment');
+  const heldEvent = held.find(e => {
+    const d = e.details as {
+      flavour?: string;
+      refundId?: string;
+      heldUnaccountedRefund?: boolean;
+    } | null;
+    return (
+      d?.flavour === 'refund' &&
+      d.refundId === input.providerRefundId &&
+      d.heldUnaccountedRefund === true
+    );
+  });
+  if (!heldEvent) throw new Error('no held webhook for that refund id on this payment');
+  // the held webhook's amount, when it reported one, must equal the claim's: matching a 500 refund to a 2000 claim would
+  // mark the 500 accounted without ever adding it (refundable balance overstated)
+  const claimAmount = (
+    forClaim.find(e => e.eventType === REFUND_CLAIM_EVENT)?.details as { amount?: number } | null
+  )?.amount;
+  const reported = (heldEvent.details as { reportedAmount?: number | null } | null)?.reportedAmount;
+  if (typeof reported === 'number' && typeof claimAmount === 'number' && reported !== claimAmount)
+    throw new Error('the held webhook amount does not equal the claim amount');
   await prisma.paymentEvent.create({
     data: {
       paymentId: input.paymentId,
