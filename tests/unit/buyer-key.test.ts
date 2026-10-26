@@ -31,6 +31,12 @@ describe('toE164 (Egypt default +20)', () => {
     expect(toE164('0312345678')).toBeNull(); // Alexandria is 03 + 7, this is 03 + 8
     expect(toE164('0912345678')).toBeNull(); // no such area code
     expect(toE164('2012345678901')).toBeNull();
+    // the `20...` and bare `1...` branches obey the same rule
+    expect(toE164('201912345678')).toBeNull(); // 20 + a number that is not Egyptian
+    expect(toE164('201001234567')).toBe('+201001234567');
+    expect(toE164('2021234567')).toBeNull(); // 10 digits starting 20: not a 12-digit 20... form
+    expect(toE164('1912345678')).toBeNull(); // bare 10 digits starting 1 but not a 1[0125] mobile
+    expect(toE164('1001234567')).toBe('+201001234567');
     // valid Egyptian shapes -> +20
     expect(toE164('01001234567')).toBe('+201001234567'); // mobile
     expect(toE164('0212345678')).toBe('+20212345678'); // Cairo/Giza 02 + 8

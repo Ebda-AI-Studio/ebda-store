@@ -82,9 +82,15 @@ export function toE164(raw: string | null | undefined, defaultCountry: '20' = '2
       // otherwise null (a UK 07911..., a Saudi 050... is never read as +20).
       if (!isEgyptianNational(s)) return null;
       s = `+${defaultCountry}${s.slice(1)}`;
-    } else if (s.startsWith(defaultCountry) && s.length === 12) s = '+' + s;
-    else if (/^1\d{9}$/.test(s)) s = `+${defaultCountry}${s}`;
-    else return null;
+    } else if (s.startsWith(defaultCountry) && s.length === 12) {
+      // `20` + 10 digits: valid only if those digits are a valid Egyptian number (PHONE-2).
+      if (!isEgyptianNational(`0${s.slice(defaultCountry.length)}`)) return null;
+      s = '+' + s;
+    } else if (/^1\d{9}$/.test(s)) {
+      // a mobile typed without its leading 0: valid only as 01[0125] + 8 (PHONE-2).
+      if (!isEgyptianNational(`0${s}`)) return null;
+      s = `+${defaultCountry}${s}`;
+    } else return null;
   }
   // A trunk 0 kept after the country code (+20 0100...) is dropped.
   if (s.startsWith(`+${defaultCountry}0`)) {
