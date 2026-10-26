@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// HELD BY AHMAD (2026-10-26): do NOT run until he gives the covered-until date and says go.
 // Move Amelia Aurum's store off the hidden `comped` plan onto Growth (InstaPay).
 // Ruling EBDA-FUNNEL-15/-19. DRY RUN unless --apply. A production DATA action: the
 // controller/Ahmad decides when to run it; nothing here runs it automatically.
