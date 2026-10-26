@@ -662,20 +662,25 @@ enforced CODEOWNERS here, so the controls are in code. They are enforced by test
   deploy-change label" (`.github/workflows/deploy-change-label.yml`, `scripts/ci/deploy-change-label.mjs`) fails a PR that edits
   `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
   `scripts/ebda-cf-api-config.mjs` unless it carries the `deploy-change` label, which only a person applies after reading the diff.
-- **The CI Cloudflare token (`CLOUDFLARE_API_TOKEN`, production environment secret) must be the minimum, never account-admin:**
+- **The CI Cloudflare token is `ebda-github-deploy` (`CLOUDFLARE_API_TOKEN`, production environment secret).** Checked in the
+  Cloudflare dashboard on 2026-10-27 by the controller: it is scoped to **1 account (Ebda's) and 1 zone (`ebda.app`)**, never
+  "all accounts" or "all zones", and carries **10 permissions**, each justified. Read vs Edit levels were not visible in that
+  review; the intent is Edit only where deploys write.
 
-  | Permission                   | Level                         | Why                                                     |
-  | ---------------------------- | ----------------------------- | ------------------------------------------------------- |
-  | Account · Workers Scripts    | Edit                          | `wrangler deploy` for the 9 Workers                     |
-  | Account · Workers KV Storage | Edit                          | the cache namespace binding on deploy                   |
-  | Account · D1                 | Edit                          | `Apply D1 migrations (ebda-identity)`                   |
-  | Account · Workers R2 Storage | Edit                          | the nightly `db-backup.yml` upload to `ebda-db-backups` |
-  | Zone · Workers Routes        | Edit                          | routes in `wrangler.jsonc` (zone `ebda.app` only)       |
-  | Zone · Zone                  | Read                          | resolve the zone for routes                             |
-  | Account resources            | Include only the Ebda account | never "All accounts"                                    |
-  | Zone resources               | Include only `ebda.app`       | never "All zones"                                       |
+  | Permission                   | Scope           | Why a deploy needs it                                                                                                              |
+  | ---------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | Account · Workers Scripts    | account         | `wrangler deploy` for the 9 Workers; `wrangler secret list` in the secret gate                                                     |
+  | Account · Workers KV Storage | account         | the cache namespace binding (`EBDA_KV_CACHE_ID`)                                                                                   |
+  | Account · D1                 | account         | `Apply D1 migrations (ebda-identity)` and the D1 bindings                                                                          |
+  | Account · Workers R2 Storage | account         | the nightly `db-backup.yml` upload to `ebda-db-backups`, and R2 bindings (cache, uploads)                                          |
+  | Account · Queues             | account         | the queue producer/consumer bindings on the API Worker                                                                             |
+  | Account · Hyperdrive         | account         | the Hyperdrive binding (`EBDA_HYPERDRIVE_ID`) to Neon                                                                              |
+  | Account · Account Settings   | account         | wrangler resolves the account and its subdomain on deploy (the broadest line here: review it first if the token is ever tightened) |
+  | Zone · Workers Routes        | zone `ebda.app` | the `<host>/*` zone routes in the `wrangler.jsonc` files, including the storefront `*/*` for merchant custom domains               |
+  | Zone · DNS                   | zone `ebda.app` | Workers **Custom Domains** create their DNS records on deploy                                                                      |
+  | Zone · DNS Settings          | zone `ebda.app` | read alongside DNS when a Custom Domain is attached                                                                                |
 
-  Everything else (Account Settings, Members, API Tokens, DNS, Firewall, Billing, Logs) is OFF. **Ahmad-only step:** open
-  Cloudflare dashboard, My Profile, API Tokens, find the token behind `CLOUDFLARE_API_TOKEN`, compare it with this table, and
-  roll it (new token, update the production environment secret, delete the old one) if it carries more. The repo cannot read
-  its own token's permissions, so this cannot be checked from CI.
+  Everything else (Members, API Tokens, Firewall, Billing, Logs, other zones, other accounts) is OFF. If a deploy ever needs a
+  permission not listed, add exactly that one and update this table in the same PR (the `deploy-change` label check forces a
+  human to look at the diff). The repo cannot read its own token's permissions, so this table is a record of the dashboard, not
+  something CI proves.
