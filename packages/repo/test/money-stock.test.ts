@@ -140,6 +140,63 @@ describe('checkout core: stock', () => {
   });
 });
 
+describe('checkout core: cart claim (P07 / M-012)', () => {
+  function withCart() {
+    const f = fixture();
+    f.raw.exec(
+      `INSERT INTO carts (id, store_id, session_id) VALUES ('cart1', 's1', 'sess1'), ('cart2', 's2', 'sess2')`
+    );
+    f.raw.exec(
+      `INSERT INTO cart_items (id, cart_id, product_id, quantity) VALUES ('ci1', 'cart1', 'sku', 1)`
+    );
+    return f;
+  }
+  it('a second checkout of the same cart (different key or none) fails; one order, stock moved once', () => {
+    const { db, base, stock, count } = withCart();
+    const cart = { id: 'cart1', items: 1, bundles: 0 };
+    const a = placeOrder(db, base({ cart, idempotencyKey: 'k-a' }));
+    expect(a.replayed).toBe(false);
+    expect(err(() => placeOrder(db, base({ cart, idempotencyKey: 'k-b' }))).code).toBe(
+      'CART_CHANGED'
+    );
+    expect(err(() => placeOrder(db, base({ cart }))).code).toBe('CART_CHANGED');
+    expect(count('SELECT count(*) AS n FROM orders')).toBe(1);
+    expect(count('SELECT count(*) AS n FROM cart_items')).toBe(0);
+    expect(stock('products', 'sku')).toBe(9);
+  });
+  it('the same key after the claim returns the first order, not CART_CHANGED', () => {
+    const { db, base, stock } = withCart();
+    const cart = { id: 'cart1', items: 1, bundles: 0 };
+    const a = placeOrder(db, base({ cart, idempotencyKey: 'k-a' }));
+    const b = placeOrder(db, base({ cart, idempotencyKey: 'k-a' }));
+    expect(b).toMatchObject({ orderId: a.orderId, replayed: true });
+    expect(stock('products', 'sku')).toBe(9);
+  });
+  it('a changed cart, another store cart, or a failed order leaves the cart claimable', () => {
+    const { raw, db, base, count } = withCart();
+    expect(
+      err(() => placeOrder(db, base({ cart: { id: 'cart1', items: 2, bundles: 0 } }))).code
+    ).toBe('CART_CHANGED');
+    expect(
+      err(() => placeOrder(db, base({ cart: { id: 'cart2', items: 0, bundles: 0 } }))).code
+    ).toBe('CART_CHANGED');
+    expect(
+      err(() =>
+        placeOrder(
+          db,
+          base({
+            cart: { id: 'cart1', items: 1, bundles: 0 },
+            lines: [{ productId: 'nope', quantity: 1 }],
+          })
+        )
+      ).code
+    ).toBe('PRODUCT_UNAVAILABLE');
+    expect(count('SELECT count(*) AS n FROM cart_items')).toBe(1); // rolled back with the failed order
+    expect(count('SELECT count(*) AS n FROM orders')).toBe(0);
+    expect(raw).toBeTruthy();
+  });
+});
+
 describe('checkout core: coupon', () => {
   it('percentage, fixed, cap, minimum, dates, inactive; the total never goes negative', () => {
     const { raw, db, base } = fixture();
