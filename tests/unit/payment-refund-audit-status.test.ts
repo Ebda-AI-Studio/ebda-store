@@ -5,7 +5,7 @@
  * compare the slice against the ORIGINAL amount, so the final slice of a
  * piecewise refund was audited as partially_refunded on a refunded payment.
  */
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   paymentFindFirst: vi.fn(),
   refund: vi.fn(),
   recordPaymentEvent: vi.fn(),
+  resolve: vi.fn(),
 }));
 
 vi.mock('@ebda/database', () => ({
@@ -25,7 +26,7 @@ vi.mock('@api/lib/definer', () => ({
   getOrderStoreId: vi.fn(),
   getPaymentStoreId: vi.fn(),
   resolvePaymentEventsStore: vi.fn(),
-  resolveStoreFromWebhookRef: vi.fn().mockResolvedValue('s1'),
+  resolveStoreFromWebhookRef: (...a: unknown[]) => h.resolve(...a),
 }));
 vi.mock('@api/middleware/auth', () => ({
   rejectImpersonated: (_req: any, _res: any, next: any) => next(),
@@ -67,6 +68,7 @@ beforeAll(async () => {
   app.use(errorHandler);
 });
 afterEach(() => vi.clearAllMocks());
+beforeEach(() => h.resolve.mockResolvedValue('s1'));
 
 function paymentRow(refundedAmount: number) {
   return {
@@ -106,5 +108,40 @@ describe('POST /payments/refund — audit toStatus', () => {
     expect(h.recordPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({ toStatus: 'partially_refunded' })
     );
+  });
+});
+
+describe('payment lookups by provider reference stay inside the named provider (Ruling ITEST-14)', () => {
+  it('refund: the optional provider reaches the store resolver', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000, provider: 'kashier' });
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_1', provider: 'kashier' });
+  });
+
+  it('refund: without a provider the lookup is unchanged', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_1', provider: undefined });
+  });
+
+  it('refund: an unknown provider name is refused before any lookup', async () => {
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000, provider: 'tap' });
+    expect(res.status).toBe(400);
+    expect(h.resolve).not.toHaveBeenCalled();
+  });
+
+  it('status: the ?provider= query narrows the store lookup', async () => {
+    h.resolve.mockResolvedValue(null); // 404 right after the lookup; only the call matters here
+    const res = await request(app).get('/api/v1/payments/status/txn_9?provider=fawry');
+    expect(res.status).toBe(404);
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_9', provider: 'fawry' });
   });
 });
