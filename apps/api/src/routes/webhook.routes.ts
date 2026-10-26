@@ -21,8 +21,38 @@ import {
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
+import { sendAlert } from '../services/alerts.service';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { inngest } from '../lib/inngest/client';
+
+/**
+ * No store owns the payment this delivery names (audit M-050 / DB-2). The Payment row is committed only after the
+ * gateway accepts the invoice, and on Cloudflare the entity index lags the checkout by an outbox drain, so a fast
+ * callback can arrive first. Answering 200 made the gateway drop it for good and the order stayed unpaid. Answer 503
+ * + Retry-After instead so the gateway redelivers (nothing about any store is revealed), and tell an operator: a
+ * delivery that never resolves is either a stray/other-environment webhook or a payment we cannot find.
+ */
+function respondUnresolvedPayment(res: Response, provider: string, idempotencyKey: string): void {
+  logger.warn(
+    { provider, idempotencyKey },
+    '[WEBHOOK] No store owns this payment yet; asking for a retry'
+  );
+  void sendAlert({
+    level: 'info',
+    scope: 'platform',
+    source: 'payment.webhook.unresolved',
+    title: `payment webhook for an unknown payment (${provider})`,
+    body: `A ${provider} webhook named a payment no store owns. It was answered 503 so the gateway retries. If it keeps arriving, find the payment at the provider.`,
+    context: { provider, idempotencyKey },
+  }).catch(() => undefined);
+  res
+    .status(503)
+    .set('Retry-After', '60')
+    .json({
+      success: false,
+      error: { code: 'PAYMENT_NOT_YET_VISIBLE', message: 'Payment not found yet, please retry' },
+    });
+}
 
 const router = Router();
 
@@ -466,8 +496,7 @@ async function handleGatewayWebhook(
     // 200 and do nothing: a 5xx would make the gateway retry it forever, and a different status
     // for "unknown" vs "known" would be a payment-existence oracle for an unauthenticated caller.
     if (!storeIdForWebhook) {
-      logger.warn({ provider, idempotencyKey }, '[WEBHOOK] No store owns this payment; ignored');
-      res.json({ success: true, data: { message: 'Webhook accepted', status: 'ignored' } });
+      respondUnresolvedPayment(res, provider, idempotencyKey);
       return;
     }
 
@@ -624,9 +653,7 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     // directly with no wrapper — see processWebhookInline's no-storeId branch.
     const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
     if (!storeIdForWebhook) {
-      // Per-merchant credentials only: nothing to verify against (see the explicit handler).
-      logger.warn({ provider, idempotencyKey }, '[WEBHOOK] No store owns this payment; ignored');
-      res.json({ success: true, data: { message: 'Webhook accepted', status: 'ignored' } });
+      respondUnresolvedPayment(res, provider, idempotencyKey);
       return;
     }
 

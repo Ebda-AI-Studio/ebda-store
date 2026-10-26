@@ -18,7 +18,20 @@ vi.mock('@api/lib/inngest/client', () => ({
 // Mock prisma — $transaction just resolves the array of update promises.
 const paymentUpdate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
-const txn = vi.fn().mockResolvedValue([{}, {}]);
+// The order write is now ONE conditional claim (payment-state-claims); `txn` counts those calls so the
+// existing "the order write ran once / never ran" assertions keep their meaning.
+const txn = vi.fn().mockResolvedValue(undefined);
+const claims = { paid: 'claimed' as string, failed: 'claimed' as string };
+vi.mock('@api/services/payment-state-claims', () => ({
+  claimOrderPaid: (...a: unknown[]) => {
+    txn('paid', ...a);
+    return Promise.resolve(claims.paid);
+  },
+  claimOrderFailed: (...a: unknown[]) => {
+    txn('failed', ...a);
+    return Promise.resolve(claims.failed);
+  },
+}));
 // Returns the order detail the "Payment received" push reads; null is fine for
 // the reconciliation tests (the push is best-effort and never affects the result).
 const orderFindUnique = vi.fn().mockResolvedValue({ status: 'pending' });
@@ -29,7 +42,10 @@ vi.mock('@ebda/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: Record<string, any> = {
     prisma: {
-      payment: { update: (...a: unknown[]) => paymentUpdate(...a) },
+      payment: {
+        update: (...a: unknown[]) => paymentUpdate(...a),
+        updateMany: (...a: unknown[]) => paymentUpdate(...a),
+      },
       order: {
         update: (...a: unknown[]) => orderUpdate(...a),
         findUnique: (...a: unknown[]) => orderFindUnique(...a),
@@ -91,6 +107,8 @@ function statusResponse(
 describe('confirmPaymentFromProviderStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    claims.paid = 'claimed';
+    claims.failed = 'claimed';
   });
 
   it('PAID + order currently unpaid → marks order paid and fires fanout ONCE', async () => {
@@ -119,6 +137,71 @@ describe('confirmPaymentFromProviderStatus', () => {
         locale: 'ar',
       },
     });
+  });
+
+  it('PAID but the claim is LOST to a concurrent webhook → no payment write, no fanout (M-049)', async () => {
+    claims.paid = 'already_paid';
+    const result = await confirmPaymentFromProviderStatus({
+      payment: basePayment,
+      order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: 'ar' },
+      providerStatus: statusResponse('completed'),
+      source: 'guest_verify',
+    });
+    expect(result).toEqual({
+      paymentStatus: 'paid',
+      providerStatus: 'completed',
+      statusChanged: false,
+    });
+    expect(paymentUpdate).not.toHaveBeenCalled();
+    expect(recordEvent).not.toHaveBeenCalled();
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('PAID but the order is no longer confirmable (claim blocked) → stays unpaid, no fanout', async () => {
+    claims.paid = 'blocked_status';
+    const result = await confirmPaymentFromProviderStatus({
+      payment: basePayment,
+      order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+      providerStatus: statusResponse('completed'),
+      source: 'guest_verify',
+    });
+    expect(result).toEqual({
+      paymentStatus: 'unpaid',
+      providerStatus: 'completed',
+      statusChanged: false,
+    });
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('FAILED/EXPIRED on an order already PAID (stale snapshot or admin Refresh) → never touches it (M-064)', async () => {
+    for (const st of ['failed', 'expired', 'cancelled'] as const) {
+      const result = await confirmPaymentFromProviderStatus({
+        payment: { ...basePayment, status: 'completed' },
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'paid', locale: null },
+        providerStatus: statusResponse(st),
+        source: 'admin_refresh',
+      });
+      expect(result).toEqual({ paymentStatus: 'paid', providerStatus: st, statusChanged: false });
+    }
+    expect(txn).not.toHaveBeenCalled();
+    expect(paymentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('FAILED while a concurrent webhook paid the order after our snapshot → claim blocked, order stays paid', async () => {
+    claims.failed = 'blocked_paid_or_settled';
+    const result = await confirmPaymentFromProviderStatus({
+      payment: basePayment,
+      order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+      providerStatus: statusResponse('expired'),
+      source: 'guest_verify',
+    });
+    expect(result).toEqual({
+      paymentStatus: 'paid',
+      providerStatus: 'expired',
+      statusChanged: false,
+    });
+    expect(paymentUpdate).not.toHaveBeenCalled();
+    expect(recordEvent).not.toHaveBeenCalled();
   });
 
   it('PAID + a STALE confirmation on a REFUNDED order → rejected, no status regression', async () => {

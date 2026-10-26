@@ -28,7 +28,11 @@ const paymentEventCreateMock = vi.fn().mockResolvedValue({});
 const paymentEventFindManyMock = vi.fn().mockResolvedValue([]);
 const paymentUpdateMany = vi.fn();
 const paymentUpdate = vi.fn().mockResolvedValue({});
+const inngestSend = vi.fn().mockResolvedValue(undefined);
+const notifyFailure = vi.fn().mockResolvedValue(undefined);
 const orderUpdate = vi.fn().mockResolvedValue({});
+// the paid / failed transitions are conditional claims (payment-state-claims): one updateMany each
+const orderUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const orderFindUnique = vi.fn().mockResolvedValue({ storeId: 'store_1' });
 const paymentConfigFindMany = vi.fn();
 let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = null;
@@ -58,6 +62,7 @@ vi.mock('@ebda/database', () => ({
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),
+      updateMany: (...a: unknown[]) => orderUpdateMany(...a),
       findUnique: (...a: unknown[]) => orderFindUnique(...a),
     },
     store: { findUnique: vi.fn() },
@@ -108,11 +113,15 @@ vi.mock('@api/services/socket.service', () => ({
 }));
 
 vi.mock('@api/lib/inngest/client', () => ({
-  inngest: { send: vi.fn().mockResolvedValue(undefined) },
+  inngest: { send: (...a: unknown[]) => inngestSend(...a) },
 }));
 
 vi.mock('@api/services/onesignal.service', () => ({
-  OneSignalService: { sendToStore: vi.fn(), sendToUser: vi.fn() },
+  OneSignalService: {
+    sendToStore: vi.fn(),
+    sendToUser: vi.fn(),
+    notifyAdminsOfPaymentFailure: (...a: unknown[]) => notifyFailure(...a),
+  },
 }));
 
 vi.mock('@api/services/redis.service', () => ({
@@ -363,10 +372,57 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('pending', 'confirmed');
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID, storeId: STORE_ID },
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        paymentStatus: { in: ['unpaid', 'failed'] },
+      }),
       data: { status: 'confirmed', paymentStatus: 'paid' },
     });
+  });
+
+  it('a verify that already paid the order: the webhook claims nothing, so no second fan-out (M-049)', async () => {
+    mockPaymentForWebhook('confirmed', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      amount: 5000,
+      currency: 'EGP',
+      paidAt: new Date(),
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+    orderFindUnique.mockResolvedValueOnce({ paymentStatus: 'paid' });
+
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('a late FAILED webhook on a PAID order changes nothing and pushes no failure alert (M-064)', async () => {
+    mockPaymentForWebhook('confirmed', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'expired',
+      amount: 5000,
+      currency: 'EGP',
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+    orderFindUnique.mockResolvedValueOnce({ paymentStatus: 'paid' });
+
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+
+    // the payment row is only touched through a guard that excludes a completed payment
+    const writes = paymentUpdateMany.mock.calls.filter(
+      c => (c[0] as { data?: { status?: string } }).data?.status === 'expired'
+    );
+    for (const w of writes)
+      expect((w[0] as { where: { status?: unknown } }).where.status).toEqual({
+        notIn: ['completed', 'refunded', 'partially_refunded', 'disputed'],
+      });
+    expect(notifyFailure).not.toHaveBeenCalled();
   });
 });
 
@@ -425,9 +481,13 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     ).rejects.toThrow('Cannot transition from cancelled to confirmed');
 
     expect(orderUpdate).not.toHaveBeenCalled();
+    expect(orderUpdateMany).not.toHaveBeenCalled();
     // The critical new assertion: the payment row must not have been mutated
     // before the assert rejected.
     expect(paymentUpdate).not.toHaveBeenCalled();
+    expect(
+      paymentUpdateMany.mock.calls.some(c => (c[0] as { data?: { status?: string } }).data?.status)
+    ).toBe(false);
   });
 
   it('refund branch: a failed applyRefundEffects leaves the idempotency metadata UNWRITTEN (retryable, not silently lost)', async () => {
