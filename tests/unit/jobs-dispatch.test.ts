@@ -114,6 +114,12 @@ describe('dispatchEvents', () => {
     expect(inngest).not.toHaveBeenCalled();
   });
 
+  it('a reserved inngest/* event is never sent to Inngest (its API answers 400)', async () => {
+    const inngest = vi.fn(async () => ({ ids: [] }));
+    await dispatchEvents({ name: 'inngest/function.failed', data: {} }, inngest);
+    expect(inngest).not.toHaveBeenCalled();
+  });
+
   it('an event nobody subscribes to still goes to Inngest', async () => {
     process.env.JOBS_CF_GROUPS = 'all';
     const inngest = vi.fn(async () => ({ ids: [] }));

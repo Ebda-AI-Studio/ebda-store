@@ -212,7 +212,7 @@ describe('runJobWorkflow', () => {
     expect(failure.event.name).toBe('inngest/function.failed');
     expect(failure.event.data.event.name).toBe('x/y');
     expect(failure.error.message).toBe('boom');
-    expect(raw).toHaveBeenCalledTimes(1); // the failed event, routed (no subscriber here -> Inngest)
+    expect(raw).not.toHaveBeenCalled(); // the failed event has no Cloudflare subscriber here and `inngest/*` is never sent to Inngest
     expect(calls).toContain('do:on-failure');
     expect(calls[calls.length - 1]).toBe('do:gate-release-0');
   });
@@ -300,7 +300,7 @@ describe('handleJobsBatch', () => {
     expect(last.ack).toHaveBeenCalled();
     expect(last.retry).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(raw).toHaveBeenCalledTimes(1);
+    expect(raw).not.toHaveBeenCalled(); // reserved failure event, no Cloudflare subscriber
   });
 
   it('NonRetriableError fails at once', async () => {
