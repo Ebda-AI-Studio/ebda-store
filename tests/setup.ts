@@ -134,3 +134,6 @@ export function createMockResponse() {
 export function createMockNext() {
   return vi.fn();
 }
+
+// Ruling ID-20: suites that mint HS256 admin tokens keep working; legacy-admin-hs256.test.ts turns this off to prove the refusal.
+process.env.EBDA_TEST_ALLOW_LEGACY_ADMIN_HS256 ??= '1';

@@ -8,6 +8,7 @@ import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { isIdentityManagedUser } from '../lib/identity-client';
+import { isLegacyAdminToken } from '../lib/legacy-admin-token';
 import {
   isAccountsToken,
   sessionRevoked,
@@ -229,6 +230,16 @@ export async function authenticate(
       audience: JWT_AUDIENCES_ACCEPTED,
     }) as AuthPayload & { type?: string };
 
+    if (isLegacyAdminToken(payload)) {
+      return next(
+        new AppError(
+          401,
+          'USE_IDENTITY_SERVICE',
+          'Sign in through the Ebda AI Studio account service'
+        )
+      );
+    }
+
     // Reject refresh tokens used as access tokens
     if (payload.type === 'refresh') {
       return next(
@@ -359,6 +370,7 @@ export async function optionalAuthenticate(
   // purpose claim must never establish an identity.
   if (payload.type === 'refresh') return next();
   if (payload.purpose && payload.purpose !== 'access') return next();
+  if (isLegacyAdminToken(payload)) return next();
 
   try {
     const decoded = jwt.decode(token) as { jti?: string } | null;

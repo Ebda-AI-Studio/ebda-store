@@ -30,6 +30,8 @@ export interface UiRefreshEvent {
   data?: Record<string, unknown>;
 }
 
+import { isLegacyAdminToken } from '../lib/legacy-admin-token';
+
 interface AuthPayload {
   userId: string;
   email: string;
@@ -183,6 +185,14 @@ class SocketService {
         if (payload.purpose && payload.purpose !== 'access') {
           return next(new Error('Invalid token purpose'));
         }
+        // Identity stage 5: the admin namespace authenticates with identity-service tokens only.
+        if (
+          isLegacyAdminToken({
+            role: payload.role,
+            impersonatedBy: (payload as { impersonatedBy?: string }).impersonatedBy,
+          })
+        )
+          return next(new Error('Use the account service'));
 
         // M1 fix: apply the same revocation checks as the HTTP authenticate
         // middleware. Fail-open on Redis unavailability (same as authenticate).

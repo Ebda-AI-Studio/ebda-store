@@ -158,10 +158,10 @@ describe('authenticate: customer token ↔ request store', () => {
   });
 
   it.each(['store_admin', 'staff', 'super_admin'])(
-    'a %s token is unaffected (any Origin, any X-Store-ID, with or without storeId)',
+    'a %s impersonation token is unaffected (any Origin, any X-Store-ID, with or without storeId)',
     async role => {
       for (const storeId of [undefined, 'store-a', null]) {
-        const req = makeReq(sign({ userId: 'u-9', role, storeId }), {
+        const req = makeReq(sign({ userId: 'u-9', role, storeId, impersonatedBy: 'sa-1' }), {
           origin: 'https://shop-b.ebda.app',
           'x-store-id': 'store-b',
         });
@@ -187,8 +187,8 @@ describe('optionalAuthenticate: a mismatched customer token is a guest', () => {
     expect(req.user).toBeUndefined();
   });
 
-  it('an admin token keeps its identity regardless of store headers', async () => {
-    const req = makeReq(sign({ userId: 'a-1', role: 'store_admin' }), {
+  it('an admin impersonation token keeps its identity regardless of store headers', async () => {
+    const req = makeReq(sign({ userId: 'a-1', role: 'store_admin', impersonatedBy: 'sa-1' }), {
       origin: 'https://shop-b.ebda.app',
       'x-store-id': 'store-b',
     });
