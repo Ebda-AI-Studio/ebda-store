@@ -2,6 +2,8 @@
 
 Moved verbatim from `CLAUDE.md` (2026-07-11) so the instruction file stays rules-only. This is the canonical env catalog; update it in the SAME session as any env change (documentation-parity rule).
 
+> **Retired stack notice (Cloudflare cutover).** The Railway API service, Inngest (cron + event functions), Redis and Neon-as-primary-over-pooler paths described in the sections marked **RETIRED** below were retired at the Cloudflare cutover. They are kept here, not deleted, until the cutover completes so a rollback can still be stood up. The live path is Workers + Hyperdrive + Durable Objects + Workflows/Queues. Names only are listed in this file; never put values here. `scripts/ci/env-docs-check.mjs` + `tests/unit/env-docs-parity.test.ts` fail when code reads a name this file does not mention (intentional omissions: `scripts/ci/env-docs-allowlist.json`).
+
 ## Deploy (GitHub Actions → Cloudflare Workers)
 
 The API is the Cloudflare Worker `ebda-api` (`api.ebda.app`), deployed only by `.github/workflows/cf-api-deploy.yml` (`workflow_dispatch`); admin/web/orders/marketing deploy from their own `cf-*-deploy.yml` on push to `main`. There is no Railway deploy for this repo (the Railway section that used to sit here was inherited from Ebda Store).
@@ -24,8 +26,8 @@ Required in production (app crashes without these):
 - `REVIEW_TOKEN_SECRET` (optional; unset → a key derived from `ENCRYPTION_KEY`, issue 2424 — it used to fall back to `JWT_SECRET`) — HMAC key for the review-request link (`/review/<order>/<product>?token=`, 90-day expiry). With it unset, links signed before issue 2424 still verify against `JWT_SECRET`.
 - `CF_WORKERS_DEV_SUBDOMAIN` (optional) — our Cloudflare workers.dev account subdomain; CORS then trusts `ebda-{web,admin,orders}.<subdomain>.workers.dev` preview origins (`apps/api/src/lib/cors-cache.ts`). Unset = no preview origin is trusted.
 - `BUILD_COMMIT_SHA` (optional, build-time) — the commit the image was built from, baked by `Dockerfile.api` from the `GIT_COMMIT_SHA` build arg. Surfaced on `/health` as `commit` so a deploy can be verified as **live** rather than merely green: a 200 is returned identically by the container still serving the previous release. Unset → `/health` reports `commit: null`, which means _unknown_, not _not deployed_. To populate it under Railway (which builds the image itself), set `GIT_COMMIT_SHA` as a service variable so it reaches the Docker build.
-- `RAILWAY_GIT_COMMIT_SHA` (read-only, platform) — **injected at runtime; verified 2026-09-03.** The first deploy carrying `/health`'s build identity reported the correct commit with no build arg and no service variable set, so this is what populates `commit` today. It appears in NEITHER listing — not the 85 the CLI reports, nor the 8 the dashboard shows as "added by Railway" — because both describe what is _configured_ on the service, which is not the container's environment. Do not conclude a platform variable is absent from either list alone.
-- `RAILWAY_DEPLOYMENT_ID` (read-only, platform) — surfaced on `/health` as `deploymentId`. **Injected at runtime; verified 2026-09-03**, which also clears the Inngest deploy sync (`lib/inngest/client.ts`) that reads it through a fallback chain — a chain falling through would have looked identical from outside. Also absent from both listings, for the same reason as above.
+- **RETIRED (Railway, kept until the Cloudflare cutover completes)** `RAILWAY_GIT_COMMIT_SHA` (read-only, platform) — **injected at runtime; verified 2026-09-03.** The first deploy carrying `/health`'s build identity reported the correct commit with no build arg and no service variable set, so this is what populates `commit` today. It appears in NEITHER listing — not the 85 the CLI reports, nor the 8 the dashboard shows as "added by Railway" — because both describe what is _configured_ on the service, which is not the container's environment. Do not conclude a platform variable is absent from either list alone.
+- **RETIRED (Railway, kept until the Cloudflare cutover completes)** `RAILWAY_DEPLOYMENT_ID` (read-only, platform) — surfaced on `/health` as `deploymentId`. **Injected at runtime; verified 2026-09-03**, which also clears the Inngest deploy sync (`lib/inngest/client.ts`) that reads it through a fallback chain — a chain falling through would have looked identical from outside. Also absent from both listings, for the same reason as above.
 - `NODE_ENV=production`
 - `ALLOW_BYPASSRLS_ROLE` — **Node shell only; an explicit escape hatch inherited from Ebda Store (whose prod runs as `neondb_owner`).** Ebda's runtime role is `ebda_app` (NOBYPASSRLS, Ruling R-EBDA-002), so this should stay UNSET. The Node boot guard (`apps/api/src/lib/database-role-guard.ts`, awaited in `apps/api/src/index.ts` BEFORE `listen()` since FIX-003, 2026-10-07) queries `pg_roles.rolbypassrls` and `rolsuper` on every boot and, in production, `process.exit(1)`s on a bypassing role unless this is the literal string `"true"`; with it set, every boot logs an `error`-level `[SECURITY] ALLOW_BYPASSRLS_ROLE=true — serving as <role> …` line. The hatch never excuses an UNVERIFIABLE role: in production a failed role query or a missing `pg_roles` row exits non-zero (it used to log and keep serving — fail open). The Workers shell ignores this variable: `cf/database-role-guard.ts` refuses any bypassing or unverifiable role per isolate. Every Node boot logs `[SECURITY] DB role check: current_user=<role> rolbypassrls=<bool> rolsuper=<bool>` (info level, all environments) — the line CI's integration job greps to fail unless it reads `current_user=ebda_app rolbypassrls=false rolsuper=false` (#1940).
 
@@ -240,7 +242,9 @@ Wired into `cf-deploy.yml` 2026-09-25: the "Build for Cloudflare (OpenNext)" ste
 - `LAMMA_DEMO_ASSET_BASE` (default `https://media.ebda.app/demo/lamma`) — the Lamma twin, read by `seed.mjs --template lamma` and `scenario-stores.mjs --template lamma` (Phase B4, Ruling B4-10): with `--yes-production` any other value is refused. Locally `/__lamma-demo` (an untracked copy of `scripts/lamma-demo/assets/` under `apps/web/public/__lamma-demo/`, deleted afterwards). `LAMMA_PORT`, `LAMMA_HOST_BASE`, `LAMMA_BASE_URL`, `LAMMA_WORKERS`, `LAMMA_STORES`, `LAMMA_PAGES`, `LAMMA_CHANNEL` — test-only knobs of the Lamma browser suite (`playwright.lamma.config.ts`, `tests/lamma/`): the local stack port, the store host base (`localhost-b4.test` for a production build, see `scripts/lamma-demo/seed-local-hosts.sh`), worker count and comma lists narrowing a run; never read by the apps.
 - `QAMAR_PORT`, `QAMAR_BASE_URL`, `QAMAR_WORKERS`, `QAMAR_STORES`, `QAMAR_PAGES`, `QAMAR_NO_MIDDLEWARE`, `QAMAR_API_URL` — test-only knobs of the Qamar browser suite (`playwright.qamar.config.ts`, `tests/qamar/`): the host-proxy port (store hosts are `<slug>.localhost:<port>`), worker count, comma lists narrowing the stores/pages of a run, `1` to skip the `private, no-store` assertion on a stack whose dev server does not run `middleware.ts`, and the API root. Never read by the apps. Docs: `docs/ebda/templates/demo-store.md`.
 
-## Inngest execution budget (Ruling INNGEST-BUDGET-1)
+## Inngest execution budget (Ruling INNGEST-BUDGET-1) — RETIRED at the Cloudflare cutover, kept until it completes
+
+> Retired: Inngest is replaced by Workflows/Queues (`JOBS_WORKFLOW`, `JOBS_QUEUE`, `EMAIL_QUEUE`, `SMS_QUEUE`). Kept for rollback only.
 
 Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch the usage is almost all cron ticks, so every cron-triggered function is priced and capped; the full design, per-function table and the launch re-check are in `docs/architecture/inngest-execution-budget.md`. Binding points for configuration:
 
@@ -255,3 +259,56 @@ Ebda runs on the Inngest Hobby plan: **50,000 executions a month**. Pre-launch t
 | ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `STORE_DO_ENABLED_IDS` | `apps/api/wrangler.jsonc` `vars` | Comma list of store ids the SQLite Durable Object may serve. Default empty = nobody. A listed store is served from the DO only for requests that also send `x-ebda-backend: do`. Never list `qa-walk-store-1010`. |
 | `STORE_DO_SEED_TOKEN`  | `wrangler secret put`            | Authorises `/api/v1/internal/store-do/:storeId/{seed,counts}`. Unset = those routes 404.                                                                                                                          |
+
+## Env parity additions (M-053 / OPS-14 / DOC-13) — names read by the code
+
+Names only. "Set" says where it lives: wrangler var (committed in the Worker's `wrangler.jsonc`), Worker secret (`wrangler secret put`), GitHub variable, or Cloudflare binding (declared in `wrangler.jsonc`, not an env string).
+
+### API Worker `ebda-api` (`apps/api`, `packages/*`)
+
+- `WEB_URL`, `ADMIN_URL` — required; public storefront / admin origins (`config/index.ts`, `provisioning.service.ts`). Set: wrangler var.
+- `AI_FEATURES_ENABLED` — optional gate for AI features (`config/index.ts`). Set: Worker secret/var.
+- `AI_DAILY_TOKEN_BUDGET_PER_STORE`, `AI_DAILY_INTERACTIVE_RESERVE`, `AI_STORE_DAILY_REQUEST_CAP` — optional AI spend caps (`config/index.ts`, `lib/ai-quota.ts`). Set: Worker var.
+- `APP_VERSION` — optional; version string surfaced in tracing/health. Set: wrangler var.
+- `CF_DEPLOYMENT_ID`, `CF_VERSION_METADATA` — read-only, platform; deployment identity / version-metadata binding surfaced on `/health` (`lib/build-identity.ts`, `worker.ts`).
+- `HYPERDRIVE`, `STORE_DO`, `STORE_REALTIME`, `STORE_BACKUPS`, `RATE_LIMITER` — Cloudflare bindings (Hyperdrive, Durable Objects, R2 bucket, rate-limit binding) declared in `apps/api/wrangler.jsonc`.
+- `DB_CLIENT_CONCURRENCY`, `DB_CLIENT_QUEUE`, `DB_CLIENT_WAIT_MS`, `DB_REQUEST_CONNECTIONS` — optional DB client tuning for the Worker (`worker.ts`). Set: wrangler var.
+- `CACHEGEN_DO_NAME`, `CACHEGEN_LOCATION_HINT` — optional; AuthState Durable Object name / location hint (`cf/auth-state-client.ts`). Set: wrangler var.
+- `DEV_STATS` — optional, local/test only (`.dev.vars` or workerd test config, never `wrangler.jsonc`); enables dev stats (`cf/dev-stats.ts`).
+- `HOP_TIMING_TOKEN` — optional; authorises hop-timing diagnostics (`lib/hop-timing.ts`). Set: Worker secret.
+- `LOAD_TEST_BYPASS_TOKEN` — optional; lets the k6 load test skip the global rate limit (`middleware/global-rate-limit-skip.ts`). Set: Worker secret, only while load testing.
+- `PUBLIC_TENANT_RATE_LIMIT_PER_MIN` — optional per-tenant public limiter (`middleware/security.ts`). Set: wrangler var.
+- `LOG_LEVEL`, `SENTRY_DEBUG` — optional logging / Sentry debug switches (`config/index.ts`). Set: wrangler var.
+- `AXIOM_TOKEN`, `AXIOM_DATASET` — optional log drain (`lib/logger.ts`). Set: Worker secret (token) / var (dataset).
+- `GMAIL_IMAP_USER`, `GMAIL_IMAP_APP_PASSWORD` — optional alert-mail poller (`services/gmail-alert-poller.service.ts`). Set: Worker secret.
+- `META_GRAPH_API_VERSION` — optional Meta Graph API version pin (`ebda-ads.service.ts`, `pixels-capi.service.ts`). Set: wrangler var.
+- `CARRIER_CALL_TIMEOUT_MS` — optional carrier HTTP timeout (`lib/carrier-http.ts`). Set: wrangler var.
+- `PAYMENT_RECONCILE_RECENCY_HOURS` — optional payment reconcile window (`payment-reconcile-sweep.ts`). Set: wrangler var.
+- `PDPL_CF_ERASURE_ENABLED` — optional gate for the Cloudflare-side erasure job (`cf/erasure/job.ts`). Set: wrangler var.
+
+### API Worker: RETIRED names (Railway / Inngest / Redis), kept until the Cloudflare cutover completes
+
+- `API_PORT` — RETIRED (Node/Railway listen port; `PORT` is ignored on Workers). Read in `config/index.ts`.
+- `REDIS_KEY_PREFIX` — RETIRED (Redis key namespace for staging). Read in `config/index.ts`.
+- `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` — RETIRED (Inngest auth); `INNGEST_DEPLOY_ID`, `INNGEST_DRY_RUN` — RETIRED (`lib/inngest/client.ts`).
+- `GIT_COMMIT`, `SOURCE_VERSION`, `VERCEL_GIT_COMMIT_SHA` — RETIRED build-identity fallbacks read by `lib/inngest/client.ts`; the live identity is `CF_DEPLOYMENT_ID` / `BUILD_COMMIT_SHA`.
+
+### Accounts Worker `ebda-accounts` (`apps/accounts`)
+
+- `ISSUER` — required; JWT issuer origin. Set: wrangler var.
+- `ALLOWED_ORIGINS`, `PASSKEY_ORIGINS` — required; CORS / WebAuthn origins. Set: wrangler var.
+- `PRODUCTS` — required; enabled product list. Set: wrangler var.
+- `JWT_PRIVATE_JWK` — required; signing key (JWK). Set: Worker secret.
+- `JWT_PREVIOUS_PUBLIC_JWKS` — optional; previous public keys kept during rotation. Set: Worker secret/var.
+- `MFA_KEY` — required for MFA; encrypts MFA secrets. Set: Worker secret.
+- `STORE_DIRECTORY`, `MAILER` — service bindings to `ebda-api` entrypoints (`StoreDirectory`, `IdentityMailer`), declared in `apps/accounts/wrangler.jsonc`.
+
+### Status Worker `ebda-status` (`apps/status`)
+
+- `STATUS_SECRET` — required; authorises status writes. Set: Worker secret.
+- `FAIL_THRESHOLD`, `RECOVER_THRESHOLD` — optional probe thresholds (defaults in `wrangler.jsonc`). Set: wrangler var.
+- `STATUS_STORE` — Durable Object binding (`StatusStore`) declared in `apps/status/wrangler.jsonc`.
+
+### Web Worker `ebda-web` (`apps/web`)
+
+- `STOREFRONT_FRAME_ANCESTORS` — optional; extra builder-preview parent origins (`builder/preview/allowed-parent-origins.ts`). Set: wrangler var.
