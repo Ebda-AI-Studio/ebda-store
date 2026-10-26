@@ -24,6 +24,7 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 import express from 'express';
 import { prisma, withRlsBypass } from '@ebda/database';
+import { exhaustFoundingSlots } from '../helpers/exhaust-founding-slots';
 import { planLimitsSchema } from '@ebda/shared';
 import {
   StubBillingProvider,
@@ -160,6 +161,7 @@ let bellSpy: ReturnType<typeof vi.spyOn>;
 beforeAll(async () => {
   if (!hasDb) return;
   setBillingProviderForTests(stub);
+  await exhaustFoundingSlots(sql => prisma.$executeRawUnsafe(sql));
   await prisma.plan.createMany({
     data: [
       {

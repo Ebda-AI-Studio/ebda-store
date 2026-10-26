@@ -84,6 +84,8 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
   _prisma_migrations: 'migration bookkeeping; not granted to ebda_app',
   plans: 'platform-global plan catalog (config; no tenant data, no store_id)',
   billing_webhook_events: 'provider-event dedupe ledger (no store_id, no tenant data)',
+  billing_referrals: 'referral link between two stores (no store_id column; platform billing data)',
+  billing_grants: 'append-only free-month grant ledger (no store_id column; platform billing data)',
 };
 
 let owner: AppPrismaClient;

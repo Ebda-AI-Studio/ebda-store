@@ -13,6 +13,7 @@
  *    and activates the period in ONE transaction, idempotent on the payer's
  *    reference. A merchant's "I paid" claim never activates anything by itself.
  */
+import { restoreRevokedGrants, revokeGrantsForEvent } from './grants.service';
 import crypto from 'crypto';
 import { prisma, withStore, withUser, acrossStores, type Prisma } from '@ebda/database';
 import { AppError } from '../../middleware/error-handler';
@@ -905,6 +906,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       where: { idempotencyKey: key, storeId: input.storeId },
     });
     if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
+    // period computed below is never from a read a grant is about to change.
+    await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${input.storeId} FOR UPDATE`;
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
@@ -1153,6 +1157,9 @@ export async function recordManualRefund(input: ManualRefundInput) {
     const fullReversal =
       amount === remaining && (prior._sum.amountMinor ?? 0) + amount >= charge.amountMinor;
 
+    // FOUNDING-3: a full reversal also takes back the free months this payment earned, BEFORE the period is read
+    // below, so `ownsCurrentPeriod` sees the end the payment itself set (a granted month would hide it).
+    if (fullReversal) await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
     // Period: a full reversal gives back exactly the time it bought; a partial
     // refund changes the period only when the operator says so.
     const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
@@ -1253,6 +1260,7 @@ export async function recordManualRefund(input: ManualRefundInput) {
   });
   if (!out.duplicate) {
     await featureService.invalidateCache(storeId).catch(() => undefined);
+    await restoreRevokedGrants().catch(() => undefined); // a referrer's side lives in another tenant
   }
   return { ...out, storeId };
 }

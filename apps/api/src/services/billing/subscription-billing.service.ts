@@ -64,6 +64,13 @@ import {
   addIntervalAnchored,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
+import {
+  grantedCarryMs,
+  restoreRevokedGrants,
+  revokeGrantsForEvent,
+  shiftedByGrants,
+  sweepFreeMonthGrants,
+} from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
@@ -270,7 +277,10 @@ async function applySuccess(
       status: 'active' as const,
       billingInterval: interval,
       currentPeriodStart: now,
-      currentPeriodEnd: addInterval(now, interval),
+      // a fresh paid period PLUS the free months still unconsumed (additive: a max() would swallow the free month)
+      currentPeriodEnd: new Date(
+        addInterval(now, interval).getTime() + (await grantedCarryMs(tx, row.storeId, now))
+      ),
       billingAnchorDay: now.getUTCDate(), // the cycle restarts today (M-125)
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,
@@ -298,7 +308,9 @@ async function applySuccess(
       sub &&
       row.forPeriodEnd &&
       periodEndOf(sub) &&
-      periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() &&
+      (periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() ||
+        // a free-month grant moved the end after this charge was claimed: same period, shifted (FOUNDING-1)
+        (await shiftedByGrants(tx, row.storeId, row.forPeriodEnd, periodEndOf(sub)!))) &&
       ['active', 'trialing', 'past_due'].includes(sub.status);
     if (!sub || !renewable) {
       // Money was taken but the subscription is not in a renewable state for
@@ -316,7 +328,7 @@ async function applySuccess(
     }
     const interval = isInterval(row.billingInterval) ? row.billingInterval : 'monthly';
     const planCode = row.planCode ?? sub.planCode;
-    let start = row.forPeriodEnd!;
+    let start = periodEndOf(sub)!; // = forPeriodEnd, or that end shifted by free-month grants
     // The day the cycle started on (M-125): clamped from the ANCHOR each cycle, so a short month never moves it.
     // (a trialing subscription's first paid period anchors on its own start: an old anchor from an earlier life of
     // this row must not be inherited)
@@ -1203,6 +1215,11 @@ export async function runBillingCycle(
     }
   }
   if (!only) {
+    // FOUNDING-1: apply pending free months / re-create lost ones before the due list is read (a granted month
+    // moves a store's due date). Never blocks the renewals below.
+    await sweepFreeMonthGrants(now).catch(err =>
+      logger.error({ err }, '[billing] free-month grant sweep failed')
+    );
     // M-023: settle / hand on charges whose outcome never arrived, BEFORE the due list is read (a given-up
     // renewal enters dunning and may be due again today).
     await sweepStuckCharges(now, provider).catch(err =>
@@ -1620,10 +1637,15 @@ async function settleRefundInTx(
     _sum: { amountMinor: true },
   });
   if ((agg._sum.amountMinor ?? 0) >= charge.amountMinor) {
-    await tx.billingEvent.updateMany({
+    const flipped = await tx.billingEvent.updateMany({
       where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
+    // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
+    // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
+    if (flipped.count === 1) {
+      await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
+    }
   }
 }
 
@@ -1708,6 +1730,8 @@ export async function refundCharge(args: {
         );
       }
     });
+    // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
+    await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };
   } catch (err) {
     if (err instanceof BillingProviderError && err.notCharged) {

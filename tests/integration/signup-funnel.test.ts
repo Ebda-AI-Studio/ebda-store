@@ -31,6 +31,7 @@ import {
   runWithRequestDb,
   runInStoreScope,
 } from '@ebda/database';
+import { exhaustFoundingSlots } from '../helpers/exhaust-founding-slots';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import {
   StubBillingProvider,
@@ -155,8 +156,9 @@ async function saveCard(storeId: string, token = `tok_ok_${crypto.randomUUID().s
   return { billingEventId, res };
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   if (!hasDb) return;
+  await withRlsBypass(tx => exhaustFoundingSlots(sql => tx.$executeRawUnsafe(sql)));
   setBillingProviderForTests(stub);
   process.env.EBDA_INSTAPAY_HANDLE = 'ebda@instapay';
 });

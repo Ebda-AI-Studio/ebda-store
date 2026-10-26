@@ -3,6 +3,7 @@
  * (socket notification) plus a durable email. Always called AFTER the DB
  * transaction committed; a notification failure never fails billing.
  */
+import { awardGrantsAfterPayment } from './grants.service';
 import { withStore } from '@ebda/database';
 import { config } from '../../config';
 import logger from '../../lib/logger';
@@ -95,6 +96,8 @@ async function runOne(effect: BillingEffect): Promise<void> {
   if (!ctx) return;
   const { store } = ctx;
   if (effect.kind === 'subscription_paid') {
+    // FOUNDING-1: founding-20 + referral free months (idempotent, never throws)
+    await awardGrantsAfterPayment(effect.storeId);
     await emitEbdaConversion({
       name: 'Purchase',
       eventId: purchaseEventId(effect.billingEventId),
