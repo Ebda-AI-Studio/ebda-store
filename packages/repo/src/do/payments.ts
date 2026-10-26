@@ -448,6 +448,18 @@ export function completeRefund(
       "SELECT json_extract(details, '$.refundId') AS rid FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.claimId') = ?",
       [p.id, REFUND_ABSORBED_EVENT, a.claimId]
     )[0]?.rid as string | undefined;
+    // the answered id was already FILED under another claim (a webhook with this id was absorbed by a same-amount sibling):
+    // close this claim on that evidence so it cannot hold later Kashier refunds forever
+    if (!absorbedAs && readAccountedRefundEventIds(parse(p.metadata)).includes(a.refundId))
+      addPaymentEvent(db, {
+        storeId: a.storeId,
+        paymentId: p.id,
+        orderId: p.order_id,
+        eventType: REFUND_ABSORBED_EVENT,
+        provider: p.provider,
+        details: { claimId: a.claimId, refundId: a.refundId, via: 'id_match_reassigned' },
+        now,
+      });
     const review = !!absorbedAs && absorbedAs !== a.refundId;
     if (review)
       addPaymentEvent(db, {
@@ -1020,6 +1032,9 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       createdAt: e.created_at as number,
       details: parse(e.details),
     }));
+  // Fawry's amount-less notice ref is not proven unique per refund: a repeat is never silently 'seen' and its id is never filed
+  const fawryAmountless =
+    input.provider === 'fawry' && !(typeof r.amount === 'number' && r.amount > 0);
   const consumeByOwnId = () => {
     const cid = executedClaimForRefundId({
       events,
@@ -1046,6 +1061,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   const meta = parse(p.metadata);
   const prevStatus = (meta.refundStatus as string | undefined) ?? 'pending';
   if (
+    !fawryAmountless &&
     isRefundEventAlreadySeen({
       metadata: meta,
       refundId: r.refundId,
@@ -1160,7 +1176,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   const next = {
     ...meta,
     refundId: r.refundId,
-    ...(s.accountedThisEvent || (completed && s.absorbedClaimId)
+    ...(s.accountedThisEvent || (completed && s.absorbedClaimId && !fawryAmountless)
       ? { [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, r.refundId) }
       : {}),
     refundStatus: r.status,
@@ -1187,6 +1203,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       flavour: 'refund',
       refundId: r.refundId,
       refundStatus: r.status,
+      reportedAmount: r.amount ?? null,
       absorbedClaimId: s.absorbedClaimId,
       ...(completed && s.heldOpenClaimIdUnverified
         ? { heldUnaccountedRefund: true, reason: 'open_claim_id_unverified' }
@@ -1401,6 +1418,14 @@ export function matchRefundToClaim(
     );
     if (held.length === 0)
       throw err('NO_HELD_WEBHOOK', 'no held webhook for that refund id on this payment', 409);
+    // the held webhook's amount, when it reported one, must equal the claim's (a 500 matched to a 2000 claim would mark the
+    // 500 accounted without ever adding it)
+    const reported = db.all(
+      "SELECT json_extract(details, '$.reportedAmount') AS a FROM payment_events WHERE payment_id = ? AND event_type = 'webhook' AND json_extract(details, '$.refundId') = ? AND json_extract(details, '$.heldUnaccountedRefund') = 1 ORDER BY created_at DESC LIMIT 1",
+      [p.id, a.providerRefundId]
+    )[0]?.a;
+    if (typeof reported === 'number' && reported !== claim.amount)
+      throw err('AMOUNT_MISMATCH', 'the held webhook amount does not equal the claim amount', 409);
     addPaymentEvent(db, {
       storeId: a.storeId,
       paymentId: p.id,

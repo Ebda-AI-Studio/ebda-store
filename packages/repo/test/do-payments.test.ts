@@ -1000,6 +1000,133 @@ describe('opus review fixes (DO)', () => {
   });
 });
 
+describe('final review fixes (DO)', () => {
+  const refundEv = (
+    ref: string,
+    id: string,
+    amount: number | null,
+    over: Partial<PaymentWebhookInput> = {}
+  ) =>
+    wh({
+      providerRef: ref,
+      eventId: `rw-${id}-${over.now ?? 0}`,
+      kind: 'refund',
+      refund: { refundId: id, status: 'completed', amount },
+      ...over,
+    });
+
+  it('operator match refuses a held webhook whose amount differs from the claim', async () => {
+    const f = fx();
+    const p = await f.paid(6, 'kashier');
+    const c = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 2000, now: NOW });
+    completeRefund(f.db, { storeId: 's1', claimId: c.claimId, refundId: 'API-ID', now: NOW });
+    await applyPaymentEvent(
+      f.db,
+      refundEv(p.ref, 'WH-500', 500, { provider: 'kashier', now: NOW + 5000 }),
+      { confirm: async () => ({ kind: 'refund', status: 'SUCCESS' }) }
+    );
+    expect(
+      await code(() =>
+        matchRefundToClaim(f.db, {
+          storeId: 's1',
+          claimId: c.claimId,
+          providerRefundId: 'WH-500',
+          actorUserId: 'op',
+        })
+      )
+    ).toBe('AMOUNT_MISMATCH');
+  });
+
+  it('a claim whose answered id was ALREADY filed under another claim is closed (id_match_reassigned), not left open forever', async () => {
+    const f = fx();
+    const p = await f.paid(8, 'kashier');
+    const seed = beginRefund(f.db, {
+      storeId: 's1',
+      paymentId: p.paymentId,
+      amount: 500,
+      now: NOW,
+    });
+    completeRefund(f.db, { storeId: 's1', claimId: seed.claimId, refundId: 'SEED', now: NOW });
+    const a = beginRefund(f.db, {
+      storeId: 's1',
+      paymentId: p.paymentId,
+      amount: 1000,
+      now: NOW + 1,
+    });
+    const b = beginRefund(f.db, {
+      storeId: 's1',
+      paymentId: p.paymentId,
+      amount: 1000,
+      now: NOW + 2,
+    });
+    // the seed refund's own webhook (same id as its API answer) closes the seed claim
+    await applyPaymentEvent(
+      f.db,
+      {
+        ...refundEv(p.ref, 'SEED', 500, { provider: 'kashier', now: NOW + 50 }),
+        eventId: 'rw-seed',
+      },
+      { confirm: async () => ({ kind: 'refund', status: 'SUCCESS' }) }
+    );
+    // B's webhook arrives first (id YB) and absorbs the OLDER claim A
+    await applyPaymentEvent(
+      f.db,
+      refundEv(p.ref, 'YB', 1000, { provider: 'kashier', now: NOW + 100 }),
+      { confirm: async () => ({ kind: 'refund', status: 'SUCCESS' }) }
+    );
+    completeRefund(f.db, { storeId: 's1', claimId: a.claimId, refundId: 'YA', now: NOW + 200 }); // A's answer: review (absorbed as YB)
+    const doneB = completeRefund(f.db, {
+      storeId: 's1',
+      claimId: b.claimId,
+      refundId: 'YB',
+      now: NOW + 300,
+    }); // B answers with the id already filed
+    expect(doneB.review).toBe(false);
+    expect(
+      f.one(
+        `SELECT count(*) n FROM payment_events WHERE event_type = 'refund_webhook_absorbed' AND json_extract(details, '$.via') = 'id_match_reassigned'`
+      ).n
+    ).toBe(1);
+    // no claim is left open: a later genuine dashboard refund with an unknown id is booked, not held
+    const later = await applyPaymentEvent(
+      f.db,
+      refundEv(p.ref, 'DASH', 700, { provider: 'kashier', now: NOW + 5 * 86_400_000 }),
+      { confirm: async () => ({ kind: 'refund', status: 'SUCCESS' }) }
+    );
+    expect(later.alerts).toEqual([]);
+  });
+
+  it('Fawry: a repeated amount-less partial notice is never silently seen: the 2nd is held + alerted', async () => {
+    const f = fx();
+    const p = await f.paid(6, 'fawry');
+    const seed = beginRefund(f.db, {
+      storeId: 's1',
+      paymentId: p.paymentId,
+      amount: 500,
+      now: NOW,
+    });
+    completeRefund(f.db, {
+      storeId: 's1',
+      claimId: seed.claimId,
+      refundId: 'fawry-refund-F9-1500',
+      now: NOW,
+    });
+    const n = (eventId: string) =>
+      wh({
+        provider: 'fawry',
+        providerRef: p.ref,
+        eventId,
+        kind: 'refund',
+        refund: { refundId: 'fawry-refund-F9-PARTIAL_REFUNDED', status: 'completed', amount: 0 },
+        now: NOW + 60_000,
+      });
+    expect((await applyPaymentEvent(f.db, n('f1'))).alerts).toEqual([]);
+    expect((await applyPaymentEvent(f.db, n('f2'))).alerts.map(a => a.kind)).toContain(
+      'held_unaccounted'
+    );
+  });
+});
+
 describe('InstaPay', () => {
   const awaiting = (f: ReturnType<typeof fx>, expiresAt: number) => {
     const o = f.order();
