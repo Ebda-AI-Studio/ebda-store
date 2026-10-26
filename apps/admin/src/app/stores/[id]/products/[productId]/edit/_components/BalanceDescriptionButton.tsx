@@ -81,7 +81,7 @@ export function BalanceDescriptionButton({
           setBalanced(true);
           onBalanced?.(data.name, data.nameAr, data.description, data.descriptionAr);
         }}
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-colors ${
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 transition-colors ${
           failedBalance
             ? 'bg-destructive/10 text-destructive-ink'
             : balanced
@@ -129,7 +129,7 @@ export function BalanceDescriptionButton({
             setBalanced(false);
             onBalanced?.(data.name, data.nameAr, data.description, data.descriptionAr);
           }}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 transition-colors ${
             failedRevert
               ? 'bg-destructive/10 text-destructive-ink'
               : 'bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive-ink'

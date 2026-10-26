@@ -403,10 +403,10 @@ export default function NewProductPage() {
                     </p>
                     <p className="text-base font-semibold text-foreground">
                       {formatPrice(discountedFils)}{' '}
-                      <span className="ml-2 text-sm font-normal line-through text-muted-foreground">
+                      <span className="ms-2 text-sm font-normal line-through text-muted-foreground">
                         {formatPrice(regularFils)}
                       </span>{' '}
-                      <span className="ml-1 text-sm font-medium text-success-ink">
+                      <span className="ms-1 text-sm font-medium text-success-ink">
                         {t('fields.discountOff', { pct: pctOff.toFixed(1).replace(/\.0$/, '') })}
                       </span>
                     </p>

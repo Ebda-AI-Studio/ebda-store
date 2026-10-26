@@ -121,6 +121,7 @@ ol {
 
 /* header */
 .site-header {
+  overflow-x: clip; /* the closed mobile menu must not widen the page (audit UI-1: 379px on a 360px phone) */
   position: sticky;
   top: 0;
   z-index: 50;

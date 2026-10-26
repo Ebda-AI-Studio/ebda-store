@@ -250,7 +250,7 @@ export function OrderSummary({
             >
               <div>
                 <span className="text-sm font-medium text-success-ink">{appliedCoupon.code}</span>
-                <span className="text-sm text-success-ink ml-2">
+                <span className="text-sm text-success-ink ms-2">
                   {appliedCoupon.type === 'percentage'
                     ? `${localize(appliedCoupon.value)}% ${t('off', 'خصم')}`
                     : appliedCoupon.type === 'free_shipping'

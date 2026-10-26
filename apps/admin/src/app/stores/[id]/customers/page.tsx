@@ -301,14 +301,14 @@ export default function StoreCustomersPage() {
                   {name || customer.email || customer.phone}
                 </Link>
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SEGMENT_BADGE_CLASSES[badgeKey]}`}
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${SEGMENT_BADGE_CLASSES[badgeKey]}`}
                 >
                   {t(`badges.${badgeKey}`)}
                 </span>
                 {customer.smsMarketingConsent === 'granted' && (
                   <span
                     data-sms-consent-badge
-                    className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success-ink"
+                    className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success-ink"
                     title={t('smsConsentBadgeTitle')}
                   >
                     {t('smsConsentBadge')}

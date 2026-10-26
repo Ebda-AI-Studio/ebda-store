@@ -7,3 +7,13 @@
 /compare/salla/ /features/ 301
 /en/compare/salla /en/features/ 301
 /en/compare/salla/ /en/features/ 301
+
+# Audit UI-12: pricing and the plan comparison live on the home page, so a link to /pricing (or /compare) lands there.
+/pricing /#pricing 301
+/pricing/ /#pricing 301
+/en/pricing /en/#pricing 301
+/en/pricing/ /en/#pricing 301
+/compare /features/ 301
+/compare/ /features/ 301
+/en/compare /en/features/ 301
+/en/compare/ /en/features/ 301
