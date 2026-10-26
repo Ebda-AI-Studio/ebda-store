@@ -52,7 +52,7 @@ export const BRAND = {
     /**
      * The Ebda Store merchant app (sign-up, plan, payment, onboarding, dashboard).
      * `admin.ebda.app` is RETIRED (Ruling HOST-STORE-1): no surface, reserved slug, 404.
-     * Future products follow the same pattern (`whatsapp.`, `crm.`, one login at `accounts.`).
+     * Future products follow the same pattern (`wa.`, `crm.`, one login at `accounts.`).
      */
     storeApp: 'store.ebda.app',
     api: 'api.ebda.app',
@@ -61,8 +61,10 @@ export const BRAND = {
     docs: 'docs.ebda.app',
     help: 'help.ebda.app',
     status: 'status.ebda.app',
-    /** Reserved for the post-launch automated WhatsApp tier. */
-    whatsapp: 'whatsapp.ebda.app',
+    /** Ebda WhatsApp (the live Worker; its API base is https://wa.ebda.app/api/v1). One host, matched by README and the WhatsApp docs (DOC-14). */
+    whatsapp: 'wa.ebda.app',
+    /** The shared identity service (one login for every Ebda product). */
+    accounts: 'accounts.ebda.app',
   },
   /**
    * The ONE public contact address. Only hello@ and security@ receive mail
