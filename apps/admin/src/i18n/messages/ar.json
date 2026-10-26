@@ -10309,8 +10309,8 @@
     },
     "download": {
       "title": "تحميل",
-      "png": "PNG",
-      "svg": "SVG",
+      "png": "ملف PNG",
+      "svg": "ملف SVG",
       "pdf": "PDF للطباعة",
       "pngSize": "حجم الـ PNG",
       "printSize": "حجم الطباعة",

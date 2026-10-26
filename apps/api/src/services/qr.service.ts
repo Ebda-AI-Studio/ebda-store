@@ -41,10 +41,9 @@ export async function resolveQrScan(
   if (kind === 'store') return { kind, ref: '', target: '/' };
 
   if (kind === 'whatsapp') {
-    const store = await prisma.store.findFirst({
-      where: { id: storeId },
-      select: { whatsapp: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findFirst({ where: { id: storeId }, select: { whatsapp: true, settings: true } })
+    );
     if (!store) throw notFound();
     const text = readQrSettings(store.settings).whatsappText;
     const link = waMeLink(store.whatsapp, text || undefined);

@@ -323,7 +323,7 @@ export default function StoreSettingsPage() {
     {
       key: 'qrCodes',
       href: `/stores/${storeId}/qr`,
-      color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+      color: 'bg-muted text-foreground',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path

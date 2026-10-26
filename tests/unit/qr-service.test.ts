@@ -10,7 +10,8 @@ const db = vi.hoisted(() => ({
 
 vi.mock('@ebda/database', () => ({
   prisma: { product: db.product, category: db.category, store: db.store },
-  withStore: async (_id: string, fn: (tx: unknown) => unknown) => fn({ $executeRaw: db.exec }),
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({ $executeRaw: db.exec, store: db.store }),
   SlugEntityType: { PRODUCT: 'PRODUCT', CATEGORY: 'CATEGORY' },
 }));
 vi.mock('../../apps/api/src/services/slug-redirect.service', () => ({

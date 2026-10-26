@@ -181,7 +181,7 @@ export function DesignControls({
         <label className="flex items-center gap-2 text-sm text-foreground">
           <input
             type="checkbox"
-            className="h-4 w-4 accent-[hsl(var(--primary))]"
+            className="h-4 w-4 accent-primary"
             checked={design.logo}
             disabled={!hasLogo}
             onChange={e => set({ logo: e.target.checked })}
