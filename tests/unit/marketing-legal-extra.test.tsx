@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
 import { COPY } from '../../apps/marketing/src/lib/content';
@@ -79,8 +79,8 @@ describe('LEGAL-1 extra legal pages', () => {
       expect(allText('en', [k])).not.toContain('14%');
       expect(allText('ar', [k])).not.toContain('14%');
     }
-    expect(allText('en', ['terms'])).toContain('not registered for VAT');
-    expect(allText('en', ['terms'])).toContain('at least 30 days of notice'); // VAT would arrive as a fee change
+    expect(allText('en', ['terms'])).toContain('not registered for value-added tax (VAT)');
+    expect(allText('en', ['terms'])).toContain('at least 30 days of written notice'); // VAT would arrive as a fee change
     expect(allText('en', ['terms'])).toContain('/legal/whatsapp-terms/');
     expect(allText('en', ['merchant'])).toContain('72 hours');
     expect(allText('ar', ['merchant'])).toContain('72 ساعة');
@@ -93,6 +93,16 @@ describe('LEGAL-1 extra legal pages', () => {
       expect(t).not.toMatch(/close (your|the) account[^.]*from the dashboard/i);
       expect(t).not.toMatch(/إغلاق حسابك[^.]*من لوحة التحكم|أغلق الحساب من لوحة التحكم/);
       expect(t).toContain('privacy@ebda.app');
+    }
+  });
+
+  it('Ruling VAT-0: the Terms and the Merchant Agreement carry docs/legal/VAT-0-clause.md word for word, in both languages', () => {
+    const md = readFileSync(path.resolve(__dirname, '../../docs/legal/VAT-0-clause.md'), 'utf8');
+    const en = /## English\n\n(.+)\n/.exec(md)![1];
+    const ar = /## العربية\n\n(.+)\n/.exec(md)![1];
+    for (const k of ['terms', 'merchant'] as const) {
+      expect(COPY.en.legalPages[k].sections.flatMap(s => s.p).join('\n'), `en ${k}`).toContain(en);
+      expect(COPY.ar.legalPages[k].sections.flatMap(s => s.p).join('\n'), `ar ${k}`).toContain(ar);
     }
   });
 });

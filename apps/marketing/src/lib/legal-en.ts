@@ -89,7 +89,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '4. Plans, fees and payment',
         p: [
-          'Paid plans, prices and billing rules are in the Merchant Agreement and the Pricing section of the website. Fees are charged in advance, in Egyptian pounds, and are non-refundable except where mandatory law says otherwise. Prices are final amounts in Egyptian pounds: we are not registered for VAT and charge none. If that changes, we will introduce VAT only with at least 30 days of notice, as a fee change under section 15, and show it as a separate line.',
+          'Paid plans, prices and billing rules are in the Merchant Agreement and the Pricing section of the website. Fees are charged in advance, in Egyptian pounds, and are non-refundable except where mandatory law says otherwise. Prices and VAT. All prices are final amounts in Egyptian pounds. We are not registered for value-added tax (VAT) and therefore charge none. If we become registered, VAT will be introduced only after at least 30 days of written notice, as a change to fees, will be shown as a separate line, and will never apply retroactively to any amount already paid or invoiced.',
           'Ebda WhatsApp is a separate service with its own terms (https://ebda.app/legal/whatsapp-terms/). If you use it, those terms apply to it in addition to these.',
         ],
       },
@@ -205,7 +205,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '4. Taxes and VAT',
         p: [
-          "The Merchant alone is responsible for all taxes, duties and filing obligations on its sales and income, including VAT, income tax, e-invoicing and customs. Ebda Store does not give tax advice, does not act as a tax agent and does not collect or remit tax for the Merchant. The VAT feature is available only to Merchants whose VAT registration has been verified by us; it is a tool, and the Merchant remains responsible for the accuracy of the rates, registration details, invoices and returns. Ebda Store's fees are final amounts: it is not registered for VAT and charges none. If that changes, VAT is introduced only with at least 30 days' notice, as a fee change under the Terms of Service, and shown as a separate line.",
+          'The Merchant alone is responsible for all taxes, duties and filing obligations on its sales and income, including VAT, income tax, e-invoicing and customs. Ebda Store does not give tax advice, does not act as a tax agent and does not collect or remit tax for the Merchant. The VAT feature is available only to Merchants whose VAT registration has been verified by us; it is a tool, and the Merchant remains responsible for the accuracy of the rates, registration details, invoices and returns. Prices and VAT. All prices are final amounts in Egyptian pounds. We are not registered for value-added tax (VAT) and therefore charge none. If we become registered, VAT will be introduced only after at least 30 days of written notice, as a change to fees, will be shown as a separate line, and will never apply retroactively to any amount already paid or invoiced.',
         ],
       },
       {
