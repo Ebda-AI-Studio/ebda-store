@@ -1,37 +1,99 @@
 import type { Metadata, Viewport } from 'next';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { Phone } from '@/components/Devices';
 import { RootShell } from '@/components/RootShell';
-import { HOME } from '@/lib/site';
+import { BRAND } from '@ebda/shared/brand';
+import { NOT_FOUND, SEARCH_SOURCES } from '@/lib/not-found-copy';
+import { LOCALES, demoLookUrl, type Locale } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'الصفحة مش موجودة | ابدأ استوديو للذكاء الاصطناعي',
   robots: { index: false, follow: true },
   icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
 };
-export const viewport: Viewport = { themeColor: '#FAFAFA', colorScheme: 'light' };
+export const viewport: Viewport = { themeColor: '#FAFAFA', colorScheme: 'light dark' };
 
-/** 404 for every path (static export writes it to out/404.html), Arabic first with English. */
+/** One static 404.html serves every path: show the language of the URL (/en/...), Arabic otherwise. */
+const PICK_LANG = `(function(){var en=/^\\/en(\\/|$)/.test(location.pathname);var d=document.documentElement;
+if(en){d.lang='en';d.dir='ltr';document.title="Page not found | Ebda AI Studio";}
+document.querySelectorAll('[data-l]').forEach(function(n){n.hidden=n.getAttribute('data-l')!==(en?'en':'ar');});})();`;
+
+function Body({ locale }: { locale: Locale }) {
+  const c = NOT_FOUND[locale];
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+  const id = `q-${locale}`;
+  return (
+    <div data-l={locale} hidden={locale !== 'ar'} lang={locale} dir={dir} className="nf-body">
+      <div className="nf-main">
+        <h1>{c.line}</h1>
+        <p className="lead">{c.hint}</p>
+        <form
+          className="search nf-search"
+          role="search"
+          action={`https://${BRAND.domains.help}${locale === 'ar' ? '' : '/en'}/search/`}
+          method="get"
+          data-sources={JSON.stringify(SEARCH_SOURCES[locale])}
+        >
+          <label className="sr-only" htmlFor={id}>
+            {c.searchLabel}
+          </label>
+          <input
+            id={id}
+            name="q"
+            type="search"
+            placeholder={c.searchPlaceholder}
+            autoComplete="off"
+            enterKeyHint="search"
+          />
+          <button type="submit">{c.searchButton}</button>
+        </form>
+      </div>
+      <nav className="nf-map" aria-label={c.mapLabel}>
+        {c.groups.map(g => (
+          <div key={g.title}>
+            <h2>{g.title}</h2>
+            <ul>
+              {g.links.map(l => (
+                <li key={l.label}>
+                  {l.soon ? (
+                    <span className="nf-soon">
+                      {l.label} <b>{c.soon}</b>
+                    </span>
+                  ) : (
+                    <a href={l.href}>{l.label}</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+      <a className="nf-phone" href={demoLookUrl('souq', 'catalogue')} aria-label={c.phoneCaption}>
+        <Phone className="nf-phone-frame">
+          <picture>
+            <source srcSet="/devices/phone-600.avif" type="image/avif" />
+            <source srcSet="/devices/phone-600.webp" type="image/webp" />
+            <img src="/devices/phone-600.webp" alt="" width={600} height={1290} loading="lazy" />
+          </picture>
+        </Phone>
+        <span>{c.phoneCaption}</span>
+      </a>
+    </div>
+  );
+}
+
+/** 404 for every path (static export writes it to out/404.html): the Apple-style page, Arabic or English by URL. */
 export default function NotFound() {
   return (
     <RootShell locale="ar">
       <Header locale="ar" offHome />
       <main id="main" className="wrap not-found">
-        <p className="nf-code" aria-hidden="true">
-          404
-        </p>
-        <h1>الصفحة دي مش موجودة.</h1>
-        <p className="lead" lang="en" dir="ltr">
-          This page doesn’t exist.
-        </p>
-        <p className="actions">
-          <a href={HOME.ar} className="btn btn-primary btn-lg">
-            الرئيسية
-          </a>
-          <a href={HOME.en} className="btn btn-ghost btn-lg" lang="en">
-            English home
-          </a>
-        </p>
+        {LOCALES.map(l => (
+          <Body key={l} locale={l} />
+        ))}
+        <script dangerouslySetInnerHTML={{ __html: PICK_LANG }} />
+        <script src="/assets/typeahead.js" defer />
       </main>
       <Footer locale="ar" />
     </RootShell>
