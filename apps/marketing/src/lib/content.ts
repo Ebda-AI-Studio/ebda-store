@@ -8,6 +8,7 @@ import {
 import { LEGAL_AR } from './legal-ar';
 import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
+import { heroSavingAr, heroSavingEn } from './positioning';
 import type { Locale } from './site';
 
 const CO = BRAND.company;
@@ -146,6 +147,8 @@ export interface Copy {
     h1: string;
     /** Names the product (BRAND.product), then what it gives you. */
     sub: string;
+    /** Ruling POSITION-1: the eliminated monthly cost, from lib/positioning.ts. */
+    saving: string;
     cta: string;
   };
   /** The /credits page (Ruling MKT-12): attribution for the third-party 3D models and the illustrative photos. */
@@ -306,6 +309,7 @@ export const COPY: Record<Locale, Copy> = {
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
       sub: `${PN.nameAr} بيديك لينك باسمك، ومنتجاتك، وطلباتك. كله من موبايلك.`,
+      saving: heroSavingAr(PN.nameAr),
       cta: 'ابدأ دلوقتي',
     },
     model3d: {
@@ -699,6 +703,7 @@ export const COPY: Record<Locale, Copy> = {
     hero: {
       h1: 'Open your online store in minutes.',
       sub: `${PN.nameEn} gives you your own link, products and orders. All from your phone.`,
+      saving: heroSavingEn(),
       cta: 'Start now',
     },
     model3d: {

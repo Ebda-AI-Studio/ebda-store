@@ -445,6 +445,13 @@ html[lang='ar'] .hero h1 {
   letter-spacing: 0;
   line-height: 1.4;
 }
+.hero-saving {
+  margin: -14px 0 28px;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
 .hero-sub {
   font-size: clamp(1.1rem, 2.4vw, 1.35rem);
   color: var(--muted);
@@ -455,10 +462,12 @@ html[lang='ar'] .hero h1 {
 @media (prefers-reduced-motion: no-preference) {
   .hero h1,
   .hero-sub,
+  .hero-saving,
   .hero .actions {
     animation: rise 0.9s var(--ease) both;
   }
-  .hero-sub {
+  .hero-sub,
+  .hero-saving {
     animation-delay: 0.08s;
   }
   .hero .actions {
