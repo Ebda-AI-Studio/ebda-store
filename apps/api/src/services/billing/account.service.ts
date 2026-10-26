@@ -28,6 +28,7 @@ import {
   isGrantedPlan,
   isInterval,
   type BillingInterval,
+  addIntervalAnchored,
 } from './period';
 import { normalizeInstapayReference, type InstapayReceiptFields } from '@ebda/shared';
 import {
@@ -528,7 +529,12 @@ export async function chooseInstapayPlan(args: {
  * starts now. Pure: unit-tested and mutation-checked.
  */
 export function manualPeriodFor(
-  sub: { status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null } | null,
+  sub: {
+    status: string;
+    trialEndsAt: Date | null;
+    currentPeriodEnd: Date | null;
+    billingAnchorDay?: number | null;
+  } | null,
   interval: BillingInterval,
   now: Date
 ): { periodStart: Date; periodEnd: Date } {
@@ -542,7 +548,21 @@ export function manualPeriodFor(
   ) {
     start = sub.currentPeriodEnd;
   }
-  return { periodStart: start, periodEnd: addInterval(start, interval) };
+  // clamp from the cycle's anchor day (M-125); a store with none yet anchors on this period's start
+  // The anchor only continues a LIVE cycle (the period starts where the previous one ended). A period that starts
+  // now (lapsed / canceled / first payment) begins a new cycle on its own day, whatever an old anchor says.
+  const continuesCycle =
+    !!sub?.currentPeriodEnd &&
+    start.getTime() === sub.currentPeriodEnd.getTime() &&
+    sub.status !== 'trialing';
+  return {
+    periodStart: start,
+    periodEnd: addIntervalAnchored(
+      start,
+      interval,
+      continuesCycle ? (sub?.billingAnchorDay ?? start.getUTCDate()) : start.getUTCDate()
+    ),
+  };
 }
 
 export async function suggestManualPeriod(
@@ -945,6 +965,13 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       billingInterval: input.interval,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
+      // keep the cycle's anchor day; the first paid period anchors on its own start (M-125)
+      billingAnchorDay:
+        !explicit &&
+        sub?.billingAnchorDay &&
+        sub.currentPeriodEnd?.getTime() === periodStart.getTime()
+          ? sub.billingAnchorDay
+          : periodStart.getUTCDate(),
       trialEndsAt: null,
       pendingPlanCode: null,
       cancelAtPeriodEnd: false,

@@ -292,6 +292,27 @@ describe('period rule: a manual payment never burns paid days (audit M2)', () =>
     expect(p.periodStart).toEqual(end);
     expect(p.periodEnd.toISOString()).toBe('2026-11-15T10:00:00.000Z');
   });
+  it('M-125: an early payer keeps the cycle anchor; a late / lapsed payer starts a NEW cycle on its own day', () => {
+    const end = new Date('2026-10-28T10:00:00Z'); // a cycle clamped to the 28th, anchor 31
+    const early = manualPeriodFor(
+      { status: 'active', trialEndsAt: null, currentPeriodEnd: end, billingAnchorDay: 31 },
+      'monthly',
+      new Date('2026-10-20T10:00:00Z')
+    );
+    expect(early.periodEnd.toISOString()).toBe('2026-11-30T10:00:00.000Z'); // clamped from the 31st, not Nov 28
+    const lapsed = manualPeriodFor(
+      {
+        status: 'past_due',
+        trialEndsAt: null,
+        currentPeriodEnd: new Date('2026-09-01T10:00:00Z'),
+        billingAnchorDay: 1,
+      },
+      'monthly',
+      new Date('2026-10-28T10:00:00Z')
+    );
+    // a stale anchor (1) must not give a 4-day month: the new cycle runs from today's date
+    expect(lapsed.periodEnd.toISOString()).toBe('2026-11-28T10:00:00.000Z');
+  });
   it('trial payer: starts at the trial end', () => {
     const trialEnd = new Date('2026-10-19T10:00:00Z');
     const p = manualPeriodFor(

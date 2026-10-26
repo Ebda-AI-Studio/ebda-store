@@ -30,16 +30,35 @@ export function isInterval(v: unknown): v is BillingInterval {
   return v === 'monthly' || v === 'yearly';
 }
 
-/** Add one billing interval in UTC, clamping the day (Jan 31 + 1 month = Feb 28/29). */
-export function addInterval(from: Date, interval: BillingInterval): Date {
+/**
+ * Add one billing interval in UTC, clamping the day to the target month. `anchorDay` (1-31) is the day of month the
+ * subscription was STARTED on: the clamp is applied from it every cycle, so Jan 31 -> Feb 28 -> Mar 31 (not Mar 28 for
+ * ever, M-125). Without an anchor the day of `from` is used (Jan 31 + 1 month = Feb 28/29).
+ */
+export function addIntervalAnchored(
+  from: Date,
+  interval: BillingInterval,
+  anchorDay?: number | null
+): Date {
   const months = interval === 'yearly' ? 12 : 1;
   const y = from.getUTCFullYear();
   const m = from.getUTCMonth() + months;
   const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const wanted =
+    typeof anchorDay === 'number' &&
+    Number.isInteger(anchorDay) &&
+    anchorDay >= 1 &&
+    anchorDay <= 31
+      ? anchorDay
+      : from.getUTCDate();
   const d = new Date(from.getTime());
   d.setUTCDate(1);
-  d.setUTCFullYear(y, m, Math.min(from.getUTCDate(), lastDay));
+  d.setUTCFullYear(y, m, Math.min(wanted, lastDay));
   return d;
+}
+
+export function addInterval(from: Date, interval: BillingInterval): Date {
+  return addIntervalAnchored(from, interval, undefined);
 }
 
 export function addDays(from: Date, days: number): Date {
