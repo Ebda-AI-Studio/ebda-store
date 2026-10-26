@@ -11,7 +11,7 @@
  * owner of an existing address gets a "you already have an account" mail.
  */
 import bcrypt from 'bcryptjs';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { withUser, type Prisma } from '@ebda/database';
 import { normalizeEgyptianMobile } from '@ebda/shared';
 import logger from '../lib/logger';

@@ -4,7 +4,7 @@
  * groups these promotions can target).
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';

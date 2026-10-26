@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma, Prisma, runInTenantContext } from '@ebda/database';
 import {
   CAMPAIGN_MAX_SCHEDULE_DAYS,

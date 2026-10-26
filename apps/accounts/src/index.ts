@@ -1,7 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { createApp, registerPending } from './app';
 import { isSessionRevoked, revokeAllForUser, revokeSession } from './data';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { hashPassword, passwordPolicy } from './password';
 
 const app = createApp();

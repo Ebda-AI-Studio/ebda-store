@@ -3,7 +3,7 @@
  * terms in business/ebda/gold-rate-free-sources.md). This is the ONLY file (with the other adapters
  * in feed/) that may name the provider: the provider-name gate fails anywhere else.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const GOLD_SPOT_URL = 'https://api.gold-api.com/price/XAU';
 

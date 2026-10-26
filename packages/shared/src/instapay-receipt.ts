@@ -6,7 +6,7 @@
  * payer corrects them and submits, a human approves. Shared by the API (validation),
  * the admin (approver view) and the storefront (payer form).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /** Largest screenshot accepted (a phone screenshot is 0.2-3 MB). */
 export const INSTAPAY_RECEIPT_MAX_BYTES = 8 * 1024 * 1024;

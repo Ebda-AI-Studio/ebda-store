@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /** Same policy as the Store register schema (auth.routes.ts registerSchema). */
 export const passwordPolicy = z

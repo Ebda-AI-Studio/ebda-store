@@ -11,7 +11,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { STUB_WEBHOOK_SECRET, StubBillingProvider, getBillingProvider } from '../services/billing';
 import {
   cancelSubscription,

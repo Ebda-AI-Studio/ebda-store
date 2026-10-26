@@ -6,6 +6,7 @@ import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '../mcp/merchant-auth';
 import { AppError } from '../middleware/error-handler';
 import { rejectBatches } from '../mcp/reject-batches';
+import { mcpRequestGuard } from '../mcp/request-guard';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import { ADMIN_WRITE_TOOL_NAMES } from '../mcp/tools/admin-write.tools';
 import logger from '../lib/logger';
@@ -91,6 +92,7 @@ export const merchantMcpIpLimiter = rateLimit({
 });
 // Batches are refused before any limiter (mcp/reject-batches.ts): one POST = one message.
 router.use(rejectBatches);
+router.use(mcpRequestGuard);
 router.use(merchantMcpIpLimiter);
 
 /**

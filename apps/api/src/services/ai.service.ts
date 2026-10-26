@@ -17,7 +17,7 @@
  * usage can be aggregated for billing/audit later.
  */
 import { GeminiFailoverClient } from '../lib/ai/gemini-keys';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { createHash } from 'crypto';
 import { prisma } from '@ebda/database';
 import { config } from '../config';

@@ -3,7 +3,7 @@
  * `?a[b]=c` into an object (a Prisma operator once cast) and `?a=1&a=2` into an array (a 500).
  */
 import { describe, it, expect } from 'vitest';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v3';
 import { assertScalarQuery } from '../../apps/api/src/lib/query-params';
 
 describe('assertScalarQuery', () => {

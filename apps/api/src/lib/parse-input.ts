@@ -1,4 +1,4 @@
-import type { ZodTypeAny, z } from 'zod';
+import type { ZodTypeAny, z } from 'zod/v3';
 import { AppError } from '../middleware/error-handler';
 
 /**

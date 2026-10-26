@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate } from '../middleware/auth';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';

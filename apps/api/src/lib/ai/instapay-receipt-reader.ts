@@ -13,7 +13,7 @@
  * receipt (amount, reference, date/time, the receiver's name + IPA/mobile) and the
  * receiver's "received" notification (the payer's masked name + IPA/mobile).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   INSTAPAY_RECEIPT_REFERENCE_MAX,
   normalizeInstapayReference,

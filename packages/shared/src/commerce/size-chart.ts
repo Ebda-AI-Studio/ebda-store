@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Size charts (B0 Task 9): one store-owned table (columns × rows of short text cells), linked to a

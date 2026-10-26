@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import jwt from 'jsonwebtoken';
 import { withUser } from '@ebda/database';
 import { config } from '../config';

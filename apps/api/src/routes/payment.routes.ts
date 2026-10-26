@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@ebda/shared';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';

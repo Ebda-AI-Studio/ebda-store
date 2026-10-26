@@ -5,7 +5,7 @@
  * storefront component, whose options live in the page settings, Task 8e), and are rendered by the
  * page's own client, not by `PageRenderer`.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import type { SectionDefInput, SectionDefinition } from './registry';
 
 // `enabled` is the legacy spelling of `hidden`, added when a node is projected for validation

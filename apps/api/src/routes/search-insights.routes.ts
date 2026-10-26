@@ -14,7 +14,7 @@
  * find is a core search tool, not a paid report (Ruling SEARCH-5).
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import type { SearchInsightsResponse } from '@ebda/shared';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';

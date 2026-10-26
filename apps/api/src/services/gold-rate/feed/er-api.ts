@@ -4,7 +4,7 @@
  * until its own `time_next_update_unix`, so a 6-hourly cron makes about one real call a day; a 429 is
  * never retried inside the run (Ruling B5-15).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { isFreshQuoteTime, type FetchLike } from './gold-api';
 
 /** This source publishes once a day, so its own tolerance is wider than a spot quote's (Ruling B5-36). */

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Plan limits — the shape of `plans.limits` (JSON) and the single list of keys
