@@ -111,7 +111,7 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
         (anchorRef.current?.closest('form')?.querySelector('input') as HTMLInputElement | null) ??
         null
     );
-  }, []);
+  }, [editedNow]);
   useEffect(() => {
     if (!input) return;
     const onKey = (ev: globalThis.KeyboardEvent) =>
@@ -156,6 +156,9 @@ export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAu
         : status === 'error'
           ? t('Search is unavailable right now', 'البحث مش شغال دلوقتي')
           : '';
+
+  // Nothing is rendered until the visitor edits the field: the header markup stays byte-identical.
+  if (!editedNow) return null;
 
   return (
     <>
