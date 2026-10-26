@@ -5,8 +5,7 @@
  *   tests/vectors/ebda-wa/phone.json      [{ in, e164 | null }]
  *   tests/vectors/ebda-wa/buyer-key.json  { secret, cases: [{ e164, hex }] } (8 numbers)
  * Vendored byte for byte; the sha256 of each is pinned in tests/vectors/ebda-wa/SHA256SUMS so a one-sided
- * edit fails here. UNTIL the WhatsApp session delivers the files this test reports them missing and
- * skips (the only skip in this file); once they are vendored it must never skip, and it asserts all 8.
+ * edit fails here. Vendored from ebda-whatsapp PR #23 at commit 3f7878d; asserts all 36 phone cases and all 8 keys.
  */
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -33,7 +32,11 @@ function phoneCases(raw: unknown): Array<[string, string | null]> {
   });
 }
 
-describe.skipIf(!present)('shared vectors with Ebda WhatsApp', () => {
+describe('shared vectors with Ebda WhatsApp', () => {
+  it('the vendored vector files exist (never skipped: they are committed)', () => {
+    expect(present).toBe(true);
+  });
+
   it('both files are the ones the WhatsApp repo pins (sha256)', () => {
     const lines = readFileSync(SUMS, 'utf8')
       .split('\n')
@@ -46,7 +49,7 @@ describe.skipIf(!present)('shared vectors with Ebda WhatsApp', () => {
 
   it('phone.json: toE164 gives the same E.164 (or null) for every input', () => {
     const cases = phoneCases(JSON.parse(readFileSync(PHONE, 'utf8')));
-    expect(cases.length).toBeGreaterThan(0);
+    expect(cases).toHaveLength(36);
     for (const [input, expected] of cases) {
       expect(toE164(input), `toE164(${JSON.stringify(input)})`).toBe(expected);
     }
@@ -62,14 +65,5 @@ describe.skipIf(!present)('shared vectors with Ebda WhatsApp', () => {
       expect(c.hex).toMatch(/^[0-9a-f]{64}$/);
       expect(await buyerKeyFor(f.secret, c.e164), `buyerKeyFor(${c.e164})`).toBe(c.hex);
     }
-  });
-});
-
-describe('vector files', () => {
-  it('are vendored (fails the day the files are expected but absent: remove skipIf above with them)', () => {
-    if (!present) {
-      console.warn('[buyer-key-vectors] vectors/ebda-wa/*.json not delivered yet - skipping');
-    }
-    expect(true).toBe(true);
   });
 });

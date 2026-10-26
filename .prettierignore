@@ -44,3 +44,6 @@ apps/api/src/contracts/wa-v1.ts
 # Byte-for-byte goldens: tests compare the API serializer output (JSON.stringify, 2 spaces) to these files, so
 # prettier collapsing short arrays onto one line fails them.
 tests/integration/__golden__/
+
+# Vendored byte-for-byte from Ebda WhatsApp (vectors/*.json at 3f7878d; sha256 in SHA256SUMS)
+tests/vectors/ebda-wa/
