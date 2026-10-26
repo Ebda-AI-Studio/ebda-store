@@ -25,6 +25,7 @@
  */
 
 import { ImageResponse } from 'next/og';
+import { isAllowedAssetUrl } from '../../lib/og-asset-url';
 import {
   getStore,
   resolveStoreBySlug,
@@ -73,21 +74,6 @@ async function rasterizeSvgToPng(svgBuf: Buffer): Promise<string | null> {
   }
 }
 
-/**
- * SSRF guard for the on-the-fly SVG rasterizer. Store logo/ogImage URLs are
- * tenant-controlled and this route runs server-side, so we must NEVER fetch an
- * arbitrary URL (could hit internal/metadata endpoints). Only allow https URLs
- * on the known public asset CDN (Cloudflare R2 `*.r2.dev`).
- */
-function isAllowedAssetUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    return u.protocol === 'https:' && /(^|\.)r2\.dev$/i.test(u.hostname);
-  } catch {
-    return false;
-  }
-}
-
 /** "H S% L%" → "hsl(H, S%, L%)"; pass-through for "#hex"; Ebda night fallback (D1016-ORANGE-1). */
 function hslComponentsToCss(hslComponents: string | undefined): string {
   if (!hslComponents) return 'hsl(210, 9%, 4%)';
@@ -114,7 +100,11 @@ function lightenHsl(hslComponents: string | undefined, lightenBy = 15): string {
 async function resolveLogoUrl(store: ResolvedStore): Promise<string | null> {
   const candidate = store.ogImage || store.logo || null;
   if (!candidate) return null;
-  if (/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(candidate)) return candidate;
+  // SEC-6: the renderer fetches this server-side, so the raster branch gets the same host
+  // allow-list as the SVG branch (a merchant-chosen URL must never be fetched blindly).
+  if (/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(candidate)) {
+    return isAllowedAssetUrl(candidate) ? candidate : null;
+  }
   if (/\.svg(\?|#|$)/i.test(candidate) && isAllowedAssetUrl(candidate)) {
     try {
       const res = await fetch(candidate, { next: { revalidate: 3600 }, redirect: 'error' });

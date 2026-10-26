@@ -7,6 +7,7 @@ import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete, unwrapList, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { ImageUpload } from '../../../../components/ImageUpload';
 
 interface SeoSettings {
   metaTitle: string;
@@ -741,13 +742,14 @@ export default function StoreSeoPage() {
           <h2 className="font-semibold text-foreground">{t('advanced')}</h2>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">{t('ogImage')}</label>
-            <input
-              type="url"
+            {/* SEC-6: the API only accepts an image from our media library, so upload it here. */}
+            <ImageUpload
               value={settings.ogImage}
-              onChange={e => setSettings(prev => ({ ...prev, ogImage: e.target.value }))}
-              placeholder={t('ogImagePlaceholder')}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onUpload={url => setSettings(prev => ({ ...prev, ogImage: url }))}
+              onRemove={() => setSettings(prev => ({ ...prev, ogImage: '' }))}
+              folder="branding"
+              storeId={storeId}
+              label={t('ogImage')}
             />
             <p className="mt-1 text-xs text-muted-foreground">{t('ogImageHint')}</p>
           </div>

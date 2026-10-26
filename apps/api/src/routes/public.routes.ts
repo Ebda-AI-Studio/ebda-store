@@ -5,7 +5,8 @@ import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
-import { redactOrderForCustomer } from '../services/gold-rate/public';
+import { redactOrderForCustomer, maskGuestOrderView } from '../services/gold-rate/public';
+import { signOrderViewToken, requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
@@ -95,6 +96,20 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 import { inParallel } from '../lib/run-in-parallel';
 import { publicReadLimit } from '../middleware/public-read-limit';
+/**
+ * The guest view token for a just-created order, or undefined when it cannot be signed. The order
+ * is already committed at this point: a missing signing key must degrade to the masked order view,
+ * never turn a placed order into a 500 (SEC-15).
+ */
+function guestViewTokenFor(orderId: string): string | undefined {
+  try {
+    return signOrderViewToken(orderId);
+  } catch (err) {
+    logger.error({ err, orderId }, '[public.orders] could not sign the guest order view token');
+    return undefined;
+  }
+}
+
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
@@ -1274,7 +1289,12 @@ router.post(
       res.status(201).json({
         success: true,
         // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-36).
-        data: { order: redactOrderForCustomer(order) },
+        // A guest also gets the signed view token for it (SEC-15): the only credential, beside the
+        // order id, that `GET /orders/:id` accepts for the unmasked address and phone.
+        data: {
+          order: redactOrderForCustomer(order),
+          ...(order.customerId ? {} : { viewToken: guestViewTokenFor(order.id) }),
+        },
       });
     } catch (error) {
       next(error);
@@ -1450,10 +1470,30 @@ router.get(
         return;
       }
 
+      // A guest (customerId null) sees the unmasked address and phone only with the signed view
+      // token issued when the order was created (SEC-15 / M-137). The order UUID alone is not
+      // enough: it leaks through history, screenshots and shared links.
+      const guestMayViewPii = isCustomer || requestHoldsOrderViewToken(req, order.id);
+      // Never shown to a shopper, token or not: the checkout IP, the merchant's internal note and the
+      // idempotency key (the schema marks checkoutIp as shown to no one).
+      const {
+        checkoutIp: _ip,
+        notes: _notes,
+        idempotencyKey: _idem,
+        ...shopperOrder
+      } = redactOrderForCustomer(order) as Record<string, unknown>;
+      void _ip;
+      void _notes;
+      void _idem;
+      const visible = shopperOrder;
+      // The answer differs by token: never cache it shared.
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.vary('X-Order-View-Token');
+
       res.json({
         success: true,
         // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-23).
-        data: { order: redactOrderForCustomer(order) },
+        data: { order: guestMayViewPii ? visible : maskGuestOrderView(visible) },
       });
     } catch (error) {
       next(error);

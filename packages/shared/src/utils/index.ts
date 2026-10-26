@@ -277,3 +277,5 @@ export {
   REDACTED_QUERY_VALUE,
 } from './sentry-url-scrub';
 export { newCspNonce, isValidCspNonce, nonceScriptSrc } from './csp-nonce';
+
+export { isEbdaMediaUrl, EBDA_MEDIA_HOSTS } from './media-url';
