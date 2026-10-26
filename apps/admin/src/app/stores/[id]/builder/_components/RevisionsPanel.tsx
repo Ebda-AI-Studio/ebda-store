@@ -105,7 +105,7 @@ export function RevisionsPanel({
               {r.publishedBy && (
                 <>
                   {' · '}
-                  {r.publishedByName ? t('by.named', { name: r.publishedByName }) : t('by.unknown')}
+                  {r.publishedByName ? t('by.named', { name: r.publishedByName }) : t('by.removed')}
                 </>
               )}
             </p>

@@ -9401,7 +9401,7 @@
       "restoreConfirmButton": "Restore",
       "by": {
         "named": "by {name}",
-        "unknown": "by a team member"
+        "removed": "Removed user"
       },
       "restoredFrom": "Restored from version {rev}"
     },

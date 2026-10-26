@@ -15,7 +15,7 @@ const LIVE_THEME = { primaryColor: '1 1% 1%', fontFamily: 'serif', showBranchesI
 const m = vi.hoisted(() => ({
   bustStoreCaches: vi.fn(),
   store: { findUnique: vi.fn(), update: vi.fn() },
-  user: { findFirst: vi.fn() },
+  staff: { findMany: vi.fn() },
   rev: {
     findFirst: vi.fn(),
     aggregate: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   const prisma = {
     store: m.store,
-    user: m.user,
+    storeStaff: m.staff,
     storePageRevision: m.rev,
     category: { findMany: vi.fn().mockResolvedValue([]) },
     product: { findMany: vi.fn().mockResolvedValue([]) },
@@ -107,11 +107,11 @@ describe('versioned publish records who and when', () => {
     m.rev.aggregate.mockResolvedValue({ _max: { rev: 3 } });
     m.rev.updateMany.mockResolvedValue({ count: 1 });
     m.rev.create.mockResolvedValue({});
-    m.user.findFirst.mockResolvedValue({ firstName: 'Mona', lastName: 'Adel' });
+    m.staff.findMany.mockResolvedValue([]);
     rows({ draft: { id: 'd1', rev: 3, status: 'draft', document: BASE } });
   });
 
-  it('publish stamps publishedBy, publishedByName and publishedAt on the promoted row', async () => {
+  it('publish stamps publishedBy and publishedAt on the promoted row', async () => {
     const res = await request(app())
       .post('/admin/stores/store-1/builder/pages/home/publish')
       .send({ baseRev: 3 });
@@ -120,7 +120,7 @@ describe('versioned publish records who and when', () => {
       .map(c => c[0])
       .find((c: any) => c.data?.status === 'published');
     expect(upd.data.publishedBy).toBe('user-1');
-    expect(upd.data.publishedByName).toBe('Mona Adel');
+    expect(upd.data).not.toHaveProperty('publishedByName');
     expect(upd.data.publishedAt).toBeInstanceOf(Date);
   });
 
@@ -133,29 +133,58 @@ describe('versioned publish records who and when', () => {
     const row = m.rev.create.mock.calls[0][0].data;
     expect(row).toMatchObject({
       publishedBy: 'user-1',
-      publishedByName: 'Mona Adel',
       note: 'rollback to rev 1',
     });
   });
 
-  it('a missing name never blocks a publish (name stays null, id is still recorded)', async () => {
-    m.user.findFirst.mockResolvedValue(null);
-    const res = await request(app())
+  it('the publisher NAME is never copied onto the revision (no stored personal data beyond the id)', async () => {
+    await request(app())
       .post('/admin/stores/store-1/builder/pages/home/publish')
       .send({ baseRev: 3 });
-    expect(res.status).toBe(200);
-    const upd = m.rev.updateMany.mock.calls
-      .map(c => c[0])
-      .find((c: any) => c.data?.status === 'published');
-    expect(upd.data.publishedBy).toBe('user-1');
-    expect(upd.data.publishedByName).toBeNull();
+    const writes = JSON.stringify([...m.rev.updateMany.mock.calls, ...m.rev.create.mock.calls]);
+    expect(writes).not.toContain('Mona');
+    expect(writes).not.toContain('publishedByName');
   });
 
-  it('history returns who and when for each version', async () => {
-    m.rev.findMany.mockResolvedValue([]);
-    await request(app()).get('/admin/stores/store-1/builder/pages/home/revisions');
-    const select = m.rev.findMany.mock.calls[0][0].select;
-    expect(select).toMatchObject({ publishedBy: true, publishedByName: true, publishedAt: true });
+  it('history resolves the publisher name at read time from staff and owner; a gone user is null', async () => {
+    const row = (rev: number, by: string | null) => ({ rev, status: 'archived', publishedBy: by });
+    m.rev.findMany.mockResolvedValue([
+      row(5, 'staff-1'),
+      row(4, 'owner-1'),
+      row(3, 'gone-1'),
+      row(2, null),
+    ]);
+    m.staff.findMany.mockResolvedValue([
+      { userId: 'staff-1', user: { firstName: 'Mona', lastName: 'Adel', deletedAt: null } },
+    ]);
+    m.store.findUnique.mockResolvedValue({
+      ownerId: 'owner-1',
+      owner: { firstName: 'Omar', lastName: 'Said', deletedAt: null },
+    });
+    const res = await request(app()).get('/admin/stores/store-1/builder/pages/home/revisions');
+    const by = Object.fromEntries(
+      res.body.data.revisions.map((r: any) => [r.rev, r.publishedByName])
+    );
+    expect(by).toEqual({ 5: 'Mona Adel', 4: 'Omar Said', 3: null, 2: null });
+    // scoped to this store, and asks only for ids that appear in the page
+    expect(m.staff.findMany.mock.calls[0][0].where).toMatchObject({ storeId: 'store-1' });
+  });
+
+  it('a soft-deleted user resolves to no name ("Removed user"), and a lookup failure never breaks history', async () => {
+    m.rev.findMany.mockResolvedValue([{ rev: 5, status: 'archived', publishedBy: 'staff-1' }]);
+    m.staff.findMany.mockResolvedValue([
+      { userId: 'staff-1', user: { firstName: 'Mona', lastName: 'Adel', deletedAt: new Date() } },
+    ]);
+    m.store.findUnique.mockResolvedValue({
+      ownerId: 'o',
+      owner: { firstName: 'a', lastName: 'b', deletedAt: null },
+    });
+    let res = await request(app()).get('/admin/stores/store-1/builder/pages/home/revisions');
+    expect(res.body.data.revisions[0].publishedByName).toBeNull();
+    m.staff.findMany.mockRejectedValue(new Error('rls'));
+    res = await request(app()).get('/admin/stores/store-1/builder/pages/home/revisions');
+    expect(res.status).toBe(200);
+    expect(res.body.data.revisions[0].publishedByName).toBeNull();
   });
 
   it('a failed purge is retried, so a transient cache error does not leave the page stale', async () => {

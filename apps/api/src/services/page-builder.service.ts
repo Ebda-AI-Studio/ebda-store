@@ -106,7 +106,6 @@ interface RevisionRow {
   note: string | null;
   createdBy: string | null;
   publishedBy: string | null;
-  publishedByName: string | null;
   createdAt: Date;
   updatedAt: Date;
   publishedAt: Date | null;
@@ -147,7 +146,6 @@ const META_SELECT = {
   note: true,
   createdBy: true,
   publishedBy: true,
-  publishedByName: true,
   createdAt: true,
   updatedAt: true,
   publishedAt: true,
@@ -512,25 +510,48 @@ function publishedThemeData(
 }
 
 /**
- * Who is publishing, as the history shows it. The name is a SNAPSHOT taken here, from the actor's own
- * user row (visible under strict RLS because it is the acting user), so history never needs a
- * cross-user read; it is merchant PII and is pseudonymised with the user on offboarding (OFFBOARD-1).
- * A lookup failure never blocks a publish: the id is still recorded and the name stays null.
+ * Who published/restored a revision is recorded as the user ID only (`published_by`, pseudonymised with
+ * the user on offboarding, OFFBOARD-1). The NAME is never copied onto the revision: history resolves it at
+ * read time (`publisherNames`), so an erased user's name cannot linger in page history.
  */
-async function publisherStamp(
-  userId: string | null
-): Promise<{ publishedBy: string | null; publishedByName: string | null }> {
-  if (!userId) return { publishedBy: null, publishedByName: null };
+function publisherStamp(userId: string | null): { publishedBy: string | null } {
+  return { publishedBy: userId };
+}
+
+/**
+ * Names for the publishers on one page of history, read live. Under strict RLS only the store's owner and
+ * its staff are visible to the acting user, which is exactly who can publish. A user who is gone, soft
+ * deleted or erased resolves to nothing, and the UI then says "Removed user".
+ */
+async function publisherNames(storeId: string, ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  const fullName = (u: { firstName: string; lastName: string; deletedAt: Date | null }) =>
+    u.deletedAt ? '' : `${u.firstName} ${u.lastName}`.trim();
+  const select = { firstName: true, lastName: true, deletedAt: true } as const;
   try {
-    const u = await prisma.user.findFirst({
-      where: { id: userId },
-      select: { firstName: true, lastName: true },
-    });
-    const name = u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : '';
-    return { publishedBy: userId, publishedByName: name || null };
+    const [staff, store] = await Promise.all([
+      prisma.storeStaff.findMany({
+        where: { storeId, userId: { in: ids } },
+        select: { userId: true, user: { select } },
+      }),
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { ownerId: true, owner: { select } },
+      }),
+    ]);
+    for (const m of staff) {
+      const n = fullName(m.user);
+      if (n) out.set(m.userId, n);
+    }
+    if (store && ids.includes(store.ownerId)) {
+      const n = fullName(store.owner);
+      if (n) out.set(store.ownerId, n);
+    }
   } catch {
-    return { publishedBy: userId, publishedByName: null };
+    // history must still load; unresolved names show as "Removed user"
   }
+  return out;
 }
 
 /** Promote `row` (or a fresh row) to published inside a savepoint; archive the old one. */
@@ -726,7 +747,7 @@ export async function publishDraft(args: {
       errors: readinessErrors,
     };
 
-  const stamp = await publisherStamp(args.userId ?? null);
+  const stamp = publisherStamp(args.userId ?? null);
   const outcome = await promote(storeId, pageKey, async () => {
     const { count } = await prisma.storePageRevision.updateMany({
       where: { id: draft.id, storeId, rev: baseRev, status: 'draft' },
@@ -768,7 +789,7 @@ async function publishNewRevision(args: {
 }): Promise<'ok' | 'conflict'> {
   const { storeId, pageKey, definition } = args;
   const rev = args.baseRev + 1;
-  const stamp = await publisherStamp(args.userId);
+  const stamp = publisherStamp(args.userId);
   return promote(storeId, pageKey, async () => {
     if (args.archiveDraft)
       await prisma.storePageRevision.updateMany({
@@ -1188,8 +1209,15 @@ export async function listRevisions(args: {
     select: META_SELECT,
   });
   const page = rows.slice(0, limit);
+  const names = await publisherNames(args.storeId, [
+    ...new Set(page.map(r => r.publishedBy).filter((x): x is string => !!x)),
+  ]);
   return {
-    revisions: page,
+    revisions: page.map(r => ({
+      ...r,
+      // null with publishedBy set = the user is gone or erased ("Removed user")
+      publishedByName: r.publishedBy ? (names.get(r.publishedBy) ?? null) : null,
+    })),
     nextCursor: rows.length > limit ? page[page.length - 1].rev : null,
   };
 }

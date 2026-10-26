@@ -9401,7 +9401,7 @@
       "restoreConfirmButton": "رجّع",
       "by": {
         "named": "بواسطة {name}",
-        "unknown": "بواسطة أحد أعضاء الفريق"
+        "removed": "مستخدم محذوف"
       },
       "restoredFrom": "مستعادة من النسخة {rev}"
     },

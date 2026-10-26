@@ -62,7 +62,7 @@ describe('RevisionsPanel shows who and when', () => {
     render(<RevisionsPanel storeId="s" headRev={5} onRestored={() => {}} />);
     await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(3));
     expect(screen.getByText(/by\.named.*منى عادل/)).toBeTruthy();
-    expect(screen.getAllByText(/by\.unknown/).length).toBe(1); // rev 4: id but no name
+    expect(screen.getAllByText(/by\.removed/).length).toBe(1); // rev 4: id but no name
     // rev 1 predates the column: no "by" line at all
     const items = screen.getAllByRole('listitem');
     expect(items[2].textContent).not.toContain('by.');

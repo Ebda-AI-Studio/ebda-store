@@ -265,4 +265,4 @@ Flipping `SEARCH_SEMANTIC_ENABLED` to `false` (or rolling the API back to a vers
 
 ## Page revision publisher (`20261105000200_store_page_revisions_published_by`)
 
-Additive, nullable. Rollback: `ALTER TABLE store_page_revisions DROP COLUMN published_by, DROP COLUMN published_by_name;` (history then simply shows no publisher; nothing else reads them).
+Additive, nullable. Rollback: `ALTER TABLE store_page_revisions DROP COLUMN published_by;` (history then simply shows no publisher; nothing else reads them).
