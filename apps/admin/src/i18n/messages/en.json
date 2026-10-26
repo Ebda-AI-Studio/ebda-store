@@ -9503,7 +9503,8 @@
       "LOOKS_EDITED": "Image looks edited",
       "FIELDS_CORRECTED": "Details were changed after the automatic read",
       "SAME_IMAGE_USED_BEFORE": "This image was used before",
-      "AI_UNAVAILABLE": "Automatic read was unavailable"
+      "AI_UNAVAILABLE": "Automatic read was unavailable",
+      "SUSPICIOUS_TEXT": "Text on the image reads like an instruction, not a receipt"
     },
     "review": {
       "status": {
@@ -9514,6 +9515,7 @@
         "voided": "Voided"
       },
       "confidence": "Read confidence {pct}%",
+      "aiAdvisory": "The AI read is advisory and can be fooled by text inside the image. Always check the amount, receiver and date yourself.",
       "flagsTitle": "Automatic checks",
       "amountMismatch": "Amount on the receipt is {paid} but {expected} is due.",
       "imageLoading": "Loading the screenshot…",
