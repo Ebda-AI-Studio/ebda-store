@@ -102,3 +102,49 @@ export function ean13Modules(value: string): boolean[] {
   bits += '101';
   return [...bits].map(c => c === '1');
 }
+
+export type BarcodeKind = 'ean13' | 'upca' | 'code128';
+export type ParsedBarcode =
+  | { ok: true; kind: BarcodeKind; value: string }
+  | { ok: false; reason: 'empty' | 'check-digit' | 'charset' | 'length' };
+
+const ARABIC_INDIC = /[٠-٩]/g;
+const PERSIAN = /[۰-۹]/g;
+export const CODE128_INPUT_MAX = 48;
+
+/**
+ * What a merchant typed or a scanner sent. 13 digits = EAN-13 and 12 digits = UPC-A, both with a
+ * REQUIRED valid check digit (a typo must not become a code nobody can scan); anything else is
+ * Code 128 text (printable ASCII, 1-48 characters). Arabic-Indic and Persian digits fold to ASCII
+ * and surrounding spaces go, so a code pasted from an Arabic keyboard works.
+ */
+export function parseBarcodeInput(raw: string): ParsedBarcode {
+  const value = raw
+    .replace(ARABIC_INDIC, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(PERSIAN, d => String(d.charCodeAt(0) - 0x06f0))
+    .trim();
+  if (!value) return { ok: false, reason: 'empty' };
+  if (/^\d{13}$/.test(value)) {
+    return isValidEan13(value)
+      ? { ok: true, kind: 'ean13', value }
+      : { ok: false, reason: 'check-digit' };
+  }
+  if (/^\d{12}$/.test(value)) {
+    return isValidUpcA(value)
+      ? { ok: true, kind: 'upca', value }
+      : { ok: false, reason: 'check-digit' };
+  }
+  if (!/^[\x20-\x7e]+$/.test(value)) return { ok: false, reason: 'charset' };
+  if (value.length > CODE128_INPUT_MAX) return { ok: false, reason: 'length' };
+  return { ok: true, kind: 'code128', value };
+}
+
+/** The modules a printed label carries for a parsed code (UPC-A prints as its EAN-13 with a leading 0). */
+export function barcodeModulesFor(
+  parsed: Extract<ParsedBarcode, { ok: true }>,
+  code128: (v: string) => boolean[]
+): boolean[] {
+  if (parsed.kind === 'ean13') return ean13Modules(parsed.value);
+  if (parsed.kind === 'upca') return ean13Modules(`0${parsed.value}`);
+  return code128(parsed.value);
+}
