@@ -1009,19 +1009,6 @@
     "pageAr": "هوية المتجر"
   },
   {
-    "id": "branding.arabic-numerals",
-    "kind": "setting",
-    "route": "/branding",
-    "access": "owner",
-    "en": "Store numerals: 123 / ١٢٣",
-    "ar": "شكل الأرقام في المتجر: 123 / ١٢٣",
-    "synEn": "arabic numbers eastern digits indian numerals",
-    "synAr": "الارقام العربية ارقام هندية شكل الارقام",
-    "query": "tab=theme",
-    "pageEn": "Store Branding",
-    "pageAr": "هوية المتجر"
-  },
-  {
     "id": "branding.blog",
     "kind": "setting",
     "route": "/branding",

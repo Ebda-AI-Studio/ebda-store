@@ -193,8 +193,6 @@ export function codFeeMinor(
 
 // ─── major <-> minor ─────────────────────────────────────────────────────────
 
-const EASTERN_ARABIC = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
 /** Normalise Eastern Arabic-Indic (٠-٩), Persian (۰-۹) digits and the Arabic decimal/thousands separators to ASCII. */
 function normalizeNumeric(input: string): string {
   return input
@@ -291,17 +289,10 @@ export function minorToDecimalString(minor: number, currency: string = REGION.cu
   return `${neg ? '-' : ''}${whole}.${frac}`;
 }
 
-/** ASCII digits → Eastern Arabic-Indic digits. */
-export function toEasternArabicDigits(input: string | number): string {
-  return String(input).replace(/[0-9]/g, d => EASTERN_ARABIC[Number(d)]);
-}
-
 export interface FormatMoneyOptions {
-  /** Digit system (Ruling NUMERALS-1). Default `'latn'` (0-9) in BOTH locales;
-   *  `'arab'` (٠١٢٣ with ٬ / ٫) only applies to the Arabic locale. Pass the
-   *  store's choice (`storeNumerals(theme)`) on customer-facing output only. */
+  /** Ignored: Western digits only, in both locales (Ruling DIGITS-1). Kept so callers keep compiling. */
   numerals?: Numerals;
-  /** @deprecated use `numerals: 'arab'`. Kept so older callers keep compiling. */
+  /** @deprecated ignored (Ruling DIGITS-1). */
   easternArabicDigits?: boolean;
   /** Currency of `minor`. Default `REGION.currency`. */
   currency?: string;
@@ -320,8 +311,7 @@ function groupThousands(whole: string): string {
 /**
  * Format a MINOR-unit amount for display. Deterministic (no ICU dependence):
  *  - en: `EGP 1,299.50`, `EGP 450`
- *  - ar: `1,299.50 ج.م`, `450 ج.م` — Western digits by default (Ruling
- *    NUMERALS-1); `١٬٢٩٩٫٥٠ ج.م` only with `numerals: 'arab'`.
+ *  - ar: `1,299.50 ج.م`, `450 ج.م` — Western digits always (Ruling DIGITS-1).
  * A whole amount drops its all-zero fraction ("450 ج.م", not "450.00 ج.م");
  * an amount with a fractional part shows every decimal of the currency.
  */
@@ -336,11 +326,8 @@ export function formatMoney(
   const [whole, frac] = plain.replace('-', '').split('.');
   const keepFrac = frac !== undefined && (opts.fixedDecimals === true || /[1-9]/.test(frac));
   let num = groupThousands(whole) + (keepFrac ? `.${frac}` : '');
-  const numerals: Numerals = opts.numerals ?? (opts.easternArabicDigits ? 'arab' : 'latn');
-  if (locale === 'ar' && numerals === 'arab') {
-    num = toEasternArabicDigits(num).replace(/,/g, '٬').replace(/\./g, '٫');
-  }
-  const signed = neg && /[1-9١-٩]/.test(num) ? `-${num}` : num;
+  // Western digits only (Ruling DIGITS-1): `numerals` / `easternArabicDigits` are accepted and ignored.
+  const signed = neg && /[1-9]/.test(num) ? `-${num}` : num;
   if (opts.hideSymbol) return signed;
   const symbol =
     currency.toUpperCase() === REGION.currency

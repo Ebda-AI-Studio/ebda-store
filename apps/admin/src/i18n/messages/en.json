@@ -2218,12 +2218,6 @@
         "title": "Show quick-add (+) on product carousels",
         "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
       },
-      "arabicNumerals": {
-        "title": "Store numerals: 123 / ١٢٣",
-        "hint": "How numbers look on your Arabic storefront (prices, quantities, dates). 123 (Western) is the default; ١٢٣ shows Arabic-Indic digits to Arabic-reading customers only. English pages, order numbers and this dashboard always use 123.",
-        "western": "Western digits (123) — default",
-        "arabic": "Arabic-Indic digits (١٢٣)"
-      },
       "socialIconColors": {
         "title": "Social icon colors",
         "hint": "By default social icons inherit the footer's text color (monochrome). Enable original brand colors to show each platform in its registered color (Instagram pink, WhatsApp green, etc.).",

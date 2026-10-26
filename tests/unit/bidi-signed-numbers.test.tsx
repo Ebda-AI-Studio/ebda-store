@@ -29,9 +29,9 @@ describe('R-02: the sale badge text', () => {
   it('ar: "−21%" in an LTR isolate, real minus, no hyphen', () => {
     expect(getDiscountBadgeText(sale, true)).toBe(`${LRI}${MINUS}21%${PDI}`);
   });
-  it('ar with Arabic-Indic digits keeps the isolate', () => {
-    expect(getDiscountBadgeText(sale, true, undefined, undefined, 'arab')).toBe(
-      `${LRI}${MINUS}٢١%${PDI}`
+  it('ar asking for Arabic-Indic digits still gets Western ones, with the isolate (DIGITS-1)', () => {
+    expect(getDiscountBadgeText(sale, true, undefined, undefined, 'arab' as never)).toBe(
+      `${LRI}${MINUS}21%${PDI}`
     );
   });
   it('en: the same isolated "−21%"', () => {

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { PaletteItem } from './admin-layout/buildPaletteItems';
 import {
+  intlLocale,
   normalizeArabicSearch as normalize,
   searchQueryHeaders,
   type AdminSearchResponse,
@@ -184,7 +185,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       icon: i.icon,
     }));
     if (!records || !storeId) return pages;
-    const money = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EGP' });
+    const money = new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency: 'EGP' });
     const out: Row[] = [...pages];
     const push = (section: NonNullable<Row['section']>, list: Row[]) =>
       list.forEach((r, i) =>

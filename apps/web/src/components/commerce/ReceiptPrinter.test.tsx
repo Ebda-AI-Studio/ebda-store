@@ -15,7 +15,7 @@ vi.mock('@/contexts/LanguageContext', () => ({
 }));
 // The real useLocalePrice runs (shared formatPrice); only the store's digit
 // choice is stubbed, so one test can switch a store to Arabic-Indic.
-let numerals: 'latn' | 'arab' = 'latn';
+let numerals: 'latn' = 'latn';
 vi.mock('@/hooks/useNumerals', () => ({
   useStoreNumerals: () => numerals,
   useNumerals: () => ({
@@ -375,12 +375,11 @@ describe('ReceiptPrinter', () => {
     expect(screen.getAllByTestId('receipt-line')[2].textContent).toContain('علبة هدية');
   });
 
-  it('arabic-indic store: money in ٠-٩, the order number stays Western', () => {
-    numerals = 'arab';
+  it('Western digits only (DIGITS-1): money and the order number carry no Arabic-Indic digit', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     const total = screen.getByTestId('receipt-total').textContent ?? '';
-    expect(total).toMatch(/٩٥٠/);
-    expect(total).not.toMatch(/[0-9]/);
+    expect(total).toMatch(/950/);
+    expect(document.body.textContent).not.toMatch(/[٠-٩۰-۹]/);
     expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
   });
 
