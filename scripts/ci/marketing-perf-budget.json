@@ -1,19 +1,19 @@
 {
-  "_why": "Measured 2026-10-26 on the static export: every page ships 187KB gzip of up-front JS (Next/React baseline ~178KB) and the home 201.5KB. The plan target is 200KB before the 3D viewer (a lazy chunk the HTML never lists); the home is 1.5KB over it today, so its budget is 205KB and must ratchet DOWN, never up, without a reviewed reason.",
+  "_why": "RATCHET 2026-10-27 (P14): the tracking client is now a dynamic chunk loaded after window load + idle, so every page dropped 186.9 -> 177.0KB and the home 201.5 -> 193.4KB; budgets are 180 / 196. Before that: measured 2026-10-26 on the static export: every page ships 187KB gzip of up-front JS (Next/React baseline ~178KB) and the home 201.5KB. The plan target is 200KB before the 3D viewer (a lazy chunk the HTML never lists); the home is 1.5KB over it today, so its budget is 205KB and must ratchet DOWN, never up, without a reviewed reason.",
   "default": {
-    "jsGzipKb": 190,
+    "jsGzipKb": 180,
     "cssGzipKb": 12,
     "htmlGzipKb": 20,
     "maxScripts": 10
   },
   "pages": {
     "/": {
-      "jsGzipKb": 205,
+      "jsGzipKb": 196,
       "htmlGzipKb": 50,
       "maxScripts": 11
     },
     "/en": {
-      "jsGzipKb": 205,
+      "jsGzipKb": 196,
       "htmlGzipKb": 50,
       "maxScripts": 11
     }
