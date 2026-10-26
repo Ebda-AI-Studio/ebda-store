@@ -37,6 +37,9 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { handleWebhook: m.handleWebhook },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: m.inngestSend } }));
 vi.mock('@api/services/shipping-carrier.service', () => ({ shippingCarrierService: {} }));
 vi.mock('@api/lib/logger', () => ({
@@ -134,11 +137,12 @@ describe.each(cases)('inbound $provider webhook route', c => {
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'WEBHOOK_DUPLICATE' }));
   });
 
-  it('a payment no store owns is ignored (200) without persisting or processing', async () => {
+  it('a payment no store can resolve YET answers 503 + Retry-After (the gateway retries), persisting nothing (M-050)', async () => {
     m.resolveStore.mockResolvedValue(null);
     const res = await post(c, path, true);
-    expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('ignored');
+    expect(res.status).toBe(503);
+    expect(res.headers['retry-after']).toBe('60');
+    expect(res.body.error.code).toBe('PAYMENT_NOT_YET_VISIBLE');
     expect(m.inboxRecord).not.toHaveBeenCalled();
     expect(m.inngestSend).not.toHaveBeenCalled();
   });
