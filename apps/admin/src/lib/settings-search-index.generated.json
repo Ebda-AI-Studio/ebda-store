@@ -944,6 +944,18 @@
     "synAr": "مزايا اضافات تفعيل"
   },
   {
+    "id": "ai.switch",
+    "kind": "setting",
+    "route": "/ai-usage",
+    "access": "owner",
+    "en": "Use AI features",
+    "ar": "استخدام ميزات الذكاء الاصطناعي",
+    "synEn": "ai on off disable enable turn off assistant gemini switch",
+    "synAr": "ذكاء اصطناعي تشغيل ايقاف قفل تفعيل مساعد",
+    "pageEn": "Usage",
+    "pageAr": "الاستخدام"
+  },
+  {
     "id": "branding.logo",
     "kind": "setting",
     "route": "/branding",

@@ -10221,5 +10221,11 @@
     "verifiedConfirmed": "Verified {at}",
     "ready": "Ready to verify",
     "confirm": "Confirm verified"
+  },
+  "aiSwitch": {
+    "title": "Use AI features",
+    "onHint": "The assistant can translate, write SEO text, tag products and draft campaigns for this store. Turn it off and no AI call is made for your store.",
+    "offHint": "AI is off for your store. Nothing is sent to an AI model, and every AI button and automatic fill is paused until you turn it back on.",
+    "failed": "Could not change this setting. Try again."
   }
 }
