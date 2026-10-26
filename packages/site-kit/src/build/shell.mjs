@@ -1,6 +1,6 @@
 // Static page shell shared by docs + help: header (wordmark, nav, language switch, search),
 // optional sidebar, footer. Pure string templates; no client framework.
-import { BRAND, SITE_NAV_CSS, siteNavHtml, siteWordmarkHtml } from '@ebda/shared/brand';
+import { BRAND, SITE_NAV_CSS, SITE_NAV_JS, siteNavHtml, siteWordmarkHtml } from '@ebda/shared/brand';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,8 @@ export function writeSiteCss(outDir) {
     path.join(outDir, 'assets', 'site.css'),
     readFileSync(path.join(here, '..', 'css', 'site.css'), 'utf8') + '\n' + SITE_NAV_CSS
   );
+  // the shared header-nav behaviour: a same-origin static file, no inline code (strict CSP)
+  writeFileSync(path.join(outDir, 'assets', 'site-nav.js'), SITE_NAV_JS);
 }
 
 const tokensCss = () =>
@@ -93,7 +95,7 @@ ${p.main}
 </main>
 </div>
 ${p.footer}
-${(p.scripts ?? []).map(s => `<script src="${esc(s)}" defer></script>`).join('')}
+<script src="/assets/site-nav.js" defer></script>${(p.scripts ?? []).map(s => `<script src="${esc(s)}" defer></script>`).join('')}
 </body>
 </html>
 `;

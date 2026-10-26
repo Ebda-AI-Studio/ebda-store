@@ -10,6 +10,7 @@
     "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
     "lint:fix": "eslint src scripts --ext .ts,.tsx,.mjs --fix",
     "og": "node scripts/make-og.mjs",
+    "site-nav-js": "tsx scripts/site-nav-js.ts",
     "lastmod": "tsx scripts/lastmod.tsx",
     "story-frames": "node scripts/story-frames/make.mjs",
     "looks": "python3 scripts/looks/export.py",

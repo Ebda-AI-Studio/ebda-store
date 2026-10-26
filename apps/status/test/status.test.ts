@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { runProbes, thresholdsFrom } from '../src/index';
+import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS } from '../src/config';
 import { probe, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
@@ -188,12 +189,26 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(snap.active[0].updates[0].body).toContain('timeout after 40ms');
   });
 
-  it('serves the page with no scripts and a restrictive CSP', async () => {
+  it('serves the page with no inline script (one same-origin file) and a restrictive CSP', async () => {
     const r = await get('/en');
     const html = await r.text();
-    expect(/<script/i.test(html)).toBe(false);
-    expect(r.headers.get('content-security-policy')).toContain("default-src 'none'");
+    // the only script is the shared header-nav file; nothing inline
+    expect(html.match(/<script\b[^>]*>/gi)).toEqual(['<script src="/assets/site-nav.js" defer>']);
+    expect(
+      /<script\b[^>]*>\s*\S/i.test(html.replace(/<script src="[^"]*" defer><\/script>/g, ''))
+    ).toBe(false);
+    const csp = r.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'self'");
     expect(has(html, 'lang="en"')).toBe(true);
+  });
+
+  it('serves the shared header-nav script as a same-origin file, byte for byte', async () => {
+    const r = await get('/assets/site-nav.js');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('javascript');
+    expect(r.headers.get('content-security-policy')).toContain("script-src 'self'");
+    expect(await r.text()).toBe(SITE_NAV_JS);
   });
 });
 

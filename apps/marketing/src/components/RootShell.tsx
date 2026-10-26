@@ -47,6 +47,8 @@ export function RootShell({ locale, children }: { locale: Locale; children: Reac
       <body>
         {children}
         <EbdaTracking />
+        {/* the shared header-nav behaviour (Esc, click-outside, one menu open, aria-expanded): a static same-origin file */}
+        <script src="/site-nav.js" defer />
       </body>
     </html>
   );
