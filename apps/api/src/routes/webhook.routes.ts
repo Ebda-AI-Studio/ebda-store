@@ -299,18 +299,28 @@ function generateIdempotencyKey(
  * Returns undefined when we can't match the payload to a Payment row;
  * handleWebhook then finds no payment and acknowledges.
  *
- * Runs through a SECURITY DEFINER lookup (`ebda_webhook_resolve_store`, exact
+ * Runs through a SECURITY DEFINER lookup (`ebda_webhook_resolve_store_scoped`: within the provider, the URL store first; exact
  * match on the provider reference, store id only) because the storeId is unknown
  * at this point. Once it is known the caller switches to runInTenantContext for
  * all subsequent writes.
  */
 async function resolveStoreIdFromWebhookPayload(
   provider: PaymentProvider,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  urlStoreId?: string
 ): Promise<string | undefined> {
   const { transactionId, invoiceId } = webhookRefs(provider, payload);
   if (!transactionId && !invoiceId) return undefined;
-  return (await resolveStoreFromWebhookRef({ transactionId, invoiceId })) ?? undefined;
+  // Within the delivering provider, and the URL's store first: a reference shared with another provider's or
+  // another store's payment must not decide which store owns THIS delivery (Ruling ITEST-14).
+  return (
+    (await resolveStoreFromWebhookRef({
+      transactionId,
+      invoiceId,
+      provider,
+      preferStoreId: urlStoreId ?? null,
+    })) ?? undefined
+  );
 }
 
 // ==========================================
@@ -459,7 +469,7 @@ async function handleGatewayWebhook(
     // correctly scoped. When storeId is undefined (platform-level path)
     // handleWebhook is called directly with no wrapper — see
     // processWebhookInline's no-storeId branch for why.
-    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
+    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload, urlStoreId);
 
     // The Egyptian gateways have per-merchant credentials only (no platform-level secret), so a
     // delivery that names no payment of ours cannot be verified or attributed to anyone. Answer

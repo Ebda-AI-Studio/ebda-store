@@ -158,8 +158,17 @@ export async function ensureAdminUser(
 export async function resolveStoreFromWebhookRef(ref: {
   transactionId?: string | null;
   invoiceId?: string | null;
+  /** Match only payments of this provider (a reference string is unique per provider, not across them). */
+  provider?: string | null;
+  /** When two stores hold the same reference, prefer this one (the store a per-store webhook URL names). */
+  preferStoreId?: string | null;
 }): Promise<string | null> {
   if (!ref.transactionId && !ref.invoiceId) return null;
+  if (ref.provider || ref.preferStoreId) {
+    const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+      SELECT public.ebda_webhook_resolve_store_scoped(${ref.transactionId ?? null}, ${ref.invoiceId ?? null}, ${ref.provider ?? null}, ${ref.preferStoreId ?? null}) AS id`;
+    return rows[0]?.id ?? null;
+  }
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
     SELECT public.ebda_webhook_resolve_store(${ref.transactionId ?? null}, ${ref.invoiceId ?? null}) AS id`;
   return rows[0]?.id ?? null;

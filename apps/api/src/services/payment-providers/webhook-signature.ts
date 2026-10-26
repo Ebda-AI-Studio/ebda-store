@@ -2,7 +2,7 @@
  * Where each gateway puts its webhook signature, and how its webhook names the payment
  * (SP6b). The webhook route needs both BEFORE the adapter runs: the signature to refuse an
  * unsigned call, the references to find the owning store (through the
- * `ebda_webhook_resolve_store` definer) and the inbox idempotency key.
+ * `ebda_webhook_resolve_store_scoped` definer) and the inbox idempotency key.
  *
  *   Paymob   `?hmac=` query parameter       (HMAC-SHA512 over 20 callback fields)
  *   Kashier  `x-kashier-signature` header   (HMAC-SHA256 over the signed keys)

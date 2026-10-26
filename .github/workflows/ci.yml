@@ -1022,7 +1022,15 @@ jobs:
         # --retry=1 (#1248): this tier makes real network/DB calls against the
         # service containers above, unlike the unit tier which is retry:0 by
         # default (vitest.config.ts) to stop retry masking state pollution.
-        run: npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts --reporter=verbose --retry=1
+        #
+        # Two passes (Ruling ITEST-13). Planner / index tests (files importing tests/helpers/app-role-planner, plus the idle-transaction counters,
+        # listed by scripts/ci/planner-lane.sh) assert on the planner's choice, which flips when other files write
+        # to the same big tables in parallel, so they run SERIALLY after the parallel pass, on a quiet database.
+        run: |
+          set -euo pipefail
+          PLANNER_EXCLUDES="$(bash scripts/ci/planner-lane.sh excludes)"
+          npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts $PLANNER_EXCLUDES --reporter=verbose --retry=1
+          npx vitest run $(bash scripts/ci/planner-lane.sh list) --no-file-parallelism --reporter=verbose --retry=1
         env:
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
