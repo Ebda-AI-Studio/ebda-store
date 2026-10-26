@@ -4,12 +4,14 @@
  * grant twice, and a grant moves the paid period by exactly one month. No mocks: the advisory locks and the
  * UNIQUE idempotency key are what is under test.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import crypto from 'node:crypto';
 import { prisma, runInStoreScope } from '@ebda/database';
 import {
   awardGrantsAfterPayment,
   grantedPaidThrough,
+  restoreRevokedGrants,
+  revokeGrantsForEvent,
   shiftedByGrants,
   sweepFreeMonthGrants,
   recordReferral,
@@ -59,18 +61,19 @@ async function mkStore(
   if (opts.paid !== false) await pay(store.id);
   return { storeId: store.id, ownerId };
 }
-async function pay(storeId: string, amountMinor = 349_000) {
-  await prisma.billingEvent.create({
+async function pay(storeId: string, amountMinor = 349_000, planCode: string | null = 'growth') {
+  const ev = await prisma.billingEvent.create({
     data: {
       storeId,
       type: 'renewal',
-      planCode: 'growth',
+      planCode,
       amountMinor,
       provider: 'instapay',
       idempotencyKey: uid('ev'),
       status: 'succeeded',
     },
   });
+  return ev.id;
 }
 const periodEnd = async (storeId: string) =>
   (await prisma.storeSubscription.findUnique({ where: { storeId } }))!.currentPeriodEnd;
@@ -81,6 +84,10 @@ const reset = () => prisma.$executeRawUnsafe('TRUNCATE billing_grants, billing_r
 describe.skipIf(!hasDb)('FOUNDING-1 free-month grants (real Postgres)', () => {
   beforeEach(async () => {
     await reset();
+  });
+
+  afterAll(async () => {
+    await reset(); // leave the global counter empty; suites that need it full fill it themselves
   });
 
   it('a first paid payment earns one founding month, applied once, replays grant nothing', async () => {
@@ -253,6 +260,79 @@ describe.skipIf(!hasDb)('FOUNDING-1 free-month grants (real Postgres)', () => {
       await shiftedByGrants(tx, a.storeId, new Date(PERIOD_END.getTime() + 1), PLUS_ONE_MONTH)
     ).toBe(false);
     expect(await grantedPaidThrough(tx, a.storeId)).toEqual(PLUS_ONE_MONTH);
+  });
+
+  it('fails closed: no plan, an unknown plan, or a plan priced 0/null never qualifies, whatever the amount', async () => {
+    const a = await mkStore({ paid: false });
+    await pay(a.storeId, 9_999_999, null);
+    await pay(a.storeId, 9_999_999, 'no-such-plan');
+    await pay(a.storeId, 9_999_999, 'comped');
+    await pay(a.storeId, 9_999_999, 'free');
+    await awardGrantsAfterPayment(a.storeId);
+    expect(await grantsOf('founding', a.storeId)).toHaveLength(0);
+    await pay(a.storeId); // a real Growth month
+    await awardGrantsAfterPayment(a.storeId);
+    expect(await grantsOf('founding', a.storeId)).toHaveLength(1);
+  });
+
+  it('refunding the qualifying payment revokes the grant, takes the month back once and frees the slot', async () => {
+    const a = await mkStore({ paid: false });
+    const ev = await pay(a.storeId);
+    await awardGrantsAfterPayment(a.storeId);
+    expect(await periodEnd(a.storeId)).toEqual(PLUS_ONE_MONTH);
+    const g = (await grantsOf('founding', a.storeId))[0];
+    expect(g.sourceEventId).toBe(ev);
+    await prisma.$executeRaw`UPDATE billing_events SET status = 'refunded' WHERE id = ${ev}`;
+    for (let i = 0; i < 2; i++)
+      await prisma.$transaction(tx =>
+        revokeGrantsForEvent(tx as never, ev, 'payment_refunded', new Date(), a.storeId)
+      );
+    const after = (await grantsOf('founding', a.storeId))[0];
+    expect(after.status).toBe('revoked');
+    expect(after.restoredAt).not.toBeNull();
+    expect(await periodEnd(a.storeId)).toEqual(PERIOD_END); // exactly one month back, not two
+    expect(await grantedPaidThrough(prisma as never, a.storeId)).toBeNull();
+    expect(
+      await prisma.billingGrant.count({ where: { kind: 'founding', status: { not: 'revoked' } } })
+    ).toBe(0); // the slot is free again
+    await expect(
+      prisma.$executeRawUnsafe(`UPDATE billing_grants SET status = 'applied'`)
+    ).rejects.toThrow();
+    // the take-back can only ever happen once: the DB refuses a second restored_at
+    await expect(
+      prisma.$executeRawUnsafe(
+        `UPDATE billing_grants SET restored_at = now() WHERE status = 'revoked' AND restored_at IS NOT NULL`
+      )
+    ).rejects.toThrow();
+  });
+
+  it("refunding the referred store's first month revokes BOTH referral grants and the referrer's month", async () => {
+    const referrer = await mkStore();
+    const slug = (await prisma.store.findUnique({ where: { id: referrer.storeId } }))!.slug;
+    const referred = await mkStore({ paid: false });
+    expect(await recordReferral(referred.storeId, slug)).toBe(true);
+    const ev = await pay(referred.storeId);
+    await awardGrantsAfterPayment(referred.storeId);
+    expect(await periodEnd(referrer.storeId)).toEqual(PLUS_ONE_MONTH);
+    await prisma.$executeRaw`UPDATE billing_events SET status = 'refunded' WHERE id = ${ev}`;
+    // the refund path revoked nothing (e.g. it crashed): the daily sweep finds it from the grants' source store
+    await sweepFreeMonthGrants(new Date(), { storeIds: [] });
+    expect((await grantsOf('referral_referred', referred.storeId))[0].status).toBe('revoked');
+    expect((await grantsOf('referral_referrer', referrer.storeId))[0].status).toBe('revoked');
+    expect(await periodEnd(referrer.storeId)).toEqual(PERIOD_END);
+    expect(await periodEnd(referred.storeId)).toEqual(PERIOD_END);
+    await restoreRevokedGrants(); // idempotent
+    expect(await periodEnd(referrer.storeId)).toEqual(PERIOD_END);
+    // the referrer's cap slot is free again
+    expect(
+      await prisma.billingGrant.count({
+        where: {
+          kind: 'referral_referrer',
+          beneficiaryId: referrer.storeId,
+          status: { not: 'revoked' },
+        },
+      })
+    ).toBe(0);
   });
 
   it('the ledger is append-only and the admin view reports the caps', async () => {

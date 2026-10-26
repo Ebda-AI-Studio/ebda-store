@@ -13,6 +13,7 @@
  *    and activates the period in ONE transaction, idempotent on the payer's
  *    reference. A merchant's "I paid" claim never activates anything by itself.
  */
+import { restoreRevokedGrants, revokeGrantsForEvent } from './grants.service';
 import crypto from 'crypto';
 import { prisma, withStore, withUser, acrossStores, type Prisma } from '@ebda/database';
 import { AppError } from '../../middleware/error-handler';
@@ -980,6 +981,9 @@ export async function recordManualRefund(input: ManualRefundInput) {
     const fullReversal =
       amount === remaining && (prior._sum.amountMinor ?? 0) + amount >= charge.amountMinor;
 
+    // FOUNDING-3: a full reversal also takes back the free months this payment earned, BEFORE the period is read
+    // below, so `ownsCurrentPeriod` sees the end the payment itself set (a granted month would hide it).
+    if (fullReversal) await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
     // Period: a full reversal gives back exactly the time it bought; a partial
     // refund changes the period only when the operator says so.
     const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
@@ -1080,6 +1084,7 @@ export async function recordManualRefund(input: ManualRefundInput) {
   });
   if (!out.duplicate) {
     await featureService.invalidateCache(storeId).catch(() => undefined);
+    await restoreRevokedGrants().catch(() => undefined); // a referrer's side lives in another tenant
   }
   return { ...out, storeId };
 }

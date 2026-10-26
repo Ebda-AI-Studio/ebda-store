@@ -66,6 +66,8 @@ import { runBillingEffects, type BillingEffect } from './billing-notify';
 import {
   grantedPaidThrough,
   laterOf,
+  restoreRevokedGrants,
+  revokeGrantsForEvent,
   shiftedByGrants,
   sweepFreeMonthGrants,
 } from './grants.service';
@@ -1500,10 +1502,15 @@ async function settleRefundInTx(
     _sum: { amountMinor: true },
   });
   if ((agg._sum.amountMinor ?? 0) >= charge.amountMinor) {
-    await tx.billingEvent.updateMany({
+    const flipped = await tx.billingEvent.updateMany({
       where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
+    // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
+    // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
+    if (flipped.count === 1) {
+      await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
+    }
   }
 }
 
@@ -1588,6 +1595,8 @@ export async function refundCharge(args: {
         );
       }
     });
+    // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
+    await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };
   } catch (err) {
     if (err instanceof BillingProviderError && err.notCharged) {

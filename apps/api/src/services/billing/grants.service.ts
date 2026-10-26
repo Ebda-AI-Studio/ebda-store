@@ -53,11 +53,15 @@ async function monthValueMinor(tx: Tx, storeId: string): Promise<number> {
 }
 
 /**
- * When did this store first make a REAL paid month? A succeeded subscription payment (checkout, renewal, upgrade,
- * manual) that covers at least one month of the plan it was for. A 1-piastre charge does not count (referral
- * farming), and a payment that was later refunded is `refunded`, not `succeeded`, so it does not count either.
+ * The store's first REAL paid month: a succeeded subscription payment (checkout, renewal, upgrade, manual) that covers
+ * at least one month of the plan it was for. FAIL CLOSED: an event with no plan, an unknown plan, or a plan priced
+ * 0 / null (free, comped, granted) does not qualify, and neither does a payment smaller than one month (referral
+ * farming). A refunded payment is `refunded`, not `succeeded`, so it does not count.
  */
-export async function firstQualifyingPayment(tx: Tx, storeId: string): Promise<Date | null> {
+export async function firstQualifyingPayment(
+  tx: Tx,
+  storeId: string
+): Promise<{ id: string; createdAt: Date } | null> {
   const events = await tx.billingEvent.findMany({
     where: {
       storeId,
@@ -67,14 +71,14 @@ export async function firstQualifyingPayment(tx: Tx, storeId: string): Promise<D
     },
     orderBy: { createdAt: 'asc' },
     take: 20,
-    select: { amountMinor: true, planCode: true, createdAt: true },
+    select: { id: true, amountMinor: true, planCode: true, createdAt: true },
   });
   if (events.length === 0) return null;
   const plans = await prisma.plan.findMany({ select: { code: true, priceMonthlyMinor: true } });
   const monthly = new Map(plans.map(p => [p.code, p.priceMonthlyMinor ?? 0]));
   for (const e of events) {
     const need = e.planCode ? (monthly.get(e.planCode) ?? 0) : 0;
-    if (e.amountMinor >= need) return e.createdAt;
+    if (need > 0 && e.amountMinor >= need) return { id: e.id, createdAt: e.createdAt };
   }
   return null;
 }
@@ -84,12 +88,23 @@ export async function hasPaid(tx: Tx, storeId: string): Promise<boolean> {
 
 /** The latest end date an APPLIED grant moved this store's period to (null = none). */
 export async function grantedPaidThrough(tx: Tx, storeId: string): Promise<Date | null> {
-  const g = await tx.billingGrant.findFirst({
+  const grants = await tx.billingGrant.findMany({
     where: { beneficiaryId: storeId, status: 'applied', periodEndAfter: { not: null } },
     orderBy: { periodEndAfter: 'desc' },
-    select: { periodEndAfter: true },
+    select: { periodEndAfter: true, sourceEventId: true, sourceStoreId: true },
   });
-  return g?.periodEndAfter ?? null;
+  for (const g of grants) {
+    // A grant backed by THIS store's own payment counts only while that payment is still succeeded. A referrer grant
+    // is backed by the referred store's payment (another tenant): its `revoked` status carries that fact.
+    if (g.sourceEventId && g.sourceStoreId === storeId) {
+      const ok = await tx.billingEvent.count({
+        where: { id: g.sourceEventId, storeId, status: 'succeeded' },
+      });
+      if (ok === 0) continue;
+    }
+    return g.periodEndAfter;
+  }
+  return null;
 }
 export const laterOf = (a: Date, b: Date | null): Date => (b && b.getTime() > a.getTime() ? b : a);
 
@@ -106,7 +121,12 @@ export async function shiftedByGrants(
   let end = forPeriodEnd;
   for (let i = 0; i < 12; i++) {
     const g = await tx.billingGrant.findFirst({
-      where: { beneficiaryId: storeId, status: 'applied', periodEndBefore: end },
+      where: {
+        beneficiaryId: storeId,
+        periodEndBefore: end,
+        periodEndAfter: { not: null },
+        OR: [{ status: 'applied' }, { status: 'revoked', restoredAt: null }],
+      },
       select: { periodEndAfter: true },
     });
     if (!g?.periodEndAfter) return false;
@@ -124,11 +144,13 @@ async function insertGrant(
     counterpartId?: string;
     key: string;
     valueMinor: number;
+    /** the qualifying payment this grant is backed by */
+    source: { eventId: string; storeId: string };
   }
 ): Promise<boolean> {
   const rows = await tx.$executeRaw`
-    INSERT INTO billing_grants (id, kind, beneficiary_id, counterpart_id, months, value_minor, status, idempotency_key)
-    VALUES (${crypto.randomUUID()}, ${g.kind}, ${g.beneficiaryId}, ${g.counterpartId ?? null}, 1, ${g.valueMinor}, 'pending', ${g.key})
+    INSERT INTO billing_grants (id, kind, beneficiary_id, counterpart_id, months, value_minor, status, idempotency_key, source_event_id, source_store_id)
+    VALUES (${crypto.randomUUID()}, ${g.kind}, ${g.beneficiaryId}, ${g.counterpartId ?? null}, 1, ${g.valueMinor}, 'pending', ${g.key}, ${g.source.eventId}, ${g.source.storeId})
     ON CONFLICT (idempotency_key) DO NOTHING`;
   return rows === 1;
 }
@@ -143,7 +165,9 @@ export async function createGrantsForPayment(
 ): Promise<{ beneficiaries: string[]; created: GrantKind[] }> {
   const beneficiaries = new Set<string>([paidStoreId]);
   const created: GrantKind[] = [];
-  if (!(await hasPaid(tx, paidStoreId))) return { beneficiaries: [], created };
+  const paid = await firstQualifyingPayment(tx, paidStoreId);
+  if (!paid) return { beneficiaries: [], created };
+  const source = { eventId: paid.id, storeId: paidStoreId };
 
   // Founding-20: one global counter, serialised by an advisory lock.
   const already = await tx.billingGrant.count({
@@ -151,7 +175,10 @@ export async function createGrantsForPayment(
   });
   if (already === 0) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey('billing_grants:founding')}))`;
-    const taken = await tx.billingGrant.count({ where: { kind: 'founding' } });
+    // a revoked grant gives its slot back
+    const taken = await tx.billingGrant.count({
+      where: { kind: 'founding', status: { not: 'revoked' } },
+    });
     if (taken < FOUNDING_SLOTS) {
       const valueMinor = await monthValueMinor(tx, paidStoreId);
       if (
@@ -160,6 +187,7 @@ export async function createGrantsForPayment(
           beneficiaryId: paidStoreId,
           key: `founding:${paidStoreId}`,
           valueMinor,
+          source,
         })
       )
         created.push('founding');
@@ -175,6 +203,7 @@ export async function createGrantsForPayment(
       counterpartId: link.referrerStoreId,
       key: `referral:${paidStoreId}:referred`,
       valueMinor: await monthValueMinor(tx, paidStoreId),
+      source,
     });
     if (referred) created.push('referral_referred');
     const rewarded = await tx.billingGrant.count({
@@ -183,7 +212,11 @@ export async function createGrantsForPayment(
     if (rewarded === 0) {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey(`billing_grants:referrer:${link.referrerStoreId}`)}))`;
       const used = await tx.billingGrant.count({
-        where: { kind: 'referral_referrer', beneficiaryId: link.referrerStoreId },
+        where: {
+          kind: 'referral_referrer',
+          beneficiaryId: link.referrerStoreId,
+          status: { not: 'revoked' },
+        },
       });
       if (used < REFERRER_MAX_GRANTS) {
         const ok = await insertGrant(tx, {
@@ -192,6 +225,7 @@ export async function createGrantsForPayment(
           counterpartId: paidStoreId,
           key: `referral:${paidStoreId}:referrer`,
           valueMinor: await monthValueMinor(tx, link.referrerStoreId),
+          source,
         });
         if (ok) {
           created.push('referral_referrer');
@@ -252,6 +286,66 @@ export async function applyPendingGrants(tx: Tx, storeId: string, now: Date): Pr
 }
 
 /**
+ * The qualifying payment behind some grants was refunded or charged back (FOUNDING-3): revoke every live grant it backs
+ * (the founding month, the referred side, and the referrer's month), idempotently. The claim is one conditional UPDATE
+ * (`pending|applied -> revoked`) that works in any context; taking the free month back off the beneficiary's period is
+ * a second step in the BENEFICIARY's own store scope (`restoreRevokedGrants`), because a referrer is another tenant.
+ * Grants of the current store `ownStoreId` are restored inline in the caller's transaction so a refund flow sees the
+ * corrected period. Returns the revoked grant ids.
+ */
+export async function revokeGrantsForEvent(
+  tx: Tx,
+  eventId: string,
+  reason: string,
+  now: Date,
+  ownStoreId?: string
+): Promise<string[]> {
+  const rows = await tx.$queryRaw<Array<{ id: string; beneficiary_id: string }>>`
+    UPDATE billing_grants SET status = 'revoked', revoked_at = ${now}, revoke_reason = ${reason}
+    WHERE source_event_id = ${eventId} AND status IN ('pending', 'applied')
+    RETURNING id, beneficiary_id`;
+  if (ownStoreId)
+    for (const r of rows)
+      if (r.beneficiary_id === ownStoreId) await restoreOne(tx, r.id, ownStoreId, now);
+  return rows.map(r => r.id);
+}
+
+/** Take one revoked, applied grant's month back off the beneficiary's period (once, under the subscription lock). */
+async function restoreOne(tx: Tx, grantId: string, storeId: string, now: Date): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${storeId} FOR UPDATE`;
+  const claimed = await tx.$queryRaw<
+    Array<{ period_end_before: Date; period_end_after: Date }>
+  >`UPDATE billing_grants SET restored_at = ${now}
+    WHERE id = ${grantId} AND status = 'revoked' AND restored_at IS NULL AND period_end_after IS NOT NULL
+    RETURNING period_end_before, period_end_after`;
+  if (claimed.length === 0) return;
+  const span = claimed[0].period_end_after.getTime() - claimed[0].period_end_before.getTime();
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+  if (!sub) return;
+  const base =
+    sub.status === 'trialing' ? (sub.trialEndsAt ?? sub.currentPeriodEnd) : sub.currentPeriodEnd;
+  if (!base) return;
+  const end = new Date(base.getTime() - span);
+  await tx.storeSubscription.update({
+    where: { storeId },
+    data: { currentPeriodEnd: end, ...(sub.status === 'trialing' ? { trialEndsAt: end } : {}) },
+  });
+}
+
+/** Restore every revoked-but-not-yet-restored applied grant (each in its beneficiary's own transaction). */
+export async function restoreRevokedGrants(now = new Date()): Promise<number> {
+  const todo = await prisma.billingGrant.findMany({
+    where: { status: 'revoked', restoredAt: null, periodEndAfter: { not: null } },
+    select: { id: true, beneficiaryId: true },
+  });
+  for (const g of todo)
+    await inOwnTx(g.beneficiaryId, tx => restoreOne(tx, g.id, g.beneficiaryId, now)).catch(err =>
+      logger.error({ err, grantId: g.id }, '[billing] restoring a revoked grant failed')
+    );
+  return todo.length;
+}
+
+/**
  * Run `fn` in its OWN real transaction scoped to `storeId`. `withStore` reuses the caller's context, and inside
  * `runInStoreScope` (the billing routes) that context has NO transaction: every statement autocommits, so an
  * advisory/row lock taken there is released at once and the caps would not hold. The lock-then-count logic below
@@ -289,6 +383,34 @@ export async function sweepFreeMonthGrants(
 ): Promise<{ applied: number; created: number }> {
   let applied = 0;
   let created = 0;
+  // (0) revoke grants whose backing payment was refunded (a refund path that missed them), then take the months back
+  const sources = await prisma.billingGrant.findMany({
+    where: { status: { in: ['pending', 'applied'] }, sourceStoreId: { not: null } },
+    distinct: ['sourceStoreId'],
+    select: { sourceStoreId: true },
+  });
+  for (const { sourceStoreId } of sources) {
+    if (!sourceStoreId) continue;
+    await inOwnTx(sourceStoreId, async tx => {
+      const live = await tx.billingGrant.findMany({
+        where: {
+          sourceStoreId,
+          status: { in: ['pending', 'applied'] },
+          sourceEventId: { not: null },
+        },
+        select: { sourceEventId: true },
+      });
+      const ids = [...new Set(live.map(g => g.sourceEventId as string))];
+      if (ids.length === 0) return;
+      const refunded = await tx.billingEvent.findMany({
+        where: { id: { in: ids }, storeId: sourceStoreId, status: 'refunded' },
+        select: { id: true },
+      });
+      for (const e of refunded)
+        await revokeGrantsForEvent(tx, e.id, 'payment_refunded', now, sourceStoreId);
+    }).catch(err => logger.error({ err, sourceStoreId }, '[billing] grant revocation scan failed'));
+  }
+  await restoreRevokedGrants(now);
   const pending = await prisma.billingGrant.findMany({
     where: { status: 'pending' },
     distinct: ['beneficiaryId'],
@@ -312,7 +434,10 @@ export async function sweepFreeMonthGrants(
     }
   }
 
-  if ((await prisma.billingGrant.count({ where: { kind: 'founding' } })) < FOUNDING_SLOTS) {
+  if (
+    (await prisma.billingGrant.count({ where: { kind: 'founding', status: { not: 'revoked' } } })) <
+    FOUNDING_SLOTS
+  ) {
     const parts = await acrossStores(
       async storeId => {
         const has = await prisma.billingGrant.count({
@@ -320,7 +445,7 @@ export async function sweepFreeMonthGrants(
         });
         if (has > 0) return null;
         const at = await firstQualifyingPayment(prisma as unknown as Tx, storeId);
-        return at ? { storeId, at } : null;
+        return at ? { storeId, at: at.createdAt } : null;
       },
       {
         ...(only?.storeIds ? { storeIds: only.storeIds } : {}),

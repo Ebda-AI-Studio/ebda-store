@@ -5294,8 +5294,16 @@ model BillingGrant {
   counterpartId    String?   @map("counterpart_id")
   months           Int       @default(1)
   valueMinor       Int       @default(0) @map("value_minor")
-  /// pending | applied
+  /// pending | applied | revoked (the qualifying payment was refunded / charged back)
   status           String    @default("pending")
+  /// The qualifying payment (billing_events.id) and the store it belongs to. A referral grant to the referrer
+  /// points at the REFERRED store's payment.
+  sourceEventId    String?   @map("source_event_id")
+  sourceStoreId    String?   @map("source_store_id")
+  revokedAt        DateTime? @map("revoked_at")
+  revokeReason     String?   @map("revoke_reason")
+  /// Set once the free month taken back from `currentPeriodEnd` (applied grants only).
+  restoredAt       DateTime? @map("restored_at")
   idempotencyKey   String    @unique @map("idempotency_key")
   periodEndBefore  DateTime? @map("period_end_before")
   periodEndAfter   DateTime? @map("period_end_after")
@@ -5304,6 +5312,8 @@ model BillingGrant {
 
   @@index([beneficiaryId, status])
   @@index([kind, createdAt])
+  @@index([sourceEventId])
+  @@index([sourceStoreId, status])
   @@map("billing_grants")
 }
 
