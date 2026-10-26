@@ -89,8 +89,8 @@ export const MODEL3D: Record<Model3dId, Model3dDef> = {
     glb: '/3d/dahab-solitaire.glb',
     variants: [
       { id: 'yellow-gold', hex: '#e0b552' },
-      { id: 'rose-gold', hex: '#d9a08a' },
-      { id: 'white-gold', hex: '#d8d9dc' },
+      { id: 'rose-gold', hex: '#e8a68e' },
+      { id: 'white-gold', hex: '#ecedef' },
     ],
     skin: {
       look: 'dahab-a',

@@ -39,8 +39,8 @@ const html = (slug, photos) => `<!doctype html><meta charset="utf-8">
   .lock{position:absolute;right:60px;bottom:92px;height:88px}
   .h{position:absolute;right:72px;top:104px;width:540px;direction:rtl;text-align:right;color:#121314;font-weight:700;font-size:58px;line-height:1.5;text-wrap:balance}
   .rule{position:absolute;right:72px;top:70px;width:96px;height:4px;background:#B08D57}
-  .url{position:absolute;right:72px;bottom:44px;direction:ltr;color:#575C5D;font-size:21px;font-weight:700;letter-spacing:.2px;opacity:.8}
-  .ph{position:absolute;width:150px;height:318px;border-radius:34px;background:#1C1C1E;padding:5px;box-shadow:0 14px 28px rgba(18,19,20,.18);outline:1px solid rgba(176,141,87,.45)}
+  .url{position:absolute;right:72px;bottom:44px;direction:ltr;color:#4A4338;font-size:21px;font-weight:700;letter-spacing:.2px}
+  .ph{position:absolute;width:150px;height:318px;border-radius:34px;background:#1C1C1E;padding:5px;box-shadow:0 14px 28px rgba(18,19,20,.12);outline:1px solid rgba(176,141,87,.45)}
   .ph div{width:100%;height:100%;border-radius:30px;background-size:cover;background-position:center}
 </style>
 <div class="rule"></div><div class="h">${h1(slug)}</div>

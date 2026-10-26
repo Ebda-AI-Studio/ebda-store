@@ -36,28 +36,30 @@ const arc = (cx, cy, r, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, i) =
 
 // ---------- Jasmine: a 30 ml dropper serum bottle (diameter 32 mm, 96 mm with the bulb) ----------
 const COLOURWAYS_J = [
-  { id: 'rose', serum: '#DE8F95', bulb: '#E8E4DA' },
-  { id: 'amber', serum: '#D18B1F', bulb: '#E8E4DA' },
-  { id: 'sage', serum: '#7FA383', bulb: '#E8E4DA' },
+  { id: 'rose', serum: '#DE8F95', bulb: '#3A3631' },
+  { id: 'amber', serum: '#D18B1F', bulb: '#3A3631' },
+  { id: 'sage', serum: '#7FA383', bulb: '#3A3631' },
 ];
 function jasmine() {
   const g = new THREE.Group();
   g.name = 'jasmine-serum';
-  const R = 0.016;
-  const body = [[0, 0], ...arc(R - 0.004, 0.004, 0.004, -Math.PI / 2, 0, 6), [R, 0.052], ...arc(R - 0.006, 0.052, 0.006, 0, Math.PI / 2 * 0.9, 6), [0.0075, 0.0625], [0.0075, 0.068]];
-  // Alpha-blended glass (not transmission): transmission needs a backdrop and goes opaque on a transparent poster.
-  const glass = P('glass-frosted', { color: '#EEF1F0', roughness: 0.25, metalness: 0, transparent: true, opacity: 0.3, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.08 });
-    const liquid = [[0, 0.003], [R - 0.0035, 0.003], [R - 0.0035, 0.044], [R - 0.0085, 0.054], [0, 0.054]];
-  const serum = P('serum', { color: COLOURWAYS_J[0].serum, roughness: 0.18, clearcoat: 0.6 });
+  const R = 0.016, T = 0.0022; // outer radius, glass wall
+  // One closed profile: outside from the base up to the lip, then back down the inside to the floor, so the glass
+  // has real thickness for refraction. DoubleSide because the inner wall faces the cavity.
+  const outer = [[0, 0], ...arc(R - 0.004, 0.004, 0.004, -Math.PI / 2, 0, 6), [R, 0.052], ...arc(R - 0.006, 0.052, 0.006, 0, Math.PI / 2 * 0.9, 6), [0.0075, 0.0625], [0.0075, 0.068]];
+  const inner = [[0.0075 - T, 0.068], [0.0075 - T, 0.0625], ...arc(R - 0.006, 0.052, 0.006 - T, Math.PI / 2 * 0.9, 0, 6), [R - T, 0.052], ...arc(R - 0.004, 0.004, 0.004 - T, 0, -Math.PI / 2, 6).map(([x, y]) => [x, Math.max(y, 0.0035)]), [0, 0.0035]];
+  const glass = P('glass', { color: '#FFFFFF', roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.004, ior: 1.5, clearcoat: 0.6, clearcoatRoughness: 0.03, side: THREE.DoubleSide });
+  const liquid = [[0, 0.0045], [R - T - 0.0006, 0.0045], [R - T - 0.0006, 0.044], [R - 0.0095, 0.054], [0, 0.054]];
+  const serum = P('serum', { color: COLOURWAYS_J[0].serum, roughness: 0.12, transmission: 0.55, thickness: 0.02, ior: 1.38 });
   g.add(mk(lathe(liquid), serum, 'serum'));
-  g.add(mk(lathe(body), glass, 'bottle'));
+  g.add(mk(lathe([...outer, ...inner]), glass, 'bottle'));
   const paper = P('label-paper', { color: '#BFB095', roughness: 0.9 });
   g.add(mk(new THREE.CylinderGeometry(R + 0.0004, R + 0.0004, 0.018, 64, 1, true, -Math.PI * 0.55, Math.PI * 1.1), paper, 'label', [0, 0.027, 0]));
   const goldMat = P('gold-collar', { color: '#B08D57', metalness: 1, roughness: 0.22 });
   const collar = [[0.0105, 0.066], [0.0105, 0.0785], [0.0095, 0.0785], [0.0095, 0.066]];
   g.add(mk(lathe(collar), goldMat, 'collar'));
   g.add(mk(new THREE.CylinderGeometry(0.0108, 0.0108, 0.0012, 64), goldMat, 'collar-top', [0, 0.0785, 0]));
-  const bulbMat = P('bulb', { color: COLOURWAYS_J[0].bulb, roughness: 0.5, clearcoat: 0.3 });
+  const bulbMat = P('bulb', { color: COLOURWAYS_J[0].bulb, roughness: 0.7, clearcoat: 0.1 });
   const bulb = [[0.0072, 0.0785], [0.0072, 0.083], [0.0070, 0.086], [0.0062, 0.0925], [0.0036, 0.0957], [0.0, 0.0962]];
   g.add(mk(lathe(bulb, 48), bulbMat, 'bulb'));
   return { root: g, variants: COLOURWAYS_J.map(c => ({ id: c.id, set: { serum: c.serum, bulb: c.bulb } })) };
@@ -66,8 +68,8 @@ function jasmine() {
 // ---------- Dahab: a solitaire ring (inner diameter 17 mm), stands upright on its band ----------
 const COLOURWAYS_D = [
   { id: 'yellow-gold', metal: '#E0B552' },
-  { id: 'rose-gold', metal: '#D9A08A' },
-  { id: 'white-gold', metal: '#D8D9DC' },
+  { id: 'rose-gold', metal: '#E8A68E' },
+  { id: 'white-gold', metal: '#ECEDEF' },
 ];
 function dahab() {
   const g = new THREE.Group();
@@ -92,8 +94,9 @@ function dahab() {
   // Head: six prongs and a brilliant-cut stone on top of the band (+y).
   const topY = Ri + tube.y * 2;
   const R = 0.0028;
-  const gem = P('stone-diamond', { color: '#FFFFFF', metalness: 0, roughness: 0.02, transmission: 1, thickness: 0.003, ior: 2.4, specularIntensity: 1 });
-  const gemGeo = lathe([[0, -0.0016 * 1.6], [R, 0], [R * 1.02, 0.0002], [R * 0.62, 0.0013], [0, 0.0013]], 8).toNonIndexed();
+  const gem = P('stone-diamond', { color: '#FFFFFF', metalness: 0, roughness: 0, transmission: 1, thickness: 0.004, ior: 2.4, specularIntensity: 1, attenuationColor: '#FFFFFF' });
+  // Brilliant-cut proportions: table 55 %, crown 15 %, pavilion 43 % of the girdle width; 16 flat facets round, two bands each side.
+  const gemGeo = lathe([[0, -0.0024], [R * 0.58, -0.0013], [R, -0.0001], [R, 0.0001], [R * 0.82, 0.0007], [R * 0.64, 0.0011], [R * 0.55, 0.0013], [0, 0.0013]], 16).toNonIndexed();
   gemGeo.computeVertexNormals();
   const stone = new THREE.Mesh(gemGeo, gem);
   stone.name = 'stone';

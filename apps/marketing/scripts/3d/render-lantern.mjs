@@ -9,14 +9,20 @@ import os from 'node:os';
 import path from 'node:path';
 import { openHarness } from './render-3d.mjs';
 
-const SECONDS = 8, FPS = 30;
+// Timeline (s): the lantern turns once in 7.5, the headline brightens through the last second of the turn, then the
+// frame holds 1.5 s with the headline and lockup fully lit, and eases back to the loop start (the front view is the
+// same at both ends, so the loop has no seam). The camera pushes in and settles back on a slow cosine; the flame
+// flickers on integer cycles per loop so it also repeats cleanly. Whole-block fades only: never per-letter.
+const FPS = 30, TURN = 7.5, HOLD = 1.5, TAIL = 0.3, TOTAL = TURN + HOLD + TAIL;
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const smooth = x => x * x * (3 - 2 * x);
 const NIGHT = '#0A0B0C';
 const lockup = readFileSync(new URL('../../../../brand/logo/svg/04a-product-store.svg', import.meta.url), 'utf8').replaceAll('#0A0B0C', '#FAF8F3');
 const lockupUri = 'data:image/svg+xml;base64,' + Buffer.from(lockup).toString('base64');
 
 // Night ground: a warm brass glow behind the lantern, falling off to the brand night.
 const stage = ({ w, h, lockupH, headline }) => `
-  html,body{background:radial-gradient(ellipse 70% 55% at 50% 46%, #2a2012 0%, #14110c 45%, ${NIGHT} 80%)!important}
+  html,body{background:#0A0B0C}
   #fx{position:fixed;inset:0;pointer-events:none;font-family:'Cairo',sans-serif}
   #fx img{position:absolute;left:50%;transform:translateX(-50%);bottom:${Math.round(h * 0.055)}px;height:${lockupH}px}
   #fx .rule{position:absolute;left:50%;transform:translateX(-50%);bottom:${Math.round(h * 0.055) + lockupH + 18}px;width:72px;height:3px;background:#B08D57}
@@ -24,7 +30,7 @@ const stage = ({ w, h, lockupH, headline }) => `
 
 async function render({ w, h, headline, outName }) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'lantern-'));
-  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 1.1, warmGlow: 0.5, litGlass: true });
+  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 0.8, envI: 0.45, warmGlow: 0.05, litGlass: true, gradient: true, bloom: 0.55 });
   const lockupH = Math.round(h * 0.115);
   await hx.page.addStyleTag({ content: stage({ w, h, lockupH }) });
   await hx.page.evaluate(([u, hl]) => {
@@ -33,16 +39,16 @@ async function render({ w, h, headline, outName }) {
     document.body.appendChild(d);
     return document.fonts.load('700 40px Cairo');
   }, [lockupUri, headline || '']).catch(() => {});
-  const frames = SECONDS * FPS;
-  const fit = w < h ? 0.56 : 0.8;
-  const draw = async i => {
-    const u = i / frames;
-    // Monotone and periodic (a < 1): a steady turn with a soft ease each quarter, so the loop has no seam.
-    const az = 2 * Math.PI * u + 0.55 * Math.sin(2 * Math.PI * u);
-    await hx.page.evaluate(a => window.draw(a), { az, el: 0.16 + 0.03 * Math.sin(2 * Math.PI * u), fit });
-  };
+  const frames = Math.round(TOTAL * FPS);
+  const base = w < h ? 0.48 : 0.8;
   for (let i = 0; i < frames; i++) {
-    await draw(i);
+    const t = i / FPS, u = clamp01(t / TURN), p = t / TOTAL;
+    // Monotone and periodic in the turn (a < 1): a steady turn with a soft ease each quarter.
+    const az = 2 * Math.PI * u + 0.55 * Math.sin(2 * Math.PI * u);
+    const fit = base * (1 + 0.06 * (1 - Math.cos(2 * Math.PI * p)) / 2);
+    const flame = 1 + 0.04 * Math.sin(2 * Math.PI * (9 * p) + 1) + 0.025 * Math.sin(2 * Math.PI * (17 * p) + 2.2) + 0.015 * Math.sin(2 * Math.PI * (31 * p));
+    const text = 0.85 + 0.15 * smooth(clamp01((t - (TURN - 1)) / 1)) - 0.15 * smooth(clamp01((t - (TURN + HOLD)) / TAIL));
+    await hx.page.evaluate(([a, o]) => { window.draw(a); document.getElementById('fx').style.opacity = o; }, [{ az, el: 0.16 + 0.03 * Math.sin(2 * Math.PI * p), fit, flame }, text]);
     await hx.page.screenshot({ path: path.join(dir, `f${String(i).padStart(4, '0')}.png`) });
   }
   await hx.close();
@@ -57,7 +63,7 @@ await mkdir(new URL('../../public/ads/', import.meta.url), { recursive: true });
 // 1200x630 poster = the OG image for the video: lantern left, the line and the lockup right (reads right-to-left).
 async function poster() {
   const w = 1200, h = 630;
-  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 1.1, warmGlow: 0.5, litGlass: true });
+  const hx = await openHarness({ url: '/apps/marketing/public/3d/brass-diya-lantern.glb', w, h, exposure: 0.8, envI: 0.45, warmGlow: 0.05, litGlass: true, gradient: true, bloom: 0.55 });
   await hx.page.addStyleTag({ content: stage({ w, h, lockupH: 96 }) + `
   #fx .hl{left:auto;right:70px;top:150px;width:520px;text-align:right;font-size:54px;padding:0}
   #fx .rule{left:auto;right:70px;transform:none;bottom:auto;top:118px}

@@ -40,7 +40,7 @@ if (process.argv[2] === 'stills') {
     { file: 'dahab-solitaire.glb', name: 'dahab', variants: ['yellow-gold', 'rose-gold', 'white-gold'], az: 0.55, el: 0.35, fit: 0.72 },
   ];
   for (const j of jobs) {
-    const hx = await openHarness({ url: `/apps/marketing/public/3d/${j.file}`, w: 1200, h: 1200, exposure: 1.05 });
+    const hx = await openHarness({ url: `/apps/marketing/public/3d/${j.file}`, w: 1200, h: 1200, exposure: 1.6, fakeGlass: true });
     for (const [i, v] of j.variants.entries()) {
       await hx.page.evaluate(a => window.draw(a), { az: j.az, el: j.el, fit: j.fit, variant: v });
       const png = await hx.page.locator('canvas').screenshot({ omitBackground: true });
