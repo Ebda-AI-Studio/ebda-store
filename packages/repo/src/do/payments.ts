@@ -871,7 +871,12 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
   const { db, input, p, o, now, alerts, postCommit, finish, status } = c;
   const meta = parse(p.metadata);
   // Money already captured is never downgraded by a stale or contradictory notice: record it, keep the state, alert.
-  if (LIVE_PAYMENT.has(p.status) && status !== 'completed' && status !== 'refunded') {
+  // (a replayed `completed` over a refunded / partially refunded / disputed payment is the same downgrade)
+  const FINANCIAL_AFTER_CAPTURE = new Set(['refunded', 'partially_refunded', 'disputed']);
+  if (
+    (LIVE_PAYMENT.has(p.status) && status !== 'completed' && status !== 'refunded') ||
+    (status === 'completed' && FINANCIAL_AFTER_CAPTURE.has(p.status))
+  ) {
     addPaymentEvent(db, {
       storeId: input.storeId,
       paymentId: p.id,
@@ -950,7 +955,14 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
     orderPay = 'failed';
   else if (status === 'refunded') orderPay = 'refunded';
   // assert the ORDER transition BEFORE any write (a throw rolls the whole section back, nothing is half-applied)
-  if (status !== 'pending' && status !== 'processing') assertTransition(o.status, orderStatus);
+  // an order the merchant already moved on (processing / shipped / delivered) is marked PAID without moving its
+  // fulfilment status (P08-2 c), so a capture is never refused for ever; cancelled / refunded still throw
+  const fulfilled = ['processing', 'shipped', 'delivered'].includes(o.status);
+  // (a failure never sets the order status, so only the confirming and refunding statuses assert a transition)
+  if ((status === 'completed' && !fulfilled) || status === 'refunded')
+    assertTransition(o.status, orderStatus);
+  // the order was already settled by another path (pull-side confirm, an earlier event): no second fan-out
+  const orderWasPaid = o.payment_status === 'paid';
   db.run('UPDATE payments SET status = ?, paid_at = ?, metadata = ?, updated_at = ? WHERE id = ?', [
     status,
     input.paidAt ?? (status === 'completed' ? now : null),
@@ -994,12 +1006,20 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
     },
     now,
   });
-  if (status !== 'pending' && status !== 'processing') {
+  // a failure only ever moves an UNPAID order (a paid / refunded one keeps its state, P08-2 a)
+  const failureOnSettledOrder = orderPay === 'failed' && o.payment_status !== 'unpaid';
+  if (status !== 'pending' && status !== 'processing' && !failureOnSettledOrder) {
     db.run(
       'UPDATE orders SET status = ?, payment_status = ?, updated_at = ? WHERE id = ? AND store_id = ?',
-      [orderStatus === 'confirmed' ? 'confirmed' : o.status, orderPay, now, o.id, input.storeId]
+      [
+        orderStatus === 'confirmed' && !fulfilled ? 'confirmed' : o.status,
+        orderPay,
+        now,
+        o.id,
+        input.storeId,
+      ]
     );
-    if (orderStatus === 'confirmed' && o.status !== 'confirmed')
+    if (orderStatus === 'confirmed' && o.status !== 'confirmed' && !fulfilled)
       addOrderEvent(
         db,
         input.storeId,
@@ -1010,8 +1030,11 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
         now
       );
   }
-  if (status === 'completed') postCommit.push('order_paid');
-  else if (status === 'failed' || status === 'expired' || status === 'cancelled')
+  if (status === 'completed' && !orderWasPaid) postCommit.push('order_paid');
+  else if (
+    (status === 'failed' || status === 'expired' || status === 'cancelled') &&
+    !failureOnSettledOrder
+  )
     postCommit.push('payment_failed');
   return finish('applied', status);
 }

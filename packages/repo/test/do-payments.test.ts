@@ -291,6 +291,117 @@ describe('payment webhook', () => {
     expect(g.one('SELECT payment_status ps FROM orders').ps).toBe('failed');
   });
 
+  it('P08: a fulfilled order (processing / shipped) is marked PAID without moving its status; a cancelled one still refuses', async () => {
+    for (const st of ['processing', 'shipped'] as const) {
+      const f = fx();
+      const o = f.order();
+      createPayment(f.db, {
+        storeId: 's1',
+        orderId: o.orderId,
+        provider: 'paymob',
+        amount: o.total,
+        transactionId: 'T1',
+      });
+      f.raw.exec(`UPDATE orders SET status = '${st}'`);
+      const r = await applyPaymentEvent(
+        f.db,
+        wh({
+          providerRef: 'T1',
+          eventId: 'e1',
+          kind: 'payment',
+          status: 'completed',
+          amount: o.total,
+          currency: 'EGP',
+        })
+      );
+      expect(r).toMatchObject({
+        outcome: 'applied',
+        paymentStatus: 'completed',
+        postCommit: ['order_paid'],
+      });
+      expect(f.one('SELECT status s, payment_status ps FROM orders')).toMatchObject({
+        s: st,
+        ps: 'paid',
+      });
+    }
+    const g = fx();
+    const o = g.order();
+    createPayment(g.db, {
+      storeId: 's1',
+      orderId: o.orderId,
+      provider: 'paymob',
+      amount: o.total,
+      transactionId: 'T1',
+    });
+    g.raw.exec(`UPDATE orders SET status = 'cancelled'`);
+    expect(
+      await code(() =>
+        applyPaymentEvent(
+          g.db,
+          wh({
+            providerRef: 'T1',
+            eventId: 'e1',
+            kind: 'payment',
+            status: 'completed',
+            amount: o.total,
+            currency: 'EGP',
+          })
+        )
+      )
+    ).not.toBe('NO_ERROR');
+    expect(g.one('SELECT payment_status ps FROM orders').ps).toBe('unpaid');
+  });
+
+  it('P08: a second completed event (a verify after a webhook) does not fan out twice; a completed replay never overwrites a refunded payment', async () => {
+    const f = fx();
+    const p = await f.paid();
+    const second = await applyPaymentEvent(
+      f.db,
+      wh({
+        providerRef: p.ref,
+        eventId: 'again',
+        kind: 'payment',
+        status: 'completed',
+        amount: p.total,
+        currency: 'EGP',
+      })
+    );
+    expect(second.postCommit).toEqual([]); // the order was already paid
+    f.raw.exec(`UPDATE payments SET status = 'refunded'`);
+    const replay = await applyPaymentEvent(
+      f.db,
+      wh({
+        providerRef: p.ref,
+        eventId: 'again2',
+        kind: 'payment',
+        status: 'completed',
+        amount: p.total,
+        currency: 'EGP',
+      })
+    );
+    expect(replay).toMatchObject({ outcome: 'ignored', paymentStatus: 'refunded' });
+    expect(f.one('SELECT status s FROM payments').s).toBe('refunded');
+  });
+
+  it('P08: a failed notice for a payment row that is not live but whose order is PAID leaves the order paid and pushes nothing', async () => {
+    const f = fx();
+    const o = f.order();
+    createPayment(f.db, {
+      storeId: 's1',
+      orderId: o.orderId,
+      provider: 'paymob',
+      amount: o.total,
+      transactionId: 'T1',
+    });
+    f.raw.exec(`UPDATE orders SET payment_status = 'paid', status = 'confirmed'`); // paid through another payment row
+    const r = await applyPaymentEvent(
+      f.db,
+      wh({ providerRef: 'T1', eventId: 'f1', kind: 'payment', status: 'expired' })
+    );
+    expect(r.postCommit).toEqual([]);
+    expect(f.one('SELECT payment_status ps FROM orders').ps).toBe('paid');
+  });
+
   it('a second captured payment on one order raises a duplicate-capture alert', async () => {
     const f = fx();
     const p = await f.paid();
