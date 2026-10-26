@@ -16,6 +16,10 @@ set -euo pipefail
 # Mirrors CI's client-secret-scan job: every `uses:` pinned to a 40-hex SHA (#1517).
 bash scripts/check-action-pins.sh
 
+# Preflight FIRST (cheapest, fails in seconds): fresh origin/main merges cleanly, migration order + controller registry,
+# wrangler crons use weekday names. Each class used to surface hours later as a red or stuck PR.
+node scripts/ci/pre-push-preflight.mjs
+
 BASE=$(git merge-base origin/main HEAD 2>/dev/null || true)
 if [ -n "$BASE" ]; then PLAN=$(node scripts/ci/pre-push-plan.mjs --base "$BASE"); else PLAN='{"mode":"full","files":[]}'; fi
 MODE=$(node -e 'console.log(JSON.parse(process.argv[1]).mode)' "$PLAN")

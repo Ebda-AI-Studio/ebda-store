@@ -125,6 +125,28 @@ describe('merge-gate.sh', () => {
     expect(r.out).toContain('head moved');
     expect(r.merged).toBeNull();
   });
+  it('CONFLICTING -> exits at once (1) saying "rebase needed", even while checks are pending', () => {
+    const r = run([...green, { name: 'Lint', status: 'QUEUED', conclusion: null }], {
+      mergeable: 'CONFLICTING',
+    });
+    expect(r.status).toBe(1);
+    expect(r.merged).toBeNull();
+    expect(r.out).toContain('rebase needed');
+  });
+  it('UNKNOWN is transient: it waits, it does not say rebase needed', () => {
+    const r = run(green, { mergeable: 'UNKNOWN' });
+    expect(r.status).toBe(2);
+    expect(r.out).not.toContain('rebase needed');
+  });
+  it('a CANCELLED check -> "cancelled (infra or controller), re-run", not "failing"', () => {
+    const r = run(
+      green.map(c => (c.name === 'Repo guards' ? { ...c, conclusion: 'CANCELLED' } : c))
+    );
+    expect(r.status).toBe(1);
+    expect(r.merged).toBeNull();
+    expect(r.out).toContain('cancelled (infra or controller), re-run: Repo guards');
+    expect(r.out).not.toContain('failing check');
+  });
   it('mergeable UNKNOWN or CONFLICTING -> does not merge', () => {
     expect(run(green, { mergeable: 'UNKNOWN' }).merged).toBeNull();
     expect(run(green, { mergeable: 'CONFLICTING' }).merged).toBeNull();

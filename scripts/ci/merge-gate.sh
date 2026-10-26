@@ -10,7 +10,7 @@
 #   - every check is COMPLETED with SUCCESS / SKIPPED / NEUTRAL (queued, in progress, failed, cancelled, timed out: no)
 #   - every REQUIRED check is an explicit SUCCESS. The required list is DERIVED from .github/workflows by
 #     scripts/ci/merge-gate-required.mjs (jobs that always run on a PR), so it cannot drift from the workflows.
-# A failed/cancelled check or a moved head ends the run at once (exit 1). Pending checks are waited on, up to
+# A failed check, a moved head, a CONFLICTING PR ("rebase needed") or a CANCELLED check ("cancelled (infra or controller), re-run" - not a failure of the code) ends the run at once (exit 1). Pending checks are waited on, up to
 # --max-wait-min (default 180); running out of time exits 2 and merges nothing.
 #
 # options: --repo OWNER/NAME (default Whisky-11/ebda-store)  --polls N (3)  --interval S (30)  --max-wait-min M (180)
@@ -47,6 +47,9 @@ evaluate() {
     . as $p
     | ($p.statusCheckRollup // []) as $c
     | if ($p.headRefOid | startswith($want) | not) then "refuse:head moved to \($p.headRefOid[0:9]) (expected \($want))"
+      elif ($p.mergeable == "CONFLICTING") then "refuse:rebase needed - this PR conflicts with main (mergeable=CONFLICTING) and can never go green; merge or rebase origin/main, resolve, push, then run the gate again"
+      elif [$c[] | select(st == "COMPLETED" and cc == "CANCELLED") | nm] | length > 0
+        then "refuse:cancelled (infra or controller), re-run: \([$c[] | select(st == "COMPLETED" and cc == "CANCELLED") | nm] | join(", "))"
       elif [$c[] | select(st == "COMPLETED" and (cc | IN("SUCCESS","SKIPPED","NEUTRAL") | not)) | nm] | length > 0
         then "refuse:failing check(s): \([$c[] | select(st == "COMPLETED" and (cc | IN("SUCCESS","SKIPPED","NEUTRAL") | not)) | nm] | join(", "))"
       elif ($c | length) == 0 then "wait:no checks have reported yet"
