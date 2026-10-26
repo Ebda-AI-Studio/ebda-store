@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
     unknown
   > | null,
   updates: [] as Array<Record<string, unknown>>,
+  paymentWhere: [] as Array<Record<string, unknown>>,
   read: vi.fn(),
   warn: vi.fn(),
 }));
@@ -34,7 +35,12 @@ vi.mock('@ebda/database', async () =>
         }),
         findUniqueOrThrow: vi.fn(async () => h.row),
       },
-      payment: { findFirst: vi.fn(async () => h.payment) },
+      payment: {
+        findFirst: vi.fn(async (a: Record<string, unknown>) => {
+          h.paymentWhere.push(a.where as Record<string, unknown>);
+          return h.payment;
+        }),
+      },
     },
   })
 );
@@ -72,6 +78,7 @@ const EXT = {
 beforeEach(() => {
   vi.clearAllMocks();
   h.updates.length = 0;
+  h.paymentWhere.length = 0;
   h.payment = { metadata: { handle: 'Shop@InstaPay', phone: '+20 101 234 5678' } };
   h.row = {
     id: 'r1',
@@ -122,5 +129,19 @@ describe('InstapayReceiptService.runExtraction - receiver check', () => {
     const data = h.updates.map(u => u.data as Record<string, unknown>);
     expect(data.some(d => d.extractionStatus === 'failed')).toBe(true);
     expect(data.some(d => d.status === 'approved' || d.extractionStatus === 'done')).toBe(false);
+  });
+
+  it('the expected receivers come from the payment the receipt was filed against; without one, the newest PENDING instapay payment', async () => {
+    h.read.mockResolvedValue({ ...EXT, receiverMatch: null });
+    h.row = { ...h.row, paymentId: 'p-9' };
+    await InstapayReceiptService.runExtraction('s1', 'r1');
+    expect(h.paymentWhere[0]).toMatchObject({ id: 'p-9', orderId: 'o1', provider: 'instapay' });
+    h.row = { ...h.row, paymentId: null, extractionStatus: 'pending' };
+    await InstapayReceiptService.runExtraction('s1', 'r1');
+    expect(h.paymentWhere[1]).toMatchObject({
+      orderId: 'o1',
+      provider: 'instapay',
+      status: 'pending',
+    });
   });
 });

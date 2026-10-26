@@ -119,10 +119,12 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
   // payer-typed comparison, as before.
   const aiReceiver = i.extractionStatus === 'done' ? (i.extraction?.receiverMatch ?? null) : null;
   if (aiReceiver === false) flags.push('RECEIVER_MISMATCH');
-  else if (aiReceiver === true) {
-    /* verified on the image */
-  } else if (shown.length === 0) flags.push('RECEIVER_MISSING');
-  else if (expected.length > 0 && !shown.some(s => expected.includes(s))) {
+  else if (shown.length === 0) {
+    // blank typed fields: a verified image stands in for them
+    if (aiReceiver !== true) flags.push('RECEIVER_MISSING');
+  } else if (expected.length > 0 && !shown.some(s => expected.includes(s))) {
+    // the payer TYPED a receiver that is not the expected account: a model "yes" (a guess, a decoy line on the image, a
+    // masked number that agrees on a few digits) never hides that
     flags.push('RECEIVER_MISMATCH');
   }
   if (i.notBefore && i.transferredAt.getTime() < i.notBefore.getTime()) flags.push(i.notBeforeFlag);
@@ -333,13 +335,16 @@ export class InstapayReceiptService {
    */
   static async expectedReceiversFor(
     storeId: string,
-    row: { kind: string; orderId: string | null }
+    row: { kind: string; orderId: string | null; paymentId?: string | null }
   ): Promise<string[]> {
     const raw: unknown[] = [];
     if (row.kind === 'order' && row.orderId) {
       const payment = await withStore(storeId, () =>
         prisma.payment.findFirst({
-          where: { orderId: row.orderId!, provider: 'instapay' },
+          // the payment the receipt was filed against (the account the approver is shown), else the newest pending one
+          where: row.paymentId
+            ? { id: row.paymentId, orderId: row.orderId!, provider: 'instapay' }
+            : { orderId: row.orderId!, provider: 'instapay', status: 'pending' },
           orderBy: { createdAt: 'desc' },
           select: { metadata: true },
         })

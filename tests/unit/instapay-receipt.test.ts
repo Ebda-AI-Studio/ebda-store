@@ -248,6 +248,15 @@ describe('automatic checks flag, they never block', () => {
     expect(f).not.toContain('RECEIVER_MISSING');
     expect(f).not.toContain('RECEIVER_MISMATCH');
   });
+  it('RECEIVER-CHECK-1: the payer TYPED a wrong receiver and the model says yes -> still RECEIVER_MISMATCH (a model yes never hides a typed mismatch)', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      fields: { ...b.fields, receiverHandle: 'someone-else@instapay', receiverMobile: null },
+      extraction: { ...b.extraction!, receiverMatch: true },
+    });
+    expect(f).toContain('RECEIVER_MISMATCH');
+  });
   it('RECEIVER-CHECK-1: no expected receiver configured -> no MISMATCH flag from the model (null), typed check unchanged', () => {
     const b = base();
     const f = computeReceiptFlags({
