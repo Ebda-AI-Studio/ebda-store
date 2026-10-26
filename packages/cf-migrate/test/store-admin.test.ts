@@ -253,3 +253,87 @@ describe('__verify', () => {
     expect((await r.json()).tables.categories.aggs).toEqual({ position: '10' });
   });
 });
+
+describe('__seal baseline, __diff, __unseal (rollback safety, Audit DB-1)', () => {
+  const rows = [
+    ['c1', 's1', 'Rings', 'rings', null],
+    ['c2', 's1', 'Chains', 'chains', null],
+    ['c3', 's1', 'Beads', 'beads', null],
+  ];
+  const diff = async (ctx: ReturnType<typeof storeDo>) =>
+    (await (await post(ctx, '__diff', '', 'application/json')).json()) as any;
+
+  it('refuses to diff before a seal (no baseline)', async () => {
+    const ctx = storeDo();
+    expect((await post(ctx, '__diff', '', 'application/json')).status).toBe(409);
+  });
+
+  it('a sealed store with no writes diffs to nothing', async () => {
+    const ctx = storeDo();
+    await post(ctx, '__import', ndjson(headOf(), rows));
+    const seal = await (await post(ctx, '__seal', '')).json();
+    expect(seal.baselineRows).toBe(3);
+    expect((await diff(ctx)).total).toBe(0);
+  });
+
+  it('reports added, changed and deleted rows after the seal, with full rows for replay', async () => {
+    const ctx = storeDo();
+    await post(ctx, '__import', ndjson(headOf(), rows));
+    await post(ctx, '__seal', '');
+    ctx.db
+      .prepare(
+        `INSERT INTO categories (id, store_id, name, slug) VALUES ('c4', 's1', 'New', 'new')`
+      )
+      .run();
+    ctx.db.prepare(`UPDATE categories SET name = 'Renamed' WHERE id = 'c1'`).run();
+    ctx.db.prepare(`DELETE FROM categories WHERE id = 'c3'`).run();
+    const d = await diff(ctx);
+    expect(d.total).toBe(3);
+    const t = d.tables.categories;
+    expect(t.added.map((r: unknown[]) => r[t.columns.indexOf('id')])).toEqual(['c4']);
+    expect(t.changed.map((r: unknown[]) => r[t.columns.indexOf('name')])).toEqual(['Renamed']);
+    expect(t.deleted).toEqual([['c3']]);
+  });
+
+  it('unseal wipes rows and bookkeeping, needs the exact confirmation, and re-opens imports', async () => {
+    const ctx = storeDo();
+    await post(ctx, '__import', ndjson(headOf(), rows));
+    await post(ctx, '__seal', '');
+    expect(
+      (await post(ctx, '__unseal', JSON.stringify({ confirm: 'yes' }), 'application/json')).status
+    ).toBe(400);
+    expect(
+      (
+        await post(
+          ctx,
+          '__unseal',
+          JSON.stringify({ confirm: 'wipe-and-unseal' }),
+          'application/json'
+        )
+      ).status
+    ).toBe(200);
+    expect(ctx.db.prepare('SELECT COUNT(*) AS n FROM categories').get()).toEqual({ n: 0 });
+    expect(
+      (await post(ctx, '__import', ndjson(headOf({ batch: 'cut-retry-1' }), rows))).status
+    ).toBe(200);
+  });
+});
+
+describe('__rebase', () => {
+  it('makes the current state the new baseline so a replayed change is no longer a diff', async () => {
+    const ctx = storeDo();
+    await post(ctx, '__import', ndjson(headOf(), [['c1', 's1', 'A', 'a', null]]));
+    await post(ctx, '__seal', '');
+    ctx.db.prepare(`UPDATE categories SET name = 'B' WHERE id = 'c1'`).run();
+    expect(((await (await post(ctx, '__diff', '', 'application/json')).json()) as any).total).toBe(
+      1
+    );
+    expect((await post(ctx, '__rebase', '')).status).toBe(200);
+    expect(((await (await post(ctx, '__diff', '', 'application/json')).json()) as any).total).toBe(
+      0
+    );
+  });
+  it('refuses before a seal', async () => {
+    expect((await post(storeDo(), '__rebase', '')).status).toBe(409);
+  });
+});

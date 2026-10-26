@@ -1,5 +1,8 @@
 // D1 access through `wrangler d1 execute` (works for --local with a persisted state dir and for --remote).
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 const run = promisify(execFile);
 
@@ -40,3 +43,18 @@ export async function d1File(d, file) {
 
 export const lit = v =>
   v === null ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`;
+
+/**
+ * Run SQL statements through `wrangler d1 execute --file` without a predictable temp path: a private
+ * mkdtemp directory (0700), the file created exclusively (`wx`) with mode 0600, removed in `finally`.
+ */
+export async function d1Statements(d, statements) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ebda-d1-'));
+  const file = path.join(dir, 'statements.sql');
+  try {
+    fs.writeFileSync(file, statements.join('\n') + '\n', { flag: 'wx', mode: 0o600 });
+    await d1File(d, file);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}

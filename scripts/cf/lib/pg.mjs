@@ -57,3 +57,25 @@ export async function resolveStore(client, ref) {
     throw new Error(`store "${ref}" resolved to ${r.rows.length} rows (must be exactly 1)`);
   return r.rows[0];
 }
+
+/**
+ * WRITABLE connection, used ONLY by the rollback replay (flip-backend --to pg). Everything runs in ONE
+ * transaction that the caller commits only after the replay is verified. A Neon host needs
+ * --allow-prod-write, so a replay can never touch production by accident.
+ */
+export async function connectWritable(url, { allowProd = false } = {}) {
+  if (!url) throw new Error('set CUTOVER_REPLAY_PG_URL (or --replay-pg-url)');
+  const host = new URL(url).hostname;
+  if (/neon\.tech$/.test(host) && !allowProd)
+    throw new Error(
+      `${host} is a production Neon host: pass --allow-prod-write to confirm the rollback replay may WRITE to it`
+    );
+  const client = new pg.Client({
+    connectionString: url,
+    options: '-c statement_timeout=120000',
+    application_name: 'ebda-cf-rollback-replay',
+  });
+  await client.connect();
+  await client.query('BEGIN');
+  return client;
+}

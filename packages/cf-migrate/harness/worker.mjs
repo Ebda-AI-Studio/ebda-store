@@ -58,7 +58,16 @@ export class StoreDO extends DurableObject {
       }
     });
   }
-  fetch(request) {
+  async fetch(request) {
+    // HARNESS ONLY (never deployed): lets the rehearsal make "live" writes after the flip.
+    if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/__sql')) {
+      const { sql, params = [] } = await request.json();
+      let rows = [];
+      this.ctx.storage.transactionSync(() => {
+        rows = this.ctx.storage.sql.exec(sql, ...params).toArray();
+      });
+      return Response.json({ ok: true, rows });
+    }
     return handleStoreAdmin(request, {
       sql: this.ctx.storage.sql,
       transactionSync: fn => this.ctx.storage.transactionSync(fn),

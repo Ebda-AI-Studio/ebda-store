@@ -11,8 +11,11 @@
 //           re-run can never overwrite writes the DO accepted after the flag flip.
 // __verify  {tables:[{table, columns, pk}], fk?:true} -> per table {count, digest} (canon.mjs) and, with
 //           fk, the PRAGMA foreign_key_check violations.
-// __seal    marks the store as live on the DO.
-import { TableDigest, sha256Hex } from './canon.mjs';
+// __seal    marks the store as live on the DO and records a per-row baseline of every table.
+// __diff    rows added / changed / deleted since the seal (the data a rollback would otherwise lose).
+// __rebase  baseline := current state, after a verified rollback replay.
+// __unseal  {confirm:'wipe-and-unseal'}: wipes the DO so a retried cutover can re-import.
+import { PK_SEP, TableDigest, canonRow, canonValue, sha256Hex } from './canon.mjs';
 
 export const MAX_PAGE_ROWS = 2000;
 export const MAX_BODY_BYTES = 8 * 1024 * 1024;
@@ -231,13 +234,142 @@ async function doVerify(request, { sql }) {
   return json({ ok: true, tables, fk });
 }
 
-function doSeal({ sql }) {
-  ensureLedger(sql);
+/** every application table of this DO (not sqlite_*, not the cf_* bookkeeping), with all its columns and pk */
+function appTables(sql) {
+  const names = sql
+    .exec(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE 'cf\\_%' ESCAPE '\\' ORDER BY name`
+    )
+    .toArray()
+    .map(r => r.name);
+  return names.map(name => {
+    const info = sql.exec(`SELECT name, pk FROM pragma_table_info(?) ORDER BY cid`, name).toArray();
+    return {
+      table: name,
+      columns: info.map(c => c.name),
+      pk: info
+        .filter(c => c.pk > 0)
+        .sort((a, b) => a.pk - b.pk)
+        .map(c => c.name),
+    };
+  });
+}
+
+async function rowKeyAndHash(t, row) {
+  const values = t.columns.map(c => row[c]);
+  const key = t.pk.map(c => canonValue(row[c])).join(PK_SEP);
+  return { key, hash: await sha256Hex(canonRow(t.columns, values)), values };
+}
+
+// SEAL closes imports for good AND records a per-row baseline (pk -> sha256 of every column) of the whole
+// DO, so a rollback can later tell exactly which rows the live DO changed (Audit DB-1).
+async function recordBaseline(sql, transactionSync, seal) {
   sql.exec(
-    `INSERT INTO cf_import_state (k, v) VALUES ('sealed', ?) ON CONFLICT (k) DO NOTHING`,
-    String(Date.now())
+    `CREATE TABLE IF NOT EXISTS cf_seal_baseline (tbl TEXT NOT NULL, pk TEXT NOT NULL, rowhash TEXT NOT NULL, PRIMARY KEY (tbl, pk))`
   );
-  return json({ ok: true, sealed: true });
+  const rows = [];
+  for (const t of appTables(sql)) {
+    for (const r of sql.exec(`SELECT ${t.columns.map(q).join(', ')} FROM ${q(t.table)}`)) {
+      const { key, hash } = await rowKeyAndHash(t, r);
+      rows.push([t.table, key, hash]);
+    }
+  }
+  transactionSync(() => {
+    sql.exec('DELETE FROM cf_seal_baseline');
+    for (const r of rows)
+      sql.exec(`INSERT INTO cf_seal_baseline (tbl, pk, rowhash) VALUES (?, ?, ?)`, ...r);
+    if (seal)
+      sql.exec(
+        `INSERT INTO cf_import_state (k, v) VALUES ('sealed', ?) ON CONFLICT (k) DO NOTHING`,
+        String(Date.now())
+      );
+  });
+  return rows.length;
+}
+
+async function doSeal({ sql, transactionSync }) {
+  ensureLedger(sql);
+  if (isSealed(sql)) return json({ ok: true, sealed: true, already: true });
+  return json({
+    ok: true,
+    sealed: true,
+    baselineRows: await recordBaseline(sql, transactionSync, true),
+  });
+}
+
+// REBASE moves the baseline to the current state. Called only after a rollback replay COMMITTED and verified,
+// so the replayed rows are no longer "changes" (a second rollback run is then a no-op, not a failed replay).
+async function doRebase({ sql, transactionSync }) {
+  ensureLedger(sql);
+  if (!isSealed(sql)) throw new HttpError(409, 'not sealed: nothing to rebase');
+  return json({ ok: true, baselineRows: await recordBaseline(sql, transactionSync, false) });
+}
+
+export const MAX_DIFF_ROWS = 50000;
+
+// DIFF: rows added, changed or deleted since the seal. Full rows for added/changed (so they can be replayed
+// elsewhere), primary-key values for deleted ones.
+async function doDiff({ sql }) {
+  ensureLedger(sql);
+  if (!isSealed(sql)) throw new HttpError(409, 'not sealed: there is no baseline to diff against');
+  const have = sql
+    .exec(`SELECT 1 FROM sqlite_master WHERE name = 'cf_seal_baseline'`)
+    .toArray().length;
+  if (!have)
+    throw new HttpError(
+      409,
+      'sealed without a baseline (sealed by an older tool): the changes cannot be enumerated'
+    );
+  const out = {};
+  let total = 0;
+  for (const t of appTables(sql)) {
+    const base = new Map(
+      sql
+        .exec(`SELECT pk, rowhash FROM cf_seal_baseline WHERE tbl = ?`, t.table)
+        .toArray()
+        .map(r => [r.pk, r.rowhash])
+    );
+    const added = [];
+    const changed = [];
+    const seen = new Set();
+    for (const r of sql.exec(`SELECT ${t.columns.map(q).join(', ')} FROM ${q(t.table)}`)) {
+      const { key, hash, values } = await rowKeyAndHash(t, r);
+      seen.add(key);
+      const b = base.get(key);
+      if (b === undefined) added.push(values);
+      else if (b !== hash) changed.push(values);
+    }
+    const deleted = [...base.keys()].filter(k => !seen.has(k)).map(k => k.split(PK_SEP));
+    const n = added.length + changed.length + deleted.length;
+    if (n === 0) continue;
+    total += n;
+    if (total > MAX_DIFF_ROWS)
+      throw new HttpError(413, `more than ${MAX_DIFF_ROWS} changed rows: replay by hand`);
+    out[t.table] = { columns: t.columns, pk: t.pk, added, changed, deleted };
+  }
+  return json({ ok: true, total, tables: out });
+}
+
+// UNSEAL wipes every application row and all bookkeeping so the store can be imported afresh. Only for a
+// retry AFTER a verified rollback; refuses without the exact confirmation string.
+function doUnseal(request, { sql, transactionSync }, body) {
+  ensureLedger(sql);
+  if (body?.confirm !== 'wipe-and-unseal')
+    throw new HttpError(400, 'confirm must be "wipe-and-unseal"');
+  sql.exec('PRAGMA foreign_keys = OFF');
+  try {
+    transactionSync(() => {
+      // rows reference each other (and cycle): check the foreign keys once, at commit, when every table is empty
+      sql.exec('PRAGMA defer_foreign_keys = ON');
+      for (const t of appTables(sql)) sql.exec(`DELETE FROM ${q(t.table)}`);
+      sql.exec('DELETE FROM cf_import_ledger');
+      sql.exec('DELETE FROM cf_import_state');
+      sql.exec('DROP TABLE IF EXISTS cf_seal_baseline');
+    });
+  } finally {
+    sql.exec('PRAGMA foreign_keys = ON');
+  }
+  return json({ ok: true, sealed: false, wiped: true });
 }
 
 function doStatus({ sql }) {
@@ -258,7 +390,11 @@ export async function handleStoreAdmin(request, ctx) {
       return await doImport(request, ctx);
     if (request.method === 'POST' && path.endsWith('/__verify'))
       return await doVerify(request, ctx);
-    if (request.method === 'POST' && path.endsWith('/__seal')) return doSeal(ctx);
+    if (request.method === 'POST' && path.endsWith('/__seal')) return await doSeal(ctx);
+    if (request.method === 'POST' && path.endsWith('/__rebase')) return await doRebase(ctx);
+    if (request.method === 'POST' && path.endsWith('/__diff')) return await doDiff(ctx);
+    if (request.method === 'POST' && path.endsWith('/__unseal'))
+      return doUnseal(request, ctx, await request.json().catch(() => null));
     if (request.method === 'GET' && path.endsWith('/__status')) return doStatus(ctx);
     return json({ ok: false, error: 'not found' }, 404);
   } catch (e) {

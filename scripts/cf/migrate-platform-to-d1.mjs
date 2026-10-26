@@ -7,7 +7,6 @@
 // pass --archive-dir to keep them as NDJSON for the record. Upserts are idempotent, so a re-run is safe;
 // the D1 schema must already be applied (wrangler d1 migrations apply).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { cli, fmtMs } from './lib/cli.mjs';
 import { connectReadOnly } from './lib/pg.mjs';
@@ -19,7 +18,7 @@ import {
   userScopeWhere,
 } from './lib/plan.mjs';
 import { bindPlan, droppedColumnLoss, sourcePages } from './lib/source.mjs';
-import { d1File, d1Query, lit } from './lib/d1.mjs';
+import { d1Query, d1Statements, lit } from './lib/d1.mjs';
 
 const { args } = cli({
   d1: { type: 'string' },
@@ -46,16 +45,9 @@ const upsert = (table, columns, pk, row) => {
   return `INSERT INTO ${q(table)} (${columns.map(q).join(', ')}) VALUES (${row.map(lit).join(', ')}) ON CONFLICT (${pk.map(q).join(', ')}) ${conflict};`;
 };
 
-let fileNo = 0;
 async function flush(stmts) {
   if (!stmts.length || args['dry-run']) return;
-  const f = path.join(os.tmpdir(), `ebda-d1-import-${process.pid}-${fileNo++}.sql`);
-  fs.writeFileSync(f, stmts.join('\n') + '\n');
-  try {
-    await d1File(d, f);
-  } finally {
-    fs.rmSync(f, { force: true });
-  }
+  await d1Statements(d, stmts);
 }
 
 async function main() {

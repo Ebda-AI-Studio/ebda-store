@@ -11,7 +11,7 @@
       "binding": "PLATFORM",
       "database_name": "ebda-platform",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "../../cf-schema/migrations/platform"
-    }
-  ]
+      "migrations_dir": "../../cf-schema/migrations/platform",
+    },
+  ],
 }
