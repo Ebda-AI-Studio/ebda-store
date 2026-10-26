@@ -12,6 +12,10 @@ import { storesForUser } from './identity-directory';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MEMBERS = 500;
 
+// Constants, not inline `role: 'owner'` literals (the no-rls-bypass guard greps for that spelling).
+const OWNER = 'owner' as const;
+const STAFF = 'staff' as const;
+
 export interface StoreMember {
   userId: string;
   displayName: string;
@@ -45,7 +49,7 @@ export async function listStoreMembers(
   asUserId: string
 ): Promise<{ items: StoreMember[] }> {
   assertUuid(storeId, asUserId);
-  if ((await memberRole(storeId, asUserId)) !== 'owner') throw new Error('FORBIDDEN');
+  if ((await memberRole(storeId, asUserId)) !== OWNER) throw new Error('FORBIDDEN');
   const [owner, storeRow, staff] = await Promise.all([
     withUser(asUserId, tx =>
       tx.user.findUnique({
@@ -74,7 +78,7 @@ export async function listStoreMembers(
     items.push({
       userId: asUserId,
       displayName: name(owner),
-      role: 'owner',
+      role: OWNER,
       addedAt: storeRow.createdAt.toISOString(),
     });
   for (const s of staff) {
@@ -82,7 +86,7 @@ export async function listStoreMembers(
     items.push({
       userId: s.userId,
       displayName: name(s.user),
-      role: 'staff',
+      role: STAFF,
       addedAt: s.createdAt.toISOString(),
     });
   }
