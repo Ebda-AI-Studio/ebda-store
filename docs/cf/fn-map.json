@@ -14,6 +14,21 @@
     "replacement": "D1 trigger (migrations/platform/0002_invariants.sql)",
     "test": "packages/cf-schema/test/platform.test.ts"
   },
+  "billing_grants_guard": {
+    "target": "d1",
+    "replacement": "D1 triggers billing_grants_guard_{update,delete} in migrations/platform/0002_invariants.sql (FOUNDING-1)",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "billing_grants_guard_delete": {
+    "target": "d1",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql); any delete aborts",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "billing_grants_guard_update": {
+    "target": "d1",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql); only pending -> applied",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
   "current_store_id": {
     "target": "deleted-by-construction",
     "replacement": "none: the StoreDO id is the store id; getStore(env, storeId) is the only entry"

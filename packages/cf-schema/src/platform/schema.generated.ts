@@ -49,6 +49,34 @@ export const billingEvents = sqliteTable('billing_events', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const billingGrants = sqliteTable('billing_grants', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  kind: text('kind').notNull(),
+  beneficiaryId: text('beneficiary_id').notNull(),
+  counterpartId: text('counterpart_id'),
+  months: integer('months').notNull().default(1),
+  valueMinor: integer('value_minor').notNull().default(0),
+  status: text('status').notNull().default('pending'),
+  idempotencyKey: text('idempotency_key').notNull(),
+  periodEndBefore: integer('period_end_before', { mode: 'timestamp_ms' }),
+  periodEndAfter: integer('period_end_after', { mode: 'timestamp_ms' }),
+  appliedAt: integer('applied_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const billingReferrals = sqliteTable('billing_referrals', {
+  referredStoreId: text('referred_store_id').primaryKey().notNull(),
+  referrerStoreId: text('referrer_store_id').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const billingReminders = sqliteTable('billing_reminders', {
   id: text('id')
     .primaryKey()

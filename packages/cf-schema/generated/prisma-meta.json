@@ -18836,6 +18836,135 @@
         }
       }
     },
+    "BillingReferral": {
+      "table": "billing_referrals",
+      "db": "d1",
+      "pk": ["referredStoreId"],
+      "uniques": [],
+      "fields": {
+        "referredStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "referred_store_id",
+          "list": false,
+          "optional": false,
+          "id": true
+        },
+        "referrerStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "referrer_store_id",
+          "list": false,
+          "optional": false
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
+    "BillingGrant": {
+      "table": "billing_grants",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [["idempotencyKey"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "kind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "kind",
+          "list": false,
+          "optional": false
+        },
+        "beneficiaryId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "beneficiary_id",
+          "list": false,
+          "optional": false
+        },
+        "counterpartId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "counterpart_id",
+          "list": false,
+          "optional": true
+        },
+        "months": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "months",
+          "list": false,
+          "optional": false,
+          "default": "1"
+        },
+        "valueMinor": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "value_minor",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"pending\""
+        },
+        "idempotencyKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "idempotency_key",
+          "list": false,
+          "optional": false
+        },
+        "periodEndBefore": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "period_end_before",
+          "list": false,
+          "optional": true
+        },
+        "periodEndAfter": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "period_end_after",
+          "list": false,
+          "optional": true
+        },
+        "appliedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "applied_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
     "BillingWebhookEvent": {
       "table": "billing_webhook_events",
       "db": "d1",

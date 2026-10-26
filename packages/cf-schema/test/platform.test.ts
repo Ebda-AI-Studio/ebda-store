@@ -10,9 +10,9 @@ const manifest = readJson<Manifest>('generated/manifest.json');
 describe('D1 platform schema', () => {
   const db = openDb('platform', 2);
 
-  it('creates the manifest tables only: 21 models + entity_index + platform_audit_log, no identity table', () => {
+  it('creates the manifest tables only: 23 models + entity_index + platform_audit_log, no identity table', () => {
     expect(tableNames(db)).toEqual(Object.keys(manifest.databases.d1.columnCounts).sort());
-    expect(tableNames(db).length).toBe(23);
+    expect(tableNames(db).length).toBe(25);
     for (const t of ['users', 'refresh_tokens', 'verification_tokens', 'passkey_credentials'])
       expect(tableNames(db)).not.toContain(t);
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
@@ -39,6 +39,29 @@ describe('D1 platform schema', () => {
           .run(),
       /CHECK/
     );
+  });
+
+  describe('billing_grants is append-only (FOUNDING-1)', () => {
+    it('refuses deletes and money edits; pending -> applied once, then final', () => {
+      db.prepare(
+        `INSERT INTO billing_grants (id, kind, beneficiary_id, months, value_minor, status, idempotency_key) VALUES ('g1', 'founding', 's', 1, 100, 'pending', 'founding:s')`
+      ).run();
+      expectThrows(
+        () => db.prepare(`DELETE FROM billing_grants WHERE id = 'g1'`).run(),
+        /append-only/
+      );
+      expectThrows(
+        () => db.prepare(`UPDATE billing_grants SET value_minor = 999 WHERE id = 'g1'`).run(),
+        /append-only/
+      );
+      db.prepare(
+        `UPDATE billing_grants SET status = 'applied', applied_at = 1 WHERE id = 'g1'`
+      ).run();
+      expectThrows(
+        () => db.prepare(`UPDATE billing_grants SET status = 'pending' WHERE id = 'g1'`).run(),
+        /append-only/
+      );
+    });
   });
 
   describe('billing_events is append-only (section 2.6)', () => {

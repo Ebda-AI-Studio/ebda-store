@@ -30,3 +30,23 @@ WHEN OLD."status" = 'refunded' AND NEW."status" <> 'refunded'
 BEGIN
   SELECT RAISE(ABORT, 'billing_events: a refunded charge is final');
 END;
+
+-- billing_grants is an append-only ledger of free months (FOUNDING-1, 20261105000500). No store_id: no cascade
+-- exception. Only pending -> applied (with the period bookkeeping) may change; an applied grant is final.
+CREATE TRIGGER IF NOT EXISTS "billing_grants_guard_delete" BEFORE DELETE ON "billing_grants"
+BEGIN
+  SELECT RAISE(ABORT, 'billing_grants is append-only (delete refused)');
+END;
+
+CREATE TRIGGER IF NOT EXISTS "billing_grants_guard_update" BEFORE UPDATE ON "billing_grants"
+WHEN NEW."kind" IS NOT OLD."kind"
+  OR NEW."beneficiary_id" IS NOT OLD."beneficiary_id"
+  OR NEW."counterpart_id" IS NOT OLD."counterpart_id"
+  OR NEW."months" IS NOT OLD."months"
+  OR NEW."value_minor" IS NOT OLD."value_minor"
+  OR NEW."idempotency_key" IS NOT OLD."idempotency_key"
+  OR NEW."created_at" IS NOT OLD."created_at"
+  OR OLD."status" = 'applied'
+BEGIN
+  SELECT RAISE(ABORT, 'billing_grants is append-only (immutable or applied)');
+END;

@@ -1166,5 +1166,21 @@
     "piiColumns": ["actor_id"],
     "subjectKeys": ["userId"],
     "note": "actor id nulled on user erasure"
+  },
+  "d1:billing_referrals": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "two store ids and a timestamp; no person data (FOUNDING-1)"
+  },
+  "d1:billing_grants": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "money ledger of free months keyed by store ids; kept as accounting history (FOUNDING-1)"
   }
 }

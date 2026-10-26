@@ -126,7 +126,7 @@
       }
     },
     "d1": {
-      "tables": 23,
+      "tables": 25,
       "maxColumns": 36,
       "columnCounts": {
         "store_staff": 4,
@@ -149,6 +149,8 @@
         "store_lifecycle_emails": 6,
         "billing_webhook_events": 7,
         "provider_activation_requests": 11,
+        "billing_referrals": 3,
+        "billing_grants": 12,
         "stores": 30,
         "entity_index": 4,
         "platform_audit_log": 8
@@ -1034,6 +1036,36 @@
       "name": "order_items_gold_snapshot_check",
       "table": "order_items",
       "disposition": "store-do:order_items"
+    },
+    {
+      "kind": "check",
+      "name": "billing_referrals_not_self",
+      "table": "billing_referrals",
+      "disposition": "d1:billing_referrals"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_kind_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_status_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_months_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_value_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
     },
     {
       "kind": "index",

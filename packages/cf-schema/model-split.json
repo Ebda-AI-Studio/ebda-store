@@ -578,5 +578,13 @@
   "GoldRateSettings": {
     "target": "store-do",
     "reason": "per-store settings"
+  },
+  "BillingReferral": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "BillingGrant": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
   }
 }
