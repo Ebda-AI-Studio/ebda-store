@@ -10277,8 +10277,12 @@
         "rejected": "Rejected",
         "failed": "Failed",
         "late": "Late (24 h passed)",
-        "manual": "Price-only refund: issue the credit in the ETA portal"
-      }
+        "manual": "Waiting for your return reason"
+      },
+      "reasonIntro": "This refund returned money without sending items back. The ETA needs a reason to issue it as a return without reference.",
+      "reasonLabel": "ETA return reason (required)",
+      "reasonPlaceholder": "Choose a reason",
+      "reasonSubmit": "Issue return receipt"
     }
   }
 }

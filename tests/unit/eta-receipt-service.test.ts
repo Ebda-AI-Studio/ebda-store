@@ -430,21 +430,87 @@ describe('returns', () => {
     expect(full.document.header.previousUUID).toBe(h.rec[1].uuid);
   });
 
-  it('a price-only refund (no goods lines) is parked manual with an alert', async () => {
+  it('a price-only refund waits for the merchant reason, once per refund (duplicate delivery safe)', async () => {
     await issuedSale();
-    expect(
-      await EtaReceiptService.enqueueReturn(S, 'o1', {
-        items: [],
-        refundKey: 'refund:abc',
-        refundAmount: 500,
-        amountOnly: true,
-      })
-    ).toBe('manual');
-    expect(h.rec.find(r => r.kind === 'return')).toMatchObject({
-      status: 'manual',
-      errorCode: 'amount_only_refund',
+    const ev = { items: [], refundKey: 'refund:abc', refundAmount: 1140, amountOnly: true };
+    expect(await EtaReceiptService.enqueueReturn(S, 'o1', ev)).toBe('manual');
+    expect(await EtaReceiptService.enqueueReturn(S, 'o1', ev)).toBe('manual');
+    const rows = h.rec.filter(r => r.kind === 'return');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'manual', errorCode: 'reason_required' });
+    expect(h.sent.filter(e => e.data.receiptId === rows[0].id)).toHaveLength(0); // nothing queued yet
+  });
+
+  it('the chosen reason issues a Return Receipt Without Reference for exactly the refunded amount', async () => {
+    await issuedSale();
+    await EtaReceiptService.enqueueReturn(S, 'o1', {
+      items: [],
+      refundKey: 'refund:abc',
+      refundAmount: 1140,
+      amountOnly: true,
     });
-    expect(h.alerts.length).toBeGreaterThan(0);
+    const row = h.rec.find(r => r.kind === 'return');
+    await EtaReceiptService.setReturnReason(S, row.id, 'B');
+    expect(row.status).toBe('queued');
+    expect(h.sent.some(e => e.data.receiptId === row.id)).toBe(true);
+    expect(
+      await EtaReceiptService.processReceipt(
+        S,
+        row.id,
+        new Date(now.getTime() + 60_000),
+        undefined,
+        okClient()
+      )
+    ).toBe('submitted');
+    const d = row.document;
+    expect(d.documentType).toEqual({ receiptType: 'RWR', typeVersion: '1.2' });
+    expect(d.header.documentUseReason).toBe('B');
+    expect(d.header.referenceUUID).toBeUndefined();
+    expect(d.header.salesIssuedDateTime).toBe(h.rec[0].document.header.dateTimeIssued);
+    expect(Math.round(d.totalAmount * 100)).toBe(1140);
+    expect(d.netAmount).toBe(10);
+    expect(d.taxTotals).toEqual([{ taxType: 'T1', amount: 1.4 }]);
+  });
+
+  it('rejects an unknown reason and a row that is not waiting', async () => {
+    await issuedSale();
+    await EtaReceiptService.enqueueReturn(S, 'o1', {
+      items: [],
+      refundKey: 'refund:abc',
+      refundAmount: 1140,
+      amountOnly: true,
+    });
+    const row = h.rec.find(r => r.kind === 'return');
+    await expect(EtaReceiptService.setReturnReason(S, row.id, 'X')).rejects.toThrow();
+    await expect(EtaReceiptService.setReturnReason(S, h.rec[0].id, 'I')).rejects.toThrow(
+      /not waiting/
+    );
+    await EtaReceiptService.setReturnReason(S, row.id, 'I');
+    await expect(EtaReceiptService.setReturnReason(S, row.id, 'I')).rejects.toThrow(/not waiting/);
+  });
+
+  it('refuses a price-only refund that would exceed the sale receipt', async () => {
+    await issuedSale();
+    await EtaReceiptService.enqueueReturn(S, 'o1', {
+      items: [],
+      refundKey: 'refund:big',
+      refundAmount: 99999,
+      amountOnly: true,
+    });
+    const row = h.rec.find(r => r.kind === 'return');
+    await EtaReceiptService.setReturnReason(S, row.id, 'I');
+    const c = okClient();
+    expect(
+      await EtaReceiptService.processReceipt(
+        S,
+        row.id,
+        new Date(now.getTime() + 60_000),
+        undefined,
+        c
+      )
+    ).toBe('failed');
+    expect(row.errorCode).toBe('ETA_RETURN_EXCEEDS');
+    expect((c as any).submitReceipts).not.toHaveBeenCalled();
   });
 
   it('re-issuing a refused partial return keeps its refundKey and lines', async () => {

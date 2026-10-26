@@ -2,6 +2,7 @@ import { withStore } from '@ebda/database';
 import {
   ETA_SUBMISSION_WINDOW_MS,
   etaConnectionInputSchema,
+  etaReturnReasonSchema,
   isMaskedSecret,
   type EtaConnectionInput,
   type EtaEnvironment,
@@ -20,6 +21,7 @@ import { etaQrPayload } from '../lib/eta/qr';
 import { EtaClient, type EtaCredentials } from '../lib/eta/client';
 import {
   buildReturnReceipt,
+  buildReturnWithoutReference,
   buildSaleReceipt,
   EtaMapError,
   type EtaOrderInput,
@@ -242,9 +244,10 @@ export const EtaReceiptService = {
   /**
    * order/refunded -> Return Receipt. `partial.items` (the Return's own lines, carried on the event) become
    * a partial return receipt; no `partial` = a whole-order refund (every unit not yet returned, plus the fee
-   * lines once). A refund with no goods lines (`amountOnly`: a provider-dashboard price adjustment) is not
-   * a return of goods; an ETA Return Receipt Without Reference needs reason codes we do not collect, so it is
-   * parked `manual` (Ruling ETA-1). Idempotent per refundKey.
+   * lines once). A refund with no goods lines (`amountOnly`: a provider-dashboard price adjustment) cannot be
+   * a Return Receipt (no lines to return): it becomes a Return Receipt Without Reference, which the ETA
+   * requires a reason code for. The reason is the merchant's, so the row waits as `manual` /
+   * `reason_required` until `setReturnReason` supplies it (order page picker). Idempotent per refundKey.
    */
   async enqueueReturn(
     storeId: string,
@@ -256,47 +259,92 @@ export const EtaReceiptService = {
     );
     if (!sale || sale.status === 'failed' || sale.status === 'rejected') return 'skipped';
     const goods = partial?.items?.filter(i => i.quantity > 0) ?? [];
-    const refundKey = partial ? partial.refundKey || '' : 'full';
-    if (partial && (partial.amountOnly || goods.length === 0 || !refundKey)) {
-      const key = refundKey || `amount:${Date.now()}`;
-      const seq = await this.nextSeq(storeId, orderId, 'return');
-      await withStore(storeId, tx =>
-        tx.etaReceipt
-          .create({
-            data: {
-              storeId,
-              orderId,
-              kind: 'return',
-              seq,
-              refundKey: key,
-              status: 'manual',
-              environment: sale.environment,
-              errorCode: 'amount_only_refund',
-              errorMessage:
-                'A price-only refund has no goods lines; issue the credit in the ETA portal.',
-            },
-          })
-          .catch(() => null)
-      );
-      await sendAlert({
-        level: 'info',
-        source: 'eta.return.manual',
-        title: 'ETA price-only refund needs a manual credit',
-        context: { storeId, orderId },
-      });
-      return 'manual';
-    }
+    const priceOnly = !!partial && (partial.amountOnly || goods.length === 0);
+    const refundKey = partial
+      ? partial.refundKey || `amount:${orderId}:${partial.refundAmount ?? 0}`
+      : 'full';
     const done = await withStore(storeId, tx =>
       tx.etaReceipt.findFirst({
         where: { storeId, orderId, kind: 'return', refundKey },
         select: { id: true },
       })
     );
-    if (done) return 'queued';
+    if (done) return priceOnly ? 'manual' : 'queued';
+    if (priceOnly) {
+      if (!(typeof partial!.refundAmount === 'number' && partial!.refundAmount > 0))
+        return 'skipped';
+      const seq = await this.nextSeq(storeId, orderId, 'return');
+      await withStore(storeId, tx =>
+        tx.etaReceipt.create({
+          data: {
+            storeId,
+            orderId,
+            kind: 'return',
+            seq,
+            refundKey,
+            status: 'manual',
+            environment: sale.environment,
+            lineMap: { amountOnly: true, refundAmount: partial!.refundAmount, reason: null },
+            errorCode: 'reason_required',
+            errorMessage: 'Choose the ETA return reason to issue this price-only refund.',
+          },
+        })
+      );
+      await sendAlert({
+        level: 'info',
+        source: 'eta.return.reason_required',
+        title: 'ETA price-only refund waits for a return reason',
+        context: { storeId, orderId },
+      });
+      return 'manual';
+    }
     return this.createRowAndSend(storeId, orderId, 'return', sale.environment, {
       refundKey,
       lineMap: partial ? { items: goods, refundAmount: partial.refundAmount ?? null } : null,
     });
+  },
+
+  /**
+   * The merchant picks the ETA return-with-no-reference reason (I | B) for a waiting price-only refund; the
+   * row is claimed (manual -> queued) and the submission job sent. Fail fast like every enqueue.
+   */
+  async setReturnReason(storeId: string, receiptId: string, rawReason: unknown): Promise<void> {
+    const { reason } = parseInput(etaReturnReasonSchema, { reason: rawReason });
+    const row = await withStore(storeId, tx =>
+      tx.etaReceipt.findFirst({ where: { id: receiptId, storeId } })
+    );
+    const map = row?.lineMap as { amountOnly?: boolean; refundAmount?: number } | null;
+    if (!row || row.kind !== 'return' || row.status !== 'manual' || !map?.amountOnly)
+      throw new AppError(409, 'ETA_REASON_NOT_NEEDED', 'this receipt is not waiting for a reason');
+    const claim = await withStore(storeId, tx =>
+      tx.etaReceipt.updateMany({
+        where: { id: receiptId, storeId, status: 'manual' },
+        data: {
+          status: 'queued',
+          errorCode: null,
+          errorMessage: null,
+          lineMap: { ...map, reason } as never,
+        },
+      })
+    );
+    if (claim.count === 0)
+      throw new AppError(409, 'ETA_REASON_NOT_NEEDED', 'this receipt is not waiting for a reason');
+    try {
+      await inngest.send({ name: 'eta/receipt.submit', data: { storeId, receiptId } });
+    } catch (err) {
+      await withStore(storeId, tx =>
+        tx.etaReceipt.updateMany({
+          where: { id: receiptId, storeId, status: 'queued' },
+          data: {
+            status: 'failed',
+            errorCode: 'enqueue_failed',
+            errorMessage: 'could not queue the submission job',
+            nextAttemptAt: null,
+          },
+        })
+      );
+      throw err;
+    }
   },
 
   async nextSeq(storeId: string, orderId: string, kind: string): Promise<number> {
@@ -571,6 +619,49 @@ export const EtaReceiptService = {
       );
       if (!sale?.document || !sale.lineMap || !['accepted', 'submitted'].includes(sale.status))
         throw new EtaMapError('ETA_NO_LINES', 'no issued sale receipt to return');
+      const rowMap = row.lineMap as {
+        amountOnly?: boolean;
+        refundAmount?: number;
+        reason?: 'I' | 'B' | null;
+      } | null;
+      if (rowMap?.amountOnly) {
+        if (rowMap.reason !== 'I' && rowMap.reason !== 'B')
+          throw new EtaMapError('ETA_NO_LINES', 'no return reason chosen');
+        // Never refund more (across non-refused return receipts) than the sale receipt.
+        const others = await withStore(storeId, tx =>
+          tx.etaReceipt.findMany({
+            where: {
+              storeId,
+              orderId: row.orderId,
+              kind: 'return',
+              id: { not: row.id },
+              status: { notIn: ['failed', 'rejected', 'manual'] },
+            },
+            select: { totalPiastres: true, refundKey: true },
+          })
+        );
+        const saleRow = await withStore(storeId, tx =>
+          tx.etaReceipt.findFirst({
+            where: { storeId, orderId: row.orderId, kind: 'sale' },
+            select: { totalPiastres: true },
+          })
+        );
+        const already = others
+          .filter(o => o.refundKey !== row.refundKey)
+          .reduce((n, o) => n + (o.totalPiastres ?? 0), 0);
+        if (already + (rowMap.refundAmount ?? 0) > (saleRow?.totalPiastres ?? 0))
+          throw new EtaMapError('ETA_RETURN_EXCEEDS', 'refunds exceed the sale receipt total');
+        const rwr = buildReturnWithoutReference({
+          sale: sale.document as never,
+          refundAmount: rowMap.refundAmount ?? 0,
+          reason: rowMap.reason,
+          previousUuid: prev?.uuid ?? '',
+          receiptNumber: `${order.orderNumber}-R${row.seq}`,
+          issuedAt: now,
+          referenceOldUuid,
+        });
+        return { doc: rwr, lineMap: undefined };
+      }
       const saleLines = sale.lineMap as unknown as LineQty[];
       // Earlier return receipts that were not refused count as already returned.
       const earlier = await withStore(storeId, tx =>

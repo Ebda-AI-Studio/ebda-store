@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   allocate,
   buildReturnReceipt,
+  buildReturnWithoutReference,
   buildSaleReceipt,
   EtaMapError,
   type EtaOrderInput,
@@ -211,6 +212,59 @@ describe('buildReturnReceipt', () => {
     const r = ret({ sale, saleLines, includeFees: true, returned: saleLines });
     expect(r.totalAmount).toBe(sale.totalAmount);
     expect(r.itemData).toHaveLength(sale.itemData.length);
+  });
+});
+
+describe('buildReturnWithoutReference', () => {
+  const sale = () => buildSaleReceipt(args()) as any;
+  const rwr = (o: any = {}) =>
+    buildReturnWithoutReference({
+      sale: sale(),
+      refundAmount: 1140,
+      reason: 'I',
+      previousUuid: 'PREV',
+      receiptNumber: 'EB-1001-R1',
+      issuedAt: new Date('2026-10-27T09:00:00.000Z'),
+      ...o,
+    }) as any;
+
+  it('is an RWR document with the reason, the sale time and no referenceUUID', () => {
+    const d = rwr();
+    expect(d.documentType).toEqual({ receiptType: 'RWR', typeVersion: '1.2' });
+    expect(d.header.documentUseReason).toBe('I');
+    expect(d.header.salesIssuedDateTime).toBe('2026-10-26T10:00:00Z');
+    expect(d.header.referenceUUID).toBeUndefined();
+    expect(d.header.previousUUID).toBe('PREV');
+    expect(d.header.uuid).toBe(receiptUuid(d));
+  });
+  it('splits the refunded amount into net and VAT at the sale rate, summing exactly', () => {
+    const d = rwr({ refundAmount: 1000 });
+    expect(d.itemData).toHaveLength(1);
+    expect(d.itemData[0].taxableItems[0]).toEqual({
+      taxType: 'T1',
+      amount: 1.23,
+      subType: 'V009',
+      rate: 14,
+    });
+    expect(d.netAmount).toBe(8.77);
+    expect(d.totalAmount).toBe(10);
+    expect(d.itemData[0].itemCode).toBe('EG-674859545-1');
+  });
+  it('has no tax line when the sale had none, and refuses a zero refund', () => {
+    const noTax = buildSaleReceipt(
+      args({ tax: 0, taxableAmount: null, total: 20000, taxRateBps: null })
+    ) as any;
+    const d = buildReturnWithoutReference({
+      sale: noTax,
+      refundAmount: 500,
+      reason: 'B',
+      previousUuid: '',
+      receiptNumber: 'x',
+      issuedAt: new Date(),
+    }) as any;
+    expect(d.taxTotals).toBeUndefined();
+    expect(d.totalAmount).toBe(5);
+    expect(() => rwr({ refundAmount: 0 })).toThrow(/nothing/);
   });
 });
 

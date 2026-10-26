@@ -65,4 +65,30 @@ describe('OrderEtaCard', () => {
       expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/s/eta/receipts/r1/retry', {})
     );
   });
+  it('price-only refund: the reason picker is required before the receipt is issued', async () => {
+    apiGet.mockResolvedValue({
+      data: { receipts: [row({ kind: 'return', status: 'manual', errorCode: 'reason_required' })] },
+    });
+    apiPost.mockResolvedValue({ data: { queued: true } });
+    render(<OrderEtaCard storeId="s" orderId="o" />);
+    const submit = (await screen.findByText('reasonSubmit')) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    expect(screen.getByText('International return receipt')).toBeTruthy();
+    expect(screen.getByText('Sales issued before adoption')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('reasonLabel'), { target: { value: 'B' } });
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/s/eta/receipts/r1/return-reason', {
+        reason: 'B',
+      })
+    );
+  });
+
+  it('shows no picker for other manual or non-return rows', async () => {
+    apiGet.mockResolvedValue({ data: { receipts: [row({ status: 'queued' })] } });
+    render(<OrderEtaCard storeId="s" orderId="o" />);
+    await screen.findByText('status.queued');
+    expect(screen.queryByText('reasonSubmit')).toBeNull();
+  });
 });

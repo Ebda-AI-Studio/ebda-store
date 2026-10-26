@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLocale } from 'next-intl';
+import { ETA_RETURN_NO_REF_REASONS } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../../lib/api';
 
@@ -29,7 +31,9 @@ const TONE: Record<string, string> = {
 export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: string }) {
   const t = useT('eta.order');
   const [rows, setRows] = useState<EtaReceiptRow[] | null>(null);
+  const locale = useLocale();
   const [busy, setBusy] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Record<string, string>>({});
   const load = useCallback(async () => {
     const { data } = await apiGet<{ receipts: EtaReceiptRow[] }>(
       `/api/v1/stores/${storeId}/orders/${orderId}/eta`
@@ -88,6 +92,42 @@ export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: s
                 >
                   {t('openInPortal')}
                 </a>
+              </div>
+            ) : null}
+            {r.status === 'manual' && r.errorCode === 'reason_required' ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-muted-foreground">{t('reasonIntro')}</p>
+                <label className="block text-xs font-medium" htmlFor={`eta-reason-${r.id}`}>
+                  {t('reasonLabel')}
+                </label>
+                <select
+                  id={`eta-reason-${r.id}`}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  value={picked[r.id] ?? ''}
+                  onChange={e => setPicked(p => ({ ...p, [r.id]: e.target.value }))}
+                >
+                  <option value="">{t('reasonPlaceholder')}</option>
+                  {ETA_RETURN_NO_REF_REASONS.map(o => (
+                    <option key={o.code} value={o.code}>
+                      {locale === 'ar' ? o.ar : o.en}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!picked[r.id] || busy === r.id}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  onClick={async () => {
+                    setBusy(r.id);
+                    await apiPost(`/api/v1/stores/${storeId}/eta/receipts/${r.id}/return-reason`, {
+                      reason: picked[r.id],
+                    });
+                    setBusy(null);
+                    void load();
+                  }}
+                >
+                  {t('reasonSubmit')}
+                </button>
               </div>
             ) : null}
             {latest(r) &&

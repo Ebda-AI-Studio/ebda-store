@@ -111,4 +111,18 @@ router.post(
   }
 );
 
+// POST /stores/:storeId/eta/receipts/:id/return-reason - the merchant's ETA reason (I | B) for a price-only refund
+router.post(
+  '/:storeId/eta/receipts/:id/return-reason',
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await EtaReceiptService.setReturnReason(req.params.storeId, req.params.id, req.body?.reason);
+      res.json({ success: true, data: { queued: true } });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
 export default router;

@@ -50,6 +50,27 @@ export type EtaReceiptStatus = (typeof ETA_RECEIPT_STATUSES)[number];
 /** 24 h submission window (https://sdk.invoicing.eta.gov.eg/receiptissuancefaq/). */
 export const ETA_SUBMISSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Reasons the ETA accepts on a Return Receipt Without Reference (`documentUseReason`), from
+ * https://sdk.invoicing.eta.gov.eg/codes/return-with-no-reference-reasons-type/ (read 2026-10-26; the page
+ * lists exactly these two and gives no Arabic text, the Arabic below is ours). The document type is
+ * `receiptType "RWR"`, https://sdk.invoicing.eta.gov.eg/documents/return-receipt-without-reference-v1-2/ .
+ */
+export const ETA_RETURN_NO_REF_REASONS = [
+  {
+    code: 'I',
+    en: 'International return receipt',
+    ar: 'إيصال مرتجع دولي (البيع تم خارج مصر)',
+  },
+  {
+    code: 'B',
+    en: 'Sales issued before adoption',
+    ar: 'بيع صدر قبل اعتماد الإيصال الإلكتروني',
+  },
+] as const;
+export type EtaReturnNoRefReason = (typeof ETA_RETURN_NO_REF_REASONS)[number]['code'];
+export const etaReturnReasonSchema = z.object({ reason: z.enum(['I', 'B']) }).strict();
+
 const code = (max: number) => z.string().trim().min(1).max(max);
 
 /** What the merchant types in the admin connect form (secrets are write-only). */

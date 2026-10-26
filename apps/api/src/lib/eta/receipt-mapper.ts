@@ -383,3 +383,70 @@ function scaleLine(
   if (t) out.taxableItems = [{ ...t, amount: piece(toP(t.amount), cum, before, soldQty) / 100 }];
   return out;
 }
+
+/**
+ * Return Receipt Without Reference v1.2 (`receiptType "RWR"`) for a PRICE-ONLY refund: money went back
+ * (provider-dashboard or partial-amount refund) with no goods lines to return. One synthetic line carries
+ * the refunded amount, split into net and VAT at the sale's own rate. `documentUseReason` is mandatory and
+ * is one of the ETA reason codes (`ETA_RETURN_NO_REF_REASONS`); `salesIssuedDateTime` is mandatory; the
+ * sale uuid is NOT sent as `referenceUUID` (the type exists for sales the ETA cannot reference).
+ * Source: https://sdk.invoicing.eta.gov.eg/documents/return-receipt-without-reference-v1-2/ (read 2026-10-26).
+ */
+export function buildReturnWithoutReference(a: {
+  sale: SaleDoc;
+  /** piastres actually refunded (tax-inclusive) */
+  refundAmount: number;
+  reason: 'I' | 'B';
+  previousUuid: string;
+  receiptNumber: string;
+  issuedAt: Date;
+  referenceOldUuid?: string;
+}) {
+  if (!(a.refundAmount > 0)) throw new EtaMapError('ETA_NO_LINES', 'nothing was refunded');
+  const sale = JSON.parse(JSON.stringify(a.sale)) as SaleDoc;
+  const template = (sale.itemData as Array<{ [k: string]: Json }>)[0];
+  const tax0 = Array.isArray(template.taxableItems)
+    ? (template.taxableItems[0] as { rate: number })
+    : null;
+  const bps = tax0 ? Math.round(Number(tax0.rate) * 100) : 0;
+  const net = bps > 0 ? Math.round((a.refundAmount * 10000) / (10000 + bps)) : a.refundAmount;
+  const tax = a.refundAmount - net;
+  const line: { [k: string]: Json } = {
+    internalCode: 'PRICE-ADJ',
+    description: 'Price adjustment refund',
+    itemType: template.itemType,
+    itemCode: template.itemCode,
+    unitType: template.unitType,
+    quantity: 1,
+    unitPrice: net / 100,
+    netSale: net / 100,
+    totalSale: net / 100,
+    total: a.refundAmount / 100,
+    ...(tax > 0
+      ? { taxableItems: [{ taxType: 'T1', amount: tax / 100, subType: 'V009', rate: bps / 100 }] }
+      : {}),
+  };
+  const doc: SaleDoc = {
+    header: {
+      dateTimeIssued: etaTime(a.issuedAt),
+      receiptNumber: a.receiptNumber.slice(0, 50),
+      uuid: '',
+      previousUUID: a.previousUuid,
+      currency: 'EGP',
+      documentUseReason: a.reason,
+      salesIssuedDateTime: sale.header.dateTimeIssued,
+      ...(a.referenceOldUuid ? { referenceOldUUID: a.referenceOldUuid } : {}),
+    },
+    documentType: { receiptType: 'RWR', typeVersion: '1.2' },
+    seller: sale.seller,
+    buyer: sale.buyer,
+    itemData: [line],
+    totalSales: net / 100,
+    netAmount: net / 100,
+    totalAmount: a.refundAmount / 100,
+    ...(tax > 0 ? { taxTotals: [{ taxType: 'T1', amount: tax / 100 }] } : {}),
+    paymentMethod: sale.paymentMethod,
+  };
+  doc.header.uuid = receiptUuid(doc);
+  return doc;
+}
