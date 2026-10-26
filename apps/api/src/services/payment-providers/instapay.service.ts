@@ -882,14 +882,25 @@ export class InstapayService {
           select: { id: true, status: true, paymentStatus: true },
         });
         if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
-        const payment = await prisma.payment.findFirst({
+        // Serialise recorders (M-063): the SAME order lock confirm / expiry / cancel take, then the payment row. The
+        // payment is re-read AFTER the locks, so a double submit (or two staff) sees the first one's refund: the
+        // duplicate-reference check, `remaining` and the metadata array are all judged on the locked row.
+        await lockOrder(prisma as unknown as Prisma.TransactionClient, storeId, orderId);
+        const candidate = await prisma.payment.findFirst({
           where: {
             orderId,
             provider: 'instapay',
             status: { in: ['completed', 'partially_refunded', 'refunded'] },
           },
           orderBy: { createdAt: 'desc' },
+          select: { id: true },
         });
+        if (candidate) {
+          await prisma.$queryRaw`SELECT id FROM payments WHERE id = ${candidate.id} FOR UPDATE`;
+        }
+        const payment = candidate
+          ? await prisma.payment.findUnique({ where: { id: candidate.id } })
+          : null;
         if (!payment) {
           throw new AppError(
             409,
