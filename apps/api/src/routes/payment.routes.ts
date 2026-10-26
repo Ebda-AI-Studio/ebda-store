@@ -78,7 +78,7 @@ function platformUrlOrRelative(url: string): boolean {
 
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry']).optional(),
+  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry', 'geidea']).optional(),
   /**
    * Which of the provider's methods the customer picked (Fawry: reference code or card;
    * Paymob: one integration). Absent = the provider's own page offers them all.

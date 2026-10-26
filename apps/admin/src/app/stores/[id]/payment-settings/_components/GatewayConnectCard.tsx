@@ -282,7 +282,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
 
       {unverified && (
         <div className="border-t px-4 py-3">
-          <UnverifiedProviderNotice />
+          <UnverifiedProviderNotice pending={!entry.capabilities.webhooks} />
         </div>
       )}
 

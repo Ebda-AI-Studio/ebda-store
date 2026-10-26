@@ -722,7 +722,12 @@ export default function CheckoutClient() {
                 methods: [m.code],
               }));
             }
-            return [{ id: p, name: p === 'kashier' ? 'Card / wallet' : p }];
+            return [
+              {
+                id: p,
+                name: p === 'kashier' ? 'Card / wallet' : p === 'geidea' ? 'Card (Geidea)' : p,
+              },
+            ];
           });
 
           // Add COD as a provider option if enabled

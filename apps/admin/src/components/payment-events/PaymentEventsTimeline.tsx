@@ -204,6 +204,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   paymob: 'Paymob',
   kashier: 'Kashier',
   fawry: 'Fawry',
+  geidea: 'Geidea',
   instapay: 'InstaPay',
   cod: 'COD',
 };

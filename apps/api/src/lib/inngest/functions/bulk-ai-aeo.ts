@@ -357,6 +357,7 @@ const bulkAiFaqAeoFn = inngest.createFunction(
           paymob: ['Visa', 'Mastercard', 'Meeza', 'Mobile wallets', 'valU installments'],
           kashier: ['Visa', 'Mastercard', 'Mobile wallets'],
           fawry: ['Pay at Fawry', 'Visa', 'Mastercard'],
+          geidea: ['Visa', 'Mastercard'],
           instapay: ['InstaPay'],
           cod: ['Cash on Delivery'],
         };

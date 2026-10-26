@@ -43,6 +43,7 @@ export const PROTECTED_BRAND_NAMES: readonly string[] = [
   'accept-paymob',
   'fawry',
   'fawrypay',
+  'geidea',
   'instapay',
   'vodafone-cash',
   'vodafonecash',

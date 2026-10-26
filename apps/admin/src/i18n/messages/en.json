@@ -10226,7 +10226,9 @@
   },
   "providerUnverified": {
     "chip": "New connection",
-    "note": "This provider has not been run against a live account yet. Save your credentials: we check them straight away, and your first real order confirms the full flow. If anything is off, the Ebda Store team sees it immediately and fixes it."
+    "note": "This provider has not been run against a live account yet. Save your credentials: we check them straight away, and your first real order confirms the full flow. If anything is off, the Ebda Store team sees it immediately and fixes it.",
+    "pendingChip": "Pending verification",
+    "pendingNote": "You can connect this provider, but it is NOT offered to your customers at checkout yet: Ebda Store cannot confirm its payments until the provider confirms how it notifies us. We switch it on for your store the moment that is confirmed."
   },
   "providerVerification": {
     "title": "Provider verification",

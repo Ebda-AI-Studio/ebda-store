@@ -36,7 +36,7 @@ import { callThroughBreaker } from './provider-health';
 import { withProviderDeadline } from './provider-call';
 import { getProviderV2, MANUAL_PROVIDERS } from './registry';
 import { toProviderCredentials } from './credentials';
-import { isProviderUsable } from './provider-gate';
+import { isOfferableAtCheckout, isProviderUsable } from './provider-gate';
 import { recordPaymentSettled, recordProviderOperation } from '../provider-verification.service';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { V2ProviderBridge } from './v2-bridge';
@@ -203,6 +203,14 @@ class PaymentFactory {
             // not). The enable gate (`assertEnableAllowed`: a passing Test connection of exactly
             // the stored credentials, and a credential edit disables the row) is what keeps an
             // untested gateway from being enabled; this only drops a code the catalog no longer has.
+            // GEIDEA-2: a provider Ebda cannot confirm is never offered to buyers (or created).
+            if (!isOfferableAtCheckout(dbConfig.provider, storeId)) {
+              logger.warn(
+                { provider: dbConfig.provider, storeId },
+                '[PAYMENT] Skipping provider: no confirmation path, hidden from checkout (GEIDEA-2)'
+              );
+              continue;
+            }
             if (!isProviderUsable(dbConfig.provider)) {
               logger.warn(
                 { provider: dbConfig.provider, storeId },

@@ -112,12 +112,12 @@ describe('the inherited Gulf payment gateways are removed from Ebda', () => {
     );
   });
 
-  it('the provider registry is exactly COD, InstaPay and the three Egyptian gateways', () => {
+  it('the provider registry is exactly COD, InstaPay and the Egyptian gateways (Geidea creation-only, GEIDEA-1)', () => {
     expect(
       listProvidersV2()
         .map(p => p.name)
         .sort()
-    ).toEqual(['cod', 'fawry', 'instapay', 'kashier', 'paymob']);
+    ).toEqual(['cod', 'fawry', 'geidea', 'instapay', 'kashier', 'paymob']);
   });
 
   it('the Postgres provider enum and the settings page offer exactly those too', () => {

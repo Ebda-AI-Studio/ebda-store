@@ -2005,7 +2005,7 @@ const adminOrderSchema = z
     billingAddress: z.record(z.unknown()).optional(),
     items: z.array(adminOrderItemSchema).min(1),
     paymentMethod: z.enum(['online', 'cod']).optional(),
-    paymentProvider: z.enum(['paymob', 'kashier', 'fawry', 'instapay', 'cod']).optional(),
+    paymentProvider: z.enum(['paymob', 'kashier', 'fawry', 'geidea', 'instapay', 'cod']).optional(),
     notes: z.string().optional(),
     couponCode: z.string().optional(),
     currency: z.string().optional(),
@@ -2114,7 +2114,7 @@ router.post(
  */
 const issuePaymentLinkSchema = z.object({
   notifyVia: z.enum(['link', 'email', 'all']).optional().default('link'),
-  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
+  provider: z.enum(['paymob', 'kashier', 'fawry', 'geidea']).optional(),
   method: z.enum(['card', 'meeza', 'wallet', 'valu', 'payatfawry']).optional(),
 });
 

@@ -3122,7 +3122,7 @@ export class OrderService {
         quantity: number;
       }>;
       paymentMethod?: 'online' | 'cod';
-      paymentProvider?: 'paymob' | 'kashier' | 'fawry' | 'instapay' | 'cod';
+      paymentProvider?: 'paymob' | 'kashier' | 'fawry' | 'geidea' | 'instapay' | 'cod';
       notes?: string;
       couponCode?: string;
       currency?: string;
