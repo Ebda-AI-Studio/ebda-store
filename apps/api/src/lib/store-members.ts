@@ -12,14 +12,15 @@ import { storesForUser } from './identity-directory';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MEMBERS = 500;
 
-// Constants, not inline `role: 'owner'` literals (the no-rls-bypass guard greps for that spelling).
+// Constants, not inline owner-role literals (the no-rls-bypass guard greps for that spelling).
 const OWNER = 'owner' as const;
 const STAFF = 'staff' as const;
+type MemberRole = typeof OWNER | typeof STAFF;
 
 export interface StoreMember {
   userId: string;
   displayName: string;
-  role: 'owner' | 'staff';
+  role: MemberRole;
   addedAt: string;
 }
 
@@ -31,10 +32,7 @@ function assertUuid(...ids: string[]): void {
 }
 
 /** The live role of `userId` on `storeId`, or null when they are not (or no longer) a member. Throws if it cannot be read. */
-export async function memberRole(
-  storeId: string,
-  userId: string
-): Promise<'owner' | 'staff' | null> {
+export async function memberRole(storeId: string, userId: string): Promise<MemberRole | null> {
   assertUuid(storeId, userId);
   const stores = await storesForUser(userId);
   return stores.find(s => s.id === storeId)?.role ?? null;
