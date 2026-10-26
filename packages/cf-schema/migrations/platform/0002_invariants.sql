@@ -48,11 +48,19 @@ WHEN NEW."kind" IS NOT OLD."kind"
   OR NEW."source_store_id" IS NOT OLD."source_store_id"
   OR NEW."idempotency_key" IS NOT OLD."idempotency_key"
   OR NEW."created_at" IS NOT OLD."created_at"
+  OR (NEW."status" = 'revoked' AND (NEW."revoked_at" IS NULL OR NEW."revoke_reason" IS NULL))
+  OR (NEW."status" <> 'revoked' AND (NEW."revoked_at" IS NOT NULL OR NEW."restored_at" IS NOT NULL))
+  OR (NEW."status" = 'applied' AND (NEW."applied_at" IS NULL OR NEW."period_end_before" IS NULL OR NEW."period_end_after" IS NULL))
+  OR (OLD."status" = 'pending' AND NEW."status" = 'revoked' AND (NEW."restored_at" IS NOT NULL
+        OR NEW."applied_at" IS NOT NULL OR NEW."period_end_before" IS NOT NULL OR NEW."period_end_after" IS NOT NULL))
+  OR (OLD."status" = 'pending' AND NEW."status" = 'pending' AND (NEW."applied_at" IS NOT NULL
+        OR NEW."period_end_before" IS NOT NULL OR NEW."period_end_after" IS NOT NULL))
   OR (OLD."status" = 'applied' AND (
         NEW."status" NOT IN ('applied', 'revoked')
         OR NEW."period_end_before" IS NOT OLD."period_end_before"
         OR NEW."period_end_after" IS NOT OLD."period_end_after"
-        OR NEW."applied_at" IS NOT OLD."applied_at"))
+        OR NEW."applied_at" IS NOT OLD."applied_at"
+        OR NEW."restored_at" IS NOT NULL))
   OR (OLD."status" = 'revoked' AND (
         NEW."status" <> 'revoked'
         OR NEW."revoked_at" IS NOT OLD."revoked_at"

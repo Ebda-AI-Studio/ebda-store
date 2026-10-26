@@ -55,14 +55,14 @@ describe('D1 platform schema', () => {
         /append-only/
       );
       db.prepare(
-        `UPDATE billing_grants SET status = 'applied', applied_at = 1 WHERE id = 'g1'`
+        `UPDATE billing_grants SET status = 'applied', applied_at = 1, period_end_before = 1, period_end_after = 2 WHERE id = 'g1'`
       ).run();
       expectThrows(
         () => db.prepare(`UPDATE billing_grants SET status = 'pending' WHERE id = 'g1'`).run(),
         /append-only/
       );
       db.prepare(
-        `UPDATE billing_grants SET status = 'revoked', revoked_at = 2 WHERE id = 'g1'`
+        `UPDATE billing_grants SET status = 'revoked', revoked_at = 2, revoke_reason = 'payment_refunded' WHERE id = 'g1'`
       ).run();
       db.prepare(`UPDATE billing_grants SET restored_at = 3 WHERE id = 'g1'`).run();
       expectThrows(
