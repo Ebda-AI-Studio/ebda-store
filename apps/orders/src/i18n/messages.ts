@@ -58,6 +58,7 @@ export interface Messages {
   search: {
     placeholder: string;
     clear: string;
+    count: string;
   };
   bulk: {
     selected: string;
@@ -292,6 +293,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     search: {
       placeholder: 'Search by order # or customer…',
       clear: 'Clear search',
+      count: 'Orders: {count}',
     },
     bulk: {
       selected: '{count} selected',
@@ -556,6 +558,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     search: {
       placeholder: 'بحث برقم الطلب أو اسم العميل…',
       clear: 'مسح البحث',
+      count: 'عدد الطلبات: {count}',
     },
     bulk: {
       selected: '{count} محدّد',
