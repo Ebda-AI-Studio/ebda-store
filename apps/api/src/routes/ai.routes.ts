@@ -10,7 +10,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { writeLimiter } from '../middleware/security';
+import { auditLog, writeLimiter } from '../middleware/security';
+import { isStoreAiEnabled, requireAiEnabled } from '../lib/store-ai-switch';
 import { requireFeature } from '../middleware/feature-gate';
 import { AIService } from '../services/ai.service';
 import { AppError } from '../middleware/error-handler';
@@ -30,6 +31,44 @@ import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 const router = Router({ mergeParams: true });
 
 router.use(authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess);
+
+/**
+ * The merchant's AI switch (`stores.ai_features_enabled`). These two routes are the ONLY ones registered before
+ * `requireAiEnabled`: a merchant must be able to read and flip the switch while it is off. Everything below it,
+ * including cached answers, is refused with 403 AI_DISABLED_BY_MERCHANT when it is off
+ * (`tests/unit/ai-entry-points-respect-switch.test.ts` pins the order).
+ */
+router.get('/settings', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const enabled = await isStoreAiEnabled(req.params.storeId);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/settings', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(req.body);
+    await prisma.store.update({ where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
+    await auditLog({
+      action: enabled ? 'store.ai.enabled' : 'store.ai.disabled',
+      userId: req.user!.userId,
+      resourceType: 'store',
+      resourceId: storeId,
+      details: {},
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.use(requireAiEnabled);
 
 const translateSchema = z.object({
   text: z.string().min(1).max(10_000),
