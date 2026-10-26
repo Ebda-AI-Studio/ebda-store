@@ -54,12 +54,12 @@ export interface CheckoutInput {
   currency?: string;
   idempotencyKey?: string;
   /**
-   * The cart this checkout consumes (audit M-012 / P07). The cart is claimed in the SAME section as the order: the rows
-   * still in it must be exactly the ones the shopper priced (`items` + `bundles` counts), and they are deleted here, so a
+   * The cart this checkout consumes (audit M-012 / P07). It is claimed in the SAME section as the order: the rows still in
+   * it must be exactly the lines and boxes being ordered (compared by content, not count), and they are deleted here, so a
    * second concurrent checkout of the same cart (no key, or a different key) finds it empty and fails with CART_CHANGED
-   * instead of creating a second order.
+   * instead of creating a second order. Also scopes `idempotencyKey` to this cart.
    */
-  cart?: { id: string; items: number; bundles: number };
+  cart?: { id: string };
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
@@ -189,6 +189,14 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     .sort()
     .join(',');
 
+  // A key from a cart-claimed checkout is scoped to ITS cart (one cart per shopper session): another shopper who guesses a key
+  // can no longer read this order back. Without a cart (admin / import callers) the key stays per store.
+  const idemKey = input.idempotencyKey
+    ? input.cart
+      ? `${input.cart.id}:${input.idempotencyKey}`
+      : input.idempotencyKey
+    : undefined;
+
   return db.transactionSync(() => {
     const sameLines = (orderId: string): boolean => {
       const rows = db.all(
@@ -215,10 +223,10 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         .join(',');
       return boxes === bundleKey;
     };
-    if (input.idempotencyKey) {
+    if (idemKey) {
       const prev = db.all(
         'SELECT id, customer_id, order_number, subtotal, discount, coupon_discount, promotion_discount, bundle_discount, loyalty_discount, shipping, cod_fee, tax, wallet_amount, total, payment_status FROM orders WHERE idempotency_key = ? AND store_id = ?',
-        [input.idempotencyKey, input.storeId]
+        [idemKey, input.storeId]
       )[0];
       if (prev) {
         if (
@@ -256,13 +264,42 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         input.cart.id,
         input.storeId,
       ])[0];
-      const live = (t: string) =>
-        db.all(`SELECT count(*) AS n FROM ${t} WHERE cart_id = ?`, [input.cart!.id])[0].n as number;
-      if (
-        !owned ||
-        live('cart_items') !== input.cart.items ||
-        live('cart_bundles') !== input.cart.bundles
-      )
+      // What the cart holds NOW must be exactly what is being ordered (the lines and boxes, not their number): the rows
+      // are deleted below, so a quantity change or a swapped line in another tab must not be silently eaten.
+      const sig = (rows: Array<Record<string, unknown>>, ...cols: string[]) =>
+        rows
+          .map(r => cols.map(c => String(r[c] ?? '')).join('|'))
+          .sort()
+          .join(',');
+      const liveItems = sig(
+        db.all('SELECT product_id, variant_id, quantity FROM cart_items WHERE cart_id = ?', [
+          input.cart.id,
+        ]),
+        'product_id',
+        'variant_id',
+        'quantity'
+      );
+      const orderedItems = sig(
+        input.lines.map(l => ({
+          product_id: l.productId,
+          variant_id: l.variantId,
+          quantity: l.quantity,
+        })),
+        'product_id',
+        'variant_id',
+        'quantity'
+      );
+      const liveBoxes = sig(
+        db.all('SELECT bundle_id, quantity FROM cart_bundles WHERE cart_id = ?', [input.cart.id]),
+        'bundle_id',
+        'quantity'
+      );
+      const orderedBoxes = sig(
+        (input.bundles ?? []).map(b => ({ bundle_id: b.bundleId, quantity: b.quantity })),
+        'bundle_id',
+        'quantity'
+      );
+      if (!owned || liveItems !== orderedItems || liveBoxes !== orderedBoxes)
         throw new MoneyError(
           'CART_CHANGED',
           'The cart changed or was already checked out. Review it and try again.',
@@ -797,7 +834,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         JSON.stringify(shippingAddress),
         JSON.stringify(input.billingAddress ?? shippingAddress),
         input.checkoutIp ?? null,
-        input.idempotencyKey ?? null,
+        idemKey ?? null,
         !fullyWalletPaid && MANUAL.has(input.paymentMethod ?? '') ? 1 : 0,
         now,
         now,
