@@ -37,8 +37,9 @@ export function studioHostResponse(
     status: plan.status,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      // Short and public: the page is static per (language, label), nothing tenant-shaped.
-      'Cache-Control': 'public, max-age=60, s-maxage=300',
+      // Nothing cacheable on an unserved host (tests/unit/web-cross-tenant-cache.test.ts): the page is
+      // tiny and static, so rendering it per request costs nothing and no cache can ever misfile it.
+      'Cache-Control': 'no-store',
       Vary: 'Accept-Language',
       'X-Robots-Tag': 'noindex, nofollow',
       'X-Content-Type-Options': 'nosniff',
