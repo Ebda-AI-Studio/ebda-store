@@ -6,3 +6,4 @@ export * from './scan-code';
 export * from './sizing';
 export * from './ean';
 export * from './scan1d';
+export * from './labels';
