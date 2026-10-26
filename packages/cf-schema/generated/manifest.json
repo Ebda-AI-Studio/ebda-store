@@ -373,6 +373,14 @@
       "pgWhere": "\"pricing_mode\" = 'gold_rate' AND \"deleted_at\" IS NULL"
     },
     {
+      "name": "payment_events_claim_single_outcome_key",
+      "table": "payment_events",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "((\"details\" ->> 'claimId'))",
+      "pgWhere": "\"event_type\" IN ('refund_webhook_absorbed', 'refund_failed')"
+    },
+    {
       "name": "provider_activation_requests_one_live",
       "table": "provider_activation_requests",
       "db": "d1",
@@ -1326,6 +1334,12 @@
       "name": "products_gold_reprice_idx",
       "table": "products",
       "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "payment_events_claim_single_outcome_key",
+      "table": "payment_events",
+      "disposition": "store-do:payment_events"
     }
   ],
   "decimals": [

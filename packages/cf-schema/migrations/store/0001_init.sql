@@ -1498,6 +1498,7 @@ CREATE INDEX IF NOT EXISTS "payment_events_order_id_occurred_at_idx" ON "payment
 CREATE INDEX IF NOT EXISTS "payment_events_event_type_occurred_at_idx" ON "payment_events" ("event_type", "occurred_at");
 CREATE INDEX IF NOT EXISTS "payment_events_provider_occurred_at_idx" ON "payment_events" ("provider", "occurred_at");
 CREATE INDEX IF NOT EXISTS "payment_events_triggered_by_user_id_idx" ON "payment_events" ("triggered_by_user_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "payment_events_claim_single_outcome_key" ON "payment_events" ((("details" ->> 'claimId'))) WHERE "event_type" IN ('refund_webhook_absorbed', 'refund_failed');
 
 CREATE TABLE IF NOT EXISTS "payments" (
   "id" TEXT NOT NULL,
