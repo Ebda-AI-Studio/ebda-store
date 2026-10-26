@@ -6,9 +6,25 @@ import { profitAndLoss } from './accounting/reports.service';
 import {
   NON_REVENUE_ORDER_STATUSES,
   pickSalesGranularity,
+  regionDayStart,
+  regionMonthStart,
+  regionYearMonth,
   type AnalyticsPeriod,
   type SalesGranularity,
 } from '@ebda/shared';
+
+/**
+ * "This month / this year / today" start in the REGION's zone (Africa/Cairo, DST-aware), not the runtime's.
+ * Workers run in UTC, so `new Date(y, m, 1)` started the month at 00:00 UTC = 02:00 or 03:00 Cairo and orders in
+ * the first hours of the 1st were counted in the previous month (finding M-124, Ruling P18-2). Egypt's offset
+ * switches from +3 to +2 on 2026-10-30; the shared helpers know that.
+ */
+export function currentMonthStart(now: Date): Date {
+  return regionMonthStart(regionYearMonth(now));
+}
+export function currentYearStart(now: Date): Date {
+  return regionMonthStart(`${regionYearMonth(now).slice(0, 4)}-01`);
+}
 
 // ==========================================
 // Simple cache-aside helper for analytics queries (60s TTL).
@@ -16,6 +32,33 @@ import {
 // ==========================================
 
 const analyticsMemCache = new Map<string, { data: unknown; expiresAt: number }>();
+/**
+ * Hard cap on the in-memory fallback (Ruling P18-1, finding M-127). Keys carry the store id and the date range,
+ * and every value is a whole aggregation payload, so an isolate that never evicted grew until it was recycled at
+ * the memory limit. An expired entry is deleted on read, and a write past the cap drops expired entries first,
+ * then the oldest (Map keeps insertion order).
+ */
+export const ANALYTICS_MEM_CACHE_MAX = 500;
+
+/** Test seam: the live entry count of the in-memory cache. */
+export function analyticsMemCacheSize(): number {
+  return analyticsMemCache.size;
+}
+
+function memCacheSet(key: string, data: unknown, ttlSeconds: number): void {
+  const now = Date.now();
+  analyticsMemCache.delete(key); // re-insert so the key becomes the newest
+  analyticsMemCache.set(key, { data, expiresAt: now + ttlSeconds * 1000 });
+  if (analyticsMemCache.size <= ANALYTICS_MEM_CACHE_MAX) return;
+  for (const [k, v] of analyticsMemCache) {
+    if (v.expiresAt <= now) analyticsMemCache.delete(k);
+  }
+  while (analyticsMemCache.size > ANALYTICS_MEM_CACHE_MAX) {
+    const oldest = analyticsMemCache.keys().next().value;
+    if (oldest === undefined) break;
+    analyticsMemCache.delete(oldest);
+  }
+}
 
 // Exported (2026-07-22, answer-engine dashboard) so other read-only,
 // tenant-scoped aggregation services can reuse the same Redis-then-memory
@@ -41,6 +84,7 @@ export async function getCachedAnalytics<T>(
   if (memEntry && memEntry.expiresAt > Date.now()) {
     return memEntry.data as T;
   }
+  if (memEntry) analyticsMemCache.delete(key); // expired: never keep it
 
   const data = await fetchFn();
 
@@ -51,7 +95,7 @@ export async function getCachedAnalytics<T>(
     // Redis unavailable
   }
 
-  analyticsMemCache.set(key, { data, expiresAt: Date.now() + ttl * 1000 });
+  memCacheSet(key, data, ttl);
   return data;
 }
 
@@ -172,7 +216,7 @@ export class AnalyticsService {
    */
   static async getDashboardStats(storeId: string, dateRange?: DateRange): Promise<DashboardStats> {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     // The default window ends "now". Quantised to the END of the current
     // minute (issue 2247): a raw `now` made the key below unique per
     // millisecond, so a caller that omits the range never hit the 120s cache
@@ -457,10 +501,10 @@ export class AnalyticsService {
           break;
         case 'year':
         case 'this_year':
-          startDate = new Date(now.getFullYear(), 0, 1);
+          startDate = currentYearStart(now);
           break;
         default:
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          startDate = currentMonthStart(now);
       }
     }
 
@@ -524,7 +568,7 @@ export class AnalyticsService {
    */
   static async getRevenueByPriceSource(storeId: string, dateRange?: DateRange) {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
     const grouped = await prisma.orderItem.groupBy({
       by: ['priceSource', 'priceGroupApplied'],
@@ -568,7 +612,7 @@ export class AnalyticsService {
     dateRange?: DateRange
   ): Promise<TopProduct[]> {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
     // Aggregate quantity sold and revenue per product at the DB level
@@ -635,7 +679,7 @@ export class AnalyticsService {
     dateRange?: DateRange
   ): Promise<TopCategory[]> {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
     // Step 1: aggregate revenue per product at the DB level
@@ -698,7 +742,7 @@ export class AnalyticsService {
     dateRange?: DateRange
   ): Promise<OrdersByStatus[]> {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
     const orders = await prisma.order.groupBy({
@@ -729,7 +773,7 @@ export class AnalyticsService {
    */
   static async getCustomerStats(storeId: string, dateRange?: DateRange): Promise<CustomerStats> {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
     // New customers: those whose very first order for this store falls inside the period
@@ -893,7 +937,7 @@ export class AnalyticsService {
    */
   static async getRevenueByPaymentStatus(storeId: string, dateRange?: DateRange) {
     const now = new Date();
-    const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = dateRange?.startDate || currentMonthStart(now);
     const endDate = dateRange?.endDate || now;
 
     const orders = await prisma.order.groupBy({
@@ -998,9 +1042,9 @@ export class AnalyticsService {
    */
   static async getPerformanceSummary(storeId: string) {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const today = regionDayStart(now);
     const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonth = currentMonthStart(now);
 
     const [todayStats, weekStats, monthStats] = await Promise.all([
       this.getPeriodStats(storeId, today, now),

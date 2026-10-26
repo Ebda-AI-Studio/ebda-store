@@ -58,11 +58,22 @@ export function utcCronsFor(expr: string): string[] {
   return offsets.map(off => {
     let h = p.hour - off;
     let dow = p.dow;
+    let dom = p.dom;
     if (h < 0) {
       h += 24;
       if (dow !== undefined) dow = (dow + 6) % 7;
+      // The UTC trigger fires on the PREVIOUS calendar day, so a fixed day-of-month moves back one too
+      // (finding M-126). The 1st would need "the last day of the previous month", which a cron field cannot say.
+      if (dom !== undefined) {
+        if (dom <= 1) {
+          throw new Error(
+            `a zoned cron on day ${dom} at local hour ${p.hour} fires on the previous UTC day: ${expr}; use hour >= ${Math.max(...offsets)}`
+          );
+        }
+        dom -= 1;
+      }
     }
-    return `${p.min} ${h} ${p.dom ?? '*'} ${p.mon ?? '*'} ${dow ?? '*'}`;
+    return `${p.min} ${h} ${dom ?? '*'} ${p.mon ?? '*'} ${dow ?? '*'}`;
   });
 }
 
@@ -88,6 +99,27 @@ export function matchesLocal(expr: string, at: Date): boolean {
     (p.mon === undefined || Number(get('month')) === p.mon) &&
     (p.dow === undefined || dows.indexOf(get('weekday')) === p.dow)
   );
+}
+
+/**
+ * The id a job start carries. A UTC cron keeps the tick time. A ZONED cron is keyed by its LOCAL date and time:
+ * on the night Egypt falls back, local 23:xx happens twice (once at +3, once at +2) and both UTC triggers pass
+ * `matchesLocal`, which started the job twice; the same local key makes the second start a duplicate (M-126).
+ */
+export function tickKey(expr: string, at: Date): string {
+  if (!/^TZ=/.test(expr.trim())) return String(at.getTime());
+  const p = parseCron(expr);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: p.tz,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(at);
+  const get = (t: string) => parts.find(x => x.type === t)?.value ?? '';
+  return `${get('year')}${get('month')}${get('day')}T${get('hour')}${get('minute')}`;
 }
 
 export interface ScheduledJob {
@@ -123,7 +155,7 @@ export async function runScheduledJobs(
     if (!matchesLocal(expr, at)) continue;
     try {
       const result = await startJob(job, {
-        id: `cron-${job.id}-${scheduledTime}`,
+        id: `cron-${job.id}-${tickKey(expr, at)}`,
         name: 'inngest/scheduled.timer',
         data: { cron: expr },
         ts: scheduledTime,
