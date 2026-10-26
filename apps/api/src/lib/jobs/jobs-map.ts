@@ -49,7 +49,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   },
   'bulk-import-orphan-cleanup': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'domain-claim-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
-  'instapay-receipt-retention-weekly': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'instapay-receipt-retention-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'order-anonymize-5y-monthly': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'r2-orphan-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'search-log-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },

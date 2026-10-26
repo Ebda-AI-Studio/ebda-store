@@ -135,18 +135,21 @@ export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
 /**
  * InstaPay receipt retention (M-025): screenshots deleted (approved: right away, a missed delete is retried here;
  * rejected / voided: 30 days after the decision; drafts: 30 days after upload) and the personal fields scrubbed 180 days
- * after a final decision. Weekly; per store, in the store's own scope. See docs/RETENTION.md.
+ * after a final decision. Daily (a missed delete is retried the next day); per store, in the store's own scope. See docs/RETENTION.md.
  */
 export const instapayReceiptRetention: InngestFunction.Any = inngest.createFunction(
   {
-    id: 'instapay-receipt-retention-weekly',
+    id: 'instapay-receipt-retention-daily',
     name: 'Delete InstaPay receipt screenshots and scrub receipt personal fields on schedule',
     retries: 1,
-    triggers: [{ cron: '15 5 * * 0' }],
+    triggers: [{ cron: '30 4 * * *' }],
   },
   async ({ step }) => {
     const out = await step.run('sweep', () => InstapayReceiptService.sweepRetention());
-    logger.info(out, 'instapay-receipt-retention: completed');
+    logger.info(
+      { images: out.images, scrubbed: out.scrubbed },
+      'instapay-receipt-retention: completed'
+    );
     return out;
   }
 );
