@@ -147,7 +147,12 @@ const apply = async (
       db.events.push({
         eventType: 'webhook',
         createdAt: new Date(NOW),
-        details: { flavour: 'refund', refundId, heldUnaccountedRefund: true },
+        details: {
+          flavour: 'refund',
+          refundId,
+          heldUnaccountedRefund: true,
+          reportedAmount: amount,
+        },
       });
     await s.commit({
       data: {
@@ -346,7 +351,8 @@ describe('Fawry amount-less settle notice: attributed on positive evidence, else
     expect(s.decision?.heldUnaccountedEvent).toBe(false);
     // a SECOND notice cannot ride the same claim
     const second = await fawry('fawry-refund-F1-PARTIAL_REFUNDED');
-    expect(second.seen).toBe(true);
+    expect(second.seen).toBe(false); // never silently seen: held + alerted
+    expect(second.decision?.heldUnaccountedEvent).toBe(true);
     const other = await apply('fawry', 'fawry-refund-F1-PARTIAL_REFUNDED#2', 0);
     expect(other.decision?.absorbedClaimId).toBeNull();
   });
@@ -591,5 +597,25 @@ describe('review fixes: operator match validation, absorbed id filed, lock mode,
     db.scope = 's1';
     expect(await inSettlementTx('s1', async () => 1)).toBe(1);
     db.scope = undefined;
+  });
+});
+
+describe('final review fixes', () => {
+  it('operator match refuses a held webhook whose amount differs from the claim (500 vs 2000)', async () => {
+    claim('c1', 2000, { executedRef: 'API-ID' });
+    await apply('kashier', 'WEBHOOK-ID', 500);
+    await expect(
+      matchRefundToClaim({ ...A, claimId: 'c1', providerRefundId: 'WEBHOOK-ID', actorUserId: 'op' })
+    ).rejects.toThrow('amount');
+    expect(types('refund_webhook_absorbed')).toHaveLength(0);
+  });
+  it('Fawry: a REPEATED amount-less partial notice is never silently seen - the 2nd is held and alerted', async () => {
+    claim('c1', 1000, { executedRef: 'fawry-refund-F1-1500', full: false });
+    const first = await apply('fawry', 'fawry-refund-F1-PARTIAL_REFUNDED', 0);
+    expect(first.decision?.absorbedClaimId).toBe('c1');
+    const second = await apply('fawry', 'fawry-refund-F1-PARTIAL_REFUNDED', 0);
+    expect(second.seen).toBe(false);
+    expect(second.decision?.absorbedClaimId ?? null).toBeNull();
+    expect(second.decision?.heldUnaccountedEvent).toBe(true);
   });
 });

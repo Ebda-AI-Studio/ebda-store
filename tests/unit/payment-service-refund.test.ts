@@ -515,6 +515,37 @@ describe('PaymentService.refund — the claim event carries what the settlement 
   });
 });
 
+describe('PaymentService.refund — a claim whose answered id was already filed under another claim is closed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    paymentEventFindMany.mockResolvedValue([]);
+    paymentEventFindFirst.mockResolvedValue(null);
+  });
+  it('writes an id_match_reassigned consume event so the claim cannot hold later refunds forever', async () => {
+    mockHappyPathUpToEffects();
+    // the ledger already holds rf_123 (a webhook with that id was absorbed by a same-amount sibling claim)
+    paymentUpdateMany.mockResolvedValue({ count: 1 });
+    const { prisma } = await import('@ebda/database');
+    (prisma.payment.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'pay_1',
+      amount: 5000,
+      currency: 'EGP',
+      status: 'partially_refunded',
+      refundedAmount: 2000,
+      metadata: { refundEventIds: ['rf_123'] },
+    });
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 }).catch(e => e);
+    const types = paymentEventCreate.mock.calls.map(
+      c => (c[0] as { data: { eventType: string; details?: Record<string, unknown> } }).data
+    );
+    expect(
+      types.some(
+        d => d.eventType === 'refund_webhook_absorbed' && d.details?.via === 'id_match_reassigned'
+      )
+    ).toBe(true);
+  });
+});
+
 describe('PaymentService.refund — a claim a webhook already absorbed is never released', () => {
   beforeEach(() => {
     vi.clearAllMocks();
