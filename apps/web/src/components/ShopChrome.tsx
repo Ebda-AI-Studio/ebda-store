@@ -27,6 +27,14 @@ import { StickyHeaderOffset } from './StickyHeaderOffset';
 import { StickyBrowseCartBar } from './commerce/StickyBrowseCartBar';
 import { CardStepperProvider } from '../templates/shared/card-stepper-context';
 
+/**
+ * Heights the placeholder reserves until the template chunk arrives, measured on the demo stores at a 393 px
+ * viewport (announcement row 41 px; header 68 px on qamar/minimal-style headers). A taller header (souq: 124 px)
+ * still moves the page once, by the difference, instead of by the whole header.
+ */
+const ANNOUNCEMENT_BAR_MIN_PX = 41;
+const HEADER_MIN_PX = 68;
+
 interface ShopChromeProps {
   children: ReactNode;
   /**
@@ -322,12 +330,46 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   };
 
   if (templateLoading || !T) {
+    // SEO-1 (P14): this placeholder MUST keep `children` at the same tree position, with the same
+    // wrapper types, as the real chrome below. It used to return a different tree, so when the template
+    // chunk arrived (after hydration, ~7 s on a slow phone) React unmounted the whole page body and
+    // mounted a new one: the product <img> was replaced, which Chrome reports as a second, late LCP
+    // candidate (6.7-7.8 s) and which shifted everything under the header (CLS). Slot order mirrors the
+    // real return: [announcement, header zone, main, ...]. Only the header's CONTENT differs.
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        {/* Reserve chrome height so the page doesn't jump on hydration. */}
-        <div className="h-16 border-b" aria-hidden />
-        <main className="flex-1">{children}</main>
-      </div>
+      <CardStepperProvider>
+        <div
+          className="flex min-h-screen flex-col bg-background"
+          data-ui-uppercase={store?.theme?.uppercaseStyle ? 'true' : undefined}
+        >
+          {/* announcement slot: reserves its row so the bar arriving later does not push the page down */}
+          {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
+            store.announcementBar?.text && (
+              <aside
+                data-zone="beforeHeader"
+                aria-hidden
+                className={sectionVisibilityClass(layout?.announcement) ?? undefined}
+                style={{ minHeight: ANNOUNCEMENT_BAR_MIN_PX }}
+              />
+            )}
+          <div
+            data-zone="header"
+            className={
+              [
+                layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
+                sectionVisibilityClass(layout?.header),
+              ]
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
+          >
+            <div aria-hidden className="border-b" style={{ minHeight: HEADER_MIN_PX }} />
+          </div>
+          <main role="main" className="flex-1">
+            {children}
+          </main>
+        </div>
+      </CardStepperProvider>
     );
   }
 
