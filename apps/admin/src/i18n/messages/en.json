@@ -21,7 +21,17 @@
         "code": "404",
         "title": "Page not found",
         "message": "The page you are looking for does not exist or has been moved.",
-        "goHome": "Go to Dashboard"
+        "goHome": "Go to Dashboard",
+        "line": "The page you're looking for can't be found.",
+        "hint": "Search the settings, or jump to a section.",
+        "quickLinks": "Go to",
+        "linkDashboard": "Dashboard",
+        "linkStores": "Your stores",
+        "linkProducts": "Products",
+        "linkOrders": "Orders",
+        "linkCustomers": "Customers",
+        "linkSettings": "Settings",
+        "backToSite": "Back to the Ebda AI Studio site"
       },
       "boundary": {
         "title": "Something went wrong",
