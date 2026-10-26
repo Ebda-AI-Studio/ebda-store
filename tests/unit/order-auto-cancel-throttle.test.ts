@@ -14,11 +14,12 @@ const h = vi.hoisted(() => ({
   findMany: vi.fn(),
   getPaymentStatus: vi.fn(),
   updateStatus: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock('@ebda/database', async () =>
   (await import('./helpers/database-mock')).databaseMock({
-    prisma: { order: { findMany: h.findMany } },
+    prisma: { order: { findMany: h.findMany }, $queryRaw: h.queryRaw },
   })
 );
 vi.mock('@api/lib/inngest/client', () => ({
@@ -79,6 +80,7 @@ beforeEach(() => {
   h.findMany.mockResolvedValue([gatewayOrder('o1'), gatewayOrder('o2')]);
   h.getPaymentStatus.mockResolvedValue({ status: 'expired' });
   h.updateStatus.mockResolvedValue(undefined);
+  h.queryRaw.mockResolvedValue([{ status: 'pending', payment_status: 'unpaid' }]);
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
     (depth > 0 ? timersInsideStep : timersOutsideStep).push(ms ?? 0);
     return realSetTimeout(fn, 0);
@@ -109,5 +111,12 @@ describe('order-auto-cancel-unpaid throttle', () => {
     expect(timersInsideStep.filter(ms => ms > 0)).toHaveLength(2);
     // … and none in the replayed loop body.
     expect(timersOutsideStep.filter(ms => ms > 0)).toEqual([]);
+  });
+
+  it('an order a webhook PAID after the provider answered "expired" is not cancelled (row lock + re-check)', async () => {
+    h.queryRaw.mockResolvedValue([{ status: 'confirmed', payment_status: 'paid' }]);
+    const r = await h.handler!({ step });
+    expect(r).toMatchObject({ scanned: 2, cancelled: 0 });
+    expect(h.updateStatus).not.toHaveBeenCalled();
   });
 });

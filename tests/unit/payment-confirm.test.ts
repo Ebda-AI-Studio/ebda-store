@@ -23,6 +23,7 @@ const orderUpdate = vi.fn().mockResolvedValue({});
 const txn = vi.fn().mockResolvedValue(undefined);
 const claims = { paid: 'claimed' as string, failed: 'claimed' as string };
 vi.mock('@api/services/payment-state-claims', () => ({
+  lockPaymentRow: () => Promise.resolve(),
   claimOrderPaid: (...a: unknown[]) => {
     txn('paid', ...a);
     return Promise.resolve(claims.paid);
@@ -170,6 +171,22 @@ describe('confirmPaymentFromProviderStatus', () => {
       providerStatus: 'completed',
       statusChanged: false,
     });
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('the order turns CANCELLED between the status read and the claim: raises INVALID_STATUS_TRANSITION, no quiet return', async () => {
+    claims.paid = 'blocked_status';
+    orderFindUnique
+      .mockResolvedValueOnce({ status: 'pending' }) // the pre-claim read
+      .mockResolvedValueOnce({ status: 'cancelled' }); // the post-claim read
+    await expect(
+      confirmPaymentFromProviderStatus({
+        payment: basePayment,
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+        providerStatus: statusResponse('completed'),
+        source: 'guest_verify',
+      })
+    ).rejects.toThrow(/transition|INVALID_STATUS/i);
     expect(inngestSend).not.toHaveBeenCalled();
   });
 

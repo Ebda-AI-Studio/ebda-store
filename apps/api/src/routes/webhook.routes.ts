@@ -492,9 +492,10 @@ async function handleGatewayWebhook(
     const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
 
     // The Egyptian gateways have per-merchant credentials only (no platform-level secret), so a
-    // delivery that names no payment of ours cannot be verified or attributed to anyone. Answer
-    // 200 and do nothing: a 5xx would make the gateway retry it forever, and a different status
-    // for "unknown" vs "known" would be a payment-existence oracle for an unauthenticated caller.
+    // delivery that names no payment of ours cannot be verified or attributed to anyone. It is NOT
+    // acknowledged (M-050): the Payment row is committed only after the gateway accepts the invoice, so a fast
+    // callback can beat it. 503 + Retry-After lets the gateway redeliver; nothing is stored and no store is
+    // revealed (an unknown reference is a 503 for every caller, so it is no per-store existence oracle).
     if (!storeIdForWebhook) {
       respondUnresolvedPayment(res, provider, idempotencyKey);
       return;

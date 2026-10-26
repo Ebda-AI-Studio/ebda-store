@@ -392,12 +392,40 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
       paidAt: new Date(),
     });
     assertValidTransitionMock.mockImplementation(() => undefined);
-    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+    // both claim shapes (confirming, then already-fulfilled) match nothing: it is already paid
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 0 });
     orderFindUnique.mockResolvedValueOnce({ paymentStatus: 'paid' });
 
     await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
 
     expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('a late or replayed webhook never moves a captured / refunded payment row off its state (payment write guard)', async () => {
+    for (const [incoming, notIn] of [
+      ['pending', ['completed', 'refunded', 'partially_refunded', 'disputed']],
+      ['processing', ['completed', 'refunded', 'partially_refunded', 'disputed']],
+      ['completed', ['refunded', 'partially_refunded', 'disputed']],
+    ] as const) {
+      vi.clearAllMocks();
+      mockPaymentForWebhook('confirmed', 'completed');
+      providerParseWebhook.mockReturnValue({
+        transactionId: TRANSACTION_ID,
+        status: incoming,
+        amount: 5000,
+        currency: 'EGP',
+      });
+      assertValidTransitionMock.mockImplementation(() => undefined);
+      paymentUpdateMany.mockResolvedValue({ count: 0 });
+      orderUpdateMany.mockResolvedValue({ count: 0 });
+      orderFindUnique.mockResolvedValue({ paymentStatus: 'paid' });
+      await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+      const write = paymentUpdateMany.mock.calls.find(
+        c => (c[0] as { data?: { status?: string } }).data?.status === incoming
+      );
+      expect(write, `payment write for ${incoming}`).toBeTruthy();
+      expect((write![0] as { where: { status?: unknown } }).where.status).toEqual({ notIn });
+    }
   });
 
   it('a late FAILED webhook on a PAID order changes nothing and pushes no failure alert (M-064)', async () => {

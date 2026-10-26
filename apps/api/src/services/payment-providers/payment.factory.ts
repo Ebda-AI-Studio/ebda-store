@@ -4,7 +4,12 @@ import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { OrderService, assertValidTransition } from '../order.service';
-import { claimOrderFailed, claimOrderPaid } from '../payment-state-claims';
+import {
+  claimOrderFailed,
+  claimOrderPaid,
+  lockPaymentRow,
+  paymentStatusesNotOverwrittenBy,
+} from '../payment-state-claims';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
@@ -2231,7 +2236,12 @@ export class PaymentService {
     // confirming and refunding statuses assert a transition.
     if (
       (webhookData.status === 'completed' || webhookData.status === 'refunded') &&
-      payment.order
+      payment.order &&
+      // processing / shipped / delivered are marked paid without moving their fulfilment status (claimOrderPaid)
+      !(
+        webhookData.status === 'completed' &&
+        ['processing', 'shipped', 'delivered'].includes(payment.order.status)
+      )
     ) {
       assertValidTransition(payment.order.status, orderStatus);
     }
@@ -2239,6 +2249,8 @@ export class PaymentService {
     // Order first, as ONE conditional update (M-049 / M-064): the webhook, the guest verify-on-return and the admin
     // Refresh can all settle the same order. Whoever wins `claimed` writes + fans out; a late "failed/expired"
     // never touches a paid order. (A refund event keeps its own path above.)
+    // payment row first, then the order (the order every refund path locks in): no lock-order flip, no deadlock
+    if (webhookData.status !== 'refunded') await lockPaymentRow(payment.id);
     let orderClaim: 'claimed' | 'already' | 'blocked' | 'none' = 'none';
     if (webhookData.status === 'completed') {
       const c = await claimOrderPaid(payment.orderId, payment.order?.storeId ?? currentStoreId());
@@ -2256,20 +2268,26 @@ export class PaymentService {
         { paymentId: payment.id, orderId: payment.orderId, provider, status: webhookData.status },
         '[PAYMENT WEBHOOK] order already settled or no longer confirmable; order not changed'
       );
+      if (webhookData.status === 'completed') {
+        // Captured money on an order that went terminal between the assert above and the claim: the same loud
+        // answer as the assert (retried, then dead-lettered into the existing P0 path), never a quiet 200.
+        const cur = await prisma.order.findUnique({
+          where: { id: payment.orderId, storeId: payment.order?.storeId ?? currentStoreId() },
+          select: { status: true },
+        });
+        assertValidTransition(cur?.status ?? 'cancelled', 'confirmed');
+      }
     }
 
     // Update payment. A terminal failure never overwrites a captured / refunded payment.
     const prevPaymentStatus = payment.status;
-    const failureStatus =
-      webhookData.status === 'failed' ||
-      webhookData.status === 'expired' ||
-      webhookData.status === 'cancelled';
     await prisma.payment.updateMany({
       where: {
         id: payment.id,
-        ...(failureStatus
-          ? { status: { notIn: ['completed', 'refunded', 'partially_refunded', 'disputed'] } }
-          : {}),
+        // never move captured / refunded money off its state (a late `pending`, a replayed `completed`)
+        ...(webhookData.status === 'refunded'
+          ? {}
+          : { status: { notIn: paymentStatusesNotOverwrittenBy(webhookData.status) } }),
       },
       data: {
         status: webhookData.status,

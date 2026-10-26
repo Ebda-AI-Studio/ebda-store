@@ -4,7 +4,7 @@
  * on the database: the conditional UPDATE and its row lock are what is under test (only the fan-out sinks are stubbed).
  */
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { prisma } from '@ebda/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 const inngestSend = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -31,7 +31,7 @@ const uid = (l: string) => `${TAG}-${l}-${++seq}`;
 let storeId = '';
 
 async function mkOrder(
-  status: 'pending' | 'confirmed' = 'pending',
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'cancelled' = 'pending',
   paymentStatus: 'unpaid' | 'paid' = 'unpaid'
 ) {
   const order = await prisma.order.create({
@@ -68,23 +68,26 @@ const answer = (status: 'completed' | 'expired' | 'failed') =>
     amount: 5000,
     currency: 'EGP',
   }) as never;
+/** Run like production: inside the store's tenant transaction (the request path), not autocommitting per statement. */
 const confirm = (
   o: Awaited<ReturnType<typeof mkOrder>>,
   status: 'completed' | 'expired' | 'failed',
   snapshot = 'unpaid'
 ) =>
-  confirmPaymentFromProviderStatus({
-    payment: {
-      id: o.payment.id,
-      status: o.payment.status,
-      provider: 'paymob',
-      metadata: {},
-      amount: 5000,
-    } as never,
-    order: { id: o.order.id, storeId, paymentStatus: snapshot, locale: 'ar' },
-    providerStatus: answer(status),
-    source: 'guest_verify',
-  });
+  runInTenantContext(storeId, () =>
+    confirmPaymentFromProviderStatus({
+      payment: {
+        id: o.payment.id,
+        status: o.payment.status,
+        provider: 'paymob',
+        metadata: {},
+        amount: 5000,
+      } as never,
+      order: { id: o.order.id, storeId, paymentStatus: snapshot, locale: 'ar' },
+      providerStatus: answer(status),
+      source: 'guest_verify',
+    })
+  );
 
 describe.skipIf(!hasDb)('P08 payment state claims (real Postgres)', () => {
   beforeAll(async () => {
@@ -128,6 +131,31 @@ describe.skipIf(!hasDb)('P08 payment state claims (real Postgres)', () => {
         'completed'
       );
     }
+  });
+
+  it('an order the merchant already moved to processing / shipped is marked PAID without moving its status', async () => {
+    for (const st of ['processing', 'shipped'] as const) {
+      const o = await mkOrder(st, 'unpaid');
+      const r = await confirm(o, 'completed');
+      expect(r).toMatchObject({ paymentStatus: 'paid', statusChanged: true });
+      const after = await prisma.order.findUnique({ where: { id: o.order.id } });
+      expect(after).toMatchObject({ status: st, paymentStatus: 'paid' });
+      expect((await prisma.payment.findUnique({ where: { id: o.payment.id } }))!.status).toBe(
+        'completed'
+      );
+    }
+  });
+
+  it('captured money on a CANCELLED order raises INVALID_STATUS_TRANSITION (the sweep records it) and changes nothing', async () => {
+    const o = await mkOrder('cancelled', 'unpaid');
+    await expect(confirm(o, 'completed')).rejects.toMatchObject({
+      code: 'INVALID_STATUS_TRANSITION',
+    });
+    const after = await prisma.order.findUnique({ where: { id: o.order.id } });
+    expect(after).toMatchObject({ status: 'cancelled', paymentStatus: 'unpaid' });
+    expect(inngestSend).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ orderId: o.order.id }) })
+    );
   });
 
   it('a late expired answer for an order that is already PAID changes nothing (stale snapshot and admin Refresh)', async () => {

@@ -15,12 +15,16 @@ export type PaidClaim = 'claimed' | 'already_paid' | 'blocked_status';
 export type FailedClaim = 'claimed' | 'already_failed' | 'blocked_paid_or_settled';
 
 /**
- * unpaid|failed -> paid (+ status confirmed). Only the caller that gets `claimed` runs the fan-out. An order that was
- * cancelled / refunded / shipped in the meantime is `blocked_status` (the money is captured, the order is not
- * confirmable: the caller alerts, it does not flip the order).
+ * unpaid|failed -> paid. Only the caller that gets `claimed` runs the fan-out.
+ *  - pending / awaiting confirmation / confirmed: the order becomes `confirmed` + paid.
+ *  - processing / shipped / delivered (the merchant moved an unpaid online order on, or it was already fulfilled):
+ *    the money is real, so ONLY `paymentStatus` becomes paid and the fulfilment status is left alone. Refusing it
+ *    would leave a captured payment unrecorded for ever, with every webhook retry failing the same way.
+ *  - cancelled / refunded: `blocked_status` (the caller raises INVALID_STATUS_TRANSITION, which the auto-cancel
+ *    sweep turns into a "captured money on a terminal order" alert).
  */
 export async function claimOrderPaid(orderId: string, storeId: string): Promise<PaidClaim> {
-  const res = await prisma.order.updateMany({
+  const confirming = await prisma.order.updateMany({
     where: {
       id: orderId,
       storeId,
@@ -29,7 +33,17 @@ export async function claimOrderPaid(orderId: string, storeId: string): Promise<
     },
     data: { status: 'confirmed', paymentStatus: 'paid' },
   });
-  if (res.count === 1) return 'claimed';
+  if (confirming.count === 1) return 'claimed';
+  const fulfilled = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      storeId,
+      paymentStatus: { in: ['unpaid', 'failed'] },
+      status: { in: ['processing', 'shipped', 'delivered'] },
+    },
+    data: { paymentStatus: 'paid' },
+  });
+  if (fulfilled.count === 1) return 'claimed';
   const cur = await prisma.order.findUnique({
     where: { id: orderId, storeId },
     select: { paymentStatus: true },
@@ -37,6 +51,22 @@ export async function claimOrderPaid(orderId: string, storeId: string): Promise<
   return cur?.paymentStatus === 'unpaid' || cur?.paymentStatus === 'failed'
     ? 'blocked_status'
     : 'already_paid';
+}
+
+/**
+ * Take the payment row lock BEFORE the order claim, the order every refund path uses (payment, then order), so a
+ * replayed webhook and a refund settling the same order cannot deadlock.
+ */
+export async function lockPaymentRow(paymentId: string): Promise<void> {
+  await prisma.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+}
+
+/** Statuses a payment row must not be moved OFF by an incoming provider answer (never regress captured money). */
+export function paymentStatusesNotOverwrittenBy(
+  incoming: string
+): Array<'completed' | 'refunded' | 'partially_refunded' | 'disputed'> {
+  if (incoming === 'completed') return ['refunded', 'partially_refunded', 'disputed'];
+  return ['completed', 'refunded', 'partially_refunded', 'disputed'];
 }
 
 /**
