@@ -97,7 +97,7 @@ export function StoreNotFoundBody() {
           onChange={e => setQuery(e.target.value)}
           placeholder={t('Search the store', 'دوّر في المتجر')}
           enterKeyHint="search"
-          className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="h-12 w-full rounded-xl border border-input bg-background px-4 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <SearchAutocomplete query={query} onSelect={() => setQuery('')} />
       </form>
@@ -108,7 +108,7 @@ export function StoreNotFoundBody() {
         </Link>
         <Link
           href={storeUrl('/cart')}
-          className={`${button} border border-border bg-background text-foreground`}
+          className={`${button} border border-input bg-background text-foreground`}
         >
           {t('Cart', 'السلة')}
         </Link>
@@ -148,7 +148,7 @@ export function StoreNotFoundBody() {
               <li key={c.id}>
                 <Link
                   href={storeUrl(`/products?category=${encodeURIComponent(c.slug)}`)}
-                  className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm text-foreground hover:border-primary hover:text-primary"
+                  className="inline-flex min-h-11 items-center rounded-full border border-input px-4 text-sm text-foreground hover:border-primary hover:text-primary"
                 >
                   {isRtl ? c.nameAr || c.name : c.name}
                 </Link>
