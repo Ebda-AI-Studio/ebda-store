@@ -47,6 +47,7 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'hub',
         'id',
         'accounts',
+        'media',
       ].sort()
     );
   });

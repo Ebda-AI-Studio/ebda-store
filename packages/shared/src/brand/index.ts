@@ -20,6 +20,14 @@ export const BRAND = {
     nameEn: 'Ebda Store',
     nameAr: 'ابدأ ستور',
   },
+  /**
+   * The WhatsApp PRODUCT (Ebda WhatsApp, by Ebda AI Studio): always the full name, never a bare "Ebda" (BRAND-NAME-1).
+   * Lives at `domains.whatsappApp`; its marketing page is /whatsapp on the marketing site.
+   */
+  productWhatsapp: {
+    nameEn: 'Ebda WhatsApp',
+    nameAr: 'ابدأ واتساب',
+  },
   /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
   company: {
     legalNameAr: 'ابدأ استوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
@@ -63,6 +71,10 @@ export const BRAND = {
     status: 'status.ebda.app',
     /** Reserved for the post-launch automated WhatsApp tier. */
     whatsapp: 'whatsapp.ebda.app',
+    /** The Ebda WhatsApp app (LAUNCH-SUITE-1; its Worker's custom domain). */
+    whatsappApp: 'wa.ebda.app',
+    /** The shared Ebda AI Studio sign-in (ID-1). */
+    accounts: 'accounts.ebda.app',
   },
   /**
    * The ONE public contact address. Only hello@ and security@ receive mail
@@ -209,12 +221,31 @@ export interface SiteNavItem {
   href: string;
   label: string;
 }
+export type SiteNavProductId = 'store' | 'whatsapp';
 export interface SiteNavProduct {
-  id: 'store';
+  id: SiteNavProductId;
   href: string;
   label: string;
   blurb: string;
 }
+/**
+ * The Products menu icons (24x24, drawn once, stroked in the panel's gold on a night tile). `fill: true` paths are
+ * solid. The marketing header renders the same paths in React, the support sites through `siteNavIconSvg`.
+ */
+export const SITE_NAV_ICONS: Record<SiteNavProductId, readonly { d: string; fill?: boolean }[]> = {
+  store: [
+    {
+      d: 'M4 9.5 5.5 4h13L20 9.5M4 9.5a2.67 2.67 0 0 0 5.33 0 2.67 2.67 0 0 0 5.34 0 2.67 2.67 0 0 0 5.33 0M5.5 12.6V20h13v-7.4M10 20v-4.6h4V20',
+    },
+  ],
+  whatsapp: [
+    { d: 'M12 3.5a8.5 8.5 0 0 0-7.3 12.9L3.5 20.5l4.2-1.1A8.5 8.5 0 1 0 12 3.5Z' },
+    {
+      d: 'M9.2 8.6c.2-.4.5-.4.7-.4l.5.1.8 1.8c0 .2 0 .4-.2.6l-.5.6c.6 1.1 1.5 2 2.6 2.6l.6-.6c.2-.2.4-.2.6-.1l1.7.8c.1.3.1.6 0 .9-.3.8-1.3 1.2-2.2 1-2.6-.7-4.5-2.6-5.2-5.2-.1-.6.1-1.5 1-2.1Z',
+      fill: true,
+    },
+  ],
+};
 
 const L = (lang: NavLang, ar: string, en: string) => (lang === 'ar' ? ar : en);
 const marketing = (lang: NavLang) => `${BRAND_MARKETING_URL}${lang === 'ar' ? '/' : '/en/'}`;
@@ -248,15 +279,27 @@ export function siteNavItems(lang: NavLang): SiteNavItem[] {
   ];
 }
 
-/** The Products menu: only live products (BRAND-ARCH-1). Same entry as the marketing header's menu. */
+/**
+ * The Products menu: only live products (BRAND-ARCH-1), Ebda Store then Ebda WhatsApp (LAUNCH-SUITE-1). The same entries,
+ * labels and blurbs as the marketing header's Products panel (tests/unit/site-nav-shared.test.ts keeps them equal).
+ */
 export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
   return [
     {
       id: 'store',
       href: marketing(lang),
       label: lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
-      // the marketing header's own storeBlurb (apps/marketing content.ts); tests/unit/site-nav-shared.test.ts keeps them equal
       blurb: L(lang, 'متجرك أونلاين في دقايق', 'Your online store in minutes'),
+    },
+    {
+      id: 'whatsapp',
+      href: `${marketing(lang)}whatsapp/`,
+      label: lang === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn,
+      blurb: L(
+        lang,
+        'كلّم عملاءك على واتساب من مكان واحد',
+        'Talk to your customers on WhatsApp, from one inbox'
+      ),
     },
   ];
 }
@@ -284,6 +327,18 @@ export function siteWordmarkHtml(p: {
   return `<a class="wordmark" href="${esc(p.href)}">${p.markHtml}<span>${esc(studio)}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>`;
 }
 
+/** The icon as an inline <svg> string (decorative). */
+export function siteNavIconSvg(id: SiteNavProductId): string {
+  const paths = SITE_NAV_ICONS[id]
+    .map(p =>
+      p.fill
+        ? `<path d="${p.d}" fill="currentColor"/>`
+        : `<path d="${p.d}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
+    )
+    .join('');
+  return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">${paths}</svg>`;
+}
+
 /** The header nav: desktop link row with the Products disclosure, and the mobile menu (below 1180px it collapses into the menu button; wider, it is its own row under the wordmark, search and language switch). */
 export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
   const t = siteNavLabels(lang);
@@ -291,33 +346,50 @@ export function siteNavHtml(lang: NavLang, active: NavSite | null): string {
   const products = siteNavProducts(lang);
   const link = (i: SiteNavItem) =>
     `<li><a href="${esc(i.href)}"${i.id === active ? ' aria-current="page"' : ''}>${esc(i.label)}</a></li>`;
+  // one card per product: icon tile, full name, one-sentence blurb (the marketing header renders the same pieces in React)
   const prod = (p: SiteNavProduct) =>
-    `<li><a href="${esc(p.href)}"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></a></li>`;
+    `<li><a href="${esc(p.href)}"><span class="np-ico">${siteNavIconSvg(p.id)}</span><span class="np-txt"><b>${esc(p.label)}</b><span>${esc(p.blurb)}</span></span></a></li>`;
   return (
     `<nav class="top-nav" aria-label="${esc(t.nav)}">` +
     `<ul class="nav-links"><li class="nav-products"><details><summary>${esc(t.products)}</summary><ul>${products.map(prod).join('')}</ul></details></li>${items.map(link).join('')}</ul>` +
     `<details class="nav-menu"><summary><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>${esc(t.menu)}</span></summary>` +
-    `<ul>${products.map(p => `<li><a href="${esc(p.href)}">${esc(p.label)}</a></li>`).join('')}${items.map(link).join('')}</ul></details>` +
+    `<ul><li class="menu-group"><p>${esc(t.products)}</p><ul>${products.map(p => `<li><a href="${esc(p.href)}">${esc(p.label)}</a></li>`).join('')}</ul></li>${items.map(link).join('')}</ul></details>` +
     `</nav>`
   );
 }
 
+/**
+ * The Products panel (desktop) and the mobile menu's Products group, as CSS: one card per product, anchored to its
+ * trigger with logical properties (so it mirrors in Arabic RTL). It reads only --fg, --muted, --line and --panel, which
+ * every Ebda site defines, plus the brand night and gold for the icon tile. The marketing site's globals.css carries
+ * the same block between `nav-products:start` and `nav-products:end` (tests/unit/site-nav-shared.test.ts keeps them equal).
+ */
+export const SITE_NAV_PANEL_CSS = `
+.nav-products{position:relative}
+.nav-products>details>ul{position:absolute;inset-inline-start:-18px;top:100%;z-index:60;margin:8px 0 0;padding:8px;list-style:none;width:min(340px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.nav-products li a{display:flex;align-items:center;gap:12px;padding:10px;min-height:44px;border-radius:10px;color:var(--fg);text-decoration:none}
+.nav-products li a:hover,.nav-products li a:focus-visible{background:color-mix(in srgb,var(--fg) 7%,transparent);color:var(--fg)}
+.np-ico{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:${BRAND.colors.night};color:${BRAND.colors.gold}}
+.np-txt{display:grid;gap:2px;min-width:0}
+.np-txt b{font-weight:600;line-height:1.35}
+.np-txt span{color:var(--muted);font-size:.875rem;line-height:1.5}
+.menu-group>p{margin:0;padding:6px var(--np-inset,10px);color:var(--muted);font-size:.8125rem;font-weight:600}
+`.replace(/\n/g, '');
+
 /** Stylesheet for the wordmark and the nav above. Uses the sites' shared tokens (--fg --muted --line --lift --panel --night). */
-export const SITE_NAV_CSS = `
+export const SITE_NAV_CSS =
+  `
 .top-nav{order:3;flex:1 1 100%;min-width:0;position:relative}
 .top-nav ul{list-style:none;margin:0;padding:0}
 .top-nav .nav-links{display:flex;flex-wrap:nowrap;align-items:center;gap:4px 16px;white-space:nowrap}
 .top-nav a{color:var(--fg);text-decoration:none;padding:6px 2px;display:inline-block}
 .top-nav a:hover{color:var(--lift)}
 .top-nav a[aria-current=page]{color:var(--lift);border-bottom:2px solid var(--lift)}
-.top-nav summary{cursor:pointer;list-style:none;color:var(--fg);padding:6px 2px;display:inline-flex;align-items:center;gap:6px}
+.top-nav summary{cursor:pointer;list-style:none;color:var(--fg);padding:6px 2px;display:inline-flex;align-items:center;gap:6px;min-height:44px}
 .top-nav summary::-webkit-details-marker{display:none}
 .nav-products>details>summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);margin-block-start:-3px}
-.nav-products>details>ul,.nav-menu>ul{position:absolute;z-index:60;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin-block-start:6px}
-.nav-products li a{display:block;padding:8px 10px;border-radius:8px}
-.nav-products li a b{display:block}
-.nav-products li a span{display:block;color:var(--muted);font-size:.85rem}
+.nav-menu>ul{position:absolute;z-index:60;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin-block-start:6px}
 .nav-menu{display:none}
 .nav-menu>ul a{display:block;padding:10px;min-height:44px}
 @media (max-width:1179px){.top-nav{order:0;flex:0 0 auto;margin-inline-start:auto}.top-nav .nav-links{display:none}.nav-menu{display:block}}
-`.replace(/\n/g, '');
+`.replace(/\n/g, '') + SITE_NAV_PANEL_CSS;
