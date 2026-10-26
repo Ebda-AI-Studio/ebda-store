@@ -2347,7 +2347,7 @@ export default function CheckoutClient() {
                               type="checkbox"
                               checked={smsOptIn}
                               onChange={e => setSmsOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                              className="mt-0.5 h-6 w-6 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2389,7 +2389,7 @@ export default function CheckoutClient() {
                               type="checkbox"
                               checked={cartEmailOptIn}
                               onChange={e => setCartEmailOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                              className="mt-0.5 h-6 w-6 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2572,7 +2572,7 @@ export default function CheckoutClient() {
                           type="checkbox"
                           checked={saveInfo}
                           onChange={e => setSaveInfo(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                          className="mt-0.5 h-6 w-6 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                         />
                         <span className="flex flex-col gap-0.5">
                           <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">

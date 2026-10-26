@@ -373,6 +373,28 @@ html[lang='en'] .wm-name {
   }
 }
 
+/* The open mobile menu hangs from the 46px menu button, so its 220px panel ran off the left edge in Arabic (x -40)
+   and off the right in English: on a phone it spans the viewport instead. */
+@media (max-width: 520px) {
+  .nav-menu ul {
+    position: fixed;
+    inset-inline: 16px;
+    top: 72px;
+    min-width: 0;
+    max-height: calc(100dvh - 88px);
+    overflow-y: auto;
+  }
+}
+
+/* A 360px phone: the lockup, menu button and the sign-up button already fill the row, so the compact WhatsApp
+   icon moves to the menu (it has its own WhatsApp item). Measured in Arabic: the row was 364px wide in 328px,
+   cutting the sign-up button off the left edge (audit UI-1). */
+@media (max-width: 400px) {
+  .header-actions .wa-compact {
+    display: none;
+  }
+}
+
 /* buttons */
 .btn {
   position: relative;

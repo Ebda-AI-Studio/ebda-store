@@ -398,7 +398,7 @@ export function OrderSummary({
                 type="checkbox"
                 checked={wallet.enabled}
                 onChange={e => wallet.onToggle(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring"
+                className="mt-1 h-6 w-6 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring"
               />
               <span className="flex-1">
                 <span className="text-sm font-medium text-foreground">
