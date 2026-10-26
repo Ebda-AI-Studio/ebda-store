@@ -229,7 +229,7 @@ for (const lang of ['ar', 'en']) {
         lang,
         title: c.searchMsgs.title,
         intro: c.searchMsgs.intro,
-        indexUrl: '/search-index.json',
+        indexUrl: `/search-index.${lang}.json`,
         messages: c.searchMsgs,
       })}</div>`,
       scripts: ['/assets/search.js'],

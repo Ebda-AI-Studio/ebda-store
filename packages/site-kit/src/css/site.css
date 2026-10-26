@@ -169,6 +169,65 @@ ol {
 .search {
   display: flex;
   gap: 6px;
+  position: relative;
+}
+.ta-list,
+.ta-note {
+  position: absolute;
+  inset-inline-start: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  inline-size: min(420px, calc(100vw - 32px));
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  text-align: start;
+}
+.ta-note {
+  padding: 12px 14px;
+  color: var(--muted);
+}
+.ta-list[hidden],
+.ta-note[hidden] {
+  display: none;
+}
+.ta-list a {
+  border-radius: 8px;
+}
+.ta-list a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-block-size: 44px;
+  justify-content: center;
+  padding: 8px 12px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.ta-list a[aria-selected='true'],
+.ta-list a:hover {
+  background: var(--raise);
+  outline: 1px solid var(--gold);
+}
+.ta-list mark {
+  background: transparent;
+  color: var(--gold);
+  font-weight: 700;
+}
+.ta-all {
+  color: var(--muted) !important;
+  font-size: 0.9em;
+}
+@media (max-width: 640px) {
+  .ta-list,
+  .ta-note {
+    inset-inline: 0;
+    inline-size: auto;
+  }
 }
 .search input {
   background: var(--panel);

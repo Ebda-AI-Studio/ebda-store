@@ -11,4 +11,10 @@ await runSearchCheck({
     { page: '/search/', q: 'x-merchant-key', expect: '/authentication/' },
     { page: '/search/', q: 'signature', expect: '/webhooks/' },
   ],
+  // Header box, no submit. The Arabic landing page searches the English index too.
+  typeahead: [
+    { page: '/', q: 'p', expect: '/money/' },
+    { page: '/', q: 'piastres', expect: '/money/' },
+    { page: '/ar/', q: 'signature', expect: '/webhooks/' },
+  ],
 });

@@ -35,7 +35,7 @@ const tokensCss = () =>
  * @param {string} p.homeHref
  * @param {'docs'|'help'} p.active    the site this page belongs to (its nav link gets aria-current)
  * @param {{href:string,label:string,lang:string}} [p.langSwitch]
- * @param {{action:string,label:string,placeholder:string}} p.search
+ * @param {{action:string,label:string,placeholder:string,index?:string}} p.search
  * @param {string} [p.sidebar]        html (a <nav>)
  * @param {string} p.main             html
  * @param {string} p.footer           html
@@ -78,7 +78,7 @@ export function renderPage(p) {
   <div class="wrap header-row">
     ${siteWordmarkHtml({ lang: p.lang, href: p.homeHref, siteLabel: p.siteLabel, markHtml: '<img src="/icon.svg" alt="" width="28" height="28">' })}
     ${siteNavHtml(p.lang, p.active)}
-    <form class="search" role="search" action="${esc(p.search.action)}" method="get">
+    <form class="search" role="search" action="${esc(p.search.action)}" method="get" data-index="${esc(p.search.index ?? `/search-index.${p.lang}.json`)}">
       <label class="sr-only" for="q">${esc(p.search.label)}</label>
       <input id="q" name="q" type="search" placeholder="${esc(p.search.placeholder)}" autocomplete="off">
       <button type="submit">${esc(p.search.label)}</button>
@@ -93,6 +93,7 @@ ${p.main}
 </main>
 </div>
 ${p.footer}
+<script src="/assets/typeahead.js" defer></script>
 ${(p.scripts ?? []).map(s => `<script src="${esc(s)}" defer></script>`).join('')}
 </body>
 </html>

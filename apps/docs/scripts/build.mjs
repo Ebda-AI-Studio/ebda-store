@@ -201,7 +201,12 @@ for (const p of pages) {
     active: 'docs',
     homeHref: '/ar/',
     langSwitch: { href: '/', label: 'English', lang: 'en' },
-    search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
+    search: {
+      action: '/search/',
+      label: 'بحث',
+      placeholder: 'ابحث في الوثائق (بالإنجليزية)',
+      index: '/search-index.en.json',
+    },
     main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${cards}</article>`,
     footer: renderFooter({
       copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
@@ -231,7 +236,7 @@ writePage(
       lang: 'en',
       title: 'Search',
       intro: 'Type to search every page of the docs.',
-      indexUrl: '/search-index.json',
+      indexUrl: '/search-index.en.json',
       messages: {
         loading: 'Loading the search index…',
         none: 'No results.',
