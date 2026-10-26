@@ -1857,6 +1857,13 @@ export default function CheckoutClient() {
           );
           checkoutKeyRef.current = undefined;
           break;
+        case 'IDEMPOTENCY_CONFLICT':
+          friendly = t(
+            'This order was already submitted with different details. Please review it and place the order again.',
+            'الطلب ده اتبعت قبل كده بتفاصيل تانية. راجع بياناتك وأكّد الطلب تاني.'
+          );
+          checkoutKeyRef.current = undefined;
+          break;
         case 'EMPTY_CART':
           friendly = t(
             'Your cart is empty. Please add items before checking out.',

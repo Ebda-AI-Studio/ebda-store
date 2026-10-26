@@ -181,10 +181,12 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
           productVariant: { update: vi.fn(), findUnique: vi.fn() },
           $queryRaw: vi.fn().mockResolvedValue([]),
           cartItem: {
+            findMany: vi.fn(async () => cartRows.items),
             count: vi.fn(async () => cartSize.items),
             deleteMany: vi.fn(async () => ({ count: cartSize.items })),
           },
           cartBundle: {
+            findMany: vi.fn(async () => cartRows.bundles),
             count: vi.fn(async () => cartSize.bundles),
             deleteMany: vi.fn(async () => ({ count: cartSize.bundles })),
           },
@@ -339,9 +341,13 @@ const ORDER_DATA = {
 
 /** what the cart mock holds, read by the transaction's cart-claim mocks (row count under the lock, rows deleted) */
 const cartSize = { items: 0, bundles: 0 };
+const cartRows: { items: unknown[]; bundles: unknown[] } = { items: [], bundles: [] };
 function setCart(looseItems: unknown[], bundleBoxes: number) {
   cartSize.items = looseItems.length;
   cartSize.bundles = bundleBoxes > 0 ? 1 : 0;
+  cartRows.items = looseItems;
+  cartRows.bundles =
+    bundleBoxes > 0 ? [{ id: 'cb-1', bundleId: 'bundle-1', quantity: bundleBoxes }] : [];
   vi.mocked(CartService.getOrCreate).mockResolvedValue({
     id: 'cart-1',
     storeId: STORE_ID,

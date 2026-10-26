@@ -3,7 +3,7 @@
  * stock ONCE, and a retry with the same Idempotency-Key returns the first order. Real transactions on real connections
  * (no mocks): the cart row lock is what serialises the requests.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { prisma } from '@ebda/database';
 import { OrderService } from '@api/services/order.service';
 import { CartService } from '@api/services/cart.service';
@@ -12,7 +12,13 @@ import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
 const TAG = `idem-${Date.now().toString(36)}-${process.pid}-${Math.random().toString(36).slice(2, 7)}`;
 let seq = 0;
 const uid = (l: string) => `${TAG}-${l}-${++seq}`;
-const address = (n: number) => ({
+const addressMemo = new Map<number, ReturnType<typeof buildAddress>>();
+/** The same `n` is the SAME request (a retry), so it must hash the same. */
+const address = (n: number) => {
+  if (!addressMemo.has(n)) addressMemo.set(n, buildAddress(n));
+  return addressMemo.get(n)!;
+};
+const buildAddress = (n: number) => ({
   firstName: 'Mona',
   lastName: 'Adel',
   address1: 'شارع النصر، مبنى 5',
@@ -125,12 +131,40 @@ describe.skipIf(!hasDb)(
       const ordersBefore = await orders(s.storeId);
       const res = await Promise.all([
         place(s, sessionId, 20, 'key-concurrent-0001'),
-        place(s, sessionId, 21, 'key-concurrent-0001'),
-        place(s, sessionId, 22, 'key-concurrent-0001'),
+        place(s, sessionId, 20, 'key-concurrent-0001'),
+        place(s, sessionId, 20, 'key-concurrent-0001'),
       ]);
       expect(new Set(res.map(o => o!.id)).size).toBe(1);
       expect(await orders(s.storeId)).toBe(ordersBefore + 1);
       expect(await stock(s.productId)).toBe(before - 2);
+    });
+
+    it('a retry of the SAME key whose request CHANGED (other address) is 409 IDEMPOTENCY_CONFLICT, not the first order', async () => {
+      const sessionId = await cartWith(s, 1);
+      const first = await place(s, sessionId, 40, 'key-changed-request-1');
+      const ordersBefore = await orders(s.storeId);
+      const again = await place(s, sessionId, 41, 'key-changed-request-1').catch(e => e);
+      expect((again as { code?: string }).code).toBe('IDEMPOTENCY_CONFLICT');
+      // the identical request is still a clean replay
+      const replay = await place(s, sessionId, 40, 'key-changed-request-1');
+      expect(replay!.id).toBe(first!.id);
+      expect(await orders(s.storeId)).toBe(ordersBefore);
+    });
+
+    it('a cart whose LINES changed under the same count (A swapped for B, or x1 -> x5) is CART_CHANGED, nothing created', async () => {
+      const sessionId = await cartWith(s, 1);
+      const stale = await CartService.getOrCreate(s.storeId, sessionId, undefined);
+      // another tab changes the quantity: same number of lines, different order
+      await prisma.cartItem.updateMany({ where: { cartId: stale.id }, data: { quantity: 5 } });
+      const spy = vi.spyOn(CartService, 'getOrCreate').mockResolvedValueOnce(stale as never);
+      const ordersBefore = await orders(s.storeId);
+      const before = await stock(s.productId);
+      const e = await place(s, sessionId, 50).catch(x => x);
+      spy.mockRestore();
+      expect((e as { code?: string }).code).toBe('CART_CHANGED');
+      expect(await orders(s.storeId)).toBe(ordersBefore);
+      expect(await stock(s.productId)).toBe(before);
+      expect(await prisma.cartItem.count({ where: { cartId: stale.id } })).toBe(1); // the cart was not eaten
     });
 
     it('a later retry with the same key (after the cart was cleared) returns the first order and changes nothing', async () => {
@@ -138,7 +172,7 @@ describe.skipIf(!hasDb)(
       const first = await place(s, sessionId, 30, 'key-sequential-0001');
       const before = await stock(s.productId);
       const ordersBefore = await orders(s.storeId);
-      const again = await place(s, sessionId, 31, 'key-sequential-0001');
+      const again = await place(s, sessionId, 30, 'key-sequential-0001');
       expect(again!.id).toBe(first.id);
       expect(await orders(s.storeId)).toBe(ordersBefore);
       expect(await stock(s.productId)).toBe(before);

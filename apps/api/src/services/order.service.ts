@@ -155,6 +155,38 @@ function checkoutIdempotencyHash(sessionId: string, key: string | null | undefin
   return createHash('sha256').update(`${sessionId}|${key}`).digest('hex');
 }
 
+/** Key-sorted JSON, so the same request always hashes the same. */
+function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .filter(k => o[k] !== undefined)
+      .sort()
+      .map(k => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(v ?? null);
+}
+
+/**
+ * What the shopper ASKED for (address, payment method, coupon, points, wallet, notes, delivery slot). Stored beside the
+ * checkout key: a retry that changes any of it under the SAME key is a different request and gets 409 IDEMPOTENCY_CONFLICT,
+ * never the first order (which would have been COD for a shopper who has since chosen a card). `expectedTotal` is a guard,
+ * not intent, and is left out.
+ */
+function checkoutRequestHash(data: CreateOrderData): string {
+  const { expectedTotal: _ignored, ...intent } = data as unknown as Record<string, unknown>;
+  return createHash('sha256').update(canonicalJson(intent)).digest('hex');
+}
+
+const IDEMPOTENCY_CONFLICT = () =>
+  new AppError(
+    409,
+    'IDEMPOTENCY_CONFLICT',
+    'This checkout was already submitted with different details. Review it and place the order again.'
+  );
+
 const ORDER_PAYMENT_SELECT = {
   id: true,
   provider: true,
@@ -604,12 +636,15 @@ export class OrderService {
   }
 
   /** The order a previous request with this checkout key created, in the shape `create` returns; null when none. */
-  static async findCheckoutReplay(storeId: string, idemHash: string) {
+  static async findCheckoutReplay(storeId: string, idemHash: string, reqHash: string) {
     const found = await prisma.order.findFirst({
       where: { storeId, checkoutIdempotencyKey: idemHash },
-      select: { id: true },
+      select: { id: true, checkoutRequestHash: true },
     });
-    return found ? OrderService.loadCreatedOrder(storeId, found.id) : null;
+    if (!found) return null;
+    if (found.checkoutRequestHash && found.checkoutRequestHash !== reqHash)
+      throw IDEMPOTENCY_CONFLICT();
+    return OrderService.loadCreatedOrder(storeId, found.id);
   }
 
   private static loadCreatedOrder(storeId: string, orderId: string) {
@@ -744,8 +779,9 @@ export class OrderService {
 
     // Checkout idempotency (audit M-012). The stored value is a hash of (session, key), so only the SAME session can replay a key.
     const idemHash = checkoutIdempotencyHash(sessionId, requestContext?.idempotencyKey);
+    const reqHash = checkoutRequestHash(data);
     if (idemHash) {
-      const prior = await OrderService.findCheckoutReplay(storeId, idemHash);
+      const prior = await OrderService.findCheckoutReplay(storeId, idemHash, reqHash);
       if (prior) return prior;
     }
 
@@ -1516,15 +1552,40 @@ export class OrderService {
           if (idemHash) {
             const winner = await tx.order.findFirst({
               where: { storeId, checkoutIdempotencyKey: idemHash },
-              select: { id: true },
+              select: { id: true, checkoutRequestHash: true },
             });
-            if (winner) throw new CheckoutReplay(winner.id);
+            if (winner) {
+              if (winner.checkoutRequestHash && winner.checkoutRequestHash !== reqHash)
+                throw IDEMPOTENCY_CONFLICT();
+              throw new CheckoutReplay(winner.id);
+            }
           }
+          // What is in the cart NOW must be exactly what was priced: compare the lines (id, product, variant, quantity), not
+          // their number - a tab that swapped A for B, or changed A x1 to A x5, keeps the count but not the order.
           const [liveItems, liveBundles] = await Promise.all([
-            tx.cartItem.count({ where: { cartId: cart.id } }),
-            tx.cartBundle.count({ where: { cartId: cart.id } }),
+            tx.cartItem.findMany({
+              where: { cartId: cart.id },
+              select: { id: true, productId: true, variantId: true, quantity: true },
+            }),
+            tx.cartBundle.findMany({
+              where: { cartId: cart.id },
+              select: { id: true, bundleId: true, quantity: true },
+            }),
           ]);
-          if (liveItems !== cart.items.length || liveBundles !== cartBundles.length)
+          const itemSig = (r: {
+            id: string;
+            productId: string;
+            variantId?: string | null;
+            quantity: number;
+          }) => `${r.id}|${r.productId}|${r.variantId ?? ''}|${r.quantity}`;
+          const bundleSig = (r: { id: string; bundleId: string; quantity: number }) =>
+            `${r.id}|${r.bundleId}|${r.quantity}`;
+          const same = (a: string[], b: string[]) =>
+            a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
+          if (
+            !same(liveItems.map(itemSig), cart.items.map(itemSig)) ||
+            !same(liveBundles.map(bundleSig), cartBundles.map(bundleSig))
+          )
             throw new AppError(
               409,
               'CART_CHANGED',
@@ -1859,6 +1920,7 @@ export class OrderService {
               customerId,
               orderNumber,
               checkoutIdempotencyKey: idemHash,
+              checkoutRequestHash: idemHash ? reqHash : null,
               // A fully wallet-paid order has no gateway step to wait for — it is
               // created paid, the same end state a completed gateway webhook
               // leaves (payment-confirm.service: confirmed + paid).
@@ -2153,7 +2215,7 @@ export class OrderService {
         err instanceof CheckoutReplay
           ? err.orderId
           : idemHash && (err as { code?: string })?.code === 'P2002'
-            ? ((await OrderService.findCheckoutReplay(storeId, idemHash))?.id ?? null)
+            ? ((await OrderService.findCheckoutReplay(storeId, idemHash, reqHash))?.id ?? null)
             : null;
       if (winnerId) {
         const replay = await OrderService.loadCreatedOrder(storeId, winnerId);

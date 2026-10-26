@@ -53,6 +53,10 @@ vi.mock('@ebda/database', () => ({
       create: vi.fn(),
     },
     cartItem: {
+      // the live cart rows are the fixture the test gave getOrCreate
+      findMany: vi.fn(
+        async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+      ),
       count: vi.fn().mockResolvedValue(1),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -458,10 +462,18 @@ describe('OrderService', () => {
               update: vi.fn().mockResolvedValue({}),
             },
             cartItem: {
+              // the live cart rows are the fixture the test gave getOrCreate
+              findMany: vi.fn(
+                async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+              ),
               count: vi.fn().mockResolvedValue(1),
               deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
             },
             cartBundle: {
+              findMany: vi.fn(
+                async () =>
+                  ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+              ),
               count: vi.fn().mockResolvedValue(0),
               deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
             },
@@ -633,10 +645,18 @@ describe('OrderService', () => {
               findUnique: vi.fn().mockResolvedValue({ allowBackorder: false }),
             },
             cartItem: {
+              // the live cart rows are the fixture the test gave getOrCreate
+              findMany: vi.fn(
+                async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+              ),
               count: vi.fn().mockResolvedValue(1),
               deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
             },
             cartBundle: {
+              findMany: vi.fn(
+                async () =>
+                  ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+              ),
               count: vi.fn().mockResolvedValue(0),
               deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
             },
@@ -739,10 +759,18 @@ describe('OrderService', () => {
             product: { update: vi.fn().mockResolvedValue({}) },
             productVariant: { update: vi.fn().mockResolvedValue({}) },
             cartItem: {
+              // the live cart rows are the fixture the test gave getOrCreate
+              findMany: vi.fn(
+                async () => ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+              ),
               count: vi.fn().mockResolvedValue(1),
               deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
             },
             cartBundle: {
+              findMany: vi.fn(
+                async () =>
+                  ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+              ),
               count: vi.fn().mockResolvedValue(0),
               deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
             },
@@ -973,10 +1001,19 @@ describe('OrderService', () => {
               product: { update: vi.fn().mockResolvedValue({}) },
               productVariant: { update: vi.fn().mockResolvedValue({}) },
               cartItem: {
+                // the live cart rows are the fixture the test gave getOrCreate
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+                ),
                 count: vi.fn().mockResolvedValue(1),
                 deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
               },
               cartBundle: {
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+                ),
                 count: vi.fn().mockResolvedValue(0),
                 deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
               },
@@ -1086,10 +1123,19 @@ describe('OrderService', () => {
               product: { update: vi.fn().mockResolvedValue({}) },
               productVariant: { update: vi.fn().mockResolvedValue({}) },
               cartItem: {
+                // the live cart rows are the fixture the test gave getOrCreate
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).items ?? []
+                ),
                 count: vi.fn().mockResolvedValue(1),
                 deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
               },
               cartBundle: {
+                findMany: vi.fn(
+                  async () =>
+                    ((await CartService.getOrCreate('', '', undefined)) as any).bundles ?? []
+                ),
                 count: vi.fn().mockResolvedValue(0),
                 deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
               },
