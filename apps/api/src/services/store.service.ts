@@ -19,6 +19,8 @@ import {
   unlinkUserAuditLogs,
 } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
+import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
+import { config as appConfig } from '../config';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
@@ -1098,6 +1100,11 @@ export class StoreService {
     }
   ) {
     const store = await this.getById(storeId);
+    assertMediaOriginOrUnchanged(
+      { logo: branding.logo, logoAr: branding.logoAr },
+      store as { logo?: string | null; logoAr?: string | null },
+      appConfig.storagePublicUrl
+    );
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({
@@ -1296,6 +1303,11 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
     const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
+    assertMediaOriginOrUnchanged(
+      { ogImage: seo.ogImage },
+      { ogImage: previousOgImage },
+      appConfig.storagePublicUrl
+    );
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({

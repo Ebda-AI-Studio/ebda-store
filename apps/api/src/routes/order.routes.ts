@@ -164,6 +164,8 @@ router.get(
   '/export.xlsx',
   ...adminMiddleware,
   requirePermission('orders:read'),
+  // SEC-14: the order sheet carries every customer's name, phone and address.
+  requirePermission('customers:export'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -428,6 +430,21 @@ router.get(
       // middleware/request-transaction.ts (one `res.send`, no `res.write`), so
       // the tx COMMITS BEFORE the bytes go out rather than after.
       const xlsxBuffer = await workbook.xlsx.writeBuffer();
+
+      await auditLog({
+        action: 'orders.exported',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'order_export',
+        details: {
+          actorRole: req.user!.role,
+          impersonatedBy: req.user!.impersonatedBy ?? null,
+          rows: orders.length,
+          filtered: Boolean(req.query.search || req.query.status),
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.setHeader(
         'Content-Type',

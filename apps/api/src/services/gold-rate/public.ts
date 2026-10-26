@@ -165,3 +165,71 @@ export function goldLineNote(
     ? `عيار ${String(karat)} · ${grams} جم · ${money(ratePerGram)} للجرام`
     : `${String(karat)} karat · ${grams} g · ${money(ratePerGram)} per gram`;
 }
+
+const GUEST_ORDER_FIELDS = [
+  'id',
+  'orderNumber',
+  'status',
+  'paymentStatus',
+  'currency',
+  'createdAt',
+  'total',
+  'subtotal',
+  'shipping',
+  'discount',
+  'codFee',
+  'tax',
+  'taxIncludedInPrice',
+  'walletAmount',
+] as const;
+
+const GUEST_ITEM_FIELDS = [
+  'id',
+  'productId',
+  'variantId',
+  'quantity',
+  'price',
+  'product',
+  'variantName',
+  'variantNameAr',
+  'goldSnapshot',
+  'bundleId',
+  'bundleGroupId',
+  'bundleName',
+  'bundleNameAr',
+] as const;
+
+const pick = (src: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (k in src) out[k] = src[k];
+  return out;
+};
+
+/**
+ * A GUEST order for a viewer who does not hold its view token (SEC-15 / M-137): the order UUID alone
+ * is a capability URL that leaks through history and screenshots. The masked view is built from an
+ * ALLOWLIST, so a field added to the order later (notes, extra-amount note, InstaPay details, buyer
+ * contact, personalisation text...) is absent by default. Status, lines and money stay (the success
+ * page and the payment-return page still work); the address shrinks to city / state / country.
+ */
+export function maskGuestOrderView(order: object): Record<string, unknown> {
+  const o = order as Record<string, unknown>;
+  const out = pick(o, GUEST_ORDER_FIELDS);
+  if (Array.isArray(o.items)) {
+    out.items = o.items.map(i => pick(i as Record<string, unknown>, GUEST_ITEM_FIELDS));
+  }
+  if (Array.isArray(o.payments)) {
+    out.payments = o.payments.map(p => {
+      const x = p as Record<string, unknown>;
+      return { provider: x.provider ?? null, method: x.method ?? null };
+    });
+  }
+  const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
+  out.shippingAddress = {
+    city: a.city ?? null,
+    state: a.state ?? null,
+    country: a.country ?? null,
+  };
+  out.viewMasked = true;
+  return out;
+}

@@ -453,3 +453,24 @@ export class InstapayReceiptService {
     });
   }
 }
+
+/**
+ * The payer's identity read off a receipt screenshot (name, InstaPay address, mobile, bank) is PII
+ * of the order's buyer. A viewer without the order's view token (SEC-15) gets the receipt with those
+ * fields nulled; amount, reference, status and flags stay so the page still works.
+ */
+export function maskReceiptPayerPii<T extends { extracted?: unknown; fields?: unknown }>(
+  receipt: T
+): T {
+  const strip = (o: unknown) =>
+    o && typeof o === 'object'
+      ? {
+          ...(o as object),
+          payerName: null,
+          payerAddress: null,
+          payerMobile: null,
+          payerBank: null,
+        }
+      : o;
+  return { ...receipt, extracted: strip(receipt.extracted), fields: strip(receipt.fields) };
+}

@@ -276,3 +276,5 @@ export {
   SENSITIVE_QUERY_PARAMS,
   REDACTED_QUERY_VALUE,
 } from './sentry-url-scrub';
+
+export { isEbdaMediaUrl, EBDA_MEDIA_HOSTS } from './media-url';

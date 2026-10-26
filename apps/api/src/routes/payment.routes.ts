@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { requestHoldsOrderViewToken } from '../lib/order-view-token';
+import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@ebda/shared';
 import { z } from 'zod';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
@@ -933,7 +935,15 @@ router.get(
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const view = await InstapayService.getInstructions(storeId, orderId);
-      res.json({ success: true, data: view });
+      // SEC-15: the receipt id (which opens the receipt poll) only with the order's view token.
+      const withToken = requestHoldsOrderViewToken(req, orderId);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.vary('X-Order-View-Token');
+      res.json({
+        success: true,
+        data:
+          withToken || !view.proof ? view : { ...view, proof: { ...view.proof, receiptId: null } },
+      });
     } catch (error) {
       next(error);
     }
@@ -993,7 +1003,15 @@ router.get(
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const receipt = await InstapayService.getReceipt(storeId, orderId, receiptId);
-      res.json({ success: true, data: { receipt } });
+      // SEC-15: the payer's name / address / mobile / bank only with the order's view token.
+      res.json({
+        success: true,
+        data: {
+          receipt: requestHoldsOrderViewToken(req, orderId)
+            ? receipt
+            : maskReceiptPayerPii(receipt),
+        },
+      });
     } catch (error) {
       next(error);
     }
