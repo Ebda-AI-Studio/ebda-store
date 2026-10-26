@@ -202,7 +202,7 @@ export default function BankReconciliationPage() {
                   ].map(h => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                      className="whitespace-nowrap px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground"
                     >
                       {h}
                     </th>

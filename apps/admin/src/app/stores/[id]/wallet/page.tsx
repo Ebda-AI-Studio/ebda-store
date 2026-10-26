@@ -139,7 +139,7 @@ export default function WalletPage() {
                   {t('checkoutTitle')}
                 </p>
                 <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                     data.checkout.available
                       ? 'bg-success/10 text-success-ink'
                       : 'bg-muted text-muted-foreground'

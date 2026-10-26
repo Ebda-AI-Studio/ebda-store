@@ -173,6 +173,7 @@ export function formatDeliveryDate(date: string, locale: string): string {
   const at = new Date(Date.UTC(y, (m || 1) - 1, d || 1, 12));
   const tag = locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB';
   return new Intl.DateTimeFormat(tag, {
+    numberingSystem: 'latn',
     timeZone: 'UTC',
     weekday: locale === 'ar' ? 'long' : 'short',
     day: 'numeric',

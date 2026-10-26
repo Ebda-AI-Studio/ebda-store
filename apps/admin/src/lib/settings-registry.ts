@@ -526,17 +526,6 @@ export const SETTINGS: SettingEntry[] = [
     { query: 'tab=theme' }
   ),
   setting(
-    'branding.arabic-numerals',
-    '/branding',
-    'branding.theme.arabicNumerals.title',
-    'owner',
-    {
-      en: 'arabic numbers eastern digits indian numerals',
-      ar: 'الارقام العربية ارقام هندية شكل الارقام',
-    },
-    { query: 'tab=theme' }
-  ),
-  setting(
     'branding.blog',
     '/branding',
     'branding.theme.blog.title',

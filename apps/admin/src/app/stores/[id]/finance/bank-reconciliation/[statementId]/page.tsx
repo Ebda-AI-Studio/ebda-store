@@ -521,7 +521,7 @@ export default function StatementDetailPage() {
                   ].map(h => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                      className="whitespace-nowrap px-3 py-3 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground"
                     >
                       {h}
                     </th>
@@ -559,7 +559,7 @@ export default function StatementDetailPage() {
                       >
                         {tx_t(`statusLabels.${tx.matchStatus}`)}
                         {tx.matchStatus === 'auto_matched' && tx.confidence < 100 && (
-                          <span className="ml-1 opacity-60">{tx.confidence}%</span>
+                          <span className="ms-1 opacity-60">{tx.confidence}%</span>
                         )}
                       </span>
                     </td>

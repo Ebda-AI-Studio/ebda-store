@@ -12,7 +12,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { formatMoney, localizeDigits } from '@ebda/shared';
 
 let lang: 'en' | 'ar' = 'ar';
-let numerals: 'latn' | 'arab' = 'latn';
+let numerals: 'latn' = 'latn';
 vi.mock('@/contexts/LanguageContext', () => ({
   useLanguage: () => ({
     language: lang,
@@ -72,7 +72,6 @@ describe.each([
 ] as const)('%s cart: sticky bar value == summary total value (after discount)', (_n, Summary) => {
   for (const [l, n] of [
     ['ar', 'latn'],
-    ['ar', 'arab'],
     ['en', 'latn'],
   ] as const) {
     it(`${l}/${n}`, () => {

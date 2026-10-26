@@ -798,7 +798,7 @@ export default function StoreSeoPage() {
                 {t('googleSiteVerificationHint')}
               </p>
               {settings.googleSiteVerification && (
-                <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 text-[11px] text-muted-foreground">
+                <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                   {`<meta name="google-site-verification" content="${settings.googleSiteVerification}" />`}
                 </pre>
               )}
@@ -973,7 +973,7 @@ export default function StoreSeoPage() {
                     <button
                       type="button"
                       onClick={() => handleToggleFaqActive(faq)}
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${faq.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${faq.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                     >
                       {faq.isActive ? t('faqActive') : t('faqInactive')}
                     </button>
@@ -1143,7 +1143,7 @@ export default function StoreSeoPage() {
                     <button
                       type="button"
                       onClick={() => handleToggleHowtoActive(howto)}
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${howto.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${howto.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                     >
                       {howto.isActive ? t('howtoActive') : t('howtoInactive')}
                     </button>

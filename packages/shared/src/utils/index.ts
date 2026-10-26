@@ -68,9 +68,8 @@ export { isSafeUrl, sanitizeUrl, safeInternalPath } from './safe-url';
  * Delegates to `formatMoney` (region/index.ts) — the single formatter.
  *
  * `locale` defaults to `'en'` (`EGP 1,299.50`, `EGP 450`). `locale: 'ar'`
- * renders `1,299.50 ج.م` / `450 ج.م` with WESTERN digits; Arabic-Indic
- * (`١٬٢٩٩٫٥٠ ج.م`) only with `numerals: 'arab'` — the store's opt-in
- * (Ruling NUMERALS-1). A whole amount drops its zero fraction.
+ * renders `1,299.50 ج.م` / `450 ج.م` with WESTERN digits, always (Ruling DIGITS-1;
+ * `numerals` is accepted and ignored). A whole amount drops its zero fraction.
  *
  * @param amount   - The price amount (minor units by default, major if `unit` is `'major'`).
  * @param options  - Optional overrides for unit, currency, locale and digits.
@@ -81,7 +80,7 @@ export function formatPrice(
     unit?: 'minor' | 'major';
     currency?: string;
     locale?: 'en' | 'ar';
-    /** Digit system; default `'latn'`. `'arab'` only affects `locale: 'ar'`. */
+    /** Ignored: Western digits only (Ruling DIGITS-1). */
     numerals?: Numerals;
     /** Keep every decimal on whole amounts (`EGP 450.00`) — merchant/accounting surfaces. */
     fixedDecimals?: boolean;
@@ -96,24 +95,6 @@ export function formatPrice(
   } = options ?? {};
   const minor = unit === 'minor' ? amount : roundToMinor(amount, currency);
   return formatMoney(minor, locale, { currency, numerals: numerals ?? 'latn', fixedDecimals });
-}
-
-/** ASCII digit → Eastern Arabic-Indic digit lookup ('0'..'9' → '٠'..'٩'). */
-const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
-/**
- * Convert ASCII digits (0-9) in a string or number to Eastern Arabic-Indic
- * digits (٠١٢٣٤٥٦٧٨٩). Every non-digit character (separators like `.`, `,`,
- * `/`, `-`, `:`, spaces, currency words, letters) is left untouched — only
- * the `0`-`9` characters are swapped.
- *
- * Used to localize numeric displays (prices, counts, quantities) on the
- * Arabic storefront when a store opts into `StoreTheme.arabicNumerals`.
- * Never apply this to identifiers (order numbers, SKUs, phone numbers,
- * tracking numbers) — those must always stay Western digits.
- */
-export function toArabicDigits(input: string | number): string {
-  return String(input).replace(/[0-9]/g, digit => ARABIC_DIGITS[Number(digit)]);
 }
 
 /**

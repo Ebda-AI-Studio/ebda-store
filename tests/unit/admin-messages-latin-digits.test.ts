@@ -20,11 +20,8 @@ function flatten(obj: Messages, prefix = '', out: Record<string, string> = {}) {
 }
 
 /** These name the ١٢٣ storefront option; showing the digits is the point. */
-const SHOWS_THE_OPTION = new Set([
-  'branding.theme.arabicNumerals.title',
-  'branding.theme.arabicNumerals.hint',
-  'branding.theme.arabicNumerals.arabic',
-]);
+// Retired with the per-store opt-in (Ruling DIGITS-1): no admin message may show an Arabic-Indic digit, no exceptions.
+const SHOWS_THE_OPTION = new Set<string>();
 
 describe('admin message files use Western digits (NUMERALS-1)', () => {
   it.each([
@@ -42,8 +39,7 @@ describe('admin message files use Western digits (NUMERALS-1)', () => {
     for (const c of ['0', '9', '%', '٫']) expect(NON_LATIN_DIGIT.test(c), c).toBe(false);
   });
 
-  it('the allowlist is still needed (a stale entry fails)', () => {
-    const flat = flatten(ar as Messages);
-    for (const k of SHOWS_THE_OPTION) expect(NON_LATIN_DIGIT.test(flat[k])).toBe(true);
+  it('there is no allowlist any more (DIGITS-1)', () => {
+    expect(SHOWS_THE_OPTION.size).toBe(0);
   });
 });

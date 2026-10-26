@@ -90,7 +90,11 @@ export function formatDate(input: string | number | Date, opts: FormatDateOption
   const locale = resolveLocale(opts.language, opts.numerals);
   const style = opts.style ?? 'long';
   const format = (timeZone: string): string => {
-    const dtf = new Intl.DateTimeFormat(locale, { ...presetOptions(style), timeZone });
+    const dtf = new Intl.DateTimeFormat(locale, {
+      ...presetOptions(style),
+      timeZone,
+      numberingSystem: 'latn', // Western digits always (DIGITS-1)
+    });
     if (style !== 'day' && style !== 'medium') return dtf.format(date);
     // Fixed weekday-day-month (or day-month-year) order with single spaces: en-US would
     // say "Wed, Oct 21" / "Oct 15, 2026".

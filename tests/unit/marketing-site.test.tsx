@@ -96,13 +96,9 @@ describe('marketing nav', () => {
     expect(LOGIN_URL).toBe('https://store.ebda.app/login');
     expect(SIGNUP_URL).toBe('https://store.ebda.app/signup');
     for (const html of [ar, en]) {
-      // external: new tab (SiteLink), same attributes plus target + rel
-      expect(html).toMatch(
-        /<a href="https:\/\/store\.ebda\.app\/login" target="_blank" rel="noopener noreferrer" class="link-login">/
-      );
-      expect(html).toMatch(
-        /<a href="https:\/\/store\.ebda\.app\/signup" target="_blank" rel="noopener noreferrer" class="btn btn-primary">/
-      );
+      // the conversion path continues in the SAME tab (audit UI-15): no target, no new-tab note
+      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/login" class="link-login">/);
+      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary">/);
     }
     expect(en).toContain('>Log in<');
     expect(en).toContain('>Start now<');

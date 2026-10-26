@@ -198,7 +198,8 @@ export default {
       return new Response(renderStatusPage(snap, path === '/' ? 'ar' : 'en', url.origin), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'public, max-age=30',
+          // no-transform: Cloudflare then does not inject its Web Analytics beacon, which this page's CSP (rightly) blocks
+          'cache-control': 'public, max-age=30, no-transform',
           ...SECURITY_HEADERS,
         },
       });
