@@ -1238,6 +1238,20 @@ export class StoreService {
   // new sub-key in, write back. Same posture as the announcement-bar
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
+  /** QR-1: replace `settings.qr` only; every other settings key is preserved. */
+  static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    const existingSettings = (store.settings as Record<string, unknown>) || {};
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { settings: { ...existingSettings, qr } as Prisma.InputJsonValue },
+      })
+    );
+    await StoreService.invalidateCache(store);
+    return updatedStore;
+  }
+
   static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
     const store = await this.getById(storeId);
     const existingSettings = (store.settings as Record<string, unknown>) || {};

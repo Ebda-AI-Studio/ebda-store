@@ -471,6 +471,7 @@ model Store {
   funnelSnapshots            FunnelSnapshot[]
   customerRfmSnapshots       CustomerRfmSnapshot[]
   productDailyViews          ProductDailyView[]
+  qrScanDaily                QrScanDaily[]
   paymentEvents              PaymentEvent[]
   orderEvents                OrderEvent[]
   webhookEvents              WebhookEvent[]
@@ -4657,6 +4658,27 @@ model ProductDailyView {
   @@index([storeId, date(sort: Desc)])
   @@index([productId, date(sort: Desc)])
   @@map("product_daily_views")
+}
+
+// QR-1: scans of a merchant's printed QR codes. Aggregate-not-event (mirrors ProductDailyView):
+// one counter row per store/Cairo day/code. No user, session, IP or user agent is stored.
+// `kind` = store | product | category | whatsapp; `ref` = product/category id ('' for store and
+// whatsapp). Written only by the storefront scan beacon for a code that resolved to a real
+// entity (bounded by the catalogue). Viewer: admin /stores/[id]/qr. Retention 400 days.
+// Store delete cascades.
+model QrScanDaily {
+  id      String   @id @default(uuid())
+  storeId String   @map("store_id")
+  date    DateTime @db.Date
+  kind    String   @db.VarChar(12)
+  ref     String   @default("") @db.VarChar(64)
+  count   Int      @default(0)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, date, kind, ref])
+  @@index([storeId, date(sort: Desc)])
+  @@map("qr_scan_daily")
 }
 
 // Answer Engine Insights (AEO) — Google Search Console daily metrics.

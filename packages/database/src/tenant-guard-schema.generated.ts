@@ -162,6 +162,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       funnelSnapshots: 'FunnelSnapshot',
       customerRfmSnapshots: 'CustomerRfmSnapshot',
       productDailyViews: 'ProductDailyView',
+      qrScanDaily: 'QrScanDaily',
       paymentEvents: 'PaymentEvent',
       orderEvents: 'OrderEvent',
       webhookEvents: 'WebhookEvent',
@@ -1281,6 +1282,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
       product: 'Product',
+    },
+  },
+  {
+    name: 'QrScanDaily',
+    table: 'qr_scan_daily',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {

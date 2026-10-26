@@ -12,6 +12,7 @@ import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
+import { recordQrScan, resolveQrScan } from '../services/qr.service';
 import { AppError } from '../middleware/error-handler';
 import {
   authenticate,
@@ -764,6 +765,27 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
       return;
     }
     res.json({ toSlug });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /qr/scan?kind=&slug= - resolve a printed QR code and count the scan (QR-1). Called
+// server-to-server by the storefront `/q/*` redirect with the shopper's store host in
+// x-store-domain. Unknown store, unknown/foreign slug, or a WhatsApp code with no number is a
+// 404 and writes nothing. Never cacheable: a cached answer would skip the count.
+const qrScanQuery = z.object({
+  kind: z.enum(['store', 'product', 'category', 'whatsapp']),
+  slug: z.string().min(1).max(200).optional(),
+});
+router.get('/qr/scan', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { kind, slug } = qrScanQuery.parse(req.query);
+    const storeId = await getStoreIdFromRequest(req);
+    const resolved = await readInStoreContext(storeId, () => resolveQrScan(storeId, kind, slug));
+    await recordQrScan(storeId, resolved.kind, resolved.ref);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data: { target: resolved.target, kind: resolved.kind } });
   } catch (err) {
     next(err);
   }
