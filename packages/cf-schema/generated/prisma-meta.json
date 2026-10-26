@@ -5896,7 +5896,7 @@
       "table": "orders",
       "db": "store-do",
       "pk": ["id"],
-      "uniques": [["orderNumber"], ["idempotencyKey"]],
+      "uniques": [["orderNumber"], ["idempotencyKey"], ["storeId", "checkoutIdempotencyKey"]],
       "fields": {
         "id": {
           "kind": "scalar",
@@ -6217,6 +6217,20 @@
           "kind": "scalar",
           "type": "String",
           "column": "idempotency_key",
+          "list": false,
+          "optional": true
+        },
+        "checkoutIdempotencyKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "checkout_idempotency_key",
+          "list": false,
+          "optional": true
+        },
+        "checkoutRequestHash": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "checkout_request_hash",
           "list": false,
           "optional": true
         },
@@ -18043,6 +18057,13 @@
           "list": false,
           "optional": true
         },
+        "billingAnchorDay": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "billing_anchor_day",
+          "list": false,
+          "optional": true
+        },
         "dunningAttempts": {
           "kind": "scalar",
           "type": "Int",
@@ -18524,6 +18545,20 @@
           "kind": "scalar",
           "type": "DateTime",
           "column": "reviewed_at",
+          "list": false,
+          "optional": true
+        },
+        "imageDeletedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "image_deleted_at",
+          "list": false,
+          "optional": true
+        },
+        "personalScrubbedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "personal_scrubbed_at",
           "list": false,
           "optional": true
         },

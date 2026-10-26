@@ -160,6 +160,8 @@ CREATE TABLE IF NOT EXISTS "instapay_receipts" (
   "review_note" TEXT,
   "reviewed_by" TEXT,
   "reviewed_at" INTEGER,
+  "image_deleted_at" INTEGER,
+  "personal_scrubbed_at" INTEGER,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "instapay_receipts_pkey" PRIMARY KEY ("id"),
@@ -177,6 +179,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "instapay_receipts_reference_key_key" ON "inst
 CREATE INDEX IF NOT EXISTS "instapay_receipts_store_id_created_at_idx" ON "instapay_receipts" ("store_id", "created_at" DESC);
 CREATE INDEX IF NOT EXISTS "instapay_receipts_store_id_order_id_idx" ON "instapay_receipts" ("store_id", "order_id");
 CREATE INDEX IF NOT EXISTS "instapay_receipts_store_id_sha256_idx" ON "instapay_receipts" ("store_id", "sha256");
+CREATE INDEX IF NOT EXISTS "instapay_receipts_retention_idx" ON "instapay_receipts" ("status", "reviewed_at") WHERE "image_deleted_at" IS NULL OR "personal_scrubbed_at" IS NULL;
 
 CREATE TABLE IF NOT EXISTS "legal_acceptances" (
   "id" TEXT NOT NULL,
@@ -403,6 +406,7 @@ CREATE TABLE IF NOT EXISTS "store_subscriptions" (
   "orders_over_limit_notified_at" INTEGER,
   "billing_interval" TEXT NOT NULL DEFAULT 'monthly',
   "pending_plan_code" TEXT,
+  "billing_anchor_day" INTEGER,
   "dunning_attempts" INTEGER NOT NULL DEFAULT 0,
   "next_retry_at" INTEGER,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
@@ -414,7 +418,8 @@ CREATE TABLE IF NOT EXISTS "store_subscriptions" (
   CONSTRAINT "store_subscriptions_cancel_at_period_end_chk" CHECK ("cancel_at_period_end" IN (0, 1)),
   CONSTRAINT "store_subscriptions_billing_interval_check" CHECK ("billing_interval" IN ('monthly', 'yearly')),
   CONSTRAINT "store_subscriptions_payment_method_last4_check" CHECK ("payment_method_last4" IS NULL OR (length("payment_method_last4") = 4 AND "payment_method_last4" NOT GLOB '*[^0-9]*')),
-  CONSTRAINT "store_subscriptions_billing_method_check" CHECK ("billing_method" IS NULL OR "billing_method" IN ('card', 'instapay'))
+  CONSTRAINT "store_subscriptions_billing_method_check" CHECK ("billing_method" IS NULL OR "billing_method" IN ('card', 'instapay')),
+  CONSTRAINT "store_subscriptions_billing_anchor_day_check" CHECK ("billing_anchor_day" IS NULL OR ("billing_anchor_day" BETWEEN 1 AND 31))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "store_subscriptions_store_id_key" ON "store_subscriptions" ("store_id");
 CREATE UNIQUE INDEX IF NOT EXISTS "store_subscriptions_payment_reference_key" ON "store_subscriptions" ("payment_reference");

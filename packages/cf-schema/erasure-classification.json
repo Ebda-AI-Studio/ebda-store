@@ -1093,9 +1093,20 @@
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["payer_name", "payer_address", "payer_mobile", "payer_bank"],
+    "piiColumns": [
+      "payer_name",
+      "payer_address",
+      "payer_mobile",
+      "payer_bank",
+      "receiver_name",
+      "receiver_handle",
+      "receiver_mobile",
+      "note",
+      "extracted",
+      "storage_key"
+    ],
     "subjectKeys": [],
-    "note": "payer details of a merchant subscription payment; kept for accounting without the payer fields after the retention window"
+    "note": "what the payer typed about people, the AI-read JSON (amount / reference / time only since M-003) and the private screenshot: scrubbed 180 days after a final decision, image deleted on approval (30 days after reject / void / abandoned), both on the shopper's erasure; amount, reference, time, flags and status are kept as financial evidence (docs/RETENTION.md)"
   },
   "d1:manual_payment_claims": {
     "db": "d1",

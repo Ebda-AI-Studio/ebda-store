@@ -1378,6 +1378,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "sms_opt_in" INTEGER NOT NULL DEFAULT 0,
   "payment_confirmation_expires_at" INTEGER,
   "idempotency_key" TEXT,
+  "checkout_idempotency_key" TEXT,
+  "checkout_request_hash" TEXT,
   "webhook_processed_at" INTEGER,
   "stuck_payment_alerted_at" INTEGER,
   "order_created_notified_at" INTEGER,
@@ -1406,6 +1408,7 @@ CREATE TABLE IF NOT EXISTS "orders" (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_order_number_key" ON "orders" ("order_number");
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_idempotency_key_key" ON "orders" ("idempotency_key");
+CREATE UNIQUE INDEX IF NOT EXISTS "orders_store_id_checkout_idempotency_key_key" ON "orders" ("store_id", "checkout_idempotency_key");
 CREATE INDEX IF NOT EXISTS "orders_customer_id_idx" ON "orders" ("customer_id");
 CREATE INDEX IF NOT EXISTS "orders_status_idx" ON "orders" ("status");
 CREATE INDEX IF NOT EXISTS "orders_payment_status_idx" ON "orders" ("payment_status");

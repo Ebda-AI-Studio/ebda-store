@@ -33,7 +33,7 @@
         "bundles": 15,
         "bundle_items": 5,
         "cart_bundles": 6,
-        "orders": 57,
+        "orders": 59,
         "order_events": 8,
         "order_items": 26,
         "payments": 17,
@@ -127,7 +127,7 @@
     },
     "d1": {
       "tables": 25,
-      "maxColumns": 36,
+      "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
         "SlugRedirect": 7,
@@ -141,9 +141,9 @@
         "answer_engine_provider_configs": 5,
         "merchant_api_keys": 12,
         "plans": 12,
-        "store_subscriptions": 25,
+        "store_subscriptions": 26,
         "billing_events": 21,
-        "instapay_receipts": 36,
+        "instapay_receipts": 38,
         "manual_payment_claims": 17,
         "billing_reminders": 6,
         "store_lifecycle_emails": 6,
@@ -389,6 +389,14 @@
       "unique": true,
       "pgCols": "\"store_id\", \"provider\"",
       "pgWhere": "\"status\" IN ('requested', 'activated')"
+    },
+    {
+      "name": "instapay_receipts_retention_idx",
+      "table": "instapay_receipts",
+      "db": "d1",
+      "unique": false,
+      "pgCols": "\"status\", \"reviewed_at\"",
+      "pgWhere": "\"image_deleted_at\" IS NULL OR \"personal_scrubbed_at\" IS NULL"
     }
   ],
   "supersededUniques": [
@@ -1068,6 +1076,12 @@
       "disposition": "d1:billing_grants"
     },
     {
+      "kind": "check",
+      "name": "store_subscriptions_billing_anchor_day_check",
+      "table": "store_subscriptions",
+      "disposition": "d1:store_subscriptions"
+    },
+    {
       "kind": "index",
       "name": "users_admin_email_key",
       "table": "users",
@@ -1372,6 +1386,12 @@
       "name": "payment_events_claim_single_outcome_key",
       "table": "payment_events",
       "disposition": "store-do:payment_events"
+    },
+    {
+      "kind": "index",
+      "name": "instapay_receipts_retention_idx",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
     }
   ],
   "decimals": [

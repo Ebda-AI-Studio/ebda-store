@@ -164,6 +164,8 @@ export const instapayReceipts = sqliteTable('instapay_receipts', {
   reviewNote: text('review_note'),
   reviewedBy: text('reviewed_by'),
   reviewedAt: integer('reviewed_at', { mode: 'timestamp_ms' }),
+  imageDeletedAt: integer('image_deleted_at', { mode: 'timestamp_ms' }),
+  personalScrubbedAt: integer('personal_scrubbed_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
@@ -417,6 +419,7 @@ export const storeSubscriptions = sqliteTable('store_subscriptions', {
   ordersOverLimitNotifiedAt: integer('orders_over_limit_notified_at', { mode: 'timestamp_ms' }),
   billingInterval: text('billing_interval').notNull().default('monthly'),
   pendingPlanCode: text('pending_plan_code'),
+  billingAnchorDay: integer('billing_anchor_day'),
   dunningAttempts: integer('dunning_attempts').notNull().default(0),
   nextRetryAt: integer('next_retry_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })

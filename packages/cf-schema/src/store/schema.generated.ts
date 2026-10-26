@@ -1465,6 +1465,8 @@ export const orders = sqliteTable('orders', {
     mode: 'timestamp_ms',
   }),
   idempotencyKey: text('idempotency_key'),
+  checkoutIdempotencyKey: text('checkout_idempotency_key'),
+  checkoutRequestHash: text('checkout_request_hash'),
   webhookProcessedAt: integer('webhook_processed_at', { mode: 'timestamp_ms' }),
   stuckPaymentAlertedAt: integer('stuck_payment_alerted_at', { mode: 'timestamp_ms' }),
   orderCreatedNotifiedAt: integer('order_created_notified_at', { mode: 'timestamp_ms' }),

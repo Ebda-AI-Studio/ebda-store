@@ -1738,6 +1738,11 @@ model Order {
 
   // Webhook idempotency - prevents duplicate processing
   idempotencyKey     String?   @unique @map("idempotency_key")
+  /// Checkout idempotency (audit M-012): sha256(sessionId|Idempotency-Key header) of the request that created this order, unique
+  /// per store. A retry of the same request returns this order instead of creating a second one. NOT the webhook key above.
+  checkoutIdempotencyKey String? @map("checkout_idempotency_key")
+  /// sha256 of what the shopper asked for, stored with the key: a retry that changed the request is 409, not the first order.
+  checkoutRequestHash    String? @map("checkout_request_hash")
   webhookProcessedAt DateTime? @map("webhook_processed_at")
 
   // LEGACY (retained, unused since 2026-07-18). Formerly the dedupe stamp for
@@ -1851,6 +1856,7 @@ model Order {
   // Order search (OrderService.orderSearchWhere): `orders_order_number_trgm_idx`,
   // a pg_trgm GIN on order_number, lives in raw SQL only
   // (20261002090000_order_search_trgm_and_fk_indexes) — not declared here.
+  @@unique([storeId, checkoutIdempotencyKey], map: "orders_store_id_checkout_idempotency_key_key")
   @@map("orders")
 }
 
@@ -5061,6 +5067,8 @@ model StoreSubscription {
   // (0 = none); `nextRetryAt` is when the cron retries (day 3, then day 7).
   billingInterval String    @default("monthly") @map("billing_interval")
   pendingPlanCode String?   @map("pending_plan_code")
+  /// Day of month (UTC, 1-31) the paid cycle started on; every renewal clamps from it (M-125). Null = derived from the period end.
+  billingAnchorDay Int?     @map("billing_anchor_day")
   dunningAttempts Int       @default(0) @map("dunning_attempts")
   nextRetryAt     DateTime? @map("next_retry_at")
 
@@ -5181,6 +5189,10 @@ model InstapayReceipt {
   reviewNote          String?   @map("review_note")
   reviewedBy          String?   @map("reviewed_by")
   reviewedAt          DateTime? @map("reviewed_at")
+  /// The screenshot (private R2) was deleted: on approval, or by the retention sweep. Null = the object may still exist.
+  imageDeletedAt      DateTime? @map("image_deleted_at")
+  /// payer / receiver / note / AI-read personal fields were scrubbed (retention sweep, or the shopper's erasure).
+  personalScrubbedAt  DateTime? @map("personal_scrubbed_at")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
