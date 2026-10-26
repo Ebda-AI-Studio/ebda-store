@@ -1,3 +1,4 @@
+import { withLocaleAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { decodeRouteParam } from '@/lib/route-params';
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   try {
     const post = await fetchPost(store.id, slug);
     if (!post) return { title: 'Not found' };
-    return buildBlogPostMetadata(post, store, slug);
+    return withLocaleAlternates(buildBlogPostMetadata(post, store, slug), store, `/blog/${slug}`);
   } catch {
     return { title: 'Blog' };
   }

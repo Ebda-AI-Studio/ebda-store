@@ -86,3 +86,26 @@ await sharp(Buffer.from(build(true)))
   .png({ compressionLevel: 9 })
   .toFile(path.join(dir, 'og.png'));
 console.log('wrote og.svg og.png');
+
+// ---- og-whatsapp.png: the Ebda WhatsApp page. The approved WhatsApp product lockup (04b), a gold rule and the outlined
+// ebda.app line on the same light canvas; no tagline (the outlined tagline above is the Store's), no phones.
+const waSvg = readFileSync(path.join(brand, 'svg', '04b-product-whatsapp.svg'), 'utf8');
+const waInner = waSvg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+const [, , waW, waH] = waSvg
+  .match(/viewBox="([^"]+)"/)[1]
+  .split(/\s+/)
+  .map(Number);
+const WA_H = 300;
+const waLockup = `<svg x="76" y="110" width="${(WA_H * waW) / waH}" height="${WA_H}" viewBox="0 0 ${waW} ${waH}">${waInner}</svg>`;
+const waOg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<title>ابدأ واتساب · Ebda WhatsApp</title>
+<rect width="${W}" height="${H}" fill="${CANVAS}"/>
+${waLockup}
+<rect x="76" y="446" width="96" height="4" fill="${GOLD}"/>
+<g transform="translate(0 38)"><path d="${pathOf('url')}" fill="${MUTED}"/></g>
+</svg>
+`;
+await sharp(Buffer.from(waOg))
+  .png({ compressionLevel: 9 })
+  .toFile(path.join(dir, 'og-whatsapp.png'));
+console.log('wrote og-whatsapp.png');

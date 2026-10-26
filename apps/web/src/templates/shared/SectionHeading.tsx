@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { TemplateId, SectionDividers, DividerSettings } from '@ebda/shared';
 import {
   DEFAULT_DIVIDER_SETTINGS,

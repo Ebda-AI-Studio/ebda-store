@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import { Button, Input } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';

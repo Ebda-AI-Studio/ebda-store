@@ -1,3 +1,4 @@
+import { permanentRedirect, redirect } from 'next/navigation';
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
@@ -12,7 +13,7 @@ import { getStore } from '../lib/store-resolver';
 import { storeThemeColor } from '../lib/theme-color';
 import { isPlatformFromHeader } from '../lib/platform-host';
 import { API_URL } from '../lib/api';
-import { organizationJsonLd } from '../lib/structured-data';
+import { getSiteUrl, organizationJsonLd } from '../lib/structured-data';
 import { buildStorefrontMetadata } from '../lib/storefront-metadata';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { PostHogProvider } from '../components/PostHogProvider';
@@ -25,6 +26,15 @@ import { TypographyProbe } from '../components/TypographyProbe';
 import { AffiliateTracker } from '../components/AffiliateTracker';
 import { StoreMaintenance } from '../components/StoreMaintenance';
 import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
+import {
+  LOCALE_PATH_HEADER,
+  LOCALE_PENDING_HEADER,
+  localizeJsonLdUrls,
+  LOCALE_REST_HEADER,
+  LOCALE_SEARCH_HEADER,
+  pendingRedirect,
+} from '../lib/locale-paths';
+import { LocalePathProvider } from '../contexts/LocalePathContext';
 import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
@@ -165,11 +175,29 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // every setLanguage() call.
   const cookieStore = await cookies();
   const cookieLang = cookieStore.get('force-language')?.value as 'en' | 'ar' | undefined;
+  const urlLang = (await headers()).get(LOCALE_PATH_HEADER);
   // Preview-draft propagation (set by middleware). Header wins for FIRST
   // load with ?_layoutDraft= in the URL (cookies set in the response
   // aren't visible to the same response's server components). Cookie
   // fallback covers subsequent navigations within the iframe.
   const headersList = await headers();
+  // An old unprefixed URL of a store with language-in-the-URL ON (LOCALE-PATHS-1): the middleware has no store, so it
+  // marked the request; here the store's own `settings.defaultLanguage` decides where it goes. Permanent to the default
+  // language, temporary to the visitor's cookie language when it differs.
+  if (headersList.get(LOCALE_PENDING_HEADER) === '1') {
+    const target = pendingRedirect({
+      rest: headersList.get(LOCALE_REST_HEADER) || '/',
+      search: headersList.get(LOCALE_SEARCH_HEADER) || '',
+      defaultLocale: resolveDefaultLanguage(
+        (store.settings as Record<string, unknown> | undefined)?.defaultLanguage as
+          | string
+          | undefined
+      ),
+      cookieLocale: cookieLang,
+    });
+    if (target.permanent) permanentRedirect(target.location);
+    redirect(target.location);
+  }
   const draftToken =
     headersList.get('x-preview-draft') ?? cookieStore.get('force-preview-draft')?.value;
   // Middleware already resolved platform-vs-custom-domain for this request
@@ -186,10 +214,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     | 'en'
     | 'ar'
     | undefined;
+  // A `/ar|/en` URL (LOCALE-PATHS-1) wins over the cookie, then the store's default.
   const resolvedLanguage: 'en' | 'ar' =
-    cookieLang === 'ar' || cookieLang === 'en'
-      ? cookieLang
-      : resolveDefaultLanguage(storeDefaultLanguage);
+    urlLang === 'ar' || urlLang === 'en'
+      ? urlLang
+      : cookieLang === 'ar' || cookieLang === 'en'
+        ? cookieLang
+        : resolveDefaultLanguage(storeDefaultLanguage);
   const lang = resolvedLanguage;
   const dir = resolvedLanguage === 'ar' ? 'rtl' : 'ltr';
 
@@ -499,7 +530,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(orgJsonLd) }}
+          dangerouslySetInnerHTML={{
+            __html: jsonLdScriptContent(
+              localizeJsonLdUrls(
+                orgJsonLd,
+                getSiteUrl(store),
+                urlLang === 'ar' || urlLang === 'en' ? urlLang : null
+              )
+            ),
+          }}
         />
         {look && (
           <>
@@ -556,118 +595,120 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             container on browsers without `overflow: clip` (see globals.css, #124), so
             Next's window-targeted scroll restoration alone leaves pages loading mid-page there. */}
         <ScrollToTop />
-        <StoreProvider
-          initialStore={store}
-          previewDraftToken={draftToken}
-          initialIsPlatform={initialIsPlatform}
-        >
-          {/* One clock for the whole render, shared by server HTML and hydration
+        <LocalePathProvider locale={urlLang === 'ar' || urlLang === 'en' ? urlLang : null}>
+          <StoreProvider
+            initialStore={store}
+            previewDraftToken={draftToken}
+            initialIsPlatform={initialIsPlatform}
+          >
+            {/* One clock for the whole render, shared by server HTML and hydration
               (the card "New" badge; W1c review M9). */}
-          <RenderClockProvider now={renderNow}>
-            <LanguageProvider defaultLanguage={resolvedLanguage}>
-              {/* Skip link: still the first focusable element in <body>, now named in
+            <RenderClockProvider now={renderNow}>
+              <LanguageProvider defaultLanguage={resolvedLanguage}>
+                {/* Skip link: still the first focusable element in <body>, now named in
                 the page's language (R-05). */}
-              <SkipLink />
-              <ConsentProvider initialConsent={resolvedConsent}>
-                {/* PostHog product analytics — mounted INSIDE ConsentProvider
+                <SkipLink />
+                <ConsentProvider initialConsent={resolvedConsent}>
+                  {/* PostHog product analytics — mounted INSIDE ConsentProvider
                   so it can read the consent state. Init is gated on
                   marketing-consent (see PostHogProvider). When consent is
                   off OR NEXT_PUBLIC_POSTHOG_KEY is missing, the provider
                   renders children as-is with no SDK init — safe in dev
                   and pre-account-creation. */}
-                <PostHogProvider>
-                  {store.status === 'suspended' ? (
-                    // Suspended store — render the branded maintenance page in
-                    // place of the entire normal storefront. We deliberately
-                    // skip Cart/Auth/Feature providers, marketing pixels, the
-                    // service worker, OneSignal, the affiliate tracker, etc.
-                    // because they all make API calls (cart sync, /auth/me,
-                    // pixel events) that would either 403 against a suspended
-                    // store or pollute analytics. The maintenance screen only
-                    // needs the store's branding + theme + language, all of
-                    // which already live above this guard.
-                    <div id="main-content">
-                      <StoreMaintenance />
-                    </div>
-                  ) : (
-                    <FeatureProvider>
-                      <AuthProvider>
-                        <ToastProvider
-                          dismissLabel={lang === 'ar' ? 'إغلاق الإشعار' : 'Dismiss notification'}
-                        >
-                          <CartProvider>
-                            {store.isDemo && <DemoLookBar activeLook={store.look} />}
-                            <div id="main-content">{children}</div>
-                            <PushNotificationPrompt />
-                            <OneSignalStorefrontInit />
-                            {/* Activates ONLY when ?probe=typography is on
+                  <PostHogProvider>
+                    {store.status === 'suspended' ? (
+                      // Suspended store — render the branded maintenance page in
+                      // place of the entire normal storefront. We deliberately
+                      // skip Cart/Auth/Feature providers, marketing pixels, the
+                      // service worker, OneSignal, the affiliate tracker, etc.
+                      // because they all make API calls (cart sync, /auth/me,
+                      // pixel events) that would either 403 against a suspended
+                      // store or pollute analytics. The maintenance screen only
+                      // needs the store's branding + theme + language, all of
+                      // which already live above this guard.
+                      <div id="main-content">
+                        <StoreMaintenance />
+                      </div>
+                    ) : (
+                      <FeatureProvider>
+                        <AuthProvider>
+                          <ToastProvider
+                            dismissLabel={lang === 'ar' ? 'إغلاق الإشعار' : 'Dismiss notification'}
+                          >
+                            <CartProvider>
+                              {store.isDemo && <DemoLookBar activeLook={store.look} />}
+                              <div id="main-content">{children}</div>
+                              <PushNotificationPrompt />
+                              <OneSignalStorefrontInit />
+                              {/* Activates ONLY when ?probe=typography is on
                           the URL and the page is in a trusted-admin
                           iframe. Measures real getComputedStyle()
                           values per data-zone and posts them back to
                           the admin so the typography form can show
                           real inherited defaults. */}
-                            <TypographyProbe />
-                          </CartProvider>
-                        </ToastProvider>
-                      </AuthProvider>
-                      {/* Marketing pixels render ONLY when the visitor has
+                              <TypographyProbe />
+                            </CartProvider>
+                          </ToastProvider>
+                        </AuthProvider>
+                        {/* Marketing pixels render ONLY when the visitor has
                     consented (read from the `force-cookie-consent` cookie
                     server-side). No consent → scripts never reach the
                     browser. GDPR/ePrivacy/applicable GCC data-protection
                     law compliance (see docs/privacy/data-map.md). */}
-                      {marketingConsentGranted &&
-                        store.marketingPixels &&
-                        Object.keys(store.marketingPixels).length > 0 && (
-                          <MarketingPixelsProvider
-                            pixels={store.marketingPixels as MarketingPixels}
-                          />
-                        )}
-                      {/* PWA is active only when BOTH the store toggle AND the
+                        {marketingConsentGranted &&
+                          store.marketingPixels &&
+                          Object.keys(store.marketingPixels).length > 0 && (
+                            <MarketingPixelsProvider
+                              pixels={store.marketingPixels as MarketingPixels}
+                            />
+                          )}
+                        {/* PWA is active only when BOTH the store toggle AND the
                     platform feature flag are on. Without this gate, flipping
                     the per-store feature off had no observable effect. */}
-                      {store.pwaEnabled === true &&
-                        (store.enabledFeatures?.includes('pwa') ?? true) && (
-                          <ServiceWorkerRegistration />
-                        )}
-                      <Suspense fallback={null}>
-                        <AffiliateTracker />
-                      </Suspense>
-                    </FeatureProvider>
-                  )}
-                  {/* No store resolved (unknown/inactive host, platform host, transient
+                        {store.pwaEnabled === true &&
+                          (store.enabledFeatures?.includes('pwa') ?? true) && (
+                            <ServiceWorkerRegistration />
+                          )}
+                        <Suspense fallback={null}>
+                          <AffiliateTracker />
+                        </Suspense>
+                      </FeatureProvider>
+                    )}
+                    {/* No store resolved (unknown/inactive host, platform host, transient
                   fallback): the page is the generic Ebda Store 404 / retry body. It sets no
                   tracking, so there is nothing to consent to, and the banner's default-
                   theme primary must not be the only colour on an Ebda Store page
                   (Ruling SUBDOMAIN-404-1). */}
-                  {store.id !== 'demo' && (
-                    <>
-                      {/* Cookie consent UI — always mounted (banner self-hides
+                    {store.id !== 'demo' && (
+                      <>
+                        {/* Cookie consent UI — always mounted (banner self-hides
                   when the user has already decided; modal opens via the
                   footer "Cookie preferences" link or banner Customize). */}
-                      <CookieConsentBanner />
-                      <CookiePreferencesModal />
-                      {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
+                        <CookieConsentBanner />
+                        <CookiePreferencesModal />
+                        {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
                     link must be reachable in initial HTML for no-JS
                     visitors + crawlers). Visible on regular pages, hidden
                     on loading screens via the [data-loading] body marker
                     set by loading.tsx files. Ahmad 2026-05-16: 'return
                     [the cookies] but keep it out of any loading screen as
                     the rest of items'. */}
-                      <div
-                        data-zone="cookieFallback"
-                        className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
-                      >
-                        <div className="container mx-auto px-4 py-3 text-center">
-                          <CookiePreferencesLink className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                        <div
+                          data-zone="cookieFallback"
+                          className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
+                        >
+                          <div className="container mx-auto px-4 py-3 text-center">
+                            <CookiePreferencesLink className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                          </div>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </PostHogProvider>
-              </ConsentProvider>
-            </LanguageProvider>
-          </RenderClockProvider>
-        </StoreProvider>
+                      </>
+                    )}
+                  </PostHogProvider>
+                </ConsentProvider>
+              </LanguageProvider>
+            </RenderClockProvider>
+          </StoreProvider>
+        </LocalePathProvider>
       </body>
     </html>
   );

@@ -5,7 +5,7 @@ import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import { memo, useState, useId } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@ebda/shared';
 import { getLook, getProductCardTextSizes, resolveColor } from '@ebda/shared';

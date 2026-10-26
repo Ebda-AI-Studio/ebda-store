@@ -54,8 +54,8 @@ export function buildStorefrontMetadata(
   const description =
     localizedDescription ||
     (preferAr
-      ? `تسوق أونلاين من ${localizedStoreName} في مصر.`
-      : `Shop ${localizedStoreName} online in Egypt.`);
+      ? `تسوق أونلاين من ${localizedStoreName} في مصر: تصفّح المنتجات واطلب بسهولة من موبايلك.`
+      : `Shop ${localizedStoreName} online in Egypt: browse the full catalogue and order in a few taps from your phone.`);
 
   const titleDefault =
     localizedTitle ||

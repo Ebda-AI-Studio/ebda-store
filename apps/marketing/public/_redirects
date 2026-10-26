@@ -7,3 +7,13 @@
 /compare/salla/ /features/ 301
 /en/compare/salla /en/features/ 301
 /en/compare/salla/ /en/features/ 301
+
+# Audit M-164: /pricing and /compare are linked from outside but are home sections. The compare-plans table lives in #pricing.
+/pricing /#pricing 301
+/pricing/ /#pricing 301
+/en/pricing /en/#pricing 301
+/en/pricing/ /en/#pricing 301
+/compare /#pricing 301
+/compare/ /#pricing 301
+/en/compare /en/#pricing 301
+/en/compare/ /en/#pricing 301

@@ -1,5 +1,6 @@
 'use client';
 
+import { StoreAnchor } from '../../components/StoreLink';
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
@@ -85,7 +86,7 @@ export function BrandStoryBlock({
               </p>
             )}
             {ctaHref && (
-              <a
+              <StoreAnchor
                 href={ctaHref}
                 className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]/80 transition-colors"
               >
@@ -104,7 +105,7 @@ export function BrandStoryBlock({
                     d={isRtl ? 'M10 19l-7-7m0 0l7-7m-7 7h18' : 'M14 5l7 7m0 0l-7 7m7-7H3'}
                   />
                 </svg>
-              </a>
+              </StoreAnchor>
             )}
           </div>
         </div>

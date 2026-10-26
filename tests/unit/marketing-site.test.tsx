@@ -71,18 +71,19 @@ describe('marketing nav', () => {
     expect(pos.every(p => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   });
-  it('header: the master brand lockup plus a Products menu naming only the live product (BRAND-ARCH-1)', () => {
-    for (const [html, studio, store, soon] of [
-      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', /قريب/],
-      [en, 'Ebda AI Studio', 'Ebda Store', /coming soon/i],
+  it('header: the master brand lockup plus a Products menu naming only the live products, Ebda Store and Ebda WhatsApp (BRAND-ARCH-1)', () => {
+    for (const [html, studio, store, wa, soon] of [
+      [ar, 'ابدأ استوديو للذكاء الاصطناعي', 'ابدأ ستور', 'ابدأ واتساب', /قريب/],
+      [en, 'Ebda AI Studio', 'Ebda Store', 'Ebda WhatsApp', /coming soon/i],
     ] as const) {
       const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
       expect(wm).toContain(`>${studio}</span>`);
       const menu = html.match(/<li class="nav-products">.*?<\/details>/s)![0];
       expect(menu).toContain(`<b>${store}</b>`);
-      expect(menu.match(/<a /g)).toHaveLength(1);
+      expect(menu).toContain(`<b>${wa}</b>`);
+      expect(menu.match(/<a /g)).toHaveLength(2);
       expect(menu).not.toMatch(soon);
-      expect(menu).not.toMatch(/WhatsApp|CRM|ERP/);
+      expect(menu).not.toMatch(/CRM|ERP/);
     }
   });
   it('footer: no competitor compare links (Ahmad 2026-10-23)', () => {

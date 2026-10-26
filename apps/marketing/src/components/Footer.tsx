@@ -38,10 +38,12 @@ export function Footer({ locale }: { locale: Locale }) {
               <Link href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</Link>
             </li>
             <li>
-              <Link href={pagePath(locale, 'about')}>{c.about}</Link>
+              <Link href={pagePath(locale, 'whatsapp')}>
+                {locale === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn}
+              </Link>
             </li>
             <li>
-              <Link href={pagePath(locale, 'contact')}>{COPY[locale].nav.contact}</Link>
+              <Link href={pagePath(locale, 'about')}>{c.about}</Link>
             </li>
             <li>
               <Link href={pagePath(locale, 'contact')}>{COPY[locale].nav.contact}</Link>

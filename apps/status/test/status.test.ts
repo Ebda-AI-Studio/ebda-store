@@ -191,7 +191,10 @@ describe('end to end: forced probe failure -> incident on the public page', () =
   it('serves the page with no scripts and a restrictive CSP', async () => {
     const r = await get('/en');
     const html = await r.text();
-    expect(/<script/i.test(html)).toBe(false);
+    // no executable script; the only script elements are JSON-LD data blocks (never run, so CSP does not apply)
+    expect(
+      /<script/i.test(html.replace(/<script type="application\/ld\+json">.*?<\/script>/gs, ''))
+    ).toBe(false);
     expect(r.headers.get('content-security-policy')).toContain("default-src 'none'");
     expect(has(html, 'lang="en"')).toBe(true);
   });
@@ -350,5 +353,16 @@ describe('master brand, products and discovery files (BRAND-ARCH-1, 6c)', () => 
     expect(sec).toContain('Canonical: https://status.ebda.app/.well-known/security.txt');
     const exp = new Date(/^Expires: (.+)$/m.exec(sec)![1]).getTime();
     expect(exp - Date.now()).toBeGreaterThan(90 * 86_400_000);
+  });
+});
+
+describe('llms.txt (audit M-119)', () => {
+  it('says what the host is and links the page and the JSON feed', async () => {
+    const r = await get('/llms.txt');
+    expect(r.status).toBe(200);
+    const t = await r.text();
+    expect(t).toContain('# Ebda AI Studio Status');
+    expect(t).toContain('https://status.ebda.app/en');
+    expect(t).toContain('https://status.ebda.app/api/status.json');
   });
 });
