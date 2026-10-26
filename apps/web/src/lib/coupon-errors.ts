@@ -18,6 +18,11 @@ export function couponErrorCopy(code: string | undefined, t: T): string {
         "This code doesn't apply to the items in your cart.",
         'الكود ده مش على المنتجات اللي في سلتك.'
       );
+    case 'COUPON_NEEDS_CONTACT':
+      return t(
+        'Add your phone number or email to use this code (one use per customer).',
+        'ضيف رقم موبايلك أو إيميلك عشان تستخدم الكود ده (مرة واحدة لكل عميل).'
+      );
     case 'MIN_ORDER_NOT_MET':
       return t("Your order is below this code's minimum.", 'طلبك أقل من الحد الأدنى للكود ده.');
     default:

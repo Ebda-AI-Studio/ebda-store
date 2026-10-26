@@ -1971,6 +1971,9 @@ export default function CheckoutClient() {
             'الكوبون ده خلصت مرات استخدامه. شيله وجرّب تاني.'
           );
           break;
+        case 'COUPON_NEEDS_CONTACT':
+          friendly = couponErrorCopy('COUPON_NEEDS_CONTACT', t);
+          break;
         case 'COUPON_NOT_ELIGIBLE':
           // `OrderService.create` refuses with this whenever the coupon does
           // not apply to the cart as the SERVER prices it — which free-shipping
