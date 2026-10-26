@@ -14,15 +14,15 @@ import { createPrismaClient, runInTenantContext, runWithRequestDb } from '@ebda/
 import { hasDb } from '../helpers/bundle-fixtures';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
-function kuwaitSessionUrl(): string {
+function offsetSessionUrl(): string {
   const u = new URL(OWNER_URL);
-  u.searchParams.set('options', '-c TimeZone=Asia/Kuwait');
+  u.searchParams.set('options', '-c TimeZone=Asia/Tokyo');
   return u.toString();
 }
 
 describe.skipIf(!hasDb)('tenant transactions pin the session time zone to UTC', () => {
   const client = hasDb
-    ? createPrismaClient({ connectionString: kuwaitSessionUrl(), max: 2, role: 'owner' })
+    ? createPrismaClient({ connectionString: offsetSessionUrl(), max: 2, role: 'owner' })
     : null;
   afterAll(async () => {
     await client?.$disconnect();
@@ -33,7 +33,7 @@ describe.skipIf(!hasDb)('tenant transactions pin the session time zone to UTC', 
     const rows = await client!.$queryRaw<
       Array<{ tz: string }>
     >`SELECT current_setting('TimeZone') AS tz`;
-    expect(rows[0].tz).toBe('Asia/Kuwait');
+    expect(rows[0].tz).toBe('Asia/Tokyo');
   });
 
   it('inside a tenant transaction the zone is UTC and CURRENT_TIMESTAMP matches the JS clock', async () => {
@@ -52,6 +52,6 @@ describe.skipIf(!hasDb)('tenant transactions pin the session time zone to UTC', 
     const after = await client!.$queryRaw<
       Array<{ tz: string }>
     >`SELECT current_setting('TimeZone') AS tz`;
-    expect(after[0].tz).toBe('Asia/Kuwait');
+    expect(after[0].tz).toBe('Asia/Tokyo');
   });
 });
