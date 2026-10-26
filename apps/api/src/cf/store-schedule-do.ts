@@ -3,8 +3,7 @@ import { setCfBindings, type CfBindings } from './bindings';
 import { StoreScheduleBase, type AlarmEvent, type LogFields } from './store-schedule';
 import { getJob } from '../lib/jobs/registry';
 import { startJob } from '../lib/jobs/start';
-import { dispatchEventsToAll } from '../lib/jobs/dispatch-all';
-import { failedEvent } from '../lib/jobs/failure';
+import { reportJobFailure } from '../lib/jobs/failure';
 import logger from '../lib/logger';
 
 export class StoreSchedule extends StoreScheduleBase<CfBindings> {
@@ -19,12 +18,12 @@ export class StoreSchedule extends StoreScheduleBase<CfBindings> {
     return startJob(def, event);
   }
 
-  /** Same observability as a failed run: the `inngest/function.failed` event feeds alerts-failure-watch. */
+  /** Same observability as a failed run: the direct P1 alert plus Sentry (lib/jobs/failure.ts). */
   protected override async onGaveUp(job: string, event: AlarmEvent, err: unknown): Promise<void> {
     const def = getJob(job);
     if (!def) return;
     const error = err instanceof Error ? err : new Error(String(err));
-    await dispatchEventsToAll(failedEvent(def, event, event.id, error));
+    await reportJobFailure(def, event, event.id, error);
   }
 
   protected override log(level: 'warn' | 'error', f: LogFields, msg: string): void {

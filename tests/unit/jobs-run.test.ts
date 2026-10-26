@@ -13,6 +13,11 @@ import {
 } from '@api/lib/jobs/run-queue';
 import type { WorkflowStepLike } from '@api/lib/jobs/step-adapter';
 
+const sendAlert = vi.hoisted(() => vi.fn(async () => 'sent'));
+const captureException = vi.hoisted(() => vi.fn());
+vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
+vi.mock('@sentry/cloudflare', () => ({ captureException }));
+
 class NonRetryable extends Error {}
 
 const calls: string[] = [];
@@ -71,6 +76,8 @@ beforeEach(() => {
   raw.mockClear();
   qsend.mockClear();
   clearJobRegistry();
+  sendAlert.mockClear();
+  captureException.mockClear();
   setRawInngestSend(raw);
   setCfBindings({
     HYPERDRIVE: { connectionString: 'x' },
@@ -214,6 +221,18 @@ describe('runJobWorkflow', () => {
     expect(failure.error.message).toBe('boom');
     expect(raw).not.toHaveBeenCalled(); // the failed event has no Cloudflare subscriber here and `inngest/*` is never sent to Inngest
     expect(calls).toContain('do:on-failure');
+    // Exactly one direct alert + one Sentry capture, with job, group, instance id and error, no event data.
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    const alert = (sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0];
+    expect(alert).toMatchObject({
+      level: 'p1',
+      scope: 'platform',
+      source: 'job.bulk-ai-seo',
+      body: 'boom',
+      context: { job: 'bulk-ai-seo', group: '4-ai', instanceId: 'inst-1', triggeringEvent: 'x/y' },
+    });
+    expect(JSON.stringify(alert)).not.toContain('s1'); // event.data (storeId) never leaves
+    expect(captureException).toHaveBeenCalledTimes(1);
     expect(calls[calls.length - 1]).toBe('do:gate-release-0');
   });
 
@@ -300,7 +319,37 @@ describe('handleJobsBatch', () => {
     expect(last.ack).toHaveBeenCalled();
     expect(last.retry).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(raw).not.toHaveBeenCalled(); // reserved failure event, no Cloudflare subscriber
+    expect(raw).not.toHaveBeenCalled(); // no inngest/* event is involved any more
+    // The failed attempts alerted nothing; the final failure alerts exactly once (queue job).
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    expect((sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0]).toMatchObject({
+      level: 'p1',
+      source: 'job.heartbeat',
+      body: 'nope',
+      context: { job: 'heartbeat', group: '1-observability', instanceId: last.id },
+    });
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('a payment webhook failure alerts at P0', async () => {
+    registerJob({ id: 'payment-webhook-process', retries: 0 }, async () => {
+      throw new Error('boom');
+    });
+    await handleJobsBatch(batch(msg(job('payment-webhook-process'), 1)));
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    expect((sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0].level).toBe(
+      'p0'
+    );
+  });
+
+  it('an alert that cannot be sent never fails the run', async () => {
+    sendAlert.mockRejectedValueOnce(new Error('telegram down'));
+    registerJob({ id: 'heartbeat', retries: 0 }, async () => {
+      throw new Error('nope');
+    });
+    const m = msg(job('heartbeat'), 1);
+    await handleJobsBatch(batch(m));
+    expect(m.ack).toHaveBeenCalled();
   });
 
   it('NonRetriableError fails at once', async () => {
