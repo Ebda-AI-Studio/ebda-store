@@ -37,7 +37,7 @@ export async function runSearchCheck({ root, name = 'site', cases, typeahead = [
         failed++;
         console.log(`FAIL ${c.page} status ${resp?.status()} (want ${c.status})`);
       }
-      await page.focus('#q');
+      await page.focus(c.input ?? '#q');
       await page.keyboard.type(c.q);
       // Results refresh while typing: wait for the expected article (or time out and report what is there).
       await page
@@ -53,9 +53,9 @@ export async function runSearchCheck({ root, name = 'site', cases, typeahead = [
       const hrefs = await page.$$eval('.ta-list [role=option]', as =>
         as.map(a => a.getAttribute('href'))
       );
-      const expanded = await page.getAttribute('#q', 'aria-expanded');
+      const expanded = await page.getAttribute(c.input ?? '#q', 'aria-expanded');
       await page.keyboard.press('ArrowDown');
-      const active = await page.getAttribute('#q', 'aria-activedescendant');
+      const active = await page.getAttribute(c.input ?? '#q', 'aria-activedescendant');
       const firstId = await page.$eval('.ta-list [role=option]', o => o.id).catch(() => null);
       // axe on the OPEN dropdown (the static a11y gate only sees the closed page).
       await page.evaluate(readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8'));
