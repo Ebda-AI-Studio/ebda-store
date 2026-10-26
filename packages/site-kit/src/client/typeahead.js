@@ -61,7 +61,15 @@ function init(form) {
   // JSON list of { index, base }: `base` makes the hrefs of a cross-origin index absolute.
   let sources = [{ index: form.dataset.index, base: '' }];
   try {
-    if (form.dataset.sources) sources = JSON.parse(form.dataset.sources);
+    // JSON `[{index,base}]`, or the bracket-free `index|base;index|base` (markup that must not contain `[`).
+    const raw = form.dataset.sources;
+    if (raw)
+      sources = raw.trim().startsWith('[')
+        ? JSON.parse(raw)
+        : raw.split(';').map(part => {
+            const [index, base = ''] = part.split('|');
+            return { index, base };
+          });
   } catch {
     /* keep the single index */
   }
