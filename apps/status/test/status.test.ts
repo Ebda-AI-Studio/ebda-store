@@ -207,6 +207,7 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     const r = await get('/assets/site-nav.js');
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toContain('javascript');
+    expect(r.headers.get('cache-control')).toBe('public, max-age=300');
     expect(r.headers.get('content-security-policy')).toContain("script-src 'self'");
     expect(await r.text()).toBe(SITE_NAV_JS);
   });

@@ -128,6 +128,9 @@ describe('shared header-nav script', () => {
           fireEvent.keyDown(document, { key: 'Escape' });
           expect(products.open).toBe(false);
           expect(document.activeElement).toBe(trig(products));
+          // a browser fires `toggle` after a programmatic close; aria-expanded follows it
+          products.dispatchEvent(new Event('toggle'));
+          expect(trig(products).getAttribute('aria-expanded')).toBe('false');
         });
         it('opening one menu closes the other', () => {
           const { products, menu, open } = mount();
@@ -146,6 +149,12 @@ describe('shared header-nav script', () => {
           out.focus();
           expect(products.open).toBe(false);
         });
+        it('a click on panel content that is not a link does not close the open menu', () => {
+          const { products, open } = mount();
+          open(products);
+          fireEvent.click(products.querySelector('ul')!);
+          expect(products.open).toBe(true);
+        });
         it('a plain link click closes the menu; a ctrl-click leaves it open', () => {
           const { products, open } = mount();
           const link = products.querySelector('a')!;
@@ -158,4 +167,11 @@ describe('shared header-nav script', () => {
       });
     }
   }
+
+  it('is a no-op on a page without a .site-header', () => {
+    document.body.innerHTML = '<details open><summary>x</summary></details>';
+    expect(() => new Function(SITE_NAV_JS)()).not.toThrow();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.querySelector('details')!.open).toBe(true);
+  });
 });

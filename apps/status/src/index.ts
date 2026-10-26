@@ -14,11 +14,11 @@ const SECURITY_HEADERS = {
   'x-frame-options': 'DENY',
 };
 
-const text = (body: string, type = 'text/plain'): Response =>
+const text = (body: string, type = 'text/plain', maxAge = 3600): Response =>
   new Response(body, {
     headers: {
       'content-type': `${type}; charset=utf-8`,
-      'cache-control': 'public, max-age=3600',
+      'cache-control': `public, max-age=${maxAge}`,
       ...SECURITY_HEADERS,
     },
   });
@@ -179,7 +179,9 @@ export default {
     if (path === '/.well-known/security.txt') return text(securityTxt(url.origin));
 
     // the shared header-nav behaviour (Esc, click-outside, one menu open, aria-expanded): a same-origin file, no inline script
-    if (path === '/assets/site-nav.js') return text(SITE_NAV_JS, 'text/javascript');
+    if (path === '/assets/site-nav.js')
+      // an unhashed file: a short cache so a changed script reaches visitors within minutes, not an hour
+      return text(SITE_NAV_JS, 'text/javascript', 300);
 
     if (path === '/healthz')
       return new Response('ok', { headers: { 'content-type': 'text/plain', ...SECURITY_HEADERS } });
