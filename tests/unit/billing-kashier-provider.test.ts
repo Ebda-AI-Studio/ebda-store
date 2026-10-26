@@ -357,6 +357,76 @@ describe('provider selection', () => {
     expect(() =>
       assertBillingConfigAtBoot({ NODE_ENV: 'production', BILLING_PROVIDER: 'none' })
     ).not.toThrow();
+    expect(() =>
+      assertBillingConfigAtBoot({
+        NODE_ENV: 'production',
+        BILLING_PROVIDER: 'none',
+        BILLING_TRIAL_CARD_MODE: 'pay_at_trial_end',
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertBillingConfigAtBoot({
+        NODE_ENV: 'production',
+        BILLING_PROVIDER: 'none',
+        BILLING_TRIAL_CARD_MODE: 'card_on_file',
+      })
+    ).toThrow(/needs a card provider/);
+  });
+});
+
+describe('Kashier getChargeStatus (M-023 stuck-charge lookup)', () => {
+  const mkGet = (status: number, json: unknown) => {
+    const calls: string[] = [];
+    const impl = (async (url: string) => {
+      calls.push(url);
+      return new Response(JSON.stringify(json), { status });
+    }) as unknown as typeof fetch;
+    return {
+      calls,
+      p: new KashierBillingProvider({
+        baseUrl: 'https://kashier.test/',
+        merchantId: 'MID-1',
+        secretKey: 'sk',
+        apiKey: API_KEY,
+        fetchImpl: impl,
+      }),
+    };
+  };
+  const details = (over: Record<string, unknown> = {}) => ({
+    body: {
+      transactionId: 'TX-1',
+      merchantOrderId: ORDER,
+      trxType: 'pay',
+      status: 'SUCCESS',
+      ...over,
+    },
+  });
+  const ask = (p: KashierBillingProvider, chargeId: string | null) =>
+    p.getChargeStatus({ idempotencyKey: 'k', merchantOrderId: ORDER, chargeId });
+
+  it('reads the gateway record for the transaction id: success, failure, pending', async () => {
+    const ok = mkGet(200, details());
+    expect(await ask(ok.p, 'TX-1')).toMatchObject({ status: 'succeeded', chargeId: 'TX-1' });
+    expect(ok.calls[0]).toBe('https://kashier.test/v2/aggregator/transactions/TX-1');
+    expect(await ask(mkGet(200, details({ status: 'FAILURE' })).p, 'TX-1')).toMatchObject({
+      status: 'failed',
+    });
+    expect(await ask(mkGet(200, details({ status: 'PENDING' })).p, 'TX-1')).toMatchObject({
+      status: 'pending',
+    });
+  });
+
+  it('with NO transaction id it throws (cannot tell) and never claims "not found"; so does anything unclear', async () => {
+    const f = mkGet(200, details());
+    await expect(ask(f.p, null)).rejects.toThrow(/without a transaction id/);
+    expect(f.calls).toHaveLength(0); // no network call, no guess
+    await expect(ask(mkGet(200, details({ transactionId: 'OTHER' })).p, 'TX-1')).rejects.toThrow(
+      /did not answer clearly/
+    );
+    await expect(ask(mkGet(200, details({ trxType: 'refund' })).p, 'TX-1')).rejects.toThrow(
+      /not a charge/
+    );
+    await expect(ask(mkGet(500, {}).p, 'TX-1')).rejects.toThrow();
   });
 });
 

@@ -503,7 +503,7 @@ describe.skipIf(!hasDb)('renewal is idempotent', () => {
     );
   });
 
-  it('M-023: a lost DECLINE moves the subscription to past_due (dunning), not free service for ever', async () => {
+  it('M-023: a lost DECLINE is read from the gateway and moves the subscription to past_due (dunning)', async () => {
     const { storeId, subId } = await subscribedStore({});
     stub.timeoutNextCharges(1, false);
     await renewSubscription(subId, T0, stub);
@@ -514,18 +514,66 @@ describe.skipIf(!hasDb)('renewal is idempotent', () => {
     expect(sub.nextRetryAt).not.toBeNull();
   });
 
-  it('M-023: a provider that cannot be asked is given up on after the window (handed to dunning), and not before', async () => {
+  it('M-023: a provider that cannot be asked is NEVER given up on blindly: still pending after days, no retry, one P1 path', async () => {
     const { storeId, subId } = await subscribedStore({});
     const blind = new StubBillingProvider();
     blind.getChargeStatus = undefined;
     blind.timeoutNextCharges(1, true);
     await renewSubscription(subId, T0, blind);
-    await sweepStuckCharges(new Date(Date.now() + 2 * 3_600_000), blind);
-    expect((await ledger(storeId))[0].status).toBe('pending'); // too early: only the P1 alert
-    await sweepStuckCharges(new Date(Date.now() + 4 * 86_400_000), blind);
+    for (const days of [0.1, 4, 30]) {
+      await sweepStuckCharges(new Date(Date.now() + days * 86_400_000), blind);
+    }
     const rows = await ledger(storeId);
-    expect(rows[0]).toMatchObject({ status: 'failed', failureReason: 'outcome_unknown_timeout' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('pending'); // a blind give-up would have sent dunning, and a new key, a second charge
+    expect((await getSub(storeId)).status).toBe('active');
+    expect(blind.chargeCalls).toHaveLength(1);
+  });
+
+  it('M-023: a claim the gateway has no record of (never sent) is failed and enters dunning', async () => {
+    const { storeId, subId } = await subscribedStore({});
+    // a claimed-but-never-sent renewal: the ledger row exists, the provider was never called
+    await withRlsBypass(tx =>
+      tx.billingEvent.create({
+        data: {
+          storeId,
+          subscriptionId: subId,
+          type: 'renewal',
+          planCode: PRO,
+          billingInterval: 'monthly',
+          forPeriodEnd: T0,
+          amountMinor: 49900,
+          provider: 'stub',
+          idempotencyKey: `sub:${subId}:${T0.toISOString()}`,
+          status: 'pending',
+        },
+      })
+    );
+    await sweepStuckCharges(new Date(Date.now() + 2 * 3_600_000), stub);
+    const rows = await ledger(storeId);
+    expect(rows[0]).toMatchObject({ status: 'failed', failureReason: 'not_found_at_gateway' });
     expect((await getSub(storeId)).status).toBe('past_due');
+  });
+
+  it('M-023: one row that cannot be settled does not stop the rest of the sweep', async () => {
+    const { storeId: a, subId: sa } = await subscribedStore({});
+    const { storeId: b, subId: sb } = await subscribedStore({});
+    const flaky = new StubBillingProvider();
+    flaky.timeoutNextCharges(2, true);
+    await renewSubscription(sa, T0, flaky);
+    await renewSubscription(sb, T0, flaky);
+    const real = flaky.getChargeStatus.bind(flaky);
+    let first = true;
+    flaky.getChargeStatus = async req => {
+      if (first) {
+        first = false;
+        throw new Error('gateway down');
+      }
+      return real(req);
+    };
+    await sweepStuckCharges(new Date(Date.now() + 2 * 3_600_000), flaky);
+    const statuses = [(await ledger(a))[0].status, (await ledger(b))[0].status].sort();
+    expect(statuses).toEqual(['pending', 'succeeded']);
   });
 
   it('M-125: the billing day returns to the 31st after a short month', async () => {

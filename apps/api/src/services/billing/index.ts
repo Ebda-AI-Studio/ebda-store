@@ -90,7 +90,16 @@ export function assertBillingConfigAtBoot(env: Env = process.env): void {
     resolveBillingProviderName(env);
   }
   // An explicit trial mode the provider cannot honour is a config error: stop at boot.
-  if ((env.BILLING_TRIAL_CARD_MODE ?? '').trim() !== '' && (env.BILLING_PROVIDER ?? '').trim()) {
+  const provider = (env.BILLING_PROVIDER ?? '').trim().toLowerCase();
+  const mode = (env.BILLING_TRIAL_CARD_MODE ?? '').trim().toLowerCase();
+  if (provider === 'none') {
+    // InstaPay only on purpose: there is no card provider to build, and card mode cannot be honoured.
+    if (mode === 'card_on_file') {
+      throw new Error(
+        'BILLING_TRIAL_CARD_MODE=card_on_file needs a card provider (BILLING_PROVIDER=kashier)'
+      );
+    }
+  } else if (mode !== '' && provider) {
     resolveTrialCardMode(createBillingProvider(resolveBillingProviderName(env), env), env);
   }
 }
