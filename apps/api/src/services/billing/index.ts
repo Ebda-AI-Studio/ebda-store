@@ -22,13 +22,17 @@ export function resolveBillingProviderName(env: Env = process.env): BillingProvi
     return 'stub';
   }
   if (raw === 'kashier') return 'kashier';
+  if (raw === 'none') {
+    // The explicit "InstaPay only" choice (Ruling EBDA-FUNNEL-17 / P10-1): no card gateway on purpose.
+    throw new Error('Card billing is disabled (BILLING_PROVIDER=none): InstaPay only');
+  }
   if (raw === '') {
     if (production) {
       throw new Error('BILLING_PROVIDER must be set to "kashier" in production');
     }
     return 'stub';
   }
-  throw new Error(`Unknown BILLING_PROVIDER "${raw}" (expected kashier|stub)`);
+  throw new Error(`Unknown BILLING_PROVIDER "${raw}" (expected kashier|stub|none)`);
 }
 
 export function createBillingProvider(
@@ -89,6 +93,19 @@ export function assertBillingConfigAtBoot(env: Env = process.env): void {
   if ((env.BILLING_TRIAL_CARD_MODE ?? '').trim() !== '' && (env.BILLING_PROVIDER ?? '').trim()) {
     resolveTrialCardMode(createBillingProvider(resolveBillingProviderName(env), env), env);
   }
+}
+
+/**
+ * A production deploy with `BILLING_PROVIDER` UNSET is almost always a forgotten binding, not a decision (Sentry
+ * EBDA-API-3/4: every card charge threw "must be set"). It does NOT stop boot (an InstaPay-only deployment needs no
+ * gateway, Ruling EBDA-FUNNEL-17), but it is no longer silent: this returns the P1 text, and `app.ts` raises it at
+ * boot. Setting `BILLING_PROVIDER=none` is the explicit "InstaPay only" acknowledgement and silences it;
+ * `kashier` is the card gateway. Pure: unit-tested.
+ */
+export function billingProviderUnsetWarning(env: Env = process.env): string | null {
+  if (env.NODE_ENV !== 'production') return null;
+  if ((env.BILLING_PROVIDER ?? '').trim() !== '') return null;
+  return 'BILLING_PROVIDER is not set in production: card billing is OFF and every card charge, renewal and trial-end charge will throw. Set BILLING_PROVIDER=kashier (card gateway) or BILLING_PROVIDER=none (InstaPay only, on purpose).';
 }
 
 /**

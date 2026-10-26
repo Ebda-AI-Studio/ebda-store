@@ -27,6 +27,7 @@ import {
   addInterval,
   isInterval,
   type BillingInterval,
+  addIntervalAnchored,
 } from './period';
 import { normalizeInstapayReference, type InstapayReceiptFields } from '@ebda/shared';
 import {
@@ -379,7 +380,12 @@ export async function chooseInstapayPlan(args: {
  * starts now. Pure: unit-tested and mutation-checked.
  */
 export function manualPeriodFor(
-  sub: { status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null } | null,
+  sub: {
+    status: string;
+    trialEndsAt: Date | null;
+    currentPeriodEnd: Date | null;
+    billingAnchorDay?: number | null;
+  } | null,
   interval: BillingInterval,
   now: Date
 ): { periodStart: Date; periodEnd: Date } {
@@ -393,7 +399,11 @@ export function manualPeriodFor(
   ) {
     start = sub.currentPeriodEnd;
   }
-  return { periodStart: start, periodEnd: addInterval(start, interval) };
+  // clamp from the cycle's anchor day (M-125); a store with none yet anchors on this period's start
+  return {
+    periodStart: start,
+    periodEnd: addIntervalAnchored(start, interval, sub?.billingAnchorDay ?? start.getUTCDate()),
+  };
 }
 
 export async function suggestManualPeriod(
@@ -796,6 +806,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       billingInterval: input.interval,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
+      // keep the cycle's anchor day; the first paid period anchors on its own start (M-125)
+      billingAnchorDay: sub?.billingAnchorDay ?? periodStart.getUTCDate(),
       trialEndsAt: null,
       pendingPlanCode: null,
       cancelAtPeriodEnd: false,

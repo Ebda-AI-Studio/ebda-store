@@ -61,6 +61,7 @@ import {
   renewalKey,
   upgradeKey,
   type BillingInterval,
+  addIntervalAnchored,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
 import { suspendForBilling } from './account.service';
@@ -269,6 +270,7 @@ async function applySuccess(
       billingInterval: interval,
       currentPeriodStart: now,
       currentPeriodEnd: addInterval(now, interval),
+      billingAnchorDay: now.getUTCDate(), // the cycle restarts today (M-125)
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,
       dunningAttempts: 0,
@@ -314,9 +316,14 @@ async function applySuccess(
     const interval = isInterval(row.billingInterval) ? row.billingInterval : 'monthly';
     const planCode = row.planCode ?? sub.planCode;
     let start = row.forPeriodEnd!;
+    // The day the cycle started on (M-125): clamped from the ANCHOR each cycle, so a short month never moves it.
+    let anchor = sub.billingAnchorDay ?? start.getUTCDate();
     // A long-lapsed period must not leave the new one already expired
     // (that would charge again on the very next cron run).
-    if (addInterval(start, interval).getTime() <= now.getTime()) start = now;
+    if (addIntervalAnchored(start, interval, anchor).getTime() <= now.getTime()) {
+      start = now;
+      anchor = now.getUTCDate();
+    }
     await tx.storeSubscription.update({
       where: { storeId: row.storeId },
       data: {
@@ -324,7 +331,8 @@ async function applySuccess(
         billingInterval: interval,
         status: 'active',
         currentPeriodStart: start,
-        currentPeriodEnd: addInterval(start, interval),
+        currentPeriodEnd: addIntervalAnchored(start, interval, anchor),
+        billingAnchorDay: anchor,
         trialEndsAt: null,
         pendingPlanCode: null,
         dunningAttempts: 0,
@@ -551,8 +559,14 @@ async function chargeAndSettle(args: {
       );
       return { settled: 'failed' };
     }
-    // Unknown outcome (timeout / 5xx): leave `pending`; never re-send blindly.
+    // Unknown outcome (timeout / 5xx): leave `pending`; never re-send blindly. Loud (M-023): nothing else is
+    // going to look at it - the daily sweep asks the gateway, then hands it to dunning after the give-up window.
     logger.error({ err, eventId: args.eventId }, '[billing] charge outcome unknown — left pending');
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: charge outcome unknown',
+      body: `billing_events ${args.eventId}: the gateway call did not answer (${(err as Error).message}). Left pending; the daily sweep will ask the gateway and, after ${STUCK_CHARGE_GIVE_UP_DAYS} days, treat it as failed.`,
+    }).catch(() => undefined);
     return { settled: 'pending', reason: (err as Error).message };
   }
   if (res.status === 'pending') {
@@ -1026,6 +1040,104 @@ export async function findDueSubscriptionIds(
   return rows.map(r => r.id);
 }
 
+/** A renewal / upgrade charge is "stuck" when its outcome has not arrived this long after it was claimed. */
+export const STUCK_CHARGE_AFTER_MS = 3_600_000;
+/** After this many days pending the charge is treated as failed so the subscription enters dunning. */
+export const STUCK_CHARGE_GIVE_UP_DAYS = 3;
+
+/**
+ * Charges whose gateway answer was lost (M-023). For each renewal/upgrade row pending > 1 h: ask the gateway when the
+ * provider can (`getChargeStatus`) and settle a definitive answer; after the give-up window with no answer settle it
+ * `failed` (outcome_unknown_timeout) so the renewal path continues - a late success webhook still settles
+ * failed -> succeeded; whatever is still unknown is named in ONE P1 alert. Idempotent: every settle is the guarded
+ * pending -> succeeded|failed transition.
+ */
+export async function sweepStuckCharges(
+  now: Date,
+  provider?: BillingProvider
+): Promise<{ polled: number; settled: number; gaveUp: number; stillStuck: number }> {
+  const cutoff = new Date(now.getTime() - STUCK_CHARGE_AFTER_MS);
+  const parts = await acrossStores(
+    storeId =>
+      prisma.billingEvent.findMany({
+        where: {
+          storeId,
+          type: { in: ['renewal', 'upgrade'] },
+          status: 'pending',
+          createdAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          storeId: true,
+          idempotencyKey: true,
+          providerRef: true,
+          createdAt: true,
+        },
+      }),
+    {
+      onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
+    }
+  );
+  const rows = parts.flatMap(p => p.value);
+  let active: BillingProvider | null = provider ?? null;
+  if (!active) {
+    try {
+      active = getBillingProvider();
+    } catch {
+      active = null; // card billing is off (InstaPay only): nothing to ask
+    }
+  }
+  const out = { polled: 0, settled: 0, gaveUp: 0, stillStuck: 0 };
+  const stuck: string[] = [];
+  for (const r of rows) {
+    if (active?.getChargeStatus) {
+      out.polled++;
+      try {
+        const res = await active.getChargeStatus({
+          idempotencyKey: r.idempotencyKey,
+          merchantOrderId: r.id,
+          chargeId: r.providerRef,
+        });
+        if (res && res.status !== 'pending') {
+          const t = await settleCharge(
+            r.id,
+            {
+              status: res.status,
+              providerRef: res.chargeId,
+              failureReason: res.failureReason,
+              raw: res.raw,
+            },
+            now
+          );
+          if (t.transitioned) out.settled++;
+          continue;
+        }
+      } catch (err) {
+        logger.warn({ err, eventId: r.id }, '[billing] charge status lookup failed');
+      }
+    }
+    if (now.getTime() - r.createdAt.getTime() > STUCK_CHARGE_GIVE_UP_DAYS * 86_400_000) {
+      const t = await settleCharge(
+        r.id,
+        { status: 'failed', failureReason: 'outcome_unknown_timeout' },
+        now
+      );
+      if (t.transitioned) out.gaveUp++;
+      continue;
+    }
+    stuck.push(r.id);
+  }
+  out.stillStuck = stuck.length;
+  if (stuck.length > 0) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: charges with an unknown outcome',
+      body: `${stuck.length} renewal/upgrade charge(s) pending for over an hour with no gateway answer: ${stuck.slice(0, 10).join(', ')}. Check /billing-events; they enter dunning after ${STUCK_CHARGE_GIVE_UP_DAYS} days.`,
+    }).catch(() => undefined);
+  }
+  return out;
+}
+
 export async function expireStaleCheckouts(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_CHECKOUT_MS);
   const parts = await acrossStores(
@@ -1070,6 +1182,13 @@ export async function runBillingCycle(
         logger.error({ err, subscriptionId: id }, '[billing] reminder threw');
       }
     }
+  }
+  if (!only) {
+    // M-023: settle / hand on charges whose outcome never arrived, BEFORE the due list is read (a given-up
+    // renewal enters dunning and may be due again today).
+    await sweepStuckCharges(now, provider).catch(err =>
+      logger.error({ err }, '[billing] stuck-charge sweep failed')
+    );
   }
   const ids = await findDueSubscriptionIds(now, only);
   for (const id of ids) {

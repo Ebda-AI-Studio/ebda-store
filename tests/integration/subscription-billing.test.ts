@@ -39,6 +39,7 @@ import {
   refundCharge,
   renewSubscription,
   runBillingCycle,
+  sweepStuckCharges,
   startCheckout,
   handleBillingWebhook,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
@@ -480,6 +481,64 @@ describe.skipIf(!hasDb)('renewal is idempotent', () => {
     expect(rows[0].status).toBe('pending');
     const stuck = (await listLedger({ storeId }))[0];
     expect(stuck.stuck).toBe(false); // fresh; stuck flag appears after an hour
+  });
+
+  it('M-023: a charge the gateway really took but whose answer was lost is found by the sweep and settled once', async () => {
+    const { storeId, subId } = await subscribedStore({});
+    stub.timeoutNextCharges(1, true);
+    expect(await renewSubscription(subId, T0, stub)).toMatchObject({ status: 'pending' });
+    const later = new Date(Date.now() + 2 * 3_600_000);
+    const out = await sweepStuckCharges(later, stub);
+    expect(out.settled).toBeGreaterThanOrEqual(1);
+    const rows = await ledger(storeId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('succeeded');
+    expect((await getSub(storeId)).currentPeriodEnd!.toISOString()).toBe(
+      addInterval(T0, 'monthly').toISOString()
+    );
+    await sweepStuckCharges(later, stub); // idempotent
+    expect(stub.chargeCalls).toHaveLength(1); // never re-sent
+    expect((await getSub(storeId)).currentPeriodEnd!.toISOString()).toBe(
+      addInterval(T0, 'monthly').toISOString()
+    );
+  });
+
+  it('M-023: a lost DECLINE moves the subscription to past_due (dunning), not free service for ever', async () => {
+    const { storeId, subId } = await subscribedStore({});
+    stub.timeoutNextCharges(1, false);
+    await renewSubscription(subId, T0, stub);
+    await sweepStuckCharges(new Date(Date.now() + 2 * 3_600_000), stub);
+    expect((await ledger(storeId))[0].status).toBe('failed');
+    const sub = await getSub(storeId);
+    expect(sub.status).toBe('past_due');
+    expect(sub.nextRetryAt).not.toBeNull();
+  });
+
+  it('M-023: a provider that cannot be asked is given up on after the window (handed to dunning), and not before', async () => {
+    const { storeId, subId } = await subscribedStore({});
+    const blind = new StubBillingProvider();
+    blind.getChargeStatus = undefined;
+    blind.timeoutNextCharges(1, true);
+    await renewSubscription(subId, T0, blind);
+    await sweepStuckCharges(new Date(Date.now() + 2 * 3_600_000), blind);
+    expect((await ledger(storeId))[0].status).toBe('pending'); // too early: only the P1 alert
+    await sweepStuckCharges(new Date(Date.now() + 4 * 86_400_000), blind);
+    const rows = await ledger(storeId);
+    expect(rows[0]).toMatchObject({ status: 'failed', failureReason: 'outcome_unknown_timeout' });
+    expect((await getSub(storeId)).status).toBe('past_due');
+  });
+
+  it('M-125: the billing day returns to the 31st after a short month', async () => {
+    const jan31 = new Date('2027-01-31T04:00:00.000Z');
+    const { storeId } = await subscribedStore({ periodEnd: jan31 });
+    await cycleFor(jan31, storeId);
+    expect((await getSub(storeId)).currentPeriodEnd!.toISOString()).toBe(
+      '2027-02-28T04:00:00.000Z'
+    );
+    await cycleFor(new Date('2027-02-28T04:00:00.000Z'), storeId);
+    const sub = await getSub(storeId);
+    expect(sub.currentPeriodEnd!.toISOString()).toBe('2027-03-31T04:00:00.000Z');
+    expect(sub.billingAnchorDay).toBe(31);
   });
 
   it('is not due before the period ends', async () => {
