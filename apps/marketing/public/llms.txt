@@ -20,6 +20,7 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - [Terms of service](https://ebda.app/terms/)
 - [Merchant agreement](https://ebda.app/merchant-agreement/)
 - [Acceptable use](https://ebda.app/acceptable-use/)
+- [Refund and cancellation policy](https://ebda.app/refund/)
 - [Data deletion and export](https://ebda.app/legal/data-deletion/)
 - [Ebda WhatsApp terms](https://ebda.app/legal/whatsapp-terms/)
 - [Ebda WhatsApp privacy](https://ebda.app/legal/whatsapp-privacy/)

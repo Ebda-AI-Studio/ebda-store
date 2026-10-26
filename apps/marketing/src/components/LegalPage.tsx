@@ -10,7 +10,10 @@ type StoreDocKey = keyof Pick<
   LegalPages,
   'legal' | 'privacy' | 'terms' | 'merchant' | 'acceptableUse'
 >;
-type ExtraDocKey = keyof Pick<LegalPages, 'dataDeletion' | 'waTerms' | 'waPrivacy' | 'waDpa'>;
+type ExtraDocKey = keyof Pick<
+  LegalPages,
+  'dataDeletion' | 'refund' | 'waTerms' | 'waPrivacy' | 'waDpa'
+>;
 
 const DOC_KEY: Record<LegalSlug, StoreDocKey> = {
   legal: 'legal',
@@ -26,6 +29,7 @@ const EXTRA_KEY: Record<LegalExtraSlug, ExtraDocKey> = {
   'legal/whatsapp-terms': 'waTerms',
   'legal/whatsapp-privacy': 'waPrivacy',
   'legal/whatsapp-dpa': 'waDpa',
+  refund: 'refund',
 };
 
 export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | LegalExtraSlug }) {

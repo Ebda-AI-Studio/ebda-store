@@ -2,6 +2,7 @@ import { BRAND } from '@ebda/shared/brand';
 import { PRIVACY_STACK } from '@ebda/shared/legal';
 import { POST_CUTOVER } from './legal-privacy-stack';
 import { DELETION_AR } from './legal-deletion';
+import { REFUND_AR } from './legal-refund';
 import { LEGAL_WA_AR } from './legal-wa-ar';
 import type { LegalPages } from './legal-types';
 
@@ -417,10 +418,12 @@ export const LEGAL_AR: LegalPages = {
     ],
   },
   dataDeletion: DELETION_AR,
+  refund: REFUND_AR,
   ...LEGAL_WA_AR,
   more: {
     h: 'وثائق قانونية أخرى',
     links: [
+      { slug: 'refund', label: 'سياسة الاسترداد والإلغاء' },
       { slug: 'legal/data-deletion', label: 'حذف البيانات وتصديرها' },
       { slug: 'legal/whatsapp-terms', label: 'شروط خدمة ابدأ واتساب' },
       { slug: 'legal/whatsapp-privacy', label: 'سياسة الخصوصية لخدمة ابدأ واتساب' },

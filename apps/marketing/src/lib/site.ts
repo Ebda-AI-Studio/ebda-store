@@ -45,6 +45,7 @@ export const LEGAL_EXTRA_SLUGS = [
   'legal/whatsapp-terms',
   'legal/whatsapp-privacy',
   'legal/whatsapp-dpa',
+  'refund',
 ] as const;
 export type LegalExtraSlug = (typeof LEGAL_EXTRA_SLUGS)[number];
 export const COMPARE_SLUGS = [

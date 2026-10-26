@@ -80,7 +80,7 @@ export const BRAND = {
   legalUrls: {
     terms: 'https://ebda.app/terms',
     privacy: 'https://ebda.app/privacy',
-    refunds: 'https://ebda.app/refunds',
+    refunds: 'https://ebda.app/refund/',
   },
 } as const;
 
