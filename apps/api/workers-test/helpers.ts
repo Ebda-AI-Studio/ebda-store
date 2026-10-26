@@ -11,7 +11,7 @@ export const testEnv = env as unknown as {
   API: ApiFetcher;
   AUTH_STATE: {
     idFromName(n: string): unknown;
-    get(id: unknown): { apply(ops: Op[]): Promise<unknown[]> };
+    get(id: unknown): { apply(ops: Op[], nowMs?: number): Promise<unknown[]> };
   };
   KV_CACHE: {
     get(k: string): Promise<string | null>;
@@ -26,9 +26,9 @@ export const testEnv = env as unknown as {
 export const api = testEnv.API;
 
 /** Run ops on the AuthState shard that owns `key`: the same routing the Worker uses. */
-export function authState(key: string, ops: Op[]): Promise<unknown[]> {
+export function authState(key: string, ops: Op[], nowMs?: number): Promise<unknown[]> {
   const ns = testEnv.AUTH_STATE;
-  return ns.get(ns.idFromName(`shard-${shardOf(key)}`)).apply(ops);
+  return ns.get(ns.idFromName(`shard-${shardOf(key)}`)).apply(ops, nowMs);
 }
 
 const b64url = (b: ArrayBuffer | string): string => {

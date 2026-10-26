@@ -7,12 +7,15 @@ import { env } from 'cloudflare:workers';
  * retrying). Needs no database: `heartbeat` opens no step.
  */
 interface Gate {
-  acquire(limit: number, ttlMs: number): Promise<string | null>;
-  renew(token: string, ttlMs: number): Promise<boolean>;
+  acquire(limit: number, ttlMs: number, nowMs?: number): Promise<string | null>;
+  renew(token: string, ttlMs: number, nowMs?: number): Promise<boolean>;
   release(token: string): Promise<void>;
-  touch(timeoutMs: number): Promise<string>;
-  isLatest(token: string, timeoutMs: number): Promise<boolean>;
+  touch(timeoutMs: number, nowMs?: number): Promise<string>;
+  isLatest(token: string, timeoutMs: number, nowMs?: number): Promise<boolean>;
 }
+// Lease and debounce timing is driven by a VIRTUAL clock (the gate's optional `nowMs`), never by `setTimeout`:
+// a 30 ms TTL renewed every 15 ms flaked on a loaded runner when the timer fired late (Ruling FLAKE-LEASE-1).
+const T0 = 1_000_000;
 const e = env as unknown as {
   JOB_GATE: { idFromName(n: string): unknown; get(id: unknown): Gate };
   JOBS_WORKFLOW: {
@@ -35,32 +38,34 @@ describe('JobGate (concurrency lease)', () => {
 
   it('an expired lease is reclaimed by the next acquire, and the old holder is fenced out', async () => {
     const g = gate('expiry');
-    const old = await g.acquire(1, 1);
-    await new Promise(r => setTimeout(r, 15));
-    const fresh = await g.acquire(1, 60_000);
+    const old = await g.acquire(1, 1, T0);
+    // 15 virtual ms later the 1 ms lease is long gone
+    const fresh = await g.acquire(1, 60_000, T0 + 15);
     expect(fresh).not.toBeNull();
-    expect(await g.renew(old!, 60_000)).toBe(false);
-    expect(await g.renew(fresh!, 60_000)).toBe(true);
+    expect(await g.renew(old!, 60_000, T0 + 15)).toBe(false);
+    expect(await g.renew(fresh!, 60_000, T0 + 15)).toBe(true);
   });
 
   it('renewal keeps a lease alive past its original TTL', async () => {
     const g = gate('renew');
-    const t = await g.acquire(1, 30);
-    for (let i = 0; i < 4; i++) {
-      await new Promise(r => setTimeout(r, 15));
-      expect(await g.renew(t!, 30)).toBe(true);
+    const t = await g.acquire(1, 30, T0);
+    for (let i = 1; i <= 4; i++) {
+      expect(await g.renew(t!, 30, T0 + 15 * i)).toBe(true);
     }
-    expect(await g.acquire(1, 60_000)).toBeNull(); // ~60 ms in, original TTL long gone
+    // 60 virtual ms in the original 30 ms TTL is long gone, but the last renewal (at +60) holds the lease until +90
+    expect(await g.acquire(1, 60_000, T0 + 60)).toBeNull();
+    expect(await g.acquire(1, 60_000, T0 + 89)).toBeNull();
+    // and once the last renewal's TTL passes, the lease is reclaimable (control: the clock really drives expiry)
+    expect(await g.acquire(1, 60_000, T0 + 91)).not.toBeNull();
   });
 
   it('debounce: only the newest token proceeds, a stream past the timeout still gets one run', async () => {
     const g = gate('debounce');
-    const t1 = await g.touch(60_000);
-    const t2 = await g.touch(60_000);
-    expect(await g.isLatest(t1, 60_000)).toBe(false);
-    expect(await g.isLatest(t2, 60_000)).toBe(true);
-    await new Promise(r => setTimeout(r, 15));
-    expect(await g.isLatest(t1, 5)).toBe(true); // burst older than the 5 ms timeout
+    const t1 = await g.touch(60_000, T0);
+    const t2 = await g.touch(60_000, T0 + 1);
+    expect(await g.isLatest(t1, 60_000, T0 + 2)).toBe(false);
+    expect(await g.isLatest(t2, 60_000, T0 + 2)).toBe(true);
+    expect(await g.isLatest(t1, 5, T0 + 16)).toBe(true); // burst (first at T0) older than the 5 ms timeout
   });
 });
 
