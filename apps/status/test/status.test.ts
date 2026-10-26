@@ -197,6 +197,27 @@ describe('end to end: forced probe failure -> incident on the public page', () =
   });
 });
 
+describe('trust details (audit UI-2, UI-9)', () => {
+  it('the footer year is the request-time year, never 1970 (the Worker clock is frozen at module scope)', async () => {
+    const year = String(new Date().getUTCFullYear());
+    for (const path of ['/', '/en']) {
+      const html = await (await get(path)).text();
+      expect(has(html, `© ${year}`)).toBe(true);
+      expect(has(html, '1970')).toBe(false);
+    }
+  });
+
+  it('HTML is no-transform, so the zone does not inject an analytics beacon the CSP blocks', async () => {
+    expect((await get('/en')).headers.get('cache-control')).toContain('no-transform');
+  });
+
+  it('probes a storefront product page on its own (UI-7)', () => {
+    expect(
+      COMPONENTS.some(c => c.id === 'storefront-product' && c.url.includes('/products/'))
+    ).toBe(true);
+  });
+});
+
 describe('manual incidents (authenticated POST)', () => {
   const post = (path: string, payload: unknown, secret?: string) =>
     worker.fetch(
