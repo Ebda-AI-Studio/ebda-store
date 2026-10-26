@@ -45,7 +45,15 @@ export const COMPARE_SLUGS = [
 ] as const;
 export type CompareSlug = (typeof COMPARE_SLUGS)[number];
 export type ComparePage = `compare/${CompareSlug}`;
-export type PageSlug = '' | 'about' | 'contact' | 'credits' | 'features' | ComparePage | LegalSlug;
+export type PageSlug =
+  | ''
+  | 'about'
+  | 'contact'
+  | 'credits'
+  | 'features'
+  | 'whatsapp'
+  | ComparePage
+  | LegalSlug;
 
 /** The comparison pages (/compare/{zid,shopify,wuilt,youcan,easyorders,expandcart}), as page slugs. */
 export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
@@ -56,6 +64,7 @@ export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
 export const SITE_PAGES = [
   '',
   'features',
+  'whatsapp',
   ...COMPARE_PAGES,
   'about',
   'contact',

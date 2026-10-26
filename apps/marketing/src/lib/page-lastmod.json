@@ -1,46 +1,50 @@
 {
   "home": {
-    "hash": "2a409c8adcd39b6a",
-    "date": "2026-10-25"
+    "hash": "d442c1471c0ada15",
+    "date": "2026-10-26"
   },
   "features": {
-    "hash": "eb131d5a1a54d706",
-    "date": "2026-10-24"
+    "hash": "d23e463c8424fa4b",
+    "date": "2026-10-26"
+  },
+  "whatsapp": {
+    "hash": "fd9e282b32b1decd",
+    "date": "2026-10-26"
   },
   "compare/zid": {
-    "hash": "f7ccffa3d821b340",
-    "date": "2026-10-24"
+    "hash": "14a2a80d4bac3819",
+    "date": "2026-10-26"
   },
   "compare/shopify": {
-    "hash": "02606da776b1e778",
-    "date": "2026-10-24"
+    "hash": "697d3c933dd8e43e",
+    "date": "2026-10-26"
   },
   "compare/wuilt": {
-    "hash": "9bff83d9d2eb5100",
-    "date": "2026-10-24"
+    "hash": "7bab27f2358c3b1e",
+    "date": "2026-10-26"
   },
   "compare/youcan": {
-    "hash": "ed4d05e4e4ba83c6",
-    "date": "2026-10-24"
+    "hash": "c6a27fd7a8b76617",
+    "date": "2026-10-26"
   },
   "compare/easyorders": {
-    "hash": "b5ac91755615d702",
-    "date": "2026-10-24"
+    "hash": "a80768e09b2396cc",
+    "date": "2026-10-26"
   },
   "compare/expandcart": {
-    "hash": "1d3132f49571b489",
-    "date": "2026-10-24"
+    "hash": "05d769cf101f0b8f",
+    "date": "2026-10-26"
   },
   "about": {
-    "hash": "ca22acf942c9d746",
-    "date": "2026-10-24"
+    "hash": "3c7b50ccd5980c08",
+    "date": "2026-10-26"
   },
   "contact": {
-    "hash": "809ea052ea7e9aeb",
-    "date": "2026-10-24"
+    "hash": "f55200d569de55cf",
+    "date": "2026-10-26"
   },
   "credits": {
-    "hash": "aad1c3043725e9f5",
-    "date": "2026-10-24"
+    "hash": "2653a466b492c916",
+    "date": "2026-10-26"
   }
 }

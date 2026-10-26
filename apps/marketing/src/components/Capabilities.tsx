@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { WhatsAppTeaser } from './WhatsAppPage';
 import { CAPABILITIES, FEATURES_PAGE, type CardId } from '../lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../lib/capability-registry';
 import { pagePath, type Locale } from '../lib/site';
@@ -71,6 +72,7 @@ export function HomeCapabilities({ locale }: { locale: Locale }) {
           {p.homeAll}
         </Link>
       </p>
+      <WhatsAppTeaser locale={locale} />
     </>
   );
 }

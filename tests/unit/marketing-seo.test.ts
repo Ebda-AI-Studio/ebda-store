@@ -123,24 +123,34 @@ describe('every page exports metadata with a canonical', () => {
       // The home pages inherit metadata from their locale layout.
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
       expect(meta, `${rel} must export metadata`).toBeTruthy();
-      // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher
-      expect(meta.title).toContain(isEn ? 'Ebda Store' : 'ابدأ ستور');
+      // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher. The /whatsapp page is
+      // the second product (Ebda WhatsApp): its own name, brand line and OG image, never the Store's.
+      const wa = page === 'whatsapp';
+      const product = wa
+        ? isEn
+          ? 'Ebda WhatsApp'
+          : 'ابدأ واتساب'
+        : isEn
+          ? 'Ebda Store'
+          : 'ابدأ ستور';
+      expect(meta.title).toContain(product);
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
       // brand disambiguation (not ebda3i.com or any other "Ebda"): the one brand line is in the OG
       // description; inner titles end in the short tail and stay SERP-length
       expect(meta.openGraph.description).toContain(
-        'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
+        wa
+          ? 'Ebda WhatsApp — ابدأ واتساب, by Ebda AI Studio (ebda.app)'
+          : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
       );
-      if (page)
-        expect(meta.title.endsWith(`| ${isEn ? 'Ebda Store' : 'ابدأ ستور'} (ebda.app)`)).toBe(true);
+      if (page) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
       expect(meta.title.length).toBeLessThanOrEqual(page ? 90 : 60);
       expect(meta.twitter.title).toBe(meta.title);
-      expect(meta.openGraph.siteName).toBe(isEn ? 'Ebda Store' : 'ابدأ ستور');
+      expect(meta.openGraph.siteName).toBe(product);
       expect(meta.description).toBeTruthy();
       expect(meta.alternates.canonical).toBe(pagePath(isEn ? 'en' : 'ar', page));
       expect(Object.keys(meta.alternates.languages).sort()).toEqual(['ar', 'en', 'x-default']);
-      expect(meta.openGraph.images[0].url).toBe('/og.png');
+      expect(meta.openGraph.images[0].url).toBe(wa ? '/og-whatsapp.png' : '/og.png');
       expect(meta.twitter.card).toBe('summary_large_image');
     });
   }

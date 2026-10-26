@@ -129,6 +129,7 @@ ol {
   border-bottom: 1px solid var(--line);
 }
 .header-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -156,10 +157,7 @@ html[lang='en'] .wm-name {
 .nav {
   flex: 1;
 }
-/* Products menu (BRAND-ARCH-1): a details disclosure, one entry per live product */
-.nav-products {
-  position: relative;
-}
+/* Products menu (BRAND-ARCH-1): a details disclosure, one card per live product (Ebda Store, Ebda WhatsApp) */
 .nav-products summary {
   cursor: pointer;
   list-style: none;
@@ -184,35 +182,76 @@ html[lang='en'] .wm-name {
 .nav-products summary:hover {
   color: var(--accent-text);
 }
+.nav-products > details[open] > summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+/* nav-products:start (generated from SITE_NAV_PANEL_CSS in packages/shared/src/brand; tests/unit/site-nav-shared.test.ts keeps it equal) */
+.nav-products {
+  position: relative;
+}
 .nav-products > details > ul {
   position: absolute;
-  inset-inline-start: 0;
-  top: calc(100% + 6px);
-  list-style: none;
-  margin: 0;
-  padding: 8px;
-  min-width: 240px;
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
+  inset-inline-start: -18px;
+  top: 100%;
   z-index: 60;
+  margin: 8px 0 0;
+  padding: 8px;
+  list-style: none;
+  width: min(340px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
-.nav-products > details > ul a {
+.nav-products li a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  min-height: 44px;
+  border-radius: 10px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.nav-products li a:hover,
+.nav-products li a:focus-visible {
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  color: var(--fg);
+}
+.np-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #0a0b0c;
+  color: #b08d57;
+}
+.np-txt {
   display: grid;
   gap: 2px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  min-height: 44px;
+  min-width: 0;
 }
-.nav-products > details > ul a:hover {
-  background: var(--raise);
+.np-txt b {
+  font-weight: 600;
+  line-height: 1.35;
 }
-.nav-products > details > ul span {
-  font-size: 0.85rem;
+.np-txt span {
   color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
+.menu-group > p {
+  margin: 0;
+  padding: 6px var(--np-inset, 10px);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+/* nav-products:end */
 .nav-links {
   display: none;
+  align-items: center;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -230,7 +269,14 @@ html[lang='en'] .wm-name {
   color: var(--accent-text);
 }
 .nav-menu {
-  position: relative;
+  /* phones: the panel anchors to the header row, so it stays inside the viewport at 360px in RTL and LTR */
+  position: static;
+}
+@media (min-width: 521px) {
+  /* wider: it opens right under its own button */
+  .nav-menu {
+    position: relative;
+  }
 }
 .nav-menu summary {
   cursor: pointer;
@@ -246,20 +292,42 @@ html[lang='en'] .wm-name {
 .nav-menu summary::-webkit-details-marker {
   display: none;
 }
-.nav-menu ul {
+.nav-menu > ul {
   position: absolute;
-  inset-inline-start: 0;
-  top: calc(100% + 8px);
+  inset-inline-start: 16px;
+  top: calc(100% + 4px);
   list-style: none;
   margin: 0;
   padding: 8px 14px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  min-width: 220px;
+  width: min(260px, calc(100vw - 32px));
+}
+@media (min-width: 521px) {
+  .nav-menu > ul {
+    inset-inline-start: 0;
+  }
 }
 .nav-menu li {
   padding: 6px 0;
+}
+.nav-menu .menu-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nav-menu .menu-group li {
+  padding: 0;
+}
+.nav-menu .menu-group a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 2px;
+}
+.nav-menu {
+  --np-inset: 2px;
 }
 .nav-menu .menu-login,
 .nav-menu .menu-lang {
@@ -369,6 +437,16 @@ html[lang='en'] .wm-name {
     height: 1px;
     overflow: hidden;
     clip: rect(0 0 0 0);
+  }
+}
+
+@media (max-width: 400px) {
+  /* 360px: wordmark + menu + WhatsApp + start must fit one row (the start button overflowed the viewport by 21px in Arabic) */
+  .wm-name {
+    max-width: 6.5rem;
+  }
+  .header-actions .btn {
+    padding: 0 10px;
   }
 }
 
@@ -2654,4 +2732,50 @@ html[dir='rtl'] .not-found .lead {
 .ai-flow p {
   margin: 0;
   color: var(--muted);
+}
+
+/* ---------- /whatsapp product page ---------- */
+.wa-feats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.wa-feats li {
+  padding-block: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.wa-feats h3 {
+  margin-bottom: 6px;
+}
+.wa-feats p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 68ch;
+}
+@media (min-width: 900px) {
+  .wa-feats {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 48px;
+  }
+}
+.wa-prose {
+  max-width: 68ch;
+}
+.wa-close .actions {
+  margin-bottom: 16px;
+}
+.wa-teaser {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  max-width: 68ch;
+}
+.wa-teaser p {
+  color: var(--muted);
+}
+.wa-teaser .actions {
+  margin-top: 4px;
 }

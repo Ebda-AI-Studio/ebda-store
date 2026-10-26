@@ -3,7 +3,12 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { renderStatusPage } from '../../apps/status/src/render';
-import { siteNavItems, siteNavLabels, siteNavProducts } from '../../packages/shared/src/brand';
+import {
+  SITE_NAV_PANEL_CSS,
+  siteNavItems,
+  siteNavLabels,
+  siteNavProducts,
+} from '../../packages/shared/src/brand';
 import { COPY } from '../../apps/marketing/src/lib/content';
 import type { Snapshot } from '../../apps/status/src/types';
 
@@ -59,19 +64,24 @@ describe('shared header nav on docs, help and status', () => {
         for (const [site, html] of Object.entries(pages())) {
           const nav = navOf(html);
           const desktop = links(nav.slice(0, nav.indexOf('<details class="nav-menu">')));
-          const store = siteNavProducts(lang)[0];
+          const prods = siteNavProducts(lang);
+          expect(prods.map(p => p.label)).toEqual(
+            lang === 'ar' ? ['ابدأ ستور', 'ابدأ واتساب'] : ['Ebda Store', 'Ebda WhatsApp']
+          );
           expect(
             desktop.map(l => l.href),
             site
-          ).toEqual([store.href, ...want.map(i => i.href)]);
-          expect(desktop.map(l => l.text).slice(1), site).toEqual(want.map(i => i.label));
+          ).toEqual([...prods.map(p => p.href), ...want.map(i => i.href)]);
+          expect(desktop.map(l => l.text).slice(prods.length), site).toEqual(
+            want.map(i => i.label)
+          );
           expect(nav).toContain(`<summary>${siteNavLabels(lang).products}</summary>`);
           // the mobile menu repeats every link
           const mobile = links(nav.slice(nav.indexOf('<details class="nav-menu">')));
           expect(
             mobile.map(l => l.href),
             site
-          ).toEqual([store.href, ...want.map(i => i.href)]);
+          ).toEqual([...prods.map(p => p.href), ...want.map(i => i.href)]);
         }
       });
 
@@ -95,6 +105,15 @@ describe('shared header nav on docs, help and status', () => {
       expect(siteNavLabels(lang).products).toBe(COPY[lang].nav.products);
       expect(siteNavLabels(lang).menu).toBe(COPY[lang].nav.menu);
       expect(siteNavProducts(lang)[0].blurb).toBe(COPY[lang].nav.storeBlurb);
+      expect(siteNavProducts(lang)[1].blurb).toBe(COPY[lang].nav.whatsappBlurb);
     }
+  });
+
+  it('the marketing globals.css carries the shared Products panel CSS verbatim (one design, two stylesheets)', () => {
+    const css = read('apps/marketing/src/app/globals.css');
+    const m = /nav-products:start \*\/([\s\S]*?)\/\* nav-products:end/.exec(css);
+    expect(m, 'the nav-products block markers').not.toBeNull();
+    const norm = (x: string) => x.replace(/\s+/g, '').replace(/;}/g, '}');
+    expect(norm(m![1])).toBe(norm(SITE_NAV_PANEL_CSS));
   });
 });

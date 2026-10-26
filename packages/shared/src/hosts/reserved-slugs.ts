@@ -34,6 +34,8 @@ export const RESERVED_SLUGS = [
   'hub',
   'id',
   'accounts',
+  // The R2 public bucket's custom domain (media.ebda.app): a platform host, never a store.
+  'media',
 ] as const;
 
 export type ReservedSlug = (typeof RESERVED_SLUGS)[number];
