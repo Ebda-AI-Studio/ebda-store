@@ -140,3 +140,7 @@ export const SEARCH_SOURCES: Record<Locale, { index: string; base: string }[]> =
     { index: `${docs}/search-index.en.json`, base: docs },
   ],
 };
+
+/** The search form's `data-sources` value: bracket-free (`index|base;index|base`) so the page text stays placeholder-clean. */
+export const sourcesAttr = (locale: Locale): string =>
+  SEARCH_SOURCES[locale].map(s => `${s.index}|${s.base}`).join(';');

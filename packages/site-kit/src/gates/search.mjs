@@ -37,6 +37,7 @@ export async function runSearchCheck({ root, name = 'site', cases, typeahead = [
         failed++;
         console.log(`FAIL ${c.page} status ${resp?.status()} (want ${c.status})`);
       }
+      if (c.click) await page.click(c.click); // a search that sits behind a button
       await page.focus(c.input ?? '#q');
       await page.keyboard.type(c.q);
       // Results refresh while typing: wait for the expected article (or time out and report what is there).
