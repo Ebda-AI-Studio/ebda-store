@@ -53,6 +53,13 @@ export interface CheckoutInput {
   paymentMethod?: string;
   currency?: string;
   idempotencyKey?: string;
+  /**
+   * The cart this checkout consumes (audit M-012 / P07). The cart is claimed in the SAME section as the order: the rows
+   * still in it must be exactly the ones the shopper priced (`items` + `bundles` counts), and they are deleted here, so a
+   * second concurrent checkout of the same cart (no key, or a different key) finds it empty and fails with CART_CHANGED
+   * instead of creating a second order.
+   */
+  cart?: { id: string; items: number; bundles: number };
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
@@ -242,6 +249,28 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           replayed: true,
         };
       }
+    }
+
+    if (input.cart) {
+      const owned = db.all('SELECT id FROM carts WHERE id = ? AND store_id = ?', [
+        input.cart.id,
+        input.storeId,
+      ])[0];
+      const live = (t: string) =>
+        db.all(`SELECT count(*) AS n FROM ${t} WHERE cart_id = ?`, [input.cart!.id])[0].n as number;
+      if (
+        !owned ||
+        live('cart_items') !== input.cart.items ||
+        live('cart_bundles') !== input.cart.bundles
+      )
+        throw new MoneyError(
+          'CART_CHANGED',
+          'The cart changed or was already checked out. Review it and try again.',
+          409
+        );
+      // counted above, deleted here: the section is single-writer, so nothing slips between the two
+      db.run('DELETE FROM cart_items WHERE cart_id = ?', [input.cart.id]);
+      db.run('DELETE FROM cart_bundles WHERE cart_id = ?', [input.cart.id]);
     }
 
     if (input.customerId) {
