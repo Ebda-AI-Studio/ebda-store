@@ -9398,7 +9398,12 @@
       "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
       "more": "Load more",
       "confirmRestoreTitle": "Restore this version?",
-      "restoreConfirmButton": "Restore"
+      "restoreConfirmButton": "Restore",
+      "by": {
+        "named": "by {name}",
+        "unknown": "by a team member"
+      },
+      "restoredFrom": "Restored from version {rev}"
     },
     "pages": {
       "label": "Page",

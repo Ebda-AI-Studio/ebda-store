@@ -17,6 +17,8 @@ interface Rev {
   note: string | null;
   createdAt: string;
   publishedAt: string | null;
+  publishedBy?: string | null;
+  publishedByName?: string | null;
 }
 
 export function RevisionsPanel({
@@ -100,7 +102,18 @@ export function RevisionsPanel({
                 dateStyle: 'medium',
                 timeStyle: 'short',
               })}
+              {r.publishedBy && (
+                <>
+                  {' · '}
+                  {r.publishedByName ? t('by.named', { name: r.publishedByName }) : t('by.unknown')}
+                </>
+              )}
             </p>
+            {r.note?.startsWith('rollback to rev ') && (
+              <p className="text-xs text-muted-foreground">
+                {t('restoredFrom', { rev: r.note.slice('rollback to rev '.length) })}
+              </p>
+            )}
           </li>
         ))}
       </ol>

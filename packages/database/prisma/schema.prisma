@@ -5297,23 +5297,28 @@ model BillingWebhookEvent {
 // stores.layout_settings through the adapter so every legacy reader keeps
 // working. Strict RLS (R-EBDA-001) in the same migration.
 model StorePageRevision {
-  id            String    @id @default(uuid())
-  storeId       String    @map("store_id")
-  pageKey       String    @map("page_key")
-  rev           Int
+  id              String    @id @default(uuid())
+  storeId         String    @map("store_id")
+  pageKey         String    @map("page_key")
+  rev             Int
   // draft | published | archived (CHECK constraint in the migration)
-  status        String
-  schemaVersion Int       @map("schema_version")
-  document      Json
-  docBytes      Int       @map("doc_bytes")
-  baseRev       Int?      @map("base_rev")
-  note          String?
+  status          String
+  schemaVersion   Int       @map("schema_version")
+  document        Json
+  docBytes        Int       @map("doc_bytes")
+  baseRev         Int?      @map("base_rev")
+  note            String?
   // User id of the editor. No FK: users are identity-keyed under RLS and an
   // erased user must not take a store's page history with them.
-  createdBy     String?   @map("created_by")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  publishedAt   DateTime? @map("published_at")
+  createdBy       String?   @map("created_by")
+  // Who made this revision live (publish, rollback, restore) and under what name AT THAT TIME. A name
+  // snapshot, not a join: history must not need a cross-user read, and it is merchant PII that is
+  // pseudonymised with the user on offboarding (OFFBOARD-1). No FK, like created_by.
+  publishedBy     String?   @map("published_by")
+  publishedByName String?   @map("published_by_name")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  publishedAt     DateTime? @map("published_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

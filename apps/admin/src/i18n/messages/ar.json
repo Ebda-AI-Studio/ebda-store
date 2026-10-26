@@ -9398,7 +9398,12 @@
       "confirmRestore": "إعادة نشر النسخة {rev}؟ سيتم استبدال المسودة الحالية.",
       "more": "تحميل المزيد",
       "confirmRestoreTitle": "ترجّع النسخة دي؟",
-      "restoreConfirmButton": "رجّع"
+      "restoreConfirmButton": "رجّع",
+      "by": {
+        "named": "بواسطة {name}",
+        "unknown": "بواسطة أحد أعضاء الفريق"
+      },
+      "restoredFrom": "مستعادة من النسخة {rev}"
     },
     "pages": {
       "label": "الصفحة",

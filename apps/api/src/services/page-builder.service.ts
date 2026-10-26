@@ -105,6 +105,8 @@ interface RevisionRow {
   baseRev: number | null;
   note: string | null;
   createdBy: string | null;
+  publishedBy: string | null;
+  publishedByName: string | null;
   createdAt: Date;
   updatedAt: Date;
   publishedAt: Date | null;
@@ -144,6 +146,8 @@ const META_SELECT = {
   baseRev: true,
   note: true,
   createdBy: true,
+  publishedBy: true,
+  publishedByName: true,
   createdAt: true,
   updatedAt: true,
   publishedAt: true,
@@ -507,6 +511,28 @@ function publishedThemeData(
   return { document: snapshotted as unknown as object, docBytes: docBytes(snapshotted) };
 }
 
+/**
+ * Who is publishing, as the history shows it. The name is a SNAPSHOT taken here, from the actor's own
+ * user row (visible under strict RLS because it is the acting user), so history never needs a
+ * cross-user read; it is merchant PII and is pseudonymised with the user on offboarding (OFFBOARD-1).
+ * A lookup failure never blocks a publish: the id is still recorded and the name stays null.
+ */
+async function publisherStamp(
+  userId: string | null
+): Promise<{ publishedBy: string | null; publishedByName: string | null }> {
+  if (!userId) return { publishedBy: null, publishedByName: null };
+  try {
+    const u = await prisma.user.findFirst({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
+    const name = u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : '';
+    return { publishedBy: userId, publishedByName: name || null };
+  } catch {
+    return { publishedBy: userId, publishedByName: null };
+  }
+}
+
 /** Promote `row` (or a fresh row) to published inside a savepoint; archive the old one. */
 async function promote(
   storeId: string,
@@ -633,12 +659,29 @@ async function applyPublishedLayout(
 }
 
 /** Exported for the purge-contract test. */
+/**
+ * Staleness class: NEVER-stale. Page content must be what the merchant just published, so the purge is
+ * EVENT invalidation on every publish path (publish, rollback, the legacy layout PUT, look apply) and
+ * clears every layer `bustStoreCaches` owns (Redis, in-memory, the `layout:<storeId>` Next tag). The
+ * storefront's 60 s revalidate is only a backstop, never the mechanism: a failed purge is therefore
+ * retried (3 attempts, short backoff) and, if it still fails, raised as an error log for alerting.
+ */
+const PURGE_ATTEMPTS = 3;
 export function purgePublishedCaches(storeId: string, slug: string, domain: string | null): void {
-  void deferAfterTenantCommit('page-builder.publish.purge', () =>
-    bustStoreCaches(storeId, slug, domain)
-  ).catch(err =>
-    // Bounded staleness on failure: the storefront fetch revalidates in 60s.
-    logger.error({ err, storeId }, '[page-builder] publish cache purge failed')
+  void deferAfterTenantCommit('page-builder.publish.purge', async () => {
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= PURGE_ATTEMPTS; attempt++) {
+      try {
+        await bustStoreCaches(storeId, slug, domain);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < PURGE_ATTEMPTS) await new Promise(r => setTimeout(r, 200 * attempt));
+      }
+    }
+    throw lastErr;
+  }).catch(err =>
+    logger.error({ err, storeId }, '[page-builder] publish cache purge failed after retries')
   );
 }
 
@@ -646,6 +689,7 @@ export async function publishDraft(args: {
   storeId: string;
   pageKey: string;
   baseRev: number;
+  userId?: string | null;
 }): Promise<ServiceResult<{ rev: number; layout: StoreLayoutSettings }>> {
   const { storeId, pageKey, baseRev } = args;
   const store = await loadStore(storeId);
@@ -682,12 +726,14 @@ export async function publishDraft(args: {
       errors: readinessErrors,
     };
 
+  const stamp = await publisherStamp(args.userId ?? null);
   const outcome = await promote(storeId, pageKey, async () => {
     const { count } = await prisma.storePageRevision.updateMany({
       where: { id: draft.id, storeId, rev: baseRev, status: 'draft' },
       data: {
         status: 'published',
         publishedAt: new Date(),
+        ...stamp,
         ...publishedThemeData(draft.document, store.theme, store.typography),
       },
     });
@@ -722,6 +768,7 @@ async function publishNewRevision(args: {
 }): Promise<'ok' | 'conflict'> {
   const { storeId, pageKey, definition } = args;
   const rev = args.baseRev + 1;
+  const stamp = await publisherStamp(args.userId);
   return promote(storeId, pageKey, async () => {
     if (args.archiveDraft)
       await prisma.storePageRevision.updateMany({
@@ -741,6 +788,7 @@ async function publishNewRevision(args: {
         note: args.note,
         createdBy: args.userId,
         publishedAt: new Date(),
+        ...stamp,
       },
     });
     await args.afterCreate?.(rev);
