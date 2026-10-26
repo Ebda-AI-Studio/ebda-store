@@ -7,14 +7,16 @@
  * or focus outside closes, opening one menu closes the other, a plain link click closes (a ctrl-click does not).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { fireEvent } from '@testing-library/react';
 import { SITE_NAV_JS } from '../../packages/shared/src/brand';
 import { renderStatusPage } from '../../apps/status/src/render';
 import { Header } from '../../apps/marketing/src/components/Header';
+// @ts-expect-error plain .mjs without types
+import { renderPage, writeSiteCss } from '../../packages/site-kit/src/build/shell.mjs';
 import type { Snapshot } from '../../apps/status/src/types';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -37,33 +39,46 @@ interface Site {
 }
 const sites: Site[] = [];
 
+/** A docs or help page through the SAME shell both builders use (apps/docs and apps/help call renderPage + writeSiteCss). */
+const shellPage = (app: 'docs' | 'help', lang: 'ar' | 'en') =>
+  renderPage({
+    lang,
+    title: app,
+    description: app,
+    canonical: `https://${app}.ebda.app/`,
+    siteLabel: app,
+    homeHref: '/',
+    active: app,
+    search: { action: '/search', label: 'Search', placeholder: 'Search' },
+    main: '<p>x</p>',
+    footer: '<footer></footer>',
+    skipLabel: 'Skip',
+  }) as string;
+
 beforeAll(() => {
+  const out = mkdtempSync(path.join(tmpdir(), 'site-nav-'));
+  writeSiteCss(out);
+  const written = readFileSync(path.join(out, 'assets', 'site-nav.js'), 'utf8');
   for (const app of ['docs', 'help'])
-    execFileSync('npm', ['run', 'build', '-w', `apps/${app}`], { cwd: ROOT, stdio: 'pipe' });
+    expect(read(`apps/${app}/scripts/build.mjs`), `${app} writes the shared assets`).toContain(
+      'writeSiteCss('
+    );
   for (const lang of ['ar', 'en'] as const) {
-    const docs = read('apps/docs/out', lang === 'ar' ? 'ar/index.html' : 'index.html');
-    const help = read('apps/help/out', lang === 'ar' ? 'index.html' : 'en/index.html');
-    const status = renderStatusPage(snap, lang, 'https://status.ebda.app');
     const marketing = renderToStaticMarkup(<Header locale={lang} page="" />);
+    const status = renderStatusPage(snap, lang, 'https://status.ebda.app');
+    for (const app of ['docs', 'help'] as const) {
+      const html = shellPage(app, lang);
+      sites.push({
+        name: app,
+        lang,
+        header: headerOf(html),
+        served: () => {
+          expect(html).toContain('<script src="/assets/site-nav.js" defer></script>');
+          expect(written).toBe(SITE_NAV_JS);
+        },
+      });
+    }
     sites.push(
-      {
-        name: 'docs',
-        lang,
-        header: headerOf(docs),
-        served: () => {
-          expect(docs).toContain('<script src="/assets/site-nav.js" defer></script>');
-          expect(read('apps/docs/out/assets/site-nav.js')).toBe(SITE_NAV_JS);
-        },
-      },
-      {
-        name: 'help',
-        lang,
-        header: headerOf(help),
-        served: () => {
-          expect(help).toContain('<script src="/assets/site-nav.js" defer></script>');
-          expect(read('apps/help/out/assets/site-nav.js')).toBe(SITE_NAV_JS);
-        },
-      },
       {
         name: 'status',
         lang,
@@ -87,7 +102,7 @@ beforeAll(() => {
       }
     );
   }
-}, 240_000);
+});
 
 describe('shared header-nav script', () => {
   it('has no framework, no eval and no network call', () => {
