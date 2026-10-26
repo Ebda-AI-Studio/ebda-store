@@ -527,6 +527,7 @@ export const COPY: Record<Locale, Copy> = {
         { name: 'Paymob', logo: 'paymob' },
         { name: 'Kashier', logo: 'kashier' },
         { name: 'FawryPay', logo: 'fawrypay' },
+        { name: 'Geidea' },
       ],
       shipLabel: 'الشحن',
       ship: [
@@ -924,6 +925,7 @@ export const COPY: Record<Locale, Copy> = {
         { name: 'Paymob', logo: 'paymob' },
         { name: 'Kashier', logo: 'kashier' },
         { name: 'FawryPay', logo: 'fawrypay' },
+        { name: 'Geidea' },
       ],
       shipLabel: 'Shipping',
       ship: [

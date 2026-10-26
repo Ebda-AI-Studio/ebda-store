@@ -145,6 +145,7 @@ export function getPaymentIcon(providerId: string): React.ReactNode {
     paymob: <CreditCardIcons />,
     kashier: <CreditCardIcons />,
     fawry: <FawryIcon />,
+    geidea: <BadgeIcon label="Geidea" />,
     payatfawry: <FawryIcon />,
     meeza: <MeezaIcon />,
     wallet: <WalletIcon />,

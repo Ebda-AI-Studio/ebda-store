@@ -37,7 +37,9 @@ const obj = (v: unknown): Record<string, unknown> =>
  * extractors below; tests/unit/provider-catalog.test.ts asserts the list equals the catalog's
  * non-manual payment providers, so a catalog entry cannot ship without its webhook wiring.
  */
-export const GATEWAY_WEBHOOK_PROVIDERS = ['paymob', 'kashier', 'fawry'] as const;
+// geidea: listed so its route exists, but its callback signature is undocumented: it carries NO
+// extractable signature (-> 401 MISSING_SIGNATURE) and its adapter refuses every delivery.
+export const GATEWAY_WEBHOOK_PROVIDERS = ['paymob', 'kashier', 'fawry', 'geidea'] as const;
 export type GatewayWebhookProvider = (typeof GATEWAY_WEBHOOK_PROVIDERS)[number];
 
 export function isGatewayWebhookProvider(p: string): p is GatewayWebhookProvider {

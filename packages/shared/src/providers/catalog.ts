@@ -113,6 +113,7 @@ export interface ProviderCatalogEntry {
 const PAYMOB_DOCS = 'https://developers.paymob.com/paymob-docs';
 const KASHIER_DOCS = 'https://developers.kashier.io';
 const FAWRY_DOCS = 'https://developer.fawrystaging.com';
+const GEIDEA_DOCS = 'https://docs.geidea.net';
 const BOSTA_DOCS = 'https://docs.bosta.co';
 const ARAMEX_DEVELOPERS = 'https://www.aramex.com/developers-solution-center/aramex-apis';
 const SHIPBLU_DOCS = 'https://docs.shipblu.com';
@@ -408,6 +409,65 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
         ar: 'ابعت الرابط ده لفريق فوري باي على إنه رابط الإشعارات (callback) بتاعك، وهما بيضبطوه على حسابك. وابدأ ستور كمان بيبعته مع كل طلب.',
       },
     },
+  },
+  {
+    code: 'geidea',
+    kind: 'payments',
+    name: { en: 'Geidea', ar: 'جيديا' },
+    logo: { monogram: 'G', color: '#E4002B' },
+    manual: false,
+    verified: false,
+    verification: {
+      sandboxVerifiedAt: null,
+      note: 'CREATION ONLY (PLANS-ALL-1). Built from docs.geidea.net/docs/geidea-checkout-v2 (read 2026-10-26): POST /payment-intent/api/v2/direct/session on api.merchant.geidea.net, Basic auth publicKey:apiPassword, base64(HMAC-SHA256(apiPassword, publicKey+amount(2dp)+currency+merchantReferenceId+timestamp)), responseCode 000 + session.id. NOT documented publicly, so NOT implemented and fail-closed: the server callback payload and its signature (every Geidea webhook is REFUSED until a real merchant or Geidea support confirms the format), order retrieval, refunds/voids, the Egypt hosted-page address (needs GEIDEA_HPP_BASE_URL, else createPayment fails closed), a harmless credential check (no Test connection call: the connection is unverified), the timestamp time zone (UTC assumed), a separate sandbox host (same host assumed). A Geidea payment can be created but is not auto-confirmed by Ebda Store yet.',
+    },
+    capabilities: {
+      methods: ['card'],
+      refunds: false,
+      partialRefunds: false,
+      webhooks: false,
+    },
+    fields: [
+      {
+        key: 'merchantPublicKey',
+        label: { en: 'Merchant public key', ar: 'المفتاح العام للتاجر (Merchant public key)' },
+        help: {
+          en: 'Identifies your Geidea merchant account (the Basic-auth user name).',
+          ar: 'بيعرّف حساب جيديا بتاعك (اسم المستخدم في التوثيق).',
+        },
+        whereToFind: {
+          en: 'Geidea merchant dashboard > Settings > API credentials (test and live differ). Ask Geidea support if you cannot see it.',
+          ar: 'لوحة جيديا للتاجر > Settings > API credentials (مفاتيح التجربة غير الحقيقية). اسأل دعم جيديا لو مش ظاهرلك.',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        bind: 'merchantId',
+      },
+      {
+        key: 'apiPassword',
+        label: { en: 'API password', ar: 'كلمة مرور الـ API (API password)' },
+        help: {
+          en: 'Signs every session request to Geidea. Keep it private.',
+          ar: 'بتوقّع كل طلب جلسة لجيديا. خليها سرية.',
+        },
+        whereToFind: {
+          en: 'Geidea merchant dashboard > Settings > API credentials, next to the public key.',
+          ar: 'لوحة جيديا للتاجر > Settings > API credentials، جنب المفتاح العام.',
+        },
+        secret: true,
+        type: 'string',
+        required: true,
+        maxLength: 300,
+        bind: 'apiKey',
+      },
+    ],
+    docs: {
+      overview: `${GEIDEA_DOCS}/`,
+      credentials: `${GEIDEA_DOCS}/docs/geidea-checkout-v2`,
+    },
+    webhook: null,
   },
   {
     code: 'cod',
