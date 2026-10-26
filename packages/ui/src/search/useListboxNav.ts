@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useId, useState, type KeyboardEvent } from 'react';
 
 export interface UseListboxNavOptions {
