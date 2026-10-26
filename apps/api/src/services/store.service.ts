@@ -49,6 +49,7 @@ import {
   assertPlanAllows,
   assertWithinLimit,
 } from './plan-limit.service';
+import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
 
@@ -645,12 +646,13 @@ export class StoreService {
     // owner still has other live stores would strand the paid period and re-parent the
     // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
     if (store.ownerId) {
-      const family = await withUser(store.ownerId, tx =>
-        tx.store.findMany({
-          where: { ownerId: store.ownerId!, deletedAt: null },
-          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          select: { id: true },
-        })
+      const family = sortOwnerStores(
+        await withUser(store.ownerId, tx =>
+          tx.store.findMany({
+            where: { ownerId: store.ownerId!, deletedAt: null },
+            select: { id: true, createdAt: true },
+          })
+        )
       );
       if (family.length > 1 && family[0].id === storeId) {
         throw new AppError(

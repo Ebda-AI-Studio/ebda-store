@@ -141,38 +141,50 @@ export async function runCompMigration(
     throw new Error('Growth plan is missing or unpriced; refusing to migrate');
   }
 
-  const store = await withStore(input.storeId, async tx => {
-    const s = await tx.store.findUnique({
-      where: { id: input.storeId },
-      select: { id: true, slug: true, domain: true },
+  const writeOnce = () =>
+    withStore(input.storeId, async tx => {
+      const s = await tx.store.findUnique({
+        where: { id: input.storeId },
+        select: { id: true, slug: true, domain: true },
+      });
+      if (!s) throw new Error('store not found');
+      // CAS: only a row still comped on a granted plan is written.
+      const hit = await tx.storeSubscription.updateMany({
+        where: { storeId: input.storeId, status: 'comped', planCode: plan.from.planCode },
+        data: {
+          planCode: COMP_MIGRATION_TARGET_PLAN,
+          status: 'active',
+          billingMethod: 'instapay',
+          billingInterval: interval,
+          currentPeriodStart: now,
+          currentPeriodEnd: input.coveredUntil,
+          cancelAtPeriodEnd: false,
+          // Comped-era leftovers must not survive: a stale pending plan would be quoted and
+          // applied instead of Growth (instapayDetails reads `pendingPlanCode ?? planCode`).
+          pendingPlanCode: null,
+          trialEndsAt: null,
+          nextRetryAt: null,
+          dunningAttempts: 0,
+          paymentReference: newPaymentReference(),
+          ordersOverLimitMonth: null,
+          ordersOverLimitNotifiedAt: null,
+        },
+      });
+      if (hit.count !== 1) return null; // someone else migrated it first: a no-op, not an error
+      await tx.store.update({ where: { id: input.storeId }, data: { plan: growth.featureTier } });
+      return s;
     });
-    if (!s) throw new Error('store not found');
-    // CAS: only a row still comped on a granted plan is written.
-    const hit = await tx.storeSubscription.updateMany({
-      where: { storeId: input.storeId, status: 'comped', planCode: plan.from.planCode },
-      data: {
-        planCode: COMP_MIGRATION_TARGET_PLAN,
-        status: 'active',
-        billingMethod: 'instapay',
-        billingInterval: interval,
-        currentPeriodStart: now,
-        currentPeriodEnd: input.coveredUntil,
-        cancelAtPeriodEnd: false,
-        // Comped-era leftovers must not survive: a stale pending plan would be quoted and
-        // applied instead of Growth (instapayDetails reads `pendingPlanCode ?? planCode`).
-        pendingPlanCode: null,
-        trialEndsAt: null,
-        nextRetryAt: null,
-        dunningAttempts: 0,
-        paymentReference: newPaymentReference(),
-        ordersOverLimitMonth: null,
-        ordersOverLimitNotifiedAt: null,
-      },
-    });
-    if (hit.count !== 1) return null; // someone else migrated it first: a no-op, not an error
-    await tx.store.update({ where: { id: input.storeId }, data: { plan: growth.featureTier } });
-    return s;
-  });
+  // A payment-reference unique collision (P2002) rolls the whole attempt back, so retrying with a
+  // fresh reference is safe and idempotent (the CAS still guards the row).
+  let store: Awaited<ReturnType<typeof writeOnce>> = null;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      store = await writeOnce();
+      break;
+    } catch (err) {
+      if ((err as { code?: string })?.code !== 'P2002' || attempt >= 4) throw err;
+    }
+  }
   if (!store) {
     return {
       plan: { action: 'noop', reason: 'already_migrated' },

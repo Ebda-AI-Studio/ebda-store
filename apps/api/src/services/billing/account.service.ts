@@ -42,7 +42,7 @@ import { getEntityStoreId, lookupStore } from '../../lib/definer';
 import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
-import { billingParentOf, childCoverage, isBillableStore } from './billing-parent';
+import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
 import { goLiveVerdict } from './go-live-verdict';
 import {
   chargeFor,
@@ -146,13 +146,15 @@ async function afterStatusChange(storeId: string): Promise<void> {
 
 /** Owner's stores, oldest first (the order that decides who is kept). */
 export async function ownerStores(ownerId: string) {
-  return withUser(ownerId, tx =>
+  // ONE ordering for "who is the parent": sortOwnerStores (billing-parent.ts), shared with
+  // assertOwnerMayCreateStore and the pure coverage predicate, never a second DB orderBy.
+  const rows = await withUser(ownerId, tx =>
     tx.store.findMany({
       where: { ownerId, deletedAt: null },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true, createdAt: true, status: true, billingSuspendedReason: true },
     })
   );
+  return sortOwnerStores(rows);
 }
 
 /**
