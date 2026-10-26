@@ -1740,6 +1740,10 @@ model Order {
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")
 
+  /// Checkout idempotency (audit M-012): sha256(sessionId|Idempotency-Key header) of the request that created this order, unique
+  /// per store. A retry of the same request returns this order instead of creating a second one. NOT the webhook key above.
+  checkoutIdempotencyKey String? @map("checkout_idempotency_key")
+
   // LEGACY (retained, unused since 2026-07-18). Formerly the dedupe stamp for
   // the always-on "Payment pending — follow up" stuck-payment sweep, which was
   // removed as a redundant duplicate of the `payment_abandonment` "Checkout
@@ -1838,6 +1842,7 @@ model Order {
   // Payment-gateway abandoners list (Enterprise).
   // Added 20260622130000.
   @@index([storeId, paymentGatewayAbandonedAt])
+  @@unique([storeId, checkoutIdempotencyKey], map: "orders_store_id_checkout_idempotency_key_key")
   // InstaPay expiry sweep: the awaiting orders whose hold has run out.
   @@index([paymentConfirmationExpiresAt])
   // Open-unpaid-hold admission uses separate contact (phone OR canonical

@@ -1257,7 +1257,11 @@ router.post(
         sessionId,
         orderData,
         undefined,
-        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null, buyer: buyerFromRequest(req) }
+        {
+          checkoutIp: ipKeyGenerator(req.ip ?? '') || null,
+          buyer: buyerFromRequest(req),
+          idempotencyKey: req.header('idempotency-key') ?? null,
+        }
       );
 
       res.status(201).json({

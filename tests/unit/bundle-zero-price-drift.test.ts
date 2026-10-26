@@ -150,9 +150,13 @@ const { mockPrisma } = vi.hoisted(() => ({
         coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         product: { update: vi.fn(), findUnique: vi.fn() },
         productVariant: { update: vi.fn(), findUnique: vi.fn() },
-        cartItem: { deleteMany: vi.fn() },
+        cartItem: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+          count: vi.fn().mockResolvedValue(0),
+        },
         cartBundle: {
-          deleteMany: vi.fn(),
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+          count: vi.fn().mockResolvedValue(1),
           findFirst: vi.fn().mockResolvedValue(null),
           create: vi.fn(),
           update: vi.fn(),

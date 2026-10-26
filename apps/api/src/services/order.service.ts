@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { orderSearchIds, ORDER_SEARCH_CUSTOMER_ID_CAP } from '../lib/order-search-ids';
 import { matchingCustomers, type CustomerMatches } from './admin-search.service';
 export {
@@ -134,6 +135,26 @@ export { assertValidTransition, VALID_ORDER_TRANSITIONS };
  * from this endpoint (refund results come back from the separate
  * POST /refund-via-provider response instead).
  */
+/** Thrown inside the checkout transaction when a concurrent request with the same key already created the order. */
+class CheckoutReplay extends Error {
+  constructor(readonly orderId: string) {
+    super('checkout replay');
+  }
+}
+
+const CHECKOUT_KEY_RE = /^[A-Za-z0-9._:-]{8,128}$/;
+/** sha256(session | key) or null when the client sent no key; a malformed key is a 400 (never silently ignored). */
+function checkoutIdempotencyHash(sessionId: string, key: string | null | undefined): string | null {
+  if (key === undefined || key === null || key === '') return null;
+  if (!CHECKOUT_KEY_RE.test(key))
+    throw new AppError(
+      400,
+      'INVALID_IDEMPOTENCY_KEY',
+      'Idempotency-Key must be 8 to 128 characters of letters, digits and . _ : -'
+    );
+  return createHash('sha256').update(`${sessionId}|${key}`).digest('hex');
+}
+
 const ORDER_PAYMENT_SELECT = {
   id: true,
   provider: true,
@@ -582,6 +603,25 @@ export class OrderService {
     return result;
   }
 
+  /** The order a previous request with this checkout key created, in the shape `create` returns; null when none. */
+  static async findCheckoutReplay(storeId: string, idemHash: string) {
+    const found = await prisma.order.findFirst({
+      where: { storeId, checkoutIdempotencyKey: idemHash },
+      select: { id: true },
+    });
+    return found ? OrderService.loadCreatedOrder(storeId, found.id) : null;
+  }
+
+  private static loadCreatedOrder(storeId: string, orderId: string) {
+    return prisma.order.findFirst({
+      where: { id: orderId, storeId },
+      include: {
+        items: true,
+        customer: { select: { id: true, email: true, firstName: true, lastName: true } },
+      },
+    });
+  }
+
   static async getByOrderNumber(storeId: string, orderNumberOrScan: string) {
     // Accepts the typed number or the scanned barcode digits (Ruling BARCODE-4).
     const orderNumber = orderNumberFromScan(orderNumberOrScan) ?? orderNumberOrScan;
@@ -647,6 +687,11 @@ export class OrderService {
     requestContext?: {
       checkoutIp?: string | null;
       /**
+       * The client's `Idempotency-Key` header for THIS checkout request (audit M-012). A retry of the same request (same session +
+       * key) returns the order the first one created instead of creating a second.
+       */
+      idempotencyKey?: string | null;
+      /**
        * Who this order is priced for (lib/buyer-identity.ts): the signed-in customer session, minted by the route via
        * `buyerFromRequest(req)`. Absent = anonymous (retail + public tiers), e.g. WhatsApp / MCP callers.
        */
@@ -696,6 +741,13 @@ export class OrderService {
           }
         : {}),
     };
+
+    // Checkout idempotency (audit M-012). The stored value is a hash of (session, key), so only the SAME session can replay a key.
+    const idemHash = checkoutIdempotencyHash(sessionId, requestContext?.idempotencyKey);
+    if (idemHash) {
+      const prior = await OrderService.findCheckoutReplay(storeId, idemHash);
+      if (prior) return prior;
+    }
 
     // Get cart
     // The lines are priced below with the REAL buyer; skip the cart service's own (anonymous) pricing pass, whose result was
@@ -1445,619 +1497,670 @@ export class OrderService {
     // SELECT … FOR UPDATE that held the row lock across the whole transaction
     // and serialized every checkout on a hot SKU (see
     // docs/superpowers/plans/2026-06-05-checkout-concurrency-scaling.md).
-    const order = await withMoneyTx(prisma, async (moneyTx: Prisma.TransactionClient) =>
-      // `scopeTransaction` sets the store on this transaction's own connection AND makes it
-      // the ambient tenant transaction, so the code-level tenant guard (R-EBDA-003) and the
-      // `prisma` proxy both see the store.
-      scopeTransaction(moneyTx, { storeId }, async (tx: Prisma.TransactionClient) => {
-        // Ruling B5-17: the gold rates this order was priced from must still be the current ones. Read
-        // FOR SHARE, so a rate write in flight is waited for and a committed one is seen: PRICE_CHANGED,
-        // never an order at the old rate.
-        await assertSameRates(tx, storeId, goldGate);
-        // Admission and stock reservation share one transaction. Full-wallet
-        // orders are already paid; a failed wallet debit below rolls back all work.
-        const manualHoldAdmitted =
-          !paidInFullByWallet && HOLD_CAPPED_PAYMENT_METHODS.has(data.paymentMethod);
-        // Ruling S4-1: every unpaid hold is counted, whatever label the client
-        // sent — gateway/unknown labels against the looser cap. Only
-        // `manualHoldAdmitted` (the tight-cap methods) unlocks COD/InstaPay later.
-        if (!paidInFullByWallet) {
-          await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
-            phone: data.shippingAddress.phone,
-            email:
-              typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
-            ip: requestContext?.checkoutIp ?? null,
-          });
-        }
-        // The public checkout (`POST /public/orders`) and the MCP `place_order`
-        // tool reach this with NO tenant context, and `backorder_lines` (written
-        // below for backordered lines) has a STRICT RLS policy: under `ebda_app`
-        // that insert is rejected and the whole order rolls back. Set the store
-        // on this transaction's own connection. Inert on the owner role; a
-        // no-op repeat when the caller's context already carried it.
-        // backorderedItems collects items where the pre-decrement inventory was
-        // insufficient and the inventory.backorder feature is enabled — these get
-        // a BackorderLine row created after the order is persisted (further down
-        // in this transaction). When the feature is disabled, out-of-stock items
-        // are rejected regardless of the per-product allowBackorder flag.
-        const backorderedItems: Array<{
-          productId: string;
-          variantId?: string;
-          quantity: number;
-          stockTaken: number;
-        }> = [];
+    let order: NonNullable<Awaited<ReturnType<typeof OrderService.loadCreatedOrder>>>;
+    try {
+      order = await withMoneyTx(prisma, async (moneyTx: Prisma.TransactionClient) =>
+        // `scopeTransaction` sets the store on this transaction's own connection AND makes it
+        // the ambient tenant transaction, so the code-level tenant guard (R-EBDA-003) and the
+        // `prisma` proxy both see the store.
+        scopeTransaction(moneyTx, { storeId }, async (tx: Prisma.TransactionClient) => {
+          // Ruling B5-17: the gold rates this order was priced from must still be the current ones. Read
+          // FOR SHARE, so a rate write in flight is waited for and a committed one is seen: PRICE_CHANGED,
+          // never an order at the old rate.
+          await assertSameRates(tx, storeId, goldGate);
+          // CLAIM THE CART (audit M-012): take the cart row lock, then re-read what is in it under the lock. The cart was read
+          // before this transaction; a concurrent submit of the same cart (double tap, timeout retry) would otherwise pass every
+          // check below on its own stale copy and create a second order. The loser blocks here until the winner commits, then
+          // finds the cart emptied (or the winner's order for its key) and rolls back before it touches stock or the wallet.
+          await tx.$queryRaw`SELECT id FROM carts WHERE id = ${cart.id} AND store_id = ${storeId} FOR UPDATE`;
+          if (idemHash) {
+            const winner = await tx.order.findFirst({
+              where: { storeId, checkoutIdempotencyKey: idemHash },
+              select: { id: true },
+            });
+            if (winner) throw new CheckoutReplay(winner.id);
+          }
+          const [liveItems, liveBundles] = await Promise.all([
+            tx.cartItem.count({ where: { cartId: cart.id } }),
+            tx.cartBundle.count({ where: { cartId: cart.id } }),
+          ]);
+          if (liveItems !== cart.items.length || liveBundles !== cartBundles.length)
+            throw new AppError(
+              409,
+              'CART_CHANGED',
+              'The cart changed or was already checked out. Review it and try again.'
+            );
+          // Admission and stock reservation share one transaction. Full-wallet
+          // orders are already paid; a failed wallet debit below rolls back all work.
+          const manualHoldAdmitted =
+            !paidInFullByWallet && HOLD_CAPPED_PAYMENT_METHODS.has(data.paymentMethod);
+          // Ruling S4-1: every unpaid hold is counted, whatever label the client
+          // sent — gateway/unknown labels against the looser cap. Only
+          // `manualHoldAdmitted` (the tight-cap methods) unlocks COD/InstaPay later.
+          if (!paidInFullByWallet) {
+            await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
+              phone: data.shippingAddress.phone,
+              email:
+                typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
+              ip: requestContext?.checkoutIp ?? null,
+            });
+          }
+          // The public checkout (`POST /public/orders`) and the MCP `place_order`
+          // tool reach this with NO tenant context, and `backorder_lines` (written
+          // below for backordered lines) has a STRICT RLS policy: under `ebda_app`
+          // that insert is rejected and the whole order rolls back. Set the store
+          // on this transaction's own connection. Inert on the owner role; a
+          // no-op repeat when the caller's context already carried it.
+          // backorderedItems collects items where the pre-decrement inventory was
+          // insufficient and the inventory.backorder feature is enabled — these get
+          // a BackorderLine row created after the order is persisted (further down
+          // in this transaction). When the feature is disabled, out-of-stock items
+          // are rejected regardless of the per-product allowBackorder flag.
+          const backorderedItems: Array<{
+            productId: string;
+            variantId?: string;
+            quantity: number;
+            stockTaken: number;
+          }> = [];
 
-        // Expand every cart bundle into its component OrderItem specs, ONE
-        // bundleGroupId per BOX (never per bundle-in-cart) so a single box can
-        // later be returned independently of any others of the same bundle in
-        // the same order. `allocated` was computed once per bundle above (pure
-        // function of `lines`+`price`), so it is simply re-read for every box —
-        // every box of the same bundle gets the identical per-line price/total.
-        interface BundleComponentLine {
-          productId: string;
-          variantId: string | null;
-          productName: string;
-          sku: string | null;
-          costPrice: number | null;
-          trackInventory: boolean;
-          quantity: number;
-          price: number;
-          total: number;
-          bundleId: string;
-          bundleGroupId: string;
-          bundleName: string;
-          bundleNameAr: string | null;
-        }
-        const bundleComponentLines: BundleComponentLine[] = [];
-        for (const { cartBundle, resolved, allocated } of bundleExpansions) {
-          for (let box = 0; box < cartBundle.quantity; box++) {
-            const bundleGroupId = randomUUID();
-            for (const line of allocated) {
-              // `line.key` is the BundleItem id (see resolveBundle) — joined
-              // back onto the raw component data fetched above.
-              //
-              // P2-3 (final review): the raw rows are read AFTER `resolveBundle`
-              // and BEFORE this transaction, and `PUT /stores/:id/bundles/:id`
-              // with `items` does a deleteMany + recreate that MINTS NEW
-              // BundleItem ids. A merchant saving an edit in that window made
-              // this lookup miss, and the non-null assertion turned it into a
-              // TypeError — an unhandled 500 on checkout, in code that is
-              // otherwise careful to answer 409. Refuse the same way every
-              // other "the bundle moved under us" case does; no order is
-              // created either way.
-              const bi = bundleItemById.get(line.key);
-              if (!bi) {
-                throw new AppError(
-                  409,
-                  'BUNDLE_NOT_PURCHASABLE',
-                  `"${resolved.name}" was just changed. Reload your cart and try again.`
-                );
+          // Expand every cart bundle into its component OrderItem specs, ONE
+          // bundleGroupId per BOX (never per bundle-in-cart) so a single box can
+          // later be returned independently of any others of the same bundle in
+          // the same order. `allocated` was computed once per bundle above (pure
+          // function of `lines`+`price`), so it is simply re-read for every box —
+          // every box of the same bundle gets the identical per-line price/total.
+          interface BundleComponentLine {
+            productId: string;
+            variantId: string | null;
+            productName: string;
+            sku: string | null;
+            costPrice: number | null;
+            trackInventory: boolean;
+            quantity: number;
+            price: number;
+            total: number;
+            bundleId: string;
+            bundleGroupId: string;
+            bundleName: string;
+            bundleNameAr: string | null;
+          }
+          const bundleComponentLines: BundleComponentLine[] = [];
+          for (const { cartBundle, resolved, allocated } of bundleExpansions) {
+            for (let box = 0; box < cartBundle.quantity; box++) {
+              const bundleGroupId = randomUUID();
+              for (const line of allocated) {
+                // `line.key` is the BundleItem id (see resolveBundle) — joined
+                // back onto the raw component data fetched above.
+                //
+                // P2-3 (final review): the raw rows are read AFTER `resolveBundle`
+                // and BEFORE this transaction, and `PUT /stores/:id/bundles/:id`
+                // with `items` does a deleteMany + recreate that MINTS NEW
+                // BundleItem ids. A merchant saving an edit in that window made
+                // this lookup miss, and the non-null assertion turned it into a
+                // TypeError — an unhandled 500 on checkout, in code that is
+                // otherwise careful to answer 409. Refuse the same way every
+                // other "the bundle moved under us" case does; no order is
+                // created either way.
+                const bi = bundleItemById.get(line.key);
+                if (!bi) {
+                  throw new AppError(
+                    409,
+                    'BUNDLE_NOT_PURCHASABLE',
+                    `"${resolved.name}" was just changed. Reload your cart and try again.`
+                  );
+                }
+                bundleComponentLines.push({
+                  productId: bi.productId,
+                  variantId: bi.variantId,
+                  productName: bi.product.name,
+                  sku: bi.product.sku,
+                  costPrice: bi.variant?.costPrice ?? bi.product.costPrice ?? null,
+                  trackInventory: bi.product.trackInventory,
+                  quantity: bi.quantity,
+                  price: line.unitAllocated,
+                  total: line.totalAllocated,
+                  bundleId: resolved.id,
+                  bundleGroupId,
+                  bundleName: resolved.name,
+                  bundleNameAr: resolved.nameAr,
+                });
               }
-              bundleComponentLines.push({
-                productId: bi.productId,
-                variantId: bi.variantId,
-                productName: bi.product.name,
-                sku: bi.product.sku,
-                costPrice: bi.variant?.costPrice ?? bi.product.costPrice ?? null,
-                trackInventory: bi.product.trackInventory,
-                quantity: bi.quantity,
-                price: line.unitAllocated,
-                total: line.totalAllocated,
-                bundleId: resolved.id,
-                bundleGroupId,
-                bundleName: resolved.name,
-                bundleNameAr: resolved.nameAr,
-              });
             }
           }
-        }
 
-        // Shared atomic check + decrement, used by BOTH loose cart items and
-        // every bundle component line below — one code path, not two. A
-        // conditional `UPDATE … WHERE inventory >= qty` does the oversell guard
-        // AND the decrement in ONE statement, so there is no SELECT … FOR
-        // UPDATE held across the rest of this multi-step order transaction
-        // (which under a single-SKU flash-sale storm serialized every checkout
-        // on the row lock). A losing concurrent writer sees 0 rows affected →
-        // INSUFFICIENT_INVENTORY (or backorder), never an oversell.
-        //
-        // RULING T5-c: this is also how COMBINED demand across loose items and
-        // every bundle's expansion is enforced. There is no separate
-        // "sum demand then check" pass — every call below runs sequentially,
-        // in this one transaction, against Postgres's actual current row
-        // value. Two bundles sharing a component (or a bundle plus a loose
-        // item of the same product) each call this once, in order; the second
-        // call always sees the stock the first call already consumed, so
-        // jointly-oversold demand fails on whichever call runs second — and
-        // because it throws, the WHOLE transaction (including the first
-        // call's decrement) rolls back. Checking each bundle's availability
-        // against a shared pre-transaction snapshot (what the cart itself
-        // does, independently, for cart-side warnings) is exactly what this
-        // must NOT do for the actual oversell guard.
-        const decrementTrackedStock = async (target: {
-          productId: string;
-          variantId?: string | null;
-          quantity: number;
-          label: string;
-        }): Promise<{ previousStock: number; newStock: number }> => {
-          const { productId, quantity: qty, label } = target;
-          const variantId = target.variantId ?? undefined;
+          // Shared atomic check + decrement, used by BOTH loose cart items and
+          // every bundle component line below — one code path, not two. A
+          // conditional `UPDATE … WHERE inventory >= qty` does the oversell guard
+          // AND the decrement in ONE statement, so there is no SELECT … FOR
+          // UPDATE held across the rest of this multi-step order transaction
+          // (which under a single-SKU flash-sale storm serialized every checkout
+          // on the row lock). A losing concurrent writer sees 0 rows affected →
+          // INSUFFICIENT_INVENTORY (or backorder), never an oversell.
+          //
+          // RULING T5-c: this is also how COMBINED demand across loose items and
+          // every bundle's expansion is enforced. There is no separate
+          // "sum demand then check" pass — every call below runs sequentially,
+          // in this one transaction, against Postgres's actual current row
+          // value. Two bundles sharing a component (or a bundle plus a loose
+          // item of the same product) each call this once, in order; the second
+          // call always sees the stock the first call already consumed, so
+          // jointly-oversold demand fails on whichever call runs second — and
+          // because it throws, the WHOLE transaction (including the first
+          // call's decrement) rolls back. Checking each bundle's availability
+          // against a shared pre-transaction snapshot (what the cart itself
+          // does, independently, for cart-side warnings) is exactly what this
+          // must NOT do for the actual oversell guard.
+          const decrementTrackedStock = async (target: {
+            productId: string;
+            variantId?: string | null;
+            quantity: number;
+            label: string;
+          }): Promise<{ previousStock: number; newStock: number }> => {
+            const { productId, quantity: qty, label } = target;
+            const variantId = target.variantId ?? undefined;
 
-          let res = variantId
-            ? await decrementVariantInventory(tx, variantId, qty)
-            : await decrementProductInventory(tx, productId, qty);
+            let res = variantId
+              ? await decrementVariantInventory(tx, variantId, qty)
+              : await decrementProductInventory(tx, productId, qty);
 
-          if (!res.ok) {
-            // Insufficient stock — accept ONLY when BOTH the store feature flag
-            // and the per-product/variant allowBackorder flag are set (the same
-            // dual-check as before: a disabled feature must never silently
-            // backorder just because the per-product flag is on). Fetched fresh
-            // to match the prior FOR UPDATE behavior, only on the rare miss path.
-            // A variant inherits the product's flag: the shared rule
-            // (`lineAllowsBackorder`, X-02 fix round), the same one the cart and
-            // the storefront's pre-order label use.
-            const productFlags = await tx.product.findUnique({
-              where: { id: productId, storeId },
-              select: { allowBackorder: true },
-            });
-            const variantFlags = variantId
-              ? await tx.productVariant.findUnique({
-                  where: { id: variantId },
-                  select: { allowBackorder: true },
-                })
-              : null;
-            if (
-              !productFlags ||
-              !lineAllowsBackorder(productFlags, variantFlags, backorderFeatureEnabled)
-            ) {
-              throw new AppError(
-                400,
-                'INSUFFICIENT_INVENTORY',
-                `Not enough inventory for ${label}`
-              );
-            }
-            // Backorder accepted — force the decrement + track for
-            // BackorderLine creation below. Variant lines floor at 0 so the
-            // admin grid never shows a negative. A NON-variant product's
-            // negative inventory is a real, meaningful backorder debt, so its
-            // decrement stays unfloored (inlined here rather than kept as an
-            // exported helper — see inventory-decrement.ts's module comment for
-            // why an exported one was a hazard).
-            if (variantId) {
-              res = await forceDecrementVariantInventory(tx, variantId, qty);
-            } else {
-              const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
+            if (!res.ok) {
+              // Insufficient stock — accept ONLY when BOTH the store feature flag
+              // and the per-product/variant allowBackorder flag are set (the same
+              // dual-check as before: a disabled feature must never silently
+              // backorder just because the per-product flag is on). Fetched fresh
+              // to match the prior FOR UPDATE behavior, only on the rare miss path.
+              // A variant inherits the product's flag: the shared rule
+              // (`lineAllowsBackorder`, X-02 fix round), the same one the cart and
+              // the storefront's pre-order label use.
+              const productFlags = await tx.product.findUnique({
+                where: { id: productId, storeId },
+                select: { allowBackorder: true },
+              });
+              const variantFlags = variantId
+                ? await tx.productVariant.findUnique({
+                    where: { id: variantId },
+                    select: { allowBackorder: true },
+                  })
+                : null;
+              if (
+                !productFlags ||
+                !lineAllowsBackorder(productFlags, variantFlags, backorderFeatureEnabled)
+              ) {
+                throw new AppError(
+                  400,
+                  'INSUFFICIENT_INVENTORY',
+                  `Not enough inventory for ${label}`
+                );
+              }
+              // Backorder accepted — force the decrement + track for
+              // BackorderLine creation below. Variant lines floor at 0 so the
+              // admin grid never shows a negative. A NON-variant product's
+              // negative inventory is a real, meaningful backorder debt, so its
+              // decrement stays unfloored (inlined here rather than kept as an
+              // exported helper — see inventory-decrement.ts's module comment for
+              // why an exported one was a hazard).
+              if (variantId) {
+                res = await forceDecrementVariantInventory(tx, variantId, qty);
+              } else {
+                const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
               UPDATE public.products SET inventory = inventory - ${qty}
               WHERE id = ${productId}
               RETURNING inventory
             `;
-              const newStock = row?.inventory ?? 0;
-              res = { ok: true, previousStock: newStock + qty, newStock };
+                const newStock = row?.inventory ?? 0;
+                res = { ok: true, previousStock: newStock + qty, newStock };
+              }
+              // What checkout actually took from stock (#2299): all of it for a
+              // non-variant row (the rest is negative debt), only what was on hand
+              // for a variant row (floored at 0). The whole-order restore gives
+              // back no more than this.
+              backorderedItems.push({
+                productId,
+                variantId,
+                quantity: qty,
+                stockTaken: Math.max(0, res.previousStock - res.newStock),
+              });
             }
-            // What checkout actually took from stock (#2299): all of it for a
-            // non-variant row (the rest is negative debt), only what was on hand
-            // for a variant row (floored at 0). The whole-order restore gives
-            // back no more than this.
-            backorderedItems.push({
-              productId,
+            return { previousStock: res.previousStock, newStock: res.newStock };
+          };
+
+          // Atomic check + decrement per tracked item. A variant item decrements
+          // ONLY the variant row and a variant-less item ONLY the product row —
+          // never both (see lib/effective-inventory.ts for why the parent column
+          // is not stock for a variant product). The InventoryHistory row is
+          // keyed on productId, so for a variant line its pre/post stock
+          // describe the variant's movement; that is the movement that actually
+          // occurred.
+          const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
+          for (const item of cart.items) {
+            // No `?? true` fallback: presence is guaranteed by the guard above.
+            if (!productInternalsById.get(item.productId)!.trackInventory) continue;
+            const qty = item.quantity;
+            const variantId = (item as { variantId?: string }).variantId;
+            const lineKey = `${item.productId}::${variantId ?? ''}`;
+
+            const stockChange = await decrementTrackedStock({
+              productId: item.productId,
               variantId,
               quantity: qty,
-              stockTaken: Math.max(0, res.previousStock - res.newStock),
+              label: `${item.product.name}${variantId ? ' (variant)' : ''}`,
             });
+
+            // ONE row per line. A variant sale moves the variant's stock and
+            // nothing else — `products.inventory` is not a running total for a
+            // variant product, it is unused (held at 0). Mirroring the sale onto
+            // the parent is what drove that column negative across the catalogue
+            // (24 products, to -16) and made six read paths report a permanent,
+            // un-clearable "out of stock". The InventoryHistory row below is keyed
+            // on productId (the table has no variantId column), so for a variant
+            // line its previous/new stock describe the VARIANT's movement — which
+            // is the movement that actually happened.
+            stockChanges.set(lineKey, stockChange);
           }
-          return { previousStock: res.previousStock, newStock: res.newStock };
-        };
 
-        // Atomic check + decrement per tracked item. A variant item decrements
-        // ONLY the variant row and a variant-less item ONLY the product row —
-        // never both (see lib/effective-inventory.ts for why the parent column
-        // is not stock for a variant product). The InventoryHistory row is
-        // keyed on productId, so for a variant line its pre/post stock
-        // describe the variant's movement; that is the movement that actually
-        // occurred.
-        const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
-        for (const item of cart.items) {
-          // No `?? true` fallback: presence is guaranteed by the guard above.
-          if (!productInternalsById.get(item.productId)!.trackInventory) continue;
-          const qty = item.quantity;
-          const variantId = (item as { variantId?: string }).variantId;
-          const lineKey = `${item.productId}::${variantId ?? ''}`;
-
-          const stockChange = await decrementTrackedStock({
-            productId: item.productId,
-            variantId,
-            quantity: qty,
-            label: `${item.product.name}${variantId ? ' (variant)' : ''}`,
-          });
-
-          // ONE row per line. A variant sale moves the variant's stock and
-          // nothing else — `products.inventory` is not a running total for a
-          // variant product, it is unused (held at 0). Mirroring the sale onto
-          // the parent is what drove that column negative across the catalogue
-          // (24 products, to -16) and made six read paths report a permanent,
-          // un-clearable "out of stock". The InventoryHistory row below is keyed
-          // on productId (the table has no variantId column), so for a variant
-          // line its previous/new stock describe the VARIANT's movement — which
-          // is the movement that actually happened.
-          stockChanges.set(lineKey, stockChange);
-        }
-
-        // Same decrement path, for every bundle component line built above.
-        // Runs AFTER the loose-item loop, in the SAME transaction — see the
-        // Ruling T5-c note on `decrementTrackedStock` above for why this
-        // ordering is what makes combined demand (a shared component across
-        // bundles, or a bundle plus a loose item of the same product) refuse
-        // correctly rather than overselling. Keyed by array index (not
-        // productId/variantId) because, unlike loose cart items, the SAME
-        // product/variant can legitimately appear on multiple lines here (two
-        // boxes of the same bundle, or two different bundles sharing a
-        // component) — each needs its OWN InventoryHistory row.
-        const bundleStockChanges: Array<{ previousStock: number; newStock: number } | null> = [];
-        for (const line of bundleComponentLines) {
-          if (!line.trackInventory) {
-            bundleStockChanges.push(null);
-            continue;
-          }
-          const stockChange = await decrementTrackedStock({
-            productId: line.productId,
-            variantId: line.variantId,
-            quantity: line.quantity,
-            label: `${line.productName} (component of "${line.bundleName}")`,
-          });
-          bundleStockChanges.push(stockChange);
-        }
-
-        // Per-customer coupon usage limit (money-integrity audit F3-adjacent
-        // gap, 2026-07-02: `usageLimitPerUser` was collected + stored but
-        // never enforced — only the store-wide `usageLimit` was). Count this
-        // customer's PRIOR orders that redeemed the same coupon and reject
-        // once they've reached the cap, mirroring the global-limit check's
-        // semantics: an order only "counts" while it hasn't been
-        // cancelled/refunded, because `applyRefundEffects`/`updateStatus`
-        // decrement `Coupon.usageCount` back on those two statuses (see
-        // order.service.ts ~1164-1171, ~733-737) — so a cancelled/refunded
-        // order shouldn't count against the per-user cap either.
-        //
-        // Identify the customer the same way the rest of the order code does
-        // (see aggregateCustomers in customers.routes.ts): registered
-        // customers by `customerId`; guests by shipping-address email/phone
-        // (JSON path match, same field names/precedent as the customer
-        // detail lookup in customers.routes.ts). A guest checkout with
-        // NEITHER an email nor a phone on the shipping address has no stable identity: such a guest is REFUSED the
-        // coupon (COUPON_NEEDS_CONTACT, 2026-10-25; it used to be waved through, which made the coupon unlimited).
-        if (
-          appliedCoupon &&
-          couponApplied &&
-          appliedCoupon.usageLimitPerUser &&
-          appliedCoupon.usageLimitPerUser > 0
-        ) {
-          // Guests are identified by E.164 phone / lowercased email, counted under an advisory lock in this same
-          // transaction (lib/coupon-per-customer-limit.ts); an unidentifiable guest is refused, not waved through.
-          const priorUsageCount = await countPriorCouponUses(
-            tx as unknown as CouponLimitTx,
-            storeId,
-            appliedCoupon.code,
-            {
-              customerId,
-              email:
-                typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
-              phone:
-                typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null,
+          // Same decrement path, for every bundle component line built above.
+          // Runs AFTER the loose-item loop, in the SAME transaction — see the
+          // Ruling T5-c note on `decrementTrackedStock` above for why this
+          // ordering is what makes combined demand (a shared component across
+          // bundles, or a bundle plus a loose item of the same product) refuse
+          // correctly rather than overselling. Keyed by array index (not
+          // productId/variantId) because, unlike loose cart items, the SAME
+          // product/variant can legitimately appear on multiple lines here (two
+          // boxes of the same bundle, or two different bundles sharing a
+          // component) — each needs its OWN InventoryHistory row.
+          const bundleStockChanges: Array<{ previousStock: number; newStock: number } | null> = [];
+          for (const line of bundleComponentLines) {
+            if (!line.trackInventory) {
+              bundleStockChanges.push(null);
+              continue;
             }
-          );
-          if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
-            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
-          }
-        }
-
-        // Atomically reserve a coupon redemption before creating the order so
-        // that two concurrent checkouts can't both slip past a usage limit by
-        // reading the same stale count. updateMany with a usageCount < limit
-        // guard updates zero rows when the limit is reached, which we detect
-        // via `count === 0` and roll back by throwing.
-        if (appliedCoupon && couponApplied) {
-          const reserve = await tx.coupon.updateMany({
-            where: {
-              id: appliedCoupon.id,
-              storeId,
-              isActive: true,
-              ...(appliedCoupon.usageLimit ? { usageCount: { lt: appliedCoupon.usageLimit } } : {}),
-            },
-            data: { usageCount: { increment: 1 } },
-          });
-          if (reserve.count === 0) {
-            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
-          }
-        }
-
-        // Create order
-        const newOrder = await tx.order.create({
-          data: {
-            storeId,
-            customerId,
-            orderNumber,
-            // A fully wallet-paid order has no gateway step to wait for — it is
-            // created paid, the same end state a completed gateway webhook
-            // leaves (payment-confirm.service: confirmed + paid).
-            status: paidInFullByWallet ? 'confirmed' : 'pending',
-            ...(paidInFullByWallet ? { paymentStatus: 'paid' as const } : {}),
-            walletAmount,
-            subtotal,
-            tax,
-            // Which convention `tax` was charged under, frozen onto the order.
-            // Every consumer of `order.tax` (GL posting, refund allocation) must
-            // know whether it is inside `subtotal`/`total` or on top of them, and
-            // the store-level switch it came from can be flipped afterwards.
-            taxIncludedInPrice: activeTax.includedInPrice,
-            // Seller TRN / legal name / rate frozen for the tax invoice — only
-            // when VAT was collected under a VERIFIED profile (ruling TAX-2).
-            ...frozenTaxInvoiceFields(activeTax),
-            shipping,
-            codFee,
-            taxableAmount,
-            discount,
-            // Persist the coupon fields ONLY when the coupon actually applied.
-            // If a promotion out-discounted the coupon it was not consumed (no
-            // usageCount increment above); leaving its code/discount on the order
-            // would make the per-user usage count over-count and the
-            // payment-failure rollback decrement a redemption that was never
-            // reserved. free_shipping coupons keep their code with a 0 discount,
-            // exactly as before.
-            couponCode: couponApplied ? (appliedCoupon?.code ?? null) : null,
-            couponDiscount: couponApplied ? couponDiscount : 0,
-            // Store the promotion discount that actually applied (mirrors the
-            // coupon gating). When the coupon out-discounted the promotion,
-            // `appliedPromotionId` is null and no promotion discount is recorded,
-            // so the persisted couponDiscount + promotionDiscount + loyaltyDiscount
-            // reconciles to `discount` in every non-tie case.
-            promotionDiscount: appliedPromotionId ? promotionDiscount : 0,
-            appliedPromotionId,
-            // Reporting-only, like couponDiscount/promotionDiscount above — the
-            // saving is already reflected in a LOWER `subtotal` (bundles are
-            // priced at `bundlePrice`, not `componentSum`), so this is never
-            // added again into `discount`/`total`.
-            bundleDiscount,
-            // Name of the group whose price applied, snapshotted so a renamed / deleted group never rewrites history.
-            priceGroupName: groupPriceApplied ? resolver.groupName : null,
-            loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
-            loyaltyDiscount,
-            total,
-            locale: data.locale ?? null,
-            smsOptIn: data.smsOptIn ?? false,
-            source: data.source ?? 'web',
-            // Stock-hold cap signal (lib/stock-hold-cap.ts) — never read for
-            // anything else. NULL when the caller passed none.
-            checkoutIp: requestContext?.checkoutIp ?? null,
-            manualHoldAdmitted,
-            shippingAddress: data.shippingAddress,
-            billingAddress: data.billingAddress || data.shippingAddress,
-            notes: orderNotes,
-            items: {
-              create: [
-                ...cart.items.map(item => ({
-                  productId: item.productId,
-                  // Persist the variant link onto OrderItem. Without this,
-                  // `updateStatus(cancel/refund)`, `rollbackForPaymentFailure`,
-                  // and `ReturnService.complete` all read OrderItem.variantId
-                  // to restore variant inventory — and always saw null.
-                  // Variant stock drifted every cancel/refund. CartItem
-                  // already carries variantId; we just have to copy it.
-                  variantId: (item as { variantId?: string | null }).variantId ?? null,
-                  productName: item.product.name,
-                  // Snapshot the chosen variant's title in BOTH languages (Ruling
-                  // B0-41): `variantName` stays the canonical title every fiscal
-                  // document, CSV export and pre-B0 reader expects; `variantNameAr`
-                  // is what the Arabic storefront and admin render (falling back
-                  // to `variantName`). Storefront orders never wrote it before, so
-                  // admin/invoice/email showed no size or colour for a variant
-                  // line; createAdminOrder already did.
-                  variantName: item.variant?.title ?? null,
-                  variantNameAr: item.variant?.titleAr || null,
-                  // The customer's personalisation text (cart line note).
-                  personalisation: item.note ?? null,
-                  sku: item.product.sku,
-                  quantity: item.quantity,
-                  // Charge the chosen variant's price (fall back to the parent
-                  // product for variant-less products). Persisting product.price
-                  // here undercharged every variant at the parent (lowest) price.
-                  price: lineUnit(item).unitMinor,
-                  // How a gold line's price was made (Ruling B5-17): refunds read `price`, this is for display and audit.
-                  ...(goldGate.snapshots.has(item.id)
-                    ? { goldSnapshot: goldGate.snapshots.get(item.id) as Prisma.InputJsonValue }
-                    : {}),
-                  // Price provenance snapshot (Ruling B2B-3b): invoices, returns and analytics read these and never
-                  // re-resolve a price. A pre-B2B order has NULLs, which read as 'base'.
-                  ...priceSnapshot(lineUnit(item)),
-                  // Snapshot cost-of-goods at sale time so profit reports
-                  // stay correct even if the product's cost changes later.
-                  // A variant line takes the variant's own cost, falling back
-                  // to the parent product's (same rule as account.service's
-                  // inventory valuation and lib/order-line-cost.ts).
-                  costPrice: lineUnitCost(
-                    productInternalsById.get(item.productId),
-                    (item as { variantId?: string | null }).variantId
-                  ),
-                  total: lineUnit(item).unitMinor * item.quantity,
-                })),
-                // Every bundle box's components, appended to the SAME array the
-                // loose cart items build above — ordinary product lines from
-                // here on, with no bundle-aware code anywhere downstream
-                // (stock, scan-to-pick, returns, backorders, per-line COGS all
-                // already work off OrderItem).
-                ...bundleComponentLines.map(line => ({
-                  productId: line.productId,
-                  variantId: line.variantId,
-                  productName: line.productName,
-                  sku: line.sku,
-                  quantity: line.quantity,
-                  price: line.price,
-                  costPrice: line.costPrice,
-                  total: line.total,
-                  bundleId: line.bundleId,
-                  bundleGroupId: line.bundleGroupId,
-                  bundleName: line.bundleName,
-                  bundleNameAr: line.bundleNameAr,
-                })),
-              ],
-            },
-          },
-          include: {
-            items: true,
-            customer: {
-              select: { id: true, email: true, firstName: true, lastName: true },
-            },
-          },
-        });
-
-        // Record inventory history. The decrement already happened atomically in
-        // the loop above (stockChanges holds the accurate pre/post PRODUCT stock
-        // per line); here we only write the ledger, atomic with the order via the
-        // same transaction, using newOrder.id as the reference (DB-010). Collected
-        // and written as a single createMany instead of one create() per line item.
-        const inventoryHistoryRows = cart.items.flatMap(item => {
-          // No `?? true` fallback: presence is guaranteed by the guard above.
-          if (!productInternalsById.get(item.productId)!.trackInventory) return [];
-          const variantId = (item as { variantId?: string }).variantId;
-          const sc = stockChanges.get(`${item.productId}::${variantId ?? ''}`);
-          if (!sc) return [];
-          return [
-            {
-              productId: item.productId,
-              storeId,
-              type: 'sale' as const,
-              quantity: -item.quantity,
-              previousStock: sc.previousStock,
-              newStock: sc.newStock,
-              reason: 'Sold via order',
-              reference: newOrder.id,
-            },
-          ];
-        });
-        // Same ledger, for every bundle component line — keyed by array index
-        // via `bundleStockChanges` (see its declaration above for why that
-        // index, not productId/variantId, is the right key here). One row per
-        // component line, same as a loose item: "decrements component stock,
-        // not any bundle counter" — there is no bundle-level stock anywhere to
-        // record instead.
-        const bundleInventoryHistoryRows = bundleComponentLines.flatMap((line, i) => {
-          const sc = bundleStockChanges[i];
-          if (!sc) return [];
-          return [
-            {
+            const stockChange = await decrementTrackedStock({
               productId: line.productId,
-              storeId,
-              type: 'sale' as const,
-              quantity: -line.quantity,
-              previousStock: sc.previousStock,
-              newStock: sc.newStock,
-              reason: 'Sold via order (bundle component)',
-              reference: newOrder.id,
-            },
-          ];
-        });
-        const allInventoryHistoryRows = [...inventoryHistoryRows, ...bundleInventoryHistoryRows];
-        if (allInventoryHistoryRows.length > 0) {
-          await tx.inventoryHistory.createMany({ data: allInventoryHistoryRows });
-        }
-
-        // Create BackorderLine rows and mark OrderItems as cost-deferred for any
-        // items that were allowed through with insufficient inventory.
-        // One BackorderLine per backordered decrement — a CONSUMING pairing, so
-        // N bundle boxes sharing a product cannot each claim the same shortfall
-        // (see lib/backorder-pairing.ts, #1552).
-        if (backorderedItems.length > 0) {
-          for (const { line: newItem, quantity, stockTaken } of pairBackorderedLines(
-            newOrder.items,
-            backorderedItems
-          )) {
-            await tx.backorderLine.create({
-              data: {
-                storeId,
-                orderItemId: newItem.id,
-                productId: newItem.productId,
-                variantId: newItem.variantId,
-                qty: quantity,
-                stockTaken: stockTaken ?? null,
-              },
+              variantId: line.variantId,
+              quantity: line.quantity,
+              label: `${line.productName} (component of "${line.bundleName}")`,
             });
-            await tx.orderItem.update({
-              where: { id: newItem.id },
-              data: { costPriceDeferred: true },
-            });
+            bundleStockChanges.push(stockChange);
           }
-        }
 
-        // Redeem loyalty points INSIDE the order transaction so the point
-        // decrement + the redeem_discount ledger row commit atomically with the
-        // order — points are never spent without an order, and the order is
-        // never created without the deduction. The conditional gate inside
-        // redeemPoints makes a concurrent checkout that already drained the
-        // balance throw INSUFFICIENT_POINTS here, rolling back this whole order.
-        // customerId is guaranteed non-null here (guests never set
-        // loyaltyPointsRedeemed > 0 above).
-        if (loyaltyPointsRedeemed > 0 && customerId) {
-          await LoyaltyService.redeemPoints(
-            storeId,
-            customerId,
-            newOrder.id,
-            loyaltyPointsRedeemed,
-            tx
-          );
-        }
-
-        // Spend from the customer wallet INSIDE the order transaction, for the
-        // same reason as the loyalty redemption above: the balance is never
-        // spent without an order and the order never exists without the spend.
-        if (walletAmount > 0 && customerId) {
-          await WalletService.debitForOrder(
-            { storeId, customerId, orderId: newOrder.id, amount: walletAmount },
-            tx
-          );
-        }
-
-        // Clear cart. Bundles live in their own table — clearing the cart
-        // must clear both, or a gateway redirect that never lands leaves a
-        // PAID bundle in the cart at a live price, and the customer checks
-        // out again believing the first attempt failed (double charge).
-        await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-        await tx.cartBundle.deleteMany({ where: { cartId: cart.id } });
-
-        // The sale's fiscal document (tax invoice or receipt) with its gap-free
-        // serial, in THIS transaction: the order and its number commit or roll
-        // back together (ruling MONEYB-1).
-        await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id);
-
-        // Check for abandoned cart recovery
-        try {
-          const abandonedCart = await tx.abandonedCart.findFirst({
-            where: {
+          // Per-customer coupon usage limit (money-integrity audit F3-adjacent
+          // gap, 2026-07-02: `usageLimitPerUser` was collected + stored but
+          // never enforced — only the store-wide `usageLimit` was). Count this
+          // customer's PRIOR orders that redeemed the same coupon and reject
+          // once they've reached the cap, mirroring the global-limit check's
+          // semantics: an order only "counts" while it hasn't been
+          // cancelled/refunded, because `applyRefundEffects`/`updateStatus`
+          // decrement `Coupon.usageCount` back on those two statuses (see
+          // order.service.ts ~1164-1171, ~733-737) — so a cancelled/refunded
+          // order shouldn't count against the per-user cap either.
+          //
+          // Identify the customer the same way the rest of the order code does
+          // (see aggregateCustomers in customers.routes.ts): registered
+          // customers by `customerId`; guests by shipping-address email/phone
+          // (JSON path match, same field names/precedent as the customer
+          // detail lookup in customers.routes.ts). A guest checkout with
+          // NEITHER an email nor a phone on the shipping address has no stable identity: such a guest is REFUSED the
+          // coupon (COUPON_NEEDS_CONTACT, 2026-10-25; it used to be waved through, which made the coupon unlimited).
+          if (
+            appliedCoupon &&
+            couponApplied &&
+            appliedCoupon.usageLimitPerUser &&
+            appliedCoupon.usageLimitPerUser > 0
+          ) {
+            // Guests are identified by E.164 phone / lowercased email, counted under an advisory lock in this same
+            // transaction (lib/coupon-per-customer-limit.ts); an unidentifiable guest is refused, not waved through.
+            const priorUsageCount = await countPriorCouponUses(
+              tx as unknown as CouponLimitTx,
               storeId,
-              OR: [
-                { cartId: cart.id },
-                { customerId: cart.customerId, status: { not: 'recovered' } },
-              ],
-              status: { in: ['pending', 'step1_sent', 'step2_sent', 'step3_sent'] },
+              appliedCoupon.code,
+              {
+                customerId,
+                email:
+                  typeof data.shippingAddress.email === 'string'
+                    ? data.shippingAddress.email
+                    : null,
+                phone:
+                  typeof data.shippingAddress.phone === 'string'
+                    ? data.shippingAddress.phone
+                    : null,
+              }
+            );
+            if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
+              throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+            }
+          }
+
+          // Atomically reserve a coupon redemption before creating the order so
+          // that two concurrent checkouts can't both slip past a usage limit by
+          // reading the same stale count. updateMany with a usageCount < limit
+          // guard updates zero rows when the limit is reached, which we detect
+          // via `count === 0` and roll back by throwing.
+          if (appliedCoupon && couponApplied) {
+            const reserve = await tx.coupon.updateMany({
+              where: {
+                id: appliedCoupon.id,
+                storeId,
+                isActive: true,
+                ...(appliedCoupon.usageLimit
+                  ? { usageCount: { lt: appliedCoupon.usageLimit } }
+                  : {}),
+              },
+              data: { usageCount: { increment: 1 } },
+            });
+            if (reserve.count === 0) {
+              throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+            }
+          }
+
+          // Create order
+          const newOrder = await tx.order.create({
+            data: {
+              storeId,
+              customerId,
+              orderNumber,
+              checkoutIdempotencyKey: idemHash,
+              // A fully wallet-paid order has no gateway step to wait for — it is
+              // created paid, the same end state a completed gateway webhook
+              // leaves (payment-confirm.service: confirmed + paid).
+              status: paidInFullByWallet ? 'confirmed' : 'pending',
+              ...(paidInFullByWallet ? { paymentStatus: 'paid' as const } : {}),
+              walletAmount,
+              subtotal,
+              tax,
+              // Which convention `tax` was charged under, frozen onto the order.
+              // Every consumer of `order.tax` (GL posting, refund allocation) must
+              // know whether it is inside `subtotal`/`total` or on top of them, and
+              // the store-level switch it came from can be flipped afterwards.
+              taxIncludedInPrice: activeTax.includedInPrice,
+              // Seller TRN / legal name / rate frozen for the tax invoice — only
+              // when VAT was collected under a VERIFIED profile (ruling TAX-2).
+              ...frozenTaxInvoiceFields(activeTax),
+              shipping,
+              codFee,
+              taxableAmount,
+              discount,
+              // Persist the coupon fields ONLY when the coupon actually applied.
+              // If a promotion out-discounted the coupon it was not consumed (no
+              // usageCount increment above); leaving its code/discount on the order
+              // would make the per-user usage count over-count and the
+              // payment-failure rollback decrement a redemption that was never
+              // reserved. free_shipping coupons keep their code with a 0 discount,
+              // exactly as before.
+              couponCode: couponApplied ? (appliedCoupon?.code ?? null) : null,
+              couponDiscount: couponApplied ? couponDiscount : 0,
+              // Store the promotion discount that actually applied (mirrors the
+              // coupon gating). When the coupon out-discounted the promotion,
+              // `appliedPromotionId` is null and no promotion discount is recorded,
+              // so the persisted couponDiscount + promotionDiscount + loyaltyDiscount
+              // reconciles to `discount` in every non-tie case.
+              promotionDiscount: appliedPromotionId ? promotionDiscount : 0,
+              appliedPromotionId,
+              // Reporting-only, like couponDiscount/promotionDiscount above — the
+              // saving is already reflected in a LOWER `subtotal` (bundles are
+              // priced at `bundlePrice`, not `componentSum`), so this is never
+              // added again into `discount`/`total`.
+              bundleDiscount,
+              // Name of the group whose price applied, snapshotted so a renamed / deleted group never rewrites history.
+              priceGroupName: groupPriceApplied ? resolver.groupName : null,
+              loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
+              loyaltyDiscount,
+              total,
+              locale: data.locale ?? null,
+              smsOptIn: data.smsOptIn ?? false,
+              source: data.source ?? 'web',
+              // Stock-hold cap signal (lib/stock-hold-cap.ts) — never read for
+              // anything else. NULL when the caller passed none.
+              checkoutIp: requestContext?.checkoutIp ?? null,
+              manualHoldAdmitted,
+              shippingAddress: data.shippingAddress,
+              billingAddress: data.billingAddress || data.shippingAddress,
+              notes: orderNotes,
+              items: {
+                create: [
+                  ...cart.items.map(item => ({
+                    productId: item.productId,
+                    // Persist the variant link onto OrderItem. Without this,
+                    // `updateStatus(cancel/refund)`, `rollbackForPaymentFailure`,
+                    // and `ReturnService.complete` all read OrderItem.variantId
+                    // to restore variant inventory — and always saw null.
+                    // Variant stock drifted every cancel/refund. CartItem
+                    // already carries variantId; we just have to copy it.
+                    variantId: (item as { variantId?: string | null }).variantId ?? null,
+                    productName: item.product.name,
+                    // Snapshot the chosen variant's title in BOTH languages (Ruling
+                    // B0-41): `variantName` stays the canonical title every fiscal
+                    // document, CSV export and pre-B0 reader expects; `variantNameAr`
+                    // is what the Arabic storefront and admin render (falling back
+                    // to `variantName`). Storefront orders never wrote it before, so
+                    // admin/invoice/email showed no size or colour for a variant
+                    // line; createAdminOrder already did.
+                    variantName: item.variant?.title ?? null,
+                    variantNameAr: item.variant?.titleAr || null,
+                    // The customer's personalisation text (cart line note).
+                    personalisation: item.note ?? null,
+                    sku: item.product.sku,
+                    quantity: item.quantity,
+                    // Charge the chosen variant's price (fall back to the parent
+                    // product for variant-less products). Persisting product.price
+                    // here undercharged every variant at the parent (lowest) price.
+                    price: lineUnit(item).unitMinor,
+                    // How a gold line's price was made (Ruling B5-17): refunds read `price`, this is for display and audit.
+                    ...(goldGate.snapshots.has(item.id)
+                      ? { goldSnapshot: goldGate.snapshots.get(item.id) as Prisma.InputJsonValue }
+                      : {}),
+                    // Price provenance snapshot (Ruling B2B-3b): invoices, returns and analytics read these and never
+                    // re-resolve a price. A pre-B2B order has NULLs, which read as 'base'.
+                    ...priceSnapshot(lineUnit(item)),
+                    // Snapshot cost-of-goods at sale time so profit reports
+                    // stay correct even if the product's cost changes later.
+                    // A variant line takes the variant's own cost, falling back
+                    // to the parent product's (same rule as account.service's
+                    // inventory valuation and lib/order-line-cost.ts).
+                    costPrice: lineUnitCost(
+                      productInternalsById.get(item.productId),
+                      (item as { variantId?: string | null }).variantId
+                    ),
+                    total: lineUnit(item).unitMinor * item.quantity,
+                  })),
+                  // Every bundle box's components, appended to the SAME array the
+                  // loose cart items build above — ordinary product lines from
+                  // here on, with no bundle-aware code anywhere downstream
+                  // (stock, scan-to-pick, returns, backorders, per-line COGS all
+                  // already work off OrderItem).
+                  ...bundleComponentLines.map(line => ({
+                    productId: line.productId,
+                    variantId: line.variantId,
+                    productName: line.productName,
+                    sku: line.sku,
+                    quantity: line.quantity,
+                    price: line.price,
+                    costPrice: line.costPrice,
+                    total: line.total,
+                    bundleId: line.bundleId,
+                    bundleGroupId: line.bundleGroupId,
+                    bundleName: line.bundleName,
+                    bundleNameAr: line.bundleNameAr,
+                  })),
+                ],
+              },
+            },
+            include: {
+              items: true,
+              customer: {
+                select: { id: true, email: true, firstName: true, lastName: true },
+              },
             },
           });
-          if (abandonedCart) {
-            await tx.abandonedCart.update({
-              where: { id: abandonedCart.id, storeId },
-              data: {
-                status: 'recovered',
-                recoveredAt: new Date(),
-                recoveredOrderId: newOrder.id,
+
+          // Record inventory history. The decrement already happened atomically in
+          // the loop above (stockChanges holds the accurate pre/post PRODUCT stock
+          // per line); here we only write the ledger, atomic with the order via the
+          // same transaction, using newOrder.id as the reference (DB-010). Collected
+          // and written as a single createMany instead of one create() per line item.
+          const inventoryHistoryRows = cart.items.flatMap(item => {
+            // No `?? true` fallback: presence is guaranteed by the guard above.
+            if (!productInternalsById.get(item.productId)!.trackInventory) return [];
+            const variantId = (item as { variantId?: string }).variantId;
+            const sc = stockChanges.get(`${item.productId}::${variantId ?? ''}`);
+            if (!sc) return [];
+            return [
+              {
+                productId: item.productId,
+                storeId,
+                type: 'sale' as const,
+                quantity: -item.quantity,
+                previousStock: sc.previousStock,
+                newStock: sc.newStock,
+                reason: 'Sold via order',
+                reference: newOrder.id,
+              },
+            ];
+          });
+          // Same ledger, for every bundle component line — keyed by array index
+          // via `bundleStockChanges` (see its declaration above for why that
+          // index, not productId/variantId, is the right key here). One row per
+          // component line, same as a loose item: "decrements component stock,
+          // not any bundle counter" — there is no bundle-level stock anywhere to
+          // record instead.
+          const bundleInventoryHistoryRows = bundleComponentLines.flatMap((line, i) => {
+            const sc = bundleStockChanges[i];
+            if (!sc) return [];
+            return [
+              {
+                productId: line.productId,
+                storeId,
+                type: 'sale' as const,
+                quantity: -line.quantity,
+                previousStock: sc.previousStock,
+                newStock: sc.newStock,
+                reason: 'Sold via order (bundle component)',
+                reference: newOrder.id,
+              },
+            ];
+          });
+          const allInventoryHistoryRows = [...inventoryHistoryRows, ...bundleInventoryHistoryRows];
+          if (allInventoryHistoryRows.length > 0) {
+            await tx.inventoryHistory.createMany({ data: allInventoryHistoryRows });
+          }
+
+          // Create BackorderLine rows and mark OrderItems as cost-deferred for any
+          // items that were allowed through with insufficient inventory.
+          // One BackorderLine per backordered decrement — a CONSUMING pairing, so
+          // N bundle boxes sharing a product cannot each claim the same shortfall
+          // (see lib/backorder-pairing.ts, #1552).
+          if (backorderedItems.length > 0) {
+            for (const { line: newItem, quantity, stockTaken } of pairBackorderedLines(
+              newOrder.items,
+              backorderedItems
+            )) {
+              await tx.backorderLine.create({
+                data: {
+                  storeId,
+                  orderItemId: newItem.id,
+                  productId: newItem.productId,
+                  variantId: newItem.variantId,
+                  qty: quantity,
+                  stockTaken: stockTaken ?? null,
+                },
+              });
+              await tx.orderItem.update({
+                where: { id: newItem.id },
+                data: { costPriceDeferred: true },
+              });
+            }
+          }
+
+          // Redeem loyalty points INSIDE the order transaction so the point
+          // decrement + the redeem_discount ledger row commit atomically with the
+          // order — points are never spent without an order, and the order is
+          // never created without the deduction. The conditional gate inside
+          // redeemPoints makes a concurrent checkout that already drained the
+          // balance throw INSUFFICIENT_POINTS here, rolling back this whole order.
+          // customerId is guaranteed non-null here (guests never set
+          // loyaltyPointsRedeemed > 0 above).
+          if (loyaltyPointsRedeemed > 0 && customerId) {
+            await LoyaltyService.redeemPoints(
+              storeId,
+              customerId,
+              newOrder.id,
+              loyaltyPointsRedeemed,
+              tx
+            );
+          }
+
+          // Spend from the customer wallet INSIDE the order transaction, for the
+          // same reason as the loyalty redemption above: the balance is never
+          // spent without an order and the order never exists without the spend.
+          if (walletAmount > 0 && customerId) {
+            await WalletService.debitForOrder(
+              { storeId, customerId, orderId: newOrder.id, amount: walletAmount },
+              tx
+            );
+          }
+
+          // Clear cart. Bundles live in their own table — clearing the cart
+          // must clear both, or a gateway redirect that never lands leaves a
+          // PAID bundle in the cart at a live price, and the customer checks
+          // out again believing the first attempt failed (double charge).
+          const clearedItems = await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+          const clearedBundles = await tx.cartBundle.deleteMany({ where: { cartId: cart.id } });
+          // belt and braces behind the row lock: what we delete must be exactly what we ordered, else roll the whole order back
+          if (
+            clearedItems.count !== cart.items.length ||
+            clearedBundles.count !== cartBundles.length
+          )
+            throw new AppError(409, 'CART_CHANGED', 'The cart changed during checkout. Try again.');
+
+          // The sale's fiscal document (tax invoice or receipt) with its gap-free
+          // serial, in THIS transaction: the order and its number commit or roll
+          // back together (ruling MONEYB-1).
+          await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id);
+
+          // Check for abandoned cart recovery
+          try {
+            const abandonedCart = await tx.abandonedCart.findFirst({
+              where: {
+                storeId,
+                OR: [
+                  { cartId: cart.id },
+                  { customerId: cart.customerId, status: { not: 'recovered' } },
+                ],
+                status: { in: ['pending', 'step1_sent', 'step2_sent', 'step3_sent'] },
               },
             });
-            logger.info(`Abandoned cart ${abandonedCart.id} recovered by order ${newOrder.id}`);
+            if (abandonedCart) {
+              await tx.abandonedCart.update({
+                where: { id: abandonedCart.id, storeId },
+                data: {
+                  status: 'recovered',
+                  recoveredAt: new Date(),
+                  recoveredOrderId: newOrder.id,
+                },
+              });
+              logger.info(`Abandoned cart ${abandonedCart.id} recovered by order ${newOrder.id}`);
+            }
+          } catch (err) {
+            logger.error({ err }, 'Abandoned cart recovery detection failed');
+            // Never fail order creation
           }
-        } catch (err) {
-          logger.error({ err }, 'Abandoned cart recovery detection failed');
-          // Never fail order creation
-        }
 
-        return newOrder;
-      })
-    );
+          return newOrder;
+        })
+      );
+    } catch (err) {
+      // the loser of a concurrent same-key request (or a unique-violation race on the key): return the winner's order
+      const winnerId =
+        err instanceof CheckoutReplay
+          ? err.orderId
+          : idemHash && (err as { code?: string })?.code === 'P2002'
+            ? ((await OrderService.findCheckoutReplay(storeId, idemHash))?.id ?? null)
+            : null;
+      if (winnerId) {
+        const replay = await OrderService.loadCreatedOrder(storeId, winnerId);
+        if (replay) return replay;
+      }
+      throw err;
+    }
 
     // Link order to affiliate referral. Must be awaited (not fire-and-forget):
     // the per-request tenant tx now COMMITS BEFORE THE RESPONSE IS SENT
