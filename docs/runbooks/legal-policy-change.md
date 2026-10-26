@@ -153,3 +153,11 @@ then send the event `legal/notice.send-requested` from the Inngest dashboard wit
   merchant sees their own under Account -> Security -> **Policies you accepted**.
 - Read-only SQL on production needs the OWNER connection (as `ebda_app` RLS returns 0 rows):
   `SELECT status, count(*) FROM legal_notice_deliveries WHERE doc_key='terms' AND version='1.1' GROUP BY 1;`
+
+## Standing rules from the 2026-10-26 docs and legal audit
+
+- **Unreviewed clauses are never published as final (DOC-3).** A clause the ebda-whatsapp source marks `PENDING LEGAL REVIEW` is published with a visible "Provisional, under legal review" marker and a note under the page title (`import-wa-legal.mjs`; `marketing-wa-legal-drift.test.ts` fails if a marker is missing). Counsel review is still owed on the Store terms, merchant agreement, privacy policy, DPA and WhatsApp terms before launch.
+- **No VAT (Ruling VAT-0).** Prices are final amounts; the Terms say Ebda is not registered for VAT and that VAT would arrive only with 30 days of notice as a fee change (`feeChange: true`, a real future `effectiveAt`). Pricing, help and Terms say the same thing.
+- **Never promise a flow that does not exist (DOC-1).** Account closure and store deletion are by writing to `privacy@ebda.app` until OFFBOARD-1 ships a dashboard action; switch the wording in the same PR as that action.
+- **Processor list follows reality (DOC-2).** `PRIVACY_STACK` in `packages/shared/src/legal/index.ts` selects the privacy policy's sections 5 and 6: `current` today, `cloudflare` (text in `apps/marketing/src/lib/legal-privacy-stack.ts`) at the cutover. The cutover PR flips it and appends a material privacy 1.2 entry in the same commit; `privacy-stack-switch.test.ts` enforces the pair.
+- **Dates are the publish day.** `LEGAL_POLICIES` entries are never backdated; set `publishedAt`/`effectiveAt` to the merge day.
