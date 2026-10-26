@@ -2,7 +2,14 @@
  * apps/marketing SEO surface: sitemap (both locales, hreflang, ebda.app only), robots,
  * JSON-LD (parses, offers come from PLANS) and per-page metadata with a canonical.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// RootShell loads its fonts through next/font, which only exists inside the Next compiler.
+vi.mock('next/font/google', () => {
+  const font = () => ({ className: '', variable: '', style: {} });
+  return { Geist: font, Geist_Mono: font, IBM_Plex_Sans_Arabic: font };
+});
+
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sitemap from '../../apps/marketing/src/app/sitemap';

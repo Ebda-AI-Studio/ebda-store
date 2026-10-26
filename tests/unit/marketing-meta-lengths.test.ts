@@ -2,7 +2,14 @@
  * Audit M-169: every marketing page's meta description fits a search snippet: 100-160 characters (Arabic too: the thin
  * ones were 75-114, the English ones 177-200 and cut off in the SERP). Both locales, every page.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// RootShell loads its fonts through next/font, which only exists inside the Next compiler.
+vi.mock('next/font/google', () => {
+  const font = () => ({ className: '', variable: '', style: {} });
+  return { Geist: font, Geist_Mono: font, IBM_Plex_Sans_Arabic: font };
+});
+
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 

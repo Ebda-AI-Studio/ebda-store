@@ -8910,7 +8910,7 @@
       "loading": "بنحمّل الشهور المجانية...",
       "failedToLoad": "مقدرناش نحمّل الشهور المجانية.",
       "empty": "لسه مفيش شهور مجانية اتمنحت.",
-      "foundingUsed": "أول ٢٠ تاجر: {used} من {slots} اتاخدوا",
+      "foundingUsed": "أول 20 تاجر: {used} من {slots} اتاخدوا",
       "referralGrants": "مكافآت الإحالة: {count} (بحد أقصى {max} لكل تاجر)",
       "totalValue": "القيمة الممنوحة: {amount}",
       "columns": {
@@ -8924,7 +8924,7 @@
         "paidThrough": "مدفوع لحد"
       },
       "kinds": {
-        "founding": "أول ٢٠ تاجر",
+        "founding": "أول 20 تاجر",
         "referral_referrer": "إحالة (اللي رشّح)",
         "referral_referred": "إحالة (المُرشَّح)"
       },

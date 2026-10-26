@@ -325,7 +325,7 @@ export function formatMoney(
   const neg = plain.startsWith('-');
   const [whole, frac] = plain.replace('-', '').split('.');
   const keepFrac = frac !== undefined && (opts.fixedDecimals === true || /[1-9]/.test(frac));
-  let num = groupThousands(whole) + (keepFrac ? `.${frac}` : '');
+  const num = groupThousands(whole) + (keepFrac ? `.${frac}` : '');
   // Western digits only (Ruling DIGITS-1): `numerals` / `easternArabicDigits` are accepted and ignored.
   const signed = neg && /[1-9]/.test(num) ? `-${num}` : num;
   if (opts.hideSymbol) return signed;

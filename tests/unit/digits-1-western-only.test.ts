@@ -46,6 +46,7 @@ const NORMALISERS = [
   /apps\/api\/src\/services\/carriers\/egypt-areas\.ts$/,
   /apps\/api\/src\/lib\/ai\/instapay-receipt-reader\.ts$/,
   /apps\/api\/src\/lib\/ai\/faq-grounding-validator\.ts$/,
+  /apps\/api\/src\/lib\/ai\/review-moderation-policy\.ts$/, // reads digits typed in a review (phone-number prefilter)
   /apps\/admin\/src\/i18n\/numerals\.ts$/,
   /apps\/admin\/src\/lib\/format\.ts$/,
   /apps\/admin\/src\/lib\/onboarding-validation\.ts$/,
