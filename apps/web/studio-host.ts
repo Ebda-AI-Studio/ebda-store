@@ -46,7 +46,9 @@ export function studioHostResponse(
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Content-Security-Policy': [
         "default-src 'none'",
+        `script-src https://${BRAND.domains.help}`,
         "style-src 'unsafe-inline'",
+        `connect-src https://${BRAND.domains.help} https://${BRAND.domains.docs}`,
         `img-src https://${BRAND.domains.marketing} data:`,
         `form-action https://${BRAND.domains.help}`,
         "base-uri 'none'",

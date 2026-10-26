@@ -61,12 +61,17 @@ describe('studio pages on hosts nobody serves', () => {
     expect(forced).toContain('dir="rtl"');
   });
 
-  it('is calm: no orange anywhere, and locked down (CSP, no script)', async () => {
+  it('is calm: no orange anywhere, one script (the help typeahead), locked-down CSP', async () => {
     const res = hit('crm.ebda.app');
     const html = await res.text();
     expect(html.toLowerCase()).not.toMatch(/orange|#ff6e01|#f60|#ff8c00/);
-    expect(html).not.toContain('<script');
-    expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
+    expect(html.match(/<script/g)).toHaveLength(1);
+    expect(html).toContain('<script src="https://help.ebda.app/assets/typeahead.js" defer>');
+    expect(html).toContain('data-sources=');
+    expect(html).toContain('https://docs.ebda.app/search-index.en.json');
+    const csp = res.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain('script-src https://help.ebda.app');
   });
 
   it('never names or suggests a store', async () => {

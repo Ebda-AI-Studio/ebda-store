@@ -170,8 +170,29 @@ nav.map li{min-block-size:28px}
 .soon b{margin-inline-start:8px;font-weight:500;font-size:.8125rem;color:var(--gold)}
 [aria-current=page]{color:var(--fg);font-weight:600}
 footer{color:var(--muted);font-size:.875rem;border-top:1px solid var(--line)}
+form.search{position:relative}
+.ta-list,.ta-note{position:absolute;inset-inline:0;top:calc(100% + 8px);z-index:5;margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.5);text-align:start}
+.ta-note{padding:14px 16px;color:var(--muted)}
+.ta-list[hidden],.ta-note[hidden]{display:none}
+.ta-list a{display:flex;flex-direction:column;gap:2px;min-block-size:44px;justify-content:center;padding:8px 12px;border-radius:8px;color:var(--fg);text-decoration:none}
+.ta-list a[aria-selected=true],.ta-list a:hover{background:#1b1e20;outline:1px solid var(--gold)}
+.ta-list mark{background:transparent;color:var(--lift);font-weight:700}
+.ta-sec{color:var(--muted);font-size:.8125rem}
+.ta-all{color:var(--muted)!important;font-size:.9rem}
 @media (max-width:520px){form.search{flex-direction:column}form.search input{flex:none;inline-size:100%}form.search button{inline-size:100%}}
 `;
+
+/** The indexes the live search reads: help (in the page language) and the developer docs, both cross-origin. */
+const SOURCES = (lang: StudioLang) => [
+  {
+    index: `https://${BRAND.domains.help}/search-index.${lang}.json`,
+    base: `https://${BRAND.domains.help}`,
+  },
+  {
+    index: `https://${BRAND.domains.docs}/search-index.en.json`,
+    base: `https://${BRAND.domains.docs}`,
+  },
+];
 
 /** The page, as a complete HTML document string. */
 export function renderStudioPage(input: StudioPageInput): string {
@@ -210,7 +231,7 @@ export function renderStudioPage(input: StudioPageInput): string {
 <main id="main">
 <h1>${esc(line)}</h1>
 <p class="hint">${esc(hint)}</p>
-<form class="search" role="search" action="${esc(searchAction)}" method="get">
+<form class="search" role="search" action="${esc(searchAction)}" method="get" data-sources="${esc(JSON.stringify(SOURCES(lang)))}">
 <label class="sr-only" for="q">${esc(c.searchLabel)}</label>
 <input id="q" name="q" type="search" placeholder="${esc(c.searchPlaceholder)}" autocomplete="off" enterkeyhint="search">
 <button type="submit">${esc(c.searchButton)}</button>
@@ -238,6 +259,7 @@ ${next('erp')}
 <span>© ${new Date().getUTCFullYear()} ${esc(lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn)}</span>
 <a href="?lang=${otherLang}" hreflang="${otherLang}" lang="${otherLang}">${esc(c.switchTo)}</a>
 </footer>
+<script src="https://${BRAND.domains.help}/assets/typeahead.js" defer></script>
 </body>
 </html>
 `;
