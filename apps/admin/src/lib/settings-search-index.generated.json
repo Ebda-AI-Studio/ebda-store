@@ -871,6 +871,16 @@
     "feature": "pwa"
   },
   {
+    "id": "page:/qr",
+    "kind": "page",
+    "route": "/qr",
+    "access": "owner",
+    "en": "QR codes",
+    "ar": "أكواد QR",
+    "synEn": "qr code scan print poster sticker flyer barcode link whatsapp",
+    "synAr": "كود كيو ار مسح طباعة ملصق بوستر فلاير واتساب رابط"
+  },
+  {
     "id": "page:/language",
     "kind": "page",
     "route": "/language",
