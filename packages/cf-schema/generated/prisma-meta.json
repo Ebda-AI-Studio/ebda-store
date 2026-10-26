@@ -19382,6 +19382,165 @@
         }
       }
     },
+    "ProviderVerification": {
+      "table": "provider_verifications",
+      "db": "d1",
+      "pk": ["provider"],
+      "uniques": [],
+      "fields": {
+        "provider": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "provider",
+          "list": false,
+          "optional": false,
+          "id": true
+        },
+        "kind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "kind",
+          "list": false,
+          "optional": false
+        },
+        "successCount": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "success_count",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "failureCount": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "failure_count",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "readyAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "ready_at",
+          "list": false,
+          "optional": true
+        },
+        "verifiedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "verified_at",
+          "list": false,
+          "optional": true
+        },
+        "verifiedById": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "verified_by_id",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        }
+      }
+    },
+    "ProviderVerificationEvent": {
+      "table": "provider_verification_events",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "provider": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "provider",
+          "list": false,
+          "optional": false
+        },
+        "sourceStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source_store_id",
+          "list": false,
+          "optional": false
+        },
+        "op": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "op",
+          "list": false,
+          "optional": false
+        },
+        "ok": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "ok",
+          "list": false,
+          "optional": false
+        },
+        "mode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "mode",
+          "list": false,
+          "optional": false,
+          "default": "\"sandbox\""
+        },
+        "counted": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "counted",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "ref": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "ref",
+          "list": false,
+          "optional": true
+        },
+        "errorCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "error_code",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
     "FiscalDocument": {
       "table": "fiscal_documents",
       "db": "store-do",

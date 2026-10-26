@@ -1166,5 +1166,21 @@
     "piiColumns": ["actor_id"],
     "subjectKeys": ["userId"],
     "note": "actor id nulled on user erasure"
+  },
+  "d1:provider_verifications": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "provider activation counters and a super-admin user id, no customer data"
+  },
+  "d1:provider_verification_events": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "per-provider settle events keyed by source_store_id; no personal data"
   }
 }
