@@ -800,7 +800,14 @@ export function createFawryProvider(options: GatewayAdapterOptions = {}): Paymen
           kind: 'refund',
           eventId,
           providerRef: merchantRefNumber,
-          refundRef: `fawry-refund-${fawryRefNumber}-${orderStatus}`,
+          // The status alone is NOT unique per refund (every partial notice would share one id and the 2nd+ would be dropped
+          // as a redelivery). Append the notice's own signed reference number when Fawry sends one.
+          refundRef: `fawry-refund-${fawryRefNumber}-${orderStatus}${
+            typeof body.paymentRefrenceNumber === 'string' &&
+            /^[A-Za-z0-9_.-]{1,64}$/.test(body.paymentRefrenceNumber)
+              ? `~${body.paymentRefrenceNumber}`
+              : ''
+          }`,
           status: 'completed',
           // UNVERIFIED: the notification does not say how much THIS refund was, and no field
           // that says so is covered by the signature. 0 = "not reported": the payment pipeline

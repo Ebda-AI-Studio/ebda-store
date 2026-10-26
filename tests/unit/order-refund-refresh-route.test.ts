@@ -20,13 +20,21 @@ import request from 'supertest';
 
 const paymentFindFirst = vi.fn();
 const paymentUpdate = vi.fn().mockResolvedValue({});
+const paymentEventFindMany = vi.fn().mockResolvedValue([]);
+const paymentEventCreate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
 const orderFindFirst = vi.fn().mockResolvedValue({ status: 'delivered' });
 vi.mock('@ebda/database', () => ({
   prisma: {
+    $queryRaw: async () => [],
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
+      findUnique: async () => paymentFindFirst(),
       update: (...a: unknown[]) => paymentUpdate(...a),
+    },
+    paymentEvent: {
+      findMany: (...a: unknown[]) => paymentEventFindMany(...a),
+      create: (...a: unknown[]) => paymentEventCreate(...a),
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),
@@ -34,6 +42,8 @@ vi.mock('@ebda/database', () => ({
     },
     store: { findUnique: vi.fn().mockResolvedValue({ name: 'Store' }) },
   },
+  hasTenantContext: () => true,
+  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
   // The error-handler middleware checks `err instanceof
   // Prisma.PrismaClientKnownRequestError` for every non-AppError/ZodError —
@@ -311,6 +321,42 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     expect(meta.refundStatusById).toMatchObject({ rf_counted: 'completed' });
   });
 
+  it('an in-flight in-band claim of the same amount absorbs this refresh: the total is not raised twice', async () => {
+    mockPaymentNeedingSideEffects();
+    paymentEventFindMany.mockResolvedValueOnce([
+      {
+        eventType: 'refund_initiated',
+        createdAt: new Date(),
+        details: { claimId: 'claim-1', amount: 2000 },
+      },
+    ]);
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundId: 'rf_inflight',
+      refundedAmount: 2000,
+      amount: 2000,
+      refundReference: 'ref-inflight',
+    });
+    applyRefundEffects.mockResolvedValue(undefined);
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+    // the claim was CONSUMED in the same settlement (outcome event naming it)
+    expect(paymentEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: 'refund_webhook_absorbed',
+          details: expect.objectContaining({ claimId: 'claim-1' }),
+        }),
+      })
+    );
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    const meta = data.metadata as Record<string, unknown>;
+    // an absorbed id is FILED (and its status recorded) so a replay after the claim closes is still seen
+    expect(meta.refundEventIds).toContain('rf_inflight');
+    expect(meta.refundStatusById).toMatchObject({ rf_inflight: 'completed' });
+  });
+
   it('treats an amount-less provider response as a FULL refund, not a 0-fil partial', async () => {
     mockPaymentNeedingSideEffects();
     getRefundStatus.mockResolvedValue({
@@ -468,8 +514,9 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
       .send({});
 
     const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
-    expect(data.status).toBe('partially_refunded');
-    expect(data.refundedAmount).toBe(2000);
+    // seen under the lock: the total and status are left exactly as they are (nothing is re-counted)
+    expect(data.status ?? 'partially_refunded').toBe('partially_refunded');
+    expect(data.refundedAmount ?? 2000).toBe(2000);
     expect(applyRefundEffects).not.toHaveBeenCalled();
   });
 
