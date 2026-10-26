@@ -21,8 +21,8 @@ describe('marketing 404', () => {
   it('carries both languages, each with one search form wired to the live sources', () => {
     expect(html).toContain('الصفحة اللي بتدوّر عليها مش موجودة.');
     expect(html).toContain('The page you&#x27;re looking for can&#x27;t be found.');
-    expect((html.match(/role="search"/g) ?? []).length).toBe(2);
-    expect((html.match(/type="search"/g) ?? []).length).toBe(2);
+    expect((html.match(/role="search"/g) ?? []).length).toBe(3); // header + one per language
+    expect((html.match(/type="search"/g) ?? []).length).toBe(3);
     for (const src of [
       '/search-index.ar.json',
       '/search-index.en.json',

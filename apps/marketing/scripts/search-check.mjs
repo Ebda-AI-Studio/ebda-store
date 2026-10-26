@@ -12,6 +12,15 @@ await runSearchCheck({
   typeahead: [
     { page: '/no-such-page/', q: 'م', expect: '/features/', status: 404, input: '#q-ar' },
     { page: '/no-such-page/', q: 'المميزات', expect: '/features/', status: 404, input: '#q-ar' },
-    { page: '/en/no-such-page/', q: 'features', expect: '/en/features/', status: 404, input: '#q-en' },
+    {
+      page: '/en/no-such-page/',
+      q: 'features',
+      expect: '/en/features/',
+      status: 404,
+      input: '#q-en',
+    },
+    // the header search (icon -> panel), on a normal page
+    { page: '/', q: 'المميزات', expect: '/features/', input: '#hs-q-ar', click: '.hs-btn' },
+    { page: '/en/', q: 'features', expect: '/en/features/', input: '#hs-q-en', click: '.hs-btn' },
   ],
 });

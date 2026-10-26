@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { SiteLink } from '@/components/SiteLink';
@@ -7,7 +6,7 @@ import { Phone } from '@/components/Devices';
 import { NotFoundLang } from '@/components/NotFoundLang';
 import { RootShell } from '@/components/RootShell';
 import { BRAND } from '@ebda/shared/brand';
-import { NOT_FOUND, SEARCH_SOURCES } from '@/lib/not-found-copy';
+import { NOT_FOUND, sourcesAttr } from '@/lib/not-found-copy';
 import { LOCALES, demoLookUrl, type Locale } from '@/lib/site';
 
 export const metadata: Metadata = {
@@ -37,7 +36,7 @@ function Body({ locale }: { locale: Locale }) {
           role="search"
           action={`https://${BRAND.domains.help}${locale === 'ar' ? '' : '/en'}/search/`}
           method="get"
-          data-sources={JSON.stringify(SEARCH_SOURCES[locale])}
+          data-sources={sourcesAttr(locale)}
         >
           <label className="sr-only" htmlFor={id}>
             {c.searchLabel}
@@ -111,7 +110,6 @@ export default function NotFound() {
         ))}
         <script dangerouslySetInnerHTML={{ __html: PICK_LANG }} />
         <NotFoundLang />
-        <Script src="/assets/typeahead.js" strategy="afterInteractive" />
       </main>
       <Footer locale="ar" />
     </RootShell>
