@@ -92,3 +92,10 @@ export const REFUND_INDETERMINATE_EVENT = 'refund_indeterminate';
  * no money and does not touch `refundedAmount` — the claim already counted it.
  */
 export const REFUND_RECONCILED_EVENT = 'refund_reconciled';
+/**
+ * A settle webhook was reconciled with (and CONSUMED) this in-band claim: `details = { claimId, refundId, amount }`.
+ * One claim absorbs at most one webhook, so a second genuine refund of the same amount is added, never swallowed.
+ */
+export const REFUND_ABSORBED_EVENT = 'refund_webhook_absorbed';
+/** A claim was released AFTER a webhook reported its refund completed: needs a human, moves no money. */
+export const REFUND_REVIEW_EVENT = 'refund_reconcile_review';
