@@ -1,0 +1,43 @@
+---
+title: ETA e-receipts (Egypt)
+description: Send every VAT order to the Egyptian Tax Authority as an electronic receipt, using your own ETA credentials.
+section: Settings
+order: 12
+appPath: /stores
+keywords: eta e-receipt electronic receipt egyptian tax authority pos serial client id secret vat b2c qr
+---
+
+## Who this is for
+
+Only for stores that are **verified for VAT** (see [VAT registration](/en/vat-registration/)) and that the Egyptian Tax Authority (ETA) requires to issue electronic receipts. The ETA decides who must issue them; ask your accountant. Ebda Store does not decide that for you, and it does not file your VAT returns.
+
+The feature is **off by default**. Ebda Store support switches it on for your store. Until then nothing is sent to the ETA.
+
+## What you need from the ETA
+
+1. Register Ebda Store as a **POS / ERP system** in your ETA profile. The ETA gives you a **client id**, a **client secret** and a **POS serial number** (and a pre-shared key where your profile has one).
+2. Register at least one **item code** (an EGS code, in the form `EG-<your registration number>-<your code>`) and wait for the ETA to approve it. Ebda Store uses this code on every receipt line.
+3. Know your **branch code** and your **activity code**.
+
+## Connect
+
+Open your store, then **Tax & VAT**. Once your VAT is verified and support has switched the feature on, an **ETA e-receipts** card appears under the VAT registration card. Fill in the form and press **Save**. Start with **Test (PreProd)** to try the ETA test system; switch to **Production** only when the test works. Press **Check connection**: it only signs in, it sends no receipt.
+
+Your client secret and pre-shared key are stored encrypted. They are never shown again, only the last four characters.
+
+## What happens to an order
+
+When a VAT order is placed, Ebda Store builds the receipt, sends it, and then asks the ETA for its verdict. The order page shows the status:
+
+- **Queued / Retrying**: waiting to be sent, or the ETA was busy and we will try again.
+- **Submitted**: the ETA received it and is checking it.
+- **Accepted**: valid. The receipt QR code and link appear on the order.
+- **Rejected / Failed**: the ETA refused it or it could not be built. The reason code is shown. Press **Issue again** after fixing the cause.
+- **Late**: the ETA allows 24 hours. After that you must raise a Late Submission Request in the ETA portal.
+
+A full refund sends a **return receipt**. A partial refund needs a return receipt issued by hand in the ETA portal.
+
+## Good to know
+
+- Receipts are currently sent **unsigned**: the ETA documents that signature checking is not switched on for receipts yet.
+- Invoices between businesses (B2B e-invoices) are not sent by Ebda Store yet. They need a signature from your ETA eSeal on a USB token, which only you can use.

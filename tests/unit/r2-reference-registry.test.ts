@@ -85,6 +85,11 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'InstapayReceipt.extracted':
     'what the AI read off a transfer receipt (amounts, names, references), never a URL; the image is a private-bucket key, not a public R2 URL',
   'StoreTaxDocument.profileId': 'foreign key to store_tax_profiles, never a URL',
+  'EtaConnection.address': 'the merchant branch address text for the ETA seller block, never a URL',
+  'EtaConnection.signingBridgeUrl':
+    'merchant-side signing service endpoint, never one of our uploads',
+  'EtaReceipt.receiptNumber': 'the order number used as the ETA receipt number, never a URL',
+  'EtaReceipt.document': 'the ETA Receipt v1.2 JSON (seller, buyer, lines, totals), no media',
   'FiscalDocument.originalDocumentId': 'id of the invoice a credit note adjusts, never a URL',
   'FiscalDocument.payload':
     'the issued document as data (seller, buyer, lines, totals), no media; immutable by trigger',

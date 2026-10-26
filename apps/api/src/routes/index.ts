@@ -34,6 +34,7 @@ import providerActivationRoutes, {
 import couponRoutes from './coupon.routes';
 import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
+import etaRoutes from './eta.routes';
 import { fiscalArchiveRoutes, fiscalDocumentRoutes } from './fiscal-document.routes';
 import customerGroupRoutes from './customer-groups.routes';
 import priceTierRoutes from './price-tier.routes';
@@ -339,6 +340,8 @@ router.use('/stores', tenantContext, setupGuideRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
+// Egypt ETA e-receipt connector (Ruling ETA-1); every route behind the per-store `eta_ereceipt` feature.
+router.use('/stores', tenantContext, etaRoutes);
 router.use('/stores', tenantContext, fiscalDocumentRoutes);
 router.use('/stores', tenantContext, customerGroupRoutes);
 router.use('/stores', tenantContext, priceTierRoutes);

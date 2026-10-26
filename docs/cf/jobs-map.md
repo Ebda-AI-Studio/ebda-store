@@ -1,6 +1,6 @@
 # Background jobs on Cloudflare (G5)
 
-Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 92 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
+Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 95 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
 
 ## Primitives
 
@@ -91,6 +91,9 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `gsc-ingest-cron`                          | 4-ai            | workflow | cron    |             |
 | `gsc-ingest-on-demand`                     | 4-ai            | queue    | event   |             |
 | `ebda-ads-conversion`                      | 5-integrations  | queue    | event   |             |
+| `eta-receipt-enqueue`                      | 5-integrations  | queue    | event   |             |
+| `eta-receipt-redrive`                      | 5-integrations  | workflow | event   |             |
+| `eta-receipt-submit`                       | 5-integrations  | queue    | event   |             |
 | `order-capi-conversion`                    | 5-integrations  | workflow | event   |             |
 | `search-index-backstop`                    | 5-integrations  | workflow | cron    |             |
 | `search-product-index`                     | 5-integrations  | workflow | event   |             |

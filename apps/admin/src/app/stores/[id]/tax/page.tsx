@@ -13,6 +13,8 @@ import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
 import { TaxInfoBox } from './_components/TaxInfoBox';
 import { TaxVerificationCard } from './_components/TaxVerificationCard';
+import { EtaConnectionCard } from './_components/EtaConnectionCard';
+import { useFeatures } from '@/hooks/useFeatures';
 import { TAX_NOT_VERIFIED_CODE, type TaxProfileStatusValue } from '@ebda/shared';
 import {
   DEFAULT_FORM,
@@ -32,6 +34,7 @@ export default function TaxSettingsPage() {
   const storeId = params.id as string;
   const tPage = useT('tax.page');
   const tEnable = useT('tax.settings.enable');
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
 
   const [settings, setSettings] = useState<TaxSettings>({
     taxEnabled: false,
@@ -245,6 +248,9 @@ export default function TaxSettingsPage() {
         ) : (
           <>
             <TaxVerificationCard storeId={storeId} onStatusChange={handleVatStatus} />
+            {!featuresLoading && isEnabled('eta_ereceipt') && vatStatus === 'verified' ? (
+              <EtaConnectionCard storeId={storeId} />
+            ) : null}
             <TaxGeneralSettings
               vatVerified={vatStatus === 'verified'}
               errorMessage={settingsError}
