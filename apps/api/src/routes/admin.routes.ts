@@ -10,6 +10,7 @@ import { requireRole } from '../middleware/rbac';
 import { bustStoreCaches } from '../services/store.service';
 import { featureService } from '../services/feature.service';
 import { invalidateCached } from '../lib/public-cache';
+import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { searchProductIds } from '../services/product-search.service';
@@ -400,6 +401,22 @@ router.get(
         })
         .parse(req.query);
       res.json({ success: true, data: { events: await listLedger(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Free-month grants (FOUNDING-1): founding-20 + referral ledger with totals. */
+router.get(
+  '/billing/grants',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = z
+        .object({ limit: z.coerce.number().int().min(1).max(500).optional() })
+        .parse(req.query);
+      res.json({ success: true, data: await listGrants(q.limit) });
     } catch (error) {
       next(error);
     }

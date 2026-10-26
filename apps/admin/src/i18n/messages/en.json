@@ -8725,7 +8725,8 @@
     "tabs": {
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
-      "claims": "Payment claims"
+      "claims": "Payment claims",
+      "grants": "Free months"
     },
     "plans": {
       "basic": "Basic",
@@ -8884,6 +8885,34 @@
       "duplicate": "This reference was already recorded. Nothing changed.",
       "failed": "We could not record this. Please try again.",
       "voidedFreed": "Reference freed. To record this transfer for the right store, use Record payment and paste this voided payment ID: {id}"
+    },
+    "grants": {
+      "title": "Free months",
+      "loading": "Loading free months...",
+      "failedToLoad": "Could not load the free months.",
+      "empty": "No free months granted yet.",
+      "foundingUsed": "Founding-20: {used} of {slots} used",
+      "referralGrants": "Referral rewards: {count} (max {max} per referrer)",
+      "totalValue": "Value granted: {amount}",
+      "columns": {
+        "date": "Date",
+        "store": "Store",
+        "kind": "Type",
+        "counterpart": "Other side",
+        "months": "Months",
+        "value": "Worth",
+        "status": "Status",
+        "paidThrough": "Paid through"
+      },
+      "kinds": {
+        "founding": "Founding-20",
+        "referral_referrer": "Referral (referrer)",
+        "referral_referred": "Referral (referred)"
+      },
+      "statuses": {
+        "pending": "Waiting for a billing period",
+        "applied": "Applied"
+      }
     }
   },
   "codReconciliation": {

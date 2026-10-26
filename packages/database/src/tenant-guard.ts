@@ -124,6 +124,9 @@ export const USER_KEYED_MODELS: Readonly<Record<string, string>> = {
 export const GLOBAL_MODELS: readonly string[] = [
   'AnswerEngineProviderConfig',
   'BillingWebhookEvent',
+  // Ruling FOUNDING-1: platform billing ledgers keyed by store ids, no store_id column, no tenant data.
+  'BillingReferral',
+  'BillingGrant',
   // Ruling LEGAL-4: one row per announced policy version, read by every merchant.
   'LegalNoticeSend',
   'Plan',
