@@ -3,7 +3,7 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { BRAND, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -331,16 +331,7 @@ for (const lang of ['en', 'ar']) {
           {
             title: c.ebda,
             links: [
-              {
-                href: BRAND_MARKETING_URL,
-                label: ar ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
-              },
-              { href: BRAND_STORE_APP_URL, label: BRAND.product[ar ? 'nameAr' : 'nameEn'] },
-              {
-                href: `https://${BRAND.domains.help}`,
-                label: ar ? 'مركز المساعدة' : 'Help centre',
-              },
-              { href: `https://${BRAND.domains.status}`, label: ar ? 'حالة الخدمة' : 'Status' },
+              ...siteNavItems(lang).map(i => ({ href: i.href, label: i.label })),
               { href: `mailto:${BRAND.supportEmail}`, label: c.contact },
             ],
           },

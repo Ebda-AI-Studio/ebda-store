@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
@@ -291,7 +291,7 @@ for (const lang of ['ar', 'en']) {
             title: c.ebda,
             links: [
               { href: homeUrl(lang), label: c.links.home },
-              ...L[lang].nav,
+              ...siteNavItems(lang).map(i => ({ href: i.href, label: i.label })),
               { href: `https://${BRAND.domains.docs}/`, label: c.links.docs },
               { href: `mailto:${BRAND.supportEmail}`, label: c.links.contact },
             ],
