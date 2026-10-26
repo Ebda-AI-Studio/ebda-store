@@ -111,9 +111,15 @@ describe('shared header nav on docs, help and status', () => {
 
   it('the marketing globals.css carries the shared Products panel CSS verbatim (one design, two stylesheets)', () => {
     const css = read('apps/marketing/src/app/globals.css');
-    const m = /nav-products:start \*\/([\s\S]*?)\/\* nav-products:end/.exec(css);
+    const m = /nav-products:start[^*]*\*\/([\s\S]*?)\/\* nav-products:end/.exec(css);
     expect(m, 'the nav-products block markers').not.toBeNull();
-    const norm = (x: string) => x.replace(/\s+/g, '').replace(/;}/g, '}');
+    // whitespace, the last `;` before `}` and prettier's leading zero (`.5rem` -> `0.5rem`) and lower-cased hex are not differences
+    const norm = (x: string) =>
+      x
+        .toLowerCase()
+        .replace(/(?<!\d)\.(\d)/g, '0.$1')
+        .replace(/\s+/g, '')
+        .replace(/;}/g, '}');
     expect(norm(m![1])).toBe(norm(SITE_NAV_PANEL_CSS));
   });
 });
