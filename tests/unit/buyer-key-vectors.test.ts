@@ -2,8 +2,8 @@
  * The Store's phone normaliser and buyer key must produce EXACTLY what Ebda WhatsApp produces (audit
  * CODE-10: two normalisers that differ give one customer two keys). Both repos run the IDENTICAL vector
  * files, created by the WhatsApp session:
- *   tests/vectors/ebda-wa/phone.json      input phone  -> E.164 (or null)
- *   tests/vectors/ebda-wa/buyer-key.json  secret + phones -> lowercase-hex buyer key (8 numbers)
+ *   tests/vectors/ebda-wa/phone.json      [{ in, e164 | null }]
+ *   tests/vectors/ebda-wa/buyer-key.json  { secret, cases: [{ e164, hex }] } (8 numbers)
  * Vendored byte for byte; the sha256 of each is pinned in tests/vectors/ebda-wa/SHA256SUMS so a one-sided
  * edit fails here. UNTIL the WhatsApp session delivers the files this test reports them missing and
  * skips (the only skip in this file); once they are vendored it must never skip, and it asserts all 8.
@@ -22,22 +22,15 @@ const present = existsSync(PHONE) && existsSync(KEYS);
 
 const sha = (f: string) => createHash('sha256').update(readFileSync(f)).digest('hex');
 
-/** Accept `[{ input, e164 }]`, `[{ phone, e164 }]` or a plain `{ input: e164 }` map. */
+/** phone.json is `[{ in, e164 | null }]`. */
 function phoneCases(raw: unknown): Array<[string, string | null]> {
-  if (Array.isArray(raw)) {
-    return raw.map((c: Record<string, unknown>) => {
-      const input = (c.input ?? c.phone ?? c.raw) as string;
-      const out = (c.e164 ?? c.expected ?? c.output ?? null) as string | null;
-      if (typeof input !== 'string') throw new Error('unrecognised phone.json case shape');
-      return [input, out];
-    });
-  }
-  if (raw && typeof raw === 'object') {
-    const obj = raw as Record<string, unknown>;
-    if (Array.isArray(obj.cases)) return phoneCases(obj.cases);
-    return Object.entries(obj).map(([k, v]) => [k, v as string | null]);
-  }
-  throw new Error('unrecognised phone.json shape');
+  if (!Array.isArray(raw)) throw new Error('phone.json must be an array of { in, e164 }');
+  return raw.map((c: { in?: unknown; e164?: unknown }) => {
+    if (typeof c.in !== 'string' || !(typeof c.e164 === 'string' || c.e164 === null)) {
+      throw new Error(`unrecognised phone.json case ${JSON.stringify(c)}`);
+    }
+    return [c.in, c.e164];
+  });
 }
 
 describe.skipIf(!present)('shared vectors with Ebda WhatsApp', () => {
@@ -62,16 +55,12 @@ describe.skipIf(!present)('shared vectors with Ebda WhatsApp', () => {
   it('buyer-key.json: the same lowercase hex for all 8 numbers', async () => {
     const f = JSON.parse(readFileSync(KEYS, 'utf8')) as {
       secret: string;
-      cases?: Array<Record<string, string>>;
-      vectors?: Array<Record<string, string>>;
+      cases: Array<{ e164: string; hex: string }>;
     };
-    const cases = f.cases ?? f.vectors ?? [];
-    expect(cases).toHaveLength(8);
-    for (const c of cases) {
-      const phone = (c.phone ?? c.input ?? c.e164) as string;
-      const hex = (c.hex ?? c.buyerKey ?? c.key ?? c.expected) as string;
-      expect(await buyerKeyFor(f.secret, phone), `buyerKeyFor(${phone})`).toBe(hex);
-      expect(hex).toMatch(/^[0-9a-f]{64}$/);
+    expect(f.cases).toHaveLength(8);
+    for (const c of f.cases) {
+      expect(c.hex).toMatch(/^[0-9a-f]{64}$/);
+      expect(await buyerKeyFor(f.secret, c.e164), `buyerKeyFor(${c.e164})`).toBe(c.hex);
     }
   });
 });

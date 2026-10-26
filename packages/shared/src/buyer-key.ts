@@ -11,6 +11,47 @@ const E164 = /^\+[1-9]\d{7,14}$/;
 // LRM/RLM, ALM, embeddings/overrides and isolates that WhatsApp's RTL UI adds around numbers.
 const BIDI_MARKS = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
 
+/** Egyptian fixed-line area codes (without the trunk 0): Cairo/Giza 2, Alexandria 3 and the governorate codes. */
+const EG_AREA_3 = new Set([
+  '13',
+  '15',
+  '40',
+  '45',
+  '46',
+  '47',
+  '48',
+  '50',
+  '55',
+  '57',
+  '62',
+  '64',
+  '65',
+  '66',
+  '68',
+  '69',
+  '82',
+  '84',
+  '86',
+  '88',
+  '92',
+  '93',
+  '95',
+  '96',
+  '97',
+]);
+
+/**
+ * Is `national` (trunk 0 + digits, nothing else) a valid Egyptian number? Mobile `01[0125]` + 8 digits
+ * (11 digits); Cairo/Giza `02` + 8; Alexandria `03` + 7; a governorate code (`EG_AREA_3`) + 7.
+ */
+export function isEgyptianNational(national: string): boolean {
+  if (/^01[0125]\d{8}$/.test(national)) return true;
+  if (/^02\d{8}$/.test(national)) return true;
+  if (/^03\d{7}$/.test(national)) return true;
+  const m = /^0(\d{2})\d{7}$/.exec(national);
+  return !!m && EG_AREA_3.has(m[1]!);
+}
+
 function asciiDigits(s: string): string {
   return s
     .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
@@ -36,8 +77,12 @@ export function toE164(raw: string | null | undefined, defaultCountry: '20' = '2
   let s = asciiDigits(raw.replace(BIDI_MARKS, '')).replace(/[\s\-().]/g, '');
   if (s.startsWith('00')) s = '+' + s.slice(2);
   if (!s.startsWith('+')) {
-    if (s.startsWith('0')) s = `+${defaultCountry}${s.slice(1)}`;
-    else if (s.startsWith(defaultCountry) && s.length === 12) s = '+' + s;
+    if (s.startsWith('0')) {
+      // Ruling PHONE-2: a national 0... number is Egyptian ONLY if it is a valid Egyptian number;
+      // otherwise null (a UK 07911..., a Saudi 050... is never read as +20).
+      if (!isEgyptianNational(s)) return null;
+      s = `+${defaultCountry}${s.slice(1)}`;
+    } else if (s.startsWith(defaultCountry) && s.length === 12) s = '+' + s;
     else if (/^1\d{9}$/.test(s)) s = `+${defaultCountry}${s}`;
     else return null;
   }

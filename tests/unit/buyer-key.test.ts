@@ -24,14 +24,21 @@ describe('toE164 (Egypt default +20)', () => {
     expect(toE164(raw)).toBe('+201001234567');
   });
 
-  it("is Ebda WhatsApp's normaliser, including its Egypt-first reading of a national 0... number", () => {
-    // Same output on both sides is the point (audit CODE-10): WhatsApp reads ANY national 0xxxxxxxxx as Egyptian,
-    // so the Store must too, or one customer gets two keys. A foreign number must carry + or 00 to stay foreign.
-    expect(toE164('07911123456')).toBe('+207911123456');
-    expect(toE164('0501234567')).toBe('+20501234567');
-    expect(toE164('0212345678')).toBe('+20212345678');
-    expect(toE164('0100123456')).toBe('+20100123456');
+  it('PHONE-2: a 0-prefixed number is Egyptian ONLY if it is a valid Egyptian number', () => {
+    // not Egyptian shapes -> null, never read as +20
+    expect(toE164('07911123456')).toBeNull(); // UK mobile
+    expect(toE164('0100123456')).toBeNull(); // mobile one digit short
+    expect(toE164('0312345678')).toBeNull(); // Alexandria is 03 + 7, this is 03 + 8
+    expect(toE164('0912345678')).toBeNull(); // no such area code
     expect(toE164('2012345678901')).toBeNull();
+    // valid Egyptian shapes -> +20
+    expect(toE164('01001234567')).toBe('+201001234567'); // mobile
+    expect(toE164('0212345678')).toBe('+20212345678'); // Cairo/Giza 02 + 8
+    expect(toE164('0312345')).toBeNull();
+    expect(toE164('03 123 4567')).toBe('+2031234567'); // Alexandria 03 + 7
+    expect(toE164('040 123 4567')).toBe('+20401234567'); // governorate code + 7
+    // a foreign number must carry + or 00
+    expect(toE164('+44 7911 123456')).toBe('+447911123456');
   });
 
   it('does not strip arbitrary text the way the old Store normaliser did', () => {
