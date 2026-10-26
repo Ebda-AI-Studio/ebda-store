@@ -66,6 +66,7 @@ import {
   planSubscriberCounts,
   storeIdsOnPlan,
 } from '../../apps/api/src/lib/definer';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'; // same as the CI role step: roles are cluster-wide, so tests must not rotate it
@@ -204,7 +205,7 @@ async function cleanup(): Promise<void> {
 beforeAll(async () => {
   owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
   // ops gives ebda_app its LOGIN + password per environment; the migration creates it NOLOGIN.
-  await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+  await setAppRoleLogin(owner, APP_PASSWORD);
   await cleanup();
 
   const mkUser = (tag: string, role: string, storeId: string | null) =>
