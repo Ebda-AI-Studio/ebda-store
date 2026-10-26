@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BRAND } from '@ebda/shared/brand';
+import { BRAND, WHATSAPP_PACKAGES, type WhatsAppBasePackageId } from '@ebda/shared/brand';
 import { CAPABILITIES } from './capabilities';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
@@ -211,7 +211,7 @@ export function jsonLd(
 
 /**
  * JSON-LD of the Ebda WhatsApp page: the studio (publisher), the product as a brand under it, a SoftwareApplication
- * and the page FAQ. No Offer: package prices are not published (they are not decided in code), so none is invented.
+ * and the page FAQ. Offers come from WHATSAPP_PACKAGES (WA-PRICE-1), the same constant the pricing section renders.
  */
 export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: string }[]) {
   const org = `${SITE_URL}/#organization`;
@@ -254,6 +254,28 @@ export function whatsappJsonLd(locale: Locale, faq: readonly { q: string; a: str
         installUrl: SIGNUP_URL,
         publisher: { '@id': org },
         inLanguage: ['ar', 'en'],
+        // one Offer per PRICED package id in WHATSAPP_PACKAGES (WA-PRICE-1; store-included has no price, there is no free plan): EGP for the package's period (1 or 12 months), Meta fees excluded
+        offers: WHATSAPP_PACKAGES.filter(pk => pk.priceMinor > 0).map(pk => {
+          const yearly = pk.periodMonths === 12;
+          const price = (pk.priceMinor / 100).toFixed(2);
+          const base = pk.id.replace(/-yearly$/, '') as WhatsAppBasePackageId;
+          return {
+            '@type': 'Offer',
+            name: `${p.pricing.names[base].name} (${yearly ? p.pricing.yearly : p.pricing.monthly})`,
+            sku: pk.id,
+            price,
+            priceCurrency: 'EGP',
+            priceSpecification: {
+              '@type': 'UnitPriceSpecification',
+              price,
+              priceCurrency: 'EGP',
+              billingDuration: yearly ? 'P1Y' : 'P1M',
+              unitCode: yearly ? 'ANN' : 'MON',
+            },
+            url: WHATSAPP_APP_URL,
+            availability: 'https://schema.org/PreOrder',
+          };
+        }),
       },
       {
         '@type': 'FAQPage',

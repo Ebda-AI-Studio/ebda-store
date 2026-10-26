@@ -203,6 +203,132 @@ export function poweredByBrand(locale?: string | null): string {
     : `Powered by ${BRAND.product.nameEn}`;
 }
 
+// ---- Ebda WhatsApp packages (Ruling WA-PRICE-1 / WA-PRICE-1a, Ahmad 2026-10-26) ----
+/**
+ * The Ebda WhatsApp packages, in ONE place: the marketing pricing section and its JSON-LD read it, and the WhatsApp app
+ * seeds the same ids, prices, seats and credits. Money is EGP in minor units (piastres) for ONE period: `periodMonths`
+ * is 1 (monthly) or 12 (a `-yearly` package, priced at 9 months for 12, the Store rule). A yearly package carries the
+ * same features as its monthly one (AI credits are still granted monthly). `features` uses the entitlement keys the
+ * app enforces (deny by default): a number is a limit (`members` = team seats, `ai_credits` = AI replies a month), a
+ * boolean is a switch. `store-included` is the package a Store Business plan carries (price 0, no yearly twin). Meta's
+ * message fees are NOT in these prices (own number: Meta bills the card; shared number: prepaid wallet, 0% margin at
+ * the moment, WA-MARGIN-1).
+ */
+export const WHATSAPP_YEARLY_MONTHS_PAID = 9;
+export type WhatsAppBasePackageId = 'store-included' | 'starter' | 'growth' | 'pro';
+export type WhatsAppPackageId =
+  | WhatsAppBasePackageId
+  | 'starter-yearly'
+  | 'growth-yearly'
+  | 'pro-yearly';
+export interface WhatsAppPackageFeatures {
+  members: number;
+  shared_inbox: boolean;
+  order_confirmations: boolean;
+  templates: boolean;
+  campaigns: boolean;
+  order_in_chat: boolean;
+  api: boolean;
+  priority_support: boolean;
+  ai_credits: number;
+}
+export interface WhatsAppPackageDef {
+  id: WhatsAppPackageId;
+  /** 1 = monthly, 12 = yearly. */
+  periodMonths: 1 | 12;
+  /** EGP piastres for one period. */
+  priceMinor: number;
+  features: WhatsAppPackageFeatures;
+}
+const WA_BASE: Record<
+  WhatsAppBasePackageId,
+  { priceMinor: number; features: WhatsAppPackageFeatures }
+> = {
+  'store-included': {
+    priceMinor: 0,
+    features: {
+      members: 2,
+      shared_inbox: true,
+      order_confirmations: true,
+      templates: true,
+      campaigns: false,
+      order_in_chat: false,
+      api: false,
+      priority_support: false,
+      ai_credits: 100,
+    },
+  },
+  starter: {
+    priceMinor: 69000,
+    features: {
+      members: 2,
+      shared_inbox: true,
+      order_confirmations: true,
+      templates: true,
+      campaigns: false,
+      order_in_chat: false,
+      api: false,
+      priority_support: false,
+      ai_credits: 300,
+    },
+  },
+  growth: {
+    priceMinor: 149000,
+    features: {
+      members: 5,
+      shared_inbox: true,
+      order_confirmations: true,
+      templates: true,
+      campaigns: true,
+      order_in_chat: true,
+      api: false,
+      priority_support: false,
+      ai_credits: 1500,
+    },
+  },
+  pro: {
+    priceMinor: 349000,
+    features: {
+      members: 15,
+      shared_inbox: true,
+      order_confirmations: true,
+      templates: true,
+      campaigns: true,
+      order_in_chat: true,
+      api: true,
+      priority_support: true,
+      ai_credits: 5000,
+    },
+  },
+};
+const WA_PAID = ['starter', 'growth', 'pro'] as const;
+/** The seven packages: the four monthly ones, then the three yearly twins (9x the monthly price, 12 months). */
+export const WHATSAPP_PACKAGES: readonly WhatsAppPackageDef[] = [
+  ...(Object.keys(WA_BASE) as WhatsAppBasePackageId[]).map(id => ({
+    id,
+    periodMonths: 1 as const,
+    ...WA_BASE[id],
+  })),
+  ...WA_PAID.map(id => ({
+    id: `${id}-yearly` as const,
+    periodMonths: 12 as const,
+    priceMinor: WA_BASE[id].priceMinor * WHATSAPP_YEARLY_MONTHS_PAID,
+    features: WA_BASE[id].features,
+  })),
+];
+/** The monthly packages, in card order. */
+export const WHATSAPP_MONTHLY_PACKAGES = WHATSAPP_PACKAGES.filter(p => p.periodMonths === 1);
+/** A package by id (throws on an unknown id: ids are a closed set). */
+export function whatsappPackage(id: WhatsAppPackageId): WhatsAppPackageDef {
+  const p = WHATSAPP_PACKAGES.find(x => x.id === id);
+  if (!p) throw new Error(`unknown WhatsApp package ${id}`);
+  return p;
+}
+/** The yearly twin of a monthly package; `store-included` has none (it stays 0 for the year). */
+export function whatsappYearlyOf(id: WhatsAppBasePackageId): WhatsAppPackageDef {
+  return id === 'store-included' ? whatsappPackage(id) : whatsappPackage(`${id}-yearly`);
+}
+
 // ---- shared header navigation of the support sites (docs, help, status) ----
 /**
  * The ONE header navigation of the three Ebda AI Studio support sites (docs, help, status): the wordmark lockup, the
