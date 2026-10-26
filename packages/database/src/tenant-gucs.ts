@@ -23,6 +23,16 @@ export interface TenantGucs {
 export const GUC_STORE = 'app.current_store_id';
 export const GUC_USER = 'app.current_user_id';
 
+/**
+ * Every tenant transaction also pins the SESSION TIME ZONE to UTC (transaction-local, the same statement,
+ * no extra round trip). The schema stores instants in `timestamp(3)` WITHOUT time zone: Prisma writes UTC
+ * wall time, but a SQL `now()` / `CURRENT_TIMESTAMP` default or `now() - interval` comparison yields the
+ * wall time of the session's zone. Production happens to run UTC; a server or pooler on any other zone
+ * (a developer's Postgres on a non-UTC zone did) silently shifted every DB-side default by hours, so rows
+ * written by `now()` looked hours old or hours in the future next to rows Prisma wrote (Ruling ITEST-12).
+ */
+export const TENANT_TIME_ZONE = 'UTC';
+
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -42,6 +52,7 @@ export function gucStatements(gucs: TenantGucs): Array<{ sql: string; params: st
     params.push(gucs.userId);
     calls.push(`set_config('${GUC_USER}', $${params.length}, true)`);
   }
+  if (calls.length) calls.push(`set_config('TimeZone', '${TENANT_TIME_ZONE}', true)`);
   return calls.length ? [{ sql: `SELECT ${calls.join(', ')}`, params }] : [];
 }
 

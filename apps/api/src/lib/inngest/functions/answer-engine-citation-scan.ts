@@ -56,7 +56,11 @@ export interface ScanStoreResult {
  * database make the filter miss rows an earlier attempt wrote.
  */
 async function dbNowIso(): Promise<string> {
-  const rows = await prisma.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`;
+  // `AT TIME ZONE 'UTC'`: the driver reads a bare `timestamptz` as if its wall-clock text were UTC and drops the
+  // offset, so a plain `now()` was hours off on any session whose zone is not UTC (Ruling ITEST-12).
+  const rows = await prisma.$queryRaw<
+    Array<{ now: Date }>
+  >`SELECT (now() AT TIME ZONE 'UTC') AS now`;
   return new Date(rows[0]?.now ?? Date.now()).toISOString();
 }
 

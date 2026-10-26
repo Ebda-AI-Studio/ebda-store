@@ -297,7 +297,7 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
 
     it('an old row cannot be withdrawn', async () => {
       const id = await mkSend(op);
-      await owner.$executeRaw`UPDATE legal_notice_sends SET sent_at = now() - interval '11 minutes' WHERE id = ${id}`;
+      await owner.$executeRaw`UPDATE legal_notice_sends SET sent_at = (now() AT TIME ZONE 'UTC') - interval '11 minutes' WHERE id = ${id}`;
       expect(await withdraw(op, id)).toBe(0);
       expect(await left()).toBe(1);
     });
