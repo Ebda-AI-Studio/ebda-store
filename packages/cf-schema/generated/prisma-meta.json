@@ -18927,6 +18927,41 @@
           "optional": false,
           "default": "\"pending\""
         },
+        "sourceEventId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source_event_id",
+          "list": false,
+          "optional": true
+        },
+        "sourceStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source_store_id",
+          "list": false,
+          "optional": true
+        },
+        "revokedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "revoked_at",
+          "list": false,
+          "optional": true
+        },
+        "revokeReason": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "revoke_reason",
+          "list": false,
+          "optional": true
+        },
+        "restoredAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "restored_at",
+          "list": false,
+          "optional": true
+        },
         "idempotencyKey": {
           "kind": "scalar",
           "type": "String",

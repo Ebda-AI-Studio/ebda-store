@@ -150,7 +150,7 @@
         "billing_webhook_events": 7,
         "provider_activation_requests": 11,
         "billing_referrals": 3,
-        "billing_grants": 12,
+        "billing_grants": 17,
         "stores": 30,
         "entity_index": 4,
         "platform_audit_log": 8

@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS "billing_grants" (
   "months" INTEGER NOT NULL DEFAULT 1,
   "value_minor" INTEGER NOT NULL DEFAULT 0,
   "status" TEXT NOT NULL DEFAULT 'pending',
+  "source_event_id" TEXT,
+  "source_store_id" TEXT,
+  "revoked_at" INTEGER,
+  "revoke_reason" TEXT,
+  "restored_at" INTEGER,
   "idempotency_key" TEXT NOT NULL,
   "period_end_before" INTEGER,
   "period_end_after" INTEGER,
@@ -64,13 +69,15 @@ CREATE TABLE IF NOT EXISTS "billing_grants" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "billing_grants_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "billing_grants_kind_check" CHECK ("kind" IN ('founding', 'referral_referrer', 'referral_referred')),
-  CONSTRAINT "billing_grants_status_check" CHECK ("status" IN ('pending', 'applied')),
+  CONSTRAINT "billing_grants_status_check" CHECK ("status" IN ('pending', 'applied', 'revoked')),
   CONSTRAINT "billing_grants_months_check" CHECK ("months" = 1),
   CONSTRAINT "billing_grants_value_check" CHECK ("value_minor" >= 0)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "billing_grants_idempotency_key_key" ON "billing_grants" ("idempotency_key");
 CREATE INDEX IF NOT EXISTS "billing_grants_beneficiary_id_status_idx" ON "billing_grants" ("beneficiary_id", "status");
 CREATE INDEX IF NOT EXISTS "billing_grants_kind_created_at_idx" ON "billing_grants" ("kind", "created_at");
+CREATE INDEX IF NOT EXISTS "billing_grants_source_event_id_idx" ON "billing_grants" ("source_event_id");
+CREATE INDEX IF NOT EXISTS "billing_grants_source_store_id_status_idx" ON "billing_grants" ("source_store_id", "status");
 
 CREATE TABLE IF NOT EXISTS "billing_referrals" (
   "referred_store_id" TEXT NOT NULL,

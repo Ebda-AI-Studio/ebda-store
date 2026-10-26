@@ -61,6 +61,18 @@ describe('D1 platform schema', () => {
         () => db.prepare(`UPDATE billing_grants SET status = 'pending' WHERE id = 'g1'`).run(),
         /append-only/
       );
+      db.prepare(
+        `UPDATE billing_grants SET status = 'revoked', revoked_at = 2 WHERE id = 'g1'`
+      ).run();
+      db.prepare(`UPDATE billing_grants SET restored_at = 3 WHERE id = 'g1'`).run();
+      expectThrows(
+        () => db.prepare(`UPDATE billing_grants SET restored_at = 4 WHERE id = 'g1'`).run(),
+        /append-only/
+      );
+      expectThrows(
+        () => db.prepare(`UPDATE billing_grants SET status = 'applied' WHERE id = 'g1'`).run(),
+        /append-only/
+      );
     });
   });
 
