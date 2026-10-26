@@ -16,8 +16,8 @@ describe('studio pages on hosts nobody serves', () => {
     ['erp.ebda.app', 'Ebda ERP is coming soon.'],
     ['wa.ebda.app', 'Ebda WhatsApp is coming soon.'],
     ['whatsapp.ebda.app', 'Ebda WhatsApp is coming soon.'],
-    ['hub.ebda.app', 'This address is held for an upcoming Ebda service.'],
-    ['id.ebda.app', 'This address is held for an upcoming Ebda service.'],
+    ['hub.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
+    ['id.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
   ])('%s: 200 coming soon, noindex, search box, live links', async (host, line) => {
     const res = hit(host, '/', { 'accept-language': 'en-US,en;q=0.9' });
     expect(res.status).toBe(200);
