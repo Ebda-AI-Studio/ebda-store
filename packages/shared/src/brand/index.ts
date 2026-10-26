@@ -210,7 +210,7 @@ export interface SiteNavItem {
   label: string;
 }
 export interface SiteNavProduct {
-  id: 'store';
+  id: 'store' | 'whatsapp';
   href: string;
   label: string;
   blurb: string;
@@ -257,6 +257,16 @@ export function siteNavProducts(lang: NavLang): SiteNavProduct[] {
       label: lang === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
       // the marketing header's own storeBlurb (apps/marketing content.ts); tests/unit/site-nav-shared.test.ts keeps them equal
       blurb: L(lang, 'متجرك أونلاين في دقايق', 'Your online store in minutes'),
+    },
+    {
+      id: 'whatsapp',
+      href: `${marketing(lang)}whatsapp/`,
+      label: L(lang, 'ابدأ واتساب', 'Ebda WhatsApp'),
+      blurb: L(
+        lang,
+        'واتساب لمتجرك: ردود وحملات وطلبات',
+        'WhatsApp for your store: chats, campaigns, orders'
+      ),
     },
   ];
 }

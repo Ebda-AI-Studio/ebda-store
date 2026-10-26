@@ -59,19 +59,21 @@ describe('shared header nav on docs, help and status', () => {
         for (const [site, html] of Object.entries(pages())) {
           const nav = navOf(html);
           const desktop = links(nav.slice(0, nav.indexOf('<details class="nav-menu">')));
-          const store = siteNavProducts(lang)[0];
+          const products = siteNavProducts(lang).map(p => p.href);
           expect(
             desktop.map(l => l.href),
             site
-          ).toEqual([store.href, ...want.map(i => i.href)]);
-          expect(desktop.map(l => l.text).slice(1), site).toEqual(want.map(i => i.label));
+          ).toEqual([...products, ...want.map(i => i.href)]);
+          expect(desktop.map(l => l.text).slice(products.length), site).toEqual(
+            want.map(i => i.label)
+          );
           expect(nav).toContain(`<summary>${siteNavLabels(lang).products}</summary>`);
           // the mobile menu repeats every link
           const mobile = links(nav.slice(nav.indexOf('<details class="nav-menu">')));
           expect(
             mobile.map(l => l.href),
             site
-          ).toEqual([store.href, ...want.map(i => i.href)]);
+          ).toEqual([...products, ...want.map(i => i.href)]);
         }
       });
 
