@@ -56,7 +56,15 @@ if (form && input && !document.getElementById('search-root')) {
   input.setAttribute('aria-expanded', 'false');
   input.setAttribute('autocomplete', 'off');
 
-  let mini = null;
+  // One index (help/docs) or several (the studio 404 searches help + docs + marketing). `data-sources` is a
+  // JSON list of { index, base }: `base` makes the hrefs of a cross-origin index absolute.
+  let sources = [{ index: form.dataset.index, base: '' }];
+  try {
+    if (form.dataset.sources) sources = JSON.parse(form.dataset.sources);
+  } catch {
+    /* keep the single index */
+  }
+  let minis = [];
   let loadState = 'idle'; // idle | loading | ready | error
   let hits = [];
   let active = -1;
@@ -66,20 +74,21 @@ if (form && input && !document.getElementById('search-root')) {
   const load = () => {
     if (loadState !== 'idle') return;
     loadState = 'loading';
-    fetch(form.dataset.index)
-      .then(r => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.text();
-      })
-      .then(json => {
-        mini = MiniSearch.loadJSON(json, searchOptions);
-        loadState = 'ready';
-        run();
-      })
-      .catch(() => {
-        loadState = 'error';
-        run();
-      });
+    Promise.all(
+      sources.map(src =>
+        fetch(src.index)
+          .then(r => {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.text();
+          })
+          .then(json => ({ mini: MiniSearch.loadJSON(json, searchOptions), base: src.base || '' }))
+          .catch(() => null)
+      )
+    ).then(loaded => {
+      minis = loaded.filter(Boolean);
+      loadState = minis.length ? 'ready' : 'error';
+      run();
+    });
   };
 
   // The <a> itself is the option (a focusable link nested in an option fails axe nested-interactive).
@@ -190,7 +199,12 @@ if (form && input && !document.getElementById('search-root')) {
     if (loadState === 'loading') return show(q, 'loading');
     if (loadState === 'error') return show(q, 'error');
     // The index is per locale already (docs' Arabic pages point at the English one), so no lang filter.
-    hits = mini.search(q, querySettings).slice(0, MAX);
+    hits = minis
+      .flatMap(({ mini, base }) =>
+        mini.search(q, querySettings).map(h => ({ ...h, id: base + h.id }))
+      )
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX);
     show(q, hits.length ? 'results' : 'none');
   };
 
