@@ -37,15 +37,14 @@ export function NavBehavior() {
       open.open = false;
       trigger(open)?.focus();
     };
-    const onPointer = (e: Event) => {
-      const t = e.target as Node;
-      for (const d of menus()) if (d.open && !d.contains(t)) d.open = false;
-    };
-    const onFocusIn = (e: FocusEvent) => {
+    /** Pointer or focus landed outside an open menu: close it. */
+    const onOutside = (e: Event) => {
       const t = e.target as Node;
       for (const d of menus()) if (d.open && !d.contains(t)) d.open = false;
     };
     const onClick = (e: MouseEvent) => {
+      // a new-tab or modified click leaves this page where it is, so the menu stays
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
       const a = (e.target as HTMLElement).closest('a');
       const d = a?.closest('details');
       if (a && d && header.contains(d)) d.open = false;
@@ -55,14 +54,14 @@ export function NavBehavior() {
     header.addEventListener('toggle', onToggle, true);
     header.addEventListener('click', onClick);
     document.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onPointer);
-    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('pointerdown', onOutside);
+    document.addEventListener('focusin', onOutside);
     return () => {
       header.removeEventListener('toggle', onToggle, true);
       header.removeEventListener('click', onClick);
       document.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onPointer);
-      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('pointerdown', onOutside);
+      document.removeEventListener('focusin', onOutside);
     };
   }, []);
   return null;

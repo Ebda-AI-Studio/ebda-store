@@ -11,7 +11,7 @@ import { COPY } from '../lib/content';
 import { egp } from '../lib/demo-stores';
 import { whatsappJsonLd } from '../lib/seo';
 import { HOME, SIGNUP_URL, pagePath, type Locale } from '../lib/site';
-import { WHATSAPP_APP_URL, WHATSAPP_PAGE } from '../lib/whatsapp-page';
+import { WHATSAPP_APP_URL, WHATSAPP_PAGE, WHATSAPP_YEARLY_SAVING_PCT } from '../lib/whatsapp-page';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { Reveal } from './Motion';
@@ -70,16 +70,11 @@ function Pricing({ locale }: { locale: Locale }) {
           ))}
         </fieldset>
         <ul className="plans wa-plans">
-          {WHATSAPP_MONTHLY_PACKAGES.map((p, i) => {
+          {WHATSAPP_MONTHLY_PACKAGES.map(p => {
             const n = c.names[p.id as WhatsAppBasePackageId];
             const included = p.id === 'store-included';
             return (
-              <li
-                key={p.id}
-                className="plan"
-                data-plan={p.id}
-                style={{ '--i': i } as React.CSSProperties}
-              >
+              <li key={p.id} className="plan" data-plan={p.id}>
                 <h3>{n.name}</h3>
                 <p className="muted plan-tag">{n.tag}</p>
                 {included ? (
@@ -125,7 +120,7 @@ function Pricing({ locale }: { locale: Locale }) {
           })}
         </ul>
       </Reveal>
-      <p className="muted small">{c.saveNote}</p>
+      <p className="muted small">{c.saveNote(WHATSAPP_YEARLY_SAVING_PCT)}</p>
       <p className="muted small wa-meta-note">{c.metaNote}</p>
     </section>
   );

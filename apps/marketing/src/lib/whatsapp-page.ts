@@ -1,12 +1,12 @@
-import { BRAND, type WhatsAppBasePackageId } from '@ebda/shared/brand';
+import { BRAND, WHATSAPP_YEARLY_MONTHS_PAID, type WhatsAppBasePackageId } from '@ebda/shared/brand';
 import { PLANS } from './plans';
 import type { Locale } from './site';
 
 /**
  * Copy of the Ebda WhatsApp product page (/whatsapp, /en/whatsapp). Every fact here is taken from the Ebda WhatsApp
- * repo (docs/help, docs/site, docs/billing.md) or the program register; nothing is invented. Package PRICES are not
- * published on purpose: they are not decided in code (only the free "included with the store plan" package is seeded),
- * so the page says where they appear instead of quoting a number.
+ * repo (docs/help, docs/site, docs/billing.md) or the program register; nothing is invented. Package prices, seats
+ * and AI credits are NOT typed here: the pricing section reads WHATSAPP_PACKAGES (Ruling WA-PRICE-1), and the copy
+ * below only supplies labels.
  */
 export interface WhatsAppPage {
   meta: { title: string; desc: string };
@@ -55,7 +55,8 @@ export interface WhatsAppPricingCopy {
   yearly: string;
   intervalLabel: string;
   pickLabel: string;
-  saveNote: string;
+  /** The yearly saving, as a percent derived from the months paid for twelve. */
+  saveNote: (percent: number) => string;
   /** Under the cards: Meta's fees are separate. */
   metaNote: string;
   names: Record<WhatsAppBasePackageId, { name: string; short: string; tag: string }>;
@@ -142,7 +143,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       yearly: 'سنوي',
       intervalLabel: 'مدة الدفع',
       pickLabel: 'اختار الباقة',
-      saveNote: 'وفّر 25% لو دفعت سنوي.',
+      saveNote: pct => `وفّر ${pct}% لو دفعت سنوي.`,
       metaNote:
         'رسوم رسايل Meta منفصلة: على رقمك الخاص Meta بتحاسب كارتك إنت، وعلى الرقم المشترك بتتخصم من محفظة مدفوعة مقدمًا، وبدون هامش مننا حاليًا (0%).',
       names: {
@@ -175,7 +176,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       'Meta بتحاسب على الرسايل حسب نوعها (تسويق، معاملات، مصادقة، خدمة). على رقمك الخاص بتحاسب كارتك إنت مباشرةً. على الرقم المشترك بتتخصم من محفظة بالجنيه بتشحنها، بنفس سعر Meta.',
     ],
     accountH: 'حساب واحد',
-    account: `بتدخل ${AR} بنفس حساب ${STUDIO_AR} اللي بتدخل بيه ${STORE_AR}، من خلال accounts.ebda.app. مفيش حساب تاني ولا باسورد تاني.`,
+    account: `بتدخل ${AR} بنفس حساب ${STUDIO_AR} اللي بتدخل بيه ${STORE_AR}، من خلال ${BRAND.domains.accounts}. مفيش حساب تاني ولا باسورد تاني.`,
     faqH: 'أسئلة شائعة',
     faq: [
       {
@@ -272,7 +273,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       yearly: 'Yearly',
       intervalLabel: 'Billing period',
       pickLabel: 'Choose a package',
-      saveNote: 'Save 25% when you pay yearly.',
+      saveNote: pct => `Save ${pct}% when you pay yearly.`,
       metaNote:
         "Meta's message fees are separate: on your own number Meta bills your card; on the shared number they come from a prepaid wallet with 0% margin from us at the moment.",
       names: {
@@ -305,7 +306,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
       "Meta charges per message by category (marketing, utility, authentication, service). On your own number, Meta bills your card directly. On the shared number the charge comes out of a prepaid EGP wallet you top up, at Meta's price.",
     ],
     accountH: 'One account',
-    account: `You sign in to ${EN} with the same ${STUDIO_EN} account you use for ${STORE_EN}, through accounts.ebda.app. No second account, no second password.`,
+    account: `You sign in to ${EN} with the same ${STUDIO_EN} account you use for ${STORE_EN}, through ${BRAND.domains.accounts}. No second account, no second password.`,
     faqH: 'Questions',
     faq: [
       {
@@ -337,4 +338,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
 };
 
 /** The WhatsApp app (LAUNCH-SUITE-1). */
+/** The yearly saving in percent (9 months paid for 12 = 25%). */
+export const WHATSAPP_YEARLY_SAVING_PCT = Math.round((1 - WHATSAPP_YEARLY_MONTHS_PAID / 12) * 100);
+
 export const WHATSAPP_APP_URL = `https://${BRAND.domains.whatsappApp}`;

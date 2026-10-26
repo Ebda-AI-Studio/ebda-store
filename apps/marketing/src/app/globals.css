@@ -2836,3 +2836,13 @@ html[dir='rtl'] .not-found .lead {
   line-height: 1.4;
   letter-spacing: 0;
 }
+/* stagger of the reveal (the Store cards set --i inline; no inline style here) */
+.wa-plans .plan:nth-child(2) {
+  --i: 1;
+}
+.wa-plans .plan:nth-child(3) {
+  --i: 2;
+}
+.wa-plans .plan:nth-child(4) {
+  --i: 3;
+}
