@@ -9465,7 +9465,7 @@
       "example1": "Add a newsletter section",
       "example2": "Hide the testimonials",
       "changesTitle": "What will change",
-      "none": "The assistant could not turn that into a change. Try describing it differently.",
+      "none": "Nothing to change: the page already looks like that, or the request cannot be done safely. Try describing it differently.",
       "skipped": "{count} part(s) were skipped because the page does not support them.",
       "apply": "Apply to draft",
       "applying": "Applying…",
@@ -9483,7 +9483,10 @@
       "added": "Add section",
       "removed": "Remove section",
       "moved_to": "Move to position {pos}",
-      "theme": "Theme"
+      "theme": "Theme",
+      "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
+      "on": "on",
+      "off": "off"
     }
   },
   "instapayReceipt": {

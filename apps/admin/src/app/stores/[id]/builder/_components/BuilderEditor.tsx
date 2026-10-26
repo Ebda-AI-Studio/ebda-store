@@ -511,22 +511,12 @@ export function BuilderEditor({
     if (!patchPreview) return;
     setPatchBusy('apply');
     try {
-      const r = await apiPost(
-        `/api/v1/admin/stores/${storeId}/builder/pages/${pageKey}/ai-patch/apply`,
-        { baseRev: patchPreview.baseRev, ops: patchPreview.ops }
-      );
-      if (r.error) {
-        setPatchPreview(null);
-        return void setPatchError(
-          r.error.code === 'REV_CONFLICT' || r.error.code === 'PATCH_STALE'
-            ? t('aiPatch.moved')
-            : t('aiPatch.failed')
-        );
-      }
-      toastSuccess(t('aiPatch.applied'));
+      // One undo step, then the normal draft save: a hand edit and an AI edit are the same thing to the page.
+      const candidate = patchPreview.candidate;
       setPatchPreview(null);
-      await b.reload();
-      setReloadKey(k => k + 1);
+      b.replaceDocument(candidate);
+      if (await b.saveDraftNow()) toastSuccess(t('aiPatch.applied'));
+      else setPatchError(t('aiPatch.failed'));
     } finally {
       setPatchBusy(null);
     }
@@ -980,6 +970,34 @@ export function BuilderEditor({
           {b.publishing ? t('publishing') : t('publish')}
         </button>
       </header>
+
+      {patchPreview && !lookPreview && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 border-b border-primary/30 bg-primary/10 px-4 py-2 text-sm"
+          data-testid="ai-patch-bar"
+        >
+          <span className="flex-1">{t('aiPatch.bar')}</span>
+          {patchPreview.changes.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void applyAiPatchNow()}
+              disabled={patchBusy !== null}
+              className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {patchBusy === 'apply' ? t('aiPatch.applying') : t('aiPatch.apply')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setPatchPreview(null)}
+            disabled={patchBusy !== null}
+            className="rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium disabled:opacity-50"
+          >
+            {t('aiPatch.discard')}
+          </button>
+        </div>
+      )}
 
       {lookPreview && (
         <div

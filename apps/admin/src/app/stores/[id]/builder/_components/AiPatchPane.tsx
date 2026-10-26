@@ -29,9 +29,15 @@ export interface AiPatchProposal {
   rejected: Array<{ index: number; reason: string }>;
 }
 
-function show(v: unknown, t: (k: string, p?: Record<string, string | number>) => string): string {
+/** A boolean means "hidden" for a hide/show change and "on" for a switch setting. */
+function show(
+  v: unknown,
+  op: string,
+  t: (k: string, p?: Record<string, string | number>) => string
+): string {
   if (v === undefined || v === null || v === '') return '-';
-  if (typeof v === 'boolean') return v ? t('shown') : t('hidden');
+  if (typeof v === 'boolean')
+    return op === 'setSectionHidden' ? t(v ? 'hidden' : 'shown') : t(v ? 'on' : 'off');
   return String(v);
 }
 
@@ -61,15 +67,19 @@ export function AiPatchPane({
       data-setting-id="builder.ai-patch"
     >
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">{t('title')}</h2>
+        <h2 id="ai-patch-title" className="text-sm font-semibold">
+          {t('title')}
+        </h2>
         <p className="mt-1 text-xs text-muted-foreground">{t('intro')}</p>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {proposal ? (
           <section aria-label={t('changesTitle')} className="space-y-3 text-sm">
-            <p className="font-medium">
-              {locale === 'ar' ? proposal.summaryAr : proposal.summaryEn}
-            </p>
+            {proposal.changes.length > 0 && (
+              <p className="font-medium">
+                {locale === 'ar' ? proposal.summaryAr : proposal.summaryEn}
+              </p>
+            )}
             {proposal.changes.length === 0 ? (
               <p className="text-xs text-muted-foreground">{t('none')}</p>
             ) : (
@@ -87,10 +97,12 @@ export function AiPatchPane({
                       c.op === 'setSectionHidden' ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1 text-muted-foreground">
                           <span>{t('from')}</span>
-                          <bdi className="rounded bg-muted px-1">{show(c.before, t)}</bdi>
+                          <bdi className="rounded bg-muted px-1 line-through decoration-muted-foreground/60">
+                            {show(c.before, c.op, t)}
+                          </bdi>
                           <span>{t('to')}</span>
                           <bdi className="rounded bg-primary/15 px-1 text-foreground">
-                            {show(c.after, t)}
+                            {show(c.after, c.op, t)}
                           </bdi>
                         </span>
                       ) : (
@@ -140,11 +152,9 @@ export function AiPatchPane({
           </section>
         ) : (
           <>
-            <label className="block text-xs font-medium" htmlFor="ai-patch-input">
-              {t('title')}
-            </label>
             <textarea
               id="ai-patch-input"
+              aria-labelledby="ai-patch-title"
               dir="auto"
               rows={4}
               maxLength={500}

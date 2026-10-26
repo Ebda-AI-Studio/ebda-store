@@ -136,7 +136,7 @@ router.post(
  * POST /stores/:storeId/ai/builder-patch
  * The visual builder's "ask AI" box: a plain Arabic/English request becomes a STRUCTURED patch
  * proposal against the saved page document (never code). Nothing is saved here; the merchant
- * reviews the diff and applies it through POST /builder/pages/:pageKey/ai-patch/apply.
+ * reviews the diff and applies it as a normal draft edit (one undo step) in the editor.
  */
 const builderPatchSchema = z
   .object({

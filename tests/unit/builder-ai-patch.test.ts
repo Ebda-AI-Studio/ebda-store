@@ -74,6 +74,24 @@ describe('applyAiPatch', () => {
     expect(r.changes).toEqual([]);
     expect(r.rejected.map(x => x.reason)).toEqual(['BAD_VALUE', 'BAD_VALUE']);
   });
+  it('drops an op that changes nothing (already hidden, same value), so the diff never lies', () => {
+    const doc = base();
+    const hero = doc.sections.find(s => s.type === 'hero')!;
+    const same = hero.settings.autoplayMs;
+    const r = applyAiPatch(doc, [
+      { op: 'setSectionSetting', id: hero.id, key: 'autoplayMs', value: same as number },
+      { op: 'setSectionHidden', id: hero.id, hidden: !!hero.hidden },
+    ]);
+    expect(r.changes).toEqual([]);
+    expect(r.rejected).toEqual([]);
+    expect(r.doc).toBe(doc);
+  });
+  it('reports the real before value for hide/show', () => {
+    const doc = base();
+    const sec = doc.sections.find(s => s.type === 'testimonials')!;
+    const r = applyAiPatch(doc, [{ op: 'setSectionHidden', id: sec.id, hidden: true }]);
+    expect(r.changes[0]).toMatchObject({ op: 'setSectionHidden', before: false, after: true });
+  });
   it('rejects a section id that does not exist', () => {
     const r = applyAiPatch(base(), [{ op: 'setSectionHidden', id: 'nope', hidden: true }]);
     expect(r.rejected[0].reason).toBe('NOT_FOUND');

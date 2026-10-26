@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { reduceDocument, locateSection, type ReduceResult } from './editor/document-reducer';
 import { DRAFT_THEME_KEYS, draftThemeSchema } from './theme-draft';
 import { SECTION_REGISTRY, getSectionDefinition, sectionAllowedOnPage } from './registry';
-import type { SettingDefinition } from './settings-schema';
+import { THEME_SETTINGS_SCHEMA, type SettingDefinition } from './settings-schema';
 import type { PageDefinition } from './schema';
 import { SECTION_ID_RE } from './schema';
 
@@ -98,6 +98,12 @@ function settingDef(
   return null;
 }
 
+function themeLabel(key: string): { labelEn: string; labelAr: string } | undefined {
+  for (const g of THEME_SETTINGS_SCHEMA)
+    for (const s of g.settings) if (String(s.id) === key) return s;
+  return undefined;
+}
+
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const TOKEN = /^token:[a-zA-Z]+$/;
 
@@ -140,6 +146,7 @@ export function applyAiPatch(input: PageDefinition, ops: readonly AiPatchOp[]): 
         const hit = sd && settingDef(sd.settings, op.key);
         if (!sd || !hit) return reject(index, 'UNKNOWN_SETTING');
         if (!valueFits(hit.def, op.value)) return reject(index, 'BAD_VALUE');
+        if (at.node.settings[op.key] === op.value) return;
         const r = reduceDocument(doc, {
           type: 'setSectionSetting',
           id: op.id,
@@ -167,6 +174,7 @@ export function applyAiPatch(input: PageDefinition, ops: readonly AiPatchOp[]): 
         const hit = bd && settingDef(bd.settings, op.key);
         if (!bd || !hit) return reject(index, 'UNKNOWN_SETTING');
         if (!valueFits(hit.def, op.value)) return reject(index, 'BAD_VALUE');
+        if (block.settings[op.key] === op.value) return;
         const r = reduceDocument(doc, {
           type: 'setBlockSetting',
           sectionId: op.sectionId,
@@ -194,6 +202,7 @@ export function applyAiPatch(input: PageDefinition, ops: readonly AiPatchOp[]): 
       case 'addSection': {
         const at = op.op === 'addSection' ? null : locateSection(doc, op.id);
         if (op.op !== 'addSection' && !at) return reject(index, 'NOT_FOUND');
+        if (op.op === 'setSectionHidden' && !!at!.node.hidden === op.hidden) return;
         const r =
           op.op === 'addSection'
             ? reduceDocument(doc, {
@@ -215,6 +224,7 @@ export function applyAiPatch(input: PageDefinition, ops: readonly AiPatchOp[]): 
         changes.push({
           op: op.op,
           id: op.op === 'addSection' ? r.createdId : op.id,
+          before: op.op === 'setSectionHidden' ? !!at!.node.hidden : undefined,
           after:
             op.op === 'setSectionHidden'
               ? op.hidden
@@ -229,6 +239,7 @@ export function applyAiPatch(input: PageDefinition, ops: readonly AiPatchOp[]): 
       }
       case 'setTheme': {
         if (!DRAFT_THEME_KEYS.includes(op.key)) return reject(index, 'UNKNOWN_THEME_KEY');
+        if (doc.theme?.[op.key] === op.value) return;
         const next = { ...(doc.theme ?? {}), [op.key]: op.value };
         if (!draftThemeSchema.safeParse(next).success) return reject(index, 'BAD_VALUE');
         changes.push({
@@ -236,8 +247,8 @@ export function applyAiPatch(input: PageDefinition, ops: readonly AiPatchOp[]): 
           key: op.key,
           before: doc.theme?.[op.key],
           after: op.value,
-          labelEn: `Theme: ${op.key}`,
-          labelAr: `التصميم: ${op.key}`,
+          labelEn: `Theme: ${themeLabel(op.key)?.labelEn ?? op.key}`,
+          labelAr: `المظهر: ${themeLabel(op.key)?.labelAr ?? op.key}`,
         });
         doc = { ...doc, theme: next };
         return;

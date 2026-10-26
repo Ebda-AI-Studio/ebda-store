@@ -8,7 +8,6 @@
  *   POST /pages/:pageKey/publish             { baseRev }             -> { rev, layout } (purges every cache layer)
  *   GET  /pages/:pageKey/revisions           ?cursor=<rev>&limit=<n> -> { revisions, nextCursor }
  *   POST /pages/:pageKey/rollback            { targetRev, baseRev }  -> { rev, discardedDraftRev, layout }
- *   POST /pages/:pageKey/ai-patch/apply      { baseRev, ops }         -> { rev, changes } (saves a DRAFT)
  *   POST /pages/:pageKey/preview-token       {}                      -> { token, expiresIn } (editor canvas)
  *
  * Concurrency: every write names the head rev it was based on (`baseRev`);
@@ -27,7 +26,6 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { randomBytes } from 'node:crypto';
 import { redis } from '../services/redis.service';
-import { applyBuilderPatch } from '../services/builder-ai-patch.service';
 import {
   BUILDER_PAGE_KEYS,
   PREVIEW_TOKEN_TTL_SECONDS,
@@ -206,47 +204,6 @@ router.post(
         resourceType: 'store',
         resourceId: storeId,
         details: { pageKey, rev: r.value.rev, targetRev: body.targetRev },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-      res.json({ success: true, data: r.value });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * Apply an approved AI patch: the client sends only the ops it was shown and the rev they were
- * proposed against; the document is re-derived here and saved as a DRAFT (never published).
- */
-router.post(
-  '/pages/:pageKey/ai-patch/apply',
-  ...guard,
-  writeLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const pageKey = pageKeyOr404(req, res);
-      if (!pageKey) return;
-      const body = z
-        .object({ baseRev: rev, ops: z.array(z.unknown()).max(12) })
-        .strict()
-        .parse(req.body);
-      const { storeId } = req.params;
-      const r = await applyBuilderPatch({
-        storeId,
-        pageKey,
-        baseRev: body.baseRev,
-        ops: body.ops,
-        userId: getAuthUser(req).userId,
-      });
-      if (!r.ok) return sendFailure(res, r);
-      await auditLog({
-        action: 'store.page.ai_patch_applied',
-        userId: getAuthUser(req).userId,
-        resourceType: 'store',
-        resourceId: storeId,
-        details: { pageKey, rev: r.value.rev, changes: r.value.changes.length },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });

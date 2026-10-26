@@ -84,7 +84,12 @@ export function RevisionsPanel({
           <li key={r.rev} className="rounded-lg border border-border p-2 text-sm">
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">
-                {t('rev', { rev: r.rev })} · {t(`status.${r.status}`)}
+                {t('rev', { rev: r.rev })} ·{' '}
+                <span
+                  className={r.status === 'published' ? 'text-primary' : 'text-muted-foreground'}
+                >
+                  {t(`status.${r.status}`)}
+                </span>
               </span>
               {r.status === 'archived' && (
                 <button
@@ -97,18 +102,20 @@ export function RevisionsPanel({
                 </button>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {format.dateTime(new Date(r.publishedAt ?? r.createdAt), {
                 dateStyle: 'medium',
                 timeStyle: 'short',
               })}
-              {r.publishedBy && (
-                <>
-                  {' · '}
-                  {r.publishedByName ? t('by.named', { name: r.publishedByName }) : t('by.removed')}
-                </>
-              )}
             </p>
+            {r.publishedBy && (
+              <p className="text-xs text-muted-foreground">
+                {/* the name is isolated (FSI/PDI) so a Latin name never scrambles the Arabic line */}
+                {r.publishedByName
+                  ? t('by.named', { name: `\u2068${r.publishedByName}\u2069` })
+                  : t('by.removed')}
+              </p>
+            )}
             {r.note?.startsWith('rollback to rev ') && (
               <p className="text-xs text-muted-foreground">
                 {t('restoredFrom', { rev: r.note.slice('rollback to rev '.length) })}
