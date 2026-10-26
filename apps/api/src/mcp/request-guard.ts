@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { bodyShapeViolation } from '../lib/body-shape';
 
 /**
  * Size guard for the MCP routes, buyer (`/mcp/:slug`) and merchant admin (`/mcp/admin/:slug`),
@@ -17,23 +18,13 @@ export const MCP_MAX_ARRAY_LENGTH = 100;
 export const MCP_MAX_DEPTH = 12;
 export const MCP_MAX_NODES = 5000;
 
-/** The first limit a parsed JSON value exceeds, or null. Iterative: a hostile depth cannot blow the stack. */
+/** The first limit a parsed JSON value exceeds, or null (shared walker, `lib/body-shape.ts`). */
 export function mcpBodyViolation(body: unknown): string | null {
-  const stack: Array<{ v: unknown; d: number }> = [{ v: body, d: 0 }];
-  let nodes = 0;
-  while (stack.length > 0) {
-    const { v, d } = stack.pop()!;
-    if (v === null || typeof v !== 'object') continue;
-    if (d > MCP_MAX_DEPTH) return 'nested too deeply';
-    if (++nodes > MCP_MAX_NODES) return 'too many fields';
-    if (Array.isArray(v)) {
-      if (v.length > MCP_MAX_ARRAY_LENGTH) return 'array too long';
-      for (const x of v) stack.push({ v: x, d: d + 1 });
-    } else {
-      for (const x of Object.values(v as Record<string, unknown>)) stack.push({ v: x, d: d + 1 });
-    }
-  }
-  return null;
+  return bodyShapeViolation(body, {
+    maxArrayLength: MCP_MAX_ARRAY_LENGTH,
+    maxDepth: MCP_MAX_DEPTH,
+    maxNodes: MCP_MAX_NODES,
+  });
 }
 
 function refuse(res: Response, status: number, message: string): void {

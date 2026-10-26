@@ -3,6 +3,7 @@
 //   - `index.ts`  : the Node server (Railway/Docker/dev): http server, socket.io,
 //                   background loops, graceful shutdown.
 //   - `worker.ts` : the Cloudflare Worker (`httpServerHandler`), R-EBDA-001.
+import { requestShapeGuard } from './middleware/request-shape-guard';
 import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -391,8 +392,11 @@ app.use(
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 
 // Body parsing
+// 10mb = API_JSON_BODY_LIMIT_BYTES, the byte cap the guard below also enforces (tests/unit/zod-huge-array-bounds).
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+// Size and shape caps before any route or schema parses the body (Ruling ITEST-11).
+app.use(requestShapeGuard);
 
 // External-service-to-Telegram alert bridge. Sentry / BetterStack /
 // PostHog all POST to /api/v1/alerts/webhooks/<source> and we fan
