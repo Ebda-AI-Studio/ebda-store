@@ -23,6 +23,7 @@ import {
 } from './period';
 import { instapayHandle, supportContact } from './manual-config';
 import { chargeFor, ledgerVat } from './charge-amount';
+import { isBillableStoreId } from './account.service';
 
 const DAY = 86_400_000;
 export type ReminderKind = 'd7' | 'd3' | 'd1' | 'd0';
@@ -88,6 +89,8 @@ export async function sendDueReminder(
 ): Promise<ReminderResult> {
   const storeId = await getEntityStoreId('store_subscription', subscriptionId);
   if (!storeId) return { sent: false, reason: 'not_found' };
+  // A child store is included in its parent's plan: it is never asked to pay (EBDA-FUNNEL-18).
+  if (!(await isBillableStoreId(storeId))) return { sent: false, reason: 'child_store' };
   const claimed = await withStore(storeId, async tx => {
     const sub = await tx.storeSubscription.findUnique({
       where: { id: subscriptionId, storeId },

@@ -63,7 +63,7 @@ import {
   type BillingInterval,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
-import { suspendForBilling } from './account.service';
+import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -615,6 +615,7 @@ export async function startCheckout(args: {
   returnUrl?: string;
 }): Promise<{ redirectUrl: string; billingEventId: string }> {
   const interval = args.interval ?? 'monthly';
+  await assertPayableStore(args.storeId);
   // Hosted card checkout exists only in card mode (Ruling EBDA-FUNNEL-17).
   if (resolveTrialCardMode(args.provider) !== 'card_on_file') {
     throw new AppError(
@@ -707,6 +708,7 @@ export async function selectTrialPlan(args: {
   planCode: string;
   interval: BillingInterval;
 }): Promise<{ planCode: string; interval: BillingInterval; amountMinor: number }> {
+  await assertPayableStore(args.storeId);
   const { plan, price } = await loadPayablePlan(args.planCode, args.interval);
   if (!plan.isPublic)
     throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
@@ -737,6 +739,7 @@ export async function startCardSetup(args: {
   provider?: BillingProvider;
   returnUrl?: string;
 }): Promise<{ redirectUrl: string; billingEventId: string }> {
+  await assertPayableStore(args.storeId);
   const provider = args.provider ?? getBillingProvider();
   if (resolveTrialCardMode(provider) !== 'card_on_file') {
     throw new AppError(
@@ -827,6 +830,9 @@ export async function renewSubscription(
   if (sub.status === 'comped' || isGrantedPlan(sub.planCode)) {
     return { action: 'skipped', reason: 'comped' };
   }
+  // A child store is included in its parent's plan and is NEVER charged on its own
+  // (Ruling EBDA-FUNNEL-18). Fail closed: a store the owner list cannot place is skipped too.
+  if (!(await isBillableStoreId(sub.storeId))) return { action: 'skipped', reason: 'child_store' };
   const billable = ['active', 'trialing', 'past_due'].includes(sub.status);
   const periodEnd = periodEndOf(sub);
   if (!billable || !periodEnd) return { action: 'skipped', reason: 'not_billable' };
@@ -1100,6 +1106,7 @@ export async function changePlan(args: {
   now?: Date;
   provider?: BillingProvider;
 }): Promise<ChangePlanResult> {
+  await assertPayableStore(args.storeId);
   const now = args.now ?? new Date();
   const provider = args.provider ?? getBillingProvider();
   const sub = await loadSub(args.storeId);

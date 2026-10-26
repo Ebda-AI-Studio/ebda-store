@@ -16,6 +16,7 @@
 
 import type { FeatureKey } from './features';
 import type { StorePlan } from './types';
+import { LOCKED_PUBLIC_PLANS, STORE_PLAN_TO_PLAN_CODE } from './schemas/plan-limits';
 
 // Re-export so callers can write `import { StorePlan } from '@ebda/shared/plan-baselines'`
 // alongside PLAN_BASELINE in one line.
@@ -178,16 +179,53 @@ export function lowestPlanForFeature(key: FeatureKey): StorePlan | null {
 }
 
 /**
- * The PUBLIC plan name (Basic / Growth / Business) that unlocks a feature, where it differs
- * from the legacy tier label `lowestPlanForFeature` returns ("Professional"). The upgrade gate
- * prefers this so a Basic merchant is told "Growth", the name on the pricing page.
+ * The PUBLIC plan (Basic / Growth / Business) a legacy `Store.plan` tier is sold as, or null
+ * for `free` (not sold, D3). Every merchant-facing upgrade prompt names plans through this, so
+ * "Starter / Professional / Enterprise" never reach a merchant (audit DOC-6 / M-080).
  */
-const PUBLIC_PLAN_LABEL_FOR_FEATURE: Partial<Record<FeatureKey, { en: string; ar: string }>> = {
-  email_campaigns: { en: 'Growth', ar: 'النمو' },
+export function publicPlanForStorePlan(
+  plan: StorePlan
+): { code: string; en: string; ar: string } | null {
+  const code = STORE_PLAN_TO_PLAN_CODE[plan];
+  const hit = LOCKED_PUBLIC_PLANS.find(p => p.code === code);
+  return hit ? { code: hit.code, en: hit.nameEn, ar: hit.nameAr } : null;
+}
+
+/**
+ * The PUBLIC plan that unlocks a feature, derived from the lowest tier whose baseline includes
+ * it. `email_campaigns` is sold from Growth although its tier baseline is lower, so it keeps an
+ * explicit override. Null when no sold plan unlocks it.
+ */
+const PUBLIC_PLAN_OVERRIDE_FOR_FEATURE: Partial<Record<FeatureKey, StorePlan>> = {
+  email_campaigns: 'professional',
 };
 
-export function publicPlanLabelForFeature(key: FeatureKey): { en: string; ar: string } | null {
-  return PUBLIC_PLAN_LABEL_FOR_FEATURE[key] ?? null;
+export function publicPlanLabelForFeature(
+  key: FeatureKey
+): { code: string; en: string; ar: string } | null {
+  const tier = PUBLIC_PLAN_OVERRIDE_FOR_FEATURE[key] ?? lowestPlanForFeature(key);
+  return tier ? publicPlanForStorePlan(tier) : null;
+}
+
+/**
+ * The sold plan to offer when `key` is switched off for a store on `planCode`, or null when the
+ * plan itself is not what withholds it (the feature is in the plan's baseline, so a merchant or
+ * super-admin toggle turned it off, or the plan is hidden/unknown). This is what lets a
+ * 403 FEATURE_DISABLED carry an upgrade target without ever misreporting a toggle as a paywall.
+ */
+export function upgradeTargetForDisabledFeature(
+  planCode: string,
+  key: FeatureKey
+): { code: string; nameEn: string; nameAr: string } | null {
+  const tier = (['starter', 'professional', 'enterprise'] as const).find(
+    t => STORE_PLAN_TO_PLAN_CODE[t] === planCode
+  );
+  if (!tier || isInBaseline(tier, key)) return null;
+  const target = publicPlanLabelForFeature(key);
+  if (!target) return null;
+  const targetTier = PUBLIC_PLAN_OVERRIDE_FOR_FEATURE[key] ?? lowestPlanForFeature(key);
+  if (!targetTier || STORE_PLANS.indexOf(targetTier) <= STORE_PLANS.indexOf(tier)) return null;
+  return { code: target.code, nameEn: target.en, nameAr: target.ar };
 }
 
 /** Convenience: is `key` in the baseline for `plan`? */
