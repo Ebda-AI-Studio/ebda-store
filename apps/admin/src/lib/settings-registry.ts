@@ -457,6 +457,18 @@ export const PAGES: PageEntry[] = [
 ];
 
 export const SETTINGS: SettingEntry[] = [
+  // ── AI ────────────────────────────────────────────────────────────────────
+  setting(
+    'ai.switch',
+    '/ai-usage',
+    'aiSwitch.title',
+    'owner',
+    {
+      en: 'ai on off disable enable turn off assistant gemini switch',
+      ar: 'ذكاء اصطناعي تشغيل ايقاف قفل تفعيل مساعد',
+    },
+    {}
+  ),
   // ── Branding (tabs: branding · theme · contact · locations) ───────────────
   setting(
     'branding.logo',
@@ -915,6 +927,7 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
  * always allowed. Keys are paths under `apps/admin/src/app/stores/[id]`.
  */
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
+  '/ai-usage': 0, // the switch is a component (components/ai/AiSwitchCard), anchored ai.switch
   '/branding': 43,
   '/builder': 27, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
