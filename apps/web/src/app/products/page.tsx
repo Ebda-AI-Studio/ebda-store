@@ -1,7 +1,7 @@
+import { storefrontAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { localizedMetadata } from '@/lib/seo/localized-metadata';
 import { getStore, getStoreOrNotFound, isResolvedStore } from '../../lib/store-resolver';
-import { storeAbsoluteUrl } from '../../lib/structured-data';
 import { getPreviewDraftToken } from '../../lib/preview-draft';
 import { builderTokenFrom } from '../../lib/page-document';
 import { ProductsPageBody } from './ProductsPageBody';
@@ -35,7 +35,7 @@ export async function generateMetadata({
       'تصفح كل منتجات المتجر مع الأسعار والتفاصيل، واختار اللي يعجبك واطلبه من موبايلك في دقايق.',
     ],
     ...(isResolvedStore(store)
-      ? { alternates: { canonical: storeAbsoluteUrl(store, productsCanonicalPath(params)) } }
+      ? { alternates: await storefrontAlternates(store, productsCanonicalPath(params), true) }
       : {}),
   });
 }

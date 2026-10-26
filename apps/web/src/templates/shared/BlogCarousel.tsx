@@ -2,7 +2,7 @@
 
 import { useStoreNumerals } from '../../hooks/useNumerals';
 import { intlLocale } from '@ebda/shared';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';

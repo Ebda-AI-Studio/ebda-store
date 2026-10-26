@@ -5,7 +5,7 @@ import { signedText } from '@/lib/bidi';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
 import { MinimalChrome } from '../../components';

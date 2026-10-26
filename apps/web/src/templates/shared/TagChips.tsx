@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { PublicTag } from '../../lib/api';
 import { tagLabel } from '../../lib/tag-label';
 

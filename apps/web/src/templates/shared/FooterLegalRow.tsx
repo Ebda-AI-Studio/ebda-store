@@ -14,6 +14,7 @@
  * (one fact, one place). Hairline idiom. Each skin passes its own footer-link ink
  * as `className` (inheriting the body ink vanished on a dark merchant footer).
  */
+import { StoreAnchor } from '../../components/StoreLink';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useRenderNow } from '../../contexts/RenderClockContext';
 import type { FooterLinksConfig } from '../types';
@@ -93,12 +94,12 @@ export function FooterLegalRow({
                     ·
                   </span>
                 )}
-                <a
+                <StoreAnchor
                   href={l.href}
                   className="inline-flex min-h-11 min-w-11 items-center justify-center underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
                 >
                   {l.label}
-                </a>
+                </StoreAnchor>
               </li>
             ))}
           </ul>

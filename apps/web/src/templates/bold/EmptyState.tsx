@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { EmptyStateProps } from '../types';
 import { useRtlText } from '../shared/useRtlText';
 import { ArrowIcon } from '../shared/icons';

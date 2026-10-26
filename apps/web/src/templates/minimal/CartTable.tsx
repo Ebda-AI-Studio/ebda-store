@@ -2,7 +2,7 @@
 
 import { VariantText } from '@ebda/ui';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { CartTableProps } from '../types';
 import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';

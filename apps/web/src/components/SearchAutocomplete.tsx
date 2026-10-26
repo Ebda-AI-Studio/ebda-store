@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
-import Link from 'next/link';
+import Link from './StoreLink';
 import Image from 'next/image';
 import { highlightSegments, useListboxNav, useLiveSearch } from '@ebda/ui';
 import { useStoreUrl } from '../contexts/StoreContext';

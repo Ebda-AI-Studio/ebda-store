@@ -14,7 +14,7 @@
  * (prices go through `useLocalePrice`).
  */
 import type { ReactNode, SVGProps } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { settingMarker, useEditorMode } from '../../builder/render/editor-mode';
 

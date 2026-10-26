@@ -2,7 +2,7 @@
 
 import { signedText } from '@/lib/bidi';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { Button, Select } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import Image from 'next/image';
 import { sanitizeUrl } from '@ebda/shared';
 import type { HeroProps } from '../types';

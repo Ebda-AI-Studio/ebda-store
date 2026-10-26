@@ -24,7 +24,7 @@
 import { useEffect, useState } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';

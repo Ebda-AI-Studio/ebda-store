@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { parse, toRGBA } from 'color-bits';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import Link from '../StoreLink';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRenderNow } from '@/contexts/RenderClockContext';
 import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';

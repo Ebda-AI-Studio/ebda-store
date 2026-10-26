@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { cn } from '@ebda/ui';
 import { IMAGE_STANDARDS, heroObjectPosition, sanitizeUrl } from '@ebda/shared';
 import type { HeroBannerProps } from '../types';

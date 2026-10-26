@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import { Button } from '@ebda/ui';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl } from '../../../contexts/StoreContext';

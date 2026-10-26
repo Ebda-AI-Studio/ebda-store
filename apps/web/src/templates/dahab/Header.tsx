@@ -11,7 +11,7 @@
  * scrolled, a translucent backdrop.
  */
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { HeaderProps } from '../types';
 import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
