@@ -1,4 +1,4 @@
-import { BRAND } from '@ebda/shared/brand';
+import { BRAND, type WhatsAppBasePackageId } from '@ebda/shared/brand';
 import { PLANS } from './plans';
 import type { Locale } from './site';
 
@@ -22,6 +22,8 @@ export interface WhatsAppPage {
   numbersH: string;
   numbersLead: string;
   table: { cols: [string, string, string]; rows: [string, string, string][] };
+  /** The packages section: every number comes from WHATSAPP_PACKAGES, never from these strings (WA-PRICE-1). */
+  pricing: WhatsAppPricingCopy;
   feesH: string;
   fees: string[];
   accountH: string;
@@ -43,6 +45,37 @@ const STUDIO_AR = BRAND.company.shortNameAr;
 const STUDIO_EN = BRAND.company.shortNameEn;
 /** The plan that carries the Ebda WhatsApp Store package (WA-PKG-1), named from the plan catalogue. */
 const BIZ = PLANS.find(p => p.id === 'business')!.name;
+
+export interface WhatsAppPricingCopy {
+  title: string;
+  lead: string;
+  perMonth: string;
+  perYear: string;
+  monthly: string;
+  yearly: string;
+  intervalLabel: string;
+  pickLabel: string;
+  saveNote: string;
+  /** Under the cards: Meta's fees are separate. */
+  metaNote: string;
+  names: Record<WhatsAppBasePackageId, { name: string; short: string; tag: string }>;
+  /** Plan card CTA; {plan} is the plan name. */
+  cta: string;
+  /** The store-included card: no price figure, only this line (there is no free plan). */
+  includedLabel: string;
+  ctaIncluded: string;
+  members: (n: number) => string;
+  aiCredits: (n: number) => string;
+  features: {
+    shared_inbox: string;
+    order_confirmations: string;
+    templates: string;
+    campaigns: string;
+    order_in_chat: string;
+    api: string;
+    priority_support: string;
+  };
+}
 
 export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
   ar: {
@@ -100,12 +133,46 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
         ['مين بيدفع لـ Meta', 'Meta بتحاسب كارتك إنت مباشرةً', 'المحفظة، بسعر Meta'],
       ],
     },
-    feesH: 'رسوم Meta والباقات',
+    pricing: {
+      title: 'باقة على قد شغلك.',
+      lead: 'اختار الباقة اللي تناسب فريقك وعدد ردود الذكاء الاصطناعي اللي محتاجها.',
+      perMonth: 'في الشهر',
+      perYear: 'في السنة',
+      monthly: 'شهري',
+      yearly: 'سنوي',
+      intervalLabel: 'مدة الدفع',
+      pickLabel: 'اختار الباقة',
+      saveNote: 'وفّر 25% لو دفعت سنوي.',
+      metaNote:
+        'رسوم رسايل Meta منفصلة: على رقمك الخاص Meta بتحاسب كارتك إنت، وعلى الرقم المشترك بتتخصم من محفظة مدفوعة مقدمًا، وبدون هامش مننا حاليًا (0%).',
+      names: {
+        'store-included': {
+          name: 'مضمّنة',
+          short: 'مضمّنة',
+          tag: `لتجّار ${STORE_AR}`,
+        },
+        starter: { name: 'المبتدئة', short: 'المبتدئة', tag: 'لأول فريق' },
+        growth: { name: 'النمو', short: 'النمو', tag: 'حملات وطلبات جوّه الشات' },
+        pro: { name: 'الاحترافية', short: 'الاحترافية', tag: 'ربط برمجي ودعم بالأولوية' },
+      },
+      cta: 'ابدأ بباقة {plan}',
+      includedLabel: `مضمّنة مع ${STORE_AR} ${BIZ.ar}`,
+      ctaIncluded: `شوف أسعار ${STORE_AR}`,
+      members: n => (n === 2 ? 'عضوين في الفريق' : `${n} ${n <= 10 ? 'أعضاء' : 'عضو'} في الفريق`),
+      aiCredits: n => `${n.toLocaleString('en-US')} رد بالذكاء الاصطناعي في الشهر`,
+      features: {
+        shared_inbox: 'صندوق وارد مشترك',
+        order_confirmations: 'تأكيد الطلبات والدفع عند الاستلام',
+        templates: 'قوالب رسايل',
+        campaigns: 'حملات بموافقة العميل',
+        order_in_chat: 'اطلب من جوّه الشات',
+        api: 'ربط برمجي (API)',
+        priority_support: 'دعم بالأولوية',
+      },
+    },
+    feesH: 'رسوم Meta',
     fees: [
       'Meta بتحاسب على الرسايل حسب نوعها (تسويق، معاملات، مصادقة، خدمة). على رقمك الخاص بتحاسب كارتك إنت مباشرةً. على الرقم المشترك بتتخصم من محفظة بالجنيه بتشحنها، بنفس سعر Meta.',
-      `${STUDIO_AR} مش بتضيف هامش على رسوم Meta حاليًا (0%)، وده ممكن يتغيّر بإعلان قبلها.`,
-      `حزمة المتجر من ${AR} مضمّنة في باقة ${BIZ.ar} في ${STORE_AR}.`,
-      `${AR} ليه باقات خاصة بيه. لسه مفيش قايمة أسعار منشورة على الصفحة دي؛ الباقات وأسعارها بتظهر جوه التطبيق وبتشوف المبلغ بالظبط قبل ما تدفع.`,
     ],
     accountH: 'حساب واحد',
     account: `بتدخل ${AR} بنفس حساب ${STUDIO_AR} اللي بتدخل بيه ${STORE_AR}، من خلال accounts.ebda.app. مفيش حساب تاني ولا باسورد تاني.`,
@@ -196,12 +263,46 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
         ['Who pays Meta', 'Meta bills your own card directly', 'The wallet, at Meta’s price'],
       ],
     },
-    feesH: "Meta's fees and packages",
+    pricing: {
+      title: 'A package that fits your work.',
+      lead: 'Pick the package that fits your team and the number of AI replies you need.',
+      perMonth: 'a month',
+      perYear: 'a year',
+      monthly: 'Monthly',
+      yearly: 'Yearly',
+      intervalLabel: 'Billing period',
+      pickLabel: 'Choose a package',
+      saveNote: 'Save 25% when you pay yearly.',
+      metaNote:
+        "Meta's message fees are separate: on your own number Meta bills your card; on the shared number they come from a prepaid wallet with 0% margin from us at the moment.",
+      names: {
+        'store-included': {
+          name: 'Included',
+          short: 'Included',
+          tag: `For ${STORE_EN} merchants`,
+        },
+        starter: { name: 'Starter', short: 'Starter', tag: 'For a first team' },
+        growth: { name: 'Growth', short: 'Growth', tag: 'Campaigns and ordering in the chat' },
+        pro: { name: 'Pro', short: 'Pro', tag: 'Integrations and priority support' },
+      },
+      cta: 'Start with {plan}',
+      includedLabel: `Included with ${STORE_EN} ${BIZ.en}`,
+      ctaIncluded: `See ${STORE_EN} pricing`,
+      members: n => `${n} team members`,
+      aiCredits: n => `${n.toLocaleString('en-US')} AI replies a month`,
+      features: {
+        shared_inbox: 'Shared inbox',
+        order_confirmations: 'Order and cash-on-delivery confirmations',
+        templates: 'Message templates',
+        campaigns: 'Opt-in campaigns',
+        order_in_chat: 'Ordering inside the chat',
+        api: 'Integrations and API',
+        priority_support: 'Priority support',
+      },
+    },
+    feesH: "Meta's fees",
     fees: [
       "Meta charges per message by category (marketing, utility, authentication, service). On your own number, Meta bills your card directly. On the shared number the charge comes out of a prepaid EGP wallet you top up, at Meta's price.",
-      `${STUDIO_EN} adds no margin to Meta's fees at the moment (0%), and this may change with notice first.`,
-      `The ${EN} Store package is included in the ${STORE_EN} ${BIZ.en} plan.`,
-      `${EN} has its own packages. We do not publish a price list on this page yet; the packages and their prices appear inside the app, and you see the exact amount before you pay.`,
     ],
     accountH: 'One account',
     account: `You sign in to ${EN} with the same ${STUDIO_EN} account you use for ${STORE_EN}, through accounts.ebda.app. No second account, no second password.`,

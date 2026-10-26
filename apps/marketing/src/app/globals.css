@@ -2779,3 +2779,60 @@ html[dir='rtl'] .not-found .lead {
 .wa-teaser .actions {
   margin-top: 4px;
 }
+
+/* /whatsapp packages: four cards in the Store plan-card style, a monthly/yearly switch (CSS only) */
+.plan-pick.wa-interval {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 360px;
+  margin-inline: 0;
+}
+.wa-pricing .wa-y {
+  display: none;
+}
+.wa-pricing:has(#wa-year:checked) .wa-y {
+  display: inline;
+}
+.wa-pricing:has(#wa-year:checked) .wa-m {
+  display: none;
+}
+.wa-pricing .plan-pick.wa-pick {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.plans.wa-plans {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+@media (min-width: 641px) {
+  .plans.wa-plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1040px) {
+  .plans.wa-plans {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+  }
+}
+.wa-plans .plan .btn {
+  margin-top: auto;
+}
+@media (max-width: 640px) {
+  .wa-pricing:has(#wa-pick-store-included:checked) .plan[data-plan='store-included'],
+  .wa-pricing:has(#wa-pick-starter:checked) .plan[data-plan='starter'],
+  .wa-pricing:has(#wa-pick-growth:checked) .plan[data-plan='growth'],
+  .wa-pricing:has(#wa-pick-pro:checked) .plan[data-plan='pro'] {
+    display: flex;
+  }
+}
+.wa-meta-note {
+  max-width: 68ch;
+}
+.wa-plans .price {
+  display: grid;
+}
+.wa-plans .price-text {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
