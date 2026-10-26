@@ -126,7 +126,7 @@
       }
     },
     "d1": {
-      "tables": 23,
+      "tables": 25,
       "maxColumns": 36,
       "columnCounts": {
         "store_staff": 4,
@@ -149,6 +149,8 @@
         "store_lifecycle_emails": 6,
         "billing_webhook_events": 7,
         "provider_activation_requests": 11,
+        "provider_verifications": 9,
+        "provider_verification_events": 10,
         "stores": 31,
         "entity_index": 4,
         "platform_audit_log": 8

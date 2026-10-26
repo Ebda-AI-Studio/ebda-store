@@ -299,6 +299,40 @@ export const providerActivationRequests = sqliteTable('provider_activation_reque
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const providerVerificationEvents = sqliteTable('provider_verification_events', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  provider: text('provider').notNull(),
+  sourceStoreId: text('source_store_id').notNull(),
+  op: text('op').notNull(),
+  ok: integer('ok', { mode: 'boolean' }).notNull(),
+  mode: text('mode').notNull().default('sandbox'),
+  counted: integer('counted', { mode: 'boolean' }).notNull().default(false),
+  ref: text('ref'),
+  errorCode: text('error_code'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const providerVerifications = sqliteTable('provider_verifications', {
+  provider: text('provider').primaryKey().notNull(),
+  kind: text('kind').notNull(),
+  successCount: integer('success_count').notNull().default(0),
+  failureCount: integer('failure_count').notNull().default(0),
+  readyAt: integer('ready_at', { mode: 'timestamp_ms' }),
+  verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+  verifiedById: text('verified_by_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const SlugRedirect = sqliteTable('SlugRedirect', {
   id: text('id')
     .primaryKey()

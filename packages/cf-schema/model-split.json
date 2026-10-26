@@ -578,5 +578,13 @@
   "GoldRateSettings": {
     "target": "store-do",
     "reason": "per-store settings"
+  },
+  "ProviderVerification": {
+    "target": "d1",
+    "reason": "platform-wide provider activation counters (no store scope), read and written by super-admin and settlement paths across stores"
+  },
+  "ProviderVerificationEvent": {
+    "target": "d1",
+    "reason": "platform-wide provider activation counters (no store scope), read and written by super-admin and settlement paths across stores"
   }
 }
