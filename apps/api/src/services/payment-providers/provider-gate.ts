@@ -14,9 +14,33 @@
  */
 import { getProviderEntry } from '@ebda/shared';
 import { prisma, withStore } from '@ebda/database';
+import { getProviderV2 } from './registry';
 
 export function isProviderUsable(code: string): boolean {
   return getProviderEntry(code) !== undefined;
+}
+
+/**
+ * Ruling GEIDEA-2: may a BUYER pay with this provider at checkout? A gateway Ebda can never CONFIRM
+ * (no verifiable webhook and no remote status API: `capabilities.webhooks` and `remoteStatus` both
+ * false) is hidden from buyers, because a payment Ebda cannot confirm is a fail-open on the money
+ * path. Merchants may still connect it in admin ("pending verification"). It is switched on per
+ * store, the moment the provider confirms its callback format, by the operator flag
+ * `CHECKOUT_UNCONFIRMED_PROVIDERS="<provider>:<storeId>,..."` (`<provider>:*` = every store).
+ * Manual providers (COD, InstaPay) have a human confirmation and are always offerable.
+ */
+export function isOfferableAtCheckout(code: string, storeId?: string | null): boolean {
+  const entry = getProviderEntry(code);
+  if (!entry) return false;
+  if (entry.manual) return true;
+  const caps = getProviderV2(code)?.capabilities;
+  if (!caps) return false;
+  if (caps.webhooks || caps.remoteStatus) return true;
+  const flags = (process.env.CHECKOUT_UNCONFIRMED_PROVIDERS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return flags.some(f => f === `${code}:*` || (storeId ? f === `${code}:${storeId}` : false));
 }
 
 /** The providers a super admin activated for this store (a read inside the store's scope). */
