@@ -462,6 +462,11 @@ export default function StoreCategoriesPage() {
         </div>
       )}
 
+      {/* A store with no categories: let the assistant propose some from its products. */}
+      {!isLoading && !error && categories.length === 0 && (
+        <CategorySuggestionPanel storeId={storeId} onCreated={fetchCategories} />
+      )}
+
       {/* Add/Edit Form */}
       {showForm && (
         <div ref={formRef} className="scroll-mt-24">
@@ -599,11 +604,6 @@ export default function StoreCategoriesPage() {
           </span>
         </div>
       </div>
-
-      {/* A store with no categories: let the assistant propose some from its products. */}
-      {!isLoading && !error && categories.length === 0 && (
-        <CategorySuggestionPanel storeId={storeId} onCreated={fetchCategories} />
-      )}
 
       {/* Categories List */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

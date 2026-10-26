@@ -247,7 +247,8 @@ User prompt:
 
 ### UX edge cases
 
-- **No categories exist yet** → suggest the first 3 the merchant should create. Different code path; might defer to phase 2 or skip.
+- **No categories exist yet** → BUILT 2026-10-27 as Ruling STORECAT-1: a proposal grouped from the store's products (`suggest-store-categories`), reviewed and edited on the categories page, created on accept (`apply-store-categories`).
+- **Merchant AI switch** → BUILT 2026-10-27 as Ruling AISWITCH-1 (`stores.ai_features_enabled`, checked in `assertAiQuota` and every AI router).
 - **Empty result** → don't show the chips at all (silently no-op).
 - **User already picked categories manually** → don't show suggestions (respect their choice).
 
