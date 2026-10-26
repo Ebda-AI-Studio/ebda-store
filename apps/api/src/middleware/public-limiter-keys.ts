@@ -27,9 +27,13 @@ export function publicIpKey(req: Request): string {
   return ipKeyGenerator(req.ip ?? '') || 'noip';
 }
 
-/** Test and load-test bypass, the same one the exact public limiters use. */
+/**
+ * Load-test bypass, the SAME one the exact public limiters use (`skipForLoadTest` in security.ts).
+ * It must not add a test-environment skip of its own: `publicReadLimit` would then bypass the exact
+ * limiters altogether under vitest, so no suite exercised them (and `RateLimit-Policy` vanished from
+ * every public response in tests; Ruling ITEST-8).
+ */
 export function skipPublicLimiters(req: Request): boolean {
-  if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') return true;
   const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
   return Boolean(expected) && req.header('x-load-test-token') === expected;
 }
