@@ -648,3 +648,34 @@ async event handler registration as a post-import listener.
 **When adding a new service worker or updating `OneSignalSDKWorker.js`:**
 preserve this pre-registration block. Removing it restores the deprecation
 warning on Chromium 133+.
+
+## CI deploy token: minimum scope, and where it can be reached from (Ruling DEPLOY-PARITY-1)
+
+`Whisky-11/ebda-store` is a Free-plan private repo: GitHub offers no required reviewers, no environment protection and no
+enforced CODEOWNERS here, so the controls are in code. They are enforced by tests and a required check:
+
+- **A pull request can never reach a deploy secret.** `tests/unit/deploy-secrets-never-on-pr.test.ts` fails the build if any
+  workflow triggered by `pull_request`, `pull_request_target` or `workflow_run` references `secrets.CLOUDFLARE_*`,
+  `EBDA_MIGRATE_DATABASE_URL`, `SENTRY_AUTH_TOKEN`, `secrets: inherit` or `toJSON(secrets)`; every `cf-*-deploy.yml` must trigger
+  only on push to `main` or manual dispatch; `db-backup.yml` only on schedule or dispatch.
+- **A change to how production deploys needs a human label.** The required check "Deploy workflow changes need the
+  deploy-change label" (`.github/workflows/deploy-change-label.yml`, `scripts/ci/deploy-change-label.mjs`) fails a PR that edits
+  `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
+  `scripts/ebda-cf-api-config.mjs` unless it carries the `deploy-change` label, which only a person applies after reading the diff.
+- **The CI Cloudflare token (`CLOUDFLARE_API_TOKEN`, production environment secret) must be the minimum, never account-admin:**
+
+  | Permission                   | Level                         | Why                                                     |
+  | ---------------------------- | ----------------------------- | ------------------------------------------------------- |
+  | Account · Workers Scripts    | Edit                          | `wrangler deploy` for the 9 Workers                     |
+  | Account · Workers KV Storage | Edit                          | the cache namespace binding on deploy                   |
+  | Account · D1                 | Edit                          | `Apply D1 migrations (ebda-identity)`                   |
+  | Account · Workers R2 Storage | Edit                          | the nightly `db-backup.yml` upload to `ebda-db-backups` |
+  | Zone · Workers Routes        | Edit                          | routes in `wrangler.jsonc` (zone `ebda.app` only)       |
+  | Zone · Zone                  | Read                          | resolve the zone for routes                             |
+  | Account resources            | Include only the Ebda account | never "All accounts"                                    |
+  | Zone resources               | Include only `ebda.app`       | never "All zones"                                       |
+
+  Everything else (Account Settings, Members, API Tokens, DNS, Firewall, Billing, Logs) is OFF. **Ahmad-only step:** open
+  Cloudflare dashboard, My Profile, API Tokens, find the token behind `CLOUDFLARE_API_TOKEN`, compare it with this table, and
+  roll it (new token, update the production environment secret, delete the old one) if it carries more. The repo cannot read
+  its own token's permissions, so this cannot be checked from CI.
