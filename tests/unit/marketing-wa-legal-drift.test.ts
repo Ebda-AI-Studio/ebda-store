@@ -9,7 +9,7 @@ import { COPY } from '../../apps/marketing/src/lib/content';
  * review-pending comments and markdown markup. The source is vendored verbatim in apps/marketing/legal-source/ by
  * `node apps/marketing/scripts/import-wa-legal.mjs <docs/legal>` (re-run it whenever the source changes; it also
  * regenerates src/lib/legal-wa-*.ts). The comparison is on the word sequence, so a clause edited or dropped in
- * either copy fails here; it cannot drift silently. PINNED_SHA256 pins the vendored files to the exact versions the
+ * either copy fails here (sources verified byte-identical at ebda-whatsapp main a0aaac9, 2026-10-26); it cannot drift silently. PINNED_SHA256 pins the vendored files to the exact versions the
  * WhatsApp session published: when they ship a new text, re-import and update the hashes together.
  */
 const ROOT = path.resolve(__dirname, '../../apps/marketing/legal-source');
