@@ -721,7 +721,7 @@ jobs:
         # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
         # default, so a future config change can't silently re-mask
         # order-dependent state pollution on this required merge gate.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
+        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -803,7 +803,7 @@ jobs:
           npx vitest list --json=/tmp/all-tests.json
 
           npx vitest list \
-            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders \
+            tests/unit packages/shared/src packages/database/src packages/ui/src apps/web apps/admin/src apps/orders \
             tests/integration apps/api/src \
             tests/e2e \
             --json=/tmp/covered-tests.json
