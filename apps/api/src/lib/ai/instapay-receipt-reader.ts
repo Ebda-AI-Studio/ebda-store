@@ -24,6 +24,7 @@ import {
 } from '@ebda/shared';
 import { cfBindings } from '../../cf/bindings';
 import { assertAiQuota } from '../ai-quota';
+import { recordUsage } from '../../services/ai.service';
 
 export const INSTAPAY_RECEIPT_AI_TIMEOUT_MS = 25_000;
 /** A vision-capable Workers AI model with JSON output; override per deployment with INSTAPAY_RECEIPT_AI_MODEL. */
@@ -199,12 +200,27 @@ const defaultCall: ReceiptModelCall = async ({ storeId, imageBase64, mimeType, s
           ],
         },
       ],
-      response_format: { type: 'json_schema', json_schema: INSTAPAY_RECEIPT_JSON_SCHEMA },
+      // Workers AI's name for a JSON schema on this model family (workers-types: `guided_json`)
+      guided_json: INSTAPAY_RECEIPT_JSON_SCHEMA,
       max_tokens: 300,
       temperature: 0,
     },
     { signal }
   );
+  // Count the read against the store / platform AI caps (assertAiQuota above counts these rows). Workers AI reports
+  // token usage on most models; when it does not, the call still counts as one use.
+  const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)
+    ?.usage;
+  await recordUsage(
+    storeId,
+    'instapay-receipt',
+    usage?.prompt_tokens ?? 0,
+    usage?.completion_tokens ?? 0,
+    false,
+    {
+      model,
+    }
+  ).catch(() => undefined);
   return unwrapWorkersAiAnswer(out);
 };
 

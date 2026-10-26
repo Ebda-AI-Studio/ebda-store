@@ -7,7 +7,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const recordUsage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@api/lib/ai-quota', () => ({ assertAiQuota: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@api/services/ai.service', () => ({ recordUsage }));
 
 import {
   INSTAPAY_RECEIPT_AI_MODEL_DEFAULT,
@@ -109,7 +111,11 @@ describe('the Workers AI call', () => {
     const parts = input.messages[0].content;
     expect(parts[0]).toEqual({ type: 'text', text: INSTAPAY_RECEIPT_PROMPT });
     expect(parts[1].image_url.url).toBe(`data:image/png;base64,${img.toString('base64')}`);
-    expect(input.response_format.json_schema).toBe(INSTAPAY_RECEIPT_JSON_SCHEMA);
+    expect(input.guided_json).toBe(INSTAPAY_RECEIPT_JSON_SCHEMA);
+    // the read is counted against the store / platform AI caps
+    expect(recordUsage).toHaveBeenCalledWith('s1', 'instapay-receipt', 0, 0, false, {
+      model: INSTAPAY_RECEIPT_AI_MODEL_DEFAULT,
+    });
     expect(input.temperature).toBe(0);
   });
 

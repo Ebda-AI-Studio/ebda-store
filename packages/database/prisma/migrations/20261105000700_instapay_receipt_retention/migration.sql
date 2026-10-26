@@ -5,3 +5,8 @@ ALTER TABLE "instapay_receipts" ADD COLUMN "image_deleted_at" TIMESTAMP(3);
 ALTER TABLE "instapay_receipts" ADD COLUMN "personal_scrubbed_at" TIMESTAMP(3);
 CREATE INDEX "instapay_receipts_retention_idx" ON "instapay_receipts"("status", "reviewed_at")
   WHERE "image_deleted_at" IS NULL OR "personal_scrubbed_at" IS NULL;
+
+-- Rows read by the old Gemini reader carry the payer / receiver details in the stored AI answer: drop those keys now.
+UPDATE "instapay_receipts"
+   SET "extracted" = ("extracted"::jsonb - ARRAY['payerName','payerAddress','payerMobile','payerBank','receiverName','receiverHandle','receiverMobile','note'])
+ WHERE "extracted" IS NOT NULL;

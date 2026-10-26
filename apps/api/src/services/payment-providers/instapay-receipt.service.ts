@@ -347,11 +347,7 @@ export class InstapayReceiptService {
   ): Promise<{ body: Buffer; mimeType: string }> {
     const row = await this.get(storeId, receiptId, scope);
     if (row.imageDeletedAt) {
-      throw new AppError(
-        410,
-        'RECEIPT_IMAGE_DELETED',
-        'The receipt image was deleted after the payment was approved'
-      );
+      throw new AppError(410, 'RECEIPT_IMAGE_DELETED', 'The receipt image is no longer stored');
     }
     const { body } = await StorageService.getPrivate(row.storageKey);
     return { body, mimeType: row.mimeType };
@@ -543,6 +539,8 @@ export class InstapayReceiptService {
               { status: 'approved' },
               { status: { in: ['rejected', 'voided'] }, reviewedAt: { lt: imageCut } },
               { status: 'draft', createdAt: { lt: imageCut } },
+              // proof nobody ever decided on (an order cancelled outside confirm / reject, a claim left pending)
+              { status: 'submitted', submittedAt: { lt: new Date(now.getTime() - 90 * day) } },
               // an erasure scrubbed it but its immediate delete missed (the delete runs after the erasure commits)
               { personalScrubbedAt: { not: null } },
             ],
@@ -556,8 +554,13 @@ export class InstapayReceiptService {
           where: {
             storeId,
             personalScrubbedAt: null,
-            status: { in: ['approved', 'rejected', 'voided'] },
-            reviewedAt: { lt: personalCut },
+            OR: [
+              {
+                status: { in: ['approved', 'rejected', 'voided'] },
+                reviewedAt: { lt: personalCut },
+              },
+              { status: 'submitted', submittedAt: { lt: personalCut } },
+            ],
           },
           data: SCRUBBED_PERSONAL_FIELDS(now),
         });
@@ -594,10 +597,9 @@ export class InstapayReceiptService {
       where: { storeId, id: { in: rows.map(r => r.id) } },
       data: SCRUBBED_PERSONAL_FIELDS(new Date()),
     });
-    for (const r of rows)
-      void deferAfterTenantCommit('instapay-receipt-erase-image', () =>
-        this.deleteImage(storeId, r.id)
-      );
+    // The screenshots are NOT deleted here: this runs inside the erasure transaction, and an object delete before its
+    // commit would lose the evidence if the erasure rolls back (and race the commit). The rows are marked
+    // (`personal_scrubbed_at`) and the next retention sweep deletes their images.
     return res.count;
   }
 

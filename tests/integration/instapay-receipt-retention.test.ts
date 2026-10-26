@@ -218,6 +218,9 @@ describe.skipIf(!hasDb)('InstaPay receipt retention (real Postgres)', () => {
     const row = await fresh(r.id);
     expect(row).toMatchObject({ payerName: null, payerMobile: null, extracted: null });
     expect(row.personalScrubbedAt).not.toBeNull();
+    // not deleted inside the erasure transaction (it could still roll back); the next sweep deletes it
+    expect(objects.has(r.key)).toBe(true);
+    await InstapayReceiptService.sweepRetention();
     expect(objects.has(r.key)).toBe(false);
     // another shopper's receipt is untouched
     expect((await fresh(other.id)).payerName).toBe('Mona Adel');
@@ -235,5 +238,25 @@ describe.skipIf(!hasDb)('InstaPay receipt retention (real Postgres)', () => {
     await InstapayReceiptService.sweepRetention();
     expect(objects.has(r.key)).toBe(false);
     expect((await fresh(r.id)).imageDeletedAt).not.toBeNull();
+  });
+
+  it('proof nobody ever decided on is retired: images after 90 days, personal fields after 180', async () => {
+    const stale = await mkReceipt({
+      status: 'submitted',
+      submittedAt: new Date(Date.now() - 91 * DAY),
+    });
+    const older = await mkReceipt({
+      status: 'submitted',
+      submittedAt: new Date(Date.now() - 181 * DAY),
+    });
+    const live = await mkReceipt({
+      status: 'submitted',
+      submittedAt: new Date(Date.now() - 5 * DAY),
+    });
+    await InstapayReceiptService.sweepRetention();
+    expect(objects.has(stale.key)).toBe(false);
+    expect((await fresh(stale.id)).payerName).toBe('Mona Adel'); // 91 days: image gone, fields kept
+    expect((await fresh(older.id)).payerName).toBeNull(); // 181 days: scrubbed
+    expect(objects.has(live.key)).toBe(true);
   });
 });
