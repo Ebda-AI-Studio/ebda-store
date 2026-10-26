@@ -5306,23 +5306,26 @@ model BillingWebhookEvent {
 // stores.layout_settings through the adapter so every legacy reader keeps
 // working. Strict RLS (R-EBDA-001) in the same migration.
 model StorePageRevision {
-  id            String    @id @default(uuid())
-  storeId       String    @map("store_id")
-  pageKey       String    @map("page_key")
-  rev           Int
+  id              String    @id @default(uuid())
+  storeId         String    @map("store_id")
+  pageKey         String    @map("page_key")
+  rev             Int
   // draft | published | archived (CHECK constraint in the migration)
-  status        String
-  schemaVersion Int       @map("schema_version")
-  document      Json
-  docBytes      Int       @map("doc_bytes")
-  baseRev       Int?      @map("base_rev")
-  note          String?
+  status          String
+  schemaVersion   Int       @map("schema_version")
+  document        Json
+  docBytes        Int       @map("doc_bytes")
+  baseRev         Int?      @map("base_rev")
+  note            String?
   // User id of the editor. No FK: users are identity-keyed under RLS and an
   // erased user must not take a store's page history with them.
-  createdBy     String?   @map("created_by")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  publishedAt   DateTime? @map("published_at")
+  createdBy       String?   @map("created_by")
+  // Who made this revision live (publish, rollback, restore): a user id only, no FK like created_by,
+  // pseudonymised on offboarding (OFFBOARD-1). The name is looked up at read time, never copied here.
+  publishedBy     String?   @map("published_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  publishedAt     DateTime? @map("published_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

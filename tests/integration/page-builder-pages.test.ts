@@ -25,6 +25,7 @@ import {
   publishDraft,
   rollbackToRevision,
 } from '../../apps/api/src/services/page-builder.service';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -64,7 +65,7 @@ async function freshStore(tag: string): Promise<string> {
 
 beforeAll(async () => {
   owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-  await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+  await setAppRoleLogin(owner, APP_PASSWORD);
 });
 
 afterAll(async () => {

@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { createPrismaClient, prisma, runWithRequestDb, withStore } from '@ebda/database';
 import { assertStockHoldCapNotExceeded } from '@api/lib/stock-hold-cap';
 import { hasDb, seedBundleStore } from '../helpers/bundle-fixtures';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const ownerUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const appUrl = () => {
@@ -19,7 +20,7 @@ describe.skipIf(!hasDb)('stock-hold admission as strict ebda_app', () => {
   let storeId: string;
   let otherStoreId: string;
   beforeAll(async () => {
-    await prisma.$executeRawUnsafe("ALTER ROLE ebda_app WITH LOGIN PASSWORD 'ci-only-app-pw'");
+    await setAppRoleLogin(prisma, 'ci-only-app-pw');
     storeId = (await seedBundleStore(`hold-app-${randomUUID()}`)).storeId;
     otherStoreId = (await seedBundleStore(`hold-other-${randomUUID()}`)).storeId;
   });

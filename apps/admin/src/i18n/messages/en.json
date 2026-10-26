@@ -9235,7 +9235,8 @@
     "tabs": {
       "sections": "Sections",
       "theme": "Theme",
-      "history": "History"
+      "history": "History",
+      "ai": "Ask AI"
     },
     "viewport": {
       "label": "Preview size",
@@ -9416,7 +9417,12 @@
       "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
       "more": "Load more",
       "confirmRestoreTitle": "Restore this version?",
-      "restoreConfirmButton": "Restore"
+      "restoreConfirmButton": "Restore",
+      "by": {
+        "named": "by {name}",
+        "removed": "Removed user"
+      },
+      "restoredFrom": "Restored from version {rev}"
     },
     "pages": {
       "label": "Page",
@@ -9467,6 +9473,39 @@
       "dividers": "Section dividers",
       "video": "Background video",
       "pageSwitcher": "Switch the page you edit"
+    },
+    "aiPatch": {
+      "tab": "Ask AI",
+      "title": "Ask AI to edit this page",
+      "intro": "Describe the change in Arabic or English. You will see exactly what changes before anything is saved.",
+      "placeholder": "For example: make the banner slideshow slower, or add a newsletter section",
+      "ask": "Suggest a change",
+      "asking": "Thinking…",
+      "example1": "Add a newsletter section",
+      "example2": "Hide the testimonials",
+      "changesTitle": "What will change",
+      "none": "Nothing to change: the page already looks like that, or the request cannot be done safely. Try describing it differently.",
+      "skipped": "{count} part(s) were skipped because the page does not support them.",
+      "apply": "Apply to draft",
+      "applying": "Applying…",
+      "discard": "Discard",
+      "draftNote": "This only changes your draft. Nothing goes live until you publish, and Undo works.",
+      "applied": "Applied to your draft.",
+      "failed": "The assistant could not make a change right now. Try again in a moment.",
+      "quota": "The daily AI limit was reached. Try again tomorrow.",
+      "moved": "The page changed since the suggestion. Ask again.",
+      "saveFirst": "Your latest edits could not be saved yet. Try again.",
+      "from": "was",
+      "to": "now",
+      "hidden": "hidden",
+      "shown": "shown",
+      "added": "Add section",
+      "removed": "Remove section",
+      "moved_to": "Move to position {pos}",
+      "theme": "Theme",
+      "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
+      "on": "on",
+      "off": "off"
     }
   },
   "instapayReceipt": {

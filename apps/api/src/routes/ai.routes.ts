@@ -18,6 +18,8 @@ import {
   applyStoreCategories,
   proposeStoreCategories,
 } from '../services/store-category-suggest.service';
+import { proposeBuilderPatch } from '../services/builder-ai-patch.service';
+import { BUILDER_PAGE_KEYS } from '../services/page-builder.service';
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
@@ -221,6 +223,46 @@ router.post(
         return;
       }
       res.status(201).json({ success: true, data: r.value });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /stores/:storeId/ai/builder-patch
+ * The visual builder's "ask AI" box: a plain Arabic/English request becomes a STRUCTURED patch
+ * proposal against the saved page document (never code). Nothing is saved here; the merchant
+ * reviews the diff and applies it as a normal draft edit (one undo step) in the editor.
+ */
+const builderPatchSchema = z
+  .object({
+    pageKey: z.string().refine(k => BUILDER_PAGE_KEYS.has(k), 'Unknown page'),
+    instruction: z.string().trim().min(2).max(500),
+  })
+  .strict();
+
+router.post(
+  '/builder-patch',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const body = builderPatchSchema.parse(req.body);
+      const r = await proposeBuilderPatch({ storeId, ...body });
+      if (!r.ok) {
+        res.status(r.status).json({
+          success: false,
+          error: {
+            code: r.code,
+            message: r.message,
+            details: r.errors ? { errors: r.errors } : {},
+          },
+        });
+        return;
+      }
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ success: true, data: r.value });
     } catch (error) {
       next(error);
     }

@@ -887,6 +887,13 @@ export const SETTINGS: SettingEntry[] = [
         'غيّر الشكل الستايل القالب معاينة تطبيق',
       ],
       [
+        'builder.ai-patch',
+        'builder.tabs.ai',
+        'select=ai',
+        'ask ai edit page change describe assistant patch',
+        'اسأل الذكاء الاصطناعي تعديل الصفحة تغيير وصف مساعد',
+      ],
+      [
         'builder.history',
         'builder.tabs.history',
         'select=history',
@@ -918,7 +925,7 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/ai-usage': 0, // the switch is a component (components/ai/AiSwitchCard), anchored ai.switch
   '/branding': 43,
-  '/builder': 27, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
+  '/builder': 28, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
   '/shipping': 20,
   '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
