@@ -126,8 +126,8 @@ const ROWS: readonly RowDef[] = [
     group: 'strength',
     label: { ar: 'سلات متروكة ونقاط ولاء', en: 'Cart recovery and loyalty' },
     ebda: {
-      ar: 'استرجاع السلات المتروكة بإشعار أو SMS، ونقاط الولاء، من باقة النمو.',
-      en: 'Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan.',
+      ar: 'استرجاع السلات المتروكة بإشعار من باقة النمو (والـSMS في باقة الأعمال بحساب SMS خاص بيك)، ونقاط الولاء.',
+      en: 'Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points.',
     },
     plus: {
       needs: 'cart',

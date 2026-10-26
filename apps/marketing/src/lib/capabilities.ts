@@ -145,7 +145,7 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     },
     cart: {
       t: 'استرجاع السلات المتروكة',
-      d: 'لو عميل ساب منتجات في السلة، المتجر بيفكّره على خطوات ويرجّعه للسلة بلينك مباشر، بإشعار، أو بإيميل، أو برسالة SMS. الإيميل والـSMS بيوصلوا بس لو العميل وافق وهو بيدفع، حتى لو زائر من غير حساب.',
+      d: 'لو عميل ساب منتجات في السلة، المتجر بيفكّره على خطوات ويرجّعه للسلة بلينك مباشر، بإشعار أو بإيميل. والـSMS في باقة الأعمال، بحساب SMS خاص بيك. الإيميل والـSMS بيوصلوا بس لو العميل وافق وهو بيدفع، حتى لو زائر من غير حساب.',
       plan: 'باقتَي النمو والأعمال',
     },
     emails: {
@@ -245,7 +245,7 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     },
     cart: {
       t: 'Abandoned-cart recovery',
-      d: 'When a shopper leaves items in the cart, the store reminds them in steps and sends them back to the cart with a direct link, by notification, by email or by SMS. Email and SMS only go out when the shopper agreed at checkout, guests included.',
+      d: 'When a shopper leaves items in the cart, the store reminds them in steps and sends them back to the cart with a direct link, by notification or by email. SMS is on the Business plan, through your own SMS account. Email and SMS only go out when the shopper agreed at checkout, guests included.',
       plan: 'Growth and Business plans',
     },
     emails: {
@@ -358,9 +358,9 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
     {
       q: 'فيه استرجاع للسلات المتروكة؟',
       needs: 'cart',
-      a: 'أيوه، في باقتَي النمو والأعمال. المتجر بيفكّر العميل على خطوات بالإيميل (لو وافق وهو بيدفع، حتى كزائر)، وبإشعار، وبرسالة SMS لو العميل وافق عليها.',
+      a: 'أيوه، في باقتَي النمو والأعمال. المتجر بيفكّر العميل على خطوات بالإيميل (لو وافق وهو بيدفع، حتى كزائر)، وبإشعار. والـSMS في باقة الأعمال، بحساب SMS خاص بيك، ولو العميل وافق عليها.',
       aSoon:
-        'أيوه، في باقتَي النمو والأعمال. المتجر بيفكّر العميل على خطوات بإشعار، وبرسالة SMS لو العميل وافق عليها. والتذكير بالإيميل جاي قريبًا.',
+        'أيوه، في باقتَي النمو والأعمال. المتجر بيفكّر العميل على خطوات بإشعار. والـSMS في باقة الأعمال، بحساب SMS خاص بيك، ولو العميل وافق عليها. والتذكير بالإيميل جاي قريبًا.',
     },
     {
       q: 'فيه نقاط ولاء وبرنامج إحالة؟',
@@ -430,9 +430,9 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
     {
       q: 'Does it recover abandoned carts?',
       needs: 'cart',
-      a: 'Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification, and by SMS when they agreed to it.',
+      a: 'Yes, on the Growth and Business plans. The store reminds shoppers in steps by email (when they opted in at checkout, guests included), by notification. SMS is on the Business plan, through your own SMS account, when the shopper agreed to it.',
       aSoon:
-        'Yes, on the Growth and Business plans. The store reminds shoppers in steps by notification, and by SMS when they agreed to it. Reminder emails are coming soon.',
+        'Yes, on the Growth and Business plans. The store reminds shoppers in steps by notification. SMS is on the Business plan, through your own SMS account, when the shopper agreed to it. Reminder emails are coming soon.',
     },
     {
       q: 'Is there loyalty and a referral programme?',
