@@ -1582,7 +1582,7 @@ class ApiClient {
    * (StoreContext does this on mount). Returns an error response if no
    * store is bound, mirroring how getCart() fails without a session.
    */
-  async searchSuggest(q: string) {
+  async searchSuggest(q: string, signal?: AbortSignal) {
     const trimmed = (q ?? '').trim();
     if (!this.storeId) {
       return {
@@ -1598,7 +1598,7 @@ class ApiClient {
     }
     return this.request<{ suggestions: SearchSuggestion[] }>(
       `/public/${this.storeId}/search/suggest`,
-      { headers: searchQueryHeaders(trimmed) }
+      { headers: searchQueryHeaders(trimmed), signal }
     );
   }
 
