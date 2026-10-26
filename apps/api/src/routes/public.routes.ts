@@ -52,7 +52,11 @@ import {
   restoreCartIntoSession,
   cartEmailOptInAvailable,
 } from '../services/cart-email-optin.service';
-import { boundedCacheKey, getCached } from '../lib/public-cache';
+import {
+  boundedCacheKey,
+  getCached,
+  invalidateStoreProductCachesAfterOrder,
+} from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
@@ -457,7 +461,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // never shared-cacheable (Ruling SEARCH-URL-1). `Vary` is set for any cache that honours it.
     if (headerTerm !== undefined) res.vary('X-Search-Query');
     if (ranked || headerTerm !== undefined) res.setHeader('Cache-Control', 'private, no-store');
-    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300, neverStale: true });
     res.json({
       success: true,
       data: gateBackorderPayload(result, backorderOn),
@@ -519,7 +523,7 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     const backorderOn = await readInStoreContext(storeId, () =>
       featureService.isFeatureEnabled(storeId, 'inventory.backorder')
     );
-    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300, neverStale: true });
     res.json({
       success: true,
       data: { product: gateBackorderPayload(payload, backorderOn) },
@@ -1236,6 +1240,9 @@ router.post(
       if (backendFor(storeId, req) === 'do') {
         // Spike order path: stock + order rows in ONE DO transaction. The demo copy only; no payment, no email.
         const order = unwrapDo(await storeDo(storeId).createOrder(storeId, sessionId));
+        // The order just decremented stock in the Durable Object: every cache layer (KV, the Worker edge cache
+        // through the same generations, the storefront tag) must see it, exactly as the Postgres path does.
+        await invalidateStoreProductCachesAfterOrder(storeId);
         res.setHeader('x-store-backend', 'do');
         res.status(201).json({ success: true, data: { order } });
         return;
