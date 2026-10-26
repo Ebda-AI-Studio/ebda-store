@@ -188,7 +188,9 @@ export default function OrderInvoicePage() {
             <iframe
               ref={iframeRef}
               title={t('title')}
-              srcDoc={html}
+              // The document's own Print button uses an inline onclick, which the admin CSP
+              // (script-src-attr 'none') blocks in this inheriting srcdoc frame; the page has its own.
+              srcDoc={html.replace(/<div class="actions no-print">[\s\S]*?<\/div>/, '')}
               className="w-full"
               style={{ height: '85vh', border: 0 }}
             />

@@ -276,3 +276,4 @@ export {
   SENSITIVE_QUERY_PARAMS,
   REDACTED_QUERY_VALUE,
 } from './sentry-url-scrub';
+export { newCspNonce, isValidCspNonce, nonceScriptSrc } from './csp-nonce';
