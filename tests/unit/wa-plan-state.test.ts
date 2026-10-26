@@ -156,6 +156,7 @@ const ent = (over: object = {}) => ({
   limits: { whatsappAutomation: true },
   currentPeriodEnd: new Date('2026-12-01T00:00:00Z'),
   trialEndsAt: null,
+  pastDueSince: null,
   ...over,
 });
 
@@ -200,6 +201,48 @@ describe('planChangedInput (the state sent to Ebda WhatsApp)', () => {
     const raw = label.split(' ')[0]!;
     h.ent.mockResolvedValue(ent({ status: raw, ...over }));
     expect((await planChangedInput(S, NOW))!.input.data).toMatchObject({ status: expected });
+  });
+
+  it('WA-GRACE-1: past_due carries pastDueSince; no other status ever does', async () => {
+    const since = new Date('2026-10-20T08:00:00Z');
+    h.ent.mockResolvedValue(ent({ status: 'past_due', pastDueSince: since }));
+    const p = (await planChangedInput(S, NOW))!;
+    expect(p.input.data).toMatchObject({ status: 'past_due', pastDueSince: since.toISOString() });
+    expect(
+      storeEventSchema.safeParse(await buildStoreEvent(p.input, { seed: p.seed })).success
+    ).toBe(true);
+    // a stale value on an active row is never sent
+    h.ent.mockResolvedValue(ent({ status: 'active', pastDueSince: since }));
+    expect((await planChangedInput(S, NOW))!.input.data).not.toHaveProperty('pastDueSince');
+    // past_due with no recorded start (should not happen): the field is simply absent
+    h.ent.mockResolvedValue(ent({ status: 'past_due', pastDueSince: null }));
+    expect((await planChangedInput(S, NOW))!.input.data).not.toHaveProperty('pastDueSince');
+  });
+
+  it('WA-GRACE-1: pastDueSince is in the dedupe seed, so a new failure window is a new envelope', async () => {
+    h.ent.mockResolvedValue(
+      ent({ status: 'past_due', pastDueSince: new Date('2026-10-20T08:00:00Z') })
+    );
+    const a = (await planChangedInput(S, NOW))!.seed;
+    h.ent.mockResolvedValue(
+      ent({ status: 'past_due', pastDueSince: new Date('2026-11-20T08:00:00Z') })
+    );
+    expect((await planChangedInput(S, NOW))!.seed).not.toBe(a);
+    h.ent.mockResolvedValue(
+      ent({ status: 'past_due', pastDueSince: new Date('2026-10-20T08:00:00Z') })
+    );
+    expect((await planChangedInput(S, NOW))!.seed).toBe(a); // same state, same id
+  });
+
+  it('a pastDueSince write is a plan-relevant write (the observer announces it)', () => {
+    expect(
+      planChangeStoreId(
+        w('StoreSubscription', 'update', {
+          where: { storeId: S },
+          data: { pastDueSince: new Date() },
+        })
+      )
+    ).toBe(S);
   });
 
   it('a cancelled store falls back to the free plan: includesWhatsApp false, planCode free', async () => {

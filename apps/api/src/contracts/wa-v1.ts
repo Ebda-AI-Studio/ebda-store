@@ -19,7 +19,9 @@ const ev = <T extends string, D extends z.ZodType>(type: T, data: D) => z.object
 
 export const storeEventSchema = z.discriminatedUnion('type', [
   // `status` and `periodEnd` are optional for compatibility; with them a dunning suspension or a cancellation reaches the package gate.
-  ev('store.plan_changed', z.object({ planCode: z.string(), includesWhatsApp: z.boolean(), ownerUserId: z.string(), effectiveAt: iso, status: planStatus.optional(), periodEnd: iso.optional() })),
+  // v1.4 (additive, WA-GRACE-1): `pastDueSince` = when the subscription first went past_due (set only while status is past_due). WhatsApp ends its
+  // grace at min(periodEnd, pastDueSince + 7 days).
+  ev('store.plan_changed', z.object({ planCode: z.string(), includesWhatsApp: z.boolean(), ownerUserId: z.string(), effectiveAt: iso, status: planStatus.optional(), periodEnd: iso.optional(), pastDueSince: iso.optional() })),
   ev('store.linked', z.object({ ownerUserId: z.string() })),
   ev('store.unlinked', z.object({ ownerUserId: z.string() })),
   ev('catalog.product_upserted', z.object({ productId: z.string().min(1), variantIds: z.array(z.string().min(1)), updatedAt: iso })),

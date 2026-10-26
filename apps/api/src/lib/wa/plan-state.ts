@@ -29,6 +29,7 @@ const RELEVANT_SUBSCRIPTION_KEYS = new Set([
   'trialEndsAt',
   'cancelAtPeriodEnd',
   'pendingPlanCode',
+  'pastDueSince',
 ]);
 
 function keysOf(data: unknown): string[] {
@@ -124,9 +125,11 @@ export async function planChangedInput(
   const periodEnd = ent.currentPeriodEnd ?? ent.trialEndsAt ?? null;
   const status = toPlanStatus(ent.status, ent.currentPeriodEnd, now);
   const includesWhatsApp = ent.limits.whatsappAutomation === true;
+  // WA-GRACE-1: only meaningful while past_due; WhatsApp ends its grace at min(periodEnd, pastDueSince + 7 d).
+  const pastDueSince = status === 'past_due' ? (ent.pastDueSince ?? null) : null;
   return {
     // Same state => same envelope id: repeated notifications and the reconcile sweep dedupe.
-    seed: `plan:${storeId}:${ent.planCode}:${status}:${periodEnd?.getTime() ?? 'none'}:${includesWhatsApp}`,
+    seed: `plan:${storeId}:${ent.planCode}:${status}:${periodEnd?.getTime() ?? 'none'}:${includesWhatsApp}:${pastDueSince?.getTime() ?? 'none'}`,
     input: {
       type: 'store.plan_changed',
       storeId,
@@ -137,6 +140,7 @@ export async function planChangedInput(
         effectiveAt: now.toISOString(),
         status,
         ...(periodEnd ? { periodEnd: periodEnd.toISOString() } : {}),
+        ...(pastDueSince ? { pastDueSince: pastDueSince.toISOString() } : {}),
       },
     },
   };

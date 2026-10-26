@@ -5117,6 +5117,9 @@ model StoreSubscription {
   billingInterval String    @default("monthly") @map("billing_interval")
   pendingPlanCode String?   @map("pending_plan_code")
   dunningAttempts Int       @default(0) @map("dunning_attempts")
+  /// First time this subscription went past_due (WA-GRACE-1). Maintained by the
+  /// store_subscriptions_past_due_since trigger on every write path; null unless status = past_due.
+  pastDueSince    DateTime? @map("past_due_since") @db.Timestamptz(3)
   nextRetryAt     DateTime? @map("next_retry_at")
 
   createdAt DateTime @default(now()) @map("created_at")
