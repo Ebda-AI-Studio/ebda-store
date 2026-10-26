@@ -1,5 +1,12 @@
 // Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
-import { BRAND, brandMarkSvg, brandAppIconSvg } from '../../../packages/shared/src/brand/index';
+import {
+  BRAND,
+  SITE_NAV_CSS,
+  brandMarkSvg,
+  brandAppIconSvg,
+  siteNavHtml,
+  siteWordmarkHtml,
+} from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, HISTORY_DAYS, PRODUCTS } from './config';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
@@ -141,7 +148,8 @@ function incident(i: Incident, lang: Lang): string {
 </li>`;
 }
 
-const CSS = `
+const CSS =
+  `
 :root{--night:${BRAND.colors.night};--gold:${BRAND.colors.gold};--lift:${BRAND.colors.lift};--panel:#121415;--raise:#181b1c;--line:#2f3435;--fg:#f3f5f4;--muted:#a9b1af;--ok:#5fd08a;--warn:#e6b450;--bad:#ff8a80}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--night);color:var(--fg);font-family:${BRAND.fonts.stacks.sans};line-height:1.65}
@@ -152,6 +160,7 @@ a{color:var(--lift);text-underline-offset:3px}a:hover{color:var(--fg)}
 .skip{position:absolute;inset-inline-start:8px;top:-80px;background:var(--lift);color:var(--night);padding:10px 14px;border-radius:8px;font-weight:600}
 .skip:focus{top:8px;color:var(--night)}
 header{border-bottom:1px solid var(--line)}
+.header-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding-block:12px}.wm-site{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px}
 .wordmark{display:inline-flex;gap:8px;align-items:center;color:var(--fg);text-decoration:none}
 .wm-l{font-weight:600;letter-spacing:.01em}.wm-mk{flex:none}.wm-a{color:var(--lift)}.wm-s{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
@@ -176,7 +185,7 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .tag{border:1px solid var(--gold);color:var(--lift);border-radius:999px;padding:0 8px;font-size:.78rem}
 .upd{margin-top:8px}.upd li{padding:6px 0;border-top:1px solid var(--line)}
 footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
-`.replace(/\n/g, '');
+`.replace(/\n/g, '') + SITE_NAV_CSS;
 
 export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): string {
   const t = T[lang];
@@ -205,8 +214,9 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 </head>
 <body>
 <a class="skip" href="#main">${esc(t.skip)}</a>
-<header><div class="wrap row">
-<a class="wordmark" href="${home}">${brandMarkSvg({ size: 24, cls: 'wm-mk' })}<span class="wm-l">${BRAND.name.toLowerCase()}</span><span class="wm-a" lang="ar">${BRAND.nameAr}</span><span class="wm-s">${esc(t.site)}</span></a>
+<header class="site-header"><div class="wrap header-row">
+${siteWordmarkHtml({ lang, href: home, siteLabel: t.site, markHtml: brandMarkSvg({ size: 28, cls: 'wm-mk' }) })}
+${siteNavHtml(lang, 'status')}
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>
 <main id="main" class="wrap">
