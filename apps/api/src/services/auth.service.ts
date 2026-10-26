@@ -1,3 +1,4 @@
+import { scrubProviderVerifier } from './provider-verification.service';
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -1981,6 +1982,9 @@ export class AuthService {
       // connection would commit independently — the hazard eraseAccount was
       // moved off).
       await deleteUserAddresses(userId);
+
+      // Platform state that names the user (a super-admin who confirmed a provider): null the id, keep the fact.
+      await scrubProviderVerifier(tx, userId);
 
       await tx.abandonedCart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
       await tx.cart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
