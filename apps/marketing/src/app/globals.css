@@ -690,9 +690,13 @@ html[lang='ar'] .story h2 {
     clamp(0, calc((var(--p) - var(--s) - 0.01) / 0.03), 1) *
       (1 - clamp(0, calc((var(--p) - var(--e) + 0.02) / 0.03), 1))
   );
-  opacity: calc(0.38 + 0.62 * var(--act));
+  opacity: calc(0.62 + 0.38 * var(--act)); /* inactive steps stay >= 4.5:1 (AA); 0.38 measured below it */
   transform: translateY(calc((1 - var(--act)) * 8px));
   will-change: opacity, transform;
+}
+/* the dimmed (inactive) steps blend with the canvas, so their small text uses the full ink: muted ink at 62% fails AA */
+.story[data-live] .story-step-d {
+  color: var(--fg);
 }
 .story-stage {
   position: relative;
