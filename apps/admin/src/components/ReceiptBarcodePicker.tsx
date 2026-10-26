@@ -1,8 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { RECEIPT_BARCODE_SHAPES, BARCODE_SHAPE_CREDIT, renderBarcodeSvg } from '@ebda/shared';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  RECEIPT_BARCODE_SHAPES,
+  BARCODE_SHAPE_CREDIT,
+  renderBarcodeSvg,
+  scanCodeFor,
+} from '@ebda/shared';
 import { apiPut } from '../lib/api';
+import { checkSvgBarcode } from '../lib/label-export';
 import { useT } from '@/i18n/useT';
 
 const SAMPLE = 'ORD-48213';
@@ -32,16 +38,40 @@ export function ReceiptBarcodePicker({
   storeId,
   value,
   onSaved,
+  selfCheck = false,
 }: {
   storeId: string;
   value: string | undefined;
   onSaved: (shape: string) => void;
+  /** Read the chosen shape back with the in-house reader (needs a browser canvas) and block Save when it will not scan. */
+  selfCheck?: boolean;
 }) {
   const t = useT('receiptBarcode');
   const [choice, setChoice] = useState(value ?? 'plain');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const options = ['plain', 'off', ...RECEIPT_BARCODE_SHAPES];
+  const [scan, setScan] = useState<'checking' | 'ok' | 'fail' | 'na'>(
+    selfCheck ? 'checking' : 'na'
+  );
+  useEffect(() => {
+    if (!selfCheck) return;
+    if (choice === 'off') {
+      setScan('na');
+      return;
+    }
+    let alive = true;
+    setScan('checking');
+    checkSvgBarcode(
+      renderBarcodeSvg({ value: SAMPLE, shape: choice, label: false, ink: '#000000' }),
+      scanCodeFor(SAMPLE)
+    )
+      .then(ok => alive && setScan(ok ? 'ok' : 'fail'))
+      .catch(() => alive && setScan('fail'));
+    return () => {
+      alive = false;
+    };
+  }, [selfCheck, choice]);
 
   const save = async () => {
     setSaving(true);
@@ -104,11 +134,22 @@ export function ReceiptBarcodePicker({
         <button
           type="button"
           onClick={save}
-          disabled={saving || choice === (value ?? 'plain')}
+          disabled={
+            saving || choice === (value ?? 'plain') || scan === 'checking' || scan === 'fail'
+          }
           className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
         >
           {t('saveShape')}
         </button>
+        {scan !== 'na' && (
+          <span
+            role="status"
+            aria-live="polite"
+            className={`text-xs ${scan === 'ok' ? 'text-success-ink' : scan === 'fail' ? 'text-destructive-ink' : 'text-muted-foreground'}`}
+          >
+            {t(`scan.${scan}`)}
+          </span>
+        )}
         {msg && (
           <span
             role="status"

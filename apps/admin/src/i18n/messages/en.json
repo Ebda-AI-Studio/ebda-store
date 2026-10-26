@@ -2081,8 +2081,8 @@
         "description": "Send order and product events to your own server"
       },
       "qrCodes": {
-        "title": "QR codes",
-        "description": "Printable codes for your store, products, categories and WhatsApp, with scan counts"
+        "title": "QR codes & barcodes",
+        "description": "QR codes, product barcode labels and the receipt barcode, with scan checks"
       }
     },
     "metaCatalogCard": {
@@ -5595,7 +5595,7 @@
         "merchantKeys": "Merchant MCP keys",
         "billing": "Billing",
         "webhooks": "Webhooks",
-        "qr": "QR codes"
+        "qr": "QR codes & barcodes"
       }
     },
     "notificationBell": {
@@ -7683,7 +7683,12 @@
       "daysAheadTitle": "Delivery date",
       "daysAheadHint": "Let customers pick a delivery date instead of only today or tomorrow. The date, and the time window if you use them, are checked again when the order is placed.",
       "daysAheadLabel": "Days to offer",
-      "daysAheadOff": "Off (today or tomorrow only)"
+      "daysAheadOff": "Off (today or tomorrow only)",
+      "orderBarcodeMoved": {
+        "title": "Order barcode",
+        "body": "The barcode on receipts, packing slips and invoices now lives with your other codes.",
+        "link": "Open QR codes & barcodes"
+      }
     }
   },
   "customerGroups": {
@@ -10160,6 +10165,11 @@
       "french-fries": "French fries",
       "hot-dog": "Hot dog",
       "cookie": "Cookie"
+    },
+    "scan": {
+      "checking": "Checking that it scans…",
+      "ok": "Scans correctly",
+      "fail": "This shape does not scan at receipt size"
     }
   },
   "ebdaReceipt": {
@@ -10339,5 +10349,93 @@
       "unsaved": "Unsaved changes"
     },
     "loadError": "Could not load your QR settings."
+  },
+  "codes": {
+    "page": {
+      "title": "QR codes & barcodes",
+      "subtitle": "Print codes for your store, products and chats, and labels with scannable barcodes."
+    },
+    "tabs": {
+      "qr": "QR codes",
+      "labels": "Product labels",
+      "receipt": "Receipt barcode"
+    },
+    "receipt": {
+      "intro": "The barcode of the order number printed on receipts, packing slips and invoices."
+    }
+  },
+  "labels": {
+    "loadError": "Could not load your label settings.",
+    "items": {
+      "title": "Products and variants",
+      "search": "Search",
+      "searchPlaceholder": "Search by name, SKU or barcode",
+      "empty": "No products found.",
+      "noBarcode": "No barcode",
+      "qty": "Copies",
+      "loadMore": "Show more",
+      "generateBody": "Give every product and variant without a barcode its own code.",
+      "generateButton": "Generate missing barcodes",
+      "generating": "Generating…",
+      "generateError": "Could not generate barcodes. Try again.",
+      "pickFirst": "Tick products to print their labels. The preview shows a sample until then.",
+      "missingSkipped": "{count} selected without a barcode will be skipped."
+    },
+    "shape": {
+      "title": "Barcode style",
+      "hint": "Shapes always keep a real Code 128 scan strip at the bottom. They need a tall label or a continuous roll; small labels use plain bars."
+    },
+    "content": {
+      "title": "What goes on the label",
+      "name": "Name",
+      "variant": "Variant",
+      "price": "Price",
+      "digits": "Digits under the bars",
+      "qr": "Store QR",
+      "lang": "Label language",
+      "langAr": "Arabic",
+      "langEn": "English"
+    },
+    "size": {
+      "title": "Label size",
+      "sheets": "A4 sticker sheets",
+      "rolls": "Thermal rolls and labels",
+      "presets": {
+        "a4-3x7": "A4, 3 x 7 (63.5 x 38.1 mm, 21 per sheet)",
+        "a4-4x10": "A4, 4 x 10 (45.7 x 25.4 mm, 40 per sheet)",
+        "a4-5x13": "A4, 5 x 13 (38.1 x 21.2 mm, 65 per sheet)",
+        "roll-58": "58 mm roll",
+        "roll-80": "80 mm roll",
+        "roll-40x30": "40 x 30 mm label",
+        "roll-50x25": "50 x 25 mm label"
+      }
+    },
+    "preview": {
+      "title": "Live preview",
+      "labelAlt": "Label preview",
+      "sheetAlt": "Sheet preview",
+      "sheet": "Sheet",
+      "sampleNote": "Sample product shown. Tick products to preview theirs.",
+      "checking": "Checking that the barcode scans…",
+      "ok": "Barcode scans correctly",
+      "notPrintable": "The bars are too thin to print at this size. Choose a bigger label, plain bars, or a roll.",
+      "unreadable": "The barcode could not be read back. Change the style or the size.",
+      "dropped": "Left out because the label is small: {parts}.",
+      "copies": "{labels} labels on {pages} pages"
+    },
+    "actions": {
+      "save": "Save design",
+      "saving": "Saving…",
+      "saved": "Design saved",
+      "saveError": "Could not save. Try again.",
+      "unsaved": "Unsaved changes",
+      "pdf": "Download PDF",
+      "print": "Print",
+      "working": "Working…",
+      "blocked": "Downloads are off until the barcode scans correctly.",
+      "downloadError": "Could not create the file. Try again.",
+      "failedItems": "These labels do not scan, so nothing was created: {names}."
+    },
+    "testNote": "Print one label and scan it with a phone before you print a whole sheet."
   }
 }

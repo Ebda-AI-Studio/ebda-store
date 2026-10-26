@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '../../../../../lib/api';
+import { apiGet } from '../../../../../../lib/api';
 import type { QrKind } from '@ebda/shared/qr';
 import { Segmented } from './Segmented';
 import type { QrTarget } from '../_hooks/useQr';

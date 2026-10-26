@@ -1255,6 +1255,20 @@ export class StoreService {
     await StoreService.invalidateCache(store);
   }
 
+  /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
+  static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{labels}', ${JSON.stringify(labels)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
   static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
     const store = await this.getById(storeId);
     const existingSettings = (store.settings as Record<string, unknown>) || {};

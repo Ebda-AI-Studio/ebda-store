@@ -263,6 +263,7 @@ export const HUBS: HubDefinition[] = [
       '/tax',
       '/pwa',
       '/qr',
+      '/codes',
       '/language',
       '/template',
       '/announcement',

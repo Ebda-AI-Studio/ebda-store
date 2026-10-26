@@ -9,7 +9,8 @@ import { RECEIPT_BARCODE_SHAPES } from './shapes';
 import { parseBarcodeInput } from './ean';
 import { code128Modules } from './code128';
 import { ean13Modules } from './ean';
-import { BARCODE_QUIET } from './sizing';
+import { BARCODE_PAD, BARCODE_QUIET } from './sizing';
+import { barcodeShapeData } from './shapes';
 
 export type LabelPreset = {
   id: string;
@@ -26,6 +27,8 @@ export type LabelPreset = {
   gapYMm?: number;
   /** Rolls only: the printable width of the head (58 mm paper prints 48 mm, 80 mm prints 72 mm). */
   printableWidthMm?: number;
+  /** Continuous roll: the label is as tall as its content (`heightMm` is the minimum). */
+  continuous?: boolean;
 };
 
 export const A4_MM = { w: 210, h: 297 } as const;
@@ -69,8 +72,22 @@ export const LABEL_PRESETS: readonly LabelPreset[] = [
     gapYMm: 0,
   },
   // Thermal rolls.
-  { id: 'roll-58', kind: 'roll', widthMm: 58, heightMm: 40, printableWidthMm: 48 },
-  { id: 'roll-80', kind: 'roll', widthMm: 80, heightMm: 40, printableWidthMm: 72 },
+  {
+    id: 'roll-58',
+    kind: 'roll',
+    widthMm: 58,
+    heightMm: 40,
+    printableWidthMm: 48,
+    continuous: true,
+  },
+  {
+    id: 'roll-80',
+    kind: 'roll',
+    widthMm: 80,
+    heightMm: 40,
+    printableWidthMm: 72,
+    continuous: true,
+  },
   { id: 'roll-40x30', kind: 'roll', widthMm: 40, heightMm: 30, printableWidthMm: 38 },
   { id: 'roll-50x25', kind: 'roll', widthMm: 50, heightMm: 25, printableWidthMm: 48 },
 ] as const;
@@ -143,6 +160,8 @@ export type LabelLayout = {
     shape: string;
     /** Width of the narrowest bar on paper. */
     moduleMm: number;
+    /** The drawn art inside the box (a shape keeps its aspect; plain bars fill the box). */
+    art: { x: number; y: number; w: number; h: number };
   };
   qr: { x: number; y: number; size: number } | null;
   /** Parts left out because they did not fit this label size. */
@@ -236,7 +255,7 @@ export function layoutLabel(
   let qr: LabelLayout['qr'] = null;
   if (wants.qr) {
     const size = Math.min(H * 0.42, innerW * 0.3);
-    if (H >= 25 && size >= 9) qr = { x: rtl ? x0 : x0 + innerW - size, y: PAD, size };
+    if (H >= 25 && size >= 12) qr = { x: rtl ? x0 : x0 + innerW - size, y: PAD, size };
     else dropped.push('qr');
   }
   const textW = qr ? innerW - qr.size - 1.5 : innerW;
@@ -266,20 +285,30 @@ export function layoutLabel(
   if (qr) y = Math.max(y, PAD + qr.size + 1);
 
   const digitsReserve = digitsOn ? digitsH : 0;
-  const barH = Math.max(MIN_BAR_H, H - PAD - y - digitsReserve);
   const { symbology, modules } = barcodeModuleCount(item.barcode, settings.shape);
-  const moduleMm = innerW / modules;
+  const shapeData = settings.shape === 'plain' ? undefined : barcodeShapeData(settings.shape);
+  const aspect = shapeData ? (shapeData.h + 2 * BARCODE_PAD) / (shapeData.w + 2 * BARCODE_PAD) : 0;
+  const available = Math.max(MIN_BAR_H, H - PAD - y - digitsReserve);
+  // A shape needs height proportional to its width: a continuous roll grows to fit it, a fixed
+  // label scales the shape down (and the self-check / `printable` then decide whether it still scans).
+  const barH = shapeData && preset.continuous ? innerW * aspect : available;
+  const artW = shapeData ? Math.min(innerW, barH / aspect) : innerW;
+  const artH = shapeData ? artW * aspect : barH;
+  const moduleMm = shapeData
+    ? (artW * (shapeData.w / (shapeData.w + 2 * BARCODE_PAD))) / modules
+    : innerW / modules;
   const barcode = {
     x: x0,
     y,
     w: innerW,
-    h: Math.min(barH, H - PAD - y - digitsReserve),
+    h: barH,
     value: item.barcode,
     symbology,
     shape: settings.shape,
     moduleMm,
+    art: { x: x0 + (innerW - artW) / 2, y, w: artW, h: artH },
   };
-  y += barcode.h;
+  y += barH;
   if (digitsOn) {
     texts.push({
       role: 'digits',
@@ -293,16 +322,18 @@ export function layoutLabel(
       rtl: false,
       align: 'center',
     });
+    y += digitsH;
   }
+  const finalH = preset.continuous ? Math.max(H, y + PAD) : H;
 
   return {
     widthMm: W,
-    heightMm: H,
+    heightMm: finalH,
     texts,
     barcode,
     qr,
     dropped,
-    printable: moduleMm >= MIN_MODULE_MM && barcode.h >= 5,
+    printable: moduleMm >= MIN_MODULE_MM && barH >= 5,
   };
 }
 

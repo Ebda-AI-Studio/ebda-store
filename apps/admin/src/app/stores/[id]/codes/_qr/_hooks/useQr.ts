@@ -13,7 +13,7 @@ import {
   type Scene,
   type SelfCheck,
 } from '@ebda/shared/qr';
-import { apiGet, apiPut } from '../../../../../lib/api';
+import { apiGet, apiPut } from '../../../../../../lib/api';
 
 export type QrTarget = { kind: QrKind; slug?: string; label?: string };
 

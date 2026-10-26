@@ -69,7 +69,7 @@ describe('layoutLabel', () => {
           expect(b.x, `${b.n} left`).toBeGreaterThanOrEqual(0);
           expect(b.y, `${b.n} top`).toBeGreaterThanOrEqual(0);
           expect(b.x + b.w, `${b.n} right`).toBeLessThanOrEqual(preset.widthMm + 1e-6);
-          expect(b.y + b.h, `${b.n} bottom`).toBeLessThanOrEqual(preset.heightMm + 1e-6);
+          expect(b.y + b.h, `${b.n} bottom`).toBeLessThanOrEqual(l.heightMm + 1e-6);
         }
         for (let i = 0; i < boxes.length; i++)
           for (let j = i + 1; j < boxes.length; j++) {
@@ -123,6 +123,27 @@ describe('layoutLabel', () => {
     expect(
       layoutLabel(labelPresetById('roll-80')!, ITEM, { ...ALL, shape: 'palm' }).printable
     ).toBe(true);
+  });
+
+  it('a shape grows a continuous roll to fit it and stays inside the label; fixed labels scale it down', () => {
+    for (const id of ['roll-58', 'roll-80']) {
+      const p = labelPresetById(id)!;
+      const l = layoutLabel(p, ITEM, {
+        ...ALL,
+        shape: 'palm',
+        content: { ...ALL.content, qr: false },
+      });
+      expect(l.heightMm, id).toBeGreaterThan(p.heightMm);
+      expect(l.barcode.art.y + l.barcode.art.h, id).toBeLessThanOrEqual(l.heightMm);
+      expect(l.barcode.art.w, id).toBeCloseTo(l.barcode.w, 5);
+    }
+    expect(
+      layoutLabel(labelPresetById('roll-80')!, ITEM, { ...ALL, shape: 'palm' }).printable
+    ).toBe(true);
+    const fixed = layoutLabel(labelPresetById('a4-3x7')!, ITEM, { ...ALL, shape: 'palm' });
+    expect(fixed.heightMm).toBe(38.1);
+    expect(fixed.barcode.art.w).toBeLessThan(fixed.barcode.w);
+    expect(fixed.printable).toBe(false);
   });
 
   it('a Code 128 (non-EAN) code prints as Code 128 even when plain', () => {
