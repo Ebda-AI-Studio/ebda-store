@@ -10,6 +10,7 @@ import {
   renderFooter,
   renderPage,
   renderSearchMain,
+  render404Main,
   renderSidebar,
   renderToc,
   writeSeoFiles,
@@ -253,22 +254,103 @@ writePage(
 await writeSearchAssets(out, searchDocs);
 
 writeSeoFiles(out, ORIGIN, urls);
-writeFileSync(
-  path.join(out, '404.html'),
-  renderPage({
-    lang: 'en',
-    title: `Not found | ${BRAND.company.shortNameEn} Docs`,
-    description: 'Page not found.',
-    canonical: ORIGIN + '/',
-    siteLabel: EN.site,
-    homeHref: '/',
-    active: 'docs',
-    search: EN.search,
-    main: `<h1>Page not found</h1><p>That page does not exist. Start from the <a href="/">docs home</a>.</p>`,
-    footer,
-    skipLabel: EN.skip,
-  })
-);
+// 404 pages: Workers Static Assets serves the NEAREST 404.html (/ar/* gets the Arabic one). Apple-style: one calm
+// sentence, live search, a compact map. The docs are English-only, so the Arabic page searches the English index.
+const NF = {
+  en: {
+    line: "The page you're looking for can't be found.",
+    hint: 'Search for what you meant, or pick a section below.',
+    mapLabel: 'Documentation sections',
+    docs: 'Documentation',
+    ebda: 'Ebda',
+    home: 'Docs home',
+    contact: 'Contact',
+  },
+  ar: {
+    line: 'الصفحة اللي بتدوّر عليها مش موجودة.',
+    hint: 'دوّر على اللي كنت تقصده (الوثائق بالإنجليزية)، أو اختار قسم من تحت.',
+    mapLabel: 'أقسام الوثائق',
+    docs: 'الوثائق',
+    ebda: 'ابدأ',
+    home: 'الصفحة الرئيسية للوثائق',
+    contact: 'تواصل معانا',
+  },
+};
+const firstOfSection = SECTIONS.flatMap(section => {
+  const first = allNav
+    .filter(p => p.section === section)
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))[0];
+  return first ? [{ label: section, href: url(first.slug) }] : [];
+});
+for (const lang of ['en', 'ar']) {
+  const c = NF[lang];
+  const ar = lang === 'ar';
+  writeFileSync(
+    path.join(out, ar ? 'ar/404.html' : '404.html'),
+    renderPage({
+      lang,
+      title: ar
+        ? `الصفحة مش موجودة | وثائق المطوّرين`
+        : `Not found | ${BRAND.company.shortNameEn} Docs`,
+      description: ar ? 'الصفحة مش موجودة.' : 'Page not found.',
+      canonical: ORIGIN + (ar ? '/ar/' : '/'),
+      siteLabel: ar ? 'وثائق المطوّرين' : EN.site,
+      homeHref: ar ? '/ar/' : '/',
+      active: 'docs',
+      search: ar
+        ? {
+            action: '/search/',
+            label: 'بحث',
+            placeholder: 'ابحث في الوثائق (بالإنجليزية)',
+            index: '/search-index.en.json',
+          }
+        : EN.search,
+      noHeaderSearch: true,
+      main: render404Main({
+        lang,
+        search: ar
+          ? {
+              action: '/search/',
+              label: 'بحث',
+              placeholder: 'ابحث في الوثائق (بالإنجليزية)',
+              index: '/search-index.en.json',
+            }
+          : EN.search,
+        line: c.line,
+        hint: c.hint,
+        mapLabel: c.mapLabel,
+        groups: [
+          {
+            title: c.docs,
+            links: [
+              { href: ar ? '/ar/' : '/', label: c.home },
+              ...firstOfSection,
+              { href: '/openapi.json', label: 'OpenAPI' },
+            ],
+          },
+          {
+            title: c.ebda,
+            links: [
+              {
+                href: BRAND_MARKETING_URL,
+                label: ar ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+              },
+              { href: BRAND_STORE_APP_URL, label: BRAND.product[ar ? 'nameAr' : 'nameEn'] },
+              {
+                href: `https://${BRAND.domains.help}`,
+                label: ar ? 'مركز المساعدة' : 'Help centre',
+              },
+              { href: `https://${BRAND.domains.status}`, label: ar ? 'حالة الخدمة' : 'Status' },
+              { href: `mailto:${BRAND.supportEmail}`, label: c.contact },
+            ],
+          },
+        ],
+      }),
+      footer,
+      skipLabel: ar ? 'تخطَّ إلى المحتوى' : EN.skip,
+    }).replace('<head>', '<head>\n<meta name="robots" content="noindex">')
+  );
+}
 writeFileSync(
   path.join(out, 'llms.txt'),
   `# ${BRAND.company.shortNameEn} Docs\n\n> Developer documentation for ${BRAND.product.nameEn}, from ${BRAND.company.shortNameEn}. Products are added here as they ship.\n\n${pages

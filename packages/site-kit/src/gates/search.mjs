@@ -31,10 +31,25 @@ export async function runSearchCheck({ root, name = 'site', cases, typeahead = [
     }
     for (const c of typeahead) {
       const page = await browser.newPage();
-      await page.goto(`${origin}${c.page}`);
+      const resp = await page.goto(`${origin}${c.page}`);
+      // A `status` on the case asserts the HTTP status (the 404 pages must stay a real 404).
+      if (c.status && resp?.status() !== c.status) {
+        failed++;
+        console.log(`FAIL ${c.page} status ${resp?.status()} (want ${c.status})`);
+      }
       await page.focus('#q');
       await page.keyboard.type(c.q);
-      await page.waitForSelector('.ta-list [role=option]', { timeout: 5000 }).catch(() => {});
+      // Results refresh while typing: wait for the expected article (or time out and report what is there).
+      await page
+        .waitForFunction(
+          href =>
+            [...document.querySelectorAll('.ta-list [role=option]')].some(
+              a => a.getAttribute('href') === href
+            ),
+          c.expect,
+          { timeout: 5000 }
+        )
+        .catch(() => {});
       const hrefs = await page.$$eval('.ta-list [role=option]', as =>
         as.map(a => a.getAttribute('href'))
       );

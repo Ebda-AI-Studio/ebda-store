@@ -16,5 +16,7 @@ await runSearchCheck({
     { page: '/', q: 'p', expect: '/money/' },
     { page: '/', q: 'piastres', expect: '/money/' },
     { page: '/ar/', q: 'signature', expect: '/webhooks/' },
+    { page: '/no-such-page/', q: 'piastres', expect: '/money/', status: 404 },
+    { page: '/ar/no-such-page/', q: 'signature', expect: '/webhooks/', status: 404 },
   ],
 });

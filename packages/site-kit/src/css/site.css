@@ -519,3 +519,57 @@ th {
     scroll-behavior: smooth;
   }
 }
+
+.nf {
+  max-inline-size: 760px;
+  margin-inline: auto;
+  padding-block: clamp(24px, 8vh, 80px);
+}
+.nf h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1.2;
+  text-wrap: balance;
+  margin: 0 0 12px;
+}
+.nf .search.nf-search {
+  margin-block: 28px 48px;
+}
+.nf .search.nf-search input {
+  flex: 1;
+  inline-size: auto;
+  block-size: 52px;
+  border-radius: 14px;
+  padding-inline: 18px;
+  font-size: 1rem;
+}
+.nf .search.nf-search button {
+  block-size: 52px;
+  border-radius: 14px;
+  padding-inline: 22px;
+}
+.nf-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 28px 40px;
+}
+.nf-map h2 {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.nf-map ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+@media (max-width: 520px) {
+  .nf .search.nf-search {
+    flex-direction: column;
+  }
+  .nf .search.nf-search input {
+    flex: none;
+  }
+}
