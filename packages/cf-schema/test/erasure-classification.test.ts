@@ -10,6 +10,10 @@ type Entry = {
   piiColumns: string[];
   subjectKeys: string[];
   reviewedNotPii?: string[];
+  userIdColumns?: string[];
+  subjectColumns?: string[];
+  actorScrub?: Record<string, string | null>;
+  retainedUserIds?: Record<string, string>;
 };
 const cls = readJson<Record<string, Entry>>('erasure-classification.json');
 const DBS = { 'store-do': openDb('store'), d1: openDb('platform') } as const;
@@ -79,6 +83,37 @@ describe('erasure classification', () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it('every user-id column is accounted for exactly once: actorScrub, subjectColumns or retainedUserIds', () => {
+    const problems: string[] = [];
+    for (const [id, e] of Object.entries(cls)) {
+      const table = id.split(':')[1];
+      const info = DBS[e.db].prepare(`PRAGMA table_info("${table}")`).all() as {
+        name: string;
+        notnull: number;
+      }[];
+      const userCols = e.piiColumns.filter(c => c !== '*' && USER_ID_SHAPED.test(c));
+      const groups = {
+        actorScrub: Object.keys(e.actorScrub ?? {}),
+        subjectColumns: e.subjectColumns ?? [],
+        retainedUserIds: Object.keys(e.retainedUserIds ?? {}),
+      };
+      const all = Object.values(groups).flat();
+      if ([...new Set(all)].length !== all.length)
+        problems.push(`${id}: a column is in two groups`);
+      if (JSON.stringify([...all].sort()) !== JSON.stringify([...(e.userIdColumns ?? [])].sort()))
+        problems.push(`${id}: userIdColumns != actorScrub + subjectColumns + retainedUserIds`);
+      for (const c of userCols)
+        if (!(e.userIdColumns ?? []).includes(c)) problems.push(`${id}.${c}: not in userIdColumns`);
+      for (const [c, rep] of Object.entries(e.actorScrub ?? {})) {
+        const col = info.find(x => x.name === c);
+        if (!col) problems.push(`${id}.${c}: no such column`);
+        else if (rep === null && col.notnull)
+          problems.push(`${id}.${c}: NOT NULL needs a tombstone`);
+      }
+    }
+    expect(problems).toEqual([]);
   });
 
   it('every NOT_A_USER exception names a real column (no stale exemption)', () => {
