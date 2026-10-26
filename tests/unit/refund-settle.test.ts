@@ -330,7 +330,7 @@ describe('release vs absorb (both orders, one outcome per claim)', () => {
     const sql = fs.readFileSync(
       path.join(
         __dirname,
-        '../../packages/database/prisma/migrations/20261103000200_refund_claim_single_outcome/migration.sql'
+        '../../packages/database/prisma/migrations/20261103000250_refund_claim_single_outcome/migration.sql'
       ),
       'utf8'
     );
