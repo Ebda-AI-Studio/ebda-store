@@ -1,10 +1,16 @@
-// Erasing a user nulls the confirming/acting user id on the D1 platform schema (twin of the Postgres scrub).
+// OFFBOARD-1: erasing a user clears their id from every actor column the classification names, on the D1 platform
+// schema and on a StoreDO schema, and leaves other users' ids and the facts themselves alone.
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { nodeSyncSql } from './node-sync-sql';
-import { PLATFORM_USER_SCRUB, scrubUserFromPlatform } from '../src/platform-erasure';
+import {
+  actorScrubPlan,
+  scrubUserFromPlatform,
+  scrubUserFromStoreDo,
+} from '../src/platform-erasure';
+import { openSqlite } from './diff-harness';
 
 const CF = path.resolve(__dirname, '../../cf-schema');
 function platformDb() {
@@ -19,22 +25,27 @@ function platformDb() {
   return raw;
 }
 
-describe('platform user erasure', () => {
-  it('nulls verified_by_id and actor_id for the erased user only, and keeps the verification', () => {
+describe('actor-id erasure', () => {
+  it('D1: nulls verified_by_id / actor_id / reviewed_by for the erased user only, keeps the facts, tombstones a NOT NULL column', () => {
     const raw = platformDb();
+    raw.exec('PRAGMA foreign_keys = OFF'); // fixtures name stores that are not seeded
     raw.exec(`INSERT INTO provider_verifications (provider, kind, verified_at, verified_by_id) VALUES
       ('paymob', 'payment', 1000, 'u1'), ('kashier', 'payment', 2000, 'u2')`);
     raw.exec(
       `INSERT INTO platform_audit_log (id, actor_id, action) VALUES ('a1', 'u1', 'x'), ('a2', 'u2', 'x')`
     );
+    raw.exec(
+      `INSERT INTO store_features (id, store_id, feature_key, enabled, enabled_by) VALUES ('f1', 's1', 'f', 1, 'u1'), ('f2', 's1', 'g', 1, 'u2')`
+    );
     const r = scrubUserFromPlatform(nodeSyncSql(raw), 'u1');
-    expect(r.rows).toBe(2);
-    const pv = raw
-      .prepare(
-        `SELECT provider, verified_at, verified_by_id FROM provider_verifications ORDER BY provider`
-      )
-      .all();
-    expect(pv).toEqual([
+    expect(r.rows).toBe(3);
+    expect(
+      raw
+        .prepare(
+          `SELECT provider, verified_at, verified_by_id FROM provider_verifications ORDER BY provider`
+        )
+        .all()
+    ).toEqual([
       { provider: 'kashier', verified_at: 2000, verified_by_id: 'u2' },
       { provider: 'paymob', verified_at: 1000, verified_by_id: null },
     ]);
@@ -42,30 +53,45 @@ describe('platform user erasure', () => {
       { id: 'a1', actor_id: null },
       { id: 'a2', actor_id: 'u2' },
     ]);
+    expect(
+      raw.prepare(`SELECT feature_key, enabled_by FROM store_features ORDER BY feature_key`).all()
+    ).toEqual([
+      { feature_key: 'f', enabled_by: null },
+      { feature_key: 'g', enabled_by: 'u2' },
+    ]);
   });
 
-  it('handles exactly the d1 columns the erasure classification scrubs by userId (a new one fails here)', () => {
+  it('StoreDO: nulls created_by / approved_by / actor_id for the erased user only', () => {
+    const raw = openSqlite();
+    const x = (sql: string, ...p: unknown[]) => raw.prepare(sql).run(...(p as never[]));
+    x(
+      `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p', 's1', 'W', 'w', 100, 5, 'active')`
+    );
+    x(`INSERT INTO inventory_history (id, store_id, product_id, type, quantity, previous_stock, new_stock, created_by) VALUES
+      ('h1', 's1', 'p', 'adjustment', 1, 5, 6, 'u1'), ('h2', 's1', 'p', 'adjustment', 1, 6, 7, 'u2')`);
+    const r = scrubUserFromStoreDo(nodeSyncSql(raw), 'u1');
+    expect(r.rows).toBeGreaterThanOrEqual(1);
+    expect(raw.prepare(`SELECT id, created_by FROM inventory_history ORDER BY id`).all()).toEqual([
+      { id: 'h1', created_by: null },
+      { id: 'h2', created_by: 'u2' },
+    ]);
+  });
+
+  it('the plan covers every classified actor column of both databases (no hand list to drift)', () => {
     const cls = JSON.parse(
       fs.readFileSync(path.join(CF, 'erasure-classification.json'), 'utf8')
-    ) as Record<
-      string,
-      { db: string; action: string; piiColumns: string[]; subjectKeys: string[] }
-    >;
-    const expected: Record<string, string[]> = {};
-    for (const [key, e] of Object.entries(cls))
-      if (e.db === 'd1' && e.action === 'scrub' && e.subjectKeys.includes('userId'))
-        expected[key.replace(/^d1:/, '')] = [...e.piiColumns].sort();
-    const actual = Object.fromEntries(
-      Object.entries(PLATFORM_USER_SCRUB).map(([t, c]) => [t, [...c].sort()])
-    );
-    expect(actual).toEqual(expected);
-    // classification must name real columns
-    const raw = platformDb();
-    for (const [t, cols] of Object.entries(expected))
-      for (const c of cols)
-        expect(
-          (raw.prepare(`PRAGMA table_info("${t}")`).all() as { name: string }[]).map(x => x.name),
-          `${t}.${c}`
-        ).toContain(c);
+    ) as Record<string, { db: string; actorScrub?: Record<string, unknown> }>;
+    for (const db of ['store-do', 'd1'] as const) {
+      const expected = Object.fromEntries(
+        Object.entries(cls)
+          .filter(([, e]) => e.db === db && e.actorScrub)
+          .map(([k, e]) => [k.split(':')[1], Object.keys(e.actorScrub!).sort()])
+      );
+      const actual = Object.fromEntries(
+        Object.entries(actorScrubPlan(db)).map(([t, c]) => [t, Object.keys(c).sort()])
+      );
+      expect(actual).toEqual(expected);
+      expect(Object.keys(actual).length).toBeGreaterThan(5);
+    }
   });
 });

@@ -37,7 +37,9 @@
     "action": "delete",
     "piiColumns": ["email", "first_name", "last_name", "phone", "user_id", "buyer_key"],
     "subjectKeys": ["email", "phone", "userId", "buyerKey", "customerId"],
-    "note": "the customer row; children cascade"
+    "note": "the customer row; children cascade",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "store-do:customer_groups": {
     "db": "store-do",
@@ -80,7 +82,11 @@
     "action": "scrub",
     "piiColumns": ["created_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["created_by"],
+    "actorScrub": {
+      "created_by": null
+    }
   },
   "store-do:product_images": {
     "db": "store-do",
@@ -162,7 +168,12 @@
     "action": "delete",
     "piiColumns": ["user_id", "phone", "decided_by", "business_name"],
     "subjectKeys": ["userId", "phone"],
-    "note": ""
+    "note": "",
+    "userIdColumns": ["user_id", "decided_by"],
+    "subjectColumns": ["user_id"],
+    "actorScrub": {
+      "decided_by": null
+    }
   },
   "store-do:size_charts": {
     "db": "store-do",
@@ -257,7 +268,11 @@
     "action": "scrub",
     "piiColumns": ["actor_id"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["actor_id"],
+    "actorScrub": {
+      "actor_id": null
+    }
   },
   "store-do:order_items": {
     "db": "store-do",
@@ -282,7 +297,11 @@
     "action": "scrub",
     "piiColumns": ["triggered_by_user_id"],
     "subjectKeys": ["userId"],
-    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record",
+    "userIdColumns": ["triggered_by_user_id"],
+    "actorScrub": {
+      "triggered_by_user_id": null
+    }
   },
   "store-do:returns": {
     "db": "store-do",
@@ -290,7 +309,12 @@
     "action": "scrub",
     "piiColumns": ["customer_id", "approved_by", "rejected_by"],
     "subjectKeys": ["customerId", "userId"],
-    "note": "money history stays"
+    "note": "money history stays",
+    "userIdColumns": ["approved_by", "rejected_by"],
+    "actorScrub": {
+      "approved_by": null,
+      "rejected_by": null
+    }
   },
   "store-do:return_items": {
     "db": "store-do",
@@ -299,7 +323,11 @@
     "piiColumns": ["adjustment_override_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "reviewedNotPii": ["product_name"]
+    "reviewedNotPii": ["product_name"],
+    "userIdColumns": ["adjustment_override_by"],
+    "actorScrub": {
+      "adjustment_override_by": null
+    }
   },
   "store-do:payment_configs": {
     "db": "store-do",
@@ -308,7 +336,12 @@
     "piiColumns": ["created_by", "updated_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "reviewedNotPii": ["api_key_last4", "merchant_id_last4", "display_name"]
+    "reviewedNotPii": ["api_key_last4", "merchant_id_last4", "display_name"],
+    "userIdColumns": ["created_by", "updated_by"],
+    "actorScrub": {
+      "created_by": null,
+      "updated_by": null
+    }
   },
   "store-do:notification_configs": {
     "db": "store-do",
@@ -341,7 +374,9 @@
     "action": "delete",
     "piiColumns": ["user_id", "player_id"],
     "subjectKeys": ["userId"],
-    "note": ""
+    "note": "",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "store-do:abandoned_carts": {
     "db": "store-do",
@@ -408,7 +443,11 @@
     "action": "delete",
     "piiColumns": ["address", "requested_by_id"],
     "subjectKeys": ["userId"],
-    "note": "merchant pickup address"
+    "note": "merchant pickup address",
+    "userIdColumns": ["requested_by_id"],
+    "actorScrub": {
+      "requested_by_id": null
+    }
   },
   "store-do:cod_remittances": {
     "db": "store-do",
@@ -424,7 +463,11 @@
     "action": "delete",
     "piiColumns": ["name", "email", "phone", "approved_by"],
     "subjectKeys": ["email", "phone", "userId"],
-    "note": "third-party referrer, not a shopper"
+    "note": "third-party referrer, not a shopper",
+    "userIdColumns": ["approved_by"],
+    "actorScrub": {
+      "approved_by": null
+    }
   },
   "store-do:affiliate_referrals": {
     "db": "store-do",
@@ -456,7 +499,11 @@
     "action": "scrub",
     "piiColumns": ["triggered_by_user_id"],
     "subjectKeys": ["userId"],
-    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record",
+    "userIdColumns": ["triggered_by_user_id"],
+    "actorScrub": {
+      "triggered_by_user_id": null
+    }
   },
   "store-do:audit_logs": {
     "db": "store-do",
@@ -464,7 +511,11 @@
     "action": "scrub",
     "piiColumns": ["user_id", "ip_address", "user_agent"],
     "subjectKeys": ["userId"],
-    "note": "actor link and network identifiers removed"
+    "note": "actor link and network identifiers removed",
+    "userIdColumns": ["user_id"],
+    "actorScrub": {
+      "user_id": null
+    }
   },
   "store-do:addresses": {
     "db": "store-do",
@@ -472,7 +523,9 @@
     "action": "delete",
     "piiColumns": ["first_name", "last_name", "address1", "address2", "phone", "user_id"],
     "subjectKeys": ["userId"],
-    "note": "user-keyed address book"
+    "note": "user-keyed address book",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "store-do:wishlists": {
     "db": "store-do",
@@ -481,7 +534,9 @@
     "piiColumns": ["user_id"],
     "subjectKeys": ["userId"],
     "note": "items cascade",
-    "reviewedNotPii": ["name"]
+    "reviewedNotPii": ["name"],
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "store-do:wishlist_items": {
     "db": "store-do",
@@ -565,7 +620,11 @@
     "action": "scrub",
     "piiColumns": ["customer_id", "actor_id"],
     "subjectKeys": ["customerId", "userId"],
-    "note": "ledger rows kept without the customer link"
+    "note": "ledger rows kept without the customer link",
+    "userIdColumns": ["actor_id"],
+    "actorScrub": {
+      "actor_id": null
+    }
   },
   "store-do:newsletter_subscribers": {
     "db": "store-do",
@@ -581,7 +640,9 @@
     "action": "delete",
     "piiColumns": ["user_id", "phone", "phone_key"],
     "subjectKeys": ["phone", "userId"],
-    "note": "consent proof kept only as an anonymised count elsewhere"
+    "note": "consent proof kept only as an anonymised count elsewhere",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "store-do:campaigns": {
     "db": "store-do",
@@ -614,7 +675,11 @@
     "action": "scrub",
     "piiColumns": ["user_id"],
     "subjectKeys": ["userId"],
-    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record",
+    "userIdColumns": ["user_id"],
+    "actorScrub": {
+      "user_id": null
+    }
   },
   "store-do:bulk_ai_jobs": {
     "db": "store-do",
@@ -622,7 +687,11 @@
     "action": "scrub",
     "piiColumns": ["user_id"],
     "subjectKeys": ["userId"],
-    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record"
+    "note": "the acting user id is nulled on user erasure or offboarding (OFFBOARD-1); the row is a business record",
+    "userIdColumns": ["user_id"],
+    "actorScrub": {
+      "user_id": null
+    }
   },
   "store-do:store_faqs": {
     "db": "store-do",
@@ -671,7 +740,11 @@
     "piiColumns": ["posted_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "reviewedNotPii": ["reversed_by_id"]
+    "reviewedNotPii": ["reversed_by_id"],
+    "userIdColumns": ["posted_by"],
+    "actorScrub": {
+      "posted_by": null
+    }
   },
   "store-do:journal_lines": {
     "db": "store-do",
@@ -687,7 +760,11 @@
     "action": "scrub",
     "piiColumns": ["recorded_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["recorded_by"],
+    "actorScrub": {
+      "recorded_by": null
+    }
   },
   "store-do:suppliers": {
     "db": "store-do",
@@ -703,7 +780,12 @@
     "action": "scrub",
     "piiColumns": ["created_by", "received_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["created_by", "received_by"],
+    "actorScrub": {
+      "created_by": null,
+      "received_by": null
+    }
   },
   "store-do:purchase_order_items": {
     "db": "store-do",
@@ -719,7 +801,12 @@
     "action": "scrub",
     "piiColumns": ["posted_by", "created_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["posted_by", "created_by"],
+    "actorScrub": {
+      "posted_by": null,
+      "created_by": null
+    }
   },
   "store-do:stock_adjustment_items": {
     "db": "store-do",
@@ -751,7 +838,12 @@
     "action": "scrub",
     "piiColumns": ["approved_by", "created_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["approved_by", "created_by"],
+    "actorScrub": {
+      "approved_by": null,
+      "created_by": null
+    }
   },
   "store-do:reorder_suggestions": {
     "db": "store-do",
@@ -759,7 +851,11 @@
     "action": "scrub",
     "piiColumns": ["dismissed_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["dismissed_by"],
+    "actorScrub": {
+      "dismissed_by": null
+    }
   },
   "store-do:deadstock_flags": {
     "db": "store-do",
@@ -767,7 +863,11 @@
     "action": "scrub",
     "piiColumns": ["dismissed_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["dismissed_by"],
+    "actorScrub": {
+      "dismissed_by": null
+    }
   },
   "store-do:profit_anomalies": {
     "db": "store-do",
@@ -775,7 +875,11 @@
     "action": "scrub",
     "piiColumns": ["acknowledged_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["acknowledged_by"],
+    "actorScrub": {
+      "acknowledged_by": null
+    }
   },
   "store-do:customer_cohort_snapshots": {
     "db": "store-do",
@@ -807,7 +911,11 @@
     "action": "scrub",
     "piiColumns": ["created_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["created_by"],
+    "actorScrub": {
+      "created_by": null
+    }
   },
   "store-do:count_lines": {
     "db": "store-do",
@@ -865,7 +973,11 @@
     "action": "scrub",
     "piiColumns": ["created_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["created_by"],
+    "actorScrub": {
+      "created_by": null
+    }
   },
   "store-do:store_tax_profiles": {
     "db": "store-do",
@@ -873,7 +985,12 @@
     "action": "delete",
     "piiColumns": ["tax_registration_number", "submitted_by", "reviewed_by", "legal_name"],
     "subjectKeys": ["userId"],
-    "note": "merchant tax identity"
+    "note": "merchant tax identity",
+    "userIdColumns": ["submitted_by", "reviewed_by"],
+    "actorScrub": {
+      "submitted_by": null,
+      "reviewed_by": null
+    }
   },
   "store-do:store_tax_documents": {
     "db": "store-do",
@@ -882,7 +999,11 @@
     "piiColumns": ["uploaded_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "reviewedNotPii": ["file_name"]
+    "reviewedNotPii": ["file_name"],
+    "userIdColumns": ["uploaded_by"],
+    "actorScrub": {
+      "uploaded_by": null
+    }
   },
   "store-do:fiscal_documents": {
     "db": "store-do",
@@ -906,7 +1027,11 @@
     "action": "scrub",
     "piiColumns": ["created_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["created_by"],
+    "actorScrub": {
+      "created_by": null
+    }
   },
   "store-do:webhook_deliveries": {
     "db": "store-do",
@@ -923,7 +1048,12 @@
     "action": "scrub",
     "piiColumns": ["created_by", "decided_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["created_by", "decided_by"],
+    "actorScrub": {
+      "created_by": null,
+      "decided_by": null
+    }
   },
   "store-do:gold_rates_current": {
     "db": "store-do",
@@ -939,7 +1069,11 @@
     "action": "scrub",
     "piiColumns": ["updated_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["updated_by"],
+    "actorScrub": {
+      "updated_by": null
+    }
   },
   "store-do:store_profile": {
     "db": "store-do",
@@ -947,7 +1081,11 @@
     "action": "delete",
     "piiColumns": ["email", "phone", "phone_ar", "whatsapp", "address", "address_ar", "owner_id"],
     "subjectKeys": ["userId"],
-    "note": "merchant business contact; goes with deleteAll()"
+    "note": "merchant business contact; goes with deleteAll()",
+    "userIdColumns": ["owner_id"],
+    "retainedUserIds": {
+      "owner_id": "store owner pseudonymous id, NOT NULL; closure of the owner account removes the store (M-024), not a column scrub"
+    }
   },
   "store-do:store_config": {
     "db": "store-do",
@@ -988,7 +1126,9 @@
     "action": "delete",
     "piiColumns": ["user_id"],
     "subjectKeys": ["userId"],
-    "note": "membership link; identity data lives in ebda-identity"
+    "note": "membership link; identity data lives in ebda-identity",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "d1:SlugRedirect": {
     "db": "d1",
@@ -1020,7 +1160,9 @@
     "action": "delete",
     "piiColumns": ["user_id", "ip", "user_agent"],
     "subjectKeys": ["userId"],
-    "note": "policy acceptance proof per user"
+    "note": "policy acceptance proof per user",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "d1:legal_notice_sends": {
     "db": "d1",
@@ -1029,7 +1171,11 @@
     "piiColumns": ["sent_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "reviewedNotPii": ["recipient_count"]
+    "reviewedNotPii": ["recipient_count"],
+    "userIdColumns": ["sent_by"],
+    "actorScrub": {
+      "sent_by": "[erased]"
+    }
   },
   "d1:legal_notice_deliveries": {
     "db": "d1",
@@ -1037,7 +1183,9 @@
     "action": "delete",
     "piiColumns": ["user_id"],
     "subjectKeys": ["userId"],
-    "note": ""
+    "note": "",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "d1:store_features": {
     "db": "d1",
@@ -1045,7 +1193,11 @@
     "action": "scrub",
     "piiColumns": ["enabled_by"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["enabled_by"],
+    "actorScrub": {
+      "enabled_by": null
+    }
   },
   "d1:store_usage_snapshots": {
     "db": "d1",
@@ -1070,7 +1222,9 @@
     "action": "delete",
     "piiColumns": ["user_id", "name"],
     "subjectKeys": ["userId"],
-    "note": "key hash only; revoked on erase"
+    "note": "key hash only; revoked on erase",
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"]
   },
   "d1:plans": {
     "db": "d1",
@@ -1109,7 +1263,11 @@
       "receiver_name"
     ],
     "subjectKeys": ["userId"],
-    "note": "payer details of a merchant subscription payment; kept for accounting without the payer fields after the retention window"
+    "note": "payer details of a merchant subscription payment; kept for accounting without the payer fields after the retention window",
+    "userIdColumns": ["reviewed_by"],
+    "actorScrub": {
+      "reviewed_by": null
+    }
   },
   "d1:manual_payment_claims": {
     "db": "d1",
@@ -1117,7 +1275,11 @@
     "action": "scrub",
     "piiColumns": ["payer_reference", "reviewed_by"],
     "subjectKeys": ["userId"],
-    "note": ""
+    "note": "",
+    "userIdColumns": ["reviewed_by"],
+    "actorScrub": {
+      "reviewed_by": null
+    }
   },
   "d1:billing_reminders": {
     "db": "d1",
@@ -1149,7 +1311,12 @@
     "action": "scrub",
     "piiColumns": ["requested_by_id", "decided_by_id"],
     "subjectKeys": ["userId"],
-    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records"
+    "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
+    "userIdColumns": ["requested_by_id", "decided_by_id"],
+    "actorScrub": {
+      "requested_by_id": null,
+      "decided_by_id": null
+    }
   },
   "d1:stores": {
     "db": "d1",
@@ -1163,7 +1330,11 @@
       "email_domain_id",
       "email_domain_status",
       "email_domain_verified_at"
-    ]
+    ],
+    "userIdColumns": ["owner_id"],
+    "retainedUserIds": {
+      "owner_id": "billing record kept; owner closure removes the store (M-024)"
+    }
   },
   "d1:entity_index": {
     "db": "d1",
@@ -1179,7 +1350,11 @@
     "action": "scrub",
     "piiColumns": ["actor_id"],
     "subjectKeys": ["userId"],
-    "note": "actor id nulled on user erasure"
+    "note": "actor id nulled on user erasure",
+    "userIdColumns": ["actor_id"],
+    "actorScrub": {
+      "actor_id": null
+    }
   },
   "d1:provider_verifications": {
     "db": "d1",
@@ -1187,7 +1362,11 @@
     "action": "scrub",
     "piiColumns": ["verified_by_id"],
     "subjectKeys": ["userId"],
-    "note": "verified_by_id (the confirming super-admin) nulled on user erasure, same as platform_audit_log.actor_id"
+    "note": "verified_by_id (the confirming super-admin) nulled on user erasure, same as platform_audit_log.actor_id",
+    "userIdColumns": ["verified_by_id"],
+    "actorScrub": {
+      "verified_by_id": null
+    }
   },
   "d1:provider_verification_events": {
     "db": "d1",
