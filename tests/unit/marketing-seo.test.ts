@@ -118,7 +118,9 @@ describe('every page exports metadata with a canonical', () => {
     it(`${rel}`, async () => {
       const dir = path.dirname(file);
       const isEn = rel.startsWith(path.join('(en)', 'en'));
-      const page = SITE_PAGES.find(p => p && dir.endsWith(p)) ?? '';
+      // longest match first: 'legal/whatsapp-privacy' must not resolve to 'privacy'
+      const page =
+        [...SITE_PAGES].sort((a, b) => b.length - a.length).find(p => p && dir.endsWith(p)) ?? '';
       const mod = await import(file);
       // The home pages inherit metadata from their locale layout.
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;

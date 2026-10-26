@@ -42,3 +42,5 @@ scripts/editor-audit/parity-baseline.json
 # Byte-for-byte goldens: tests compare the API serializer output (JSON.stringify, 2 spaces) to these files, so
 # prettier collapsing short arrays onto one line fails them.
 tests/integration/__golden__/
+# vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/marketing-wa-legal-drift.test.ts)
+apps/marketing/legal-source

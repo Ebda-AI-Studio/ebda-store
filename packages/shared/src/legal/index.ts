@@ -50,17 +50,67 @@ function firstVersion(): LegalVersion {
   });
 }
 
+/** v1.1 (LEGAL-1), dated the day it is published (never backdated; set it to the merge day). No fee changes: prices stay final amounts, no VAT (Ruling VAT-0), so `feeChange` is false and no 30-day notice applies. */
+function v11(material: boolean, summary: { ar: string; en: string }): LegalVersion {
+  return Object.freeze({
+    version: '1.1',
+    publishedAt: '2026-10-26',
+    effectiveAt: '2026-10-26',
+    material,
+    feeChange: false,
+    summary: Object.freeze(summary),
+  });
+}
+
 const doc = (...history: LegalVersion[]) =>
   Object.freeze({ history: Object.freeze(history) as readonly LegalVersion[] });
 
 /** Oldest first; the LAST entry is the current version. Frozen: the registry is code, not state. */
 export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
-  legal: doc(firstVersion()),
-  privacy: doc(firstVersion()),
-  terms: doc(firstVersion()),
-  acceptableUse: doc(firstVersion()),
-  merchant: doc(firstVersion()),
+  legal: doc(
+    firstVersion(),
+    v11(false, {
+      ar: 'بريد مستقل لطلبات الخصوصية وحماية البيانات، وروابط إلى صفحة حذف البيانات ووثائق ابدأ واتساب.',
+      en: 'A separate address for privacy and data-protection requests, and links to the data deletion page and the Ebda WhatsApp documents.',
+    })
+  ),
+  privacy: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'مسؤول حماية البيانات وبريده privacy@ebda.app، وقائمة الجهات المستلمة خارج مصر، وMeta عند استخدام ابدأ واتساب، وإخطار الاختراق خلال 72 ساعة، ورابط صفحة حذف البيانات.',
+      en: 'Our data protection officer and privacy@ebda.app, the recipients outside Egypt, Meta when Ebda WhatsApp is used, 72-hour breach notice, and a link to the data deletion page.',
+    })
+  ),
+  terms: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ واتساب.',
+      en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda WhatsApp terms.',
+    })
+  ),
+  acceptableUse: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'منتجات ممنوعة عبر ابدأ واتساب وفق سياسة التجارة في واتساب من Meta.',
+      en: "Products that may not be sold through Ebda WhatsApp, following Meta's WhatsApp Commerce Policy.",
+    })
+  ),
+  merchant: doc(
+    firstVersion(),
+    v11(true, {
+      ar: 'الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإخطار التاجر بالاختراق خلال 72 ساعة، وضمانات النقل خارج مصر.',
+      en: 'Prices are final amounts with no VAT, notice of a data breach to the merchant within 72 hours, and safeguards for transfers outside Egypt.',
+    })
+  ),
 });
+
+/**
+ * Which processor stack the privacy policy's sections 5 and 6 describe (DOC-2). 'current' = Neon, Resend, Inngest and
+ * the rest as live today; 'cloudflare' = the post-cutover text (apps/marketing/src/lib/legal-privacy-stack.ts). The
+ * cutover PR flips this AND appends a material `privacy` 1.2 entry to LEGAL_POLICIES in the same commit; the policy
+ * must change the day the processors do, never before (it would be false) and never after.
+ */
+export const PRIVACY_STACK: 'current' | 'cloudflare' = 'current';
 
 /** Document titles, identical to the marketing pages' titles (parity-tested in marketing-site.test.tsx). */
 export const LEGAL_DOC_TITLE: Readonly<Record<LegalDocKey, { ar: string; en: string }>> = {

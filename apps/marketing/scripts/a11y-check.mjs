@@ -20,6 +20,11 @@ const pages = [
   '/for/food/',
   '/for/jewellery/',
   '/acceptable-use/',
+  '/refund/',
+  '/legal/data-deletion/',
+  '/legal/whatsapp-terms/',
+  '/legal/whatsapp-privacy/',
+  '/legal/whatsapp-dpa/',
   '/en/legal/',
   '/en/privacy/',
   '/en/terms/',
@@ -30,6 +35,11 @@ const pages = [
   '/en/for/food/',
   '/en/for/jewellery/',
   '/en/acceptable-use/',
+  '/en/refund/',
+  '/en/legal/data-deletion/',
+  '/en/legal/whatsapp-terms/',
+  '/en/legal/whatsapp-privacy/',
+  '/en/legal/whatsapp-dpa/',
 ];
 
 await runA11y({
