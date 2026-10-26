@@ -21,6 +21,7 @@ import {
   INSTAPAY_RECEIPT_LOW_CONFIDENCE,
   INSTAPAY_RECEIPT_MAX_BYTES,
   REGION,
+  hasInstructionLikeText,
   normalizeInstapayReceiver,
   normalizeInstapayReference,
   zonedLocalToUtc,
@@ -110,6 +111,19 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
     if (i.extraction.confidence < INSTAPAY_RECEIPT_LOW_CONFIDENCE) flags.push('LOW_CONFIDENCE');
     if (i.extraction.looksEdited) flags.push('LOOKS_EDITED');
     const e = i.extraction;
+    // Rule-based, so a screenshot cannot instruct the reader into silence (SEC-11).
+    if (
+      hasInstructionLikeText([
+        e.note,
+        e.payerName,
+        e.receiverName,
+        e.payerAddress,
+        e.receiverHandle,
+        e.payerBank,
+      ])
+    ) {
+      flags.push('SUSPICIOUS_TEXT');
+    }
     const corrected =
       (e.amountMinor !== null && e.amountMinor !== i.fields.amountMinor) ||
       (e.reference !== null &&
