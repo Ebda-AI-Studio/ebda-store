@@ -34,6 +34,8 @@ import { runScheduled } from './cf/cron';
 import { runJobWorkflow } from './lib/jobs/run-workflow';
 import type { JobParams } from './lib/jobs/start';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
+import { servePublicEdge, stripFillMarker, type CacheLike } from './cf/public-edge-cache';
+import { readEdgeGens } from './lib/edge-gens';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   sendCodeMail,
@@ -313,26 +315,43 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
     // The upgrade is authenticated in the DO via the API; the Express app is not involved.
     return routeRealtime(request, env);
   }
-  const forwarded = withTrustedClientIp(request);
-  try {
-    return await withWorkerContext(
-      env,
-      ctx,
-      () => handleAsNodeRequest(PORT, forwarded, env, ctx),
-      request.signal
-    );
-  } catch (err) {
-    if (err instanceof ClientPoolTimeout) {
-      if (err.reason === 'aborted') return new Response(null, { status: 499 }); // client already gone
-      logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
-      // Shed load instead of letting the isolate hit its memory limit.
-      return Response.json(
-        { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },
-        { status: 503, headers: { 'retry-after': '1' } }
+  const origin = async (req: Request): Promise<Response> => {
+    const forwarded = withTrustedClientIp(req);
+    try {
+      return await withWorkerContext(
+        env,
+        ctx,
+        () => handleAsNodeRequest(PORT, forwarded, env, ctx),
+        req.signal
       );
+    } catch (err) {
+      if (err instanceof ClientPoolTimeout) {
+        if (err.reason === 'aborted') return new Response(null, { status: 499 }); // client already gone
+        logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
+        // Shed load instead of letting the isolate hit its memory limit.
+        return Response.json(
+          { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },
+          { status: 503, headers: { 'retry-after': '1' } }
+        );
+      }
+      throw err;
     }
-    throw err;
+  };
+  // Ruling EDGE-API-1: anonymous public catalogue reads are answered from the Workers Cache API while their
+  // cache generations are unchanged (cf/public-edge-cache.ts). Everything else, and any doubt, goes to Express.
+  const edgeCache = (globalThis as unknown as { caches?: { default?: CacheLike } }).caches?.default;
+  if (edgeCache && env.PUBLIC_EDGE_CACHE !== '0') {
+    return servePublicEdge(request, ctx, origin, {
+      cache: edgeCache,
+      now: Date.now,
+      readGens: async names => {
+        prepare(env);
+        await redisReady;
+        return readEdgeGens(names);
+      },
+    });
   }
+  return origin(stripFillMarker(request));
 }
 
 async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promise<void> {
