@@ -1946,8 +1946,14 @@ html[lang='ar'] .legal-doc p {
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
-.nf-body[hidden] {
+/* One static 404.html for every path: show the language block that matches the URL (set on <html> by a
+   tiny inline script; Arabic when it never runs). */
+.nf-body[data-l='en'],
+html[data-nf='en'] .nf-body[data-l='ar'] {
   display: none;
+}
+html[data-nf='en'] .nf-body[data-l='en'] {
+  display: grid;
 }
 .nf-main h1 {
   font-size: clamp(1.9rem, 5vw, 3rem);

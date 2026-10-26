@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { Phone } from '@/components/Devices';
+import { NotFoundLang } from '@/components/NotFoundLang';
 import { RootShell } from '@/components/RootShell';
 import { BRAND } from '@ebda/shared/brand';
 import { NOT_FOUND, SEARCH_SOURCES } from '@/lib/not-found-copy';
@@ -15,16 +17,17 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: '#FAFAFA', colorScheme: 'light dark' };
 
 /** One static 404.html serves every path: show the language of the URL (/en/...), Arabic otherwise. */
+// Only <html> attributes change before hydration (never React-owned text or elements), so hydration stays clean;
+// the CSS (`html[data-nf]`) shows the matching language block.
 const PICK_LANG = `(function(){var en=/^\\/en(\\/|$)/.test(location.pathname);var d=document.documentElement;
-if(en){d.lang='en';d.dir='ltr';document.title="Page not found | Ebda AI Studio";}
-document.querySelectorAll('[data-l]').forEach(function(n){n.hidden=n.getAttribute('data-l')!==(en?'en':'ar');});})();`;
+d.setAttribute('data-nf',en?'en':'ar');if(en){d.lang='en';d.dir='ltr';}})();`;
 
 function Body({ locale }: { locale: Locale }) {
   const c = NOT_FOUND[locale];
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   const id = `q-${locale}`;
   return (
-    <div data-l={locale} hidden={locale !== 'ar'} lang={locale} dir={dir} className="nf-body">
+    <div data-l={locale} lang={locale} dir={dir} className="nf-body">
       <div className="nf-main">
         <h1>{c.line}</h1>
         <p className="lead">{c.hint}</p>
@@ -72,9 +75,15 @@ function Body({ locale }: { locale: Locale }) {
       <a className="nf-phone" href={demoLookUrl('souq', 'catalogue')} aria-label={c.phoneCaption}>
         <Phone className="nf-phone-frame">
           <picture>
-            <source srcSet="/devices/phone-600.avif" type="image/avif" />
-            <source srcSet="/devices/phone-600.webp" type="image/webp" />
-            <img src="/devices/phone-600.webp" alt="" width={600} height={1290} loading="lazy" />
+            <source srcSet="/devices/dahab-story-4-900.avif" type="image/avif" />
+            <source srcSet="/devices/dahab-story-4-900.webp" type="image/webp" />
+            <img
+              src="/devices/dahab-story-4-900.webp"
+              alt=""
+              width={900}
+              height={1930}
+              loading="lazy"
+            />
           </picture>
         </Phone>
         <span>{c.phoneCaption}</span>
@@ -93,7 +102,8 @@ export default function NotFound() {
           <Body key={l} locale={l} />
         ))}
         <script dangerouslySetInnerHTML={{ __html: PICK_LANG }} />
-        <script src="/assets/typeahead.js" defer />
+        <NotFoundLang />
+        <Script src="/assets/typeahead.js" strategy="afterInteractive" />
       </main>
       <Footer locale="ar" />
     </RootShell>
