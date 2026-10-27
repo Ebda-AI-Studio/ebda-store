@@ -32,6 +32,7 @@ import { withAramexEmails } from './carriers/aramex.carrier';
 import {
   activeCredentials,
   decryptCarrierBlob,
+  previousSecretGraceOpen,
   encryptCarrierBlob,
 } from './carriers/carrier-credentials';
 import {
@@ -295,7 +296,7 @@ class ShippingCarrierService {
    * path and, for carriers that echo a header, in that header). Kept inside the encrypted
    * credentials, generated once, replaced only on `rotate`.
    */
-  async rotateWebhookSecret(storeId: string, carrier: CarrierCode) {
+  async rotateWebhookSecret(storeId: string, carrier: CarrierCode, opts: { grace?: boolean } = {}) {
     await prisma.$transaction(async tx => {
       // same lock as upsertCarrierConfig: a rotation must not be reverted by a concurrent save
       await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
@@ -306,7 +307,9 @@ class ShippingCarrierService {
       if (!current) throw new AppError(404, 'NOT_FOUND', 'Carrier is not configured');
       await tx.shippingCarrierConfig.update({
         where: { storeId_carrier: { storeId, carrier } },
-        data: { credentials: rotateBlobWebhookSecret(current.credentials, current.settings) },
+        data: {
+          credentials: rotateBlobWebhookSecret(current.credentials, current.settings, opts),
+        },
       });
     });
     await this.invalidateCarrierConfigCache(storeId);
@@ -1172,8 +1175,30 @@ class ShippingCarrierService {
         where: { storeId_carrier: { storeId, carrier } },
         select: { credentials: true, settings: true },
       });
-      const secret = this.readWebhookSecret(row);
-      if (!verifyWebhookToken(secret, token)) return 'unauthorized' as const;
+      const { current, previous } = this.readWebhookSecrets(row);
+      let secret = '';
+      let createdBefore: Date | undefined;
+      if (verifyWebhookToken(current, token)) {
+        secret = current;
+      } else if (previous && verifyWebhookToken(previous.secret, token)) {
+        // Graceful rotation (SEC-8): callbacks registered before it keep working while a shipment
+        // created before the rotation is still undelivered, for at most 30 days.
+        const inFlight = await prisma.shipment.findFirst({
+          where: {
+            storeId,
+            carrier,
+            createdAt: { lt: new Date(previous.rotatedAt) },
+            status: { notIn: [...TERMINAL_SHIPMENT_STATUSES, CREATION_FAILED, 'creating'] },
+          },
+          select: { id: true },
+        });
+        if (previousSecretGraceOpen(previous, Date.now(), !!inFlight)) {
+          secret = previous.secret;
+          // The old URL may only touch what was registered before the rotation and is not done.
+          createdBefore = new Date(previous.rotatedAt);
+        }
+      }
+      if (!secret) return 'unauthorized' as const;
       // Carriers that echo a header we set (Bosta) must present it too: a leaked URL alone is
       // not enough. Missing, wrong or empty are the same `unauthorized` (no oracle).
       if (impl.webhookHeader) {
@@ -1185,16 +1210,28 @@ class ShippingCarrierService {
 
       const result = impl.processWebhook(body, headers);
       if (!result) return 'ignored' as const;
-      return this.applyWebhookResult(carrier, result);
+      return this.applyWebhookResult(carrier, result, createdBefore);
     });
   }
 
   private async applyWebhookResult(
     carrier: string,
-    result: CarrierWebhookResult
+    result: CarrierWebhookResult,
+    /** Set when the PREVIOUS secret authenticated: only older, still-open shipments may change. */
+    createdBefore?: Date
   ): Promise<'unknown_shipment' | 'duplicate' | 'applied'> {
     const shipment = await prisma.shipment.findFirst({
-      where: { storeId: currentStoreId(), trackingNumber: result.trackingNumber, carrier },
+      where: {
+        storeId: currentStoreId(),
+        trackingNumber: result.trackingNumber,
+        carrier,
+        ...(createdBefore
+          ? {
+              createdAt: { lt: createdBefore },
+              status: { notIn: [...TERMINAL_SHIPMENT_STATUSES, CREATION_FAILED, 'creating'] },
+            }
+          : {}),
+      },
       select: { id: true },
     });
     if (!shipment) {
@@ -1422,14 +1459,15 @@ class ShippingCarrierService {
     }
   }
 
-  private readWebhookSecret(
+  private readWebhookSecrets(
     row: { credentials?: string | null; settings?: unknown } | null | undefined
-  ): string {
-    if (!row?.credentials) return '';
+  ): { current: string; previous?: { secret: string; rotatedAt: string } } {
+    if (!row?.credentials) return { current: '' };
     try {
-      return decryptCarrierBlob(row.credentials, row.settings).webhookSecret ?? '';
+      const blob = decryptCarrierBlob(row.credentials, row.settings);
+      return { current: blob.webhookSecret ?? '', previous: blob.previousWebhook };
     } catch {
-      return '';
+      return { current: '' };
     }
   }
 

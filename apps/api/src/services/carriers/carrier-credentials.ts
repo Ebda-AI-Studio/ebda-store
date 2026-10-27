@@ -31,6 +31,31 @@ import {
 
 export interface CarrierBlob extends CredentialBlob {
   webhookSecret?: string;
+  /**
+   * The webhook secret before the last GRACEFUL rotation (SEC-8). Callback URLs already registered
+   * at the carrier for in-flight shipments carry it, so it is still accepted while
+   * `previousSecretGraceOpen` says so. Dropped by the next rotation and when the window closes.
+   */
+  previousWebhook?: { secret: string; rotatedAt: string };
+}
+
+/** A previous webhook secret is honoured for at most this long after the rotation. */
+export const PREVIOUS_SECRET_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Is the previous secret still honoured? Within 30 days of the rotation AND while a shipment
+ * created before the rotation is still undelivered (`hasInFlightShipment`, the caller's query):
+ * whichever ends first closes the window. Pure.
+ */
+export function previousSecretGraceOpen(
+  previous: { rotatedAt: string } | undefined,
+  now: number,
+  hasInFlightShipment: boolean
+): boolean {
+  if (!previous || !hasInFlightShipment) return false;
+  const at = Date.parse(previous.rotatedAt);
+  if (!Number.isFinite(at)) return false;
+  return now >= at && now - at < PREVIOUS_SECRET_GRACE_MS;
 }
 
 export interface CarrierCredentialRow {
@@ -73,6 +98,10 @@ export function decryptCarrierBlob(
   const out: CarrierBlob = {};
   const webhookSecret = typeof root.webhookSecret === 'string' ? root.webhookSecret : undefined;
   if (webhookSecret) out.webhookSecret = webhookSecret;
+  const prev = root.previousWebhook;
+  if (isPlain(prev) && typeof prev.secret === 'string' && typeof prev.rotatedAt === 'string') {
+    out.previousWebhook = { secret: prev.secret, rotatedAt: prev.rotatedAt };
+  }
   if (isPlain(root.sandbox) || isPlain(root.live)) {
     for (const mode of ['sandbox', 'live'] as const) {
       const set = stringsOf(root[mode]);
@@ -82,6 +111,7 @@ export function decryptCarrierBlob(
   }
   // Legacy flat map.
   const { webhookSecret: _w, ...flat } = stringsOf(root);
+  delete (flat as Record<string, string>).previousWebhook;
   if (Object.keys(flat).length > 0) {
     const legacySandbox =
       isPlain(settings) && (settings.sandbox === true || settings.sandbox === 'true');
