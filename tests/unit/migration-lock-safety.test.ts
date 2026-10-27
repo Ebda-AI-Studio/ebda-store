@@ -43,7 +43,7 @@ const GRANDFATHERED = new Set([
   // handful of rows at most) so the unique index below it can be built; without it a store that
   // already holds a duplicate would fail `prisma migrate deploy` and block the release. Not a
   // backfill of the table and no SET NOT NULL. Not historical: this is the one deliberate new entry.
-  '20261104000600_barcode_unique',
+  '20261106000300_barcode_unique',
 ]);
 
 /** Large/hot tables where an unbounded UPDATE risks a boot-time lock stall. */

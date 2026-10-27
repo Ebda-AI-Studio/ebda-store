@@ -1098,7 +1098,7 @@ model Product {
   // Barcode lookup index — barcode scan resolves within a store scope.
   // Added 2026-06-15 for inventory.barcode Enterprise feature.
   // BARCODE-1: the partial unique `products_store_id_barcode_uniq` (store_id, barcode WHERE barcode IS NOT
-  // NULL AND deleted_at IS NULL) lives in SQL only (migration 20261104000600_barcode_unique).
+  // NULL AND deleted_at IS NULL) lives in SQL only (migration 20261106000300_barcode_unique).
   @@index([storeId, barcode])
   @@index([sizeChartId])
   @@map("products")
@@ -1298,7 +1298,7 @@ model ProductVariant {
   @@index([sku])
   // Barcode lookup — scan resolves to a variant within a product.
   // BARCODE-1: the partial unique `product_variants_product_id_barcode_uniq` (product_id, barcode WHERE
-  // barcode IS NOT NULL) lives in SQL only (migration 20261104000600_barcode_unique).
+  // barcode IS NOT NULL) lives in SQL only (migration 20261106000300_barcode_unique).
   @@index([productId, barcode])
   @@map("product_variants")
 }
