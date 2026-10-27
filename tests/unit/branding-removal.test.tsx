@@ -19,7 +19,7 @@ vi.mock('@api/services/feature.service', () => ({
 vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/config', () => ({ config: {} }));
 vi.mock('@api/lib/logger', () => ({ default: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => ({ ResendService: {} }));
+vi.mock('@api/services/store-mailer.service', () => ({ StoreMailer: {} }));
 
 import { PoweredByEbda } from '../../apps/web/src/templates/shared/PoweredByEbda';
 import {

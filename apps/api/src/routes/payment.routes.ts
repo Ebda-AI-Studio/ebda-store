@@ -1048,7 +1048,12 @@ router.get(
       // provider reference through the definer, and every read below runs inside that store.
       const statusStoreId = await resolveStoreFromWebhookRef({
         transactionId,
-        provider: typeof provider === 'string' ? provider : undefined,
+        // Only the gateways share reference strings across providers; `cod` / `instapay` have no gateway reference,
+        // and a caller's ?provider= for them must not turn a found payment into a 404 (Ruling ITEST-14).
+        provider:
+          provider === 'paymob' || provider === 'kashier' || provider === 'fawry'
+            ? provider
+            : undefined,
       });
       if (!statusStoreId) {
         notFound();

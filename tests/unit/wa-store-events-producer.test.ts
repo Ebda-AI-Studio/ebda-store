@@ -96,6 +96,7 @@ beforeEach(() => {
   setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, WA_EVENTS_QUEUE: { send: h.send } });
 });
 
+const send_clear = () => h.send.mockClear();
 const sent = () =>
   h.send.mock.calls.map(c => c[0] as { type: string; id: string; data: Record<string, unknown> });
 
@@ -518,6 +519,54 @@ describe('catalog/changed', () => {
     h.send.mockClear();
     await emitStoreEventsFor({ ...ev(['p1']), id: 'k2' });
     expect(sent()[0]!.id).toBe(first);
+  });
+});
+
+describe('customer.consent_changed v1.5 wording (WA-OPTIN-WORDING-1)', () => {
+  const K = 'f'.repeat(64);
+  const ev = { name: 'wa/consent-changed', data: { storeId: STORE, buyerKey: K } };
+  const row = (over: object) => ({
+    granted: true,
+    grantedAt: new Date('2026-10-25T10:00:00Z'),
+    revokedAt: null,
+    updatedAt: new Date('2026-10-25T10:00:00Z'),
+    locale: 'ar',
+    ...over,
+  });
+
+  it('an opt-in carries the exact words shown beside the tick, in the locale shown, and validates', async () => {
+    const { whatsappOptInWording } = await import('@ebda/shared');
+    for (const locale of ['ar', 'en'] as const) {
+      h.consentRow.mockResolvedValue(row({ locale }));
+      send_clear();
+      await emitStoreEventsFor(ev);
+      const e = sent().at(-1)!;
+      expect(storeEventSchema.safeParse(e).success).toBe(true);
+      expect(e.data.wording).toEqual({ text: whatsappOptInWording(locale), locale });
+    }
+    // the wording IS the checkout's label + note (one source), not a copy
+    const { WHATSAPP_OPTIN_LABEL, WHATSAPP_OPTIN_NOTE } = await import('@ebda/shared');
+    expect(whatsappOptInWording('en')).toBe(`${WHATSAPP_OPTIN_LABEL.en} ${WHATSAPP_OPTIN_NOTE.en}`);
+  });
+
+  it('a withdrawal, an unknown locale and a missing locale carry no wording', async () => {
+    for (const r of [
+      row({ granted: false, locale: 'ar' }),
+      row({ locale: 'fr' }),
+      row({ locale: null }),
+    ]) {
+      h.consentRow.mockResolvedValue(r);
+      send_clear();
+      await emitStoreEventsFor(ev);
+      const e = sent().at(-1)!;
+      expect(storeEventSchema.safeParse(e).success).toBe(true);
+      expect(e.data).not.toHaveProperty('wording');
+    }
+  });
+
+  it('the vendored contract is v1.5', async () => {
+    const { CONTRACT_VERSION } = await import('@api/contracts/wa-v1');
+    expect(CONTRACT_VERSION).toBe('1.5');
   });
 });
 

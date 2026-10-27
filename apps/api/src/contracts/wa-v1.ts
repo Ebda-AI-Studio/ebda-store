@@ -7,6 +7,9 @@
  */
 import { z } from 'zod/v3';
 
+/** The minor version of this contract (envelope `v` stays 1: every change so far is additive). v1.5 = `customer.consent_changed.wording`. */
+export const CONTRACT_VERSION = '1.5';
+
 const iso = z.string().datetime({ offset: true });
 const phone = z.string().regex(/^\+[1-9]\d{7,14}$/);
 const key = z.string().regex(/^[0-9a-f]{64}$/);
@@ -45,7 +48,9 @@ export const storeEventSchema = z.discriminatedUnion('type', [
   ev('customer.erased', z.object({ buyerKey: key })),
   // v1.1 (additive): the buyer changed their marketing choice at the Store (account settings or a new checkout tick). Marketing to
   // them follows it; a STOP sent on WhatsApp still wins over a later opt-in here.
-  ev('customer.consent_changed', z.object({ buyerKey: key, marketingOptIn: z.boolean(), at: iso })),
+  // v1.5 (additive): `wording` = the exact words shown beside the checkout opt-in tick, in the locale shown (proof of what the buyer agreed to). Present
+  // only when marketingOptIn is true and the Store recorded the locale.
+  ev('customer.consent_changed', z.object({ buyerKey: key, marketingOptIn: z.boolean(), at: iso, wording: z.object({ text: z.string().min(1).max(600), locale: z.enum(['ar', 'en']) }).optional() })),
 ]);
 export type StoreEvent = z.infer<typeof storeEventSchema>;
 export type StoreEventType = StoreEvent['type'];

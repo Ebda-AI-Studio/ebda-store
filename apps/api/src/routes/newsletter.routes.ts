@@ -5,7 +5,7 @@ import { csvField } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
-import { ResendService } from '../services/resend.service';
+import { StoreMailer } from '../services/store-mailer.service';
 import { storeHidesPoweredBy } from '../services/email.service';
 import { buildBroadcastMessage } from '../lib/newsletter-broadcast';
 import logger from '../lib/logger';
@@ -299,7 +299,7 @@ router.post(
       for (let i = 0; i < messages.length; i += CHUNK) {
         const chunk = messages.slice(i, i + CHUNK);
         try {
-          const r = await ResendService.sendBrandedBatch(storeId, {
+          const r = await StoreMailer.sendBrandedBatch(storeId, {
             subject: chunk[0].subject,
             messages: chunk.map(({ to, html, text, headers }) => ({ to, html, text, headers })),
           });
