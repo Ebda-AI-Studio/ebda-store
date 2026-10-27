@@ -33,9 +33,9 @@ describe('utcCronsFor', () => {
   });
   it('a weekly Cairo cron whose hour wraps past midnight moves to the previous weekday', () => {
     // Sunday 01:00 Cairo is Saturday 23:00 / 22:00 UTC.
-    expect(utcCronsFor('TZ=Africa/Cairo 0 1 * * 0')).toEqual(['0 23 * * 6', '0 22 * * 6']);
+    expect(utcCronsFor('TZ=Africa/Cairo 0 1 * * 0')).toEqual(['0 23 * * SAT', '0 22 * * SAT']);
     // Monday 00:00 Cairo is Sunday.
-    expect(utcCronsFor('TZ=Africa/Cairo 0 0 * * 1')).toEqual(['0 22 * * 0', '0 21 * * 0']);
+    expect(utcCronsFor('TZ=Africa/Cairo 0 0 * * 1')).toEqual(['0 22 * * SUN', '0 21 * * SUN']);
   });
   it('refuses a zoned expression it cannot translate (no silent wrong schedule)', () => {
     expect(() => utcCronsFor('TZ=Africa/Cairo */5 * * * *')).toThrow();
@@ -48,6 +48,21 @@ describe('utcCronsFor', () => {
       min: 0,
       dow: 0,
     });
+  });
+});
+
+describe('Cloudflare cron validity (the schedules PUT rejects a numeric weekday 0)', () => {
+  it('weekdays are always names: 0 is invalid on Cloudflare and 1 means Sunday there', () => {
+    expect(utcCronsFor('0 3 * * 0')).toEqual(['0 3 * * SUN']);
+    expect(utcCronsFor('0 2 * * 1')).toEqual(['0 2 * * MON']);
+    expect(utcCronsFor('0 2 * * 1-5')).toEqual(['0 2 * * MON-FRI']);
+    expect(utcCronsFor('0 2 * * 7')).toEqual(['0 2 * * SUN']);
+  });
+  it('every Cron Trigger in wrangler.jsonc has a Cloudflare-valid weekday field (* or names)', () => {
+    for (const c of wrangler.triggers.crons) {
+      const dow = c.trim().split(/\s+/)[4];
+      expect(dow, c).toMatch(/^(\*|[A-Z]{3}(-[A-Z]{3})?(,[A-Z]{3}(-[A-Z]{3})?)*)$/);
+    }
   });
 });
 

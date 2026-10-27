@@ -25,7 +25,11 @@ export async function dispatchEvents<R>(
   for (const ev of events) {
     const subs = jobsForEvent(ev.name);
     const cf = subs.filter(d => jobRunsOnCf(d.id));
-    if (subs.length === 0 || cf.length < subs.length) forInngest.push(ev);
+    // `inngest/*` names are reserved: Inngest's API refuses them (400), and the only subscriber of
+    // `inngest/function.failed` is alerts-failure-watch. Until that moves, a failure event with no
+    // Cloudflare subscriber is dropped here instead of failing the run's own failure step.
+    const reserved = ev.name.startsWith('inngest/');
+    if (!reserved && (subs.length === 0 || cf.length < subs.length)) forInngest.push(ev);
     const results = await Promise.allSettled(cf.map(d => startJob(d, ev)));
     results.forEach((r, i) => {
       if (r.status === 'rejected') {

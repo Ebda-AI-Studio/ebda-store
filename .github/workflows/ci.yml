@@ -500,6 +500,15 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
+      # Request-time boot check (Ruling DEP-OPENNEXT-PREVIEW-1). `next build` + `wrangler deploy --dry-run`
+      # never execute a request: #256 (next 16.4.3) passed both, then 500'd on every request on
+      # web/admin/orders (adapter threw Unexpected loadManifest(.../preview-props.json)). Boots the
+      # built worker in local workerd and requests the deploy workflows' probe paths.
+      - name: Boot the built ${{ matrix.app }} Worker and request the deploy probe paths
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
+        timeout-minutes: 5
+        run: node scripts/ci/next-worker-smoke.mjs ${{ matrix.app }}
+
       # Startup CPU + bundle size budget (scripts/ci/worker-startup-budget.json). Cloudflare error
       # 10021 ("Script startup exceeded CPU time limit") failed one API deploy after the B2B merge;
       # this fails the PR that pushes the Worker toward it instead of the deploy. No database.
@@ -576,7 +585,7 @@ jobs:
       # the binding, so nothing else runs this path on workerd before production does. No database.
       - name: Embedding provider on workerd (fake AI binding)
         timeout-minutes: 10
-        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts
+        run: npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts
 
   # G11 (Ruling INFRA-CF-1): the DB-less integration lane. The real StoreDO (SQLite), D1 and R2 bindings run on
   # LOCAL workerd (Miniflare via @cloudflare/vitest-pool-workers), no Postgres and no built bundle, so it
@@ -737,7 +746,7 @@ jobs:
         # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
         # default, so a future config change can't silently re-mask
         # order-dependent state pollution on this required merge gate.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
+        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -1186,7 +1195,7 @@ jobs:
         # `ebda_app` a CI-only login (ALTER ROLE ... LOGIN PASSWORD; the migration creates
         # it NOLOGIN) and to write fixtures. Every ASSERTION runs on an ebda_app connection.
         # REQUIRE_PGBOUNCER makes a missing pgbouncer a failure instead of a skip.
-        run: npx vitest run tests/integration/rls-ebda-app.test.ts tests/integration/rls-pooler-isolation.test.ts --reporter=verbose --retry=0
+        run: npx vitest run tests/integration/rls-ebda-app.test.ts tests/integration/rls-pooler-isolation.test.ts tests/integration/rls-wa-consent-erasure.test.ts tests/integration/subscription-past-due-since.test.ts --reporter=verbose --retry=0
         env:
           DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test

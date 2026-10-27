@@ -31,6 +31,9 @@ import {
   writeLimiter,
   couponAttemptLimiter,
   newsletterLimiter,
+  whatsappConsentStoreLimiter,
+  whatsappConsentUserLimiter,
+  auditLog,
   viewIngestLimiter,
 } from '../middleware/security';
 import {
@@ -53,6 +56,9 @@ import {
   restoreCartIntoSession,
   cartEmailOptInAvailable,
 } from '../services/cart-email-optin.service';
+import { isWhatsAppLinked } from '../lib/wa/link';
+import { createWhatsAppOptInHandlers, createWhatsAppOptInStateHandlers } from './whatsapp-optin';
+import { WhatsAppConsentService } from '../lib/wa/consent';
 import {
   boundedCacheKey,
   getCached,
@@ -982,6 +988,49 @@ router.post(
       next(error);
     }
   }
+);
+
+// POST /cart/whatsapp-optin - the checkout box "Send me offers and reminders on WhatsApp" (Ruling
+// WA-CONSENT-1). Cart reminders are marketing: the box is UNTICKED by default, nothing is recorded
+// until the shopper ticks it, and unticking withdraws it. SECURITY: the body carries NO phone. The
+// caller must be a logged-in customer with a cart in THIS session; consent is recorded against the
+// number on their own account (the number the reminder goes to), source 'checkout', audited with the
+// cart id. A guest, another session or a body-supplied phone cannot opt anyone in or out. Rate-limited
+// per IP+session and per store. Only offered on a store that has Ebda WhatsApp linked.
+/** Show the WhatsApp marketing box only where Ebda WhatsApp is linked; a lookup failure fails CLOSED (hidden). */
+async function whatsappOptInAvailable(storeId: string): Promise<boolean> {
+  try {
+    return await isWhatsAppLinked(storeId);
+  } catch (err) {
+    logger.warn({ err, storeId }, '[public] whatsapp link lookup failed, opt-in box hidden');
+    return false;
+  }
+}
+router.post(
+  '/cart/whatsapp-optin',
+  ...createWhatsAppOptInHandlers({
+    authenticate: (req, res, next) => optionalAuthenticate(req, res, next),
+    userLimiter: (req, res, next) => whatsappConsentUserLimiter(req, res, next),
+    storeLimiter: (req, res, next) => whatsappConsentStoreLimiter(req, res, next),
+    storeIdFor: getStoreIdFromRequest,
+    isLinked: isWhatsAppLinked,
+    record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    state: (s, u) => WhatsAppConsentService.stateForUser(s, u),
+    audit: e => auditLog(e as Parameters<typeof auditLog>[0]),
+  })
+);
+router.get(
+  '/cart/whatsapp-optin',
+  ...createWhatsAppOptInStateHandlers({
+    authenticate: (req, res, next) => optionalAuthenticate(req, res, next),
+    userLimiter: (req, res, next) => whatsappConsentUserLimiter(req, res, next),
+    storeLimiter: (req, res, next) => whatsappConsentStoreLimiter(req, res, next),
+    storeIdFor: getStoreIdFromRequest,
+    isLinked: isWhatsAppLinked,
+    record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    state: (s, u) => WhatsAppConsentService.stateForUser(s, u),
+    audit: e => auditLog(e as Parameters<typeof auditLog>[0]),
+  })
 );
 
 // POST /cart/restore - the recovery email's button: copy the emailed cart's lines into THIS
@@ -2239,6 +2288,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         // It is display-only — the send gate re-checks everything live.
         smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
         cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+        whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -2460,6 +2510,7 @@ router.get(
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
           cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
         };
 
         const locations = await fetchFooterLocations(store);

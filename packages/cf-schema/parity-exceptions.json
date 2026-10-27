@@ -1,0 +1,28 @@
+{
+  "_doc": "Intentional differences between schema.prisma and the Cloudflare SQLite schema (task 1.6). Anything else must match exactly, so a Prisma change that is not mirrored fails parity.test.ts.",
+  "representations": {
+    "Decimal": "INTEGER scaled by 10^scale (generated/manifest.json decimals); percent columns are hundredths, fx rates are 1e-8 units",
+    "DateTime": "INTEGER epoch milliseconds UTC",
+    "Boolean": "INTEGER 0/1 with CHECK (col IN (0, 1))",
+    "Json": "TEXT with CHECK json_valid(col)",
+    "String[]": "TEXT JSON array with CHECK json_valid AND json_type = 'array'",
+    "enum": "TEXT with CHECK (col IN (...values))",
+    "BigInt": "INTEGER (SQLite 64-bit; the app reads it as a JS number, safe below 2^53, which the byte and micro counters never reach)"
+  },
+  "renamedColumns": [
+    {
+      "table": "store_profile",
+      "column": "store_id",
+      "prisma": "Store.id",
+      "reason": "the DO store row is keyed by the store id it lives in"
+    },
+    { "table": "store_config", "column": "store_id", "prisma": "Store.id", "reason": "same" }
+  ],
+  "unsupportedNotCarried": [
+    {
+      "model": "ProductEmbedding",
+      "fields": ["embedding", "termsEmbedding"],
+      "reason": "halfvec(1024) has no SQLite type; the model targets analytics/R2 (Vectorize), not the StoreDO"
+    }
+  ]
+}

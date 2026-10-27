@@ -11,6 +11,8 @@ export interface JobEvent {
 }
 
 export interface JobStep {
+  /** Set by the Workflow step only: code outside `run` has no database connection there. */
+  cfWorkflow?: true;
   /** One durable, retried unit. Its result is JSON (Dates become strings), as on Inngest. */
   run<T>(id: string, fn: () => Promise<T> | T): Promise<T>;
   /** `'30s'`, `'5m'`, `'2h'`, `'1d'` or milliseconds. */

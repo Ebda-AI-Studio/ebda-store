@@ -1,0 +1,598 @@
+{
+  "User": {
+    "target": "identity",
+    "reason": "moved to the ebda-identity D1 behind accounts.ebda.app (Ruling ID-1/ID-2); owned by the identity track, not emitted here"
+  },
+  "RefreshToken": {
+    "target": "identity",
+    "reason": "moved to the ebda-identity D1 behind accounts.ebda.app (Ruling ID-1/ID-2); owned by the identity track, not emitted here"
+  },
+  "VerificationToken": {
+    "target": "identity",
+    "reason": "moved to the ebda-identity D1 behind accounts.ebda.app (Ruling ID-1/ID-2); owned by the identity track, not emitted here"
+  },
+  "Store": {
+    "target": "d1",
+    "reason": "host/slug directory: resolves host to store before any DO is reachable"
+  },
+  "StoreCredential": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StoreStaff": {
+    "target": "d1",
+    "reason": "staff login resolves cross-store membership by user"
+  },
+  "SlugRedirect": {
+    "target": "d1",
+    "reason": "host/slug directory: resolves host to store before any DO is reachable"
+  },
+  "BlogPost": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StoreLocation": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StorePage": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Customer": {
+    "target": "store-do",
+    "reason": "storeId-scoped customer; email to store lookup for storefront login stays inside the DO"
+  },
+  "CustomerGroup": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CustomerAddress": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Category": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Product": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "InventoryHistory": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductImage": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductCategory": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Tag": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductTag": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductOption": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductOptionValue": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductVariant": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductModel": {
+    "target": "store-do",
+    "reason": "3D/AR models per store"
+  },
+  "SearchQueryDaily": {
+    "target": "analytics",
+    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+  },
+  "ProductEmbedding": {
+    "target": "analytics",
+    "reason": "vector index (Vectorize), rebuilt from Product"
+  },
+  "ProductPriceTier": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "WholesaleApplication": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductEmbedFailure": {
+    "target": "drop",
+    "reason": "Vectorize upsert failures go to Sentry plus a retry alarm in the DO"
+  },
+  "SizeChart": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductModelBinding": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductVariantOption": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Cart": {
+    "target": "store-do",
+    "reason": "storeId-scoped; hot write path, single-writer"
+  },
+  "CartItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Bundle": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "BundleItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CartBundle": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Order": {
+    "target": "store-do",
+    "reason": "storeId-scoped; money/stock single-writer"
+  },
+  "OrderEvent": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "OrderItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Payment": {
+    "target": "store-do",
+    "reason": "child of Order; same DO transaction"
+  },
+  "PaymentEvent": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "WebhookEvent": {
+    "target": "d1",
+    "reason": "looked up by secret/id BEFORE the store is known (needs global index)"
+  },
+  "Return": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ReturnItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "PaymentConfig": {
+    "target": "store-do",
+    "reason": "per-store provider config (encrypted secrets stay encrypted at rest)"
+  },
+  "SystemSetting": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "LegalAcceptance": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "PasskeyCredential": {
+    "target": "identity",
+    "reason": "moved to the ebda-identity D1 behind accounts.ebda.app (Ruling ID-1/ID-2); owned by the identity track, not emitted here"
+  },
+  "LegalNoticeSend": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "LegalNoticeDelivery": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "StoreFeature": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "NotificationConfig": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "NotificationEventConfig": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "PushSubscription": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "OneSignalSubscription": {
+    "target": "store-do",
+    "reason": "push subscription; no storeId, hangs off Customer inside the DO"
+  },
+  "NotificationLog": {
+    "target": "analytics",
+    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+  },
+  "AbandonedCart": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AbandonedCartConfig": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductRelation": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "FrequentlyBoughtTogether": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AiRecommendation": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ShippingCarrierConfig": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Shipment": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ShipmentPickup": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CodRemittance": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Affiliate": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AffiliateReferral": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AffiliatePayout": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AffiliateConfig": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AffiliateEvent": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AuditLog": {
+    "target": "store-do",
+    "reason": "per-store append-only; nightly rollover of old rows to R2"
+  },
+  "Address": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Wishlist": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "WishlistItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Coupon": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Promotion": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ShippingZone": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ShippingAreaRate": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "TaxRate": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "LoyaltyPoints": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "LoyaltyTransaction": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CustomerWallet": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "WalletTransaction": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "NewsletterSubscriber": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "SmsMarketingConsent": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Campaign": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CampaignRecipient": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Review": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "BulkImportJob": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "BulkAiJob": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AiUsage": {
+    "target": "analytics",
+    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+  },
+  "StoreFaq": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StoreHowto": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProductFaq": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Sequence": {
+    "target": "store-do",
+    "reason": "counter: single-writer increment replaces FOR UPDATE"
+  },
+  "Account": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "JournalEntry": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "JournalLine": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "FxRateEntry": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Supplier": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "PurchaseOrder": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "PurchaseOrderItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StockAdjustment": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StockAdjustmentItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ReorderRule": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "BackorderLine": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Expense": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ReorderSuggestion": {
+    "target": "store-do",
+    "reason": "derived per-store suggestion"
+  },
+  "DeadStockFlag": {
+    "target": "store-do",
+    "reason": "derived per-store flag"
+  },
+  "ProfitAnomaly": {
+    "target": "store-do",
+    "reason": "derived per-store alert"
+  },
+  "CustomerCohortSnapshot": {
+    "target": "store-do",
+    "reason": "derived snapshot, read per store dashboard"
+  },
+  "FunnelSnapshot": {
+    "target": "store-do",
+    "reason": "derived snapshot, read per store dashboard"
+  },
+  "CustomerRfmSnapshot": {
+    "target": "store-do",
+    "reason": "derived snapshot, read per store dashboard"
+  },
+  "StoreUsageSnapshot": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "ProductDailyView": {
+    "target": "analytics",
+    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+  },
+  "GscDailyMetric": {
+    "target": "analytics",
+    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+  },
+  "CountSession": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CountLine": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "BankStatement": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "BankTransaction": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "Warehouse": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "WarehouseStock": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AnswerEngineCheck": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "AnswerEngineProviderConfig": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "MerchantApiKey": {
+    "target": "d1",
+    "reason": "looked up by secret/id BEFORE the store is known (needs global index)"
+  },
+  "Plan": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "StoreSubscription": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "BillingEvent": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "InstapayReceipt": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "ManualPaymentClaim": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "BillingReminder": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "StoreLifecycleEmail": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "BillingWebhookEvent": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "StorePageRevision": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StoreTaxProfile": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "StoreTaxDocument": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "ProviderActivationRequest": {
+    "target": "d1",
+    "reason": "platform settings / legal / super-admin queue, cross-store"
+  },
+  "FiscalDocument": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "FiscalDocumentCounter": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "WebhookEndpoint": {
+    "target": "store-do",
+    "reason": "per-store config"
+  },
+  "WebhookDelivery": {
+    "target": "store-do",
+    "reason": "per-store outbound delivery log; old rows rolled to R2"
+  },
+  "GoldRate": {
+    "target": "store-do",
+    "reason": "per-store gold rate history (has storeId)"
+  },
+  "GoldRateCurrent": {
+    "target": "store-do",
+    "reason": "per-store current rate; single-row, alarm-refreshed"
+  },
+  "GoldRateSettings": {
+    "target": "store-do",
+    "reason": "per-store settings"
+  },
+  "ProviderVerification": {
+    "target": "d1",
+    "reason": "platform-wide provider activation counters (no store scope), read and written by super-admin and settlement paths across stores"
+  },
+  "ProviderVerificationEvent": {
+    "target": "d1",
+    "reason": "platform-wide provider activation counters (no store scope), read and written by super-admin and settlement paths across stores"
+  },
+  "StoreWhatsAppLink": {
+    "target": "store-do",
+    "reason": "storeId-scoped link state, read and written only in one store context (the WhatsApp consumer resolves the store first)"
+  },
+  "StoreWhatsAppConsent": {
+    "target": "store-do",
+    "reason": "storeId-scoped marketing consent keyed by buyer key, read only in one store context"
+  }
+}

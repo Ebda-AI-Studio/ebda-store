@@ -9,7 +9,11 @@
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
   "logpush": true,
-  "routes": [{ "pattern": "accounts.ebda.app", "custom_domain": true }],
+  "routes": [
+    { "pattern": "accounts.ebda.app", "custom_domain": true },
+    // M-072: out-ranks the storefront's `*/*` and `*.ebda.app/*` zone routes (cf-routes.cjs).
+    { "pattern": "accounts.ebda.app/*", "zone_name": "ebda.app" },
+  ],
   "d1_databases": [
     {
       "binding": "DB",

@@ -38,6 +38,7 @@ export const EMPTY_PATH_STEPS: Record<string, number> = {
   'payment-reconcile-sweep': 0, // stepRunUnlessEmpty
   'payment-webhook-stuck-sweep': 0, // stepRunUnlessEmpty
   'queue-depth-watch': 0, // no step at all
+  'wa-plan-sync': 0, // un-stepped read of the stores that ever linked WhatsApp; none = return
   'refund-reversal-stuck-sweep': 0, // stepRunUnlessEmpty x3
 };
 

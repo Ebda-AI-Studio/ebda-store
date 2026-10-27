@@ -184,6 +184,9 @@ export async function handleOrderStatusFanoutStuckSweep(
             // The REQUESTED transition (issue 2070); equal to the current
             // status here by construction (superseded rows were split out).
             status: o.statusFanoutRequestedStatus ?? o.status,
+            ...(o.statusFanoutRequestedAt
+              ? { requestedAt: new Date(o.statusFanoutRequestedAt).toISOString() }
+              : {}),
             // Only gates the admin refund bookkeeping email. updateStatus reads
             // it off the pre-transition order; from the persisted row, money
             // was captured when the payment status says paid or refunded.

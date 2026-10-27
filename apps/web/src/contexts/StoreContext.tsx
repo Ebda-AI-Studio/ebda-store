@@ -177,6 +177,7 @@ export interface StoreData {
   smsMarketingOptIn?: boolean;
   /** See `ResolvedStore.cartEmailOptIn` in lib/store-resolver.ts. */
   cartEmailOptIn?: boolean;
+  whatsappMarketingOptIn?: boolean;
   enabledFeatures?: string[];
   /**
    * Slugs of CMS pages the merchant has explicitly disabled

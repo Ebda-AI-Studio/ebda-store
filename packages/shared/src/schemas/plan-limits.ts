@@ -269,7 +269,8 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
       platformFeeBps: 0,
       codPlatformFeeBps: 0,
       abandonedCartAutomation: true,
-      whatsappAutomation: false,
+      // Ruling WA-PKG-1 (Ahmad 2026-10-24): the Business plan includes the Ebda WhatsApp package.
+      whatsappAutomation: true,
       brandingRemoval: true,
       apiAccess: true,
       wholesalePricing: true,

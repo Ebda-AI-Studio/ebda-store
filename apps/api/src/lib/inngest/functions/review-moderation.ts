@@ -41,7 +41,10 @@ export const reviewModeration: InngestFunction.Any = inngest.createFunction(
     }
 
     // Feature gate — skip AI moderation when reviews feature is disabled.
-    const reviewsEnabled = await featureService.isFeatureEnabled(storeId, 'reviews');
+    // In a step: on a Workflow only step bodies hold a database connection.
+    const reviewsEnabled = await step.run('check-feature', () =>
+      featureService.isFeatureEnabled(storeId, 'reviews')
+    );
     if (!reviewsEnabled) {
       logger.info({ storeId, reviewId }, '[REVIEW-MODERATION] reviews feature disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'reviews' };
