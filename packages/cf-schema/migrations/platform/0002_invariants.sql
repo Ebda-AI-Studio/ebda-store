@@ -30,3 +30,25 @@ WHEN OLD."status" = 'refunded' AND NEW."status" <> 'refunded'
 BEGIN
   SELECT RAISE(ABORT, 'billing_events: a refunded charge is final');
 END;
+
+-- WA-GRACE-1 (Postgres: store_subscriptions_past_due_since). `past_due_since` (epoch ms) is the first time
+-- the subscription went past_due: set once on the transition into past_due, kept on a retry that stays
+-- past_due, cleared on any other status. Ebda WhatsApp ends its grace at min(periodEnd, pastDueSince + 7 d).
+CREATE TRIGGER IF NOT EXISTS "store_subscriptions_past_due_since_insert" AFTER INSERT ON "store_subscriptions"
+WHEN NEW."status" = 'past_due' AND NEW."past_due_since" IS NULL
+BEGIN
+  UPDATE "store_subscriptions" SET "past_due_since" = CAST(unixepoch('subsec') * 1000 AS INTEGER) WHERE "id" = NEW."id";
+END;
+
+CREATE TRIGGER IF NOT EXISTS "store_subscriptions_past_due_since_update" AFTER UPDATE OF "status" ON "store_subscriptions"
+WHEN NEW."status" = 'past_due' AND (OLD."status" <> 'past_due' OR OLD."past_due_since" IS NULL)
+BEGIN
+  UPDATE "store_subscriptions" SET "past_due_since" = COALESCE(NEW."past_due_since", CAST(unixepoch('subsec') * 1000 AS INTEGER)) WHERE "id" = NEW."id";
+END;
+
+CREATE TRIGGER IF NOT EXISTS "store_subscriptions_past_due_since_clear" AFTER UPDATE OF "status" ON "store_subscriptions"
+WHEN NEW."status" <> 'past_due' AND NEW."past_due_since" IS NOT NULL
+BEGIN
+  UPDATE "store_subscriptions" SET "past_due_since" = NULL WHERE "id" = NEW."id";
+END;
+

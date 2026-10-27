@@ -419,6 +419,7 @@ export const storeSubscriptions = sqliteTable('store_subscriptions', {
   billingInterval: text('billing_interval').notNull().default('monthly'),
   pendingPlanCode: text('pending_plan_code'),
   dunningAttempts: integer('dunning_attempts').notNull().default(0),
+  pastDueSince: integer('past_due_since', { mode: 'timestamp_ms' }),
   nextRetryAt: integer('next_retry_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()

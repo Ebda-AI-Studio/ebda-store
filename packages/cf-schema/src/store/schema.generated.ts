@@ -2732,6 +2732,46 @@ export const storeTaxProfiles = sqliteTable('store_tax_profiles', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const storeWhatsappConsents = sqliteTable(
+  'store_whatsapp_consents',
+  {
+    storeId: text('store_id').notNull(),
+    buyerKey: text('buyer_key').notNull(),
+    granted: integer('granted', { mode: 'boolean' }).notNull().default(false),
+    grantedAt: integer('granted_at', { mode: 'timestamp_ms' }),
+    grantedSource: text('granted_source'),
+    locale: text('locale'),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    revokedSource: text('revoked_source'),
+    userId: text('user_id'),
+    optOutVersion: integer('opt_out_version').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  },
+  t => [primaryKey({ columns: [t.storeId, t.buyerKey] })]
+);
+
+export const storeWhatsappLinks = sqliteTable('store_whatsapp_links', {
+  storeId: text('store_id').primaryKey().notNull(),
+  linked: integer('linked', { mode: 'boolean' }).notNull().default(false),
+  ownerUserId: text('owner_user_id'),
+  linkedAt: integer('linked_at', { mode: 'timestamp_ms' }),
+  entitlementVersion: integer('entitlement_version').notNull().default(0),
+  entitlementPackageId: text('entitlement_package_id'),
+  entitlementAutomation: integer('entitlement_automation', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  entitlementStatus: text('entitlement_status'),
+  entitlementValidUntil: integer('entitlement_valid_until', { mode: 'timestamp_ms' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const suppliers = sqliteTable('suppliers', {
   id: text('id')
     .primaryKey()
