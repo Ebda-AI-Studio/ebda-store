@@ -123,6 +123,8 @@ export function durableStep(wf: WorkflowStepLike, o: DurableStepOptions): JobSte
     );
   return {
     run,
+    // Marker read by `stepRunUnlessEmpty`: code between steps has no database on a Workflow.
+    cfWorkflow: true,
     async sleep(id, duration) {
       await o.aroundSleep?.before();
       await wf.sleep(name(id), parseDurationMs(duration));

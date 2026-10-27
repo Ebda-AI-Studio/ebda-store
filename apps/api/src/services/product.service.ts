@@ -1015,6 +1015,7 @@ export class ProductService {
         },
       });
       if (Object.keys(setSources).length > 0 || removedSources.length > 0) {
+        // wa-catalog: not-catalog-data (ai_field_sources is internal; the product update above is observed)
         // Per-key merge on the row as it is NOW (this UPDATE holds its lock): concurrent
         // stamps on other keys survive. store_id keeps the raw statement tenant-keyed.
         const merged = await tx.$queryRaw<Array<{ ai_field_sources: unknown }>>`

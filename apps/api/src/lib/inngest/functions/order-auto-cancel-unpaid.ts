@@ -141,12 +141,12 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
     triggers: [{ cron: '0 3 * * *' }], // daily 03:00 UTC
   },
   async ({ step }) => {
-    const threshold = new Date(Date.now() - AUTO_CANCEL_UNPAID_DAYS * 24 * 60 * 60 * 1000);
-
     // Cross-tenant — withRlsBypass so FORCE RLS doesn't hide other tenants'
     // rows (no HTTP tenant GUC on a cron).
-    const stale = await step.run('find-stale-unpaid', () =>
-      sweepAcrossStores({
+    const stale = await step.run('find-stale-unpaid', () => {
+      // Read inside the step: the cutoff is part of the memoised read, not re-derived on replay.
+      const threshold = new Date(Date.now() - AUTO_CANCEL_UNPAID_DAYS * 24 * 60 * 60 * 1000);
+      return sweepAcrossStores({
         fetch: storeId =>
           prisma.order.findMany({
             where: {
@@ -193,8 +193,8 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
           }),
         orderKey: r => r.createdAt,
         take: RUN_CAP,
-      })
-    );
+      });
+    });
 
     if (stale.length === 0) {
       logger.info('order-auto-cancel-unpaid: nothing to cancel');

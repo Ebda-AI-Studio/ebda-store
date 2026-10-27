@@ -137,6 +137,8 @@ export interface ResolvedStore {
    * store's plan has abandoned-cart recovery AND the merchant turned the email channel on.
    */
   cartEmailOptIn?: boolean;
+  /** Ebda WhatsApp is linked: show the WhatsApp marketing-consent box (Ruling WA-CONSENT-1). */
+  whatsappMarketingOptIn?: boolean;
 
   // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.
   // NULL/undefined means the merchant never declared one, and the storefront
@@ -469,6 +471,7 @@ async function fetchStoreByDomain(
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       cartEmailOptIn: storeData.cartEmailOptIn === true,
+      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -645,6 +648,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       cartEmailOptIn: storeData.cartEmailOptIn === true,
+      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -985,6 +989,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       cartEmailOptIn: storeData.cartEmailOptIn === true,
+      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

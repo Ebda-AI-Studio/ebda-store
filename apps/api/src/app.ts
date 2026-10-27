@@ -4,6 +4,7 @@
 //                   background loops, graceful shutdown.
 //   - `worker.ts` : the Cloudflare Worker (`httpServerHandler`), R-EBDA-001.
 import { requestShapeGuard } from './middleware/request-shape-guard';
+import { installWaWriteObservers } from './lib/wa/observers';
 import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -62,6 +63,9 @@ import { buildIdentity } from './lib/build-identity';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 assertBillingConfigAtBoot();
+
+// Every plan / subscription / catalog write anywhere tells Ebda WhatsApp (lib/wa/observers.ts).
+installWaWriteObservers();
 
 const app = express();
 

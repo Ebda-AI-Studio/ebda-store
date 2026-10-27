@@ -109,11 +109,23 @@ describe('order-status-fanout-stuck-sweep', () => {
     expect(r.resent).toBe(2);
     expect(mockSend).toHaveBeenCalledWith({
       name: 'order/status-changed',
-      data: { orderId: 'o1', storeId: 's1', status: 'delivered', hadCapturedPayment: true },
+      data: {
+        orderId: 'o1',
+        storeId: 's1',
+        status: 'delivered',
+        hadCapturedPayment: true,
+        requestedAt: expect.any(String), // the transition's own time travels with the re-send
+      },
     });
     expect(mockSend).toHaveBeenCalledWith({
       name: 'order/status-changed',
-      data: { orderId: 'o2', storeId: 's1', status: 'refunded', hadCapturedPayment: false },
+      data: {
+        orderId: 'o2',
+        storeId: 's1',
+        status: 'refunded',
+        hadCapturedPayment: false,
+        requestedAt: expect.any(String),
+      },
     });
     expect(mockSendAlert).not.toHaveBeenCalled();
   });

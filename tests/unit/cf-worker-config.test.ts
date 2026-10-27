@@ -51,7 +51,9 @@ describe('wrangler.jsonc', () => {
 
   it('declares every binding the code reads', () => {
     const doNames = config.durable_objects.bindings.map((b: any) => b.name);
-    expect(doNames).toEqual(expect.arrayContaining(['AUTH_STATE', 'STORE_REALTIME', 'JOB_GATE']));
+    expect(doNames).toEqual(
+      expect.arrayContaining(['AUTH_STATE', 'STORE_REALTIME', 'JOB_GATE', 'STORE_SCHEDULE'])
+    );
     expect(config.kv_namespaces.map((k: any) => k.binding)).toContain('KV_CACHE');
     expect(config.queues.producers.map((p: any) => p.binding)).toEqual(
       expect.arrayContaining(['EMAIL_QUEUE', 'SMS_QUEUE', 'JOBS_QUEUE'])
