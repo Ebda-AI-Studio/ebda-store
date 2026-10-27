@@ -130,10 +130,11 @@
       }
     },
     "d1": {
-      "tables": 25,
+      "tables": 26,
       "maxColumns": 36,
       "columnCounts": {
         "store_staff": 4,
+        "staff_invites": 10,
         "SlugRedirect": 7,
         "webhook_events": 16,
         "system_settings": 7,
@@ -1088,6 +1089,18 @@
       "name": "eta_receipts_environment_check",
       "table": "eta_receipts",
       "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_role_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_status_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
     },
     {
       "kind": "index",
