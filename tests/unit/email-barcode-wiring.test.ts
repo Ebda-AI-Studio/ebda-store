@@ -10,13 +10,12 @@ vi.mock('@ebda/database', () => {
   const prisma = { store: { findUnique: storeFind } };
   return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
 });
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendBrandedEmail: vi.fn().mockResolvedValue({ id: 'em' }) },
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendBrandedEmail: vi.fn().mockResolvedValue({ id: 'em' }) },
 }));
 vi.mock('@api/services/barcode-image.service', () => ({ ensureEmailBarcode: ensure }));
 vi.mock('@api/config', () => ({
   config: {
-    resendApiKey: 're_test',
     webUrl: 'https://s.test',
     adminUrl: 'https://a.test',
     smtpFromEmail: 'n@test.com',
@@ -24,7 +23,7 @@ vi.mock('@api/config', () => ({
 }));
 
 import { EmailService, type OrderEmailData } from '@api/services/email.service';
-import { ResendService } from '@api/services/resend.service';
+import { StoreMailer } from '@api/services/store-mailer.service';
 
 const data: OrderEmailData = {
   orderNumber: 'ORD-T5JK9Q-AB3XY',
@@ -59,7 +58,7 @@ const store = (settings: object) => ({
   whatsapp: null,
   settings,
 });
-const html = () => vi.mocked(ResendService.sendBrandedEmail).mock.calls.at(-1)![1].html as string;
+const html = () => vi.mocked(StoreMailer.sendBrandedEmail).mock.calls.at(-1)![1].html as string;
 const IMG = {
   url: 'https://cdn.ebda.app/stores/x/barcodes/0123456789abcdef0123456789abcdef.png',
   width: 360,
@@ -96,7 +95,7 @@ describe('sendOrderConfirmation + barcode png', () => {
     expect(html()).toContain('ORD-T5JK9Q-AB3XY');
     ensure.mockRejectedValue(new Error('boom'));
     await expect(EmailService.sendOrderConfirmation(SID, data, 'en')).resolves.toBeUndefined();
-    expect(vi.mocked(ResendService.sendBrandedEmail)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(StoreMailer.sendBrandedEmail)).toHaveBeenCalledTimes(2);
   });
   it('shape off never asks for an image', async () => {
     storeFind.mockResolvedValue(store({ receiptBarcodeShape: 'off' }));

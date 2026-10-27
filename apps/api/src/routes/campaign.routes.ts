@@ -19,7 +19,7 @@ import { AppError } from '../middleware/error-handler';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
-import { ResendService } from '../services/resend.service';
+import { StoreMailer } from '../services/store-mailer.service';
 import { storeHidesPoweredBy } from '../services/email.service';
 import { AIService } from '../services/ai.service';
 import {
@@ -557,7 +557,7 @@ campaignTestSendRouter.post(
           unsubscribeUrl: null,
           hidePoweredBy,
         });
-        await ResendService.sendMarketingEmail(store as CampaignStoreContext, {
+        await StoreMailer.sendMarketingEmail(store as CampaignStoreContext, {
           to: user.email,
           subject,
           html,

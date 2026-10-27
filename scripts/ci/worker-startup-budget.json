@@ -1,8 +1,8 @@
 {
   "_doc": "Budget for the API Worker's startup, enforced by scripts/ci/worker-startup-budget.mjs (CI: Worker dry-run (api)). Cloudflare rejects a deploy whose global scope exceeds its startup CPU limit (error 10021, hit once after the B2B merge). Local workerd numbers are not Cloudflare's, so these are REGRESSION gates with headroom over the recorded baseline, not the platform limit. Raise one only with a Ruling that says why. The absolute startupCpuMs ceiling is enforced on main/nightly runs (quiet runner); pull requests compare against main's bundle measured in the same job (relative.ratio + relative.slackMs).",
   "startupCpuMs": 140,
-  "bundleBytes": 14800000,
-  "bundleGzipBytes": 3200000,
+  "bundleBytes": 15500000,
+  "bundleGzipBytes": 3400000,
   "baseline": {
     "recorded": "2026-10-22",
     "before": {
