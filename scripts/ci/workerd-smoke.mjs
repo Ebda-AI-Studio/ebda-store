@@ -126,6 +126,7 @@ async function main() {
       `API_URL=${base}`,
       'BUILD_COMMIT_SHA=smoke',
       'JWT_SECRET=smoke-only-jwt-secret-0123456789abcdef',
+      'SUITE_BUYER_KEY_SECRET=smoke-only-suite-buyer-key-secret-0123456789',
       `ENCRYPTION_KEY=${'0'.repeat(64)}`,
       'TAP_API_KEY=k',
       'TAP_SECRET_KEY=s',

@@ -93,6 +93,8 @@
 
   "queues": {
     "producers": [
+      // Store -> Ebda WhatsApp events (contract 2026-10-24; lib/wa/events.ts). Ebda WhatsApp consumes it.
+      { "binding": "WA_EVENTS_QUEUE", "queue": "ebda-wa-events" },
       { "binding": "JOBS_QUEUE", "queue": "ebda-jobs" },
       { "binding": "EMAIL_QUEUE", "queue": "ebda-email" },
       { "binding": "SMS_QUEUE", "queue": "ebda-sms" },
@@ -117,6 +119,16 @@
         "dead_letter_queue": "ebda-sms-dlq",
       },
       { "queue": "ebda-email-dlq", "max_batch_size": 10, "max_retries": 2 },
+      // WhatsApp -> Store events (COD outcomes, erasure races): lib/wa/store-events-consumer.ts.
+      {
+        "queue": "ebda-store-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 2,
+        "max_retries": 5,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-store-events-dlq",
+      },
+      { "queue": "ebda-store-events-dlq", "max_batch_size": 10, "max_retries": 2 },
       // Background jobs with at most one step. The job's own `retries` (max 6 in the map) decide when
       // a run fails for good, so the platform limit sits above it and only a crash loop reaches the DLQ.
       {
@@ -182,6 +194,7 @@
       "30 3 * * *",
       "30 3 1 * *",
       "30 4 * * *",
+      "41 */12 * * *",
       "45 4 * * *",
       "5 */6 * * *",
       "7 * * * *",

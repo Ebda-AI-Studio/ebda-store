@@ -379,6 +379,8 @@ model Store {
   owner                      User                        @relation(fields: [ownerId], references: [id])
   /// Encrypted provider credentials, split out of the routing table (R-EBDA-005).
   credentials                StoreCredential?
+  whatsappLink               StoreWhatsAppLink?
+  whatsappConsents           StoreWhatsAppConsent[]
   // Customer accounts that authenticate against this store. Distinct from
   // `customers` (which is the per-store order-history record).
   customerUsers              User[]                      @relation("StoreCustomers")
@@ -504,6 +506,59 @@ model Store {
 /// on first write (`credentials: { upsert: ... }`). Every value is AES-256-GCM ciphertext from
 /// apps/api/src/services/encryption.service.ts; the client omits all three by default, so a
 /// reader names the field it needs in a `select`.
+/// Server-owned link state of Ebda WhatsApp for a store (Store <-> WhatsApp contract 2026-10-24).
+/// Written ONLY by WhatsAppLinkService (the `store.linked` / `store.unlinked` path), never by a
+/// merchant-facing route or the merchant-writable `stores.settings` JSON, which is where a flag
+/// would let a store owner switch the integration on. Read by lib/wa/link.ts together with the
+/// plan entitlement.
+model StoreWhatsAppLink {
+  storeId     String    @id @map("store_id")
+  linked      Boolean   @default(false)
+  ownerUserId String?   @map("owner_user_id")
+  linkedAt    DateTime? @map("linked_at")
+  /// The messaging package's standing, from Ebda WhatsApp's `whatsapp.entitlement_changed` (bought
+  /// there, included by the plan, or assigned by an operator). `entitlementVersion` only goes up:
+  /// an event that is not newer is ignored. Server-side only, like the link itself.
+  entitlementVersion    Int       @default(0) @map("entitlement_version")
+  entitlementPackageId  String?   @map("entitlement_package_id")
+  entitlementAutomation Boolean   @default(false) @map("entitlement_automation")
+  entitlementStatus     String?   @map("entitlement_status")
+  entitlementValidUntil DateTime? @map("entitlement_valid_until")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_whatsapp_links")
+}
+
+/// A buyer's WhatsApp MARKETING consent for one store (Ruling WA-CONSENT-1: cart reminders are marketing,
+/// PDPL needs prior consent). Keyed by `buyerKey` (the suite HMAC of the E.164 phone, NEVER the phone), so
+/// it lines up with Ebda WhatsApp's own keys and holds no raw number. Unticked by default; revocable.
+/// Order, COD and shipping messages are transactional and do not read this.
+model StoreWhatsAppConsent {
+  storeId     String    @map("store_id")
+  buyerKey    String    @map("buyer_key")
+  granted     Boolean   @default(false)
+  grantedAt   DateTime? @map("granted_at")
+  /// 'checkout' | 'cart' | 'admin' | 'whatsapp' (a STOP the buyer sent); revoke also 'erasure' | 'profile' (phone changed)
+  grantedSource String? @map("granted_source")
+  /// The language of the label the buyer saw when ticking.
+  locale      String?
+  revokedAt   DateTime? @map("revoked_at")
+  revokedSource String? @map("revoked_source")
+  /// The account that last granted/withdrew this row (null for a STOP sent on WhatsApp). Lets export and
+  /// erasure cover EVERY row an account ever created, also those of an earlier phone number.
+  userId      String?   @map("user_id")
+  /// Highest `whatsapp.opt_out_changed` version applied (monotonic; a stale or replayed event is ignored).
+  optOutVersion Int     @default(0) @map("opt_out_version")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@id([storeId, buyerKey])
+  @@index([storeId, userId])
+  @@map("store_whatsapp_consents")
+}
+
 model StoreCredential {
   storeId         String   @id @map("store_id")
   /// Agent (MCP) write credential (was `stores.agent_api_key`).
@@ -5062,6 +5117,9 @@ model StoreSubscription {
   billingInterval String    @default("monthly") @map("billing_interval")
   pendingPlanCode String?   @map("pending_plan_code")
   dunningAttempts Int       @default(0) @map("dunning_attempts")
+  /// First time this subscription went past_due (WA-GRACE-1). Maintained by the
+  /// store_subscriptions_past_due_since trigger on every write path; null unless status = past_due.
+  pastDueSince    DateTime? @map("past_due_since") @db.Timestamptz(3)
   nextRetryAt     DateTime? @map("next_retry_at")
 
   createdAt DateTime @default(now()) @map("created_at")
