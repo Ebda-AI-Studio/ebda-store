@@ -303,7 +303,9 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 20
+    # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
+    # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -721,7 +723,7 @@ jobs:
         # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
         # default, so a future config change can't silently re-mask
         # order-dependent state pollution on this required merge gate.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/cf-schema apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
+        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -803,7 +805,7 @@ jobs:
           npx vitest list --json=/tmp/all-tests.json
 
           npx vitest list \
-            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders \
+            tests/unit packages/shared/src packages/database/src packages/ui/src apps/web apps/admin/src apps/orders \
             tests/integration apps/api/src \
             tests/e2e \
             --json=/tmp/covered-tests.json
@@ -1022,7 +1024,15 @@ jobs:
         # --retry=1 (#1248): this tier makes real network/DB calls against the
         # service containers above, unlike the unit tier which is retry:0 by
         # default (vitest.config.ts) to stop retry masking state pollution.
-        run: npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts --reporter=verbose --retry=1
+        #
+        # Two passes (Ruling ITEST-13). Planner / index tests (files importing tests/helpers/app-role-planner, plus the idle-transaction counters,
+        # listed by scripts/ci/planner-lane.sh) assert on the planner's choice, which flips when other files write
+        # to the same big tables in parallel, so they run SERIALLY after the parallel pass, on a quiet database.
+        run: |
+          set -euo pipefail
+          PLANNER_EXCLUDES="$(bash scripts/ci/planner-lane.sh excludes)"
+          npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts $PLANNER_EXCLUDES --reporter=verbose --retry=1
+          npx vitest run $(bash scripts/ci/planner-lane.sh list) --no-file-parallelism --reporter=verbose --retry=1
         env:
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
