@@ -8,6 +8,8 @@ import { COMPARE_PAGES, SIGNUP_URL, pagePath, type Locale } from '../lib/site';
 import { CapabilityGrid, withHost } from './Capabilities';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { WhatsAppTeaser } from './WhatsAppPage';
+import { WHATSAPP_PAGE } from '../lib/whatsapp-page';
 import { JsonLd } from './JsonLd';
 
 export function FeaturesPage({ locale }: { locale: Locale }) {
@@ -61,6 +63,9 @@ export function FeaturesPage({ locale }: { locale: Locale }) {
               </details>
             ))}
           </div>
+        </section>
+        <section className="page-sec" aria-label={WHATSAPP_PAGE[locale].teaser.h}>
+          <WhatsAppTeaser locale={locale} />
         </section>
         <section className="page-sec" aria-labelledby="cmp-h">
           <h2 id="cmp-h">{p.compareTitle}</h2>

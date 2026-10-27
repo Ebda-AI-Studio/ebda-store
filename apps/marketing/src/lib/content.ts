@@ -140,6 +140,8 @@ export interface Copy {
     /** The Products menu (BRAND-ARCH-1): one entry per LIVE product; the others are added when they ship. */
     products: string;
     storeBlurb: string;
+    /** The Ebda WhatsApp entry of the same menu (LAUNCH-SUITE-1). */
+    whatsappBlurb: string;
     contact: string;
   };
   hero: {
@@ -301,6 +303,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
       products: 'المنتجات',
       storeBlurb: 'متجرك أونلاين في دقايق',
+      whatsappBlurb: 'كلّم عملاءك على واتساب من مكان واحد',
       contact: 'تواصل معنا',
     },
     hero: {
@@ -694,6 +697,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
       products: 'Products',
       storeBlurb: 'Your online store in minutes',
+      whatsappBlurb: 'Talk to your customers on WhatsApp, from one inbox',
       contact: 'Contact',
     },
     hero: {
