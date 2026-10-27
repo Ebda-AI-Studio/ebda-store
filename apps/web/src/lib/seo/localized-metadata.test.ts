@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 let lang: 'ar' | 'en' = 'ar';
+// The /ar|/en URL header (LOCALE-PATHS-1) is read through next/headers; no request scope exists in a unit test.
+vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('./resolve-locale', () => ({ resolveStorefrontLocale: async () => lang }));
 vi.mock('../store-resolver', () => ({
   getStore: async () => ({ settings: { defaultLanguage: 'ar' } }),
