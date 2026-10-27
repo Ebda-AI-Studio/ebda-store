@@ -39,7 +39,10 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
     }
 
     // Feature gate — skip review requests when reviews feature is disabled.
-    const reviewsEnabled = await featureService.isFeatureEnabled(storeId, 'reviews');
+    // In a step: on a Workflow only step bodies hold a database connection.
+    const reviewsEnabled = await step.run('check-feature', () =>
+      featureService.isFeatureEnabled(storeId, 'reviews')
+    );
     if (!reviewsEnabled) {
       logger.info({ storeId, orderId }, '[REVIEW-REQUEST] reviews feature disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'reviews' };

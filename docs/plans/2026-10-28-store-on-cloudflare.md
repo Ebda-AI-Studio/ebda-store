@@ -666,3 +666,7 @@ Paths: new package `packages/cf-schema/` (`src/platform/*.ts` for D1, `src/store
 
 - Estimates from the draft stand (guess); Phase 0 report refreshes them on 30 Oct.
 - Open for Ahmad: (1) go/no-go after Phase 0; (2) rollback window policy after first DO write (task 5.2); (3) Neon deletion approval (7.3).
+
+## Status log
+
+- 2026-10-24: Phase 1 (tasks 1.1 to 1.6) implemented in `packages/cf-schema` (PR feat/cf-phase1-schema). Paths differ from the task text: `docs/cf/fn-map.json` (82 distinct names, 88 definitions), tests under `packages/cf-schema/test/` (fn-inventory lives there so the PR unit lane runs it). Rulings CF-SCHEMA-1 to 5.

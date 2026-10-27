@@ -28,6 +28,7 @@
 
 import type { InngestFunction } from 'inngest';
 import { runInTenantContext, storeDirectory } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -83,12 +84,14 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 2 * * *` }], // 02:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set). Ids only.
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer (id order).
-      storeDirectory(s => s.accountingEnabled).then(list => list.map(s => ({ id: s.id })))
+      storeDirectory(storeFilter(event, s => s.accountingEnabled)).then(list =>
+        list.map(s => ({ id: s.id }))
+      )
     );
 
     // One event per store, sent in bounded batches: the per-store work runs in

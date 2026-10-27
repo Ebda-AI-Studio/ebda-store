@@ -46,7 +46,10 @@ if [ "$MODE" != "full" ]; then
     echo "-> vitest related (changed files only; the full suite runs in CI + nightly)"
     _SCHEME="postgresql"; _CREDS="test:test"; _HOST="localhost:5432"; _DB="test_db"
     export TEST_DATABASE_URL="${_SCHEME}://${_CREDS}@${_HOST}/${_DB}"
-    npx vitest related --run --passWithNoTests --maxWorkers=50% $RELATED
+    # PREPUSH-2: unit tier only. `related` follows imports, so exclude what needs Postgres/Redis (CI runs it).
+    EXCLUDE_ARGS=()
+    for g in $(field exclude); do EXCLUDE_ARGS+=(--exclude "$g"); done
+    npx vitest related --run --passWithNoTests --maxWorkers=50% "${EXCLUDE_ARGS[@]}" $RELATED
   fi
   echo "OK affected-only pre-push gate passed"
   exit 0

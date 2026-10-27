@@ -97,18 +97,19 @@ describe('realtime (StoreRealtime durable object, hibernating WebSocket)', () =>
     ws.accept();
     const messages: string[] = [];
     ws.addEventListener('message', e => messages.push(String(e.data)));
-    await new Promise(r => setTimeout(r, 100));
+    // wait for the frame to ARRIVE (poll with a deadline), not a fixed 100 ms that a loaded runner can overrun
+    await waitFor(async () => messages.length > 0);
     expect(messages[0].startsWith('0{')).toBe(true);
     expect(JSON.parse(messages[0].slice(1))).toMatchObject({ upgrades: [], pingInterval: 25000 });
     // Socket.IO CONNECT with no token and no cookie.
     ws.send('40');
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(async () => messages.some(m => m.startsWith('44')));
     expect(messages.some(m => m.startsWith('44') && m.includes('Authentication required'))).toBe(
       true
     );
     // A token the API cannot vouch for (the DO asks API_URL, which is unreachable here) is refused too.
     ws.send('40' + JSON.stringify({ token: 'garbage' }));
-    await new Promise(r => setTimeout(r, 500));
+    await waitFor(async () => messages.some(m => m.includes('Invalid token')));
     expect(messages.some(m => m.startsWith('44') && m.includes('Invalid token'))).toBe(true);
     ws.close(1000, 'done');
   });

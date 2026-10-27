@@ -236,9 +236,9 @@ const campaignSendFn = inngest.createFunction(
     }
 
     // 2. Wait for a future schedule (durable — survives deploys).
-    if (nonce.getTime() > Date.now()) {
-      await step.sleepUntil('wait-for-schedule', nonce);
-    }
+    // Unconditional: a past time resumes at once, and a clock check here would make a replay skip the
+    // sleep the first run took (the job's concurrency lease is released/re-taken around it).
+    await step.sleepUntil('wait-for-schedule', nonce);
 
     // 3. Claim scheduled → sending, atomically and only for this request.
     //    A cancel during the wait leaves it `cancelled` and nothing is sent.

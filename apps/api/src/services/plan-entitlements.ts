@@ -53,6 +53,8 @@ export interface Entitlements {
   derivedFromLegacyPlan: boolean;
   currentPeriodEnd: Date | null;
   trialEndsAt: Date | null;
+  /** First time the subscription went past_due (null unless status is past_due). */
+  pastDueSince: Date | null;
   cancelAtPeriodEnd: boolean;
   ordersOverLimitMonth: Date | null;
   /** card | instapay | null (not chosen). */
@@ -114,6 +116,7 @@ export async function getEntitlements(
       derivedFromLegacyPlan: !sub,
       currentPeriodEnd: sub?.currentPeriodEnd ?? null,
       trialEndsAt: sub?.trialEndsAt ?? null,
+      pastDueSince: sub?.pastDueSince ?? null,
       cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
       ordersOverLimitMonth: sub?.ordersOverLimitMonth ?? null,
       billingMethod: sub?.billingMethod ?? null,
