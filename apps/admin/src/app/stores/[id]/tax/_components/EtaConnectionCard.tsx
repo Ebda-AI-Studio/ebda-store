@@ -113,8 +113,10 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
       enabled: f.enabled,
       environment: f.environment,
       clientId: f.clientId.trim(),
+      // clear-gate-allow: write-only secret, omitted = keep the stored encrypted value (the server never returns it)
       clientSecret: f.clientSecret.trim() || undefined,
       posSerial: f.posSerial.trim(),
+      // clear-gate-allow: write-only secret, omitted = keep the stored encrypted value (the server never returns it)
       posPreSharedKey: f.posPreSharedKey.trim() || undefined,
       branchCode: f.branchCode.trim(),
       activityCode: f.activityCode.trim(),
@@ -127,6 +129,7 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
         ...(f.address.postalCode.trim() ? { postalCode: f.address.postalCode.trim() } : {}),
       },
       signingBridgeUrl: f.signingBridgeUrl.trim() || null,
+      // clear-gate-allow: write-only secret, omitted = keep the stored encrypted value (the server never returns it)
       signingBridgeToken: f.signingBridgeToken.trim() || undefined,
     };
     const { data, error } = await apiPut<{ connection: Connection }>(base, body);
@@ -188,7 +191,11 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
       className="rounded-xl border border-border bg-card p-4 mb-4"
       aria-labelledby="eta-title"
     >
-      <h2 id="eta-title" className="text-base font-semibold text-foreground">
+      <h2
+        id="eta-title"
+        data-setting-id="tax.eta"
+        className="text-base font-semibold text-foreground"
+      >
         {t('title')}
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">{t('intro')}</p>
