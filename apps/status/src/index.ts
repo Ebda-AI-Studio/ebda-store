@@ -1,4 +1,9 @@
 import { BRAND, BRAND_MARKETING_URL, SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
+import {
+  pickStudioLang,
+  renderStudioPage,
+  STUDIO_PAGE_HEADERS,
+} from '../../../packages/shared/src/studio-pages/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
 import { probeAll, type Fetcher } from './probe';
 import { renderStatusPage, statusSearchDocs } from './render';
@@ -218,6 +223,17 @@ export default {
           ...SECURITY_HEADERS,
         },
       });
+    }
+    // A person who mistyped a status URL gets the studio's calm 404 (search + a map); API clients keep the JSON.
+    if (!path.startsWith('/api/') && (req.headers.get('accept') ?? '').includes('text/html')) {
+      const lang = pickStudioLang(req.headers.get('accept-language'), url.searchParams.get('lang'));
+      return new Response(
+        req.method === 'HEAD' ? null : renderStudioPage({ lang, kind: 'not-found' }),
+        {
+          status: 404,
+          headers: STUDIO_PAGE_HEADERS,
+        }
+      );
     }
     return json({ success: false, error: { code: 'NOT_FOUND' } }, 404);
   },

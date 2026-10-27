@@ -324,6 +324,38 @@ describe('manual incidents (authenticated POST)', () => {
   });
 });
 
+describe('404 (the studio page for people, JSON for API clients)', () => {
+  const html = (path: string, headers: Record<string, string> = {}) =>
+    worker.fetch(
+      new Request(`https://status.ebda.app${path}`, {
+        headers: { accept: 'text/html', ...headers },
+      }),
+      env
+    );
+
+  it('a browser on a missing path gets a real 404 studio page: noindex, search box, links', async () => {
+    const r = await html('/no-such-page', { 'accept-language': 'en' });
+    expect(r.status).toBe(404);
+    expect(r.headers.get('content-type')).toContain('text/html');
+    expect(r.headers.get('x-robots-tag')).toContain('noindex');
+    const page = await r.text();
+    expect(page.includes('The page you&#39;re looking for can&#39;t be found.')).toBe(true);
+    expect(page.includes('role="search"')).toBe(true);
+    expect(page.includes('href="https://help.ebda.app/en/"')).toBe(true);
+    expect(page.includes('href="https://status.ebda.app/"')).toBe(true);
+  });
+
+  it('Arabic by default, and an API client or an /api path keeps the JSON 404', async () => {
+    expect((await (await html('/zzz')).text()).includes('dir="rtl"')).toBe(true);
+    const api = await html('/api/nope');
+    expect(api.status).toBe(404);
+    expect(api.headers.get('content-type')).toContain('application/json');
+    const json = await worker.fetch(new Request('https://status.ebda.app/zzz'), env);
+    expect(json.status).toBe(404);
+    expect(json.headers.get('content-type')).toContain('application/json');
+  });
+});
+
 describe('90-day history', () => {
   it('rolls checks up per UTC day, computes uptime and prunes rows older than 90 days', async () => {
     const now = Date.now();

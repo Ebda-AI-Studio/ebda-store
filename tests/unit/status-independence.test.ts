@@ -1,7 +1,8 @@
 /**
  * status.ebda.app must keep working when the platform is down, so apps/status is its own Worker
  * with its own storage and may not import (or be wired to) apps/api, the database package or any
- * app. The only allowed cross-package import is the pure-data brand module.
+ * app. The only allowed cross-package imports are the pure-data brand module and the studio 404 renderer
+ * (a pure string-in/string-out function whose only import is that same brand module).
  */
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -26,7 +27,7 @@ describe('apps/status independence', () => {
           /apps\/(api|admin|web|orders|marketing)|@ebda\/(api|database|ui)\b/
         );
         if (spec.includes('packages/'))
-          expect(spec, `${f}`).toMatch(/packages\/shared\/src\/brand\/index$/);
+          expect(spec, `${f}`).toMatch(/packages\/shared\/src\/(brand|studio-pages)\/index$/);
       }
     }
   });
