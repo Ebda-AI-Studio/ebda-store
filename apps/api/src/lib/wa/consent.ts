@@ -60,9 +60,11 @@ export async function revokeForAccount(
   userId: string,
   phone: string | null
 ): Promise<void> {
-  const proven = phone && (await phoneOnOwnOrder(storeId, userId, phone));
-  const key = proven ? await buyerKeyFor(suiteBuyerKeySecret(), phone) : null;
   await runInTenantContext(storeId, async () => {
+    // The ownership proof reads `orders`: it MUST run inside the tenant scope (under strict RLS an
+    // out-of-scope read returns nothing and the proof is silently false), same scope as the revoke.
+    const proven = phone && (await phoneOnOwnOrder(storeId, userId, phone));
+    const key = proven ? await buyerKeyFor(suiteBuyerKeySecret(), phone) : null;
     const rows = await prisma.storeWhatsAppConsent.findMany({
       where: { storeId, granted: true, OR: [{ userId }, ...(key ? [{ buyerKey: key }] : [])] },
       select: { buyerKey: true },

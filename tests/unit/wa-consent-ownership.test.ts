@@ -12,6 +12,8 @@ const h = vi.hoisted(() => ({
   orders: [] as Row[],
   consents: [] as Row[],
   afterOrderRead: null as null | (() => void),
+  inScope: false,
+  proofReadInScope: [] as boolean[],
 }));
 
 const same = (r: Row, k: { storeId: string; buyerKey: string }) =>
@@ -48,6 +50,7 @@ const fakePrisma = {
   },
   order: {
     findMany: async ({ where }: any) => {
+      h.proofReadInScope.push(h.inScope);
       const hit = h.orders.filter(
         r =>
           r.customerId === where.customerId &&
@@ -62,7 +65,14 @@ const fakePrisma = {
 };
 vi.mock('@ebda/database', () => ({
   prisma: new Proxy({}, { get: (_t, k) => (fakePrisma as any)[k] }),
-  runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  runInTenantContext: async (_s: string, fn: () => unknown) => {
+    h.inScope = true;
+    try {
+      return await fn();
+    } finally {
+      h.inScope = false;
+    }
+  },
 }));
 
 import { buyerKeyFor } from '@ebda/shared';
@@ -223,5 +233,14 @@ describe('review follow-ups', () => {
       ['6', false, 'erasure'],
       ['7', true, undefined],
     ]);
+  });
+});
+
+describe('revokeForAccount proof runs inside the tenant scope', () => {
+  it('the delivered-order proof read is made in scope (strict RLS would otherwise return nothing)', async () => {
+    const { revokeForAccount } = await import('@api/lib/wa/consent');
+    h.proofReadInScope.length = 0;
+    await revokeForAccount(S, 'user-a', '01001234567');
+    expect(h.proofReadInScope).toEqual([true]);
   });
 });
