@@ -5,7 +5,7 @@
  *
  * Consumers dedupe on `id`. Ordering is not guaranteed: entity events carry `updatedAt`, and an older one is dropped.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const iso = z.string().datetime({ offset: true });
 const phone = z.string().regex(/^\+[1-9]\d{7,14}$/);
