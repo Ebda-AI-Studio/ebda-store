@@ -1,0 +1,43 @@
+name: cf-schema-current
+
+# The generated Cloudflare schema (packages/cf-schema) is derived from schema.prisma and the SQL migrations.
+# 2026-10-27: #218 merged new Prisma models without regenerating it, the cf-schema tests went red on main, and
+# nothing noticed because a push to main skips the unit tier. This runs on main only, ONLY when those inputs move.
+# (No pull_request trigger on purpose: the PR unit lane already adds packages/cf-schema via scripts/ci-affected.mjs,
+# and a path-filtered PR workflow would become a 'required' check that unrelated PRs never report.)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/prisma/migrations/**'
+      - 'packages/cf-schema/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf-schema-current-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  current:
+    name: CF schema is current
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Generated files match schema.prisma and the migrations
+        run: node packages/cf-schema/scripts/generate.mjs --check
+      - name: cf-schema tests
+        run: npx vitest run packages/cf-schema --reporter=verbose --retry=0 --maxWorkers=2
