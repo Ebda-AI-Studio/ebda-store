@@ -36,6 +36,12 @@ export default defineConfig({
       'apps/api/workers-test/**',
       // apps/api/workers-do runs the real StoreDO + D1 + R2 on local workerd (npm run cf:test:do -w apps/api).
       'apps/api/workers-do/**',
+      // Playwright specs (their own playwright.<name>.config.ts), not vitest: collecting them throws
+      // "Playwright Test did not expect test() to be called here" and failed `vitest list` in the
+      // Orphan test coverage job (Ruling ITEST-3).
+      'tests/{dahab,jasmine,lamma,marketing-layout,qamar,souq}/**',
+      // spikes/* are self-contained packages with their own vitest config (workerd pool: `cloudflare:test`).
+      'spikes/**',
     ],
     coverage: {
       provider: 'v8',
