@@ -26,7 +26,7 @@ import { signSubscriberUnsubscribeToken } from '../lib/campaign-unsubscribe-toke
 import { storeBrandTheme } from '../lib/store-brand-theme';
 import { config } from '../config';
 import logger from '../lib/logger';
-import { ResendService } from './resend.service';
+import { StoreMailer } from './store-mailer.service';
 import { EmailSendError } from './mail-transport';
 import { featureService } from './feature.service';
 import { renderBrandedShell, storeHidesPoweredBy } from './email.service';
@@ -362,7 +362,7 @@ export async function deliverCartRecoveryEmail(
   if (fresh.row.status === 'recovered' || fresh.row.recoveredAt) return skip('recovered');
   if (!fresh.hasItems) return skip('cart_empty');
   try {
-    await ResendService.sendMarketingEmail(store, {
+    await StoreMailer.sendMarketingEmail(store, {
       to: email,
       subject,
       html,

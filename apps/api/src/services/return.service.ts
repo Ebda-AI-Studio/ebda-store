@@ -622,7 +622,7 @@ export class ReturnService {
     // This used to be a bare `void EmailService.sendReturnConfirmation(...)`.
     // `/stores/:storeId/returns` runs under `tenantContext`, so the detached
     // promise inherited the request's tenant transaction and made its Prisma
-    // reads (three of them, ending at `resend.service.ts`'s
+    // reads (three of them, ending at `store-mailer.service.ts`'s
     // `prisma.store.findUnique`) AFTER that transaction committed — P2028,
     // swallowed by the `.catch` below. Every return confirmation email
     // silently failed to send. `deferAfterTenantCommit` reruns the same call

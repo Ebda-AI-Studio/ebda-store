@@ -33,9 +33,11 @@ vi.mock('@ebda/database', () => ({
     store: { findUnique: vi.fn() },
   },
 }));
-vi.mock('@api/services/resend.service', () => ({ ResendService: { sendBrandedEmail: vi.fn() } }));
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendBrandedEmail: vi.fn() },
+}));
 vi.mock('@api/config', () => ({
-  config: { resendApiKey: 're_x', webUrl: 'https://store.test', adminUrl: 'https://admin.test' },
+  config: { webUrl: 'https://store.test', adminUrl: 'https://admin.test' },
 }));
 
 import { renderBrandedShell, type EmailStoreContext } from '@api/services/email.service';

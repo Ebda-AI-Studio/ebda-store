@@ -237,8 +237,6 @@
     "TRUST_PROXY_HOPS": "1",
     // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
-    // Outbound email provider. `cloudflare` = the EMAIL binding; `resend` = legacy rollback until the Resend decommission.
-    "EMAIL_PROVIDER": "cloudflare",
     // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
     // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
     "JOBS_CF_GROUPS": "1,2,3",
