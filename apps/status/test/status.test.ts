@@ -189,17 +189,20 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(snap.active[0].updates[0].body).toContain('timeout after 40ms');
   });
 
-  it('serves the page with no inline script (one same-origin file) and a restrictive CSP', async () => {
+  it('serves the page with two same-origin scripts (the shared nav and the optional search) and a restrictive CSP', async () => {
     const r = await get('/en');
     const html = await r.text();
-    // the only script is the shared header-nav file; nothing inline
-    expect(html.match(/<script\b[^>]*>/gi)).toEqual(['<script src="/assets/site-nav.js" defer>']);
+    expect(html.match(/<script\b[^>]*>/gi)).toEqual([
+      '<script src="/assets/site-nav.js" defer>',
+      '<script src="/assets/typeahead.js" defer>',
+    ]);
     expect(
       /<script\b[^>]*>\s*\S/i.test(html.replace(/<script src="[^"]*" defer><\/script>/g, ''))
     ).toBe(false);
     const csp = r.headers.get('content-security-policy') ?? '';
     expect(csp).toContain("default-src 'none'");
     expect(csp).toContain("script-src 'self'");
+    expect(has(html, 'role="search"')).toBe(true);
     expect(has(html, 'lang="en"')).toBe(true);
   });
 
@@ -210,6 +213,33 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(r.headers.get('cache-control')).toBe('public, max-age=300');
     expect(r.headers.get('content-security-policy')).toContain("script-src 'self'");
     expect(await r.text()).toBe(SITE_NAV_JS);
+  });
+});
+
+describe('header search (components, incidents, help)', () => {
+  it('serves the search script itself, and the page data in both languages', async () => {
+    const js = await get('/assets/typeahead.js');
+    expect(js.status).toBe(200);
+    expect(js.headers.get('content-type')).toContain('javascript');
+    expect((await js.text()).length).toBeGreaterThan(5000);
+    for (const [lang, name] of [
+      ['en', 'Merchant dashboard'],
+      ['ar', 'لوحة التحكم'],
+    ] as const) {
+      const r = await get(`/search.json?lang=${lang}`);
+      expect(r.status).toBe(200);
+      const docs = (await r.json()) as { id: string; title: string; section: string }[];
+      const hit = docs.find(d => d.title === name);
+      expect(hit?.id.includes('#c-')).toBe(true);
+      expect(docs.every(d => d.id.startsWith(lang === 'ar' ? '/#' : '/en#'))).toBe(true);
+    }
+  });
+
+  it('the page carries anchors for the results and the form points at the help search', async () => {
+    const html = await (await get('/en')).text();
+    expect(has(html, 'id="c-admin"')).toBe(true);
+    expect(has(html, 'action="https://help.ebda.app/en/search/"')).toBe(true);
+    expect(has(html, '/search.json?lang=en||docs')).toBe(true);
   });
 });
 

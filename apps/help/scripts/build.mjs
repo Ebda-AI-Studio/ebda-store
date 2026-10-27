@@ -4,13 +4,14 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
   renderFooter,
   renderPage,
   renderSearchMain,
+  render404Main,
   renderSidebar,
   renderToc,
   writeSeoFiles,
@@ -229,7 +230,7 @@ for (const lang of ['ar', 'en']) {
         lang,
         title: c.searchMsgs.title,
         intro: c.searchMsgs.intro,
-        indexUrl: '/search-index.json',
+        indexUrl: `/search-index.${lang}.json`,
         messages: c.searchMsgs,
       })}</div>`,
       scripts: ['/assets/search.js'],
@@ -239,16 +240,67 @@ for (const lang of ['ar', 'en']) {
 
 await writeSearchAssets(out, searchDocs);
 writeSeoFiles(out, ORIGIN, urls);
-writeFileSync(
-  path.join(out, '404.html'),
-  renderPage({
-    ...base('ar'),
-    title: `${L.ar.notFound[0]} | ${L.ar.site}`,
-    description: L.ar.notFound[0],
-    canonical: ORIGIN + '/',
-    main: `<h1>${L.ar.notFound[0]}</h1><p>${L.ar.notFound[1]} <a href="/">${L.ar.homeLink}</a>.</p><p lang="en" dir="ltr">${L.en.notFound[0]}. <a href="/en/">${L.en.homeLink}</a></p>`,
-  })
-);
+// 404 pages, one per language: Workers Static Assets serves the NEAREST 404.html, so /en/* gets the English one.
+// Apple-style: one calm sentence, live search, a compact map of the sections. Status stays 404 (not_found_handling).
+const NF = {
+  ar: {
+    line: 'الصفحة اللي بتدوّر عليها مش موجودة.',
+    hint: 'دوّر على اللي كنت تقصده، أو اختار قسم من تحت.',
+    mapLabel: 'أقسام مركز المساعدة',
+    sections: 'أقسام المساعدة',
+    ebda: BRAND.company.shortNameAr,
+    links: { home: 'الصفحة الرئيسية للمساعدة', docs: 'وثائق المطوّرين', contact: 'تواصل معانا' },
+  },
+  en: {
+    line: "The page you're looking for can't be found.",
+    hint: 'Search for what you meant, or pick a section below.',
+    mapLabel: 'Help sections',
+    sections: 'Help sections',
+    ebda: BRAND.company.shortNameEn,
+    links: { home: 'Help home', docs: 'Developer docs', contact: 'Contact' },
+  },
+};
+for (const lang of ['ar', 'en']) {
+  const c = NF[lang];
+  const firstOfSection = new Map();
+  for (const a of content[lang]) {
+    const g = a.data.section ?? '';
+    if (g && !firstOfSection.has(g)) firstOfSection.set(g, articleUrl(lang, a.slug));
+  }
+  writeFileSync(
+    path.join(out, lang === 'ar' ? '404.html' : 'en/404.html'),
+    renderPage({
+      ...base(lang),
+      title: `${L[lang].notFound[0]} | ${L[lang].site}`,
+      description: L[lang].notFound[0],
+      canonical: ORIGIN + (lang === 'ar' ? '/' : '/en/'),
+      langSwitch: undefined,
+      noHeaderSearch: true,
+      main: render404Main({
+        lang,
+        search: L[lang].search,
+        line: c.line,
+        hint: c.hint,
+        mapLabel: c.mapLabel,
+        groups: [
+          {
+            title: c.sections,
+            links: [...firstOfSection].map(([label, href]) => ({ label, href })),
+          },
+          {
+            title: c.ebda,
+            links: [
+              { href: homeUrl(lang), label: c.links.home },
+              ...siteNavItems(lang).map(i => ({ href: i.href, label: i.label })),
+              { href: `https://${BRAND.domains.docs}/`, label: c.links.docs },
+              { href: `mailto:${BRAND.supportEmail}`, label: c.links.contact },
+            ],
+          },
+        ],
+      }),
+    }).replace('<head>', '<head>\n<meta name="robots" content="noindex">')
+  );
+}
 writeFileSync(
   path.join(out, 'llms.txt'),
   `# ${BRAND.company.shortNameEn} Help\n\n> Merchant help for ${BRAND.product.nameEn}, in Arabic and English. Products are added here as they ship.\n\n${content.en

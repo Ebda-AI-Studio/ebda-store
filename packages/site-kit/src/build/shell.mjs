@@ -37,13 +37,14 @@ const tokensCss = () =>
  * @param {string} p.homeHref
  * @param {'docs'|'help'} p.active    the site this page belongs to (its nav link gets aria-current)
  * @param {{href:string,label:string,lang:string}} [p.langSwitch]
- * @param {{action:string,label:string,placeholder:string}} p.search
+ * @param {{action:string,label:string,placeholder:string,index?:string}} p.search
  * @param {string} [p.sidebar]        html (a <nav>)
  * @param {string} p.main             html
  * @param {string} p.footer           html
  * @param {string[]} [p.scripts]
  * @param {string} p.skipLabel
  * @param {string} [p.ogImage]
+ * @param {boolean} [p.noHeaderSearch]  omit the header search box (a page that carries its own, e.g. the 404)
  */
 export function renderPage(p) {
   const dir = p.lang === 'ar' ? 'rtl' : 'ltr';
@@ -80,11 +81,7 @@ export function renderPage(p) {
   <div class="wrap header-row">
     ${siteWordmarkHtml({ lang: p.lang, href: p.homeHref, siteLabel: p.siteLabel, markHtml: '<img src="/icon.svg" alt="" width="28" height="28">' })}
     ${siteNavHtml(p.lang, p.active)}
-    <form class="search" role="search" action="${esc(p.search.action)}" method="get">
-      <label class="sr-only" for="q">${esc(p.search.label)}</label>
-      <input id="q" name="q" type="search" placeholder="${esc(p.search.placeholder)}" autocomplete="off">
-      <button type="submit">${esc(p.search.label)}</button>
-    </form>
+    ${p.noHeaderSearch ? '' : searchForm(p, 'q', 'search')}
     ${sw}
   </div>
 </header>
@@ -95,10 +92,40 @@ ${p.main}
 </main>
 </div>
 ${p.footer}
-<script src="/assets/site-nav.js" defer></script>${(p.scripts ?? []).map(s => `<script src="${esc(s)}" defer></script>`).join('')}
+<script src="/assets/site-nav.js" defer></script>
+<script src="/assets/typeahead.js" defer></script>${(p.scripts ?? []).map(s => `<script src="${esc(s)}" defer></script>`).join('')}
 </body>
 </html>
 `;
+}
+
+/** The search form: a plain GET to the search page that /assets/typeahead.js upgrades to a live combobox. */
+function searchForm(p, id, cls) {
+  return `<form class="${cls}" role="search" action="${esc(p.search.action)}" method="get" data-index="${esc(p.search.index ?? `/search-index.${p.lang}.json`)}">
+      <label class="sr-only" for="${id}">${esc(p.search.label)}</label>
+      <input id="${id}" name="q" type="search" placeholder="${esc(p.search.placeholder)}" autocomplete="off" enterkeyhint="search">
+      <button type="submit">${esc(p.search.label)}</button>
+    </form>`;
+}
+
+/**
+ * The Apple-style 404 body for a static site: one calm sentence, the live search box (the same typeahead as the
+ * header, in the page where the visitor is looking), and a compact map of the site's sections.
+ * @param {{lang:'ar'|'en', search:{action:string,label:string,placeholder:string,index?:string}, line:string, hint:string, mapLabel:string, groups:{title:string,links:{href:string,label:string}[]}[]}} p
+ */
+export function render404Main(p) {
+  const groups = p.groups
+    .map(
+      g =>
+        `<div><h2>${esc(g.title)}</h2><ul>${g.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.label)}</a></li>`).join('')}</ul></div>`
+    )
+    .join('');
+  return `<div class="nf">
+<h1>${esc(p.line)}</h1>
+<p class="muted">${esc(p.hint)}</p>
+${searchForm(p, 'q', 'search nf-search')}
+<nav class="nf-map" aria-label="${esc(p.mapLabel)}">${groups}</nav>
+</div>`;
 }
 
 /** Sidebar nav from groups: [{title, items:[{href,label,current}]}] */

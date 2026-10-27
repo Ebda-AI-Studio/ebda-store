@@ -3,6 +3,7 @@ import path from 'node:path';
 
 /** Chromium from PLAYWRIGHT_BROWSERS_PATH (default /opt/pw-browsers). Never installs a browser. */
 export function chromiumPath() {
+  if (process.env.EBDA_CHROMIUM) return process.env.EBDA_CHROMIUM; // local macOS runs
   const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
   const dir = readdirSync(base)
     .filter(d => /^chromium-\d+$/.test(d))
