@@ -7,7 +7,7 @@ export interface LegalDoc {
   meta?: { version: string; publishedAt: string };
   /** A visible note under the title (a document with clauses still under legal review says so). */
   note?: string;
-  sections: { h: string; p: string[] }[];
+  sections: { h: string; p: readonly string[] }[];
 }
 
 export interface LegalPages {
