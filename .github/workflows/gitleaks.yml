@@ -6,7 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    # Nightly FULL-history scan (a PR scan only sees its own commits).
+    # Nightly scan of main's FULL history (HEAD of the default branch; never other refs, GITLEAKS-SCOPE-1).
     - cron: '23 2 * * *'
 
 permissions:
@@ -46,23 +46,30 @@ jobs:
           gitleaks version
 
       - name: Run gitleaks
-        # A pull request is scanned over ITS OWN commit range only (base..head). `gitleaks detect` otherwise walks
-        # `git log --all`, and with fetch-depth 0 that includes every other open PR's branch, so one branch's test
-        # fixture failed this gate on every unrelated PR (#228, 2026-10-25). Pushes to main, the nightly schedule
-        # and manual dispatch keep the full-history scan. The pre-commit hook uses the same .gitleaks.toml.
+        # Scope (Ruling GITLEAKS-SCOPE-1). `gitleaks detect` with no --log-opts walks `git log --all`, and with
+        # fetch-depth 0 that includes every open PR branch, so a test fixture on someone's branch turned main
+        # red and paged on every push (12 times overnight). Each event now scans exactly its own history:
+        #   pull_request   base..head (the PR's own commits)
+        #   push to main   before..after (what this push added); a first push / zero `before` scans HEAD
+        #   schedule, manual dispatch   HEAD only = the checked-out branch (main for the nightly), never --all
+        # No allowlist is added: a real finding on main still fails.
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
         run: |
           set -eu
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            echo "gitleaks: scanning the PR range ${BASE_SHA}..${HEAD_SHA}"
-            gitleaks detect --source . --config .gitleaks.toml --log-opts="${BASE_SHA}..${HEAD_SHA}" --redact --verbose --exit-code 1
+            RANGE="${BASE_SHA}..${HEAD_SHA}"
+          elif [ "$EVENT_NAME" = "push" ] && [ -n "${PUSH_BEFORE:-}" ] && [ "${PUSH_BEFORE}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${PUSH_BEFORE}^{commit}" 2>/dev/null; then
+            RANGE="${PUSH_BEFORE}..${PUSH_AFTER}"
           else
-            echo "gitleaks: scanning the full history"
-            gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
+            RANGE="HEAD"
           fi
+          echo "gitleaks: scanning ${RANGE}"
+          gitleaks detect --source . --config .gitleaks.toml --log-opts="${RANGE}" --redact --verbose --exit-code 1
 
   notify-failure:
     name: Notify on failure (main only)

@@ -173,7 +173,7 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
     'feature.routes.ts', // (a) featureService.readFromDb calls withRlsBypass internally
     'notification.routes.ts', // (a)+(b) notificationConfigService.readFromDb withRlsBypass + testConnection external SMS API
     'store.routes.ts', // (b) domain provisioning calls Vercel/Cloudflare/Resend APIs in-request
-    'newsletter.routes.ts', // (b) chunked loop of ResendService.sendBrandedEmail calls in-request
+    'newsletter.routes.ts', // (b) chunked loop of StoreMailer.sendBrandedEmail calls in-request
   ];
 
   it.each(phase2ContextLessFiles)(

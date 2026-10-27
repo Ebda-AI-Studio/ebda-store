@@ -368,7 +368,7 @@ export const LEGAL_EN: LegalPages = {
           PRIVACY_STACK === 'cloudflare'
             ? POST_CUTOVER.en.providers
             : [
-                'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email; being replaced by the Cloudflare email service); Sentry (error and performance monitoring, EU region); Inngest (background job processing; being replaced by the Cloudflare job runtime); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
+                'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues, file/image storage and email delivery: transactional and campaign email); Neon (database hosting, EU region); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
                 'When a merchant uses Ebda WhatsApp, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda WhatsApp Privacy Policy (https://ebda.app/legal/whatsapp-privacy/).',
                 'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
               ],
@@ -379,7 +379,7 @@ export const LEGAL_EN: LegalPages = {
           PRIVACY_STACK === 'cloudflare'
             ? POST_CUTOVER.en.transfers
             : [
-                'Some providers process data outside Egypt, including in the EU and the United States. Where the law requires, we rely on appropriate contractual and technical safeguards, and we choose EU regions for the database and monitoring services above. The recipients outside Egypt are the providers listed in section 5 (Cloudflare, Neon, Resend, Sentry, Inngest, Google, PostHog, Meta and OneSignal, in the EU, the United States or both) and, for Ebda WhatsApp, Meta.',
+                'Some providers process data outside Egypt, including in the EU and the United States. Where the law requires, we rely on appropriate contractual and technical safeguards, and we choose EU regions for the database and monitoring services above. The recipients outside Egypt are the providers listed in section 5 (Cloudflare, Neon, Sentry, Inngest, Google, PostHog, Meta and OneSignal, in the EU, the United States or both) and, for Ebda WhatsApp, Meta.',
               ],
       },
       {

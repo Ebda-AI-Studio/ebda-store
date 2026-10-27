@@ -18,8 +18,8 @@ const h = vi.hoisted(() => {
   };
 });
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: h.send, createFunction: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendMarketingEmail: h.sendMarketingEmail },
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendMarketingEmail: h.sendMarketingEmail },
   ResendSendError: class extends Error {
     constructor(
       readonly code: string,

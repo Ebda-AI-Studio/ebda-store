@@ -6,7 +6,7 @@ import { inngest } from '../client';
 import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
-import { ResendService } from '../../../services/resend.service';
+import { StoreMailer } from '../../../services/store-mailer.service';
 import { EmailSendError } from '../../../services/mail-transport';
 import { storeHidesPoweredBy } from '../../../services/email.service';
 import { sendAlert } from '../../../services/alerts.service';
@@ -405,7 +405,7 @@ const campaignSendFn = inngest.createFunction(
         }
         let messageId: string;
         try {
-          ({ id: messageId } = await ResendService.sendMarketingEmail(store, {
+          ({ id: messageId } = await StoreMailer.sendMarketingEmail(store, {
             to: r.email,
             subject,
             html,

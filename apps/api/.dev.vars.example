@@ -12,7 +12,6 @@ SUITE_BUYER_KEY_SECRET=dev-only-suite-buyer-key-secret-0123456789
 # Real Inngest / Resend / Sentry / Gemini / payment-provider keys are secrets: wrangler secret put
 # INNGEST_SIGNING_KEY=
 # INNGEST_EVENT_KEY=
-# RESEND_API_KEY=
 # SENTRY_DSN=
 # GEMINI_API_KEY=
 # Fake Tap credentials: the payment-webhook replay in the exit test signs with TAP_WEBHOOK_SECRET

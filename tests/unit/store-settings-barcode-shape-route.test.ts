@@ -74,7 +74,7 @@ vi.mock('@api/services/store.service', () => ({
 vi.mock('@api/services/domain-provider', () => ({
   resolveDomainService: vi.fn(() => ({ isConfigured: () => false })),
 }));
-vi.mock('@api/services/resend.service', () => ({ ResendService: {} }));
+vi.mock('@api/services/store-mailer.service', () => ({ StoreMailer: {} }));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { invalidateCache: vi.fn().mockResolvedValue(undefined) },
 }));
