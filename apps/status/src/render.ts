@@ -236,6 +236,7 @@ ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>
 </main>
 <footer><div class="wrap muted small">${esc(t.footer)} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
+<script src="/assets/site-nav.js" defer></script>
 </body>
 </html>
 `;

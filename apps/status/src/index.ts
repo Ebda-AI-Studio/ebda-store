@@ -1,4 +1,4 @@
-import { BRAND, BRAND_MARKETING_URL } from '../../../packages/shared/src/brand/index';
+import { BRAND, BRAND_MARKETING_URL, SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
 import { probeAll, type Fetcher } from './probe';
 import { renderStatusPage } from './render';
@@ -8,17 +8,17 @@ export { StatusStore } from './store';
 
 const SECURITY_HEADERS = {
   'content-security-policy':
-    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
 };
 
-const text = (body: string, type = 'text/plain'): Response =>
+const text = (body: string, type = 'text/plain', maxAge = 3600): Response =>
   new Response(body, {
     headers: {
       'content-type': `${type}; charset=utf-8`,
-      'cache-control': 'public, max-age=3600',
+      'cache-control': `public, max-age=${maxAge}`,
       ...SECURITY_HEADERS,
     },
   });
@@ -177,6 +177,11 @@ export default {
         'application/xml'
       );
     if (path === '/.well-known/security.txt') return text(securityTxt(url.origin));
+
+    // the shared header-nav behaviour (Esc, click-outside, one menu open, aria-expanded): a same-origin file, no inline script
+    if (path === '/assets/site-nav.js')
+      // an unhashed file: a short cache so a changed script reaches visitors within minutes, not an hour
+      return text(SITE_NAV_JS, 'text/javascript', 300);
 
     if (path === '/healthz')
       return new Response('ok', { headers: { 'content-type': 'text/plain', ...SECURITY_HEADERS } });
