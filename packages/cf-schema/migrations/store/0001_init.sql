@@ -1368,6 +1368,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "customer_notes" TEXT,
   "shipping_address" TEXT NOT NULL,
   "billing_address" TEXT NOT NULL,
+  "area_key" TEXT,
+  "buyer_key" TEXT,
   "shipped_at" INTEGER,
   "delivered_at" INTEGER,
   "review_request_sent_at" INTEGER,
@@ -1391,7 +1393,6 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "source" TEXT DEFAULT 'web',
   "checkout_ip" TEXT,
   "manual_hold_admitted" INTEGER NOT NULL DEFAULT 0,
-  "buyer_key" TEXT,
   CONSTRAINT "orders_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "orders_applied_promotion_id_fkey" FOREIGN KEY ("applied_promotion_id") REFERENCES "promotions" ("id") ON DELETE SET NULL,
   CONSTRAINT "orders_status_chk" CHECK ("status" IN ('pending', 'awaiting_payment_confirmation', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded')),
@@ -1402,7 +1403,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
   CONSTRAINT "orders_sms_opt_in_chk" CHECK ("sms_opt_in" IN (0, 1)),
   CONSTRAINT "orders_manual_hold_admitted_chk" CHECK ("manual_hold_admitted" IN (0, 1)),
   CONSTRAINT "orders_wallet_amount_non_negative" CHECK ("wallet_amount" >= 0),
-  CONSTRAINT "orders_cod_fee_nonneg" CHECK ("cod_fee" >= 0)
+  CONSTRAINT "orders_cod_fee_nonneg" CHECK ("cod_fee" >= 0),
+  CONSTRAINT "orders_buyer_key_check" CHECK ("buyer_key" IS NULL OR (length("buyer_key") = 64 AND "buyer_key" NOT GLOB '*[^0-9a-f]*'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_order_number_key" ON "orders" ("order_number");
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_idempotency_key_key" ON "orders" ("idempotency_key");
@@ -1416,7 +1418,6 @@ CREATE INDEX IF NOT EXISTS "orders_store_id_created_at_idx" ON "orders" ("store_
 CREATE INDEX IF NOT EXISTS "orders_store_id_payment_gateway_abandoned_at_idx" ON "orders" ("store_id", "payment_gateway_abandoned_at");
 CREATE INDEX IF NOT EXISTS "orders_payment_confirmation_expires_at_idx" ON "orders" ("payment_confirmation_expires_at");
 CREATE INDEX IF NOT EXISTS "orders_applied_promotion_id_idx" ON "orders" ("applied_promotion_id");
-CREATE INDEX IF NOT EXISTS "orders_buyer_key_idx" ON "orders" ("buyer_key");
 CREATE INDEX IF NOT EXISTS "orders_payment_gateway_abandoned_at_idx" ON "orders" ("store_id", "payment_gateway_abandoned_at") WHERE "payment_gateway_abandoned_at" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "orders_refund_reversal_pending_idx" ON "orders" ("updated_at") WHERE "refund_reversed_at" IS NULL AND "status" IN ('cancelled', 'refunded');
 CREATE INDEX IF NOT EXISTS "orders_refund_reversal_requested_idx" ON "orders" ("refund_reversal_requested_at") WHERE "refund_reversed_at" IS NULL AND "refund_reversal_requested_at" IS NOT NULL;
@@ -1424,6 +1425,7 @@ CREATE INDEX IF NOT EXISTS "orders_status_fanout_pending_idx" ON "orders" ("stat
 CREATE INDEX IF NOT EXISTS "orders_open_hold_phone_idx" ON "orders" ("store_id", (json_extract(shipping_address, '$.phone'))) WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_email_idx" ON "orders" ("store_id", (lower(trim(json_extract(shipping_address, '$.email'))))) WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_ip_idx" ON "orders" ("store_id", "checkout_ip") WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
+CREATE INDEX IF NOT EXISTS "orders_store_buyer_key_created_idx" ON "orders" ("store_id", "buyer_key", "created_at") WHERE "buyer_key" IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "payment_configs" (
   "id" TEXT NOT NULL,
@@ -2201,27 +2203,29 @@ CREATE TABLE IF NOT EXISTS "shipments" (
   "carrier_name" TEXT,
   "create_attempts" INTEGER NOT NULL DEFAULT 0,
   "last_polled_at" INTEGER,
-  "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
-  "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
-  "return_reason_raw" TEXT,
-  "return_reason_code" TEXT,
   "picked_up_at" INTEGER,
   "delivered_at" INTEGER,
-  "attempts" INTEGER NOT NULL DEFAULT 0,
+  "returned_at" INTEGER,
+  "delivery_attempts" INTEGER NOT NULL DEFAULT 0,
+  "return_reason_raw" TEXT,
+  "return_reason_code" TEXT,
   "area_key" TEXT,
+  "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
+  "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "shipments_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "shipments_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE,
   CONSTRAINT "shipments_pickup_address_chk" CHECK (json_valid("pickup_address")),
   CONSTRAINT "shipments_delivery_address_chk" CHECK (json_valid("delivery_address")),
   CONSTRAINT "shipments_dimensions_chk" CHECK ("dimensions" IS NULL OR (json_valid("dimensions"))),
   CONSTRAINT "shipments_status_history_chk" CHECK (json_valid("status_history")),
-  CONSTRAINT "shipments_return_reason_code_chk" CHECK ("return_reason_code" IS NULL OR ("return_reason_code" IN ('refused', 'not_home', 'wrong_address', 'unreachable', 'rescheduled', 'price_or_changed_mind', 'damaged', 'other', 'unknown')))
+  CONSTRAINT "shipments_return_reason_code_check" CHECK ("return_reason_code" IS NULL OR "return_reason_code" IN ( 'customer_refused', 'customer_unreachable', 'wrong_address', 'address_incomplete', 'customer_postponed', 'price_dispute', 'product_not_as_described', 'damaged_in_transit', 'courier_failed_attempts', 'courier_lost', 'duplicate_order', 'fake_order', 'other' )),
+  CONSTRAINT "shipments_return_reason_raw_len_check" CHECK ("return_reason_raw" IS NULL OR length("return_reason_raw") <= 200),
+  CONSTRAINT "shipments_delivery_attempts_check" CHECK ("delivery_attempts" >= 0)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "shipments_order_id_key" ON "shipments" ("order_id");
 CREATE INDEX IF NOT EXISTS "shipments_store_id_idx" ON "shipments" ("store_id");
 CREATE INDEX IF NOT EXISTS "shipments_tracking_number_idx" ON "shipments" ("tracking_number");
 CREATE INDEX IF NOT EXISTS "shipments_store_id_status_idx" ON "shipments" ("store_id", "status");
-CREATE INDEX IF NOT EXISTS "shipments_store_id_area_key_idx" ON "shipments" ("store_id", "area_key");
 
 CREATE TABLE IF NOT EXISTS "shipping_area_rates" (
   "id" TEXT NOT NULL,
@@ -2405,6 +2409,8 @@ CREATE TABLE IF NOT EXISTS "store_config" (
   "ai_bulk_throttle_ms" INTEGER NOT NULL DEFAULT 2500,
   "ai_narration_enabled" INTEGER NOT NULL DEFAULT 1,
   "insights_rollup_cron" TEXT NOT NULL DEFAULT 'daily',
+  "ci_sharing" INTEGER NOT NULL DEFAULT 0,
+  "ci_sharing_changed_at" INTEGER,
   CONSTRAINT "store_config_pkey" PRIMARY KEY ("store_id"),
   CONSTRAINT "store_config_settings_chk" CHECK (json_valid("settings")),
   CONSTRAINT "store_config_tax_enabled_chk" CHECK ("tax_enabled" IN (0, 1)),
@@ -2419,6 +2425,7 @@ CREATE TABLE IF NOT EXISTS "store_config" (
   CONSTRAINT "store_config_expense_two_step_approval_chk" CHECK ("expense_two_step_approval" IN (0, 1)),
   CONSTRAINT "store_config_ai_features_enabled_chk" CHECK ("ai_features_enabled" IN (0, 1)),
   CONSTRAINT "store_config_ai_narration_enabled_chk" CHECK ("ai_narration_enabled" IN (0, 1)),
+  CONSTRAINT "store_config_ci_sharing_chk" CHECK ("ci_sharing" IN (0, 1)),
   CONSTRAINT "stores_fiscal_year_start_month_range" CHECK (fiscal_year_start_month BETWEEN 1 AND 12)
 );
 

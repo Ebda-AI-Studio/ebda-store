@@ -33,7 +33,7 @@
         "bundles": 15,
         "bundle_items": 5,
         "cart_bundles": 6,
-        "orders": 57,
+        "orders": 58,
         "order_events": 8,
         "order_items": 26,
         "payments": 17,
@@ -51,7 +51,7 @@
         "frequently_bought_together": 6,
         "ai_recommendation": 7,
         "shipping_carrier_configs": 12,
-        "shipments": 29,
+        "shipments": 30,
         "shipment_pickups": 20,
         "cod_remittances": 13,
         "affiliates": 18,
@@ -121,7 +121,7 @@
         "store_whatsapp_links": 10,
         "store_whatsapp_consents": 12,
         "store_profile": 62,
-        "store_config": 22,
+        "store_config": 24,
         "commerce_outcomes": 14,
         "do_flags": 2,
         "d1_outbox": 7
@@ -383,6 +383,14 @@
       "unique": true,
       "pgCols": "((\"details\" ->> 'claimId'))",
       "pgWhere": "\"event_type\" IN ('refund_webhook_absorbed', 'refund_failed')"
+    },
+    {
+      "name": "orders_store_buyer_key_created_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"buyer_key\", \"created_at\"",
+      "pgWhere": "\"buyer_key\" IS NOT NULL"
     },
     {
       "name": "provider_activation_requests_one_live",
@@ -1064,6 +1072,30 @@
       "disposition": "store-do:store_whatsapp_consents"
     },
     {
+      "kind": "check",
+      "name": "shipments_return_reason_code_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_return_reason_raw_len_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_delivery_attempts_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "orders_buyer_key_check",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
       "kind": "index",
       "name": "users_admin_email_key",
       "table": "users",
@@ -1368,6 +1400,12 @@
       "name": "payment_events_claim_single_outcome_key",
       "table": "payment_events",
       "disposition": "store-do:payment_events"
+    },
+    {
+      "kind": "index",
+      "name": "orders_store_buyer_key_created_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
     }
   ],
   "decimals": [
@@ -1537,7 +1575,9 @@
       "aiFeaturesEnabled",
       "aiBulkThrottleMs",
       "aiNarrationEnabled",
-      "insightsRollupCron"
+      "insightsRollupCron",
+      "ciSharing",
+      "ciSharingChangedAt"
     ]
   }
 }

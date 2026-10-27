@@ -85,7 +85,8 @@ describe('StoreDO schema', () => {
         'return_reason_code',
         'picked_up_at',
         'delivered_at',
-        'attempts',
+        'returned_at',
+        'delivery_attempts',
         'area_key',
       ])
     );
