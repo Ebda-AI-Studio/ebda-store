@@ -1,5 +1,12 @@
 export interface LegalDoc {
   title: string;
+  /**
+   * Own version and publish date, for documents that are not Ebda Store acceptance documents (the data deletion
+   * page and the Ebda WhatsApp documents). Store documents take theirs from LEGAL_POLICIES.
+   */
+  meta?: { version: string; publishedAt: string };
+  /** A visible note under the title (a document with clauses still under legal review says so). */
+  note?: string;
   sections: { h: string; p: string[] }[];
 }
 
@@ -19,4 +26,10 @@ export interface LegalPages {
   terms: LegalDoc;
   acceptableUse: LegalDoc;
   merchant: LegalDoc;
+  dataDeletion: LegalDoc;
+  waTerms: LegalDoc;
+  waPrivacy: LegalDoc;
+  waDpa: LegalDoc;
+  /** Link list on the legal notice page, to the documents that sit under /legal/. */
+  more: { h: string; links: { slug: string; label: string }[] };
 }

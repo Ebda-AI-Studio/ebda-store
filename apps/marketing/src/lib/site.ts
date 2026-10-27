@@ -35,6 +35,18 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
+/**
+ * Legal pages that are not Ebda Store acceptance documents (they have no row in LEGAL_POLICIES): the data
+ * deletion page and the three Ebda WhatsApp documents. They are legal pages for every other purpose (sitemap
+ * date, layout, tests); their own version and date live in legal-extra-*.ts.
+ */
+export const LEGAL_EXTRA_SLUGS = [
+  'legal/data-deletion',
+  'legal/whatsapp-terms',
+  'legal/whatsapp-privacy',
+  'legal/whatsapp-dpa',
+] as const;
+export type LegalExtraSlug = (typeof LEGAL_EXTRA_SLUGS)[number];
 export const COMPARE_SLUGS = [
   'zid',
   'shopify',
@@ -53,7 +65,8 @@ export type PageSlug =
   | 'features'
   | 'whatsapp'
   | ComparePage
-  | LegalSlug;
+  | LegalSlug
+  | LegalExtraSlug;
 
 /** The comparison pages (/compare/{zid,shopify,wuilt,youcan,easyorders,expandcart}), as page slugs. */
 export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
@@ -70,6 +83,7 @@ export const SITE_PAGES = [
   'contact',
   'credits',
   ...LEGAL_SLUGS,
+  ...LEGAL_EXTRA_SLUGS,
 ] as const satisfies readonly PageSlug[];
 
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */

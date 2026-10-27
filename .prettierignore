@@ -47,3 +47,5 @@ tests/integration/__golden__/
 
 # Vendored byte-for-byte from Ebda WhatsApp (vectors/*.json at 3f7878d; sha256 in SHA256SUMS)
 tests/vectors/ebda-wa/
+# vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/marketing-wa-legal-drift.test.ts)
+apps/marketing/legal-source
