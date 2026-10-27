@@ -1,4 +1,10 @@
-import { BRAND, BRAND_MARKETING_URL, whatsappUrl } from '@ebda/shared';
+import {
+  BRAND,
+  BRAND_MARKETING_URL,
+  BRAND_STORE_APP_URL,
+  validateStoreSlug,
+  whatsappUrl,
+} from '@ebda/shared';
 import type { ResolvedStore } from './store-resolver';
 import { DEMO_HOSTS } from './demo-hosts';
 
@@ -44,4 +50,26 @@ export function unknownHostLinks(
         ? `https://${DEMO_HOSTS.qamar ?? 'storedemo'}${BRAND.domains.storeSuffix}`
         : null,
   };
+}
+
+/**
+ * The slug a visitor could claim from a 404 on `<slug>.ebda.app`: the host's single label when it is a
+ * valid store slug that is not reserved, a protected brand or a demo-showroom name. `null` for custom
+ * domains, the platform host, IPs and anything else (no CTA). Availability is NOT asserted here: the
+ * signup flow checks it live and says so; this only avoids offering a name signup would refuse outright.
+ */
+export function signupSlugForHost(host: string | null | undefined): string | null {
+  if (!host) return null;
+  const bare = host.split(':')[0].toLowerCase().replace(/\.$/, '');
+  const suffix = BRAND.domains.storeSuffix;
+  if (!bare.endsWith(suffix)) return null;
+  const label = bare.slice(0, -suffix.length);
+  if (!label || label.includes('.')) return null;
+  const valid = validateStoreSlug(label);
+  return valid.ok ? valid.slug : null;
+}
+
+/** Signup with the name prefilled; the onboarding store step reads it back (it still checks availability). */
+export function signupUrlForSlug(slug: string): string {
+  return `${BRAND_STORE_APP_URL}/signup?slug=${encodeURIComponent(slug)}`;
 }

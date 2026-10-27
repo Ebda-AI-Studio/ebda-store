@@ -9,6 +9,10 @@ import { getEbdaTracker } from '../../../lib/ebda-tracker';
 import { suggestSlug } from '../../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
 import type { PlanSelection } from '../../../components/billing/types';
+import {
+  clearStoredSignupSlug,
+  readStoredSignupSlug,
+} from '../../../components/onboarding/signup-slug';
 import type { OnboardingStore, SlugCheck } from './types';
 
 type SlugUi =
@@ -48,6 +52,14 @@ export function StoreStep({
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugUi, setSlugUi] = useState<SlugUi>({ kind: 'idle' });
+  // A name carried from a store host's 404 ("Start your store as <slug>"): prefill, still checked live below.
+  useEffect(() => {
+    const carried = readStoredSignupSlug();
+    if (carried) {
+      setSlug(carried);
+      setSlugTouched(true);
+    }
+  }, []);
   const [nameError, setNameError] = useState('');
   const [formError, setFormError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -125,6 +137,7 @@ export function StoreStep({
     }
     // StoreCreated: same event_id as the server's Conversions API event (dedup).
     getEbdaTracker()?.track('store_created', { eventId: storeCreatedEventId(data.store.id) });
+    clearStoredSignupSlug();
     onCreated(data.store, data.lookApplied !== false);
   }
 
