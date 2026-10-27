@@ -14,17 +14,21 @@ import {
 import type { WorkflowStepLike } from '@api/lib/jobs/step-adapter';
 
 const sendAlert = vi.hoisted(() => vi.fn(async () => 'sent'));
-const captureException = vi.hoisted(() => vi.fn());
+const captureException = vi.hoisted(() => vi.fn(() => 'evt-123'));
+const flush = vi.hoisted(() => vi.fn(async () => true));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
-vi.mock('@sentry/cloudflare', () => ({ captureException }));
+vi.mock('@sentry/cloudflare', () => ({ captureException, flush }));
 
 class NonRetryable extends Error {}
 
 const calls: string[] = [];
+const outputs: Record<string, unknown> = {};
 const wf: WorkflowStepLike = {
   async do(name, _cfg, cb) {
     calls.push(`do:${name}`);
-    return cb();
+    const out = await cb();
+    outputs[name] = out;
+    return out;
   },
   async sleep(name) {
     calls.push(`sleep:${name}`);
@@ -69,6 +73,7 @@ const qsend = vi.fn(async () => undefined);
 
 beforeEach(() => {
   calls.length = 0;
+  for (const k of Object.keys(outputs)) delete outputs[k];
   leases.clear();
   now = 0;
   acquireFails = 0;
@@ -78,6 +83,7 @@ beforeEach(() => {
   clearJobRegistry();
   sendAlert.mockClear();
   captureException.mockClear();
+  flush.mockClear();
   setRawInngestSend(raw);
   setCfBindings({
     HYPERDRIVE: { connectionString: 'x' },
@@ -233,6 +239,13 @@ describe('runJobWorkflow', () => {
     });
     expect(JSON.stringify(alert)).not.toContain('s1'); // event.data (storeId) never leaves
     expect(captureException).toHaveBeenCalledTimes(1);
+    expect(flush).toHaveBeenCalledTimes(1); // awaited: a Workflow step has no waitUntil
+    // The step output is the proof of delivery (readable with `wrangler workflows instances describe`).
+    expect(outputs['on-failure']).toEqual({
+      alert: 'sent',
+      sentryEventId: 'evt-123',
+      sentryFlushed: true,
+    });
     expect(calls[calls.length - 1]).toBe('do:gate-release-0');
   });
 
@@ -350,6 +363,20 @@ describe('handleJobsBatch', () => {
     const m = msg(job('heartbeat'), 1);
     await handleJobsBatch(batch(m));
     expect(m.ack).toHaveBeenCalled();
+  });
+
+  it('the failure report records a throttled alert and an unflushed sentry event honestly', async () => {
+    sendAlert.mockResolvedValueOnce('throttled' as never);
+    flush.mockResolvedValueOnce(false);
+    registerJob({ id: 'heartbeat', retries: 0 }, async () => {
+      throw new Error('nope');
+    });
+    await expect(runJobWorkflow(args('heartbeat'))).rejects.toThrow('nope');
+    expect(outputs['on-failure']).toEqual({
+      alert: 'throttled',
+      sentryEventId: 'evt-123',
+      sentryFlushed: false,
+    });
   });
 
   it('NonRetriableError fails at once', async () => {
