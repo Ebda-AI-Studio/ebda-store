@@ -339,6 +339,11 @@
     "replacement": "platform.webhookInbox.resolveStore(provider, ref)",
     "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
   },
+  "ebda_webhook_resolve_store_scoped": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.resolveStoreScoped({transactionId, invoiceId, provider, preferStore}): entity-index lookup by provider reference, filtered by provider when given, preferred store first, newest payment, deterministic order (Ruling ITEST-14)",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
   "ebda_withdraw_legal_notice_send": {
     "target": "d1",
     "replacement": "platform.withdrawLegalNotice(id)",
