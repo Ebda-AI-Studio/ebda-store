@@ -108,6 +108,8 @@ jobs:
       accounts_tests: ${{ steps.affected.outputs.accounts_tests }}
       workers: ${{ steps.affected.outputs.workers }}
       has_workers: ${{ steps.affected.outputs.has_workers }}
+      build_apps: ${{ steps.affected.outputs.build_apps }}
+      has_build_apps: ${{ steps.affected.outputs.has_build_apps }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -516,6 +518,70 @@ jobs:
           name: worker-startup-budget
           path: ${{ runner.temp }}/worker-startup-budget.json
           if-no-files-found: ignore
+
+  # OPS-2: the PRODUCTION build of every app whose dependency graph includes a changed workspace, with the same commands the
+  # cf-<app>-deploy.yml workflows run. #248 merged green and broke the storefront build because no PR check built the apps.
+  app-build:
+    name: App build (${{ matrix.app }})
+    needs: [changes]
+    if: needs.changes.outputs.has_build_apps == 'true'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.changes.outputs.build_apps) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Build database + shared packages
+        run: |
+          npm run build -w packages/database
+          npm run build -w packages/shared
+      - name: Generate the ${{ matrix.app }} worker config (same generator as cf-deploy)
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
+        env:
+          OPENNEXT_CACHE: 'true'
+          CF_SETUP_SKIP_DEPS: '1'
+        run: bash scripts/cf-setup-local.sh ${{ matrix.app }}
+      - name: Build ${{ matrix.app }} for Cloudflare (OpenNext) - the deploy's build command
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
+        env:
+          NEXT_PUBLIC_API_URL: https://api.ebda.app/api/v1
+        run: bash scripts/cf-build.sh ${{ matrix.app }}
+      - name: Build ${{ matrix.app }} (static site) - the deploy's build command
+        if: contains(fromJSON('["marketing","docs","help"]'), matrix.app)
+        run: npm run build -w apps/${{ matrix.app }}
+
+  # The ONE required check for the app builds: runs on every PR, passes when no app needed building, fails when any app
+  # build failed or was cancelled. (A matrix job that is legitimately skipped cannot itself be a required check.)
+  app-builds:
+    name: App builds (affected)
+    needs: [changes, app-build]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 2
+    steps:
+      - name: Require every affected app build to have passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          BUILDS: ${{ needs.app-build.result }}
+        run: |
+          echo "changes=$CHANGES app-build=$BUILDS"
+          [ "$CHANGES" = "success" ] || { echo "::error::could not compute the affected apps ($CHANGES)"; exit 1; }
+          case "$BUILDS" in success|skipped) ;; *) echo "::error::an affected app build did not pass ($BUILDS)"; exit 1 ;; esac
 
   # Boot the API Worker in workerd (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot
   # see code that throws only on Workers (2026-10-08: `Prisma.dmmf` -> error 1101 on every request

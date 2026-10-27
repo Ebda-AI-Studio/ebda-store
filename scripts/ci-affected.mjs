@@ -48,6 +48,20 @@ export const WORKER_APPS = [
   'apps/accounts',
 ];
 
+/**
+ * Apps whose PRODUCTION BUILD is a deploy step (cf-<app>-deploy.yml). OPS-2: #248 merged green and broke the storefront
+ * build because PR checks never built the apps. The PR lane builds every one of these whose dependency graph includes a
+ * changed workspace (packages/ui or packages/shared touch all of them).
+ */
+export const BUILD_APPS = [
+  'apps/web',
+  'apps/admin',
+  'apps/orders',
+  'apps/marketing',
+  'apps/docs',
+  'apps/help',
+];
+
 /** Changing these affects every workspace. */
 export const GLOBAL_WORKSPACES = ['packages/shared', 'packages/database'];
 
@@ -190,6 +204,7 @@ export function classify(files, workspaces) {
     statusTests: all || direct.has('apps/status'),
     accountsTests: all || direct.has('apps/accounts'),
     workers: ws.filter(w => workerTouched.has(w.dir) && w.hasWrangler).map(w => w.dir.slice(5)),
+    buildApps: ws.filter(w => BUILD_APPS.includes(w.dir)).map(w => w.dir.slice(5)),
     changedFiles: codeFiles,
   };
 }
@@ -209,6 +224,8 @@ function formatOutputs(r) {
     accounts_tests: String(r.accountsTests),
     workers: JSON.stringify(r.workers),
     has_workers: String(r.workers.length > 0),
+    build_apps: JSON.stringify(r.buildApps),
+    has_build_apps: String(r.buildApps.length > 0),
     affected: r.workspaces.join(' '),
   };
   return Object.entries(lines).map(([k, v]) => `${k}=${v}`);
