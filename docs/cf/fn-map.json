@@ -1,0 +1,410 @@
+{
+  "billing_events_guard": {
+    "target": "d1",
+    "replacement": "D1 triggers billing_events_guard_{update,delete} in migrations/platform/0002_invariants.sql; repo exposes only insertBillingEvent/transition",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "billing_events_guard_delete": {
+    "target": "d1",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql); a direct delete aborts, the store-delete cascade is allowed",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "billing_events_guard_update": {
+    "target": "d1",
+    "replacement": "D1 trigger (migrations/platform/0002_invariants.sql)",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "current_store_id": {
+    "target": "deleted-by-construction",
+    "replacement": "none: the StoreDO id is the store id; getStore(env, storeId) is the only entry"
+  },
+  "current_user_id": {
+    "target": "deleted-by-construction",
+    "replacement": "none: the user id comes from the verified session; the platform repo takes userId explicitly"
+  },
+  "ebda_admin_push_player_ids": {
+    "target": "d1",
+    "replacement": "platform.adminPushPlayerIds(role, storeId)",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_admin_user_ensure": {
+    "target": "identity",
+    "replacement": "ebda-identity service: ensureAdminUser",
+    "test": "identity track"
+  },
+  "ebda_ai_usage_count": {
+    "target": "analytics",
+    "replacement": "analytics.aiUsageCount(storeId, window) over Analytics Engine SQL",
+    "test": "packages/repo/test/contract/analytics.contract.ts"
+  },
+  "ebda_ar_norm": {
+    "target": "store-do",
+    "replacement": "TypeScript normaliseArabic() shared by indexer and query",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_audit_log_exists": {
+    "target": "store-do",
+    "replacement": "StoreDO.audit.exists",
+    "test": "packages/repo/test/contract/audit.contract.ts"
+  },
+  "ebda_audit_log_insert": {
+    "target": "store-do",
+    "replacement": "StoreDO.audit.insert",
+    "test": "packages/repo/test/contract/audit.contract.ts"
+  },
+  "ebda_audit_log_retention_count": {
+    "target": "store-do",
+    "replacement": "StoreDO.audit.retentionCount(cutoff) (nightly alarm)",
+    "test": "packages/repo/test/contract/audit.contract.ts"
+  },
+  "ebda_audit_log_retention_page": {
+    "target": "store-do",
+    "replacement": "StoreDO.audit.retentionPage(cutoff) rolled to R2 by the alarm",
+    "test": "packages/repo/test/contract/audit.contract.ts"
+  },
+  "ebda_audit_log_retention_purge": {
+    "target": "store-do",
+    "replacement": "StoreDO.audit.purge(cutoff)",
+    "test": "packages/repo/test/contract/audit.contract.ts"
+  },
+  "ebda_audit_logs_detach_store": {
+    "target": "store-do",
+    "replacement": "erasure: StoreDO.audit rows die with the DO; platform_audit_log keeps store_id",
+    "test": "packages/repo/test/contract/erasure.contract.ts"
+  },
+  "ebda_audit_logs_unlink_user": {
+    "target": "store-do",
+    "replacement": "StoreDO.audit.unlinkUser(userId)",
+    "test": "packages/repo/test/contract/erasure.contract.ts"
+  },
+  "ebda_auth_find_user_id": {
+    "target": "identity",
+    "replacement": "ebda-identity service: findUserByEmail (identity track, ID-1)",
+    "test": "identity track"
+  },
+  "ebda_billing_refund_store_id": {
+    "target": "d1",
+    "replacement": "platform.storeIdForEntity(\"refund\", id)",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_customer_search_ids": {
+    "target": "store-do",
+    "replacement": "StoreDO.search.customers(q) over FTS5",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_digits": {
+    "target": "store-do",
+    "replacement": "TypeScript digitsOnly() shared by indexer and query",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_entity_store_id": {
+    "target": "d1",
+    "replacement": "D1 entity_index(kind,id,store_id), written by the StoreDO outbox; platform.storeIdForEntity(kind,id)",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_fiscal_archive": {
+    "target": "store-do",
+    "replacement": "StoreDO.fiscal.archiveOld() run by a DO alarm",
+    "test": "packages/repo/test/contract/fiscal.contract.ts"
+  },
+  "ebda_fiscal_archive_stores": {
+    "target": "deleted-by-construction",
+    "replacement": "the store list function disappears: each StoreDO runs its own alarm"
+  },
+  "ebda_gold_feed_stores": {
+    "target": "deleted-by-construction",
+    "replacement": "cron fan-out list disappears: each StoreDO refreshes its own rate by alarm (gold feed uses Queues)"
+  },
+  "ebda_gold_price_guard": {
+    "target": "store-do",
+    "replacement": "SQLite triggers on products and product_variants (migrations/store/0002_invariants.sql)",
+    "test": "packages/cf-schema/test/store-invariants.test.ts"
+  },
+  "ebda_gold_rate_watch": {
+    "target": "store-do",
+    "replacement": "StoreDO.gold.watch() alarm check",
+    "test": "packages/repo/test/contract/gold.contract.ts"
+  },
+  "ebda_is_super_admin": {
+    "target": "d1",
+    "replacement": "requireSuperAdmin(ctx) guard in the platform repo",
+    "test": "packages/repo/test/contract/platform-authz.contract.ts"
+  },
+  "ebda_is_system_job": {
+    "target": "d1",
+    "replacement": "systemJob capability check on signed job requests (Queues/Workflows consumers)",
+    "test": "packages/repo/test/contract/platform-authz.contract.ts"
+  },
+  "ebda_may_act_on_user": {
+    "target": "d1",
+    "replacement": "requireSuperAdmin(ctx) / same-user check in the platform repo",
+    "test": "packages/repo/test/contract/platform-authz.contract.ts"
+  },
+  "ebda_order_search_ids": {
+    "target": "store-do",
+    "replacement": "StoreDO.search.orders(q) over FTS5",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_order_store_id": {
+    "target": "d1",
+    "replacement": "platform.storeIdForEntity(\"order\", id)",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_owned_store_ids": {
+    "target": "d1",
+    "replacement": "platform.listOwnedStoreIds(ownerId)",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_passkey_lookup": {
+    "target": "identity",
+    "replacement": "ebda-identity service: passkeyByCredentialId",
+    "test": "identity track"
+  },
+  "ebda_passkeys_delete": {
+    "target": "identity",
+    "replacement": "ebda-identity service: deletePasskeys(userId)",
+    "test": "identity track"
+  },
+  "ebda_payment_events_store": {
+    "target": "d1",
+    "replacement": "platform.storeIdForEntity(\"payment\", id) before StoreDO.payments.recordEvent",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_payment_store_id": {
+    "target": "d1",
+    "replacement": "platform.storeIdForEntity(\"payment\", id)",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_plan_store_ids": {
+    "target": "d1",
+    "replacement": "platform.storeIdsOnPlan(code)",
+    "test": "packages/repo/test/contract/platform-billing.contract.ts"
+  },
+  "ebda_plan_subscriber_counts": {
+    "target": "d1",
+    "replacement": "platform.planSubscriberCounts() over D1 store_subscriptions",
+    "test": "packages/repo/test/contract/platform-billing.contract.ts"
+  },
+  "ebda_platform_audit_log_list": {
+    "target": "d1",
+    "replacement": "platform.listAuditLog over D1 platform_audit_log",
+    "test": "packages/repo/test/contract/platform-audit.contract.ts"
+  },
+  "ebda_platform_webhook_inbox_list": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.list",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_product_embed_doc": {
+    "target": "store-do",
+    "replacement": "TS buildProductDoc() for the Vectorize embedding text",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_product_name_doc": {
+    "target": "store-do",
+    "replacement": "TS buildProductDoc() (name part)",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_product_search_doc": {
+    "target": "store-do",
+    "replacement": "TS buildProductDoc() for the FTS5 row",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_product_search_ids": {
+    "target": "store-do",
+    "replacement": "StoreDO.search.products(q) over FTS5",
+    "test": "packages/repo/test/contract/search.contract.ts"
+  },
+  "ebda_public_store_page": {
+    "target": "d1",
+    "replacement": "platform.listPublicStores(cursor)",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_refresh_token_user": {
+    "target": "identity",
+    "replacement": "ebda-identity service: tokenUser",
+    "test": "identity track"
+  },
+  "ebda_refresh_tokens_purge": {
+    "target": "identity",
+    "replacement": "ebda-identity cron: purgeTokens",
+    "test": "identity track"
+  },
+  "ebda_resolve_store_id": {
+    "target": "d1",
+    "replacement": "platform.resolveStore({slug, host}) on D1 stores",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_shipment_store_id_by_tracking": {
+    "target": "d1",
+    "replacement": "platform.storeIdForEntity(\"shipment\", trackingNumber) via the entity index",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_sms_consent_lookup": {
+    "target": "store-do",
+    "replacement": "StoreDO.smsConsent(id), id routed via entity_index",
+    "test": "packages/repo/test/contract/sms-consent.contract.ts"
+  },
+  "ebda_store_directory": {
+    "target": "d1",
+    "replacement": "platform.listStores(cursor)",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_store_id_by_domain": {
+    "target": "d1",
+    "replacement": "platform.resolveStore({host})",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_store_id_by_slug": {
+    "target": "d1",
+    "replacement": "platform.resolveStore({slug})",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_store_ids_claiming_domain": {
+    "target": "d1",
+    "replacement": "platform.storeIdsClaimingDomain(host)",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_store_lookup": {
+    "target": "d1",
+    "replacement": "platform.getStore(id)",
+    "test": "packages/repo/test/contract/platform-directory.contract.ts"
+  },
+  "ebda_storefront_for_payment_ref": {
+    "target": "d1",
+    "replacement": "platform.storeIdForEntity(\"payment\", providerRef)",
+    "test": "packages/repo/test/contract/entity-index.contract.ts"
+  },
+  "ebda_tax_profiles_for_review": {
+    "target": "d1",
+    "replacement": "D1 tax_review_queue fed by the DO (outbox); super-admin review list reads D1",
+    "test": "packages/repo/test/contract/tax-profile.contract.ts"
+  },
+  "ebda_user_addresses_delete": {
+    "target": "store-do",
+    "replacement": "erasure fan-out: platform enqueues eraseUser to each StoreDO the user touched; StoreDO.customers.erase",
+    "test": "packages/repo/test/contract/erasure.contract.ts"
+  },
+  "ebda_user_revoke_sessions": {
+    "target": "identity",
+    "replacement": "ebda-identity service: revokeSessions(userId) (sid revocation, contract v1)",
+    "test": "identity track"
+  },
+  "ebda_user_state": {
+    "target": "identity",
+    "replacement": "ebda-identity service: getUserState",
+    "test": "identity track"
+  },
+  "ebda_user_tokens_delete": {
+    "target": "identity",
+    "replacement": "ebda-identity service: deleteUserTokens",
+    "test": "identity track"
+  },
+  "ebda_verification_token_user": {
+    "target": "identity",
+    "replacement": "ebda-identity service: verificationTokenUser",
+    "test": "identity track"
+  },
+  "ebda_wbs_bridge_keys": {
+    "target": "deleted-by-construction",
+    "replacement": "dropped with the legacy WBS bridge by migration 20261103000100_drop_legacy_wa_bridge (#223); nothing to port, the DO/D1 schema never has it"
+  },
+  "ebda_webhook_inbox_get": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.get",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_webhook_inbox_record": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.record",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_webhook_inbox_stuck": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.listStuck",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_webhook_inbox_update": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.update",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_webhook_order_by_idempotency": {
+    "target": "d1",
+    "replacement": "D1 webhook_inbox unique (provider, idempotency_key) replaces the ON CONFLICT logic",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_webhook_resolve_store": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.resolveStore(provider, ref)",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_webhook_resolve_store_scoped": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.resolveStoreScoped({transactionId, invoiceId, provider, preferStore}): entity-index lookup by provider reference, filtered by provider when given, preferred store first, newest payment, deterministic order (Ruling ITEST-14)",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
+  "ebda_withdraw_legal_notice_send": {
+    "target": "d1",
+    "replacement": "platform.withdrawLegalNotice(id)",
+    "test": "packages/repo/test/contract/platform-legal.contract.ts"
+  },
+  "fiscal_documents_immutable": {
+    "target": "store-do",
+    "replacement": "SQLite trigger fiscal_documents_immutable in migrations/store/0002_invariants.sql (pure row guard)",
+    "test": "packages/cf-schema/test/store-invariants.test.ts"
+  },
+  "gold_price_guard_products": {
+    "target": "store-do",
+    "replacement": "SQLite trigger ebda_gold_price_guard_products + StoreDO.catalog.updateProduct rejects price writes for gold-priced rows",
+    "test": "packages/cf-schema/test/store-invariants.test.ts"
+  },
+  "gold_price_guard_variants": {
+    "target": "store-do",
+    "replacement": "SQLite trigger ebda_gold_price_guard_variants + StoreDO.catalog.updateVariant",
+    "test": "packages/cf-schema/test/store-invariants.test.ts"
+  },
+  "journal_entry_dr_cr_balance_check": {
+    "target": "store-do",
+    "replacement": "StoreDO.ledger.post(entry) asserts sum(debit)=sum(credit) inside transactionSync",
+    "test": "packages/repo/test/contract/ledger.contract.ts"
+  },
+  "platform_vat_setting_guard": {
+    "target": "d1",
+    "replacement": "platform.setVatSetting validates the caller is a super admin (role check; there is no DB role in D1)",
+    "test": "packages/repo/test/contract/platform-authz.contract.ts"
+  },
+  "set_count_sessions_updated_at": {
+    "target": "store-do",
+    "replacement": "repo layer sets updated_at on every write (one helper); no trigger",
+    "test": "packages/repo/test/contract/repo-helpers.contract.ts"
+  },
+  "set_updated_at": {
+    "target": "store-do",
+    "replacement": "repo layer sets updated_at on every write (one helper); no trigger",
+    "test": "packages/repo/test/contract/repo-helpers.contract.ts"
+  },
+  "store_credentials_mirror": {
+    "target": "deleted-by-construction",
+    "replacement": "dropped: credentials live in the StoreDO; D1 holds only the directory fields"
+  },
+  "store_tax_profiles_review_guard": {
+    "target": "store-do",
+    "replacement": "same as tax_profile_review_guard (the trigger becomes a state machine in the method)",
+    "test": "packages/repo/test/contract/tax-profile.contract.ts"
+  },
+  "stores_credentials_mirror": {
+    "target": "deleted-by-construction",
+    "replacement": "dropped with store_credentials_mirror"
+  },
+  "system_settings_platform_vat_guard": {
+    "target": "d1",
+    "replacement": "same as platform_vat_setting_guard (the trigger becomes a method guard)",
+    "test": "packages/repo/test/contract/platform-authz.contract.ts"
+  },
+  "tax_profile_review_guard": {
+    "target": "store-do",
+    "replacement": "StoreDO.taxProfile.submit/review state machine; only a super-admin-signed review call may set verified/rejected/revoked",
+    "test": "packages/repo/test/contract/tax-profile.contract.ts"
+  }
+}
