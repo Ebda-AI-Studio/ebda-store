@@ -38,9 +38,17 @@ import {
   JWT_MFA_AUDIENCE,
   PASSWORD_RESET_TTL_MINUTES,
   registrationEventId as registrationEventIdFor,
+  toE164,
 } from '@ebda/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
+import { buyerKeyForErasure } from '../lib/wa/buyer-key';
+import {
+  WhatsAppConsentService,
+  lockAccountConsent,
+  phoneOnOwnOrder,
+  revokeForPhoneChangeInTx,
+} from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -315,6 +323,19 @@ async function pushTokenVersion(userId: string, tv: number, source: string): Pro
     }
   }
 }
+
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  avatar: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
@@ -1427,6 +1448,43 @@ export class AuthService {
     userId: string,
     data: { firstName?: string; lastName?: string; phone?: string }
   ) {
+    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one needs
+    // a fresh tick and proof). For a store customer the revoke and the phone write are ONE transaction
+    // holding the account's consent lock, the same lock a grant takes, so a grant can never land on a
+    // number that was just replaced. A failed revoke aborts the whole update: the phone is unchanged.
+    const scope =
+      data.phone !== undefined
+        ? await withUser(userId, () =>
+            prisma.user.findUnique({
+              where: { id: userId },
+              select: { phone: true, storeId: true },
+            })
+          )
+        : null;
+    if (scope?.storeId) {
+      const storeId = scope.storeId;
+      return runInTenantContext(
+        storeId,
+        async () => {
+          await lockAccountConsent(userId);
+          const user = await prisma.user.findUnique({ where: { id: userId } });
+          if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+          if (user.phone && toE164(user.phone) !== toE164(data.phone!)) {
+            await revokeForPhoneChangeInTx(storeId, user.phone);
+          }
+          return prisma.user.update({
+            where: { id: userId },
+            data: {
+              ...(data.firstName !== undefined && { firstName: data.firstName }),
+              ...(data.lastName !== undefined && { lastName: data.lastName }),
+              phone: data.phone,
+            },
+            select: PROFILE_SELECT,
+          });
+        },
+        userId
+      );
+    }
     return withUser(userId, async () => {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
@@ -1440,18 +1498,7 @@ export class AuthService {
           ...(data.lastName !== undefined && { lastName: data.lastName }),
           ...(data.phone !== undefined && { phone: data.phone }),
         },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          role: true,
-          avatar: true,
-          emailVerified: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: PROFILE_SELECT,
       });
 
       return updated;
@@ -1923,6 +1970,9 @@ export class AuthService {
       )
     ).map(s => s.playerId);
 
+    // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
+    // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
+    const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
@@ -1933,6 +1983,19 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // ORDERING: the WhatsApp-consent ownership proof reads the shopper's delivered orders, so it MUST run
+      // before the order scrub below nulls `customerId` and the address snapshots (afterwards it would
+      // always be false and the current number's consent row would silently survive the erasure). It runs
+      // on THIS transaction (tenant + user context, ebda_app under RLS) with the same store id as the
+      // erase; a missing store id fails loud.
+      const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
+      if (!consentStoreId)
+        throw new Error('[auth.eraseAccount] no store id for the consent erasure');
+      const eraseProvenBuyerKey =
+        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
+          ? buyerKey
+          : undefined;
+
       // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
       // Must run before the orders lose their customer link below. Already-delivered payloads on
       // the merchant's own server cannot be recalled.
@@ -2209,6 +2272,10 @@ export class AuthService {
           OR: smsConsentOr,
         },
       });
+      // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
+      // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
+      // (the proof, `eraseProvenBuyerKey`, was computed at the START of this transaction, before the order scrub)
+      await WhatsAppConsentService.eraseForAccount(tx, consentStoreId, userId, eraseProvenBuyerKey);
 
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
@@ -2318,7 +2385,12 @@ export class AuthService {
     // DROPS it if the transaction failed. Outside a request (self-service,
     // retention cron) it runs inline, unchanged.
     void deferAfterTenantCommit('auth.eraseAccount.propagate', () =>
-      inngest.send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })
+      inngest.send({
+        name: 'account/erased',
+        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
+        // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
+        data: { userId, oneSignalPlayerIds, storeId: user.storeId ?? undefined, buyerKey },
+      })
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );
@@ -2494,6 +2566,24 @@ export class AuthService {
         },
       }),
     ]);
+    // WhatsApp marketing consent (Ruling WA-CONSENT-1): what was ticked, when, where, and any withdrawal.
+    const exportBuyerKey = await buyerKeyForErasure(
+      typeof user.phone === 'string' ? user.phone : null
+    );
+    // Only for a PROVEN number: a profile phone is self-declared, and an export must not reveal whether
+    // someone else's number opted in (same rule as the checkout box state).
+    const provenKey =
+      exportBuyerKey &&
+      typeof user.phone === 'string' &&
+      (await phoneOnOwnOrder(storeId, userId, user.phone))
+        ? exportBuyerKey
+        : undefined;
+    // Rows this account created (any earlier number) plus the current number's row when proven.
+    const whatsappMarketingConsent = await WhatsAppConsentService.exportForAccount(
+      storeId,
+      userId,
+      provenKey
+    );
 
     return {
       exportedAt: new Date().toISOString(),
@@ -2513,6 +2603,7 @@ export class AuthService {
       onesignalSubscriptions,
       passkeys,
       smsMarketingConsents,
+      whatsappMarketingConsent,
       wholesaleApplications,
     };
   }

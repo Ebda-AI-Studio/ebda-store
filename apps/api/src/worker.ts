@@ -30,6 +30,8 @@ import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
+import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
+import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
 import { runJobWorkflow } from './lib/jobs/run-workflow';
 import type { JobParams } from './lib/jobs/start';
@@ -44,6 +46,7 @@ import {
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import { assertEmbeddingConfig } from './lib/search/embedding-provider';
+import { assertWhatsAppLinkConfig } from './lib/wa/config';
 import * as Sentry from '@sentry/cloudflare';
 import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
@@ -119,6 +122,7 @@ function withTrustedClientIp(request: Request): Request {
 }
 
 let embeddingConfigChecked = false;
+let whatsAppConfigChecked = false;
 
 function prepare(env: CfBindings): void {
   setCfBindings(env);
@@ -127,6 +131,11 @@ function prepare(env: CfBindings): void {
   if (!embeddingConfigChecked) {
     assertEmbeddingConfig(logger);
     embeddingConfigChecked = true;
+  }
+  // The WhatsApp link needs SUITE_BUYER_KEY_SECRET; fail loud here, not on the first order.
+  if (!whatsAppConfigChecked) {
+    assertWhatsAppLinkConfig(env);
+    whatsAppConfigChecked = true;
   }
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
   redisReady ??= redis.connect();
@@ -337,7 +346,12 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
 }
 
 async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promise<void> {
-  await withWorkerContext(env, ctx, () => handleQueueBatch(batch));
+  await withWorkerContext(env, ctx, () =>
+    // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
+    batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ
+      ? handleStoreEventsBatch(batch)
+      : handleQueueBatch(batch)
+  );
 }
 
 async function scheduled(

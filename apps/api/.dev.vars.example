@@ -7,6 +7,8 @@ API_URL=http://localhost:8787
 BUILD_COMMIT_SHA=dev
 JWT_SECRET=dev-only-jwt-secret-change-me-0123456789abcdef
 ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+# Keys every buyerKey in the Ebda suite (Store <-> WhatsApp contract); >= 32 chars; the SAME value in every suite Worker.
+SUITE_BUYER_KEY_SECRET=dev-only-suite-buyer-key-secret-0123456789
 # Real Inngest / Resend / Sentry / Gemini / payment-provider keys are secrets: wrangler secret put
 # INNGEST_SIGNING_KEY=
 # INNGEST_EVENT_KEY=

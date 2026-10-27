@@ -76,6 +76,8 @@ export interface CfBindings {
   STORE_DO?: DurableObjectNamespaceLike;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
+  /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */
+  WA_EVENTS_QUEUE?: QueueProducerLike;
   /** Cloudflare Email Service `send_email` binding (G6): every outbound email (services/mail-transport.ts). */
   EMAIL?: EmailBindingLike;
   /** Background jobs (G5): Workflows binding, the jobs Queue and the concurrency/debounce gate DO. */

@@ -586,5 +586,13 @@
   "ProviderVerificationEvent": {
     "target": "d1",
     "reason": "platform-wide provider activation counters (no store scope), read and written by super-admin and settlement paths across stores"
+  },
+  "StoreWhatsAppLink": {
+    "target": "store-do",
+    "reason": "storeId-scoped link state, read and written only in one store context (the WhatsApp consumer resolves the store first)"
+  },
+  "StoreWhatsAppConsent": {
+    "target": "store-do",
+    "reason": "storeId-scoped marketing consent keyed by buyer key, read only in one store context"
   }
 }

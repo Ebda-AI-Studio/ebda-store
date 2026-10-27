@@ -397,6 +397,7 @@ CREATE TABLE IF NOT EXISTS "store_subscriptions" (
   "billing_interval" TEXT NOT NULL DEFAULT 'monthly',
   "pending_plan_code" TEXT,
   "dunning_attempts" INTEGER NOT NULL DEFAULT 0,
+  "past_due_since" INTEGER,
   "next_retry_at" INTEGER,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
