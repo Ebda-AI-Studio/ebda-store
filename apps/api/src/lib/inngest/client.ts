@@ -337,6 +337,19 @@ type EbdaAdsConversionRequestedEvent = EventPayload & {
   };
 };
 
+// Egypt ETA e-receipt submit (Ruling ETA-1): one event per eta_receipts row; the job also re-sends
+// itself for the verdict poll, so the same row id may arrive many times (idempotent by row state).
+type EtaReceiptSubmitEvent = EventPayload & {
+  name: 'eta/receipt.submit';
+  data: { storeId: string; receiptId: string };
+};
+
+// Durable timer for the next ETA attempt/poll of a row (sleeps until `at`, then re-sends eta/receipt.submit).
+type EtaReceiptScheduledEvent = EventPayload & {
+  name: 'eta/receipt.scheduled';
+  data: { storeId: string; receiptId: string; at: string };
+};
+
 // Material legal-policy change (Ruling LEGAL-4): emitted ONLY by the super-admin
 // POST /admin/legal-policies/:docKey/:version/{send-notice,resume,retry-failed};
 // see functions/legal-notice-send.ts. `sendId` pins the run to ONE legal_notice_sends row
@@ -413,6 +426,8 @@ export type AppEvent =
   | CampaignSendRequestedEvent
   | CartRecoveryEmailRequestedEvent
   | EbdaAdsConversionRequestedEvent
+  | EtaReceiptSubmitEvent
+  | EtaReceiptScheduledEvent
   | LegalNoticeSendRequestedEvent
   | SearchStoreReindexRequestedEvent
   | WebhookDeliveryRequestedEvent

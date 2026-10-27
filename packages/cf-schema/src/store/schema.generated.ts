@@ -942,6 +942,66 @@ export const doFlags = sqliteTable('do_flags', {
   value: integer('value').notNull().default(0),
 });
 
+export const etaConnections = sqliteTable('eta_connections', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  environment: text('environment').notNull().default('preprod'),
+  credentialsEnc: text('credentials_enc').notNull(),
+  posSerial: text('pos_serial').notNull(),
+  branchCode: text('branch_code').notNull(),
+  activityCode: text('activity_code').notNull(),
+  defaultItemCode: text('default_item_code').notNull(),
+  address: text('address', { mode: 'json' }).$type<unknown>().notNull(),
+  signingBridgeUrl: text('signing_bridge_url'),
+  lastCheckStatus: text('last_check_status'),
+  lastCheckedAt: integer('last_checked_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const etaReceipts = sqliteTable('eta_receipts', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  orderId: text('order_id').notNull(),
+  kind: text('kind').notNull(),
+  seq: integer('seq').notNull().default(1),
+  refundKey: text('refund_key'),
+  lineMap: text('line_map', { mode: 'json' }).$type<unknown>(),
+  status: text('status').notNull().default('queued'),
+  environment: text('environment').notNull(),
+  receiptNumber: text('receipt_number'),
+  uuid: text('uuid'),
+  previousUuid: text('previous_uuid'),
+  document: text('document', { mode: 'json' }).$type<unknown>(),
+  totalPiastres: integer('total_piastres'),
+  issuedAt: integer('issued_at', { mode: 'timestamp_ms' }),
+  deadlineAt: integer('deadline_at', { mode: 'timestamp_ms' }),
+  submissionUuid: text('submission_uuid'),
+  longId: text('long_id'),
+  attempts: integer('attempts').notNull().default(0),
+  nextAttemptAt: integer('next_attempt_at', { mode: 'timestamp_ms' }),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const expenses = sqliteTable('expenses', {
   id: text('id')
     .primaryKey()

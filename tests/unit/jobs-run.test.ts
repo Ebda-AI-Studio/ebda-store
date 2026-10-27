@@ -381,6 +381,30 @@ describe('handleJobsBatch', () => {
     });
   });
 
+  it('an inactive sentry client falls back to a direct ingest event and reports ITS id', async () => {
+    flush.mockResolvedValueOnce(false);
+    const fetchMock = vi.fn(async () => new Response('{"id":"x"}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.SENTRY_DSN = 'https://k@o1.ingest.de.sentry.io/4512212920565840';
+    try {
+      registerJob({ id: 'heartbeat', retries: 0 }, async () => {
+        throw new Error('nope');
+      });
+      await expect(runJobWorkflow(args('heartbeat'))).rejects.toThrow('nope');
+      const out = outputs['on-failure'] as {
+        sentryEventId: string;
+        sentryProbe: { status: number };
+      };
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(out.sentryProbe.status).toBe(200);
+      expect(out.sentryEventId).toMatch(/^[0-9a-f]{32}$/);
+      expect(out.sentryEventId).not.toBe('evt-123'); // the SDK's id never left the Worker
+    } finally {
+      delete process.env.SENTRY_DSN;
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('NonRetriableError fails at once', async () => {
     const onFailure = vi.fn(async () => undefined);
     registerJob({ id: 'heartbeat', retries: 5, onFailure }, async () => {

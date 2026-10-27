@@ -26,12 +26,15 @@ import type { OrderDetail } from './_components/types';
 import { manualRefundBody, type ManualRefundInput } from '../_components/manualRefundCopy';
 import { ManualRefundModal } from '../../../../../components/ManualRefundModal';
 import { OrderDocumentsCard } from './_components/OrderDocumentsCard';
+import { OrderEtaCard } from './_components/OrderEtaCard';
+import { useFeatures } from '@/hooks/useFeatures';
 
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const storeId = params?.id as string;
   const orderId = params?.orderId as string;
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
   const t = useT('orders.detail');
   const tList = useT('orders.list');
   const locale = useLocale();
@@ -302,6 +305,9 @@ export default function OrderDetailPage() {
                 <ItemsCard order={order} previewLimit={5} />
                 <SummaryCard order={order} />
                 <OrderDocumentsCard storeId={storeId} orderId={orderId} />
+                {!featuresLoading && isEnabled('eta_ereceipt') ? (
+                  <OrderEtaCard storeId={storeId} orderId={orderId} />
+                ) : null}
                 <PlatformCard order={order} />
               </div>
             </div>
