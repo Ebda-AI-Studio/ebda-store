@@ -12,7 +12,7 @@
  */
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch-all';
-import { failedEvent, runOnFailure } from './failure';
+import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,
   debounceFor,
@@ -128,7 +128,7 @@ export async function runJobWorkflow(a: RunWorkflowArgs): Promise<void> {
     await step.do('on-failure', NO_RETRY, () =>
       a.withContext(async () => {
         await runOnFailure(def, event, a.instanceId, error);
-        await dispatchEventsToAll(failedEvent(def, event, a.instanceId, error));
+        await reportJobFailure(def, event, a.instanceId, error);
         return null;
       })
     );

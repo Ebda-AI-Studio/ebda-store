@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
+import { acrossOpts } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -168,7 +169,7 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
           FROM stores s
           WHERE s.id = ${storeId} AND s.deleted_at IS NULL
         `;
-      }).then(toJsonSafeRows)
+      }, acrossOpts(event)).then(toJsonSafeRows)
     );
 
     let written = 0;

@@ -293,36 +293,40 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
       }
 
       if (result.notFound) {
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        await step.run('mark-failed', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+          });
         });
         return;
       }
 
       const quotaReached = result.quotaReached === true;
 
-      const llmsFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
-
       // Bust ONCE per sweep, never per item. `Store.llmsTxt` is served off
       // the STORE record's own `public:store:*` cache keys, not
       // `public:products:*` — the product invalidator this used to call
       // busts the wrong namespace entirely (#1333).
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: llmsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed: result.filled + result.skipped + result.failed,
-          filled: result.filled,
-          skipped: result.skipped,
-          failed: result.failed,
-          errors: result.errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const llmsFinalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: llmsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed: result.filled + result.skipped + result.failed,
+            filled: result.filled,
+            skipped: result.skipped,
+            failed: result.failed,
+            errors: result.errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
@@ -406,17 +410,21 @@ const bulkAiCitationCopyFn = inngest.createFunction(
       });
 
       if (!storeFound) {
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        await step.run('mark-failed', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+          });
         });
         return;
       }
 
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { name: true, nameAr: true },
-      });
+      const store = await step.run('load-store', () =>
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { name: true, nameAr: true },
+        })
+      );
       const storeName = store?.name ?? storeId;
 
       const batches = chunk(productIds, BULK_AI_BATCH_SIZE);
@@ -599,11 +607,6 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
         }
       }
 
-      const citationFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
-
       // Bust ONCE per sweep, never per item. This file defines THREE separate
       // Inngest functions; an earlier pass inserted the bust before only the LAST
       // completion block in the file, so two of the three sweeps still wrote
@@ -616,17 +619,24 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
       // public:store:<id> cache, so the storefront kept serving the
       // pre-sweep store data until that key's TTL expired.
       await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: citationFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const citationFinalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: citationFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed,
+            filled,
+            skipped,
+            failed,
+            errors: errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
@@ -815,36 +825,40 @@ Populate using only the information provided above. For keyCategories, use the c
       }
 
       if (result.notFound) {
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        await step.run('mark-failed', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+          });
         });
         return;
       }
 
       const quotaReached = result.quotaReached === true;
 
-      const factsFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
-
       // `Store.aboutJson` is served off the STORE record's own
       // `public:store:*` cache keys, not `public:products:*` — the product
       // invalidator this used to call busts the wrong namespace entirely
       // (#1333). Bust ONCE at the end, never per item.
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: factsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed: result.filled + result.skipped + result.failed,
-          filled: result.filled,
-          skipped: result.skipped,
-          failed: result.failed,
-          errors: result.errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const factsFinalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: factsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed: result.filled + result.skipped + result.failed,
+            filled: result.filled,
+            skipped: result.skipped,
+            failed: result.failed,
+            errors: result.errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
