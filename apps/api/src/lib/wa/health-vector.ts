@@ -7,8 +7,15 @@
  */
 export const BUYER_KEY_PROBE_MESSAGE = 'suite-buyer-key-probe:v1';
 
+/**
+ * The probe is public, so it is an offline guessing oracle for a WEAK secret (WA-HEALTH-VECTOR-1 addendum):
+ * a human-chosen secret could be brute-forced against the published 64 bits. The production secret is 256-bit
+ * random (64 hex chars), so the field is emitted ONLY for a secret of at least this many characters.
+ */
+export const MIN_PROBE_SECRET_LENGTH = 64;
+
 export async function buyerKeyVector(secret: string | undefined): Promise<string | null> {
-  if (!secret) return null;
+  if (!secret || secret.length < MIN_PROBE_SECRET_LENGTH) return null;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
