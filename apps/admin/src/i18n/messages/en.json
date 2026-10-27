@@ -2095,6 +2095,10 @@
       "webhooks": {
         "title": "Webhooks",
         "description": "Send order and product events to your own server"
+      },
+      "qrCodes": {
+        "title": "QR codes",
+        "description": "Printable codes for your store, products, categories and WhatsApp, with scan counts"
       }
     },
     "metaCatalogCard": {
@@ -5606,7 +5610,8 @@
         "agentKey": "AI agent key",
         "merchantKeys": "Merchant MCP keys",
         "billing": "Billing",
-        "webhooks": "Webhooks"
+        "webhooks": "Webhooks",
+        "qr": "QR codes"
       }
     },
     "notificationBell": {
@@ -10237,5 +10242,118 @@
     "verifiedConfirmed": "Verified {at}",
     "ready": "Ready to verify",
     "confirm": "Confirm verified"
+  },
+  "qr": {
+    "page": {
+      "title": "QR codes",
+      "subtitle": "Print a code that opens your store, a product, a category or your WhatsApp chat. Every scan is counted."
+    },
+    "target": {
+      "title": "What should the code open?",
+      "store": "My store",
+      "product": "A product",
+      "category": "A category",
+      "whatsapp": "WhatsApp chat",
+      "productSearch": "Search your products",
+      "productPlaceholder": "Type a product name",
+      "categoryPlaceholder": "Choose a category",
+      "noResults": "No product found",
+      "noWhatsapp": "Add your WhatsApp number in Branding, then Contact info, to make this code.",
+      "linkLabel": "Link inside the code",
+      "pickFirst": "Pick one to see the code."
+    },
+    "look": {
+      "title": "Looks",
+      "style": "Dots",
+      "finder": "Corners",
+      "frame": "Frame",
+      "styles": {
+        "square": "Square",
+        "rounded": "Rounded",
+        "dots": "Dots"
+      },
+      "finders": {
+        "square": "Square",
+        "rounded": "Rounded",
+        "circle": "Round"
+      },
+      "frames": {
+        "none": "None",
+        "card": "Card",
+        "badge": "Label"
+      }
+    },
+    "colors": {
+      "title": "Colours",
+      "fg": "Code colour",
+      "bg": "Background",
+      "frameColor": "Frame colour",
+      "hex": "Hex colour",
+      "swatch": "Use {color}",
+      "lowContrast": "These colours are too close. Make the code darker or the background lighter (contrast {ratio}:1, needs at least 4.5:1).",
+      "inverted": "The code must be darker than its background, or many phones will not scan it.",
+      "ratio": "Contrast {ratio}:1"
+    },
+    "logo": {
+      "title": "Store logo in the centre",
+      "use": "Show my logo in the middle",
+      "noLogo": "Add a store logo in Branding to use this.",
+      "loadFail": "We could not load your logo for the code. Re-upload it in Branding and try again.",
+      "hint": "The code switches to the strongest error correction (H) and leaves room around the logo."
+    },
+    "cta": {
+      "title": "Line under the code",
+      "text": "Text",
+      "placeholder": "Scan to shop",
+      "lang": "Language",
+      "ar": "Arabic",
+      "en": "English",
+      "needFrame": "Choose the card or label frame to add a line.",
+      "remaining": "{count} left"
+    },
+    "whatsapp": {
+      "textLabel": "First message",
+      "textPlaceholder": "Hi, I would like to ask about…",
+      "hint": "Opens the chat with this message already written."
+    },
+    "preview": {
+      "title": "Live preview",
+      "checking": "Checking that it scans…",
+      "scanOk": "Scans correctly",
+      "scanFail": "This design does not scan. Change the colours or remove the logo.",
+      "alt": "QR code preview"
+    },
+    "download": {
+      "title": "Download",
+      "png": "PNG",
+      "svg": "SVG",
+      "pdf": "PDF for print",
+      "pngSize": "PNG size",
+      "printSize": "Print size",
+      "blocked": "Downloads are off until the code scans correctly.",
+      "error": "Could not create the file. Try again.",
+      "pdfNote": "The PDF is 300 dpi, sized for print. Use the SVG for sign makers.",
+      "cm": "{n} cm"
+    },
+    "stats": {
+      "title": "Scans",
+      "last30": "Last 30 days",
+      "empty": "No scans yet. They show up here after the first scan.",
+      "scans": "{count} scans",
+      "kinds": {
+        "store": "Store",
+        "product": "Product",
+        "category": "Category",
+        "whatsapp": "WhatsApp chat"
+      }
+    },
+    "actions": {
+      "save": "Save design",
+      "saving": "Saving…",
+      "saved": "Design saved",
+      "saveError": "Could not save. Try again.",
+      "unsaved": "Unsaved changes"
+    },
+    "loadError": "Could not load your QR settings."
   }
 }

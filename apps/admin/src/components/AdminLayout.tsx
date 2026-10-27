@@ -306,6 +306,7 @@ export function AdminLayout({
     shipping: tcp('pages.shipping'),
     tax: tcp('pages.tax'),
     pwa: tcp('pages.pwa'),
+    qr: tcp('pages.qr'),
     template: tcp('pages.template'),
     language: tcp('pages.language'),
     staff: tcp('pages.staff'),

@@ -262,6 +262,7 @@ export const HUBS: HubDefinition[] = [
       '/cod-reconciliation',
       '/tax',
       '/pwa',
+      '/qr',
       '/language',
       '/template',
       '/announcement',

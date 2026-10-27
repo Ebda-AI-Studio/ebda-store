@@ -38,6 +38,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   shipping: 'delivery rates zones courier areas governorate شحن توصيل مناطق محافظة أسعار شركة شحن',
   tax: 'vat taxes ضريبة ضرائب القيمة المضافة',
   pwa: 'app install mobile icon manifest progressive تطبيق جوال أيقونة تثبيت',
+  qr: 'qr code scan print poster flyer sticker كود كيو ار مسح طباعة ملصق',
   template: 'theme design layout template skin قالب تصميم تخطيط مظهر',
   language: 'translation arabic english locale rtl لغة ترجمة عربي انجليزي اتجاه',
   staff: 'team members roles permissions users access موظفين فريق صلاحيات أدوار مستخدمين وصول',
@@ -102,6 +103,7 @@ export interface SettingsPaletteLabels {
   shipping: string;
   tax: string;
   pwa: string;
+  qr: string;
   template: string;
   language: string;
   staff: string;
@@ -167,6 +169,7 @@ export function buildStorePaletteItems(
       [settings.shipping, `/stores/${storeId}/shipping`],
       [settings.tax, `/stores/${storeId}/tax`],
       [settings.pwa, `/stores/${storeId}/pwa`],
+      [settings.qr, `/stores/${storeId}/qr`],
       [settings.template, `/stores/${storeId}/template`],
       [settings.language, `/stores/${storeId}/language`],
       [settings.staff, `/stores/${storeId}/staff`],

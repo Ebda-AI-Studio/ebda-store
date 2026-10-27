@@ -421,6 +421,12 @@ export const PAGES: PageEntry[] = [
     feature: 'pwa',
     syn: { en: 'app install home screen mobile icon', ar: 'تطبيق تثبيت شاشة رئيسية جوال ايقونة' },
   }),
+  page('/qr', 'qr.page.title', 'owner', {
+    syn: {
+      en: 'qr code scan print poster sticker flyer barcode link whatsapp',
+      ar: 'كود كيو ار مسح طباعة ملصق بوستر فلاير واتساب رابط',
+    },
+  }),
   page('/language', 'language.page.title', 'owner', {
     syn: {
       en: 'arabic english default language rtl translation',
