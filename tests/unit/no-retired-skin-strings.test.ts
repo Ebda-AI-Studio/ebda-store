@@ -63,6 +63,18 @@ const FALSE_POSITIVES: Record<string, Array<[RegExp, string]>> = {
   'apps/admin/src/app/stores/[id]/builder/_components/ThemeSettingsPanel.test.tsx': [
     [/\['classic', 'Only'\]/, 'copy-gate absence check for the classic builder'],
   ],
+  'packages/cf-schema/src/platform/schema.generated.ts': [
+    [
+      /^\s*'(modern|classic|minimal|bold|elegant)',$/,
+      'the Prisma StoreTemplate enum mirrored by the generated cf-schema: persisted values the tolerant reader maps',
+    ],
+  ],
+  'packages/cf-schema/src/store/schema.generated.ts': [
+    [
+      /^\s*'(modern|classic|minimal|bold|elegant)',$/,
+      'the Prisma StoreTemplate enum mirrored by the generated cf-schema: persisted values the tolerant reader maps',
+    ],
+  ],
   'tests/unit/editor-matrix.test.ts': [[/\?\? 'classic'/, 'the classic builder capability label']],
 };
 

@@ -1,0 +1,1 @@
+Ruling SKIN-DEL-3 - superseded: no migration script and no publish-on-migrate step are shipped, because production has no store to migrate (6 stores: 5 demo stores on qamar, souq, lamma, dahab and jasmine, and `qa-walk-store-1010`). Cost if wrong: a store that appears on an old skin later is mapped at read time instead of re-looked; `scripts/skins/preflight.mjs` reports it.

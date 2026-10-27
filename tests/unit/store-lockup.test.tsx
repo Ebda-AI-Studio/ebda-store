@@ -9,7 +9,7 @@ describe('built-in store lockup (G1)', () => {
       expect(LOCKUPS[l.id], l.id).toBeTruthy();
     expect(lockupFor(null, 'dahab')).toBe(LOCKUPS['dahab.worn']);
     expect(lockupFor('souq.night', 'souq')).toBe(LOCKUPS['souq.night']);
-    expect(lockupFor(null, 'modern')).toBeNull();
+    expect(lockupFor(null, 'no-such-skin' as never)).toBeNull();
   });
 
   it('the Latin line is the uppercased Latin name, a fixed text, or nothing', () => {

@@ -138,7 +138,7 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
     const host = `${slug}.ebda.app`;
     expect((await call('GET', '/public/products?limit=5', { host })).status).toBe(400); // not live yet
 
-    // Picking a style is now `applyLook` onto a BUILT look; a bare-skin switch like 'bold' is closed
+    // Picking a style is now `applyLook` onto a BUILT look; a bare-skin switch is closed
     // (Ruling B1-17, StoreService.updateTemplate -> 400 INVALID_TEMPLATE).
     expect(
       (
