@@ -303,7 +303,9 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 20
+    # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
+    # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
