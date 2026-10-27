@@ -44,11 +44,15 @@ vi.mock('@api/lib/definer', () => ({
     lastName: 'B',
   }),
 }));
-const identity = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
+const identity = vi.hoisted(() => ({
+  calls: [] as Array<Record<string, unknown>>,
+  /** When set, the identity service answers with THIS id instead of the one it was asked to use. */
+  forceId: null as string | null,
+}));
 vi.mock('@api/lib/identity-client', () => ({
   createIdentity: async (input: Record<string, unknown>) => {
     identity.calls.push(input);
-    return { id: (input.id as string) === 'u-existing' ? 'u-existing' : 'u1' };
+    return { id: identity.forceId ?? (input.id as string) };
   },
 }));
 vi.mock('@api/services/auth.service', () => ({
@@ -72,8 +76,29 @@ const base = {
 
 beforeEach(() => {
   identity.calls.length = 0;
+  identity.forceId = null;
   txLog.length = 0;
   state.existing = null;
+});
+
+describe('identity binding (Ruling SIGNUP-TAKEOVER-1)', () => {
+  const input = () => merchantSignupSchema.parse({ ...base, acceptedLegal: true });
+
+  it('asks the identity service for an id it generated and writes the profile under exactly that id', async () => {
+    await MerchantSignupService.signup(input(), { ip: '203.0.113.9', userAgent: 'UA/1' });
+    const asked = identity.calls[0].id as string;
+    expect(asked).toMatch(/^[0-9a-f-]{36}$/);
+    const create = txLog.find(l => l.op === 'user.create')!;
+    expect(create.args.data.id).toBe(asked);
+  });
+
+  it('creates NO profile row and NO legal acceptance when the identity answers with a different id', async () => {
+    identity.forceId = '00000000-0000-4000-8000-000000000bad';
+    const result = await MerchantSignupService.signup(input(), { ip: '203.0.113.9' });
+    expect(txLog).toEqual([]);
+    // the caller cannot tell: the body is the same generic result as a normal signup
+    expect(result).toEqual({ emailVerificationSent: true });
+  });
 });
 
 describe('signup click-wrap', () => {
@@ -97,7 +122,7 @@ describe('signup click-wrap', () => {
     expect(rows.map(r => r.docKey).sort()).toEqual([...LEGAL_DOC_KEYS].sort());
     for (const r of rows) {
       expect(r).toMatchObject({
-        userId: 'u1',
+        userId: identity.calls[0].id,
         version: currentLegalVersion(LEGAL_POLICIES, r.docKey as never).version,
         ip: '203.0.113.9',
         userAgent: 'UA/1',

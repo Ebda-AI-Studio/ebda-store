@@ -121,8 +121,12 @@ export class MerchantSignupService {
     const parts = name.split(/\s+/);
     const firstName = parts[0];
     const lastName = parts.slice(1).join(' ');
+    // The id is OURS: generated here (or the existing profile's), sent to the identity service, and the answer must be exactly it.
+    // The profile row and the legal acceptances are only ever written under an id this function chose (Ruling SIGNUP-TAKEOVER-1),
+    // so a wrong, replayed or attacker-influenced answer cannot bind a Store profile to someone else's identity.
+    const requestedId = existing?.id ?? crypto.randomUUID();
     const identity = await createIdentity({
-      id: existing?.id ?? crypto.randomUUID(),
+      id: requestedId,
       email,
       password: input.password,
       firstName,
@@ -131,6 +135,15 @@ export class MerchantSignupService {
       language: language ?? 'ar',
     });
     if (!identity) return GENERIC_SIGNUP_RESULT; // verified by someone else in the meantime: indistinguishable from "taken"
+    if (identity.id !== requestedId) {
+      // An identity already exists for this address under another id (a half-finished earlier signup) or the answer is wrong.
+      // Never create the profile or the acceptances for it; the caller sees the same generic result as always.
+      logger.error(
+        { email: maskEmail(email), requestedId, returnedId: identity.id },
+        'merchant signup: identity id does not match the requested id; no profile written'
+      );
+      return GENERIC_SIGNUP_RESULT;
+    }
     if (existing) return GENERIC_SIGNUP_RESULT; // unverified: the profile row and the acceptance rows already stand
 
     // Profile row (same id as the identity, so every foreign key resolves) + click-wrap acceptance in ONE transaction, as

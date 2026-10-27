@@ -36,7 +36,7 @@ vi.mock('@api/lib/definer', () => ({
   }),
 }));
 vi.mock('@api/lib/identity-client', () => ({
-  createIdentity: async () => ({ id: 'u1' }),
+  createIdentity: async (input: { id: string }) => ({ id: input.id }),
 }));
 vi.mock('@api/services/auth.service', () => ({
   AuthService: { sendVerificationEmail: async () => undefined },
