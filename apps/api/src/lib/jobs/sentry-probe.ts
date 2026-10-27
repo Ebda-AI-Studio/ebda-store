@@ -25,9 +25,24 @@ export function parseDsn(
   }
 }
 
+/**
+ * The real failure as a Sentry event, for when the SDK client is not active in the step (its flush
+ * returns false and the captured event never leaves): same endpoint, but a proper error event.
+ */
+export interface DirectSentryEvent {
+  message: string;
+  errorName: string;
+  errorMessage: string;
+  tags: Record<string, string>;
+  extra: Record<string, string>;
+  environment?: string;
+  release?: string;
+}
+
 export async function probeSentry(
   dsn: string | undefined,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  real?: DirectSentryEvent
 ): Promise<SentryProbeResult | { error: string }> {
   const p = dsn ? parseDsn(dsn) : null;
   if (!p) return { error: 'no usable SENTRY_DSN in this context' };
@@ -37,13 +52,28 @@ export async function probeSentry(
     '\n' +
     JSON.stringify({ type: 'event' }) +
     '\n' +
-    JSON.stringify({
-      event_id: eventId,
-      level: 'info',
-      message: 'ebda job failure: sentry transport probe',
-      platform: 'javascript',
-      timestamp: Date.now() / 1000,
-    });
+    JSON.stringify(
+      real
+        ? {
+            event_id: eventId,
+            level: 'error',
+            message: real.message,
+            exception: { values: [{ type: real.errorName, value: real.errorMessage }] },
+            tags: real.tags,
+            extra: real.extra,
+            environment: real.environment,
+            release: real.release,
+            platform: 'javascript',
+            timestamp: Date.now() / 1000,
+          }
+        : {
+            event_id: eventId,
+            level: 'info',
+            message: 'ebda job failure: sentry transport probe',
+            platform: 'javascript',
+            timestamp: Date.now() / 1000,
+          }
+    );
   try {
     const res = await fetchImpl(`${p.scheme}://${p.host}/api/${p.project}/envelope/`, {
       method: 'POST',

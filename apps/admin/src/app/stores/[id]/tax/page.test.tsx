@@ -31,6 +31,10 @@ vi.mock('@/components/AdminLayout', () => ({
 }));
 vi.mock('./_components/TaxGeneralSettings', () => ({ TaxGeneralSettings: () => null }));
 vi.mock('./_components/TaxVerificationCard', () => ({ TaxVerificationCard: () => null }));
+vi.mock('./_components/EtaConnectionCard', () => ({ EtaConnectionCard: () => null }));
+vi.mock('@/hooks/useFeatures', () => ({
+  useFeatures: () => ({ isEnabled: () => false, isLoading: false }),
+}));
 vi.mock('./_components/TaxTimeZoneCard', () => ({ TaxTimeZoneCard: () => null }));
 vi.mock('./_components/TaxInfoBox', () => ({ TaxInfoBox: () => null }));
 vi.mock('./_components/TaxRateFormModal', () => ({ TaxRateFormModal: () => null }));
