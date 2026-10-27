@@ -1397,5 +1397,21 @@
       "owner_user_id": null
     },
     "note": "the linking owner's user id is nulled on user erasure or offboarding (OFFBOARD-1); the link itself is store state"
+  },
+  "store-do:eta_receipts": {
+    "db": "store-do",
+    "class": "legal-retention",
+    "action": "retain",
+    "piiColumns": ["document", "error_message"],
+    "subjectKeys": ["orderId"],
+    "note": "ETA e-receipt: the submitted document carries the buyer block (name, mobile, national id above the threshold) and is retained like fiscal_documents; ETA error text can echo document fields"
+  },
+  "store-do:eta_connections": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["address", "credentials_enc"],
+    "subjectKeys": [],
+    "note": "merchant ETA credentials (encrypted) and branch address; destroyed with the store"
   }
 }

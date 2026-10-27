@@ -1568,6 +1568,20 @@
           "fromProps": ["id"],
           "to": ["store_id"],
           "toProps": ["storeId"]
+        },
+        "etaConnection": {
+          "kind": "relation",
+          "type": "EtaConnection",
+          "list": false,
+          "optional": true,
+          "external": true
+        },
+        "etaReceipts": {
+          "kind": "relation",
+          "type": "EtaReceipt",
+          "list": true,
+          "optional": false,
+          "external": true
         }
       }
     },
@@ -20606,6 +20620,341 @@
           "list": false,
           "optional": false,
           "default": "now()"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "EtaConnection": {
+      "table": "eta_connections",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "enabled": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "enabled",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "environment": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "environment",
+          "list": false,
+          "optional": false,
+          "default": "\"preprod\""
+        },
+        "credentialsEnc": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "credentials_enc",
+          "list": false,
+          "optional": false
+        },
+        "posSerial": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "pos_serial",
+          "list": false,
+          "optional": false
+        },
+        "branchCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "branch_code",
+          "list": false,
+          "optional": false
+        },
+        "activityCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "activity_code",
+          "list": false,
+          "optional": false
+        },
+        "defaultItemCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "default_item_code",
+          "list": false,
+          "optional": false
+        },
+        "address": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "address",
+          "list": false,
+          "optional": false
+        },
+        "signingBridgeUrl": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "signing_bridge_url",
+          "list": false,
+          "optional": true
+        },
+        "lastCheckStatus": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "last_check_status",
+          "list": false,
+          "optional": true
+        },
+        "lastCheckedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "last_checked_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "EtaReceipt": {
+      "table": "eta_receipts",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "orderId", "kind", "seq"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "orderId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "order_id",
+          "list": false,
+          "optional": false
+        },
+        "kind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "kind",
+          "list": false,
+          "optional": false
+        },
+        "seq": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "seq",
+          "list": false,
+          "optional": false,
+          "default": "1"
+        },
+        "refundKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "refund_key",
+          "list": false,
+          "optional": true
+        },
+        "lineMap": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "line_map",
+          "list": false,
+          "optional": true
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"queued\""
+        },
+        "environment": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "environment",
+          "list": false,
+          "optional": false
+        },
+        "receiptNumber": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "receipt_number",
+          "list": false,
+          "optional": true
+        },
+        "uuid": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "uuid",
+          "list": false,
+          "optional": true
+        },
+        "previousUuid": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "previous_uuid",
+          "list": false,
+          "optional": true
+        },
+        "document": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "document",
+          "list": false,
+          "optional": true
+        },
+        "totalPiastres": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "total_piastres",
+          "list": false,
+          "optional": true
+        },
+        "issuedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "issued_at",
+          "list": false,
+          "optional": true
+        },
+        "deadlineAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "deadline_at",
+          "list": false,
+          "optional": true
+        },
+        "submissionUuid": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "submission_uuid",
+          "list": false,
+          "optional": true
+        },
+        "longId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "long_id",
+          "list": false,
+          "optional": true
+        },
+        "attempts": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "attempts",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "nextAttemptAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "next_attempt_at",
+          "list": false,
+          "optional": true
+        },
+        "errorCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "error_code",
+          "list": false,
+          "optional": true
+        },
+        "errorMessage": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "error_message",
+          "list": false,
+          "optional": true
+        },
+        "acceptedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "accepted_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
         },
         "store": {
           "kind": "relation",
