@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/cloudflare';
 import logger from '../logger';
 import { sendAlert } from '../../services/alerts.service';
 import { JOBS_MAP } from './jobs-map';
+import { probeSentry, type SentryProbeResult } from './sentry-probe';
 import type { JobDef, JobEvent } from './types';
 
 /** The `inngest/function.failed` event Inngest emits; alerts-failure-watch subscribes to it. */
@@ -40,6 +41,8 @@ export interface JobFailureReport {
   sentryEventId: string | null;
   /** Did Sentry's flush finish within its budget? A step that ends before the flush loses the event. */
   sentryFlushed: boolean;
+  /** Only when the flush did not finish: a direct POST to the ingest endpoint, to show why. */
+  sentryProbe?: SentryProbeResult | { error: string };
 }
 
 /**
@@ -91,6 +94,7 @@ export async function reportJobFailure(
         extra: { instanceId: runId, triggeringEvent: event.name },
       }) || null;
     report.sentryFlushed = await Sentry.flush(3000);
+    if (!report.sentryFlushed) report.sentryProbe = await probeSentry(process.env.SENTRY_DSN);
   } catch (err) {
     logger.warn({ err, job: def.id }, '[jobs] failure not sent to sentry');
   }
@@ -102,6 +106,8 @@ export async function reportJobFailure(
       alert: report.alert,
       sentryEventId: report.sentryEventId,
       sentryFlushed: report.sentryFlushed,
+      sentryProbeStatus:
+        report.sentryProbe && 'status' in report.sentryProbe ? report.sentryProbe.status : null,
     },
     '[jobs] final failure reported'
   );
