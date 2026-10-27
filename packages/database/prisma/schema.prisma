@@ -375,6 +375,11 @@ model Store {
   aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
   insightsRollupCron String  @default("daily") @map("insights_rollup_cron")
 
+  /// Customer Intelligence (CI-1, docs/plans/2026-10-28-customer-intelligence.md rule 3): the merchant's
+  /// opt-in to cross-store signals. Default OFF; only the (later) onboarding/settings write path sets it.
+  ciSharing          Boolean   @default(false) @map("ci_sharing")
+  ciSharingChangedAt DateTime? @map("ci_sharing_changed_at")
+
   // Relations
   owner                      User                        @relation(fields: [ownerId], references: [id])
   /// Encrypted provider credentials, split out of the routing table (R-EBDA-005).
@@ -1766,6 +1771,10 @@ model Order {
   customerNotes               String?            @map("customer_notes")
   shippingAddress             Json               @map("shipping_address")
   billingAddress              Json               @map("billing_address")
+  /// Customer Intelligence (CI-1): normalised destination `EG-<gov>-<district>` (no street/building)
+  /// and the suite buyer key (HMAC of the E.164 phone); null when the order has no usable phone.
+  areaKey                     String?            @map("area_key")
+  buyerKey                    String?            @map("buyer_key")
   shippedAt                   DateTime?          @map("shipped_at")
   deliveredAt                 DateTime?          @map("delivered_at")
   reviewRequestSentAt         DateTime?          @map("review_request_sent_at")
@@ -2838,6 +2847,17 @@ model Shipment {
   // How many times booking with the carrier was tried (the Inngest retry counts here).
   createAttempts       Int       @default(0) @map("create_attempts")
   lastPolledAt         DateTime? @map("last_polled_at")
+  // Customer Intelligence (CI-1, docs/plans/2026-10-28-customer-intelligence.md 1.1). The three
+  // timestamps are the FIRST time the carrier reached that state and are never overwritten (they
+  // guard the first-time-only shipment events); deliveryAttempts counts failed-attempt statuses.
+  pickedUpAt           DateTime? @map("picked_up_at")
+  deliveredAt          DateTime? @map("delivered_at")
+  returnedAt           DateTime? @map("returned_at")
+  deliveryAttempts     Int       @default(0) @map("delivery_attempts")
+  // Why a COD parcel came back: what the carrier wrote (scrubbed, max 200 chars) and the closed code.
+  returnReasonRaw      String?   @map("return_reason_raw")
+  returnReasonCode     String?   @map("return_reason_code")
+  areaKey              String?   @map("area_key")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 

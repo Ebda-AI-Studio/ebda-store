@@ -1509,6 +1509,8 @@ export const orders = sqliteTable('orders', {
   customerNotes: text('customer_notes'),
   shippingAddress: text('shipping_address', { mode: 'json' }).$type<unknown>().notNull(),
   billingAddress: text('billing_address', { mode: 'json' }).$type<unknown>().notNull(),
+  areaKey: text('area_key'),
+  buyerKey: text('buyer_key'),
   shippedAt: integer('shipped_at', { mode: 'timestamp_ms' }),
   deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
   reviewRequestSentAt: integer('review_request_sent_at', { mode: 'timestamp_ms' }),
@@ -1538,7 +1540,6 @@ export const orders = sqliteTable('orders', {
   source: text('source').default('web'),
   checkoutIp: text('checkout_ip'),
   manualHoldAdmitted: integer('manual_hold_admitted', { mode: 'boolean' }).notNull().default(false),
-  buyerKey: text('buyer_key'),
 });
 
 export const paymentConfigs = sqliteTable('payment_configs', {
@@ -2301,30 +2302,19 @@ export const shipments = sqliteTable('shipments', {
   carrierName: text('carrier_name'),
   createAttempts: integer('create_attempts').notNull().default(0),
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp_ms' }),
+  pickedUpAt: integer('picked_up_at', { mode: 'timestamp_ms' }),
+  deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
+  returnedAt: integer('returned_at', { mode: 'timestamp_ms' }),
+  deliveryAttempts: integer('delivery_attempts').notNull().default(0),
+  returnReasonRaw: text('return_reason_raw'),
+  returnReasonCode: text('return_reason_code'),
+  areaKey: text('area_key'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
-  returnReasonRaw: text('return_reason_raw'),
-  returnReasonCode: text('return_reason_code', {
-    enum: [
-      'refused',
-      'not_home',
-      'wrong_address',
-      'unreachable',
-      'rescheduled',
-      'price_or_changed_mind',
-      'damaged',
-      'other',
-      'unknown',
-    ],
-  }),
-  pickedUpAt: integer('picked_up_at', { mode: 'timestamp_ms' }),
-  deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
-  attempts: integer('attempts').notNull().default(0),
-  areaKey: text('area_key'),
 });
 
 export const shippingAreaRates = sqliteTable('shipping_area_rates', {
@@ -2522,6 +2512,8 @@ export const storeConfig = sqliteTable('store_config', {
   aiBulkThrottleMs: integer('ai_bulk_throttle_ms').notNull().default(2500),
   aiNarrationEnabled: integer('ai_narration_enabled', { mode: 'boolean' }).notNull().default(true),
   insightsRollupCron: text('insights_rollup_cron').notNull().default('daily'),
+  ciSharing: integer('ci_sharing', { mode: 'boolean' }).notNull().default(false),
+  ciSharingChangedAt: integer('ci_sharing_changed_at', { mode: 'timestamp_ms' }),
 });
 
 export const storeCredentials = sqliteTable('store_credentials', {

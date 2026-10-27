@@ -53,48 +53,15 @@ export const extraColumns = {
       note: 'Per-store backend selector (task 2.4 + flip-backend): pg = Postgres, do = this store runs on its StoreDO. Lives in D1 (the directory) so the router can read it before it knows which DO to call.',
     }),
   ],
-  Shipment: [
-    f('returnReasonRaw', 'String', {
-      optional: true,
-      note: 'CI-1: the carrier text for a returned COD shipment, verbatim',
-    }),
-    f('returnReasonCode', 'String', {
-      optional: true,
-      kind: 'enum',
-      enumValues: RETURN_REASON_CODES,
-      note: 'CI-1: normalised code (closed set, widened by migration)',
-    }),
-    f('pickedUpAt', 'DateTime', { optional: true, note: 'CI-1: carrier picked the parcel up' }),
-    f('deliveredAt', 'DateTime', {
-      optional: true,
-      note: 'CI-1: delivered (or returned-to-sender) timestamp',
-    }),
-    f('attempts', 'Int', {
-      default: '0',
-      note: 'CI-1: delivery attempts reported by the carrier (create_attempts counts booking retries)',
-    }),
-    f('areaKey', 'String', {
-      optional: true,
-      note: 'CI-1: normalised delivery area key (governorate/city/district slug) for cross-store aggregation',
-    }),
-  ],
-  Order: [
-    f('buyerKey', 'String', {
-      optional: true,
-      note: 'WhatsApp contract + CI-1: lowercase-hex HMAC-SHA256(SUITE_BUYER_KEY_SECRET, E.164 phone); never the phone',
-    }),
-  ],
   Customer: [
     f('buyerKey', 'String', { optional: true, note: 'same HMAC buyer key as orders.buyer_key' }),
   ],
 };
 
 // Indexes that go with the added columns: [model, columns].
-export const extraIndexes = [
-  ['Order', ['buyerKey']],
-  ['Customer', ['buyerKey']],
-  ['Shipment', ['storeId', 'areaKey']],
-];
+// (The Shipment/Order CI-1 columns and their indexes moved into schema.prisma + the CI-1 migration; only
+// Customer.buyerKey, which has no Postgres counterpart yet, is still a Cloudflare-only addition.)
+export const extraIndexes = [['Customer', ['buyerKey']]];
 
 export const extraModels = {
   'store-do': [
