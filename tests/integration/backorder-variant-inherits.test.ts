@@ -16,7 +16,12 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
-import { hasDb, cartSessionId, DEFAULT_TEST_SHIPPING_ADDRESS } from '../helpers/bundle-fixtures';
+import {
+  hasDb,
+  cartSessionId,
+  uniqueClientIp,
+  DEFAULT_TEST_SHIPPING_ADDRESS,
+} from '../helpers/bundle-fixtures';
 
 const created: { storeIds: string[]; userIds: string[] } = { storeIds: [], userIds: [] };
 
@@ -109,6 +114,7 @@ const hdr = (storeId: string, tag: string) => ({
   'Content-Type': 'application/json',
   'x-store-id': storeId,
   'x-session-id': cartSessionId(tag),
+  'X-Forwarded-For': uniqueClientIp(),
 });
 
 async function pdpVariant(storeId: string, slug: string, variantId: string) {

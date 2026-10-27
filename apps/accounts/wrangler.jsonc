@@ -18,6 +18,7 @@
   // `accounts.ebda.app/*` the storefront wildcard (`*.ebda.app/*`) answers this host (as it did help/docs/status, 2026-10-24).
   "routes": [
     { "pattern": "accounts.ebda.app", "custom_domain": true },
+    // M-072: out-ranks the storefront's `*/*` and `*.ebda.app/*` zone routes (cf-routes.cjs).
     { "pattern": "accounts.ebda.app/*", "zone_name": "ebda.app" },
   ],
   "d1_databases": [

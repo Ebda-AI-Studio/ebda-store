@@ -365,6 +365,12 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 // The role itself
 // ---------------------------------------------------------------------------
+const PLATFORM_GLOBAL_TRUE = new Set([
+  'system_settings',
+  'provider_verifications',
+  'provider_verification_events',
+]);
+
 describe('ebda_app: the runtime role', () => {
   it('is a plain login: no superuser, no BYPASSRLS, no createdb/createrole', async () => {
     const [r] = await asApp(
@@ -507,7 +513,11 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
         ['USING', p.qual],
         ['WITH CHECK', p.with_check],
       ] as const) {
-        if (p.tablename === 'system_settings') continue; // platform-global, documented
+        // Platform-global, documented: `system_settings`, and the PROVIDERS-3 evidence tables (Ruling
+        // PROVIDERS-3, migration 20261103000200). They carry NO tenant data and are listed in
+        // GLOBAL_MODELS; the ONLY accepted shape is the literal `true` policy, so any other predicate
+        // that skips the GUC still fails.
+        if (PLATFORM_GLOBAL_TRUE.has(p.tablename) && text?.trim() === 'true') continue;
         if (!text) {
           offenders.push(`${p.tablename}.${p.policyname} ${label} missing`);
           continue;
