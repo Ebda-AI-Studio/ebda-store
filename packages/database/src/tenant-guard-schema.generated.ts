@@ -184,6 +184,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       billingReminders: 'BillingReminder',
       lifecycleEmails: 'StoreLifecycleEmail',
       staffInvites: 'StaffInvite',
+      etaConnection: 'EtaConnection',
+      etaReceipts: 'EtaReceipt',
     },
   },
   {
@@ -1560,6 +1562,22 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
   {
     name: 'GoldRateSettings',
     table: 'gold_rate_settings',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'EtaConnection',
+    table: 'eta_connections',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'EtaReceipt',
+    table: 'eta_receipts',
     storeId: true,
     relations: {
       store: 'Store',
