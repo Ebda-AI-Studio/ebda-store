@@ -376,6 +376,8 @@ describe('handleJobsBatch', () => {
       alert: 'throttled',
       sentryEventId: 'evt-123',
       sentryFlushed: false,
+      // An unfinished flush adds a direct ingest probe (no DSN in the test environment).
+      sentryProbe: { error: 'no usable SENTRY_DSN in this context' },
     });
   });
 
