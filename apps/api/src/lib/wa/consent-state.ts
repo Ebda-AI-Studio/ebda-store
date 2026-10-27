@@ -6,6 +6,7 @@
  * the message always carries the truth and a retry cannot send a stale value.
  */
 import type { ModelWriteEvent } from '@ebda/database';
+import { whatsappOptInWording } from '@ebda/shared';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { sendEventAfterCommit } from '../inngest/send-after-commit';
 import logger from '../logger';
@@ -71,7 +72,7 @@ export async function consentChangedInput(
   const row = await runInTenantContext(storeId, () =>
     prisma.storeWhatsAppConsent.findUnique({
       where: { storeId_buyerKey: { storeId, buyerKey } },
-      select: { granted: true, grantedAt: true, revokedAt: true, updatedAt: true },
+      select: { granted: true, grantedAt: true, revokedAt: true, updatedAt: true, locale: true },
     })
   );
   const marketingOptIn = row?.granted === true;
@@ -82,7 +83,16 @@ export async function consentChangedInput(
     input: {
       type: 'customer.consent_changed',
       storeId,
-      data: { buyerKey, marketingOptIn, at: at.toISOString() },
+      data: {
+        buyerKey,
+        marketingOptIn,
+        at: at.toISOString(),
+        // v1.5: the exact words the buyer ticked, in the locale shown (only for an opt-in whose locale
+        // the Store recorded; a withdrawal has no wording).
+        ...(marketingOptIn && (row?.locale === 'ar' || row?.locale === 'en')
+          ? { wording: { text: whatsappOptInWording(row.locale), locale: row.locale } }
+          : {}),
+      },
     },
   };
 }
