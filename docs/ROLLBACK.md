@@ -263,6 +263,6 @@ The RLS-via-AsyncLocalStorage pattern (`runInTenantContext`) sets `app.current_s
 
 Flipping `SEARCH_SEMANTIC_ENABLED` to `false` (or rolling the API back to a version with it `false`) does **NOT** stop the indexer: `search-product-index` and `search-index-backstop` embed products whenever the `AI` binding exists (Ruling SEARCH-T11-8). The stop is `SEARCH_EMBED_STORE_DAILY_CAP=0` — see `docs/ENVIRONMENT.md` → "Semantic search — emergency stop" for the durable (wrangler `vars` + `cf-api-deploy.yml`) and emergency (dashboard variable, undone by the next deploy) routes. Rolling back to a version WITHOUT the `ai` binding (before PR 3) also stops it, at the cost of every other change since.
 
-## Page revision publisher (`20261105000200_store_page_revisions_published_by`)
+## Page revision publisher (`20261105000420_store_page_revisions_published_by`)
 
 Additive, nullable. Rollback: `ALTER TABLE store_page_revisions DROP COLUMN published_by;` (history then simply shows no publisher; nothing else reads them).
