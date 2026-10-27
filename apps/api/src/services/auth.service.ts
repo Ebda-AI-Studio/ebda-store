@@ -1469,7 +1469,7 @@ export class AuthService {
           const user = await prisma.user.findUnique({ where: { id: userId } });
           if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
           if (user.phone && toE164(user.phone) !== toE164(data.phone!)) {
-            await revokeForPhoneChangeInTx(storeId, user.phone);
+            await revokeForPhoneChangeInTx(storeId, userId, user.phone);
           }
           return prisma.user.update({
             where: { id: userId },
@@ -1974,6 +1974,10 @@ export class AuthService {
     const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
+    // The buyer key of the profile phone, ONLY when that phone is proven to be this account's (a delivered
+    // order). Set inside `anonymize`; it is what the `account/erased` event carries, so an attacker who
+    // typed a victim's number cannot make WhatsApp erase the victim's contact (WA-CONSENT-PROOF-1).
+    let eraseProvenBuyerKey: string | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
@@ -1990,7 +1994,7 @@ export class AuthService {
       const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
       if (!consentStoreId)
         throw new Error('[auth.eraseAccount] no store id for the consent erasure');
-      const eraseProvenBuyerKey =
+      eraseProvenBuyerKey =
         buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
           ? buyerKey
           : undefined;
@@ -2385,7 +2389,12 @@ export class AuthService {
         name: 'account/erased',
         // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
         // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
-        data: { userId, oneSignalPlayerIds, storeId: user.storeId ?? undefined, buyerKey },
+        data: {
+          userId,
+          oneSignalPlayerIds,
+          storeId: user.storeId ?? undefined,
+          buyerKey: eraseProvenBuyerKey,
+        },
       })
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')

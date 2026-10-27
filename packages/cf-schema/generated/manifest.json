@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 120,
+      "tables": 122,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -120,6 +120,8 @@
         "gold_rate_settings": 10,
         "store_whatsapp_links": 10,
         "store_whatsapp_consents": 12,
+        "eta_connections": 15,
+        "eta_receipts": 25,
         "store_profile": 62,
         "store_config": 22,
         "commerce_outcomes": 14,
@@ -1078,6 +1080,30 @@
       "name": "store_whatsapp_consents_revoked_source_check",
       "table": "store_whatsapp_consents",
       "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "eta_connections_environment_check",
+      "table": "eta_connections",
+      "disposition": "store-do:eta_connections"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_kind_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_status_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_environment_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
     },
     {
       "kind": "index",

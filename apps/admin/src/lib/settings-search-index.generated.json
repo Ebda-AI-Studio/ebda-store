@@ -1288,6 +1288,19 @@
     "pageAr": "الضرائب وضريبة القيمة المضافة"
   },
   {
+    "id": "tax.eta",
+    "kind": "setting",
+    "route": "/tax",
+    "access": "owner",
+    "en": "ETA e-receipts (Egypt)",
+    "ar": "الإيصال الإلكتروني (مصلحة الضرائب)",
+    "synEn": "eta e-receipt electronic receipt egyptian tax authority pos serial client id secret",
+    "synAr": "الايصال الالكتروني مصلحة الضرائب رقم الجهاز",
+    "feature": "eta_ereceipt",
+    "pageEn": "Tax & VAT",
+    "pageAr": "الضرائب وضريبة القيمة المضافة"
+  },
+  {
     "id": "pwa.app-name",
     "kind": "setting",
     "route": "/pwa",

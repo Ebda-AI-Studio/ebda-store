@@ -73,8 +73,9 @@ describe('Feature Registry', () => {
     // 2026-10-07: 46 keys (added `product_3d` — every plan's baseline, Ruling R-EBDA-3D-2).
     // 2026-10-10: 47 keys (added `merchant_mcp_write` — MCP write tools, decided by the plan layer, in NO baseline).
     // 2026-10-21: 48 keys (added `b2b.wholesale` — B2B wholesale pricing, decided by the plan layer, in NO baseline).
-    it('has exactly 48 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(48);
+    // 2026-10-26: 49 keys (added `eta_ereceipt` — Egypt ETA e-receipt connector, hidden, in NO baseline; Ruling ETA-1).
+    it('has exactly 49 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(49);
     });
   });
 
