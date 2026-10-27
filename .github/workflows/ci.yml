@@ -486,6 +486,15 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
+      # Request-time boot check (Ruling DEP-OPENNEXT-PREVIEW-1). `next build` + `wrangler deploy --dry-run`
+      # never execute a request: #256 (next 16.4.3) passed both, then 500'd on every request on
+      # web/admin/orders (adapter threw Unexpected loadManifest(.../preview-props.json)). Boots the
+      # built worker in local workerd and requests the deploy workflows' probe paths.
+      - name: Boot the built ${{ matrix.app }} Worker and request the deploy probe paths
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
+        timeout-minutes: 5
+        run: node scripts/ci/next-worker-smoke.mjs ${{ matrix.app }}
+
       # Startup CPU + bundle size budget (scripts/ci/worker-startup-budget.json). Cloudflare error
       # 10021 ("Script startup exceeded CPU time limit") failed one API deploy after the B2B merge;
       # this fails the PR that pushes the Worker toward it instead of the deploy. No database.

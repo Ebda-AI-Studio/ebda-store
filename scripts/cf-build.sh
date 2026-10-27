@@ -60,6 +60,7 @@ if [ -f "$INSTR" ]; then
   echo "cf-build: moved $INSTR aside for the Cloudflare build (OpenNext trace workaround)"
 fi
 
+node "$ROOT/scripts/ci/patch-opennext-preview-props.mjs"
 echo "cf-build: building apps/$APP for Cloudflare..."
 OPEN_NEXT_CLOUDFLARE=1 "$BIN" build
 
