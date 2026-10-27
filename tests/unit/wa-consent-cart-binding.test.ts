@@ -163,13 +163,13 @@ describe('a profile phone is self-declared: granting needs proof it is theirs', 
     });
     expect(r).toMatchObject({ status: 'recorded', granted: false });
   });
-  it('REVOKING needs no proof: withdrawal always works', async () => {
+  it('REVOKING needs the same proof (WA-CONSENT-PROOF-1): an unproven number with no owned row is refused', async () => {
     h.users[0]!.phone = '01099999999';
     const r = await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false });
-    expect(r).toMatchObject({ status: 'recorded', granted: false });
+    expect(r).toEqual({ status: 'phone_unproven' });
   });
   it("changing the profile phone revokes the OLD number's consent (source profile)", async () => {
-    await revokeForPhoneChange(S, '01001234567');
+    await revokeForPhoneChange(S, 'user-a', '01001234567');
     const a = h.updateMany.mock.calls[0]![0];
     expect(a.where).toMatchObject({ storeId: S, granted: true });
     expect(a.where.buyerKey).toMatch(/^[0-9a-f]{64}$/);
