@@ -84,6 +84,7 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     pushSubscription: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    providerVerification: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     loyaltyTransaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },

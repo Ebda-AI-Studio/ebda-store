@@ -71,7 +71,7 @@ BEGIN
   SELECT RAISE(ABORT, 'GOLD_PRICE_MANAGED: the price of a gold-rate variant is written only by the repricer');
 END;
 
--- commerce_outcomes is append-only (CI-1): only exported_at may change, rows are never deleted by the app.
+-- commerce_outcomes is append-only (CI-1): only exported_at may change (plus buyer_key -> NULL while do_flags.erasure = 1, the PDPL erasure path), rows are never deleted by the app.
 CREATE TRIGGER IF NOT EXISTS "commerce_outcomes_no_delete" BEFORE DELETE ON "commerce_outcomes"
 BEGIN
   SELECT RAISE(ABORT, 'commerce_outcomes is append-only (delete refused)');
@@ -79,7 +79,7 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS "commerce_outcomes_only_export_stamp" BEFORE UPDATE ON "commerce_outcomes"
 WHEN NEW."id" IS NOT OLD."id" OR NEW."store_id" IS NOT OLD."store_id" OR NEW."kind" IS NOT OLD."kind"
-  OR NEW."order_id" IS NOT OLD."order_id" OR NEW."buyer_key" IS NOT OLD."buyer_key" OR NEW."area_key" IS NOT OLD."area_key"
+  OR NEW."order_id" IS NOT OLD."order_id" OR (NEW."buyer_key" IS NOT OLD."buyer_key" AND NOT (NEW."buyer_key" IS NULL AND COALESCE((SELECT "value" FROM "do_flags" WHERE "name" = 'erasure'), 0) = 1)) OR NEW."area_key" IS NOT OLD."area_key"
   OR NEW."carrier" IS NOT OLD."carrier" OR NEW."payment_method" IS NOT OLD."payment_method" OR NEW."amount" IS NOT OLD."amount"
   OR NEW."reason_code" IS NOT OLD."reason_code" OR NEW."reason_raw" IS NOT OLD."reason_raw" OR NEW."source" IS NOT OLD."source"
   OR NEW."occurred_at" IS NOT OLD."occurred_at"
