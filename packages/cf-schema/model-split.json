@@ -594,5 +594,13 @@
   "StoreWhatsAppConsent": {
     "target": "store-do",
     "reason": "storeId-scoped marketing consent keyed by buyer key, read only in one store context"
+  },
+  "BillingReferral": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "BillingGrant": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
   }
 }

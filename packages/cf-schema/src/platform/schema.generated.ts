@@ -49,6 +49,39 @@ export const billingEvents = sqliteTable('billing_events', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const billingGrants = sqliteTable('billing_grants', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  kind: text('kind').notNull(),
+  beneficiaryId: text('beneficiary_id').notNull(),
+  counterpartId: text('counterpart_id'),
+  months: integer('months').notNull().default(1),
+  valueMinor: integer('value_minor').notNull().default(0),
+  status: text('status').notNull().default('pending'),
+  sourceEventId: text('source_event_id'),
+  sourceStoreId: text('source_store_id'),
+  revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+  revokeReason: text('revoke_reason'),
+  restoredAt: integer('restored_at', { mode: 'timestamp_ms' }),
+  idempotencyKey: text('idempotency_key').notNull(),
+  periodEndBefore: integer('period_end_before', { mode: 'timestamp_ms' }),
+  periodEndAfter: integer('period_end_after', { mode: 'timestamp_ms' }),
+  appliedAt: integer('applied_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const billingReferrals = sqliteTable('billing_referrals', {
+  referredStoreId: text('referred_store_id').primaryKey().notNull(),
+  referrerStoreId: text('referrer_store_id').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const billingReminders = sqliteTable('billing_reminders', {
   id: text('id')
     .primaryKey()
@@ -131,6 +164,8 @@ export const instapayReceipts = sqliteTable('instapay_receipts', {
   reviewNote: text('review_note'),
   reviewedBy: text('reviewed_by'),
   reviewedAt: integer('reviewed_at', { mode: 'timestamp_ms' }),
+  imageDeletedAt: integer('image_deleted_at', { mode: 'timestamp_ms' }),
+  personalScrubbedAt: integer('personal_scrubbed_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
@@ -418,6 +453,7 @@ export const storeSubscriptions = sqliteTable('store_subscriptions', {
   ordersOverLimitNotifiedAt: integer('orders_over_limit_notified_at', { mode: 'timestamp_ms' }),
   billingInterval: text('billing_interval').notNull().default('monthly'),
   pendingPlanCode: text('pending_plan_code'),
+  billingAnchorDay: integer('billing_anchor_day'),
   dunningAttempts: integer('dunning_attempts').notNull().default(0),
   pastDueSince: integer('past_due_since', { mode: 'timestamp_ms' }),
   nextRetryAt: integer('next_retry_at', { mode: 'timestamp_ms' }),

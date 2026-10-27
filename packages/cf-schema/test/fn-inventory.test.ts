@@ -30,9 +30,9 @@ describe('docs/cf/fn-map.json', () => {
   const defs = definitions();
   const names = [...new Set(defs)].sort();
 
-  it('finds the 92 definitions (85 distinct names; several are redefinitions, one legacy bridge function was dropped by 20261103000100, two came with WA-GRACE-1)', () => {
-    expect(defs.length).toBe(92);
-    expect(names.length).toBe(85);
+  it('finds the 95 definitions (88 distinct names; several are redefinitions, one legacy bridge function was dropped by 20261103000100, two came with WA-GRACE-1, three with FOUNDING-1)', () => {
+    expect(defs.length).toBe(95);
+    expect(names.length).toBe(88);
   });
 
   it('maps every defined name, and names nothing that is not defined (a new SQL function fails until mapped)', () => {
