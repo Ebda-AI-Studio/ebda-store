@@ -380,10 +380,10 @@ describe('runLegalNoticeSend loop', () => {
     const ids: string[] = [];
     const r = await runLegalNoticeSend({ event: EVENT, step: makeStep(ids) });
     expect(ids).toEqual(['materialize', 'preflight']);
-    expect(r).toMatchObject({ sent: 0, failed: 2, skipped: 'RESEND_NOT_CONFIGURED' });
+    expect(r).toMatchObject({ sent: 0, failed: 2, skipped: 'MAIL_NOT_CONFIGURED' });
     expect(h.rows.map(x => [x.status, x.error])).toEqual([
-      ['failed', 'RESEND_NOT_CONFIGURED'],
-      ['failed', 'RESEND_NOT_CONFIGURED'],
+      ['failed', 'MAIL_NOT_CONFIGURED'],
+      ['failed', 'MAIL_NOT_CONFIGURED'],
     ]);
     expect(h.awaitCampaignSendSlot).not.toHaveBeenCalled();
     expect(h.sendLegalNoticeEmail).not.toHaveBeenCalled();

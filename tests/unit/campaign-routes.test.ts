@@ -96,9 +96,9 @@ vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: mocks.isFeatureEnabled },
 }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: mocks.inngestSend } }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendMarketingEmail: mocks.sendMarketingEmail },
-  ResendSendError: class extends Error {},
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendMarketingEmail: mocks.sendMarketingEmail },
+  EmailSendError: class extends Error {},
 }));
 vi.mock('@api/services/ai.service', () => ({
   AIService: { suggestCampaignDraft: vi.fn() },

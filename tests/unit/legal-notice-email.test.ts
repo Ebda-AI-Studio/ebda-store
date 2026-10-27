@@ -83,11 +83,11 @@ describe('sendLegalNoticeEmail', () => {
 });
 
 describe('production delivery path', () => {
-  it('RESEND_NOT_CONFIGURED: production without a key throws and records nothing (I2)', async () => {
+  it('MAIL_NOT_CONFIGURED: production without a key throws and records nothing (I2)', async () => {
     (config as { nodeEnv: string }).nodeEnv = 'production';
     vi.spyOn(transport, 'isMailTransportConfigured').mockReturnValue(false);
     expect(legalNoticeMailerReady()).toBe(false);
-    await expect(sendLegalNoticeEmail(data)).rejects.toThrow('RESEND_NOT_CONFIGURED');
+    await expect(sendLegalNoticeEmail(data)).rejects.toThrow('MAIL_NOT_CONFIGURED');
     expect(latestCapturedMailTo('m@test.local')).toBeFalsy();
   });
 
