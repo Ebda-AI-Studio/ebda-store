@@ -17,13 +17,15 @@ const m = vi.hoisted(() => ({
   inboxUpdate: vi.fn(),
   inngestSend: vi.fn(),
   handleWebhook: vi.fn(),
+  getStatus: vi.fn(),
+  storeFind: vi.fn(),
   audit: vi.fn(),
 }));
 
 vi.mock('@ebda/database', () => ({
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
   withStore: async (_s: string, fn: () => unknown) => fn(),
-  prisma: {},
+  prisma: { store: { findUnique: m.storeFind } },
   Prisma: {},
 }));
 vi.mock('@api/lib/definer', () => ({
@@ -34,7 +36,7 @@ vi.mock('@api/lib/definer', () => ({
   webhookInbox: { record: m.inboxRecord, update: m.inboxUpdate },
 }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { handleWebhook: m.handleWebhook },
+  PaymentService: { handleWebhook: m.handleWebhook, getPaymentStatus: m.getStatus },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: m.inngestSend } }));
@@ -196,4 +198,59 @@ describe('legacy-keyed Paymob replay is a no-op on EVERY entry path', () => {
       expect(m.handleWebhook).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('store resolution stays inside the delivering provider (Ruling ITEST-14)', () => {
+  it.each(cases)(
+    '$provider: the resolver is asked for that provider, with no URL store on the bare route',
+    async c => {
+      await post(c, `/payment/${c.provider}`, true);
+      expect(m.resolveStore).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: c.provider, preferStoreId: null })
+      );
+    }
+  );
+
+  it.each(cases)('$provider: the per-store URL names its store as the preferred owner', async c => {
+    await post(c, `/payment/${c.provider}/s/${STORE}`, true);
+    expect(m.resolveStore).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: c.provider, preferStoreId: STORE })
+    );
+  });
+});
+
+describe('payment callback redirect (GET /payment/callback)', () => {
+  const SLUG = { slug: 'shop-a', domain: null };
+  beforeEach(() => {
+    m.getStatus.mockResolvedValue({ status: 'completed' });
+    m.storeFind.mockResolvedValue(SLUG);
+  });
+
+  it.each([
+    ['order', 'paymob'],
+    ['merchantOrderId', 'kashier'],
+    ['merchantRefNumber', 'fawry'],
+  ] as const)(
+    '?%s= resolves the owning store within %s, once, for status AND storefront',
+    async (param, provider) => {
+      const res = await request(app).get(`/api/v1/webhooks/payment/callback?${param}=ref-1`);
+      expect(res.status).toBe(302);
+      expect(m.resolveStore).toHaveBeenCalledTimes(1);
+      expect(m.resolveStore).toHaveBeenCalledWith({ transactionId: 'ref-1', provider });
+      // the status read and the storefront come from the SAME store
+      expect(m.getStatus).toHaveBeenCalledWith('ref-1', undefined, STORE);
+      expect(m.storeFind).toHaveBeenCalledWith(expect.objectContaining({ where: { id: STORE } }));
+      expect(res.headers.location).toContain('/checkout/success');
+      expect(res.headers.location).toContain('shop-a');
+    }
+  );
+
+  it('an unknown reference falls back to the platform web URL', async () => {
+    m.resolveStore.mockResolvedValue(null);
+    m.getStatus.mockResolvedValue({ status: 'pending' });
+    const res = await request(app).get('/api/v1/webhooks/payment/callback?order=ref-2');
+    expect(res.status).toBe(302);
+    expect(m.storeFind).not.toHaveBeenCalled();
+    expect(res.headers.location).toContain('/checkout/pending');
+  });
 });

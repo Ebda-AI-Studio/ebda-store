@@ -24,6 +24,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── Mocks (declared before the module-under-test import) ────────────────
 
 const paymentFindFirst = vi.fn();
+const paymentEventCreateMock = vi.fn().mockResolvedValue({});
+const paymentEventFindManyMock = vi.fn().mockResolvedValue([]);
 const paymentUpdateMany = vi.fn();
 const paymentUpdate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
@@ -35,6 +37,7 @@ const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 vi.mock('@ebda/database', () => ({
   currentStoreId: () => STORE_ID,
   prisma: {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
       // handleWebhook resolves the payment with findMany({ take: 2 }) so an
@@ -47,7 +50,11 @@ vi.mock('@ebda/database', () => ({
       },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
-      findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
+      // lockPayment (refund-settle) and PaymentService.refund both re-read the payment: serve the current fixture
+      findUnique: async () => {
+        const r = (await paymentFindFirst()) as Record<string, unknown> | undefined;
+        return r ? { ...r, metadata: r.metadata ?? {} } : { metadata: {} };
+      },
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),
@@ -61,13 +68,15 @@ vi.mock('@ebda/database', () => ({
     $transaction: (ops: unknown[]) => txMock(ops),
     // PaymentService.refund's ledger rows (claim / completed / released).
     paymentEvent: {
-      create: vi.fn().mockResolvedValue({}),
-      findMany: vi.fn().mockResolvedValue([]),
+      create: (...a: unknown[]) => paymentEventCreateMock(...a),
+      findMany: (...a: unknown[]) => paymentEventFindManyMock(...a),
     },
   },
   Prisma: {},
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
+  hasTenantContext: () => true,
+  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
   // The factory reads a store's provider configs inside that store's scope.
   withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
@@ -816,6 +825,53 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
 
     expect(await alertSources()).toContain('payment.refund.held_provenance_unknown');
     expect(await alertSources()).not.toContain('payment.refund.held_unaccounted');
+  });
+
+  const claimRow = (claimId: string, amount: number, ageMs = 1000) => ({
+    eventType: 'refund_initiated',
+    createdAt: new Date(Date.now() - ageMs),
+    details: { claimId, amount },
+  });
+  const absorbedEvents = () =>
+    paymentEventCreateMock.mock.calls
+      .map(c => (c[0] as { data: { eventType: string; details: Record<string, unknown> } }).data)
+      .filter(d => d.eventType === 'refund_webhook_absorbed');
+
+  it('a settle webhook that outruns the in-band id write is absorbed: total unchanged, the CLAIM is consumed (event carries its id)', async () => {
+    paymentEventFindManyMock.mockResolvedValueOnce([claimRow('claim-1', 1000)]);
+    webhookFor(
+      {
+        refundedAmount: 3000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      },
+      { refundId: 'rf_new', amount: 1000 }
+    );
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+    const write = paymentUpdate.mock.calls.at(-1)?.[0] as { data: { refundedAmount?: number } };
+    expect(write.data.refundedAmount).toBe(3000);
+    expect(absorbedEvents()).toEqual([
+      expect.objectContaining({
+        details: expect.objectContaining({ claimId: 'claim-1', refundId: 'rf_new' }),
+      }),
+    ]);
+    expect(recordRefundOutsideReturn).not.toHaveBeenCalled();
+  });
+
+  it('a STALE claim (older than the window) does not absorb: the same webhook is a new refund and adds', async () => {
+    paymentEventFindManyMock.mockResolvedValueOnce([claimRow('claim-old', 1000, 10 * 60_000)]);
+    webhookFor(
+      {
+        refundedAmount: 3000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      },
+      { refundId: 'rf_new', amount: 1000 }
+    );
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+    const write = paymentUpdate.mock.calls.at(-1)?.[0] as { data: { refundedAmount?: number } };
+    expect(write.data.refundedAmount).toBe(4000);
+    expect(absorbedEvents()).toEqual([]);
   });
 
   it('the settle notice for an already-counted refund raises nothing (control)', async () => {

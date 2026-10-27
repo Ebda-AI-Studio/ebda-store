@@ -20,7 +20,12 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
-import { hasDb, cartSessionId, DEFAULT_TEST_SHIPPING_ADDRESS } from '../helpers/bundle-fixtures';
+import {
+  hasDb,
+  cartSessionId,
+  uniqueClientIp,
+  DEFAULT_TEST_SHIPPING_ADDRESS,
+} from '../helpers/bundle-fixtures';
 
 const created: { storeIds: string[]; userIds: string[] } = { storeIds: [], userIds: [] };
 
@@ -78,7 +83,7 @@ const optional = {
 async function post(path: string, headers: Record<string, string>, body: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers,
+    headers: { 'X-Forwarded-For': uniqueClientIp(), ...headers },
     body: JSON.stringify(body),
   });
   return {

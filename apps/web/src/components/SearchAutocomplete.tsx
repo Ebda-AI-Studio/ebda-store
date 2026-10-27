@@ -1,18 +1,14 @@
 'use client';
 
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react';
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { highlightSegments, useListboxNav, useLiveSearch } from '@ebda/ui';
 import { useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLocalePrice } from '../hooks/useLocalePrice';
 import { api, type SearchSuggestion } from '../lib/api';
+import { countText, RESULTS } from '../lib/plural';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -29,293 +25,266 @@ interface SearchAutocompleteProps {
   committedQuery?: string;
 }
 
-// ─── Module-level cache ──────────────────────────────────────────────────────
-//
-// Cache suggestion results per query string for the lifetime of the page
-// session so revisiting the same query doesn't trigger another round-trip.
-// Keyed by lowercased trimmed query; bounded to 50 entries so a long
-// session can't grow this without limit.
-const SUGGEST_CACHE = new Map<string, SearchSuggestion[]>();
-const SUGGEST_CACHE_LIMIT = 50;
-
-function cacheGet(key: string): SearchSuggestion[] | undefined {
-  return SUGGEST_CACHE.get(key);
-}
-
-function cacheSet(key: string, value: SearchSuggestion[]) {
-  if (SUGGEST_CACHE.size >= SUGGEST_CACHE_LIMIT) {
-    // Simple FIFO eviction — Map iteration order is insertion order
-    const firstKey = SUGGEST_CACHE.keys().next().value;
-    if (firstKey !== undefined) SUGGEST_CACHE.delete(firstKey);
-  }
-  SUGGEST_CACHE.set(key, value);
+/** Suggestions for one term. Throws on an API failure so the box shows the error state, not "no results". */
+async function fetchSuggestions(q: string, signal: AbortSignal): Promise<SearchSuggestion[]> {
+  const res = await api.searchSuggest(q, signal);
+  if (!res.success || !res.data) throw new Error('suggest failed');
+  return res.data.suggestions ?? [];
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * Header search-as-you-type. The parent owns the <input>; this component finds it (the input in the
+ * same wrapper or form), turns it into an ARIA combobox (role, aria-expanded, aria-controls,
+ * aria-activedescendant) and handles Arrow / Home / End / Enter / Escape on it, so no template has
+ * to forward keys. Results come from the first character (one Arabic letter is a word), after 150 ms,
+ * and a slower older response can never replace a newer one (useLiveSearch aborts + ignores it).
+ */
 export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAutocompleteProps) {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
   const money = useLocalePrice();
   const isAr = language === 'ar';
 
-  const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-
+  const anchorRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track the latest query the user typed so a slow earlier response
-  // can't overwrite a faster later one. Same-stale-request guard pattern.
-  const latestQueryRef = useRef('');
+  const trimmed = query.trim();
+
   // The query the parent mounted us with (a restored search prefills the input). Suggestions for that
   // untouched term would open a dropdown over the first row of the results the page already
   // shows, so we stay closed until the visitor edits the field (PR 1 visual gate).
   const mountedQueryRef = useRef((committedQuery ?? query).trim());
-  const editedRef = useRef(false);
+  const [edited, setEdited] = useState(false);
+  // The term the visitor dismissed with Escape / a pick / an outside click: closed until it changes.
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
 
   // A new committed query (URL changed while we stayed mounted) is a fresh prefill: forget the
-  // edit, drop any pending fetch, and close, so the new results are not covered either.
+  // edit and close, so the new results are not covered either.
   useEffect(() => {
     if (committedQuery === undefined) return;
     const next = committedQuery.trim();
     if (next === mountedQueryRef.current) return;
     mountedQueryRef.current = next;
-    editedRef.current = false;
-    latestQueryRef.current = '';
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setIsOpen(false);
-    setSuggestions(null);
-    setActiveIndex(-1);
+    setEdited(false);
+    setDismissedFor(null);
   }, [committedQuery]);
 
-  // ── Fetch suggestions ──────────────────────────────────────────────────────
-
-  const fetchSuggestions = useCallback(async (q: string) => {
-    const key = q.toLowerCase();
-
-    // Cache hit — render immediately, no network call.
-    const cached = cacheGet(key);
-    if (cached) {
-      if (latestQueryRef.current === q) {
-        setSuggestions(cached);
-        setIsOpen(true);
-        setActiveIndex(-1);
-      }
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const res = await api.searchSuggest(q);
-      // If the user typed something else while we were waiting, drop
-      // this response on the floor.
-      if (latestQueryRef.current !== q) return;
-
-      if (res.success && res.data) {
-        const list = res.data.suggestions ?? [];
-        cacheSet(key, list);
-        setSuggestions(list);
-        setIsOpen(true);
-        setActiveIndex(-1);
-      } else {
-        setSuggestions([]);
-        setIsOpen(true);
-      }
-    } catch {
-      if (latestQueryRef.current === q) {
-        setSuggestions([]);
-        setIsOpen(true);
-      }
-    } finally {
-      if (latestQueryRef.current === q) setIsLoading(false);
-    }
-  }, []);
-
-  // ── Debounced query → fetch ────────────────────────────────────────────────
-
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (trimmed !== mountedQueryRef.current) setEdited(true);
+  }, [trimmed]);
 
-    const trimmed = query.trim();
-    latestQueryRef.current = trimmed;
-    if (trimmed !== mountedQueryRef.current) editedRef.current = true;
-    if (!editedRef.current) return;
+  const editedNow = edited || trimmed !== mountedQueryRef.current;
+  const { status, results, settledQuery } = useLiveSearch<SearchSuggestion>({
+    query,
+    search: fetchSuggestions,
+    enabled: editedNow,
+  });
 
-    if (trimmed.length < 1) {
-      setSuggestions(null);
-      setIsOpen(false);
-      setActiveIndex(-1);
-      return;
-    }
+  const open = editedNow && trimmed.length >= 1 && dismissedFor !== trimmed;
+  const setOpen = useCallback((next: boolean) => setDismissedFor(next ? null : trimmed), [trimmed]);
 
-    // 200ms debounce — short enough that the dropdown feels live, long
-    // enough that we don't fire a request per keystroke on a fast typer.
-    debounceRef.current = setTimeout(() => {
-      fetchSuggestions(trimmed);
-    }, 200);
+  const pick = useCallback(
+    (index: number) => {
+      const item = results[index];
+      if (!item) return;
+      setOpen(false);
+      onSelect?.();
+      window.location.href = storeUrl(`/products/${item.slug}`);
+    },
+    [results, setOpen, onSelect, storeUrl]
+  );
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, fetchSuggestions]);
+  const nav = useListboxNav({ count: results.length, open, setOpen, onPick: pick });
+  // Reset the highlighted option whenever the result set changes.
+  const { setActiveIndex } = nav;
+  useEffect(() => setActiveIndex(-1), [settledQuery, setActiveIndex]);
+
+  // ── Make the parent's input a combobox ────────────────────────────────────
+  const navRef = useRef(nav);
+  navRef.current = nav;
+  const [input, setInput] = useState<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const host = anchorRef.current?.parentElement;
+    setInput(
+      (host?.querySelector('input') as HTMLInputElement | null) ??
+        (anchorRef.current?.closest('form')?.querySelector('input') as HTMLInputElement | null) ??
+        null
+    );
+  }, [editedNow]);
+  useEffect(() => {
+    if (!input) return;
+    const onKey = (ev: globalThis.KeyboardEvent) =>
+      navRef.current.inputProps.onKeyDown(ev as unknown as KeyboardEvent<HTMLElement>);
+    input.addEventListener('keydown', onKey);
+    return () => input.removeEventListener('keydown', onKey);
+  }, [input]);
+  useEffect(() => {
+    if (!input) return;
+    const { inputProps } = nav;
+    input.setAttribute('role', inputProps.role);
+    input.setAttribute('aria-autocomplete', inputProps['aria-autocomplete']);
+    input.setAttribute('aria-haspopup', inputProps['aria-haspopup']);
+    input.setAttribute('aria-controls', inputProps['aria-controls']);
+    input.setAttribute('aria-expanded', String(open && status !== 'idle'));
+    if (inputProps['aria-activedescendant'])
+      input.setAttribute('aria-activedescendant', inputProps['aria-activedescendant']);
+    else input.removeAttribute('aria-activedescendant');
+    input.setAttribute('autocomplete', 'off');
+  });
 
   // ── Click outside to close ─────────────────────────────────────────────────
-
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || input?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [input, setOpen]);
 
-  // ── Keyboard navigation (consumer must forward keydown via onKeyDown
-  //    on the parent input/form for arrow-key navigation to work). The
-  //    listener is attached to the dropdown container as a fallback for
-  //    when the dropdown itself has focus. ─────────────────────────────────
-  const totalItems = suggestions?.length ?? 0;
-  const handleKeyDown = useCallback(
-    (e: ReactKeyboardEvent<HTMLElement>) => {
-      if (!isOpen) return;
+  const loading = status === 'loading';
+  const showPopup = open && status !== 'idle';
+  const announce =
+    status === 'ready'
+      ? results.length === 0
+        ? t('No products found', 'مفيش منتجات')
+        : countText(language, results.length, RESULTS, String(results.length))
+      : status === 'loading'
+        ? t('Searching...', 'بندوّر...')
+        : status === 'error'
+          ? t('Search is unavailable right now', 'البحث مش شغال دلوقتي')
+          : '';
 
-      if (e.key === 'Escape') {
-        setIsOpen(false);
-        setActiveIndex(-1);
-        return;
-      }
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setActiveIndex(prev => (prev + 1) % Math.max(1, totalItems));
-        return;
-      }
-
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setActiveIndex(prev => (prev <= 0 ? totalItems - 1 : prev - 1));
-        return;
-      }
-
-      if (e.key === 'Enter' && activeIndex >= 0 && activeIndex < totalItems && suggestions) {
-        e.preventDefault();
-        const item = suggestions[activeIndex];
-        window.location.href = storeUrl(`/products/${item.slug}`);
-        setIsOpen(false);
-        onSelect?.();
-      }
-    },
-    [isOpen, totalItems, activeIndex, suggestions, storeUrl, onSelect]
-  );
-
-  // ── Nothing to render ──────────────────────────────────────────────────────
-
-  if (!isOpen && !isLoading) return null;
-
-  const hasResults = suggestions && suggestions.length > 0;
-  const isEmpty = suggestions !== null && !hasResults && !isLoading;
+  // Nothing is rendered until the visitor edits the field: the header markup stays byte-identical.
+  if (!editedNow) return null;
 
   return (
-    <div
-      ref={containerRef}
-      className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[70vh] overflow-y-auto overscroll-contain rounded-xl border border-border bg-background shadow-xl"
-      role="listbox"
-      aria-label={t('Search suggestions', 'اقتراحات البحث')}
-      onKeyDown={handleKeyDown}
-    >
-      {/* Loading state */}
-      {isLoading && (
-        <div className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-muted-foreground">
-          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          {t('Searching...', 'بندوّر...')}
-        </div>
-      )}
-
-      {/* Empty state — "No products found" per spec */}
-      {isEmpty && (
-        <div className="px-4 py-3 text-sm text-muted-foreground">
-          {t('No products found', 'مفيش منتجات')}
-        </div>
-      )}
-
-      {/* Results */}
-      {!isLoading && hasResults && suggestions && (
-        <div>
-          {suggestions.map((product, idx) => {
-            const isActive = activeIndex === idx;
-            const displayName = isAr && product.nameAr ? product.nameAr : product.name;
-            const priceMajor = money(product.price);
-
-            return (
-              <Link
-                key={product.id}
-                href={storeUrl(`/products/${product.slug}`)}
-                role="option"
-                aria-selected={isActive}
-                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted ${
-                  isActive ? 'bg-muted' : ''
-                }`}
-                onClick={() => {
-                  setIsOpen(false);
-                  onSelect?.();
-                }}
+    <>
+      <span ref={anchorRef} hidden />
+      <div role="status" aria-live="polite" className="sr-only">
+        {open ? announce : ''}
+      </div>
+      {showPopup && (
+        <div
+          ref={containerRef}
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-[70vh] overflow-y-auto overscroll-contain rounded-xl border border-border bg-background shadow-xl"
+        >
+          {/* Loading / empty / error rows sit outside the listbox so it only ever holds options. */}
+          {loading && (
+            <div className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+              <svg
+                className="h-4 w-4 motion-safe:animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
               >
-                {/* Thumbnail */}
-                <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                  {product.image ? (
-                    <Image
-                      src={product.image}
-                      alt={displayName}
-                      width={48}
-                      height={48}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                  )}
-                </div>
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              {t('Searching...', 'بندوّر...')}
+            </div>
+          )}
+          {status === 'ready' && results.length === 0 && (
+            <div className="px-4 py-3 text-sm text-muted-foreground">
+              {t('No products found', 'مفيش منتجات')}
+            </div>
+          )}
+          {status === 'error' && (
+            <div className="px-4 py-3 text-sm text-muted-foreground">
+              {t('Search is unavailable right now. Try again.', 'البحث مش شغال دلوقتي. جرّب تاني.')}
+            </div>
+          )}
+          <div
+            {...nav.listProps}
+            aria-label={t('Search suggestions', 'اقتراحات البحث')}
+            aria-busy={loading}
+            hidden={status !== 'ready' || results.length === 0}
+          >
+            {results.map((product, idx) => {
+              const isActive = nav.activeIndex === idx;
+              const displayName = isAr && product.nameAr ? product.nameAr : product.name;
+              const priceMajor = money(product.price);
 
-                {/* Name + price */}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{priceMajor}</p>
-                </div>
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={product.id}
+                  id={nav.optionId(idx)}
+                  href={storeUrl(`/products/${product.slug}`)}
+                  role="option"
+                  aria-selected={isActive}
+                  tabIndex={-1}
+                  className={`flex min-h-[44px] items-center gap-3 px-4 py-2.5 text-sm text-start transition-colors hover:bg-muted ${
+                    isActive ? 'bg-muted' : ''
+                  }`}
+                  onMouseDown={e => e.preventDefault() /* keep focus in the input */}
+                  onClick={() => {
+                    setOpen(false);
+                    onSelect?.();
+                  }}
+                >
+                  {/* Thumbnail */}
+                  <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                    {product.image ? (
+                      <Image
+                        src={product.image}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <svg
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Name + price */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-foreground">
+                      {highlightSegments(displayName, settledQuery).map((seg, i) =>
+                        seg.match ? (
+                          <mark key={i} className="rounded-sm bg-primary/15 text-inherit">
+                            {seg.text}
+                          </mark>
+                        ) : (
+                          <span key={i}>{seg.text}</span>
+                        )
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{priceMajor}</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
