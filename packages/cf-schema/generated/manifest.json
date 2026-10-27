@@ -1,0 +1,1569 @@
+{
+  "generatedBy": "packages/cf-schema/scripts/generate.mjs",
+  "databases": {
+    "store-do": {
+      "tables": 122,
+      "maxColumns": 62,
+      "columnCounts": {
+        "store_credentials": 4,
+        "blog_posts": 14,
+        "store_locations": 18,
+        "store_pages": 12,
+        "customers": 16,
+        "customer_groups": 12,
+        "customer_addresses": 12,
+        "categories": 22,
+        "products": 60,
+        "inventory_history": 11,
+        "product_images": 6,
+        "product_categories": 3,
+        "tags": 4,
+        "product_tags": 2,
+        "product_options": 6,
+        "product_option_values": 8,
+        "product_variants": 24,
+        "product_models": 16,
+        "product_price_tiers": 9,
+        "wholesale_applications": 15,
+        "size_charts": 11,
+        "product_model_bindings": 10,
+        "product_variant_options": 2,
+        "carts": 9,
+        "cart_items": 10,
+        "bundles": 15,
+        "bundle_items": 5,
+        "cart_bundles": 6,
+        "orders": 57,
+        "order_events": 8,
+        "order_items": 26,
+        "payments": 17,
+        "payment_events": 13,
+        "returns": 26,
+        "return_items": 13,
+        "payment_configs": 28,
+        "notification_configs": 8,
+        "notification_event_configs": 6,
+        "push_subscriptions": 9,
+        "onesignal_subscriptions": 6,
+        "abandoned_carts": 23,
+        "abandoned_cart_configs": 16,
+        "product_relations": 7,
+        "frequently_bought_together": 6,
+        "ai_recommendation": 7,
+        "shipping_carrier_configs": 12,
+        "shipments": 29,
+        "shipment_pickups": 20,
+        "cod_remittances": 13,
+        "affiliates": 18,
+        "affiliate_referrals": 11,
+        "affiliate_payouts": 10,
+        "affiliate_configs": 9,
+        "affiliate_events": 10,
+        "audit_logs": 10,
+        "addresses": 25,
+        "wishlists": 7,
+        "wishlist_items": 4,
+        "coupons": 24,
+        "promotions": 21,
+        "shipping_zones": 15,
+        "shipping_area_rates": 14,
+        "tax_rates": 12,
+        "loyalty_points": 9,
+        "loyalty_transactions": 9,
+        "customer_wallets": 6,
+        "wallet_transactions": 13,
+        "newsletter_subscribers": 12,
+        "sms_marketing_consents": 13,
+        "campaigns": 18,
+        "campaign_recipients": 14,
+        "reviews": 21,
+        "bulk_import_jobs": 17,
+        "bulk_ai_jobs": 20,
+        "store_faqs": 12,
+        "store_howtos": 14,
+        "product_faqs": 9,
+        "sequences": 4,
+        "accounts": 11,
+        "journal_entries": 12,
+        "journal_lines": 13,
+        "fx_rate_entries": 7,
+        "suppliers": 19,
+        "purchase_orders": 20,
+        "purchase_order_items": 10,
+        "stock_adjustments": 16,
+        "stock_adjustment_items": 9,
+        "reorder_rules": 12,
+        "backorder_lines": 13,
+        "expenses": 28,
+        "reorder_suggestions": 19,
+        "deadstock_flags": 15,
+        "profit_anomalies": 15,
+        "customer_cohort_snapshots": 9,
+        "funnel_snapshots": 11,
+        "customer_rfm_snapshots": 11,
+        "count_sessions": 10,
+        "count_lines": 8,
+        "bank_statements": 9,
+        "bank_transactions": 13,
+        "warehouses": 13,
+        "warehouse_stock": 8,
+        "answer_engine_checks": 12,
+        "store_page_revisions": 14,
+        "store_tax_profiles": 15,
+        "store_tax_documents": 11,
+        "fiscal_documents": 26,
+        "fiscal_document_counters": 4,
+        "webhook_endpoints": 17,
+        "webhook_deliveries": 18,
+        "gold_rates": 12,
+        "gold_rates_current": 5,
+        "gold_rate_settings": 10,
+        "store_whatsapp_links": 10,
+        "store_whatsapp_consents": 12,
+        "eta_connections": 15,
+        "eta_receipts": 25,
+        "store_profile": 62,
+        "store_config": 22,
+        "commerce_outcomes": 14,
+        "do_flags": 2,
+        "d1_outbox": 7
+      }
+    },
+    "d1": {
+      "tables": 25,
+      "maxColumns": 36,
+      "columnCounts": {
+        "store_staff": 4,
+        "SlugRedirect": 7,
+        "webhook_events": 16,
+        "system_settings": 7,
+        "legal_acceptances": 8,
+        "legal_notice_sends": 6,
+        "legal_notice_deliveries": 8,
+        "store_features": 7,
+        "store_usage_snapshots": 21,
+        "answer_engine_provider_configs": 5,
+        "merchant_api_keys": 12,
+        "plans": 12,
+        "store_subscriptions": 26,
+        "billing_events": 21,
+        "instapay_receipts": 36,
+        "manual_payment_claims": 17,
+        "billing_reminders": 6,
+        "store_lifecycle_emails": 6,
+        "billing_webhook_events": 7,
+        "provider_activation_requests": 11,
+        "provider_verifications": 9,
+        "provider_verification_events": 10,
+        "stores": 31,
+        "entity_index": 4,
+        "platform_audit_log": 8
+      }
+    }
+  },
+  "translatedIndexes": [
+    {
+      "name": "journal_entries_store_source_source_id_unique",
+      "table": "journal_entries",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "store_id, source, source_id",
+      "pgWhere": "source_id IS NOT NULL"
+    },
+    {
+      "name": "products_store_id_barcode_idx",
+      "table": "products",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "store_id, barcode",
+      "pgWhere": "barcode IS NOT NULL"
+    },
+    {
+      "name": "product_variants_product_id_barcode_idx",
+      "table": "product_variants",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "product_id, barcode",
+      "pgWhere": "barcode IS NOT NULL"
+    },
+    {
+      "name": "warehouse_stock_warehouse_id_product_id_base_key",
+      "table": "warehouse_stock",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"warehouse_id\", \"product_id\"",
+      "pgWhere": "\"variant_id\" IS NULL"
+    },
+    {
+      "name": "orders_payment_gateway_abandoned_at_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"payment_gateway_abandoned_at\"",
+      "pgWhere": "\"payment_gateway_abandoned_at\" IS NOT NULL"
+    },
+    {
+      "name": "products_store_id_is_new_new_arrival_position_idx",
+      "table": "products",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"is_new\", \"new_arrival_position\"",
+      "pgWhere": "\"is_new\" = true"
+    },
+    {
+      "name": "products_store_id_is_best_seller_best_seller_position_idx",
+      "table": "products",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"is_best_seller\", \"best_seller_position\"",
+      "pgWhere": "\"is_best_seller\" = true"
+    },
+    {
+      "name": "loyalty_transactions_earn_purchase_unique",
+      "table": "loyalty_transactions",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"order_id\"",
+      "pgWhere": "\"type\" = 'earn_purchase'"
+    },
+    {
+      "name": "orders_refund_reversal_pending_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"updated_at\"",
+      "pgWhere": "\"refund_reversed_at\" IS NULL AND \"status\" IN ('cancelled', 'refunded')"
+    },
+    {
+      "name": "customer_groups_one_default_per_store",
+      "table": "customer_groups",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\"",
+      "pgWhere": "\"is_default\""
+    },
+    {
+      "name": "products_store_id_sku_key",
+      "table": "products",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"sku\"",
+      "pgWhere": "\"deleted_at\" IS NULL"
+    },
+    {
+      "name": "loyalty_transactions_reversal_tag_unique",
+      "table": "loyalty_transactions",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"order_id\", \"description\"",
+      "pgWhere": "\"type\" = 'adjust' AND \"order_id\" IS NOT NULL AND ( \"description\" LIKE 'refund-revoke:%' OR \"description\" LIKE 'redeem-recredit:%' )"
+    },
+    {
+      "name": "orders_refund_reversal_requested_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"refund_reversal_requested_at\"",
+      "pgWhere": "\"refund_reversed_at\" IS NULL AND \"refund_reversal_requested_at\" IS NOT NULL"
+    },
+    {
+      "name": "orders_status_fanout_pending_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"status_fanout_requested_at\"",
+      "pgWhere": "\"status_fanout_claimed_at\" IS NULL AND \"status_fanout_requested_at\" IS NOT NULL"
+    },
+    {
+      "name": "returns_reversal_pending_idx",
+      "table": "returns",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"reversal_requested_at\"",
+      "pgWhere": "\"reversal_applied_at\" IS NULL AND \"reversal_requested_at\" IS NOT NULL"
+    },
+    {
+      "name": "store_page_revisions_one_published",
+      "table": "store_page_revisions",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"page_key\"",
+      "pgWhere": "\"status\" = 'published'"
+    },
+    {
+      "name": "store_page_revisions_one_draft",
+      "table": "store_page_revisions",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"page_key\"",
+      "pgWhere": "\"status\" = 'draft'"
+    },
+    {
+      "name": "shipment_pickups_one_active",
+      "table": "shipment_pickups",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"shipment_id\"",
+      "pgWhere": "\"status\" IN ('requesting', 'requested')"
+    },
+    {
+      "name": "orders_open_hold_phone_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", (shipping_address #>> '{phone}')",
+      "pgWhere": "\"status\" IN ('pending', 'awaiting_payment_confirmation') AND \"payment_status\" = 'unpaid' AND \"deleted_at\" IS NULL"
+    },
+    {
+      "name": "orders_open_hold_email_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", (lower(btrim(shipping_address #>> '{email}')))",
+      "pgWhere": "\"status\" IN ('pending', 'awaiting_payment_confirmation') AND \"payment_status\" = 'unpaid' AND \"deleted_at\" IS NULL"
+    },
+    {
+      "name": "orders_open_hold_ip_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"checkout_ip\"",
+      "pgWhere": "\"status\" IN ('pending', 'awaiting_payment_confirmation') AND \"payment_status\" = 'unpaid' AND \"deleted_at\" IS NULL"
+    },
+    {
+      "name": "cart_items_line_no_variant",
+      "table": "cart_items",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"cart_id\", \"product_id\", (COALESCE(\"note\", ''))",
+      "pgWhere": "\"variant_id\" IS NULL"
+    },
+    {
+      "name": "cart_items_line_with_variant",
+      "table": "cart_items",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"cart_id\", \"product_id\", \"variant_id\", (COALESCE(\"note\", ''))",
+      "pgWhere": "\"variant_id\" IS NOT NULL"
+    },
+    {
+      "name": "product_price_tiers_scope_min_qty_key",
+      "table": "product_price_tiers",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"product_id\", COALESCE(\"variant_id\", '00000000-0000-0000-0000-000000000000'), COALESCE(\"group_id\", '00000000-0000-0000-0000-000000000000'), \"min_qty\"",
+      "pgWhere": null
+    },
+    {
+      "name": "wholesale_applications_one_pending_key",
+      "table": "wholesale_applications",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"user_id\"",
+      "pgWhere": "\"status\" = 'pending'"
+    },
+    {
+      "name": "customers_store_id_user_id_key",
+      "table": "customers",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"user_id\"",
+      "pgWhere": "\"user_id\" IS NOT NULL"
+    },
+    {
+      "name": "products_gold_reprice_idx",
+      "table": "products",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"gold_karat\"",
+      "pgWhere": "\"pricing_mode\" = 'gold_rate' AND \"deleted_at\" IS NULL"
+    },
+    {
+      "name": "payment_events_claim_single_outcome_key",
+      "table": "payment_events",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "((\"details\" ->> 'claimId'))",
+      "pgWhere": "\"event_type\" IN ('refund_webhook_absorbed', 'refund_failed')"
+    },
+    {
+      "name": "provider_activation_requests_one_live",
+      "table": "provider_activation_requests",
+      "db": "d1",
+      "unique": true,
+      "pgCols": "\"store_id\", \"provider\"",
+      "pgWhere": "\"status\" IN ('requested', 'activated')"
+    }
+  ],
+  "supersededUniques": [
+    {
+      "table": "products",
+      "unique": "products_store_id_barcode_idx",
+      "by": "products_store_id_barcode_idx"
+    },
+    {
+      "table": "product_variants",
+      "unique": "product_variants_product_id_barcode_idx",
+      "by": "product_variants_product_id_barcode_idx"
+    },
+    {
+      "table": "products",
+      "unique": "products_store_id_is_new_new_arrival_position_idx",
+      "by": "products_store_id_is_new_new_arrival_position_idx"
+    },
+    {
+      "table": "products",
+      "unique": "products_store_id_is_best_seller_best_seller_position_idx",
+      "by": "products_store_id_is_best_seller_best_seller_position_idx"
+    },
+    {
+      "table": "products",
+      "unique": "products_store_id_sku_key",
+      "by": "products_store_id_sku_key"
+    }
+  ],
+  "rawInvariants": [
+    {
+      "kind": "check",
+      "name": "stores_fiscal_year_start_month_range",
+      "table": "stores",
+      "disposition": "store-do:store_config"
+    },
+    {
+      "kind": "check",
+      "name": "journal_lines_debit_credit_nonneg",
+      "table": "journal_lines",
+      "disposition": "store-do:journal_lines"
+    },
+    {
+      "kind": "check",
+      "name": "journal_lines_debit_xor_credit",
+      "table": "journal_lines",
+      "disposition": "store-do:journal_lines"
+    },
+    {
+      "kind": "check",
+      "name": "purchase_order_items_qty_received_range",
+      "table": "purchase_order_items",
+      "disposition": "store-do:purchase_order_items"
+    },
+    {
+      "kind": "check",
+      "name": "purchase_order_items_qty_positive",
+      "table": "purchase_order_items",
+      "disposition": "store-do:purchase_order_items"
+    },
+    {
+      "kind": "check",
+      "name": "purchase_order_items_unit_cost_nonneg",
+      "table": "purchase_order_items",
+      "disposition": "store-do:purchase_order_items"
+    },
+    {
+      "kind": "check",
+      "name": "stock_adjustment_items_delta_matches_qty",
+      "table": "stock_adjustment_items",
+      "disposition": "store-do:stock_adjustment_items"
+    },
+    {
+      "kind": "check",
+      "name": "backorder_lines_qty_fulfilled_range",
+      "table": "backorder_lines",
+      "disposition": "store-do:backorder_lines"
+    },
+    {
+      "kind": "check",
+      "name": "backorder_lines_qty_positive",
+      "table": "backorder_lines",
+      "disposition": "store-do:backorder_lines"
+    },
+    {
+      "kind": "check",
+      "name": "expenses_total_matches_amount_plus_tax",
+      "table": "expenses",
+      "disposition": "store-do:expenses"
+    },
+    {
+      "kind": "check",
+      "name": "expenses_amount_nonneg",
+      "table": "expenses",
+      "disposition": "store-do:expenses"
+    },
+    {
+      "kind": "check",
+      "name": "bundle_items_quantity_range",
+      "table": "bundle_items",
+      "disposition": "store-do:bundle_items"
+    },
+    {
+      "kind": "check",
+      "name": "customer_wallets_balance_non_negative",
+      "table": "customer_wallets",
+      "disposition": "store-do:customer_wallets"
+    },
+    {
+      "kind": "check",
+      "name": "wallet_transactions_amount_non_zero",
+      "table": "wallet_transactions",
+      "disposition": "store-do:wallet_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "wallet_transactions_balance_after_non_negative",
+      "table": "wallet_transactions",
+      "disposition": "store-do:wallet_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "orders_wallet_amount_non_negative",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "check",
+      "name": "store_subscriptions_billing_interval_check",
+      "table": "store_subscriptions",
+      "disposition": "d1:store_subscriptions"
+    },
+    {
+      "kind": "check",
+      "name": "billing_events_amount_check",
+      "table": "billing_events",
+      "disposition": "d1:billing_events"
+    },
+    {
+      "kind": "check",
+      "name": "billing_events_status_check",
+      "table": "billing_events",
+      "disposition": "d1:billing_events"
+    },
+    {
+      "kind": "check",
+      "name": "stores_domain_status_check",
+      "table": "stores",
+      "disposition": "d1:stores"
+    },
+    {
+      "kind": "check",
+      "name": "cod_remittances_net_check",
+      "table": "cod_remittances",
+      "disposition": "store-do:cod_remittances"
+    },
+    {
+      "kind": "check",
+      "name": "cod_remittances_nonneg_check",
+      "table": "cod_remittances",
+      "disposition": "store-do:cod_remittances"
+    },
+    {
+      "kind": "check",
+      "name": "store_subscriptions_payment_method_last4_check",
+      "table": "store_subscriptions",
+      "disposition": "d1:store_subscriptions"
+    },
+    {
+      "kind": "check",
+      "name": "store_subscriptions_billing_method_check",
+      "table": "store_subscriptions",
+      "disposition": "d1:store_subscriptions"
+    },
+    {
+      "kind": "check",
+      "name": "stores_billing_suspended_reason_check",
+      "table": "stores",
+      "disposition": "d1:stores"
+    },
+    {
+      "kind": "check",
+      "name": "billing_events_type_check",
+      "table": "billing_events",
+      "disposition": "d1:billing_events"
+    },
+    {
+      "kind": "check",
+      "name": "manual_payment_claims_amount_check",
+      "table": "manual_payment_claims",
+      "disposition": "d1:manual_payment_claims"
+    },
+    {
+      "kind": "check",
+      "name": "manual_payment_claims_status_check",
+      "table": "manual_payment_claims",
+      "disposition": "d1:manual_payment_claims"
+    },
+    {
+      "kind": "check",
+      "name": "manual_payment_claims_method_check",
+      "table": "manual_payment_claims",
+      "disposition": "d1:manual_payment_claims"
+    },
+    {
+      "kind": "check",
+      "name": "billing_reminders_kind_check",
+      "table": "billing_reminders",
+      "disposition": "d1:billing_reminders"
+    },
+    {
+      "kind": "check",
+      "name": "store_page_revisions_status_check",
+      "table": "store_page_revisions",
+      "disposition": "store-do:store_page_revisions"
+    },
+    {
+      "kind": "check",
+      "name": "store_page_revisions_rev_check",
+      "table": "store_page_revisions",
+      "disposition": "store-do:store_page_revisions"
+    },
+    {
+      "kind": "check",
+      "name": "store_page_revisions_doc_bytes_check",
+      "table": "store_page_revisions",
+      "disposition": "store-do:store_page_revisions"
+    },
+    {
+      "kind": "check",
+      "name": "store_page_revisions_page_key_check",
+      "table": "store_page_revisions",
+      "disposition": "store-do:store_page_revisions"
+    },
+    {
+      "kind": "check",
+      "name": "billing_events_vat_minor_range",
+      "table": "billing_events",
+      "disposition": "d1:billing_events"
+    },
+    {
+      "kind": "check",
+      "name": "payment_configs_provider_code_check",
+      "table": "payment_configs",
+      "disposition": "store-do:payment_configs"
+    },
+    {
+      "kind": "check",
+      "name": "product_models_bytes_check",
+      "table": "product_models",
+      "disposition": "store-do:product_models"
+    },
+    {
+      "kind": "check",
+      "name": "product_model_bindings_kind_check",
+      "table": "product_model_bindings",
+      "disposition": "store-do:product_model_bindings"
+    },
+    {
+      "kind": "check",
+      "name": "product_model_bindings_color_check",
+      "table": "product_model_bindings",
+      "disposition": "store-do:product_model_bindings"
+    },
+    {
+      "kind": "check",
+      "name": "product_model_bindings_unit_check",
+      "table": "product_model_bindings",
+      "disposition": "store-do:product_model_bindings"
+    },
+    {
+      "kind": "check",
+      "name": "product_model_bindings_target_check",
+      "table": "product_model_bindings",
+      "disposition": "store-do:product_model_bindings"
+    },
+    {
+      "kind": "check",
+      "name": "shipment_pickups_status_check",
+      "table": "shipment_pickups",
+      "disposition": "store-do:shipment_pickups"
+    },
+    {
+      "kind": "check",
+      "name": "shipment_pickups_date_check",
+      "table": "shipment_pickups",
+      "disposition": "store-do:shipment_pickups"
+    },
+    {
+      "kind": "check",
+      "name": "shipment_pickups_window_check",
+      "table": "shipment_pickups",
+      "disposition": "store-do:shipment_pickups"
+    },
+    {
+      "kind": "check",
+      "name": "shipment_pickups_key_check",
+      "table": "shipment_pickups",
+      "disposition": "store-do:shipment_pickups"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_receipts_kind_check",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_receipts_status_check",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_receipts_extraction_check",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_receipts_amount_check",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_receipts_size_check",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "provider_activation_requests_status_check",
+      "table": "provider_activation_requests",
+      "disposition": "d1:provider_activation_requests"
+    },
+    {
+      "kind": "check",
+      "name": "orders_cod_fee_nonneg",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "check",
+      "name": "fiscal_documents_status_check",
+      "table": "fiscal_documents",
+      "disposition": "store-do:fiscal_documents"
+    },
+    {
+      "kind": "check",
+      "name": "fiscal_documents_serial_check",
+      "table": "fiscal_documents",
+      "disposition": "store-do:fiscal_documents"
+    },
+    {
+      "kind": "check",
+      "name": "fiscal_documents_original_check",
+      "table": "fiscal_documents",
+      "disposition": "store-do:fiscal_documents"
+    },
+    {
+      "kind": "check",
+      "name": "fiscal_documents_amounts_check",
+      "table": "fiscal_documents",
+      "disposition": "store-do:fiscal_documents"
+    },
+    {
+      "kind": "check",
+      "name": "fiscal_document_counters_last_serial_check",
+      "table": "fiscal_document_counters",
+      "disposition": "store-do:fiscal_document_counters"
+    },
+    {
+      "kind": "check",
+      "name": "stores_look_format",
+      "table": "stores",
+      "disposition": "store-do:store_profile,d1:stores"
+    },
+    {
+      "kind": "check",
+      "name": "product_option_values_swatch_hex_format",
+      "table": "product_option_values",
+      "disposition": "store-do:product_option_values"
+    },
+    {
+      "kind": "check",
+      "name": "products_facts_is_array",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_lead_time_days_range",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "size_charts_unit_check",
+      "table": "size_charts",
+      "disposition": "store-do:size_charts"
+    },
+    {
+      "kind": "check",
+      "name": "legal_acceptances_source_check",
+      "table": "legal_acceptances",
+      "disposition": "d1:legal_acceptances"
+    },
+    {
+      "kind": "check",
+      "name": "legal_notice_deliveries_status_check",
+      "table": "legal_notice_deliveries",
+      "disposition": "d1:legal_notice_deliveries"
+    },
+    {
+      "kind": "check",
+      "name": "product_embeddings_terms_pair_chk",
+      "table": "product_embeddings",
+      "disposition": "skipped: model ProductEmbedding targets analytics"
+    },
+    {
+      "kind": "check",
+      "name": "product_price_tiers_min_qty_chk",
+      "table": "product_price_tiers",
+      "disposition": "store-do:product_price_tiers"
+    },
+    {
+      "kind": "check",
+      "name": "product_price_tiers_price_minor_chk",
+      "table": "product_price_tiers",
+      "disposition": "store-do:product_price_tiers"
+    },
+    {
+      "kind": "check",
+      "name": "wholesale_applications_status_chk",
+      "table": "wholesale_applications",
+      "disposition": "store-do:wholesale_applications"
+    },
+    {
+      "kind": "check",
+      "name": "customer_groups_pricing_mode_chk",
+      "table": "customer_groups",
+      "disposition": "store-do:customer_groups"
+    },
+    {
+      "kind": "check",
+      "name": "customer_groups_discount_bps_chk",
+      "table": "customer_groups",
+      "disposition": "store-do:customer_groups"
+    },
+    {
+      "kind": "check",
+      "name": "products_moq_chk",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_audience_chk",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "order_items_price_source_chk",
+      "table": "order_items",
+      "disposition": "store-do:order_items"
+    },
+    {
+      "kind": "check",
+      "name": "passkey_credentials_device_type_check",
+      "table": "passkey_credentials",
+      "disposition": "skipped: model PasskeyCredential targets identity"
+    },
+    {
+      "kind": "check",
+      "name": "passkey_credentials_counter_check",
+      "table": "passkey_credentials",
+      "disposition": "skipped: model PasskeyCredential targets identity"
+    },
+    {
+      "kind": "check",
+      "name": "store_lifecycle_emails_kind_check",
+      "table": "store_lifecycle_emails",
+      "disposition": "d1:store_lifecycle_emails"
+    },
+    {
+      "kind": "check",
+      "name": "store_lifecycle_emails_status_check",
+      "table": "store_lifecycle_emails",
+      "disposition": "d1:store_lifecycle_emails"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rates_karat_check",
+      "table": "gold_rates",
+      "disposition": "store-do:gold_rates"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rates_rate_check",
+      "table": "gold_rates",
+      "disposition": "store-do:gold_rates"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rates_source_check",
+      "table": "gold_rates",
+      "disposition": "store-do:gold_rates"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rates_status_check",
+      "table": "gold_rates",
+      "disposition": "store-do:gold_rates"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rates_current_karat_check",
+      "table": "gold_rates_current",
+      "disposition": "store-do:gold_rates_current"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rates_current_rate_check",
+      "table": "gold_rates_current",
+      "disposition": "store-do:gold_rates_current"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rate_settings_premium_check",
+      "table": "gold_rate_settings",
+      "disposition": "store-do:gold_rate_settings"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rate_settings_max_age_check",
+      "table": "gold_rate_settings",
+      "disposition": "store-do:gold_rate_settings"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rate_settings_jump_check",
+      "table": "gold_rate_settings",
+      "disposition": "store-do:gold_rate_settings"
+    },
+    {
+      "kind": "check",
+      "name": "gold_rate_settings_step_check",
+      "table": "gold_rate_settings",
+      "disposition": "store-do:gold_rate_settings"
+    },
+    {
+      "kind": "check",
+      "name": "products_pricing_mode_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_gold_karat_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_gold_weight_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_making_type_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_making_value_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_gold_margin_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_gold_spec_complete_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "products_gold_no_compare_check",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_pricing_mode_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_gold_karat_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_gold_weight_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_making_type_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_making_value_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_gold_margin_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "product_variants_gold_no_compare_check",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "check",
+      "name": "order_items_gold_snapshot_check",
+      "table": "order_items",
+      "disposition": "store-do:order_items"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_links_entitlement_status_check",
+      "table": "store_whatsapp_links",
+      "disposition": "store-do:store_whatsapp_links"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_consents_buyer_key_check",
+      "table": "store_whatsapp_consents",
+      "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_consents_granted_source_check",
+      "table": "store_whatsapp_consents",
+      "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_consents_revoked_source_check",
+      "table": "store_whatsapp_consents",
+      "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "eta_connections_environment_check",
+      "table": "eta_connections",
+      "disposition": "store-do:eta_connections"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_kind_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_status_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_environment_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "index",
+      "name": "users_admin_email_key",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "journal_entries_store_source_source_id_unique",
+      "table": "journal_entries",
+      "disposition": "store-do:journal_entries"
+    },
+    {
+      "kind": "index",
+      "name": "products_store_id_barcode_idx",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "product_variants_product_id_barcode_idx",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
+    },
+    {
+      "kind": "index",
+      "name": "warehouse_stock_warehouse_id_product_id_base_key",
+      "table": "warehouse_stock",
+      "disposition": "store-do:warehouse_stock"
+    },
+    {
+      "kind": "index",
+      "name": "orders_payment_gateway_abandoned_at_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "products_store_id_is_new_new_arrival_position_idx",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "products_store_id_is_best_seller_best_seller_position_idx",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "loyalty_transactions_earn_purchase_unique",
+      "table": "loyalty_transactions",
+      "disposition": "store-do:loyalty_transactions"
+    },
+    {
+      "kind": "index",
+      "name": "orders_refund_reversal_pending_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "customer_groups_one_default_per_store",
+      "table": "customer_groups",
+      "disposition": "store-do:customer_groups"
+    },
+    {
+      "kind": "index",
+      "name": "products_store_id_sku_key",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "products_name_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_name_ar_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_description_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_description_ar_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "loyalty_transactions_reversal_tag_unique",
+      "table": "loyalty_transactions",
+      "disposition": "store-do:loyalty_transactions"
+    },
+    {
+      "kind": "index",
+      "name": "orders_refund_reversal_requested_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "orders_status_fanout_pending_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "returns_reversal_pending_idx",
+      "table": "returns",
+      "disposition": "store-do:returns"
+    },
+    {
+      "kind": "index",
+      "name": "orders_order_number_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "users_first_name_trgm_idx",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "users_last_name_trgm_idx",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "users_email_trgm_idx",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "users_phone_trgm_idx",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_first_name_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_last_name_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_email_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_phone_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "store_page_revisions_one_published",
+      "table": "store_page_revisions",
+      "disposition": "store-do:store_page_revisions"
+    },
+    {
+      "kind": "index",
+      "name": "store_page_revisions_one_draft",
+      "table": "store_page_revisions",
+      "disposition": "store-do:store_page_revisions"
+    },
+    {
+      "kind": "index",
+      "name": "shipment_pickups_one_active",
+      "table": "shipment_pickups",
+      "disposition": "store-do:shipment_pickups"
+    },
+    {
+      "kind": "index",
+      "name": "provider_activation_requests_one_live",
+      "table": "provider_activation_requests",
+      "disposition": "d1:provider_activation_requests"
+    },
+    {
+      "kind": "index",
+      "name": "orders_open_hold_phone_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "orders_open_hold_email_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "orders_open_hold_ip_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "cart_items_line_no_variant",
+      "table": "cart_items",
+      "disposition": "store-do:cart_items"
+    },
+    {
+      "kind": "index",
+      "name": "cart_items_line_with_variant",
+      "table": "cart_items",
+      "disposition": "store-do:cart_items"
+    },
+    {
+      "kind": "index",
+      "name": "products_search_doc_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_name_doc_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "products_sku_norm_trgm_idx",
+      "table": "products",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "users_phone_digits_trgm_idx",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "users_name_norm_trgm_idx",
+      "table": "users",
+      "disposition": "skipped: model User targets identity"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_phone_digits_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_name_norm_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "orders_guest_email_store_trgm_idx",
+      "table": "orders",
+      "disposition": "skipped: Postgres trigram GIN: replaced by FTS5 (task 3.7)"
+    },
+    {
+      "kind": "index",
+      "name": "product_price_tiers_scope_min_qty_key",
+      "table": "product_price_tiers",
+      "disposition": "store-do:product_price_tiers"
+    },
+    {
+      "kind": "index",
+      "name": "wholesale_applications_one_pending_key",
+      "table": "wholesale_applications",
+      "disposition": "store-do:wholesale_applications"
+    },
+    {
+      "kind": "index",
+      "name": "customers_store_id_user_id_key",
+      "table": "customers",
+      "disposition": "store-do:customers"
+    },
+    {
+      "kind": "index",
+      "name": "products_gold_reprice_idx",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "payment_events_claim_single_outcome_key",
+      "table": "payment_events",
+      "disposition": "store-do:payment_events"
+    }
+  ],
+  "decimals": [
+    {
+      "table": "payment_configs",
+      "column": "percentage_fee",
+      "precision": 5,
+      "scale": 2,
+      "representation": "INTEGER = value x 10^2"
+    },
+    {
+      "table": "shipments",
+      "column": "weight",
+      "precision": 8,
+      "scale": 2,
+      "representation": "INTEGER = value x 10^2"
+    },
+    {
+      "table": "affiliates",
+      "column": "commission_rate",
+      "precision": 5,
+      "scale": 2,
+      "representation": "INTEGER = value x 10^2"
+    },
+    {
+      "table": "affiliate_configs",
+      "column": "default_commission_rate",
+      "precision": 5,
+      "scale": 2,
+      "representation": "INTEGER = value x 10^2"
+    },
+    {
+      "table": "tax_rates",
+      "column": "rate",
+      "precision": 5,
+      "scale": 2,
+      "representation": "INTEGER = value x 10^2"
+    },
+    {
+      "table": "journal_lines",
+      "column": "fx_rate",
+      "precision": 16,
+      "scale": 8,
+      "representation": "INTEGER = value x 10^8"
+    },
+    {
+      "table": "fx_rate_entries",
+      "column": "rate",
+      "precision": 16,
+      "scale": 8,
+      "representation": "INTEGER = value x 10^8"
+    },
+    {
+      "table": "expenses",
+      "column": "fx_rate",
+      "precision": 16,
+      "scale": 8,
+      "representation": "INTEGER = value x 10^8"
+    },
+    {
+      "table": "store_config",
+      "column": "default_tax_rate",
+      "precision": 5,
+      "scale": 2,
+      "representation": "INTEGER = value x 10^2"
+    }
+  ],
+  "storeSplit": {
+    "d1Only": [
+      "domainStatus",
+      "pendingDomain",
+      "domainClaimedAt",
+      "domainVerifiedAt",
+      "domainProvider",
+      "emailSenderLocalPart",
+      "emailDomainId",
+      "emailDomainStatus",
+      "emailDomainVerifiedAt",
+      "billingSuspendedReason",
+      "billingSuspendedAt",
+      "deletedAt"
+    ],
+    "mirror": [
+      "id",
+      "name",
+      "nameAr",
+      "slug",
+      "domain",
+      "ownerId",
+      "status",
+      "plan",
+      "logo",
+      "logoAr",
+      "favicon",
+      "currency",
+      "timezone",
+      "createdAt",
+      "updatedAt",
+      "template",
+      "look",
+      "isDemo"
+    ],
+    "profile": [
+      "heroTitle",
+      "heroTitleAr",
+      "heroSubtitle",
+      "heroSubtitleAr",
+      "heroCtaText",
+      "heroCtaTextAr",
+      "heroCtaLink",
+      "heroImage",
+      "bestSellersImage",
+      "typography",
+      "description",
+      "descriptionAr",
+      "theme",
+      "layoutSettings",
+      "socialLinks",
+      "email",
+      "phone",
+      "phoneAr",
+      "whatsapp",
+      "address",
+      "addressAr",
+      "businessHours",
+      "googleMapsUrl",
+      "announcementBar",
+      "metaTitle",
+      "metaTitleAr",
+      "metaDescription",
+      "metaDescriptionAr",
+      "metaDescriptionAeo",
+      "metaDescriptionAeoAr",
+      "ogImage",
+      "twitterHandle",
+      "googleSiteVerification",
+      "marketingPixels",
+      "metaPixelId",
+      "tiktokPixelId",
+      "snapchatPixelId",
+      "googleAnalyticsId",
+      "googleTagManagerId",
+      "googleAdsId",
+      "twitterPixelId",
+      "pinterestTagId",
+      "llmsTxt",
+      "aboutJson"
+    ],
+    "config": [
+      "settings",
+      "taxEnabled",
+      "taxIncludedInPrice",
+      "defaultTaxRate",
+      "loyaltyEnabled",
+      "loyaltySettings",
+      "pwaEnabled",
+      "pwaSettings",
+      "blogEnabled",
+      "locationsEnabled",
+      "agentApiKeyRotatedAt",
+      "returnWindowDays",
+      "returnFeesPaidBy",
+      "accountingEnabled",
+      "defaultTaxRateBps",
+      "fiscalYearStartMonth",
+      "expenseTwoStepApproval",
+      "aiFeaturesEnabled",
+      "aiBulkThrottleMs",
+      "aiNarrationEnabled",
+      "insightsRollupCron"
+    ]
+  }
+}

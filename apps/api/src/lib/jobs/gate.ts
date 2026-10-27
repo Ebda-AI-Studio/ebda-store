@@ -2,6 +2,7 @@
 import { cfBindings } from '../../cf/bindings';
 import type { ConcurrencySpec, JobDef, JobEvent } from './types';
 import { readEventKey } from './path';
+import { alarmStoreId } from './store-scope';
 import { parseDurationMs } from './step-adapter';
 
 interface GateStub {
@@ -37,13 +38,20 @@ export interface Gate {
   limit: number;
 }
 
-/** The gates a run must hold, in a fixed order (no deadlock between two multi-gate functions). */
+/**
+ * The gates a run must hold, in a fixed order (no deadlock between two multi-gate functions). An
+ * alarm run (one store) with a global limit gets a per-store gate: the global one existed only
+ * because the cron swept every store in a single run.
+ */
 export function gatesFor(def: JobDef, event: JobEvent): Gate[] {
   const c = def.options.concurrency;
   const specs: ConcurrencySpec[] = !c ? [] : Array.isArray(c) ? c : [c];
   return specs
     .filter(s => s.limit <= MAX_ENFORCED_CONCURRENCY)
-    .map(s => ({ gateId: `${def.id}|${readEventKey(event, s.key) ?? '*'}`, limit: s.limit }))
+    .map(s => ({
+      gateId: `${def.id}|${readEventKey(event, s.key) ?? alarmStoreId(event) ?? '*'}`,
+      limit: s.limit,
+    }))
     .sort((a, b) => a.gateId.localeCompare(b.gateId));
 }
 

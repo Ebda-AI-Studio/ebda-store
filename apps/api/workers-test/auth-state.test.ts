@@ -43,10 +43,12 @@ describe('AuthState durable object: revocation holds across requests', () => {
 
   it('a denied jti expires with its TTL', async () => {
     const key = `jti:deny:${uid()}`;
-    await authState(key, [['set', key, '1', { ttlMs: 150 }]]);
-    expect((await authState(key, [['exists', key]]))[0]).toBe(1);
-    await new Promise(r => setTimeout(r, 300));
-    expect((await authState(key, [['exists', key]]))[0]).toBe(0);
+    // Virtual clock (the store's `nowMs`): a 150 ms TTL checked "right after" the write flaked when a loaded
+    // runner took longer than that between the two calls (Ruling FLAKE-LEASE-1).
+    const T0 = 2_000_000;
+    await authState(key, [['set', key, '1', { ttlMs: 150 }]], T0);
+    expect((await authState(key, [['exists', key]], T0 + 149))[0]).toBe(1);
+    expect((await authState(key, [['exists', key]], T0 + 151))[0]).toBe(0);
   });
 
   it('SET NX is a mutex: of 25 parallel claims exactly one wins', async () => {

@@ -94,6 +94,7 @@ import staffRoutes from './staff.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import lifecycleEmailsRoutes from './lifecycle-emails.routes';
+import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
@@ -543,6 +544,8 @@ router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 // Self-serve lifecycle emails: the merchant's log (admin) and the login-free unsubscribe link (store from the signed token).
 router.use('/stores/:storeId/lifecycle-emails', tenantContext, lifecycleEmailsRoutes);
+// Ebda WhatsApp connect / disconnect (the only request path that writes the server-owned link).
+router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not

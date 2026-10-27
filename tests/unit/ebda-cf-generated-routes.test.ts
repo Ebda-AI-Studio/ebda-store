@@ -29,10 +29,11 @@ describe('Ebda generated Cloudflare routes', () => {
       })) {
         const config = JSON.parse(readFileSync(join(root, 'apps', app, 'wrangler.jsonc'), 'utf8'));
         if (app === 'web') {
-          // Storefront: wildcard subdomains only — claiming the apex (or `*/*`)
-          // would steal ebda.app from the ebda-marketing Worker.
+          // Storefront: wildcard subdomains plus `*/*` for merchant custom domains (M-072). `*/*` is only safe because the apex
+          // and every other hostname have explicit, more specific routes: tests/unit/cf-route-precedence.test.ts.
           expect(config.routes).toEqual([
             { pattern: `*${BRAND.domains.storeSuffix}/*`, zone_name: BRAND.domains.marketing },
+            { pattern: '*/*', zone_name: BRAND.domains.marketing },
           ]);
         } else expect(config.routes).toContainEqual({ pattern: host, custom_domain: true });
         expect(

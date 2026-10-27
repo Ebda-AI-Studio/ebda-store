@@ -7,7 +7,7 @@
  */
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch-all';
-import { failedEvent, runOnFailure } from './failure';
+import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,
   debounceFor,
@@ -96,9 +96,7 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
     if (isNonRetriable(error) || msg.attempts > retries) {
       logger.error({ err: error, job: def.id, attempts: msg.attempts }, '[jobs] run failed');
       await runOnFailure(def, event, msg.id, error);
-      await dispatchEventsToAll(failedEvent(def, event, msg.id, error)).catch(e =>
-        logger.error({ err: e, job: def.id }, '[jobs] failure event not dispatched')
-      );
+      await reportJobFailure(def, event, msg.id, error);
       msg.ack();
     } else {
       logger.warn({ err: error, job: def.id, attempt: msg.attempts }, '[jobs] failed, retrying');
@@ -130,7 +128,7 @@ async function parkForGate(msg: QueueMessageLike, body: JobQueueMessage, gate: G
       `concurrency gate ${gate.gateId} not free after ${GATE_MAX_WAITS} waits`
     );
     await runOnFailure(def, body.event, msg.id, error);
-    await dispatchEventsToAll(failedEvent(def, body.event, msg.id, error)).catch(() => undefined);
+    await reportJobFailure(def, body.event, msg.id, error);
     msg.ack();
     return;
   }
@@ -153,9 +151,7 @@ async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
     if (def) {
       const error = new Error('queue delivery attempts exhausted');
       await runOnFailure(def, msg.body.event, msg.id, error);
-      await dispatchEventsToAll(failedEvent(def, msg.body.event, msg.id, error)).catch(
-        () => undefined
-      );
+      await reportJobFailure(def, msg.body.event, msg.id, error);
     }
   }
   logger.error({ id: msg.id }, '[jobs] dead-lettered job processed');

@@ -88,8 +88,8 @@ describe.skipIf(!hasDb)(
              CASE WHEN g <= ${REGISTERED_ORDERS}::int THEN ${tag} || '-u' || ((g % ${USERS}::int) + 1) END,
              now()
       FROM generate_series(1, ${ORDERS}::int) g`;
-      await prisma.$executeRaw`ANALYZE public.orders`;
-      await prisma.$executeRaw`ANALYZE public.users`;
+      await prisma.$executeRaw`VACUUM (ANALYZE) public.orders`;
+      await prisma.$executeRaw`VACUUM (ANALYZE) public.users`;
     }, 180_000);
 
     afterAll(async () => {

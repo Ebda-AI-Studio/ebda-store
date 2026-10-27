@@ -9,6 +9,7 @@
  * change. A variant is priced by its resolved spec (a NULL spec field inherits the product's); a
  * variant whose mode is `fixed` keeps its own price.
  */
+import { notifyCatalogChanged } from '../../lib/wa/catalog-state';
 import { Prisma } from '@ebda/database';
 import {
   computeGoldUnitPrice,
@@ -213,6 +214,11 @@ async function writePlan(tx: Tx, storeId: string, plan: Plan): Promise<number> {
        WHERE pv.id = v.id
          AND EXISTS (SELECT 1 FROM products p WHERE p.id = pv.product_id AND p.store_id = ${storeId})`;
     repricerHooks.afterChunk?.(plan.products.length + Math.min(i + CHUNK, plan.variants.length));
+  }
+  // A reprice changes prices of many products at once: raw SQL bypasses the db write observer, so
+  // Ebda WhatsApp is told here (whole catalog of the store).
+  if (plan.products.length + plan.variants.length > 0) {
+    await notifyCatalogChanged({ storeId, productIds: null });
   }
   return plan.products.length + plan.variants.length;
 }
