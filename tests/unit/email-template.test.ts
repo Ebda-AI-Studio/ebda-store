@@ -16,16 +16,15 @@ vi.mock('@ebda/database', () => {
   return mod;
 });
 
-// ResendService is called by sendForStore — mock it out so no real HTTP.
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: {
+// StoreMailer is called by sendForStore — mock it out so no real HTTP.
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: {
     sendBrandedEmail: vi.fn().mockResolvedValue({ id: 'em_test' }),
   },
 }));
 
 vi.mock('@api/config', () => ({
   config: {
-    resendApiKey: 're_test',
     webUrl: 'https://store.test',
     adminUrl: 'https://admin.test',
     smtpFromEmail: 'noreply@test.com',
@@ -177,10 +176,10 @@ describe('EmailService language override', () => {
     prismaStoreFindUnique.mockResolvedValue(makeStorePrismaRow({ defaultLanguage: 'en' }));
 
     // Use the internal test helper that exercises renderTemplate → renderBrandedShell
-    // via sendOrderConfirmation path, but capture at the ResendService boundary
+    // via sendOrderConfirmation path, but capture at the StoreMailer boundary
     // by inspecting the html arg that sendBrandedEmail receives.
-    const { ResendService } = await import('@api/services/resend.service');
-    const sendBrandedEmailMock = vi.mocked(ResendService.sendBrandedEmail);
+    const { StoreMailer } = await import('@api/services/store-mailer.service');
+    const sendBrandedEmailMock = vi.mocked(StoreMailer.sendBrandedEmail);
 
     await EmailService.sendOrderConfirmation(
       'store-test',
@@ -215,8 +214,8 @@ describe('EmailService language override', () => {
     // Store configured as Arabic — no explicit language arg
     prismaStoreFindUnique.mockResolvedValue(makeStorePrismaRow({ defaultLanguage: 'ar' }));
 
-    const { ResendService } = await import('@api/services/resend.service');
-    const sendBrandedEmailMock = vi.mocked(ResendService.sendBrandedEmail);
+    const { StoreMailer } = await import('@api/services/store-mailer.service');
+    const sendBrandedEmailMock = vi.mocked(StoreMailer.sendBrandedEmail);
 
     await EmailService.sendOrderConfirmation('store-test', {
       orderNumber: 'ORD-2',
@@ -248,8 +247,8 @@ describe('EmailService language override', () => {
     // Store is Arabic but caller explicitly requests English
     prismaStoreFindUnique.mockResolvedValue(makeStorePrismaRow({ defaultLanguage: 'ar' }));
 
-    const { ResendService } = await import('@api/services/resend.service');
-    const sendBrandedEmailMock = vi.mocked(ResendService.sendBrandedEmail);
+    const { StoreMailer } = await import('@api/services/store-mailer.service');
+    const sendBrandedEmailMock = vi.mocked(StoreMailer.sendBrandedEmail);
 
     await EmailService.sendOrderConfirmation(
       'store-test',

@@ -61,8 +61,8 @@ vi.mock('@api/services/domain-provider', () => {
     getDomainProviderName: () => 'cloudflare' as const,
   };
 });
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: {
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: {
     removeStoreDomain: vi.fn().mockResolvedValue(undefined),
     provisionStoreDomain: vi.fn().mockResolvedValue([]),
     refreshDomainStatus: vi.fn(),

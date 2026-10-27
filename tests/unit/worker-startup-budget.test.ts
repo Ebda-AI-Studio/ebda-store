@@ -3,6 +3,7 @@ import {
   activeMs,
   budgetProblems,
   median,
+  minSample,
   relativeProblems,
 } from '../../scripts/ci/worker-startup-budget.mjs';
 import budget from '../../scripts/ci/worker-startup-budget.json';
@@ -55,5 +56,22 @@ describe('API Worker startup budget verdict', () => {
   it('median of odd and even sets', () => {
     expect(median([3, 1, 2])).toBe(2);
     expect(median([4, 1, 2, 3])).toBe(2.5);
+  });
+});
+
+describe('minSample: a profile that recorded nothing is not the fastest start', () => {
+  it('ignores 0, negative and NaN samples (the #260 baseline: 127.8, 128.6, 0, 147.2, 124.9)', () => {
+    expect(minSample([127.8, 128.6, 0, 147.2, 124.9])).toBe(124.9);
+    expect(minSample([130, -1, NaN, 126.5])).toBe(126.5);
+  });
+  it('is 0 (not measured) only when no sample is real, and that still fails the relative verdict', () => {
+    expect(minSample([])).toBe(0);
+    expect(minSample([0, 0])).toBe(0);
+    expect(relativeProblems(101, minSample([0, 0]), { ratio: 0.2, slackMs: 20 })).toHaveLength(1);
+  });
+  it('with the zero dropped, the PR from that run passes against its base', () => {
+    const base = minSample([127.8, 128.6, 0, 147.2, 124.9]);
+    const pr = minSample([109.7, 101.1, 112.5, 138.4, 104.2]);
+    expect(relativeProblems(pr, base, { ratio: 0.2, slackMs: 20 })).toEqual([]);
   });
 });

@@ -18,7 +18,6 @@ import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
-import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { maskEmail } from '../lib/pii-mask';
@@ -306,20 +305,6 @@ export class ProvisioningService {
       // provision is never undone by a downstream error (e.g. welcome email
       // failure handled below).
       domainAdded = false;
-
-      // Per-store Resend provisioning for the newly-created store. Best-effort:
-      // failures don't roll back the provisioning — the storefront still works;
-      // email just falls back to platform sender until merchant adds DNS.
-      if (domain) {
-        try {
-          await ResendService.provisionStoreDomain(result.store.id);
-        } catch (err) {
-          logger.warn(
-            { err, storeId: result.store.id, domain },
-            'Resend domain provision failed during store provisioning (email stays on platform fallback)'
-          );
-        }
-      }
     } catch (error) {
       // Compensating action: if we registered the domain with the provider but
       // the DB transaction failed, remove it so we don't strand a phantom domain

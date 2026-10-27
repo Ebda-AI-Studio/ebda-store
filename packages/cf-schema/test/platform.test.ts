@@ -1,5 +1,5 @@
 // Task 1.2: the D1 platform schema.
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { expectThrows, openDb, readJson, tableNames } from './helpers';
 
 type Manifest = {
@@ -53,6 +53,49 @@ describe('D1 platform schema', () => {
           .run(),
       /CHECK/
     );
+  });
+
+  describe('store_subscriptions.past_due_since (WA-GRACE-1, mirrors the Postgres trigger)', () => {
+    const sub = (id: string, status: string) =>
+      db
+        .prepare(
+          `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES (?, ?, 'business', ?)`
+        )
+        .run(id, `st-${id}`, status);
+    afterAll(() => {
+      db.exec('PRAGMA foreign_keys = ON');
+    });
+    const since = (id: string) =>
+      (
+        db.prepare(`SELECT past_due_since AS v FROM store_subscriptions WHERE id = ?`).get(id) as {
+          v: number | null;
+        }
+      ).v;
+
+    it('is set on the first past_due, kept by a retry, cleared on recovery, set again on a new episode', () => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      sub('p1', 'active');
+      expect(since('p1')).toBeNull();
+      db.prepare(`UPDATE store_subscriptions SET status = 'past_due' WHERE id = 'p1'`).run();
+      const first = since('p1');
+      expect(first).toBeGreaterThan(0);
+      db.prepare(
+        `UPDATE store_subscriptions SET status = 'past_due', dunning_attempts = 2 WHERE id = 'p1'`
+      ).run();
+      expect(since('p1')).toBe(first);
+      db.prepare(`UPDATE store_subscriptions SET status = 'active' WHERE id = 'p1'`).run();
+      expect(since('p1')).toBeNull();
+      db.prepare(`UPDATE store_subscriptions SET status = 'past_due' WHERE id = 'p1'`).run();
+      expect(since('p1')).toBeGreaterThanOrEqual(first!);
+    });
+
+    it('an insert that is already past_due gets a date; any other status stays null', () => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      sub('p2', 'past_due');
+      expect(since('p2')).toBeGreaterThan(0);
+      sub('p3', 'trialing');
+      expect(since('p3')).toBeNull();
+    });
   });
 
   describe('billing_events is append-only (section 2.6)', () => {

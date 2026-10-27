@@ -128,8 +128,8 @@ export async function runJobWorkflow(a: RunWorkflowArgs): Promise<void> {
     await step.do('on-failure', NO_RETRY, () =>
       a.withContext(async () => {
         await runOnFailure(def, event, a.instanceId, error);
-        await reportJobFailure(def, event, a.instanceId, error);
-        return null;
+        // The step output is the proof of delivery: alert outcome + Sentry event id + flush result.
+        return reportJobFailure(def, event, a.instanceId, error);
       })
     );
     if (isNonRetriable(error)) throw new a.NonRetryable(error.message);

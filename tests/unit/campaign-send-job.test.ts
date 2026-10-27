@@ -42,7 +42,7 @@ vi.mock('@ebda/database', () => ({
   withStore: (_storeId: string, fn: (tx: unknown) => unknown) => fn(holder.prisma),
 }));
 
-vi.mock('@api/services/resend.service', () => ({ ResendService: { sendMarketingEmail } }));
+vi.mock('@api/services/store-mailer.service', () => ({ StoreMailer: { sendMarketingEmail } }));
 
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: {
@@ -61,7 +61,7 @@ vi.mock('@api/lib/logger', () => ({
 const { sendAlert } = vi.hoisted(() => ({ sendAlert: vi.fn(async () => 'sent') }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
 
-import { EmailSendError as ResendSendError } from '@api/services/mail-transport';
+import { EmailSendError } from '@api/services/mail-transport';
 import '@api/lib/inngest/functions/campaign-send';
 
 const THROTTLE = 7;
@@ -211,7 +211,7 @@ describe('campaign-send', () => {
     let calls = 0;
     sendMarketingEmail.mockImplementation(async () => {
       calls++;
-      if (calls === 3) throw new ResendSendError('rate_limit_exceeded', 'slow down');
+      if (calls === 3) throw new EmailSendError('E_RATE_LIMIT_EXCEEDED', 'slow down');
       return { id: `msg-${calls}` };
     });
 
@@ -244,7 +244,7 @@ describe('campaign-send', () => {
   it('a permanent provider rejection marks THAT recipient failed and the rest still send', async () => {
     seed(['a@x.test', 'bad@x.test', 'c@x.test']);
     sendMarketingEmail.mockImplementation(async (_s: unknown, o: { to: string }) => {
-      if (o.to === 'bad@x.test') throw new ResendSendError('validation_error', 'Invalid `to`');
+      if (o.to === 'bad@x.test') throw new EmailSendError('E_VALIDATION_ERROR', 'Invalid `to`');
       return { id: `msg-${o.to}` };
     });
 
