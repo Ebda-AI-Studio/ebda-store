@@ -16,7 +16,7 @@
  * (`recordManualPayment` for subscriptions, `InstapayService.confirm` for orders).
  */
 import crypto from 'crypto';
-import { prisma, withStore, type Prisma } from '@ebda/database';
+import { prisma, withStore, acrossStores, Prisma } from '@ebda/database';
 import {
   INSTAPAY_RECEIPT_LOW_CONFIDENCE,
   INSTAPAY_RECEIPT_MAX_BYTES,
@@ -38,9 +38,25 @@ import { inngest } from '../../lib/inngest/client';
 import { isP2002 } from '../../lib/prisma-errors';
 import { withSavepoint } from '../../lib/savepoint';
 import { StorageService } from '../storage.service';
+import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { readInstapayReceipt } from '../../lib/ai/instapay-receipt-reader';
+import { instapayHandle } from '../billing/manual-config';
 
 export type ReceiptKind = 'subscription' | 'order';
+
+/** What a scrub clears: everything a person typed or the AI read about a person. Money and evidence columns are untouched. */
+const SCRUBBED_PERSONAL_FIELDS = (now: Date) => ({
+  payerName: null,
+  payerAddress: null,
+  payerMobile: null,
+  payerBank: null,
+  receiverName: null,
+  receiverHandle: null,
+  receiverMobile: null,
+  note: null,
+  extracted: Prisma.DbNull,
+  personalScrubbedAt: now,
+});
 type ReceiptRow = Prisma.InstapayReceiptGetPayload<Record<string, never>>;
 
 /** Per target: how many receipts may be uploaded (abuse cap on top of the IP/user rate limit). */
@@ -98,8 +114,18 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
   const shown = [i.fields.receiverHandle, i.fields.receiverMobile]
     .map(r => normalizeInstapayReceiver(r))
     .filter((r): r is string => !!r);
-  if (shown.length === 0) flags.push('RECEIVER_MISSING');
-  else if (expected.length > 0 && !shown.some(s => expected.includes(s))) {
+  // RECEIVER-CHECK-1: the model compared the screenshot's receiver with the store's expected account(s) and answered
+  // yes / no. A "no" flags RECEIVER_MISMATCH whatever the payer typed; a "yes" stands in for the typed fields (a payer who
+  // left them blank is not RECEIVER_MISSING). Without that answer (AI failed, no expected receiver) the check is the
+  // payer-typed comparison, as before.
+  const aiReceiver = i.extractionStatus === 'done' ? (i.extraction?.receiverMatch ?? null) : null;
+  if (aiReceiver === false) flags.push('RECEIVER_MISMATCH');
+  else if (shown.length === 0) {
+    // blank typed fields: a verified image stands in for them
+    if (aiReceiver !== true) flags.push('RECEIVER_MISSING');
+  } else if (expected.length > 0 && !shown.some(s => expected.includes(s))) {
+    // the payer TYPED a receiver that is not the expected account: a model "yes" (a guess, a decoy line on the image, a
+    // masked number that agrees on a few digits) never hides that
     flags.push('RECEIVER_MISMATCH');
   }
   if (i.notBefore && i.transferredAt.getTime() < i.notBefore.getTime()) flags.push(i.notBeforeFlag);
@@ -271,7 +297,7 @@ export class InstapayReceiptService {
 
   /**
    * The AI read (Inngest job, under a store scope: no transaction is held across the
-   * Gemini call). Idempotent: only a `pending` read is written. Any failure (timeout,
+   * AI call). Idempotent: only a `pending` read is written. Any failure (timeout,
    * quota, bad JSON, no key) = `failed`, which the payer sees as manual entry.
    */
   static async runExtraction(
@@ -284,10 +310,19 @@ export class InstapayReceiptService {
     if (!row || row.extractionStatus !== 'pending') return 'skipped';
     try {
       const { body } = await StorageService.getPrivate(row.storageKey);
+      const expectedReceivers = await this.expectedReceiversFor(storeId, row);
+      if (expectedReceivers.length === 0) {
+        // P2: nothing to compare the receiver with, so no receiver flag from the AI (the payer-typed check stays).
+        logger.warn(
+          { storeId, receiptId, kind: row.kind },
+          '[P2][instapay-receipt] no expected receiver configured; receiver check skipped'
+        );
+      }
       const extraction = await readInstapayReceipt({
         storeId,
         image: body,
         mimeType: row.mimeType,
+        expectedReceivers,
       });
       await withStore(storeId, () =>
         prisma.instapayReceipt.updateMany({
@@ -306,6 +341,42 @@ export class InstapayReceiptService {
       await this.markExtractionFailed(storeId, receiptId, String(code));
       return 'failed';
     }
+  }
+
+  /**
+   * The account(s) this receipt's money must have gone to: the order's InstaPay handle and mobile (frozen on its payment),
+   * or Ebda's own handle for a subscription receipt. The MERCHANT's details, normalised; empty = no receiver check.
+   */
+  static async expectedReceiversFor(
+    storeId: string,
+    row: { kind: string; orderId: string | null; paymentId?: string | null }
+  ): Promise<string[]> {
+    const raw: unknown[] = [];
+    if (row.kind === 'order' && row.orderId) {
+      const payment = await withStore(storeId, () =>
+        prisma.payment.findFirst({
+          // the payment the receipt was filed against (the account the approver is shown), else the newest pending one
+          where: row.paymentId
+            ? { id: row.paymentId, orderId: row.orderId!, provider: 'instapay' }
+            : { orderId: row.orderId!, provider: 'instapay', status: 'pending' },
+          orderBy: { createdAt: 'desc' },
+          select: { metadata: true },
+        })
+      );
+      const m = (
+        payment?.metadata && typeof payment.metadata === 'object' ? payment.metadata : {}
+      ) as Record<string, unknown>;
+      raw.push(m.handle, m.phone);
+    } else if (row.kind === 'subscription') {
+      raw.push(instapayHandle());
+    }
+    return [
+      ...new Set(
+        raw
+          .map(v => (typeof v === 'string' ? normalizeInstapayReceiver(v) : null))
+          .filter((v): v is string => !!v)
+      ),
+    ];
   }
 
   static async get(
@@ -345,6 +416,9 @@ export class InstapayReceiptService {
     scope: { kind: 'subscription' } | { kind: 'order'; orderId: string }
   ): Promise<{ body: Buffer; mimeType: string }> {
     const row = await this.get(storeId, receiptId, scope);
+    if (row.imageDeletedAt) {
+      throw new AppError(410, 'RECEIPT_IMAGE_DELETED', 'The receipt image is no longer stored');
+    }
     const { body } = await StorageService.getPrivate(row.storageKey);
     return { body, mimeType: row.mimeType };
   }
@@ -451,6 +525,152 @@ export class InstapayReceiptService {
             },
     });
     return count;
+  }
+
+  /**
+   * A human approved the payment: mark the submitted receipts approved and return their ids so the CALLER deletes the
+   * screenshots AFTER its transaction commits (`deleteImages`). Two callers: the merchant's confirm of an order payment
+   * (all the order's submitted receipts) and the super-admin's recorded manual payment (the receipts of the claims it settles).
+   */
+  static async approveSubmitted(
+    tx: Prisma.TransactionClient,
+    storeId: string,
+    where: { orderId: string } | { claimIds: string[] },
+    actorId: string | null,
+    now: Date
+  ): Promise<string[]> {
+    const scope =
+      'orderId' in where
+        ? { storeId, kind: 'order', orderId: where.orderId, status: 'submitted' }
+        : { storeId, claimId: { in: where.claimIds }, status: 'submitted' };
+    const rows = await tx.instapayReceipt.findMany({ where: scope, select: { id: true } });
+    if (rows.length === 0) return [];
+    await tx.instapayReceipt.updateMany({
+      where: { ...scope, id: { in: rows.map(r => r.id) } },
+      data: { status: 'approved', reviewedBy: actorId, reviewedAt: now },
+    });
+    return rows.map(r => r.id);
+  }
+
+  /** After the approving transaction committed: delete the screenshots (each failure is retried by the retention sweep). */
+  static async deleteImages(storeId: string, receiptIds: string[]): Promise<void> {
+    for (const id of receiptIds) await this.deleteImage(storeId, id);
+  }
+
+  /** Delete the stored screenshot (idempotent) and record it. Never throws: the retention sweep retries a miss. */
+  static async deleteImage(storeId: string, receiptId: string): Promise<boolean> {
+    try {
+      const row = await withStore(storeId, () =>
+        prisma.instapayReceipt.findUnique({
+          where: { id: receiptId, storeId },
+          select: { storageKey: true, imageDeletedAt: true },
+        })
+      );
+      if (!row || row.imageDeletedAt) return false;
+      await StorageService.deletePrivate(row.storageKey);
+      await withStore(storeId, () =>
+        prisma.instapayReceipt.updateMany({
+          where: { id: receiptId, storeId, imageDeletedAt: null },
+          data: { imageDeletedAt: new Date() },
+        })
+      );
+      return true;
+    } catch (err) {
+      logger.warn(
+        { err, storeId, receiptId },
+        '[instapay-receipt] image delete failed; the retention sweep retries'
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Retention (M-025), run by the weekly data-retention job:
+   *  - screenshots: approved and not yet deleted (a missed post-commit delete) -> deleted; rejected / voided 30 days after
+   *    the decision; drafts and failed uploads 30 days after creation. Each is recorded in `image_deleted_at`.
+   *  - personal fields (payer / receiver / note / the AI-read JSON): scrubbed 180 days after a final decision
+   *    (approved, rejected, voided) and recorded in `personal_scrubbed_at`. The amount, reference, transfer time, flags and
+   *    status stay: they are the financial evidence behind the payment, kept with it (docs/RETENTION.md).
+   * Idempotent; per store, in the store's own scope.
+   */
+  static async sweepRetention(
+    now: Date = new Date()
+  ): Promise<{ images: number; scrubbed: number }> {
+    const day = 86_400_000;
+    const imageCut = new Date(now.getTime() - 30 * day);
+    const personalCut = new Date(now.getTime() - 180 * day);
+    const parts = await acrossStores(
+      async storeId => {
+        const imgs = await prisma.instapayReceipt.findMany({
+          where: {
+            storeId,
+            imageDeletedAt: null,
+            OR: [
+              { status: 'approved' },
+              { status: { in: ['rejected', 'voided'] }, reviewedAt: { lt: imageCut } },
+              { status: 'draft', createdAt: { lt: imageCut } },
+              // proof nobody ever decided on (an order cancelled outside confirm / reject, a claim left pending)
+              { status: 'submitted', submittedAt: { lt: new Date(now.getTime() - 90 * day) } },
+              // an erasure scrubbed it but its immediate delete missed (the delete runs after the erasure commits)
+              { personalScrubbedAt: { not: null } },
+            ],
+          },
+          select: { id: true },
+          take: 500,
+        });
+        let images = 0;
+        for (const r of imgs) if (await this.deleteImage(storeId, r.id)) images++;
+        const scrub = await prisma.instapayReceipt.updateMany({
+          where: {
+            storeId,
+            personalScrubbedAt: null,
+            OR: [
+              {
+                status: { in: ['approved', 'rejected', 'voided'] },
+                reviewedAt: { lt: personalCut },
+              },
+              { status: 'submitted', submittedAt: { lt: personalCut } },
+            ],
+          },
+          data: SCRUBBED_PERSONAL_FIELDS(now),
+        });
+        return { images, scrubbed: scrub.count };
+      },
+      {
+        onStoreError: (storeId, err) =>
+          logger.error({ err, storeId }, '[instapay-receipt] retention failed'),
+      }
+    );
+    return parts.reduce(
+      (a, p) => ({ images: a.images + p.value.images, scrubbed: a.scrubbed + p.value.scrubbed }),
+      { images: 0, scrubbed: 0 }
+    );
+  }
+
+  /**
+   * The shopper's erasure: the receipts attached to the given orders lose their personal fields and their screenshot
+   * (the amount, reference and status stay with the order's financial record). Runs inside the erasure transaction;
+   * the object deletes happen after it commits.
+   */
+  static async scrubForOrders(
+    tx: Prisma.TransactionClient,
+    storeId: string,
+    orderIds: string[]
+  ): Promise<number> {
+    if (orderIds.length === 0) return 0;
+    const rows = await tx.instapayReceipt.findMany({
+      where: { storeId, orderId: { in: orderIds }, kind: 'order' },
+      select: { id: true },
+    });
+    if (rows.length === 0) return 0;
+    const res = await tx.instapayReceipt.updateMany({
+      where: { storeId, id: { in: rows.map(r => r.id) } },
+      data: SCRUBBED_PERSONAL_FIELDS(new Date()),
+    });
+    // The screenshots are NOT deleted here: this runs inside the erasure transaction, and an object delete before its
+    // commit would lose the evidence if the erasure rolls back (and race the commit). The rows are marked
+    // (`personal_scrubbed_at`) and the next retention sweep deletes their images.
+    return res.count;
   }
 
   /** Free a (approved) receipt's reference after its payment was VOIDED (recorded in error). */

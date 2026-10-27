@@ -457,10 +457,17 @@ export class InstapayService {
         },
       });
       // The merchant's confirm IS the approval of the shopper's submitted receipt(s).
-      await prisma.instapayReceipt.updateMany({
-        where: { storeId, kind: 'order', orderId, status: 'submitted' },
-        data: { status: 'approved', reviewedBy: args.actorUserId, reviewedAt: now },
-      });
+      const approvedReceiptIds = await InstapayReceiptService.approveSubmitted(
+        prisma as unknown as Prisma.TransactionClient,
+        storeId,
+        { orderId },
+        args.actorUserId,
+        now
+      );
+      // The screenshot has done its job once a human approved the payment (M-003): delete it after the COMMIT.
+      after('instapay.receipt.image-delete', () =>
+        InstapayReceiptService.deleteImages(storeId, approvedReceiptIds)
+      );
       await prisma.orderEvent.create({
         data: {
           storeId,

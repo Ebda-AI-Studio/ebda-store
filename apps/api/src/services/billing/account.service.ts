@@ -834,6 +834,8 @@ export type ManualPaymentResult = {
   billingEventId: string;
   periodStart?: Date;
   periodEnd?: Date;
+  /** @internal receipts approved by this payment; consumed (and stripped) by recordManualPayment */
+  approvedReceiptIds?: string[];
 };
 
 /** The idempotency key of a manual payment: one per (method, payer reference). */
@@ -1015,20 +1017,28 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       where: { storeId: input.storeId, billingEventId: eventId },
       select: { id: true },
     });
+    let approvedReceiptIds: string[] = [];
     if (confirmed.length) {
-      await tx.instapayReceipt.updateMany({
-        where: {
-          storeId: input.storeId,
-          claimId: { in: confirmed.map(c => c.id) },
-          status: 'submitted',
-        },
-        data: { status: 'approved', reviewedBy: input.actorId, reviewedAt: now },
-      });
+      approvedReceiptIds = await InstapayReceiptService.approveSubmitted(
+        tx,
+        input.storeId,
+        { claimIds: confirmed.map(c => c.id) },
+        input.actorId,
+        now
+      );
     }
-    return { duplicate: false, billingEventId: eventId, periodStart, periodEnd };
+    return {
+      duplicate: false,
+      billingEventId: eventId,
+      periodStart,
+      periodEnd,
+      approvedReceiptIds,
+    };
   });
 
   if (!result.duplicate) {
+    // the approved receipts' screenshots are deleted now that the approval has committed (M-003; a miss is retried weekly)
+    await InstapayReceiptService.deleteImages(input.storeId, result.approvedReceiptIds ?? []);
     await featureService.invalidateCache(input.storeId).catch(() => undefined);
     await reconcileStoreAccess(input.storeId);
     await runBillingEffects([
@@ -1042,7 +1052,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       { kind: 'subscription_paid', storeId: input.storeId, billingEventId: result.billingEventId },
     ]);
   }
-  return result;
+  const { approvedReceiptIds: _internal, ...publicResult } = result;
+  return publicResult;
 }
 
 // ───────────────────────── manual refund / void ───────────────────────────

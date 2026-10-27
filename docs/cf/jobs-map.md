@@ -1,6 +1,6 @@
 # Background jobs on Cloudflare (G5)
 
-Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 92 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
+Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 93 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
 
 ## Primitives
 
@@ -39,6 +39,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `audit-log-archive-weekly`                 | 2-housekeeping  | queue    | cron    | yes         |
 | `bulk-import-orphan-cleanup`               | 2-housekeeping  | queue    | cron    |             |
 | `domain-claim-sweep`                       | 2-housekeeping  | queue    | cron    |             |
+| `instapay-receipt-retention-daily`         | 2-housekeeping  | queue    | cron    |             |
 | `order-anonymize-5y-monthly`               | 2-housekeeping  | queue    | cron    |             |
 | `r2-orphan-sweep`                          | 2-housekeeping  | queue    | cron    |             |
 | `search-log-purge-daily`                   | 2-housekeeping  | queue    | cron    |             |

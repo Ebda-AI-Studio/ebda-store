@@ -135,6 +135,11 @@ export interface InstapayReceiptExtraction {
   direction: 'sent' | 'received' | 'unknown';
   looksEdited: boolean;
   confidence: number;
+  /**
+   * RECEIVER-CHECK-1: did the screenshot show one of the store's expected receivers? A yes / no only (never any receiver
+   * text); null = not asked (no expected receiver configured) or the model gave no clear answer.
+   */
+  receiverMatch?: boolean | null;
 }
 
 export type InstapayReceiptStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'voided';

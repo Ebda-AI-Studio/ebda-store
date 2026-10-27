@@ -43,7 +43,7 @@ const png = (name: string) => readFileSync(path.join(FIX, `${name}.png`));
 
 afterEach(() => setReceiptModelCallForTests(null));
 
-describe('the AI read (recorded Gemini responses, two real layouts)', () => {
+describe('the AI read (recorded answers, two real layouts; personal fields dropped)', () => {
   it('"sent" layout: the payer\'s own receipt', () => {
     const e = normalizeReceiptExtraction(recorded('receipt-sent'));
     expect(e).toMatchObject({
@@ -51,30 +51,36 @@ describe('the AI read (recorded Gemini responses, two real layouts)', () => {
       reference: '482193377105',
       transferDate: '2026-10-05',
       transferTime: '15:15',
-      payerName: 'SYNTH TEST PAYER',
-      payerAddress: 'synthpayer@instapay',
-      payerBank: 'CIB',
-      receiverName: 'DEMO STORE LLC',
-      receiverHandle: 'demostore@instapay',
-      note: 'Order SYN-1001',
-      direction: 'sent',
       looksEdited: false,
+    });
+    // The recorded (old Gemini) answer ALSO carried names, bank, handle and note; the Workers AI reader never asks for
+    // them and DROPS them if a model volunteers them (M-003): nothing personal survives normalisation.
+    expect(e).toMatchObject({
+      payerName: null,
+      payerAddress: null,
+      payerMobile: null,
+      payerBank: null,
+      receiverName: null,
+      receiverHandle: null,
+      receiverMobile: null,
+      note: null,
+      direction: 'unknown',
     });
     expect(e.confidence).toBeGreaterThan(0.7);
   });
 
-  it('"received" layout: the masked payer name is kept exactly as shown', () => {
+  it('"received" layout: amount, reference and time are read; the masked payer details are NOT kept', () => {
     const e = normalizeReceiptExtraction(recorded('receipt-received'));
     expect(e).toMatchObject({
       amountMinor: 349_000,
       reference: '771034829156',
       transferDate: '2026-10-07',
       transferTime: '21:40',
-      payerName: 'SYN*** T*** P***',
-      payerMobile: '010****4321',
+      payerName: null,
+      payerMobile: null,
       payerAddress: null,
-      receiverHandle: 'ebdatest@instapay',
-      direction: 'received',
+      receiverHandle: null,
+      direction: 'unknown',
     });
   });
 
@@ -232,6 +238,50 @@ describe('automatic checks flag, they never block', () => {
   });
   it('a clean receipt has no flags', () => {
     expect(computeReceiptFlags(base())).toEqual([]);
+  });
+  it('RECEIVER-CHECK-1: the model says the receiver is NOT the expected account -> RECEIVER_MISMATCH, even when the payer typed the right one', () => {
+    const b = base();
+    const f = computeReceiptFlags({ ...b, extraction: { ...b.extraction!, receiverMatch: false } });
+    expect(f).toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: the model confirms the receiver -> no receiver flag even if the payer left it blank', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      fields: { ...b.fields, receiverHandle: null, receiverMobile: null },
+      extraction: { ...b.extraction!, receiverMatch: true },
+    });
+    expect(f).not.toContain('RECEIVER_MISSING');
+    expect(f).not.toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: the payer TYPED a wrong receiver and the model says yes -> still RECEIVER_MISMATCH (a model yes never hides a typed mismatch)', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      fields: { ...b.fields, receiverHandle: 'someone-else@instapay', receiverMobile: null },
+      extraction: { ...b.extraction!, receiverMatch: true },
+    });
+    expect(f).toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: no expected receiver configured -> no MISMATCH flag from the model (null), typed check unchanged', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      expectedReceivers: [],
+      extraction: { ...b.extraction!, receiverMatch: null },
+    });
+    expect(f).not.toContain('RECEIVER_MISMATCH');
+  });
+  it('RECEIVER-CHECK-1: the AI failed -> AI_UNAVAILABLE and the typed check as today (manual review, nothing auto-approved)', () => {
+    const b = base();
+    const f = computeReceiptFlags({
+      ...b,
+      extraction: null,
+      extractionStatus: 'failed',
+      expectedReceivers: ['other@instapay'],
+    });
+    expect(f).toContain('AI_UNAVAILABLE');
+    expect(f).toContain('RECEIVER_MISMATCH'); // the payer-typed comparison still runs
   });
   it('each check raises its own flag', () => {
     const b = base();
