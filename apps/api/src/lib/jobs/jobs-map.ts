@@ -164,6 +164,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'search-product-index': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron' },
   'wa-store-events': { group: '5-integrations', kind: 'queue', trigger: 'event' },
+  'ci-erasure-second-pass': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
+  'ci-outcomes': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'webhook-deliver': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'webhook-fanout': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'campaign-send': { group: '6-comms', kind: 'workflow', trigger: 'event' },

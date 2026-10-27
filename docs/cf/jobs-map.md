@@ -1,6 +1,6 @@
 # Background jobs on Cloudflare (G5)
 
-Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 94 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
+Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 96 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
 
 ## Primitives
 
@@ -95,6 +95,8 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `search-index-backstop`                    | 5-integrations  | workflow | cron    |             |
 | `wa-plan-sync`                             | 5-integrations  | queue    | cron    |             |
 | `wa-store-events`                          | 5-integrations  | queue    | event   |             |
+| `ci-erasure-second-pass`                   | 5-integrations  | workflow | event   |             |
+| `ci-outcomes`                              | 5-integrations  | queue    | event   |             |
 | `search-product-index`                     | 5-integrations  | workflow | event   |             |
 | `webhook-deliver`                          | 5-integrations  | workflow | event   |             |
 | `webhook-fanout`                           | 5-integrations  | workflow | event   |             |
