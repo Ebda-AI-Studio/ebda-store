@@ -385,6 +385,22 @@
       "pgWhere": "\"event_type\" IN ('refund_webhook_absorbed', 'refund_failed')"
     },
     {
+      "name": "products_store_id_barcode_uniq",
+      "table": "products",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"store_id\", \"barcode\"",
+      "pgWhere": "\"barcode\" IS NOT NULL AND \"deleted_at\" IS NULL"
+    },
+    {
+      "name": "product_variants_product_id_barcode_uniq",
+      "table": "product_variants",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "\"product_id\", \"barcode\"",
+      "pgWhere": "\"barcode\" IS NOT NULL"
+    },
+    {
       "name": "provider_activation_requests_one_live",
       "table": "provider_activation_requests",
       "db": "d1",
@@ -1368,6 +1384,18 @@
       "name": "payment_events_claim_single_outcome_key",
       "table": "payment_events",
       "disposition": "store-do:payment_events"
+    },
+    {
+      "kind": "index",
+      "name": "products_store_id_barcode_uniq",
+      "table": "products",
+      "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "product_variants_product_id_barcode_uniq",
+      "table": "product_variants",
+      "disposition": "store-do:product_variants"
     }
   ],
   "decimals": [

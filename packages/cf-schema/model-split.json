@@ -463,6 +463,10 @@
     "target": "analytics",
     "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
   },
+  "QrScanDaily": {
+    "target": "analytics",
+    "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
+  },
   "GscDailyMetric": {
     "target": "analytics",
     "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
