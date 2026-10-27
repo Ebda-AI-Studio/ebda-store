@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@ebda/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { runInTenantContext, withStore } from '@ebda/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import {
   findOrderByIdempotencyKey,
   getOrderStoreId,
@@ -329,18 +329,28 @@ function generateIdempotencyKey(
  * Returns undefined when we can't match the payload to a Payment row;
  * handleWebhook then finds no payment and acknowledges.
  *
- * Runs through a SECURITY DEFINER lookup (`ebda_webhook_resolve_store`, exact
+ * Runs through a SECURITY DEFINER lookup (`ebda_webhook_resolve_store_scoped`: within the provider, the URL store first; exact
  * match on the provider reference, store id only) because the storeId is unknown
  * at this point. Once it is known the caller switches to runInTenantContext for
  * all subsequent writes.
  */
 async function resolveStoreIdFromWebhookPayload(
   provider: PaymentProvider,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  urlStoreId?: string
 ): Promise<string | undefined> {
   const { transactionId, invoiceId } = webhookRefs(provider, payload);
   if (!transactionId && !invoiceId) return undefined;
-  return (await resolveStoreFromWebhookRef({ transactionId, invoiceId })) ?? undefined;
+  // Within the delivering provider, and the URL's store first: a reference shared with another provider's or
+  // another store's payment must not decide which store owns THIS delivery (Ruling ITEST-14).
+  return (
+    (await resolveStoreFromWebhookRef({
+      transactionId,
+      invoiceId,
+      provider,
+      preferStoreId: urlStoreId ?? null,
+    })) ?? undefined
+  );
 }
 
 // ==========================================
@@ -489,7 +499,7 @@ async function handleGatewayWebhook(
     // correctly scoped. When storeId is undefined (platform-level path)
     // handleWebhook is called directly with no wrapper — see
     // processWebhookInline's no-storeId branch for why.
-    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
+    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload, urlStoreId);
 
     // The Egyptian gateways have per-merchant credentials only (no platform-level secret), so a
     // delivery that names no payment of ours cannot be verified or attributed to anyone. It is NOT
@@ -715,14 +725,25 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   const { order, merchantOrderId, merchantRefNumber } = req.query;
   const transactionId = (order || merchantOrderId || merchantRefNumber) as string;
 
+  // Which gateway sent the shopper back, from the parameter it uses: the lookup stays inside that provider.
+  const callbackProvider = order ? 'paymob' : merchantOrderId ? 'kashier' : 'fawry';
+
+  // ONE store resolution for the whole callback (provider-scoped, Ruling ITEST-14): the status read and the
+  // storefront the shopper is sent back to must come from the same store, which two separate definer lookups on
+  // a shared reference could not promise.
+  const resolveCallbackStore = async (): Promise<string | null> =>
+    transactionId
+      ? resolveStoreFromWebhookRef({ transactionId, provider: callbackProvider })
+      : null;
+
   // Resolve the correct storefront URL — custom domain if the store has one,
   // otherwise fall back to the platform's web URL.
-  async function getStorefrontUrl(): Promise<string> {
+  async function getStorefrontUrl(storeId: string | null): Promise<string> {
     try {
-      if (!transactionId) return config.webUrl;
-      // The store is not known yet: a definer maps the provider's transaction id
-      // to the owning store's slug/domain (`ebda_storefront_for_payment_ref`).
-      const store = await getStorefrontForPaymentRef(transactionId);
+      if (!storeId) return config.webUrl;
+      const store = await withStore(storeId, () =>
+        prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
+      );
       if (store) return storefrontOrigin(store);
       return config.webUrl;
     } catch {
@@ -738,14 +759,14 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   try {
     // Under strict RLS the payment is found inside its store's scope (the store comes from
     // the same definer the webhooks use).
-    const callbackStoreId = await resolveStoreFromWebhookRef({ transactionId });
+    const callbackStoreId = await resolveCallbackStore();
     const [status, baseUrl] = await Promise.all([
       callbackStoreId
         ? withStore(callbackStoreId, () =>
             PaymentService.getPaymentStatus(transactionId, undefined, callbackStoreId)
           )
         : PaymentService.getPaymentStatus(transactionId),
-      getStorefrontUrl(),
+      getStorefrontUrl(callbackStoreId),
     ]);
 
     if (status.status === 'completed') {

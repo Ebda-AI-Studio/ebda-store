@@ -59,7 +59,11 @@ describe.skipIf(!hasDb)(
                WHEN 300 THEN 'S/XL' || g || ' ' WHEN 400 THEN '(XL) ' || g || ' ' ELSE '' END || md5('n' || g), md5('a' || g), md5('s' || g),
              repeat('quality cotton item ', 17), ${tag} || '-' || g, 1000, 'active', now()
       FROM generate_series(1, ${ROWS}::int) g`;
-      await prisma.$executeRaw`ANALYZE public.products`;
+      // VACUUM, not just ANALYZE: a freshly bulk-inserted table has an all-visible fraction of 0 until
+      // (auto)vacuum runs, and the planner's choice between this index and a seq scan flips when autovacuum
+      // lands mid-file. That made the "index was not scanned" counters pass or fail by timing alone
+      // (measured: calls 1-4 seq scan, then the index every call once autovacuum had run).
+      await prisma.$executeRaw`VACUUM (ANALYZE) public.products`;
     }, 120_000);
 
     afterAll(async () => {

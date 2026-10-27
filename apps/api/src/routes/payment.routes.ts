@@ -106,6 +106,8 @@ const createPaymentSchema = z.object({
 
 const refundSchema = z.object({
   transactionId: z.string(),
+  /** Narrows the lookup when two providers hold the same reference string (Ruling ITEST-14). */
+  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
   amount: z.number().int().positive().optional(),
   reason: z.string().optional(),
 });
@@ -1063,7 +1065,10 @@ router.get(
 
       // Strict RLS: a contextless read sees nothing, so the owning store is resolved from the
       // provider reference through the definer, and every read below runs inside that store.
-      const statusStoreId = await resolveStoreFromWebhookRef({ transactionId });
+      const statusStoreId = await resolveStoreFromWebhookRef({
+        transactionId,
+        provider: typeof provider === 'string' ? provider : undefined,
+      });
       if (!statusStoreId) {
         notFound();
         return;
@@ -1131,6 +1136,7 @@ router.post(
       // reference to its store and the payment is read inside that store. Ownership follows.
       const resolvedRefundStore = await resolveStoreFromWebhookRef({
         transactionId: data.transactionId,
+        provider: data.provider,
       });
       const paymentRow = resolvedRefundStore
         ? await withStore(resolvedRefundStore, () =>
