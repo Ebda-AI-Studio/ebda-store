@@ -55,6 +55,16 @@ export function activeMs(profile) {
   return us / 1000;
 }
 
+/**
+ * The stable estimate of a set of startup-CPU samples: the MIN of the real ones. A sample of 0 (or less, or NaN) is a
+ * profile that recorded nothing, not a fast start; taking it as the minimum made the base read "not measured (base 0)"
+ * and failed an unrelated PR (#260, 2026-10-27: samples 127.8, 128.6, 0, 147.2, 124.9). 0 when no sample is real.
+ */
+export function minSample(xs) {
+  const real = xs.filter(x => Number.isFinite(x) && x > 0);
+  return real.length ? Math.min(...real) : 0;
+}
+
 export function median(xs) {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
@@ -246,10 +256,23 @@ async function main() {
     };
     const baselineRef = arg('baseline-ref');
     let base;
+    let baselineFailed = false;
     const samples = [];
     const baseSamples = [];
     try {
-      if (baselineRef) base = buildBaseline(baselineRef, config);
+      if (baselineRef) {
+        try {
+          base = buildBaseline(baselineRef, config);
+        } catch (err) {
+          // The baseline borrows THIS checkout's installed deps, so a PR that REMOVES a dependency main still
+          // imports cannot build main ("Could not resolve 'resend'"). The PR's own build above succeeded, so
+          // say so loudly, enforce the size budgets, and skip the CPU comparison (no baseline to compare with).
+          baselineFailed = true;
+          console.warn(
+            `::warning::baseline ${baselineRef} did not build with this PR's dependencies; startup CPU is NOT compared. ${String(err).split('\n')[0]}`
+          );
+        }
+      }
       // Alternate PR/base so a load spike hits both, never just one side.
       for (let i = 0; i < runs; i++) {
         samples.push(await profileOnce(outdir, compat));
@@ -264,7 +287,7 @@ async function main() {
     }
     const measured = {
       // MIN of the runs: scheduler noise only ever adds CPU time, so the minimum is the stable estimate.
-      startupCpuMs: Math.min(...samples),
+      startupCpuMs: minSample(samples),
       bundleBytes: bytes,
       bundleGzipBytes: gzip,
     };
@@ -275,7 +298,7 @@ async function main() {
         ? {
             baseline: {
               ref: baselineRef,
-              startupCpuMs: Math.min(...baseSamples),
+              startupCpuMs: minSample(baseSamples),
               samplesMs: baseSamples.map(s => Math.round(s * 10) / 10),
             },
           }
@@ -297,7 +320,7 @@ async function main() {
       );
     }
     const problems = [
-      ...budgetProblems(measured, budget, { skipCpu: !!base }),
+      ...budgetProblems(measured, budget, { skipCpu: !!base || baselineFailed }),
       ...(base
         ? relativeProblems(measured.startupCpuMs, record.baseline.startupCpuMs, budget.relative)
         : []),

@@ -27,8 +27,8 @@ vi.mock('@ebda/database', () => {
     withStore: async (_id: string, fn: (t: typeof tx) => unknown) => fn(tx),
   };
 });
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: {
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: {
     sendBrandedEmail: async (_s: string, a: { html: string }) => {
       sent.push(a.html);
     },

@@ -31,6 +31,10 @@ const key = (f: Finding) => `${f.job}|${f.rule}|${f.text}`;
 
 export const RULED: Array<[RegExp, string]> = [
   [
+    /^gold-rate-staleness-watch\.ts#handleGoldRateStalenessWatch\|await-outside-step\|await sendAlert\(/,
+    'sendAlert is a Redis throttle key plus one Telegram fetch: no Prisma, so it needs no step connection (the Worker bindings are set in run())',
+  ],
+  [
     /^(order-created-stuck-sweep|order-status-fanout-stuck-sweep|payment-reconcile-sweep|refund-reversal-stuck-sweep)\.ts#\w+\|clock-outside-step\|Date\.now\(\)$/,
     'sweep cutoffs: a wall-clock read that only parameterises the find step (read inside the step, memoised) or an alert age threshold; a replay or a step retry shifts it by seconds and the next tick re-evaluates, every write is guarded by its own state predicate',
   ],
@@ -168,7 +172,7 @@ export function auditFile(file: string): Finding[] {
   let fileHasWorkflow = false;
   const helpers: Array<{ name: string; body: ts.Node }> = [];
   const takesStep = (fn: ts.SignatureDeclaration): boolean =>
-    fn.parameters.some(p => p.name.getText(sf) === 'step');
+    fn.parameters.some(p => /\bstep\b/.test(p.name.getText(sf))); // `step` or `{ step, ... }`
   for (const st of sf.statements) {
     if (ts.isFunctionDeclaration(st) && st.name && st.body && takesStep(st)) {
       helpers.push({ name: st.name.text, body: st.body });

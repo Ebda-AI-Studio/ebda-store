@@ -56,9 +56,9 @@ vi.mock('@api/middleware/security', () => ({
   writeLimiter: (_req: any, _res: any, next: any) => next(),
   publicLimiter: (_req: any, _res: any, next: any) => next(),
 }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendBrandedBatch: mocks.sendBrandedBatch },
-  ResendSendError: class extends Error {},
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendBrandedBatch: mocks.sendBrandedBatch },
+  EmailSendError: class extends Error {},
 }));
 vi.mock('@api/services/email.service', async importOriginal => ({
   ...(await importOriginal<any>()),

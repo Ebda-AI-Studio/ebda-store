@@ -79,16 +79,16 @@ not even be marked), `legal.notice.withdraw_failed`. Each names the document and
 
 ### Failure reasons (`error` on a failed delivery)
 
-| Reason                  | Meaning                                                                                                                                                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SEND_WINDOW_EXHAUSTED` | The job hit its 900-step cap; the rest were marked failed (P1 `legal.notice.window_exhausted`). Retry failed.                                                                                                   |
-| `SEND_JOB_FAILED`       | The Inngest job died after retries; `onFailure` marked the unsent rows failed. Retry failed.                                                                                                                    |
-| `RESEND_NOT_CONFIGURED` | Production without a Resend key. Checked ONCE at the start of each run: every queued row is failed at once, nobody is mailed, P1 `legal.notice.mailer_not_configured`. Fix `RESEND_API_KEY`, then Retry failed. |
-| `USER_GONE`             | The account was deleted (or no longer exists) when its turn came. Not mailed.                                                                                                                                   |
-| `NOT_RECIPIENT`         | The account is no longer a store owner (`store_admin`) when its turn came. Not mailed.                                                                                                                          |
-| `TIMEOUT_UNKNOWN`       | The provider call timed out or the connection dropped: the mail MAY have been delivered. Listed apart on the page ("may have been delivered: check before re-sending"). Retry failed NEVER re-sends these.      |
-| `RETRY_ENQUEUE_FAILED`  | A Retry failed could not start its run; the rows went back to failed. Press Retry failed again.                                                                                                                 |
-| any other text          | The provider's error, emails scrubbed (fail-closed) and cut to 300 characters.                                                                                                                                  |
+| Reason                  | Meaning                                                                                                                                                                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEND_WINDOW_EXHAUSTED` | The job hit its 900-step cap; the rest were marked failed (P1 `legal.notice.window_exhausted`). Retry failed.                                                                                                                       |
+| `SEND_JOB_FAILED`       | The Inngest job died after retries; `onFailure` marked the unsent rows failed. Retry failed.                                                                                                                                        |
+| `MAIL_NOT_CONFIGURED`   | Production without the `EMAIL` send binding. Checked ONCE at the start of each run: every queued row is failed at once, nobody is mailed, P1 `legal.notice.mailer_not_configured`. Fix the `EMAIL` send binding, then Retry failed. |
+| `USER_GONE`             | The account was deleted (or no longer exists) when its turn came. Not mailed.                                                                                                                                                       |
+| `NOT_RECIPIENT`         | The account is no longer a store owner (`store_admin`) when its turn came. Not mailed.                                                                                                                                              |
+| `TIMEOUT_UNKNOWN`       | The provider call timed out or the connection dropped: the mail MAY have been delivered. Listed apart on the page ("may have been delivered: check before re-sending"). Retry failed NEVER re-sends these.                          |
+| `RETRY_ENQUEUE_FAILED`  | A Retry failed could not start its run; the rows went back to failed. Press Retry failed again.                                                                                                                                     |
+| any other text          | The provider's error, emails scrubbed (fail-closed) and cut to 300 characters.                                                                                                                                                      |
 
 Not delivery reasons, for the record: `SEND_ROW_MISSING` is a job SKIP result (the run's send row was
 withdrawn or replaced; nobody was mailed, no row written), and `WITHDRAW_FAILED` is an API 502 on
@@ -117,7 +117,7 @@ its mail, and `sending`/`sent` rows are never touched.
 1. **Stalled / did not start** -> press **Resume**. It re-emits the email run for the same send row.
    If recipients were never listed, they are listed now; otherwise only rows still `queued` are
    mailed.
-2. **Failed emails** -> fix the cause first (e.g. `RESEND_API_KEY`), then press **Retry failed (N)**.
+2. **Failed emails** -> fix the cause first (e.g. the `EMAIL` send binding), then press **Retry failed (N)**.
    It moves that version's `failed` rows back to `queued` (an UPDATE; DELETE is revoked on the
    table) and resumes. If it says "Nothing to retry", nothing is marked failed now.
 3. **May have been delivered (`TIMEOUT_UNKNOWN`)** -> the page lists these separately and Retry

@@ -53,6 +53,8 @@ import {
   fromMinor,
   REGION,
   isValidEgyptianMobile,
+  WHATSAPP_OPTIN_LABEL,
+  WHATSAPP_OPTIN_NOTE,
 } from '@ebda/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
@@ -2433,16 +2435,10 @@ export default function CheckoutClient() {
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
-                                {t(
-                                  'Send me offers and reminders on WhatsApp',
-                                  'ابعتلي عروض وتذكيرات على واتساب'
-                                )}
+                                {t(WHATSAPP_OPTIN_LABEL.en, WHATSAPP_OPTIN_LABEL.ar)}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {t(
-                                  'Marketing messages only. Order updates are separate. You can stop them anytime.',
-                                  'رسائل تسويقية بس، وتحديثات الطلب منفصلة. وتقدر توقفها في أي وقت.'
-                                )}
+                                {t(WHATSAPP_OPTIN_NOTE.en, WHATSAPP_OPTIN_NOTE.ar)}
                               </span>
                               {whatsAppUnproven && (
                                 <span role="status" className="text-xs font-medium text-foreground">
