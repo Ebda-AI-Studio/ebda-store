@@ -42,4 +42,24 @@ describe('sentry probe', () => {
     expect(down).toMatchObject({ status: null, project: '4512212920565840' });
     expect(await probeSentry(undefined)).toEqual({ error: 'no usable SENTRY_DSN in this context' });
   });
+
+  it('can send the real failure as an error event with tags (the direct fallback)', async () => {
+    const f = vi.fn(async () => new Response('{"id":"x"}', { status: 200 }));
+    const r = await probeSentry(DSN, f as never, {
+      message: 'job failed: x',
+      errorName: 'Error',
+      errorMessage: 'boom',
+      tags: { job: 'x', group: '4-ai' },
+      extra: { instanceId: 'i1', triggeringEvent: 'a/b' },
+    });
+    const body = (f.mock.calls[0] as unknown as [string, { body: string }])[1].body.split('\n');
+    const ev = JSON.parse(body[2]);
+    expect(ev).toMatchObject({
+      level: 'error',
+      message: 'job failed: x',
+      tags: { job: 'x', group: '4-ai' },
+      exception: { values: [{ type: 'Error', value: 'boom' }] },
+    });
+    expect(r).toMatchObject({ status: 200 });
+  });
 });
