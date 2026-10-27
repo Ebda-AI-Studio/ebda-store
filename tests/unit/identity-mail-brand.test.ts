@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ sent: [] as Array<Record<string, unknown>> }));
 vi.mock('@api/config', () => ({
   config: { nodeEnv: 'production', adminUrl: 'https://store.ebda.app', resendApiKey: 're_x' },
 }));
-vi.mock('@api/services/resend.service', () => ({ ResendService: { isConfigured: () => true } }));
+vi.mock('@api/services/mail-transport', () => ({ isMailTransportConfigured: () => true }));
 vi.mock('@api/services/email.service', async () => {
   const actual = await vi.importActual<typeof import('@api/services/email.service')>(
     '@api/services/email.service'
