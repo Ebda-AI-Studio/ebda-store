@@ -1,0 +1,33 @@
+/**
+ * Ruling ITEST-11: the repo's schemas are written against the zod 3 API, which zod 4 ships at `zod/v3`. A bare
+ * `from 'zod'` now yields the v4 API (no `.errors`, different error shapes), so new code must import `zod/v3`
+ * until a deliberate migration. The one allowed bare import is the regression test that exercises v4 on purpose.
+ */
+import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+
+const ROOT = path.resolve(__dirname, '../..');
+const ALLOWED = new Set([
+  'tests/unit/zod-huge-array-bounds.test.ts',
+  'tests/unit/zod-imports-use-v3.test.ts',
+]);
+
+// an import / export from 'zod', or a require('zod') binding (comments that merely mention it do not count)
+const BARE_ZOD = String.raw`^[[:space:]]*(import|export)[[:space:]].*from ['"]zod['"]|^[[:space:]]*(const|let|var)[[:space:]].*require\(['"]zod['"]\)`;
+
+describe('zod imports', () => {
+  it("no tracked source file imports bare 'zod' (use 'zod/v3')", () => {
+    let out = '';
+    try {
+      out = execFileSync('git', ['grep', '-lE', BARE_ZOD, '--', '*.ts', '*.tsx', '*.mjs', '*.js'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      });
+    } catch {
+      out = ''; // git grep exits 1 on no match
+    }
+    const offenders = out.split('\n').filter(f => f && !ALLOWED.has(f));
+    expect(offenders).toEqual([]);
+  });
+});
