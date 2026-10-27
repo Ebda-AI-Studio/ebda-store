@@ -70,7 +70,7 @@ jobs:
         working-directory: apps/api
         run: |
           npx wrangler secret list --config .wrangler.deploy.jsonc > /tmp/ebda-secret-names.json
-          node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); for (const name of ["JWT_SECRET", "ENCRYPTION_KEY", "RESEND_API_KEY"]) { if (!names.has(name)) throw new Error(`Missing Worker secret: ${name}`); } for (const name of ["SEARCH_SEMANTIC_ENABLED"]) { if (names.has(name)) throw new Error(`${name} must be a wrangler.jsonc var, not a Worker secret (Ruling SEARCH-T10-1)`); }'
+          node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); for (const name of ["JWT_SECRET", "ENCRYPTION_KEY", "SUITE_BUYER_KEY_SECRET"]) { if (!names.has(name)) throw new Error(`Missing Worker secret: ${name}`); } for (const name of ["SEARCH_SEMANTIC_ENABLED"]) { if (names.has(name)) throw new Error(`${name} must be a wrangler.jsonc var, not a Worker secret (Ruling SEARCH-T10-1)`); }'
       - name: Pre-deploy smoke - boot THIS Worker on workerd (refuse to deploy a Worker that cannot boot)
         # Ruling DEPLOY-SAFETY-1. Fresh Postgres migrated from scratch, the Worker built from the
         # deploy config and booted in local workerd; /health and a tenant-scoped public read must

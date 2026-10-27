@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import { withStore, storeDirectory } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { storeFilter } from '../../jobs/store-scope';
 import { sendAlert } from '../../../services/alerts.service';
 
 import { REGION } from '@ebda/shared';
@@ -20,11 +21,11 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
     concurrency: { limit: 1 }, // serialize across all stores
     triggers: [{ cron: `TZ=${REGION.timezone} 0 1 * * *` }], // 01:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // FORCE RLS: cross-tenant cron — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores-with-accounting', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory(s => s.accountingEnabled).then(list =>
+      storeDirectory(storeFilter(event, s => s.accountingEnabled)).then(list =>
         list.map(s => ({ id: s.id, name: s.name, slug: s.slug }))
       )
     );

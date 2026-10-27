@@ -53,6 +53,8 @@ import {
   fromMinor,
   REGION,
   isValidEgyptianMobile,
+  WHATSAPP_OPTIN_LABEL,
+  WHATSAPP_OPTIN_NOTE,
 } from '@ebda/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
@@ -500,6 +502,15 @@ export default function CheckoutClient() {
   const showCartEmailOptIn = store?.cartEmailOptIn === true;
   const cartEmailRecorded = useRef(false);
   const showSmsOptIn = store?.smsMarketingOptIn === true;
+  // "Send me offers and reminders on WhatsApp": MARKETING consent (Ruling WA-CONSENT-1). Unticked by
+  // default, shown only when the store has Ebda WhatsApp linked. Ticking records consent against
+  // the phone (server stores only the hashed buyer key); unticking withdraws it.
+  const [whatsAppOptIn, setWhatsAppOptIn] = useState(false);
+  // Needs an account: the number comes from the account, never from this form (security review).
+  const showWhatsAppOptIn = store?.whatsappMarketingOptIn === true && isAuthenticated;
+  const whatsAppRecorded = useRef(false);
+  // Shown under the box when the number cannot be proven yet (no silent failure).
+  const [whatsAppUnproven, setWhatsAppUnproven] = useState(false);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -1062,6 +1073,49 @@ export default function CheckoutClient() {
     }, 600);
     return () => clearTimeout(timeoutId);
   }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
+
+  // Show the customer's REAL current consent (they may have ticked it on an earlier visit), so
+  // an already-granted box can be unticked to withdraw.
+  useEffect(() => {
+    if (!showWhatsAppOptIn) return;
+    let cancelled = false;
+    api
+      .get<{ granted: boolean; proven: boolean }>('/public/cart/whatsapp-optin')
+      .then(res => {
+        if (cancelled || !res.success) return;
+        if (res.data?.proven === false) setWhatsAppUnproven(true);
+        if (res.data?.granted !== true) return;
+        whatsAppRecorded.current = true;
+        setWhatsAppOptIn(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showWhatsAppOptIn]);
+
+  // Record / withdraw the WhatsApp marketing consent. Debounced; only withdraws if a tick was
+  // actually recorded. No phone is sent: the server uses the signed-in customer's own number.
+  useEffect(() => {
+    if (!showWhatsAppOptIn) return;
+    if (!whatsAppOptIn && !whatsAppRecorded.current) return;
+    const timeoutId = setTimeout(() => {
+      api
+        .post('/public/cart/whatsapp-optin', { consent: whatsAppOptIn, language })
+        .then(res => {
+          if (res.success) {
+            whatsAppRecorded.current = whatsAppOptIn;
+            setWhatsAppUnproven(false);
+          } else if (whatsAppOptIn) {
+            // PHONE_UNPROVEN (or no phone on the account): untick and explain, the box stays usable.
+            setWhatsAppOptIn(false);
+            setWhatsAppUnproven(true);
+          }
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(timeoutId);
+  }, [showWhatsAppOptIn, whatsAppOptIn, language]);
 
   const autoAppliedPromoRef = useRef(false);
   useEffect(() => {
@@ -2338,6 +2392,38 @@ export default function CheckoutClient() {
                           error={formErrors.phone}
                           className={CHECKOUT_FIELD}
                         />
+                        {showWhatsAppOptIn && (
+                          <label
+                            data-whatsapp-marketing-optin
+                            className="mt-2 flex min-h-11 cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={whatsAppOptIn}
+                              onChange={e => {
+                                setWhatsAppUnproven(false);
+                                setWhatsAppOptIn(e.target.checked);
+                              }}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="text-sm text-foreground">
+                                {t(WHATSAPP_OPTIN_LABEL.en, WHATSAPP_OPTIN_LABEL.ar)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t(WHATSAPP_OPTIN_NOTE.en, WHATSAPP_OPTIN_NOTE.ar)}
+                              </span>
+                              {whatsAppUnproven && (
+                                <span role="status" className="text-xs font-medium text-foreground">
+                                  {t(
+                                    'WhatsApp offers turn on after your first order with this number',
+                                    'نقدر نفعّل رسايل واتساب بعد أول طلب ليك بالرقم ده'
+                                  )}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        )}
                         {showSmsOptIn && (
                           <label
                             data-sms-marketing-optin

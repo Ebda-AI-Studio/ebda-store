@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   send: vi.fn(),
-  cfg: { emailProvider: 'cloudflare', resendApiKey: '' },
+  cfg: {},
 }));
 vi.mock('@api/config', () => ({ config: h.cfg }));
 
@@ -21,7 +21,6 @@ import {
 
 beforeEach(() => {
   h.send.mockReset();
-  h.cfg.emailProvider = 'cloudflare';
   clearCfBindings();
   setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, EMAIL: { send: h.send } });
 });
@@ -132,12 +131,5 @@ describe('undeliverable recipients (Ruling WA-LEGACY-1) on the Cloudflare path',
     await sendMail({ ...base, to: ['a@placeholder.invalid', 'buyer@example.com'] });
     expect(h.send).toHaveBeenCalledTimes(1);
     expect(h.send.mock.calls[0]![0].to).toEqual(['buyer@example.com']);
-  });
-
-  it('the same filter holds on the Resend path (no provider ever sees it)', async () => {
-    h.cfg.emailProvider = 'resend';
-    expect(await sendMail({ ...base, to: 'x@orders.invalid' })).toEqual({
-      id: 'skipped-undeliverable',
-    });
   });
 });

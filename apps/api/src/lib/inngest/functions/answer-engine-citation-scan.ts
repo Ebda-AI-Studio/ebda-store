@@ -266,7 +266,13 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
   async ({ event, step }) => {
     const { storeId } = event.data;
 
-    const enabled = await featureService.isFeatureEnabled(storeId, 'answer_engine_insights');
+    // One step for both gates: on a Workflow only step bodies hold a database connection.
+    const { enabled, store } = await step.run('gates', async () => ({
+      enabled: await featureService.isFeatureEnabled(storeId, 'answer_engine_insights'),
+      store: await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    }));
     if (!enabled) {
       logger.info(
         { storeId },
@@ -280,9 +286,6 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
     // excludes those via `isAiEligiblePlan` when enumerating stores, so
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts`'s on-demand plan gate).
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

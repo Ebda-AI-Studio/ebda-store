@@ -1697,6 +1697,41 @@ export const newsletterLimiter = rateLimit({
   },
 });
 
+// WhatsApp marketing-consent: per-CALLER ceiling (the signed-in customer), applied to grants AND
+// revocations so one customer cannot spam, but keyed on the user so nobody else's traffic can exhaust it.
+export const whatsappConsentUserLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-user'),
+  windowMs: 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => `u:${req.user?.userId ?? 'anon'}`,
+});
+
+// WhatsApp marketing-consent GRANTS: a per-STORE ceiling, keyed on the RESOLVED store id (set by the
+// opt-in chain before this runs), never on a raw client header.
+export const whatsappConsentStoreLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-store'),
+  windowMs: 60 * 1000,
+  max: Number(process.env.WA_CONSENT_STORE_RATE_LIMIT_PER_MIN) || 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: (req, res) =>
+    `s:${(res.locals.waStoreId as string | undefined) ?? ipKeyGenerator(req.ip ?? '')}`,
+});
+
 // Coupon validate limiter — public brute-force discovery protection.
 // 20 attempts per minute per IP is enough for a legitimate checkout flow
 // but prevents rapid enumeration of valid coupon codes.

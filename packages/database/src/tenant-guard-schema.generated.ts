@@ -72,6 +72,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       owner: 'User',
       credentials: 'StoreCredential',
+      whatsappLink: 'StoreWhatsAppLink',
+      whatsappConsents: 'StoreWhatsAppConsent',
       customerUsers: 'User',
       products: 'Product',
       categories: 'Category',
@@ -182,6 +184,22 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       billingReminders: 'BillingReminder',
       lifecycleEmails: 'StoreLifecycleEmail',
       staffInvites: 'StaffInvite',
+    },
+  },
+  {
+    name: 'StoreWhatsAppLink',
+    table: 'store_whatsapp_links',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'StoreWhatsAppConsent',
+    table: 'store_whatsapp_consents',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {

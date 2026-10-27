@@ -61,7 +61,8 @@
       "faqs": [],
       "howtos": [],
       "smsMarketingOptIn": false,
-      "cartEmailOptIn": false
+      "cartEmailOptIn": false,
+      "whatsappMarketingOptIn": false
     },
     "enabledFeatures": [
       "coupons",

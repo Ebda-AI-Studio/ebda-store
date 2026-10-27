@@ -10,6 +10,7 @@ FROM base AS deps
 COPY package.json package-lock.json* ./
 COPY apps/admin/package.json ./apps/admin/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/cf-schema/package.json ./packages/cf-schema/
 COPY packages/shared/package.json ./packages/shared/
 RUN npm ci --legacy-peer-deps
 

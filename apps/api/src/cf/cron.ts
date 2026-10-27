@@ -19,6 +19,7 @@ import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
 import { runBackupSweep, flaggedStoreIds, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
+import { syncStoreSchedules } from '../lib/jobs/store-schedule';
 
 const isJobCron = (cron: string): boolean => allJobCronStrings().includes(cron);
 
@@ -28,6 +29,8 @@ export interface CronJob {
 }
 
 export const CRON_SCHEDULE: Record<string, CronJob[]> = {
+  // Per-store job alarms (cf/store-schedule.ts): arm every live store's schedule, hourly.
+  '0 * * * *': [{ name: 'store-schedule-sync', run: () => syncStoreSchedules() }],
   // Abandoned-cart reminder emails (was every 15 min).
   '*/15 * * * *': [{ name: 'abandoned-cart', run: () => abandonedCartService.process() }],
   // Carrier tracking poll (was every 30 min).

@@ -13,13 +13,22 @@ import {
 } from '@api/lib/jobs/run-queue';
 import type { WorkflowStepLike } from '@api/lib/jobs/step-adapter';
 
+const sendAlert = vi.hoisted(() => vi.fn(async () => 'sent'));
+const captureException = vi.hoisted(() => vi.fn(() => 'evt-123'));
+const flush = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
+vi.mock('@sentry/cloudflare', () => ({ captureException, flush }));
+
 class NonRetryable extends Error {}
 
 const calls: string[] = [];
+const outputs: Record<string, unknown> = {};
 const wf: WorkflowStepLike = {
   async do(name, _cfg, cb) {
     calls.push(`do:${name}`);
-    return cb();
+    const out = await cb();
+    outputs[name] = out;
+    return out;
   },
   async sleep(name) {
     calls.push(`sleep:${name}`);
@@ -64,6 +73,7 @@ const qsend = vi.fn(async () => undefined);
 
 beforeEach(() => {
   calls.length = 0;
+  for (const k of Object.keys(outputs)) delete outputs[k];
   leases.clear();
   now = 0;
   acquireFails = 0;
@@ -71,6 +81,9 @@ beforeEach(() => {
   raw.mockClear();
   qsend.mockClear();
   clearJobRegistry();
+  sendAlert.mockClear();
+  captureException.mockClear();
+  flush.mockClear();
   setRawInngestSend(raw);
   setCfBindings({
     HYPERDRIVE: { connectionString: 'x' },
@@ -212,8 +225,27 @@ describe('runJobWorkflow', () => {
     expect(failure.event.name).toBe('inngest/function.failed');
     expect(failure.event.data.event.name).toBe('x/y');
     expect(failure.error.message).toBe('boom');
-    expect(raw).toHaveBeenCalledTimes(1); // the failed event, routed (no subscriber here -> Inngest)
+    expect(raw).not.toHaveBeenCalled(); // the failed event has no Cloudflare subscriber here and `inngest/*` is never sent to Inngest
     expect(calls).toContain('do:on-failure');
+    // Exactly one direct alert + one Sentry capture, with job, group, instance id and error, no event data.
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    const alert = (sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0];
+    expect(alert).toMatchObject({
+      level: 'p1',
+      scope: 'platform',
+      source: 'job.bulk-ai-seo',
+      body: 'boom',
+      context: { job: 'bulk-ai-seo', group: '4-ai', instanceId: 'inst-1', triggeringEvent: 'x/y' },
+    });
+    expect(JSON.stringify(alert)).not.toContain('s1'); // event.data (storeId) never leaves
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(flush).toHaveBeenCalledTimes(1); // awaited: a Workflow step has no waitUntil
+    // The step output is the proof of delivery (readable with `wrangler workflows instances describe`).
+    expect(outputs['on-failure']).toEqual({
+      alert: 'sent',
+      sentryEventId: 'evt-123',
+      sentryFlushed: true,
+    });
     expect(calls[calls.length - 1]).toBe('do:gate-release-0');
   });
 
@@ -300,7 +332,53 @@ describe('handleJobsBatch', () => {
     expect(last.ack).toHaveBeenCalled();
     expect(last.retry).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(raw).toHaveBeenCalledTimes(1);
+    expect(raw).not.toHaveBeenCalled(); // no inngest/* event is involved any more
+    // The failed attempts alerted nothing; the final failure alerts exactly once (queue job).
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    expect((sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0]).toMatchObject({
+      level: 'p1',
+      source: 'job.heartbeat',
+      body: 'nope',
+      context: { job: 'heartbeat', group: '1-observability', instanceId: last.id },
+    });
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('a payment webhook failure alerts at P0', async () => {
+    registerJob({ id: 'payment-webhook-process', retries: 0 }, async () => {
+      throw new Error('boom');
+    });
+    await handleJobsBatch(batch(msg(job('payment-webhook-process'), 1)));
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+    expect((sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0].level).toBe(
+      'p0'
+    );
+  });
+
+  it('an alert that cannot be sent never fails the run', async () => {
+    sendAlert.mockRejectedValueOnce(new Error('telegram down'));
+    registerJob({ id: 'heartbeat', retries: 0 }, async () => {
+      throw new Error('nope');
+    });
+    const m = msg(job('heartbeat'), 1);
+    await handleJobsBatch(batch(m));
+    expect(m.ack).toHaveBeenCalled();
+  });
+
+  it('the failure report records a throttled alert and an unflushed sentry event honestly', async () => {
+    sendAlert.mockResolvedValueOnce('throttled' as never);
+    flush.mockResolvedValueOnce(false);
+    registerJob({ id: 'heartbeat', retries: 0 }, async () => {
+      throw new Error('nope');
+    });
+    await expect(runJobWorkflow(args('heartbeat'))).rejects.toThrow('nope');
+    expect(outputs['on-failure']).toEqual({
+      alert: 'throttled',
+      sentryEventId: 'evt-123',
+      sentryFlushed: false,
+      // An unfinished flush adds a direct ingest probe (no DSN in the test environment).
+      sentryProbe: { error: 'no usable SENTRY_DSN in this context' },
+    });
   });
 
   it('NonRetriableError fails at once', async () => {

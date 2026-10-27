@@ -56,6 +56,8 @@
       { "name": "STORE_DO", "class_name": "StoreDO" },
       // Concurrency leases and debounce for background jobs (G5, src/cf/job-gate.ts): one per function + key.
       { "name": "JOB_GATE", "class_name": "JobGate" },
+      // One per store: its recurring jobs as an alarm (G5, src/cf/store-schedule.ts).
+      { "name": "STORE_SCHEDULE", "class_name": "StoreSchedule" },
     ],
   },
   // StoreDO nightly backups (Ruling INFRA-CF-1 Phase 0): the EXISTING private bucket, prefix store-do-backups/.
@@ -86,6 +88,7 @@
     { "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] },
     { "tag": "v2", "new_sqlite_classes": ["StoreDO"] },
     { "tag": "v3", "new_sqlite_classes": ["JobGate"] },
+    { "tag": "v4", "new_sqlite_classes": ["StoreSchedule"] },
   ],
 
   // Background jobs (G5, src/lib/jobs): one Workflow class runs every multi-step job, one instance
@@ -94,6 +97,8 @@
 
   "queues": {
     "producers": [
+      // Store -> Ebda WhatsApp events (contract 2026-10-24; lib/wa/events.ts). Ebda WhatsApp consumes it.
+      { "binding": "WA_EVENTS_QUEUE", "queue": "ebda-wa-events" },
       { "binding": "JOBS_QUEUE", "queue": "ebda-jobs" },
       { "binding": "EMAIL_QUEUE", "queue": "ebda-email" },
       { "binding": "SMS_QUEUE", "queue": "ebda-sms" },
@@ -118,6 +123,16 @@
         "dead_letter_queue": "ebda-sms-dlq",
       },
       { "queue": "ebda-email-dlq", "max_batch_size": 10, "max_retries": 2 },
+      // WhatsApp -> Store events (COD outcomes, erasure races): lib/wa/store-events-consumer.ts.
+      {
+        "queue": "ebda-store-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 2,
+        "max_retries": 5,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-store-events-dlq",
+      },
+      { "queue": "ebda-store-events-dlq", "max_batch_size": 10, "max_retries": 2 },
       // Background jobs with at most one step. The job's own `retries` (max 6 in the map) decide when
       // a run fails for good, so the platform limit sits above it and only a crash loop reaches the DLQ.
       {
@@ -166,15 +181,15 @@
       "0 */4 * * *",
       "0 */6 * * *",
       "0 0 * * *",
-      "0 2 * * 1",
+      "0 2 * * MON",
       "0 2 1 * *",
       "0 22 * * *",
       "0 23 * * *",
       "0 3 * * *",
-      "0 3 * * 0",
+      "0 3 * * SUN",
       "0 3 1 * *",
       "0 4 * * *",
-      "0 4 * * 0",
+      "0 4 * * SUN",
       "0 7 * * *",
       "17 * * * *",
       "17 */6 * * *",
@@ -183,6 +198,7 @@
       "30 3 * * *",
       "30 3 1 * *",
       "30 4 * * *",
+      "41 */12 * * *",
       "45 4 * * *",
       "5 */6 * * *",
       "7 * * * *",
@@ -225,11 +241,12 @@
     "TRUST_PROXY_HOPS": "1",
     // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
-    // Outbound email provider. `cloudflare` = the EMAIL binding; `resend` = legacy rollback until the Resend decommission.
-    "EMAIL_PROVIDER": "cloudflare",
     // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
     // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
-    "JOBS_CF_GROUPS": "1",
+    "JOBS_CF_GROUPS": "1,2,3",
+    // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
+    // comma list of function ids or "all"; "" = every schedule stays a cron.
+    "JOBS_CF_ALARMS": "",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",

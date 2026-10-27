@@ -6,7 +6,7 @@ import { inngest } from '../client';
 import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
-import { ResendService } from '../../../services/resend.service';
+import { StoreMailer } from '../../../services/store-mailer.service';
 import { EmailSendError } from '../../../services/mail-transport';
 import { storeHidesPoweredBy } from '../../../services/email.service';
 import { sendAlert } from '../../../services/alerts.service';
@@ -236,9 +236,9 @@ const campaignSendFn = inngest.createFunction(
     }
 
     // 2. Wait for a future schedule (durable — survives deploys).
-    if (nonce.getTime() > Date.now()) {
-      await step.sleepUntil('wait-for-schedule', nonce);
-    }
+    // Unconditional: a past time resumes at once, and a clock check here would make a replay skip the
+    // sleep the first run took (the job's concurrency lease is released/re-taken around it).
+    await step.sleepUntil('wait-for-schedule', nonce);
 
     // 3. Claim scheduled → sending, atomically and only for this request.
     //    A cancel during the wait leaves it `cancelled` and nothing is sent.
@@ -405,7 +405,7 @@ const campaignSendFn = inngest.createFunction(
         }
         let messageId: string;
         try {
-          ({ id: messageId } = await ResendService.sendMarketingEmail(store, {
+          ({ id: messageId } = await StoreMailer.sendMarketingEmail(store, {
             to: r.email,
             subject,
             html,

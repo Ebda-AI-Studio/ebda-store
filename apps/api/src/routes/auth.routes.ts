@@ -1,3 +1,4 @@
+import { revokeForAccount } from '../lib/wa/consent';
 import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
@@ -850,12 +851,18 @@ router.delete(
         await setAccountStatus(userId, 'inactive', 'self-delete');
 
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
+      const before = await withUser(userId, tx =>
+        tx.user.findUnique({ where: { id: userId }, select: { storeId: true, phone: true } })
+      );
       await withUser(userId, tx =>
         tx.user.update({
           where: { id: userId },
           data: { deletedAt: new Date() },
         })
       );
+      // WA-CONSENT-1: a deactivated account must stop receiving WhatsApp marketing NOW, not when the
+      // retention cron finally erases it.
+      if (before?.storeId) await revokeForAccount(before.storeId, userId, before.phone);
 
       // Audit log
       await auditLog({

@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, runInStoreScope, acrossStores } from '@ebda/database';
+import { acrossOpts } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
@@ -81,13 +82,17 @@ export interface WarehouseSweepResult {
  * real deploy (not just a hot-reload) for Inngest to pick up the new
  * cron/on-demand pair.
  */
-export async function sweepAllWarehouseStores(step: FanoutStep): Promise<WarehouseSweepResult> {
+export async function sweepAllWarehouseStores(
+  step: FanoutStep,
+  event?: { data?: unknown }
+): Promise<WarehouseSweepResult> {
   // FORCE RLS: cron has no storeId — visit every store and keep the ones that
   // have at least one warehouse row.
   const stores = await step.run('list-stores-with-warehouses', async () =>
     (
-      await acrossStores(storeId =>
-        prisma.warehouse.findFirst({ where: { storeId }, select: { storeId: true } })
+      await acrossStores(
+        storeId => prisma.warehouse.findFirst({ where: { storeId }, select: { storeId: true } }),
+        acrossOpts(event)
       )
     )
       .filter(r => r.value !== null)
@@ -151,7 +156,7 @@ export const warehouseReconcileSweepCron: InngestFunction.Any = inngest.createFu
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * *` }], // 06:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => sweepAllWarehouseStores(step)
+  async ({ event, step }) => sweepAllWarehouseStores(step, event)
 );
 
 /**

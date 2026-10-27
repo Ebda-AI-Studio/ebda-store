@@ -3,6 +3,7 @@
 //   - `index.ts`  : the Node server (Railway/Docker/dev): http server, socket.io,
 //                   background loops, graceful shutdown.
 //   - `worker.ts` : the Cloudflare Worker (`httpServerHandler`), R-EBDA-001.
+import { installWaWriteObservers } from './lib/wa/observers';
 import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -57,10 +58,13 @@ import {
   decideCorsCache,
   isPlatformOrigin,
 } from './lib/cors-cache';
-import { buildIdentity } from './lib/build-identity';
+import { healthPayload } from './lib/health-payload';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 assertBillingConfigAtBoot();
+
+// Every plan / subscription / catalog write anywhere tells Ebda WhatsApp (lib/wa/observers.ts).
+installWaWriteObservers();
 
 const app = express();
 
@@ -445,8 +449,8 @@ app.use(requestLogger);
 // and any manual check had nothing to compare against. Unknown values are
 // reported as null rather than omitted or guessed, so a caller can tell
 // "this build is X" apart from "this build will not say".
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), ...buildIdentity() });
+app.get('/health', async (_req, res) => {
+  res.json(await healthPayload());
 });
 
 // Comprehensive health check with dependency status (requires auth)

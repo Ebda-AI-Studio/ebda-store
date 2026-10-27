@@ -94,6 +94,7 @@ import staffInviteRoutes from './staff-invite.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import lifecycleEmailsRoutes from './lifecycle-emails.routes';
+import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
@@ -241,7 +242,7 @@ router.use('/stores', tenantContext, featureRoutes);
 // (Phase 1a), then REVERTED — the domain-management handlers in
 // store.routes.ts call external APIs in-request (Cloudflare-for-SaaS domain
 // provisioning via `resolveDomainService`, Resend domain verification via
-// `ResendService.provisionStoreDomain` / `removeStoreDomain` /
+// `StoreMailer.provisionStoreDomain` / `removeStoreDomain` /
 // `verifyAndRefreshDomain`). Trapping a slow third-party call inside a 30s
 // RLS interactive transaction risks blowing the timeout. This router is
 // CONTEXT-LESS — Phase 2 candidate; the CRUD-only handlers are fine, only
@@ -442,7 +443,7 @@ router.use('/public', publicAffiliateRoutes);
 // Newsletter admin routes (list + CSV export). Public signup is in
 // public.routes.ts so visitors don't need a JWT to subscribe.
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the
-// broadcast endpoint loops `ResendService.sendBrandedEmail` in chunks of 50,
+// broadcast endpoint loops `StoreMailer.sendBrandedEmail` in chunks of 50,
 // sequentially awaited in-request — a large subscriber list can run well
 // past 30s, which would blow the RLS transaction's timeout.
 router.use('/stores', tenantContext, newsletterRoutes);
@@ -542,6 +543,8 @@ router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 // Self-serve lifecycle emails: the merchant's log (admin) and the login-free unsubscribe link (store from the signed token).
 router.use('/stores/:storeId/lifecycle-emails', tenantContext, lifecycleEmailsRoutes);
+// Ebda WhatsApp connect / disconnect (the only request path that writes the server-owned link).
+router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not

@@ -3,11 +3,10 @@
 //
 // Why a standalone module: this is a pure function (no I/O, no DB) so it
 // gets the cheapest possible unit tests — feed it a plain object, assert
-// the from-line. The full ResendService composes this helper.
+// the from-line. The full StoreMailer composes this helper.
 import { z } from 'zod';
 import { BRAND } from '@ebda/shared';
 import logger from '../lib/logger';
-import { customSenderDomainsSupported } from './mail-transport';
 
 const PLATFORM_EMAIL_DOMAIN: string = BRAND.domains.marketing;
 const PLATFORM_FALLBACK_LOCAL = 'no-reply';
@@ -83,39 +82,24 @@ export function merchantSenderLocalPart(
 
 export function resolveSender(store: StoreSenderShape): ResolvedSender {
   const displayName = sanitizeDisplayName(store.name);
-  const useCustomDomain =
-    customSenderDomainsSupported() &&
-    store.emailDomainStatus === 'verified' &&
-    !!store.domain &&
-    store.domain.length > 0;
-
-  // A verified merchant domain (legacy provider only) keeps the merchant's own prefix; the
-  // platform domain gets the allowlisted `<prefix>.<slug>` form.
+  // Always the platform domain: a merchant's own domain is not a zone in our Cloudflare account, so
+  // there are no per-store sender domains (G6). Replies reach the merchant via Reply-To.
   let localPart: string;
-  if (useCustomDomain) {
-    localPart = store.emailSenderLocalPart?.trim() || 'noreply';
-  } else {
-    try {
-      localPart = merchantSenderLocalPart(store.emailSenderLocalPart, store.slug);
-    } catch {
-      // A caller whose store query did not select `slug` must not crash the send (a job would fail
-      // and retry forever). Fall back to the PLATFORM sender with the store named in the display
-      // name, never a bare or invented merchant mailbox: replies still reach the merchant.
-      logger.warn(
-        { storeName: store.name },
-        '[email] store slug missing, platform sender fallback'
-      );
-      return {
-        from: `${displayName} via ${BRAND.product.nameEn} <${PLATFORM_FALLBACK_LOCAL}@${PLATFORM_EMAIL_DOMAIN}>`,
-        replyTo: store.email ? store.email : undefined,
-      };
-    }
+  try {
+    localPart = merchantSenderLocalPart(store.emailSenderLocalPart, store.slug);
+  } catch {
+    // A caller whose store query did not select `slug` must not crash the send (a job would fail
+    // and retry forever). Fall back to the PLATFORM sender with the store named in the display
+    // name, never a bare or invented merchant mailbox: replies still reach the merchant.
+    logger.warn({ storeName: store.name }, '[email] store slug missing, platform sender fallback');
+    return {
+      from: `${displayName} via ${BRAND.product.nameEn} <${PLATFORM_FALLBACK_LOCAL}@${PLATFORM_EMAIL_DOMAIN}>`,
+      replyTo: store.email ? store.email : undefined,
+    };
   }
 
-  const host = useCustomDomain ? (store.domain as string) : PLATFORM_EMAIL_DOMAIN;
-
   return {
-    from: `${displayName} <${localPart}@${host}>`,
+    from: `${displayName} <${localPart}@${PLATFORM_EMAIL_DOMAIN}>`,
     replyTo: store.email ? store.email : undefined,
   };
 }

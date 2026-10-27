@@ -1,3 +1,4 @@
+import { revokeForAccount } from '../lib/wa/consent';
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -1343,6 +1344,11 @@ router.delete(
       // honoured again and the Store cannot re-create the profile row from it. If this fails the user still exists everywhere.
       if (target.storeId === null && target.role !== 'customer') await eraseIdentityUser(id);
 
+      // WA-CONSENT-1: withdraw the account's WhatsApp marketing consent before the hard delete.
+      const doomed = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.findUnique({ where: { id }, select: { storeId: true, phone: true } })
+      );
+      if (doomed?.storeId) await revokeForAccount(doomed.storeId, id, doomed.phone);
       try {
         await asPlatformOperator(req.user!.userId, () => prisma.user.delete({ where: { id } }));
       } catch (delErr) {

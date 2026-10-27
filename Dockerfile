@@ -18,6 +18,7 @@ COPY apps/admin/package.json ./apps/admin/
 COPY packages/database/package.json ./packages/database/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/cf-schema/package.json ./packages/cf-schema/
 
 # Install all dependencies (including dev for build stage)
 RUN npm ci

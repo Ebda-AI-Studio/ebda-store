@@ -32,6 +32,8 @@ import {
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
   LOOK_OWNED_THEME_KEYS,
+  mergeClientSettings,
+  stripServerOwnedSettings,
 } from '@ebda/shared';
 import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -444,11 +446,13 @@ export class StoreService {
                   : ('enterprise' as const),
               }
             : {}),
-          settings: data.settings || {
+          settings: ((data.settings && typeof data.settings === 'object'
+            ? stripServerOwnedSettings(data.settings as Record<string, unknown>)
+            : null) || {
             currency: REGION.currency,
             locale: 'ar-EG',
             defaultLanguage: REGION.defaultLocale,
-          },
+          }) as Prisma.InputJsonValue,
           // 2026-07-12 design structural batch: new stores get the persona-chrome
           // completion + card-frame dedup ON by default (Ahmad-approved for NEW
           // stores only — every existing store keeps these flags undefined/false
@@ -540,11 +544,11 @@ export class StoreService {
     // Merge settings instead of replacing entirely
     let mergedSettings = data.settings;
     if (data.settings && typeof data.settings === 'object') {
-      const existingSettings = (store.settings as Record<string, unknown>) || {};
-      mergedSettings = {
-        ...existingSettings,
-        ...(data.settings as Record<string, unknown>),
-      } as Prisma.InputJsonValue;
+      // Server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
+      mergedSettings = mergeClientSettings(
+        (store.settings as Record<string, unknown>) || {},
+        data.settings as Record<string, unknown>
+      ) as Prisma.InputJsonValue;
     }
 
     const updatedStore = await withStore(storeId, tx =>

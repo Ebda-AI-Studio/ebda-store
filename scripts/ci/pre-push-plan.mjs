@@ -9,7 +9,8 @@
  *   lint      ['-w apps/x', ...]     workspaces to lint
  *   typecheck ['apps/x/tsconfig.json', ...]
  *   related   changed files to hand to `vitest related --run` (a changed test file runs itself; a changed source
- *             file runs every test that imports it)
+ *             file runs every UNIT test that imports it)
+ *   exclude   globs handed to `vitest related` as --exclude: integration / E2E never run locally (PREPUSH-2)
  *   files     all changed files (prettier is run on exactly these)
  *
  * Usage: node scripts/ci/pre-push-plan.mjs --base <sha>   |   --files a,b,c   (no git; tests)
@@ -21,6 +22,22 @@ import { classify, loadWorkspaces } from '../ci-affected.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TESTABLE = /\.(ts|tsx|js|jsx|mjs|mts|cts)$/;
+
+/**
+ * PREPUSH-2: the local gate runs the UNIT tier only. `vitest related` follows imports, so a change to a shared file
+ * (config, security, jobs) pulled in integration tests (refresh-token-rotation, auth-gdpr, warehouse/*) that need the
+ * `test` role / test_db: 71 files failed on the environment, not on code. These globs are handed to vitest as
+ * `--exclude`; integration and E2E stay in CI. The colocated `apps/api/src` tests are CI's integration job too (their
+ * shared setup connects to Postgres + Redis), not part of the unit tier (`npm run test:unit`, ci.yml unit job).
+ */
+export const PREPUSH_EXCLUDE = [
+  '**/tests/integration/**',
+  '**/tests/e2e/**',
+  '**/tests/smoke/**',
+  '**/apps/api/src/**',
+  '**/workers-test/**',
+  '**/workers-do/**',
+];
 
 export function plan(files, workspaces) {
   const changed = files.filter(Boolean);
@@ -34,6 +51,7 @@ export function plan(files, workspaces) {
     lint: r.lint,
     typecheck: r.typecheck,
     related: r.changedFiles.filter(f => TESTABLE.test(f)),
+    exclude: PREPUSH_EXCLUDE,
     files: changed,
   };
 }

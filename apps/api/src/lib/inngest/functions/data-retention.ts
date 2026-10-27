@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
+import { acrossOpts } from '../../jobs/store-scope';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -55,7 +56,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     retries: 1,
     triggers: [{ cron: '0 4 * * 0' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     const cutoff = new Date(Date.now() - ABANDONED_CART_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
     // FORCE RLS: data-retention is cross-tenant — no storeId available.
@@ -63,10 +64,12 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     // Store-scoped table: counted and purged store by store, each in its own scope.
     const candidateCount = await step.run('count-candidates', async () =>
       (
-        await acrossStores(storeId =>
-          prisma.abandonedCart.count({
-            where: { storeId, createdAt: { lt: cutoff }, customerId: null },
-          })
+        await acrossStores(
+          storeId =>
+            prisma.abandonedCart.count({
+              where: { storeId, createdAt: { lt: cutoff }, customerId: null },
+            }),
+          acrossOpts(event)
         )
       ).reduce((n, r) => n + r.value, 0)
     );
@@ -90,7 +93,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
           where: { id: { in: candidates.map(c => c.id) }, storeId },
         });
         return result.count;
-      })) {
+      }, acrossOpts(event))) {
         removed += value;
       }
       return removed;
