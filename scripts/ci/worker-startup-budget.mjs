@@ -246,10 +246,23 @@ async function main() {
     };
     const baselineRef = arg('baseline-ref');
     let base;
+    let baselineFailed = false;
     const samples = [];
     const baseSamples = [];
     try {
-      if (baselineRef) base = buildBaseline(baselineRef, config);
+      if (baselineRef) {
+        try {
+          base = buildBaseline(baselineRef, config);
+        } catch (err) {
+          // The baseline borrows THIS checkout's installed deps, so a PR that REMOVES a dependency main still
+          // imports cannot build main ("Could not resolve 'resend'"). The PR's own build above succeeded, so
+          // say so loudly, enforce the size budgets, and skip the CPU comparison (no baseline to compare with).
+          baselineFailed = true;
+          console.warn(
+            `::warning::baseline ${baselineRef} did not build with this PR's dependencies; startup CPU is NOT compared. ${String(err).split('\n')[0]}`
+          );
+        }
+      }
       // Alternate PR/base so a load spike hits both, never just one side.
       for (let i = 0; i < runs; i++) {
         samples.push(await profileOnce(outdir, compat));
@@ -297,7 +310,7 @@ async function main() {
       );
     }
     const problems = [
-      ...budgetProblems(measured, budget, { skipCpu: !!base }),
+      ...budgetProblems(measured, budget, { skipCpu: !!base || baselineFailed }),
       ...(base
         ? relativeProblems(measured.startupCpuMs, record.baseline.startupCpuMs, budget.relative)
         : []),
