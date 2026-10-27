@@ -210,7 +210,7 @@ describe('Customers page table + filters', () => {
 
   it('uses the shared debounced SearchInput and sends search server-side', async () => {
     renderPage();
-    const input = await screen.findByRole('textbox', { name: 'searchPlaceholder' });
+    const input = await screen.findByRole('searchbox', { name: 'searchPlaceholder' });
     fireEvent.change(input, { target: { value: 'ahm' } });
     await waitFor(
       () =>
@@ -287,7 +287,7 @@ describe('Customers page — segment filter integrity (#2222, #2234)', () => {
       return Promise.resolve(listResponse());
     });
     renderPage();
-    const input = await screen.findByRole('textbox', { name: 'searchPlaceholder' });
+    const input = await screen.findByRole('searchbox', { name: 'searchPlaceholder' });
     fireEvent.change(input, { target: { value: 'ahm' } });
     await screen.findByText('Ahmed S', {}, { timeout: 2000 });
     await act(async () => {
