@@ -718,3 +718,37 @@ describe("AuthService.updateProfile — phone change ends the old number's Whats
     expect(mockPrisma.storeWhatsAppConsent.updateMany).not.toHaveBeenCalled();
   });
 });
+
+describe('WA-CONSENT-PROOF-1: account/erased carries a buyerKey only for a PROVEN phone', () => {
+  const setup = (delivered: boolean) => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...CUSTOMER,
+      phone: '01001234567', // the (possibly someone else's) number on the profile
+      email: 'a@b.co',
+    });
+    mockPrisma.order.findMany.mockImplementation(async (args: any) =>
+      delivered && args?.where?.status === 'delivered'
+        ? [{ shippingAddress: { phone: '+201001234567' } }]
+        : []
+    );
+    mockPrisma.storeWhatsAppConsent.findMany.mockResolvedValue([]);
+    sendMock.mockClear();
+  };
+  const erasedEvent = () =>
+    sendMock.mock.calls.map(c => c[0]).find((e: any) => e?.name === 'account/erased');
+
+  it("an attacker who typed a victim's number (no order proves it) sends NO buyerKey: WhatsApp keeps the victim's contact", async () => {
+    setup(false);
+    await AuthService.eraseAccount(CUSTOMER.id);
+    const ev = erasedEvent();
+    expect(ev).toBeTruthy();
+    expect(ev.data.buyerKey).toBeUndefined();
+  });
+
+  it("the proven owner's erasure carries the buyerKey", async () => {
+    setup(true);
+    await AuthService.eraseAccount(CUSTOMER.id);
+    expect(erasedEvent().data.buyerKey).toMatch(/^[0-9a-f]{64}$/);
+  });
+});

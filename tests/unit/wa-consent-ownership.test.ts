@@ -101,14 +101,15 @@ describe('only a PROVEN grant binds a row to an account', () => {
     expect(h.consents[0]).toMatchObject({ userId: 'user-a', granted: true });
   });
 
-  it("an UNPROVEN revoke does not bind: the account cannot claim and export someone else's row", async () => {
+  it("an UNPROVEN revoke is refused and creates no row: the account cannot claim or export someone else's number", async () => {
     h.users[0]!.phone = '01099999999'; // never on one of its orders
-    await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false });
-    expect(h.consents[0]).toMatchObject({ granted: false, userId: null });
+    const r = await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false });
+    expect(r).toEqual({ status: 'phone_unproven' });
+    expect(h.consents).toHaveLength(0);
     expect(await WhatsAppConsentService.exportForAccount(S, 'user-a')).toHaveLength(0);
   });
 
-  it("an unproven revoke by ANOTHER account leaves the owner untouched (cannot strip X's ownership)", async () => {
+  it('a revoke by ANOTHER account that proves the number never rewrites the row owner', async () => {
     h.consents.push({
       storeId: S,
       buyerKey: (await key('01001234567'))!,
@@ -242,5 +243,54 @@ describe('revokeForAccount proof runs inside the tenant scope', () => {
     h.proofReadInScope.length = 0;
     await revokeForAccount(S, 'user-a', '01001234567');
     expect(h.proofReadInScope).toEqual([true]);
+  });
+});
+
+describe("WA-CONSENT-PROOF-1: an unproven profile phone cannot act on someone else's consent", () => {
+  const VICTIM = '01001234567'; // user-a proved it with a delivered order (see beforeEach)
+  beforeEach(() => {
+    // the attacker (user-b) types the victim's number into their own profile and has a cart; no order proves it
+    h.users.push({ id: 'user-b', storeId: S, phone: VICTIM });
+    h.carts.push({ id: 'cart-b', storeId: S, sessionId: 'sess-b', customerId: 'user-b' });
+  });
+
+  it("a REVOKE with an unproven phone is refused and the victim's row is unchanged", async () => {
+    const k = (await key(VICTIM))!;
+    h.consents.push({ storeId: S, buyerKey: k, userId: 'user-a', granted: true });
+    const r = await WhatsAppConsentService.recordForCart(S, 'sess-b', 'user-b', { consent: false });
+    expect(r).toEqual({ status: 'phone_unproven' });
+    expect(h.consents[0]).toMatchObject({ granted: true, userId: 'user-a' });
+    expect(h.consents[0]!.revokedSource).toBeUndefined();
+  });
+
+  it('an unproven revoke does not even create a revoked row for a number nobody consented for', async () => {
+    const r = await WhatsAppConsentService.recordForCart(S, 'sess-b', 'user-b', { consent: false });
+    expect(r).toEqual({ status: 'phone_unproven' });
+    expect(h.consents).toHaveLength(0);
+  });
+
+  it('the PROVEN owner can revoke, and so can the account that owns the row without a current proof', async () => {
+    const k = (await key(VICTIM))!;
+    h.consents.push({ storeId: S, buyerKey: k, userId: 'user-a', granted: true });
+    expect(
+      await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false })
+    ).toMatchObject({ status: 'recorded', granted: false });
+    expect(h.consents[0]).toMatchObject({ granted: false });
+    // owner of the row, but the proving order is gone: ownership alone is enough to withdraw
+    h.consents[0] = { storeId: S, buyerKey: k, userId: 'user-a', granted: true };
+    h.orders.length = 0;
+    expect(
+      await WhatsAppConsentService.recordForCart(S, 'sess-a', 'user-a', { consent: false })
+    ).toMatchObject({ status: 'recorded', granted: false });
+  });
+
+  it("a phone change by the attacker leaves the victim's consent alone; the proven owner's change revokes the old number", async () => {
+    const { revokeForPhoneChangeInTx } = await import('@api/lib/wa/consent');
+    const k = (await key(VICTIM))!;
+    h.consents.push({ storeId: S, buyerKey: k, userId: 'user-a', granted: true });
+    await revokeForPhoneChangeInTx(S, 'user-b', VICTIM); // attacker moves away from the victim's number
+    expect(h.consents[0]).toMatchObject({ granted: true });
+    await revokeForPhoneChangeInTx(S, 'user-a', VICTIM); // the proven owner changes their number
+    expect(h.consents[0]).toMatchObject({ granted: false, revokedSource: 'profile' });
   });
 });
