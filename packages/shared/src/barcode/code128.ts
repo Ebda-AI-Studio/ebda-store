@@ -3,7 +3,7 @@
  * value (half the width), subset B otherwise (ASCII 32..126). Order numbers
  * look like `ORD-MJ4K9L2A-AB3XY`, so B is the working case.
  */
-const WIDTHS = (
+export const CODE128_WIDTHS = (
   '212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 ' +
   '123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 ' +
   '232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 ' +
@@ -13,7 +13,8 @@ const WIDTHS = (
   '114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112'
 ).split(' ');
 
-const START_B = 104;
+export const CODE128_START_B = 104;
+const START_B = CODE128_START_B;
 const START_C = 105;
 const STOP = 106;
 
@@ -43,7 +44,7 @@ export function code128Modules(value: string): boolean[] {
   const out: boolean[] = [];
   for (const code of encodeCode128(value)) {
     let bar = true;
-    for (const w of WIDTHS[code]!) {
+    for (const w of CODE128_WIDTHS[code]!) {
       for (let i = 0; i < Number(w); i++) out.push(bar);
       bar = !bar;
     }

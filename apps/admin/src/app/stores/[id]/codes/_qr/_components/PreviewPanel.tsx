@@ -12,7 +12,7 @@ import {
   fileStem,
   renderToCanvas,
   triggerDownload,
-} from '../../../../../lib/qr-export';
+} from '../../../../../../lib/qr-export';
 import { Segmented } from './Segmented';
 
 type Props = {

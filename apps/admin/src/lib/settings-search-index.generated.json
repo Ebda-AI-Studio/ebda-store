@@ -871,14 +871,14 @@
     "feature": "pwa"
   },
   {
-    "id": "page:/qr",
+    "id": "page:/codes",
     "kind": "page",
-    "route": "/qr",
+    "route": "/codes",
     "access": "owner",
-    "en": "QR codes",
-    "ar": "أكواد QR",
-    "synEn": "qr code scan print poster sticker flyer barcode link whatsapp",
-    "synAr": "كود كيو ار مسح طباعة ملصق بوستر فلاير واتساب رابط"
+    "en": "QR codes & barcodes",
+    "ar": "أكواد QR والباركود",
+    "synEn": "qr code barcode label sticker print scan poster flyer receipt thermal a4 ean",
+    "synAr": "كود كيو ار باركود ملصق طباعة مسح بوستر فلاير فاتورة حراري"
   },
   {
     "id": "page:/language",
