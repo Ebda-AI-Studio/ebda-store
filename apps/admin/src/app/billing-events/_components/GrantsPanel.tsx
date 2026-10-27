@@ -90,7 +90,7 @@ export function GrantsPanel({ refreshKey }: { refreshKey: number }) {
   if (loading) return <p className="text-sm text-muted-foreground">{t('loading')}</p>;
   if (failed || !data)
     return (
-      <p role="alert" className="text-sm text-destructive">
+      <p role="alert" className="text-sm text-destructive-ink">
         {t('failedToLoad')}
       </p>
     );
