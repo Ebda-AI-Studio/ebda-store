@@ -258,6 +258,34 @@ describe('1. pre-hijacking: an unverified account is unusable and is stripped on
     );
   });
 
+  it("victim signs up, attacker re-signs: the victim's old code verifies with NOBODY's password, and the attacker's newest code does not verify with the victim's password", async () => {
+    const email = `pre7-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'Victoria' } });
+    const victimCode = fakes.mails.at(-1)!.code;
+    await call('/signup', { json: { email, password: 'Attacker!Pass1', firstName: 'Mallory' } });
+    const attackerCode = fakes.mails.at(-1)!.code;
+    expect(attackerCode).not.toBe(victimCode);
+    const verify = (code: string, password: string) =>
+      call('/otp/verify', { json: { email, code, password } });
+    // the victim's code was superseded: dead with their own password and with the attacker's
+    expect((await verify(victimCode, 'Victim!Pass123')).status).toBe(400);
+    expect((await verify(victimCode, 'Attacker!Pass1')).status).toBe(400);
+    // the attacker's code (mailed to the VICTIM's inbox) does not activate under the victim's password
+    expect((await verify(attackerCode, 'Victim!Pass123')).status).toBe(400);
+    expect(
+      await env.DB.prepare(`SELECT email_verified FROM users WHERE lower(email) = ?1`)
+        .bind(email)
+        .first()
+    ).toMatchObject({ email_verified: 0 });
+    // and neither password can sign in: nothing was activated
+    expect((await call('/login', { json: { email, password: 'Victim!Pass123' } })).status).toBe(
+      401
+    );
+    expect((await call('/login', { json: { email, password: 'Attacker!Pass1' } })).status).toBe(
+      401
+    );
+  });
+
   it("the takeover path from the review: victim signs up, attacker signs up, victim resends and verifies with their own password -> never the attacker's", async () => {
     const email = `pre6-${crypto.randomUUID().slice(0, 6)}@example.com`;
     await call('/signup', { json: { email, password: 'Victim!Pass123', firstName: 'Victoria' } });

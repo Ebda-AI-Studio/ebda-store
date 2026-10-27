@@ -17,7 +17,11 @@ import { normalizeEgyptianMobile } from '@ebda/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { findUserIdByEmail } from '../lib/definer';
-import { createIdentity, resendIdentityVerification } from '../lib/identity-client';
+import {
+  createIdentity,
+  getAccountState,
+  resendIdentityVerification,
+} from '../lib/identity-client';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
 import { buildAcquisition, signupTrackingSchema } from './ebda-ads.service';
 import { signupAcceptanceRows } from './legal-notice.service';
@@ -81,6 +85,17 @@ const SALT_ROUNDS = 12;
 // global scope (R-EBDA-001).
 const DUMMY_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
+/** Same address, unverified in the identity service, and no Store profile row under that id. */
+async function isAdoptableOrphan(identityId: string, email: string): Promise<boolean> {
+  const acc = await getAccountState(identityId).catch(() => null);
+  if (!acc || acc.emailVerified || acc.email.trim().toLowerCase() !== email.trim().toLowerCase())
+    return false;
+  const profile = await withUser(identityId, tx =>
+    tx.user.findUnique({ where: { id: identityId }, select: { id: true } })
+  );
+  return !profile;
+}
+
 export class MerchantSignupService {
   static async signup(
     input: MerchantSignupInput,
@@ -135,24 +150,35 @@ export class MerchantSignupService {
       language: language ?? 'ar',
     });
     if (!identity) return GENERIC_SIGNUP_RESULT; // verified by someone else in the meantime: indistinguishable from "taken"
+    let profileId = requestedId;
     if (identity.id !== requestedId) {
-      // An identity already exists for this address under another id (a half-finished earlier signup) or the answer is wrong.
-      // Never create the profile or the acceptances for it; the caller sees the same generic result as always.
-      logger.error(
-        { email: maskEmail(email), requestedId, returnedId: identity.id },
-        'merchant signup: identity id does not match the requested id; no profile written'
+      // The identity service already holds this address under another id. That is legitimate in exactly one case, an ORPHAN
+      // from a half-finished earlier signup: no Store profile for this address (existing is null), the identity is for the
+      // SAME address, still unverified, and no profile row exists under its id. Then the merchant adopts it (otherwise they
+      // would be stuck forever). Anything else writes nothing, logs an error and answers the same generic result.
+      const adopt = !existing && (await isAdoptableOrphan(identity.id, email));
+      if (!adopt) {
+        logger.error(
+          { email: maskEmail(email), requestedId, returnedId: identity.id },
+          'merchant signup: identity id does not match the requested id; no profile written'
+        );
+        return GENERIC_SIGNUP_RESULT;
+      }
+      logger.warn(
+        { email: maskEmail(email), adoptedId: identity.id },
+        'merchant signup: adopting the id of an orphan unverified identity'
       );
-      return GENERIC_SIGNUP_RESULT;
+      profileId = identity.id;
     }
     if (existing) return GENERIC_SIGNUP_RESULT; // unverified: the profile row and the acceptance rows already stand
 
     // Profile row (same id as the identity, so every foreign key resolves) + click-wrap acceptance in ONE transaction, as
     // the new user (Ruling LEGAL-4). Credentials are NOT stored here.
     const acquisition = buildAcquisition(input.tracking, request);
-    await withUser(identity.id, async tx => {
+    await withUser(profileId, async tx => {
       await tx.user.create({
         data: {
-          id: identity.id,
+          id: profileId,
           storeId: null,
           email,
           passwordHash: '!identity',
@@ -166,7 +192,7 @@ export class MerchantSignupService {
         },
       });
       await tx.legalAcceptance.createMany({
-        data: signupAcceptanceRows(identity.id, request),
+        data: signupAcceptanceRows(profileId, request),
         skipDuplicates: true,
       });
     });
