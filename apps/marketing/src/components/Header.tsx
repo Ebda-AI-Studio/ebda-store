@@ -3,6 +3,7 @@ import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand
 import { COPY } from '../lib/content';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
+import { HeaderSearch } from './HeaderSearch';
 import {
   HOME,
   LOGIN_URL,
@@ -154,6 +155,7 @@ export function Header({
           </details>
         </nav>
         <div className="header-actions">
+          <HeaderSearch locale={locale} />
           <Link
             href={pagePath(other, page)}
             hrefLang={other}
