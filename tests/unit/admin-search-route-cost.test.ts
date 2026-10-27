@@ -100,7 +100,7 @@ describe('admin search route: transport (SEARCH-P2-9)', () => {
   });
 
   it('no term (the empty state) or a malformed header: three empty lists and no lookup at all', async () => {
-    for (const r of [get(), get(undefined, { 'X-Search-Query': '%E0%A4%A' }), get('a')]) {
+    for (const r of [get(), get(undefined, { 'X-Search-Query': '%E0%A4%A' })]) {
       const res = await r;
       expect(res.status).toBe(200);
       expect(res.body.data).toEqual({ products: [], orders: [], customers: [] });
@@ -108,6 +108,13 @@ describe('admin search route: transport (SEARCH-P2-9)', () => {
     expect(h.matching).not.toHaveBeenCalled();
     expect(h.productIds).not.toHaveBeenCalled();
     expect(h.prismaCalls).toEqual([]);
+  });
+
+  it('ONE character (search as you type) costs a product word-start lookup only: no customer or order scan', async () => {
+    await get('ا');
+    expect(h.productIds).toHaveBeenCalledTimes(1);
+    expect(h.matching).not.toHaveBeenCalled();
+    expect(h.orderSearchWhere).not.toHaveBeenCalled();
   });
 });
 

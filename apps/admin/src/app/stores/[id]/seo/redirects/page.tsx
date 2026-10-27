@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -42,6 +43,9 @@ export default function SlugRedirectsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [appliedQuery, setAppliedQuery] = useState('');
+  // Search-as-you-type: apply 150 ms after the last keystroke (the button still applies at once).
+  const liveQuery = useDebouncedValue(query.trim(), 150);
+  useEffect(() => setAppliedQuery(liveQuery), [liveQuery]);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(() => {
