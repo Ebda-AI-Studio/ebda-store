@@ -24,9 +24,12 @@ export class AuthState extends DurableObject {
     this.store = new AuthStateStore(ctx.storage.sql);
   }
 
-  /** Run `ops` atomically and in order; returns one result per op. */
-  async apply(ops: Op[]): Promise<unknown[]> {
-    const now = Date.now();
+  /**
+   * Run `ops` atomically and in order; returns one result per op. `nowMs` is a clock override for TESTS only
+   * (Ruling FLAKE-LEASE-1); production callers (auth-state-client.ts) never pass it.
+   */
+  async apply(ops: Op[], nowMs?: number): Promise<unknown[]> {
+    const now = nowMs ?? Date.now();
     const out = this.ctx.storage.transactionSync(() => ops.map(op => this.store.run(op, now)));
     if (ops.some(op => WRITE_COMMANDS.has(op[0]))) await this.scheduleAlarm(now);
     return out;
