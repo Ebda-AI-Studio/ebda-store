@@ -727,6 +727,20 @@
           "optional": true,
           "external": true
         },
+        "whatsappLink": {
+          "kind": "relation",
+          "type": "StoreWhatsAppLink",
+          "list": false,
+          "optional": true,
+          "external": true
+        },
+        "whatsappConsents": {
+          "kind": "relation",
+          "type": "StoreWhatsAppConsent",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
         "customerUsers": {
           "kind": "relation",
           "type": "User",
@@ -1554,6 +1568,211 @@
           "fromProps": ["id"],
           "to": ["store_id"],
           "toProps": ["storeId"]
+        }
+      }
+    },
+    "StoreWhatsAppLink": {
+      "table": "store_whatsapp_links",
+      "db": "store-do",
+      "pk": ["storeId"],
+      "uniques": [],
+      "fields": {
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false,
+          "id": true
+        },
+        "linked": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "linked",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "ownerUserId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "owner_user_id",
+          "list": false,
+          "optional": true
+        },
+        "linkedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "linked_at",
+          "list": false,
+          "optional": true
+        },
+        "entitlementVersion": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "entitlement_version",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "entitlementPackageId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "entitlement_package_id",
+          "list": false,
+          "optional": true
+        },
+        "entitlementAutomation": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "entitlement_automation",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "entitlementStatus": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "entitlement_status",
+          "list": false,
+          "optional": true
+        },
+        "entitlementValidUntil": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "entitlement_valid_until",
+          "list": false,
+          "optional": true
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "StoreWhatsAppConsent": {
+      "table": "store_whatsapp_consents",
+      "db": "store-do",
+      "pk": ["storeId", "buyerKey"],
+      "uniques": [],
+      "fields": {
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "buyerKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "buyer_key",
+          "list": false,
+          "optional": false
+        },
+        "granted": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "granted",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "grantedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "granted_at",
+          "list": false,
+          "optional": true
+        },
+        "grantedSource": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "granted_source",
+          "list": false,
+          "optional": true
+        },
+        "locale": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "locale",
+          "list": false,
+          "optional": true
+        },
+        "revokedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "revoked_at",
+          "list": false,
+          "optional": true
+        },
+        "revokedSource": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "revoked_source",
+          "list": false,
+          "optional": true
+        },
+        "userId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "user_id",
+          "list": false,
+          "optional": true
+        },
+        "optOutVersion": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "opt_out_version",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
         }
       }
     },
@@ -18050,6 +18269,13 @@
           "list": false,
           "optional": false,
           "default": "0"
+        },
+        "pastDueSince": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "past_due_since",
+          "list": false,
+          "optional": true
         },
         "nextRetryAt": {
           "kind": "scalar",

@@ -1375,5 +1375,27 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "reviewed 2026-10-26: no actor or user id column; source_store_id is a store id; ref is a provider invoice/tracking reference and error_code a short code (the service writes no names or emails)"
+  },
+  "store-do:store_whatsapp_consents": {
+    "db": "store-do",
+    "class": "customer-pii",
+    "action": "delete",
+    "piiColumns": ["buyer_key", "user_id"],
+    "subjectKeys": ["buyerKey", "userId"],
+    "userIdColumns": ["user_id"],
+    "subjectColumns": ["user_id"],
+    "note": "WhatsApp marketing consent keyed by the buyer key; erased with the buyer (WA-CONSENT-1)"
+  },
+  "store-do:store_whatsapp_links": {
+    "db": "store-do",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["owner_user_id"],
+    "subjectKeys": ["userId"],
+    "userIdColumns": ["owner_user_id"],
+    "actorScrub": {
+      "owner_user_id": null
+    },
+    "note": "the linking owner's user id is nulled on user erasure or offboarding (OFFBOARD-1); the link itself is store state"
   }
 }
