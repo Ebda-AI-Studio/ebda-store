@@ -14,6 +14,10 @@
   // Pinned to what the pinned wrangler's workerd supports (4.116.0 rejects 2026-09-01).
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Minified bundle (Ruling BUNDLE-BUDGET-4). `upload_source_maps` keeps Workers Observability stack
+  // traces readable; wrangler keeps function/class names (keep_names default).
+  "minify": true,
+  "upload_source_maps": true,
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
   "logpush": true,

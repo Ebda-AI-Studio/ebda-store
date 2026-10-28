@@ -8,7 +8,7 @@ import {
 } from '../../scripts/ci/worker-startup-budget.mjs';
 import budget from '../../scripts/ci/worker-startup-budget.json';
 
-const ok = { startupCpuMs: 90, bundleBytes: 14_244_673, bundleGzipBytes: 3_020_756 };
+const ok = { startupCpuMs: 90, bundleBytes: 7_518_999, bundleGzipBytes: 2_171_018 };
 
 describe('API Worker startup budget verdict', () => {
   it('the recorded post-fix baseline passes', () => {
