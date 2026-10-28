@@ -53,7 +53,7 @@ OTel tracing is wired in `apps/api/src/tracing.ts` behind the
 > **LIVE since 2026-07-12:** exports to Grafana Cloud Tempo — stack `brownoak2576` (https://brownoak2576.grafana.net, prod-eu-west-2, free tier 50GB traces). Railway `api` service carries `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` (Basic auth, instance `1720967`, access policy `ebda-api-otlp`). View: Grafana → Explore → Traces. Verified end-to-end (ebda-api spans incl. redis + http).
 > `OTEL_EXPORTER_OTLP_ENDPOINT` env flag. When the var is set, spans are exported
 > via OTLP/HTTP and trace context (`traceparent`) propagates through all downstream
-> HTTP calls (Neon, Redis, Inngest, Gemini).
+> HTTP calls (Neon, Redis, Gemini).
 
 **Recommended exporters:** Grafana Tempo (free in cloud tier) · Honeycomb · Jaeger
 (self-hosted). Set `OTEL_SERVICE_NAME=ebda-api` and

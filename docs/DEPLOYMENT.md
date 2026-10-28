@@ -441,7 +441,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 - **Wired call sites**:
   - `process.on('uncaughtException')` in `apps/api/src/index.ts` → P0 platform
   - Payment HMAC repeated fail (3+ in 5min via Redis counter) → P0 store-scoped (`payment.factory.ts`)
-  - Background job failure past final retry → P1 platform (`alerts-failure-watch.ts` listening on `inngest/function.failed`)
+  - Background job failure past final retry → P1 platform (`reportJobFailure`, `lib/jobs/failure.ts`, Ruling G5-4)
   - `/api/v1/health` deep-check degradation → P1 platform (`index.ts`)
 
 ### 5. Log drain — Axiom via `@axiomhq/pino` transport (persistent log retention)

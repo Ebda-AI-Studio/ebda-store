@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { acrossStores, prisma, runInTenantContext } from '@ebda/database';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
@@ -454,7 +454,7 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   return events.length;
 }
 
-export const waStoreEvents: InngestFunction.Any = inngest.createFunction(
+export const waStoreEvents: JobDef = inngest.createFunction(
   {
     id: 'wa-store-events',
     name: 'Store -> Ebda WhatsApp events',
@@ -482,7 +482,7 @@ export const waStoreEvents: InngestFunction.Any = inngest.createFunction(
  * that has a WhatsApp link row is re-sent. Same state = same envelope id, so a store whose state did
  * not change costs the consumer one deduped message; one that was missed is corrected within hours.
  */
-export const waPlanSync: InngestFunction.Any = inngest.createFunction(
+export const waPlanSync: JobDef = inngest.createFunction(
   {
     id: 'wa-plan-sync',
     name: 'Ebda WhatsApp: plan state reconcile (12-hourly)',

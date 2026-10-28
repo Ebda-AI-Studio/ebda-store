@@ -57,7 +57,7 @@ Effect:
 
 - `cf-{web,admin,orders,marketing}-deploy.yml` each re-run on the push and `wrangler deploy` the reverted Worker (~3–5 min, only the apps whose paths changed since that workflow's last successful run)
 - the API auto-deploys on a push to `main` that touches `apps/api/**`, `packages/**`, the lockfile or the deploy config (`cf-api-deploy.yml`, Ruling API-AUTODEPLOY-1, 2026-10-25); `scripts/rollback.sh` also dispatches it explicitly; a manual `git revert && git push` must also run `gh workflow run cf-api-deploy.yml`, or the API stays on the old commit while the frontends roll back
-- Inngest functions auto-redeploy on next API Worker boot
+- Background jobs (Workflows, Queues, Cron Triggers) ship with the API Worker version, so a rollback restores the previous job code too (Ruling G5-3: no Inngest fallback)
 - OneSignal apps unchanged (no rebuild)
 
 ### C. Data rollback (PITR first, dump restore as fallback)
