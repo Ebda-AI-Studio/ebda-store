@@ -32,12 +32,12 @@ describe('BRAND', () => {
   });
 
   it('carries the public WhatsApp line once, with a wa.me link and a readable form', () => {
-    expect(BRAND.contact.whatsapp).toBe('+201207761882');
-    expect(whatsappUrl()).toBe('https://wa.me/201207761882');
+    expect(BRAND.contact.whatsapp).toBe('+201514191411');
+    expect(whatsappUrl()).toBe('https://wa.me/201514191411');
     expect(whatsappUrl('أهلاً ستور')).toBe(
-      `https://wa.me/201207761882?text=${encodeURIComponent('أهلاً ستور')}`
+      `https://wa.me/201514191411?text=${encodeURIComponent('أهلاً ستور')}`
     );
-    expect(whatsappDisplay()).toBe('+20 120 776 1882');
+    expect(whatsappDisplay()).toBe('+20 151 419 1411');
   });
 
   it('store.ebda.app is the merchant app; admin.ebda.app is retired (HOST-STORE-1)', () => {

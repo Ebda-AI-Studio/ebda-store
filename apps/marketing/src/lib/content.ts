@@ -144,6 +144,9 @@ export interface Copy {
     /** The Ebda WhatsApp entry of the same menu (LAUNCH-SUITE-1). */
     whatsappBlurb: string;
     contact: string;
+    /** The header's "More" menu (FAQ, About, Contact): keeps the top row to one line. */
+    more: string;
+    about: string;
   };
   hero: {
     h1: string;
@@ -308,6 +311,8 @@ export const COPY: Record<Locale, Copy> = {
       storeBlurb: 'متجرك أونلاين في دقايق',
       whatsappBlurb: 'كلّم عملاءك على واتساب من مكان واحد',
       contact: 'تواصل معنا',
+      more: 'المزيد',
+      about: 'عن الاستوديو',
     },
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
@@ -725,6 +730,8 @@ export const COPY: Record<Locale, Copy> = {
       storeBlurb: 'Your online store in minutes',
       whatsappBlurb: 'Talk to your customers on WhatsApp, from one inbox',
       contact: 'Contact',
+      more: 'More',
+      about: 'About the studio',
     },
     hero: {
       h1: 'Open your online store in minutes.',

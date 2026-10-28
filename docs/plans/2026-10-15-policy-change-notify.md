@@ -624,7 +624,7 @@ Replace the test `'llms.txt and og assets exist; legal pages show their version 
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(`${word} ${cur.version}`);
         // the WhatsApp button's wa.me href is the only long number on the page, and it is not a registration number
-        const withoutPhone = html.replace(/201207761882/g, '');
+        const withoutPhone = html.replace(/201514191411/g, '');
         expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
       }
     }
