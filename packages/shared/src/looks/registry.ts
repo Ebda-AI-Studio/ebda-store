@@ -752,7 +752,8 @@ export const LOOKS: readonly LookDefinition[] = [
       muted: '#62505A',
       primary: '#A5303F',
       onPrimary: '#FFFFFF',
-      accent: '#2F6B34',
+      // TEMPLATES-MOCK-9: the mock's herb green #3E7A3A (5.19:1 on the page), was #2F6B34.
+      accent: '#3E7A3A',
       line: '#EBD6DA',
       fonts: { display: 'El Messiri', body: 'Cairo', latin: 'Fraunces' },
       radius: 'md',
@@ -975,6 +976,8 @@ export const LOOKS: readonly LookDefinition[] = [
       primary: '#121212',
       onPrimary: '#FFFFFF',
       // Ruling B5-2: rose gold (hue 351), not the brass the first design used.
+      // TEMPLATES-MOCK-9: the mock's gold #A9792E was NOT taken (see that ruling): at 4.5:1 on white it falls out of
+      // the METAL-1 band (lightness < 0.4) and into the no-orange gate.
       accent: '#8F4F59',
       onAccent: '#FFFFFF',
       line: '#E8E8E8',
