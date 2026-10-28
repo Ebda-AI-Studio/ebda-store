@@ -72,6 +72,7 @@ import {
   type TemplateFamily,
   type TemplateId,
   getLook,
+  normalizeLegacyTemplate,
   PAGE_KINDS,
   diffTemplateFamily,
   PAGE_OWNED_SETTING_KEYS,
@@ -220,7 +221,7 @@ function resolvedLayout(store: {
 }) {
   return resolveLayoutSettings(
     store.layoutSettings ?? {},
-    (store.template ?? undefined) as TemplateId | undefined,
+    store.template ? normalizeLegacyTemplate(store.template) : undefined,
     store.look
   );
 }
@@ -903,7 +904,9 @@ async function composeLookDocument(
       ? toSkin
       : {
           skin:
-            outgoing && outgoingId !== store.look ? outgoing.skin : (store.template as TemplateId),
+            outgoing && outgoingId !== store.look
+              ? outgoing.skin
+              : normalizeLegacyTemplate(store.template),
           look: outgoing?.id ?? null,
         };
   let definition = applyTemplateFamily(start, family, look, {

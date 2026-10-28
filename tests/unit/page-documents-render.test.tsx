@@ -165,7 +165,7 @@ async function mount(doc?: PageDefinition, opts: { editorMode?: boolean; templat
   const { default: ProductDetailClient } =
     await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
   const { PageDocumentProvider } = await import('../../apps/web/src/builder/render/PageDocument');
-  ctx.store = { ...STORES.A, template: opts.template ?? 'minimal' };
+  ctx.store = { ...STORES.A, template: opts.template ?? 'qamar' };
   const page = (
     <ProductDetailClient
       initialProduct={product() as never}

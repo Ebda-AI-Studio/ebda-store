@@ -18,8 +18,6 @@ const WA_ME_SURFACES = [
   'apps/web/src/templates/shared/WaMeButtons.tsx',
   'apps/web/src/templates/shared/FloatingWidget.tsx',
   'apps/web/src/templates/shared/ShareProductRow.tsx',
-  'apps/web/src/templates/classic/Footer.tsx',
-  'apps/web/src/templates/modern/Footer.tsx',
   'apps/web/src/components/ShopChrome.tsx',
   'apps/admin/src/app/stores/[id]/branding/_components/ContactInfoTab.tsx',
   'apps/admin/src/app/stores/[id]/floating-widget/page.tsx',

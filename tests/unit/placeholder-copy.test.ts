@@ -117,7 +117,7 @@ describe('registry presets source their starter copy from the one constant', () 
 });
 
 describe('validatePublishReadiness: PLACEHOLDER_COPY', () => {
-  const base = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+  const base = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
   const withStarter = (): PageDefinition =>
     reduceDocument(base(), {
       type: 'addSection',

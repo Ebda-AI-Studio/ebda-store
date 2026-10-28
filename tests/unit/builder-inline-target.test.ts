@@ -47,7 +47,7 @@ const doc = (): PageDefinition =>
           ],
         },
       } as never,
-      'modern'
+      'qamar'
     )
   );
 const heroId = (d: PageDefinition) => d.sections.find(n => n.type === 'hero')!.id;

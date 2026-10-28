@@ -13,6 +13,7 @@ import {
   parseStoreHost,
   isReservedSlug,
   validateStoreSlugFormat,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
@@ -233,7 +234,7 @@ const DEFAULT_STORE: ResolvedStore = {
   status: 'active',
   currency: REGION.currency,
   timezone: 'Africa/Cairo',
-  template: 'modern',
+  template: 'qamar',
   theme: DEFAULT_THEME,
   socialLinks: {},
   heroTitle: null,
@@ -420,11 +421,11 @@ async function fetchStoreByDomain(
       descriptionAr: storeData.descriptionAr,
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
-      template: storeData.template || 'modern',
+      template: normalizeLegacyTemplate(storeData.template),
       look: storeData.look ?? null,
       isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
-        template: storeData.template || 'modern',
+        template: normalizeLegacyTemplate(storeData.template),
         look: storeData.look,
         theme: customTheme,
       }),
@@ -597,11 +598,11 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       descriptionAr: storeData.descriptionAr,
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
-      template: storeData.template || 'modern',
+      template: normalizeLegacyTemplate(storeData.template),
       look: storeData.look ?? null,
       isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
-        template: storeData.template || 'modern',
+        template: normalizeLegacyTemplate(storeData.template),
         look: storeData.look,
         theme: customTheme,
       }),
@@ -938,11 +939,11 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       descriptionAr: storeData.descriptionAr,
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
-      template: storeData.template || 'modern',
+      template: normalizeLegacyTemplate(storeData.template),
       look: storeData.look ?? null,
       isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
-        template: storeData.template || 'modern',
+        template: normalizeLegacyTemplate(storeData.template),
         look: storeData.look,
         theme: customTheme,
       }),

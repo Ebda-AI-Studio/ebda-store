@@ -80,7 +80,7 @@ async function seedMerchant(
       data: {
         name: `look-${tag}-${run}`,
         slug: `look-${tag}-${run}`,
-        template: 'modern',
+        template: 'dahab',
         currency: 'EGP',
         ownerId: user.id,
         status: 'active',
@@ -173,7 +173,7 @@ describe.skipIf(!hasDb)('POST /stores/:id/look/preview (ebda_app + tenant guard)
     expect(report.keptContent.map((s: { type: string }) => s.type)).toContain('hero');
     // a reset clears the look-owned theme key the store had
     expect(report.themeKeysReset).toEqual(['primaryColor']);
-    expect(skinChange).toEqual({ from: 'modern', to: getLook(LOOK)!.skin });
+    expect(skinChange).toEqual({ from: 'dahab', to: getLook(LOOK)!.skin });
     // nothing was written: no revision row, the same look, template and theme
     expect(await rows(m.storeId)).toEqual(before.rows);
     expect(await storeRow(m.storeId)).toEqual(before.store);
@@ -203,7 +203,7 @@ describe.skipIf(!hasDb)('POST /stores/:id/look/preview (ebda_app + tenant guard)
     const m = await seedMerchant('moved', {}, HERO);
     const preview = await post(m.storeId, m.token, { lookId: LOOK, design: 'keep' });
     // the merchant edits in another tab: a new draft revision
-    const doc = layoutToDefinition(resolveLayoutSettings(HERO, 'modern'));
+    const doc = layoutToDefinition(resolveLayoutSettings(HERO, 'dahab'));
     const saved = await asStore(m.storeId, () =>
       saveDraft({
         storeId: m.storeId,

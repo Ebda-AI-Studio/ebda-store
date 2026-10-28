@@ -132,7 +132,7 @@ const pdpProduct = {
   categories: [],
 };
 
-function setStore(lang: 'en' | 'ar', template = 'minimal') {
+function setStore(lang: 'en' | 'ar', template = 'qamar') {
   ctx.lang = lang;
   ctx.store = { ...STORES.A, template, currency: 'EGP', theme: {} };
 }
@@ -152,24 +152,8 @@ const CARD_MODULES: [string, () => Promise<React.ComponentType<Record<string, un
         .StorefrontProductCard as never,
   ],
   [
-    'modern/ProductCard',
-    async () => (await import('../../apps/web/src/templates/modern/ProductCard')).default as never,
-  ],
-  [
-    'elegant/ProductCard',
-    async () => (await import('../../apps/web/src/templates/elegant/ProductCard')).default as never,
-  ],
-  [
-    'classic/ProductCard',
-    async () => (await import('../../apps/web/src/templates/classic/ProductCard')).default as never,
-  ],
-  [
-    'bold/ProductCard',
-    async () => (await import('../../apps/web/src/templates/bold/ProductCard')).default as never,
-  ],
-  [
-    'minimal/ProductCard',
-    async () => (await import('../../apps/web/src/templates/minimal/ProductCard')).default as never,
+    'base/ProductCard',
+    async () => (await import('../../apps/web/src/templates/base/ProductCard')).default as never,
   ],
   [
     'dahab/ProductCard',
@@ -191,7 +175,7 @@ describe('one price format on every card path (B1-28)', () => {
           addEventListener: () => {},
           removeEventListener: () => {},
         }));
-        setStore(lang, name.startsWith('dahab') ? 'dahab' : 'minimal');
+        setStore(lang, name.startsWith('dahab') ? 'dahab' : 'qamar');
         const Card = await load();
         const { container } = render(
           <Card product={cardProduct} isRtl={lang === 'ar'} currency="EGP" />
@@ -244,7 +228,7 @@ describe('PDP main price + sticky bar print the card string (B1-28)', () => {
 });
 
 describe('every theme cart table + order summary prints the same string (B1-28)', () => {
-  const THEMES = ['minimal', 'modern', 'elegant', 'classic', 'bold', 'dahab'] as const;
+  const THEMES = ['base', 'dahab'] as const;
   const line = {
     id: 'l1',
     productId: 'p1',
@@ -258,7 +242,7 @@ describe('every theme cart table + order summary prints the same string (B1-28)'
   for (const lang of LANGS)
     for (const theme of THEMES)
       it(`${theme} CartTable + OrderSummary (${lang})`, async () => {
-        setStore(lang, theme);
+        setStore(lang, theme === 'base' ? 'qamar' : theme);
         const CartTable = (await import(`../../apps/web/src/templates/${theme}/CartTable.tsx`))
           .default as React.ComponentType<Record<string, unknown>>;
         const Summary = (await import(`../../apps/web/src/templates/${theme}/OrderSummary.tsx`))

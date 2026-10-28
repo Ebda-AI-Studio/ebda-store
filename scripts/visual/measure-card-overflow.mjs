@@ -2,7 +2,7 @@
 // Layout proof for FU46 / D7: a long product name and the add-to-cart CTA must stay
 // inside their card on every skin. jsdom has no layout, so this drives real Chromium.
 //
-//   npm run test:card-overflow -- [--widths 390,360,320] [--skins modern,dahab] [--pages plp,pdp] [--label after] [--out <dir>]
+//   npm run test:card-overflow -- [--widths 390,360,320] [--skins qamar,dahab] [--pages plp,pdp] [--label after] [--out <dir>]
 //
 // Needs the local stack + the seed (scripts/visual/seed-card-overflow.mjs):
 //   1. DATABASE_URL=<owner url on localhost> node scripts/visual/seed-card-overflow.mjs
@@ -26,7 +26,7 @@ const arg = (name, dflt) => {
   return i >= 0 ? process.argv[i + 1] : dflt;
 };
 const WIDTHS = arg('widths', '390,360,320').split(',').map(Number);
-const SKINS = arg('skins', 'modern,elegant,classic,minimal,bold,dahab').split(',');
+const SKINS = arg('skins', 'qamar,souq,jasmine,lamma,dahab').split(',');
 const LABEL = arg('label', 'run');
 const OUT = resolve(arg('out', join(tmpdir(), 'card-overflow')));
 const PORT = process.env.WEB_PORT || '3150';

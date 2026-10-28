@@ -26,7 +26,7 @@ import {
   snapshotTypography,
 } from '@ebda/shared';
 
-const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const BASE = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const GOOGLE = {
   type: 'google' as const,
   family: 'Tajawal',
@@ -278,7 +278,7 @@ const PATCH = { fonts: [GOOGLE], zones: { header: { fontSize: '2rem' }, footer: 
 const DRAFT_DOC = { ...BASE, typography: PATCH };
 const STORE = {
   layoutSettings: {},
-  template: 'modern',
+  template: 'qamar',
   slug: 'acme',
   domain: 'acme.example.com',
   theme: { primaryColor: '1 1% 1%' },

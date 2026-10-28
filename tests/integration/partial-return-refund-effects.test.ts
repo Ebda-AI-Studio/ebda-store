@@ -76,7 +76,7 @@ describe.skipIf(!hasDb)('partial-return refund effects', () => {
         data: {
           name: 'prt-test-store',
           slug: `prt-test-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

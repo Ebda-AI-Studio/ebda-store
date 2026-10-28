@@ -3,7 +3,7 @@
  * S-01 (Qamar taste audit 2026-10-15, quality-bar § 8): every footer renders
  * the legal row — privacy · terms · returns · © — from `resolveBottomBar`.
  * The toggles were dead (0 callers): no footer linked a policy page at all.
- * Per footer (5 skins + Dahab; Qamar is a look on these skins): the 3 hrefs
+ * Per footer (the shared base + Dahab; every other template renders the base): the 3 hrefs
  * are there when the toggles are on, and gone when they are off.
  */
 import React from 'react';
@@ -27,20 +27,12 @@ vi.mock('../../apps/web/src/lib/api', () => ({
   api: { get: () => Promise.resolve({ success: false }) },
 }));
 
-import Minimal from '../../apps/web/src/templates/minimal/Footer';
-import Classic from '../../apps/web/src/templates/classic/Footer';
-import Modern from '../../apps/web/src/templates/modern/Footer';
-import Elegant from '../../apps/web/src/templates/elegant/Footer';
-import Bold from '../../apps/web/src/templates/bold/Footer';
+import Base from '../../apps/web/src/templates/base/Footer';
 import Dahab from '../../apps/web/src/templates/dahab/Footer';
 import type { FooterProps } from '../../apps/web/src/templates/types';
 
 const FOOTERS = {
-  minimal: Minimal,
-  classic: Classic,
-  modern: Modern,
-  elegant: Elegant,
-  bold: Bold,
+  base: Base,
   dahab: Dahab,
 };
 const base: FooterProps = {
@@ -145,7 +137,7 @@ describe('FU46 I-1: the © year is the per-request render clock, not the local o
         vi.setSystemTime(now);
         const { container, unmount } = render(
           <RenderClockProvider now={now}>
-            <Minimal {...base} />
+            <Base {...base} />
           </RenderClockProvider>
         );
         years.push(container.querySelector('[data-footer-legal] p')!.textContent!);
@@ -211,7 +203,7 @@ describe('rule (d): the cookie-preferences button under the footer is 44px', () 
 // Ebda Store" was larger and semibold: the platform outweighed the store at the last impression.
 describe('IA-09: footer wordmark and attribution weight', () => {
   it('a look store (wordmarkSize) gets the wordmark in the display face at 24px, both breakpoints', () => {
-    const { container } = render(<Minimal {...base} theme={{ wordmarkSize: 'lg' } as never} />);
+    const { container } = render(<Base {...base} theme={{ wordmarkSize: 'lg' } as never} />);
     const marks = container.querySelectorAll('[data-footer-brand]');
     expect(marks.length).toBe(2);
     for (const m of marks) {
@@ -221,7 +213,7 @@ describe('IA-09: footer wordmark and attribution weight', () => {
     }
   });
   it('no look: the skin wordmark is unchanged', () => {
-    const { container } = render(<Minimal {...base} />);
+    const { container } = render(<Base {...base} />);
     expect(container.querySelector('[data-footer-brand="mobile"]')!.className).toContain(
       'tracking-[0.25em]'
     );
@@ -236,7 +228,7 @@ describe('IA-09: footer wordmark and attribution weight', () => {
 // IA-09 (independent audit): footer gutters measured 24 vs 32px at 1280: the body used
 // `container px-6` (or px-4) while the legal row used the page gutter. One gutter token.
 describe('IA-09: one footer gutter', () => {
-  it.each(['minimal', 'modern', 'elegant', 'classic', 'bold'])('%s', async skin => {
+  it.each(['base'])('%s', async skin => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const src = readFileSync(

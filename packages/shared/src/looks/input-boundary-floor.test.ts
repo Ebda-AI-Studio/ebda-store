@@ -11,7 +11,7 @@ import { LOOKS } from './registry';
 import { contrastRatio } from '../utils/color';
 import type { TemplateId } from '../types/store-theme';
 
-const SKINS: TemplateId[] = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab', 'qamar'];
+const SKINS: TemplateId[] = ['dahab', 'qamar', 'souq', 'jasmine', 'lamma'];
 const ratio = (t: { inputColor: string; backgroundColor: string }) =>
   contrastRatio(t.backgroundColor, t.inputColor);
 
@@ -28,14 +28,14 @@ describe('the composed --input is a visible boundary (>= 3:1)', () => {
   });
   it('a merchant saved light border with no input colour', () => {
     const t = composeStoreTheme({
-      template: 'minimal',
+      template: 'qamar',
       look: null,
       theme: { borderColor: '220 13% 91%' },
     });
     expect(ratio(t)).toBeGreaterThanOrEqual(3);
   });
   it('keeps the hue of the colour it strengthens and never touches the decorative border', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: null, theme: null });
+    const t = composeStoreTheme({ template: 'qamar', look: null, theme: null });
     expect(t.inputColor.split(' ')[0]).toBe(t.borderColor.split(' ')[0]);
     expect(t.borderColor).toBe('220 13% 91%');
   });

@@ -7,7 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonDetail } from '../../../../components/AdminSkeleton';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useLocale } from 'next-intl';
-import { getLook, type LookId } from '@ebda/shared';
+import { getLook, normalizeLegacyTemplate, type LookId } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { LookPicker } from '../../../../components/looks/LookPicker';
 import {
@@ -15,10 +15,10 @@ import {
   type LookDesignChoice,
 } from '../../../../components/looks/LookSwitchDialog';
 
-const SKIN_IDS = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
-// Qamar, Souq, Jasmine and Lamma are reached only through a look (Rulings B1-17, B2-1, B3-1, B4-1): labelled, never a bare
-// skin choice.
-const SKIN_LABEL_IDS = [...SKIN_IDS, 'qamar', 'souq', 'jasmine', 'lamma'];
+// Every template is reached only through a look (Rulings B1-17, B2-1, B3-1, B4-1): labelled, never a bare
+// skin choice. A store still holding a retired Force skin (SKIN-DEL-8) is shown on the template it
+// renders as (`normalizeLegacyTemplate`), with the "pick a look" note.
+const SKIN_LABEL_IDS = ['dahab', 'qamar', 'souq', 'jasmine', 'lamma'];
 
 export default function StoreTemplatePage() {
   const params = useParams();
@@ -50,7 +50,7 @@ export default function StoreTemplatePage() {
         if (data?.store) {
           setStore({
             name: data.store.name,
-            template: data.store.template || 'modern',
+            template: normalizeLegacyTemplate(data.store.template),
             look: getLook(data.store.look)?.id ?? null,
           });
         }

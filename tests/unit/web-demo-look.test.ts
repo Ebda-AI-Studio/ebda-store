@@ -123,10 +123,10 @@ const baseStore = (over: Partial<ResolvedStore> = {}): ResolvedStore =>
     status: 'active',
     currency: 'EGP',
     timezone: 'Africa/Cairo',
-    template: 'modern',
+    template: 'qamar',
     look: 'qamar.atelier',
     isDemo: true,
-    theme: composeStoreTheme({ template: 'modern', look: 'qamar.atelier', theme: {} }),
+    theme: composeStoreTheme({ template: 'qamar', look: 'qamar.atelier', theme: {} }),
     socialLinks: {},
     ...over,
   }) as ResolvedStore;
@@ -193,7 +193,7 @@ describe('store-resolver: x-demo-look', () => {
           id: 'store-1',
           slug: 'storedemo',
           name: 'Demo',
-          template: 'modern',
+          template: 'qamar',
           look: 'qamar.atelier',
           isDemo,
           theme: {},
@@ -228,7 +228,7 @@ describe('store-resolver: x-demo-look', () => {
     headerBag.value.delete('x-demo-look');
     const plain = await resolver.getStoreOrNotFound();
     expect(plain.look).toBe('qamar.atelier');
-    expect(plain.template).toBe('modern');
+    expect(plain.template).toBe('qamar');
   });
 
   it('demo + a look that is not built (every registry look is built since B5, so an unregistered id stands in): ignored', async () => {

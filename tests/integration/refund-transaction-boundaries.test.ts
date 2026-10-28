@@ -56,7 +56,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
         data: {
           name: 'rtb-test-store',
           slug: `rtb-test-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

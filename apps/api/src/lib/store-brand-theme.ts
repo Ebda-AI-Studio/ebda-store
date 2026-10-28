@@ -1,4 +1,4 @@
-import { composeStoreTheme, getLook, type TemplateId } from '@ebda/shared';
+import { composeStoreTheme, getLook, normalizeLegacyTemplate } from '@ebda/shared';
 
 /**
  * The theme a store's brand surfaces OUTSIDE the storefront read (emails, invoices, campaign
@@ -19,7 +19,7 @@ export function storeBrandTheme(store: {
       : null;
   if (!getLook(store.look)) return stored;
   return composeStoreTheme({
-    template: (store.template ?? 'modern') as TemplateId,
+    template: normalizeLegacyTemplate(store.template),
     look: store.look,
     theme: stored,
   }) as unknown as Record<string, unknown>;

@@ -41,7 +41,7 @@ const languageState = { language: 'en' as 'en' | 'ar' };
 vi.mock('../../contexts/StoreContext', () => ({
   useStore: () => storeState,
   useStoreUrl: () => (path: string) => path,
-  useStoreTemplate: () => 'modern',
+  useStoreTemplate: () => 'qamar',
 }));
 
 vi.mock('../../contexts/LanguageContext', () => ({
@@ -81,11 +81,7 @@ vi.mock('next/link', () => ({
 
 // Imported AFTER the mocks so every card picks them up.
 const { StorefrontProductCard } = await import('./StorefrontProductCard');
-const { default: ModernProductCard } = await import('../modern/ProductCard');
-const { default: ElegantProductCard } = await import('../elegant/ProductCard');
-const { default: ClassicProductCard } = await import('../classic/ProductCard');
-const { default: BoldProductCard } = await import('../bold/ProductCard');
-const { default: MinimalProductCard } = await import('../minimal/ProductCard');
+const { default: BaseProductCard } = await import('../base/ProductCard');
 const { ProductCarousel } = await import('./ProductCarousel');
 const { ProductListItem } = await import('../../app/products/ProductListItem');
 
@@ -113,11 +109,7 @@ const LABEL = { badgeLabel: 'Offer', badgeLabelAr: 'عرض' };
 
 const CARDS = [
   ['shared/StorefrontProductCard', StorefrontProductCard],
-  ['modern/ProductCard', ModernProductCard],
-  ['elegant/ProductCard', ElegantProductCard],
-  ['classic/ProductCard', ClassicProductCard],
-  ['bold/ProductCard', BoldProductCard],
-  ['minimal/ProductCard', MinimalProductCard],
+  ['base/ProductCard', BaseProductCard],
 ] as const;
 
 function layoutWith(
@@ -245,7 +237,7 @@ describe('custom badge — the merchant’s label renders on every card', () => 
 // ── 3. Corner placement is physical, not mirrored ───────────────────────────
 
 describe('custom badge — corner placement does not mirror in RTL', () => {
-  it.each(CARDS.filter(([name]) => name !== 'minimal/ProductCard'))(
+  it.each(CARDS.filter(([name]) => name !== 'base/ProductCard'))(
     '%s: bottom-left stays physically left in Arabic',
     (_name, Card) => {
       const en = render(
@@ -275,7 +267,7 @@ describe('custom badge — corner placement does not mirror in RTL', () => {
 // ── 4. The collision rule, rendered ─────────────────────────────────────────
 
 describe('custom badge — the collision rule on the real cards', () => {
-  const CORNERED = CARDS.filter(([name]) => name !== 'minimal/ProductCard');
+  const CORNERED = CARDS.filter(([name]) => name !== 'base/ProductCard');
 
   it.each(CORNERED)(
     '%s: same corner → the custom badge wins, the sale chip goes',
@@ -332,11 +324,11 @@ describe('custom badge — the collision rule on the real cards', () => {
     }
   );
 
-  it('minimal: its inline discount text survives a same-corner custom badge', () => {
-    // minimal's discount indicator has no corner, so the corner arm of the
+  it('base: its inline discount text survives a same-corner custom badge', () => {
+    // the base card's discount indicator has no corner, so the corner arm of the
     // mutex must not fire there.
     const html = render(
-      MinimalProductCard,
+      BaseProductCard,
       { ...ON_SALE, ...LABEL },
       {
         layout: layoutWith(
@@ -499,10 +491,10 @@ describe.each(ALL_PATHS)('custom badge colours + tap-through — %s', (_name, re
     expect(chipTag(renderPath({ ...NO_SALE, ...LABEL }))).toContain('pointer-events-none');
   });
 
-  it('neither does the corner discount chip (minimal renders it inline, not as a chip)', () => {
+  it('neither does the corner discount chip (the base card renders it inline, not as a chip)', () => {
     const html = renderPath(ON_SALE);
     const m = html.match(/<span[^>]*>\u2066\u221238%\u2069<\/span>/);
-    if (_name === 'minimal/ProductCard') return;
+    if (_name === 'base/ProductCard') return;
     expect(m, 'discount chip not rendered').not.toBeNull();
     expect(m![0]).toContain('pointer-events-none');
   });
@@ -510,28 +502,25 @@ describe.each(ALL_PATHS)('custom badge colours + tap-through — %s', (_name, re
 
 // ── #665 — a merchant cardShape radius beats the pack's own rounded-* ───────
 
-describe('cardShape radius vs the modern pack (tailwind-merge order)', () => {
+describe('cardShape radius vs the pack (tailwind-merge order)', () => {
   it.each([
     ['StorefrontProductCard', () => StorefrontProductCard],
     ['ProductCarousel', () => ProductCarousel],
-  ] as const)(
-    '%s: circle cardShape renders rounded-full, not the pack rounded-2xl',
-    (name, get) => {
-      storeState.layout = undefined;
-      languageState.language = 'en';
-      const Comp = get();
-      const props =
-        name === 'ProductCarousel'
-          ? { products: [NO_SALE], pack: 'modern', cardShape: 'circle', currency: 'EGP' }
-          : { product: NO_SALE, pack: 'modern', cardShape: 'circle', currency: 'EGP' };
-      const html = renderToStaticMarkup(React.createElement(Comp as never, props as never));
-      // The card frame is the element that carries the modern pack's border.
-      const frame = html.match(/class="[^"]*border-primary\/15[^"]*"/);
-      expect(frame, 'modern card frame not found').not.toBeNull();
-      expect(frame![0]).toContain('rounded-full');
-      expect(frame![0]).not.toContain('rounded-2xl');
-    }
-  );
+  ] as const)('%s: circle cardShape renders rounded-full, not the pack radius', (name, get) => {
+    storeState.layout = undefined;
+    languageState.language = 'en';
+    const Comp = get();
+    const props =
+      name === 'ProductCarousel'
+        ? { products: [NO_SALE], pack: 'souq', cardShape: 'circle', currency: 'EGP' }
+        : { product: NO_SALE, pack: 'souq', cardShape: 'circle', currency: 'EGP' };
+    const html = renderToStaticMarkup(React.createElement(Comp as never, props as never));
+    // The card frame is the element that carries the souq pack's `rounded-[var(--radius)]`.
+    const frame = html.match(/class="[^"]*border-border bg-card[^"]*"/);
+    expect(frame, 'souq card frame not found').not.toBeNull();
+    expect(frame![0]).toContain('rounded-full');
+    expect(frame![0]).not.toContain('rounded-[var(--radius)]');
+  });
 });
 
 // ── 6. Heart / quick-add collision avoidance, on the REAL wiring ───────────
@@ -567,132 +556,12 @@ describe('heart collision — StorefrontProductCard (heart at top-start)', () =>
   });
 });
 
-/**
- * modern's wishlist heart only renders when `onAddToWishlist` is provided
- * (elegant's renders unconditionally) — the plain `render()` helper above
- * never passes it, so these two tests need their own small variant that
- * does, matching how a real page wires an "add to wishlist" handler.
- */
-function renderWithWishlistHandler(
-  Card: (typeof CARDS)[number][1],
-  product: Record<string, unknown>,
-  { layout = undefined as StoreLayoutSettings | undefined } = {}
-): string {
-  languageState.language = 'en';
-  storeState.layout = layout;
-  return renderToStaticMarkup(
-    React.createElement(Card as never, {
-      product: product as never,
-      isRtl: false,
-      currency: 'EGP',
-      onAddToWishlist: () => {},
-    })
-  );
-}
-
-describe('heart collision — modern/elegant (heart at top-end)', () => {
-  // The NEW chip is the merchant's choice (Ruling D1016-NEW-1): these cases turn it on.
-  beforeEach(() => {
-    storeState.store.theme = { showNewBadge: true };
-  });
-  afterEach(() => {
-    storeState.store.theme = {};
-  });
-  it.each([
-    ['modern/ProductCard', ModernProductCard],
-    ['elegant/ProductCard', ElegantProductCard],
-  ] as const)('%s: a top-left badge is untouched (heart is on the END side)', (_name, Card) => {
-    const html = renderWithWishlistHandler(
-      Card,
-      { ...NO_SALE, ...LABEL },
-      {
-        layout: layoutWith({ position: 'top-left', color: BADGE_COLOR }),
-      }
-    );
-    const chip = stripBadgeChip(html).chips[0];
-    expect(chip).toMatch(/\btop-3 left-3\b/);
-  });
-
-  it.each([
-    ['modern/ProductCard', ModernProductCard],
-    ['elegant/ProductCard', ElegantProductCard],
-  ] as const)('%s: a top-right badge (LTR heart corner) moves to top-left', (_name, Card) => {
-    const html = renderWithWishlistHandler(
-      Card,
-      { ...NO_SALE, ...LABEL },
-      {
-        layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
-      }
-    );
-    const chip = stripBadgeChip(html).chips[0];
-    expect(chip).toMatch(/\btop-3 left-3\b/);
-  });
-
-  it('modern: with NO wishlist handler (heart absent), top-right is untouched', () => {
-    // The plain `render()` helper never passes onAddToWishlist, so modern's
-    // heart does not mount — nothing to avoid.
-    const html = render(
-      ModernProductCard,
-      { ...NO_SALE, ...LABEL },
-      { layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }) }
-    );
-    const chip = stripBadgeChip(html).chips[0];
-    expect(chip).toMatch(/\btop-3 right-3\b/);
-  });
-
-  // Issue #1997 — before this fix, avoiding the heart corner only ever
-  // checked the OTHER top corner against a second action button
-  // (topStartReserved), never against the NEW badge these same two themes
-  // render unconditionally at that exact corner. A badge relocated off the
-  // heart landed directly under the NEW chip instead.
-  it.each([
-    ['modern/ProductCard', ModernProductCard],
-    ['elegant/ProductCard', ElegantProductCard],
-  ] as const)(
-    '%s: a top-right badge on a NEW product drops to the bottom, not onto the NEW chip at top-left',
-    (_name, Card) => {
-      const html = renderWithWishlistHandler(
-        Card,
-        { ...NO_SALE, ...LABEL, isNew: true },
-        {
-          layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
-        }
-      );
-      const chip = stripBadgeChip(html).chips[0];
-      // Both top corners are now spoken for (heart at top-right, NEW at
-      // top-left) — same side as the merchant's chosen corner, but lifted
-      // above the always-mounted CTA band per issue #1611/#1609.
-      expect(chip).toContain('bottom-[min(6rem,calc(100%-2.25rem))] right-3');
-      expect(chip).not.toMatch(/\btop-3 left-3\b/);
-      expect(chip).not.toMatch(/\btop-3 right-3\b/);
-    }
-  );
-
-  it.each([
-    ['modern/ProductCard', ModernProductCard],
-    ['elegant/ProductCard', ElegantProductCard],
-  ] as const)(
-    '%s: a top-right badge on a product that is NOT new still moves to top-left (no regression)',
-    (_name, Card) => {
-      const html = renderWithWishlistHandler(
-        Card,
-        { ...NO_SALE, ...LABEL, isNew: false },
-        {
-          layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
-        }
-      );
-      const chip = stripBadgeChip(html).chips[0];
-      expect(chip).toMatch(/\btop-3 left-3\b/);
-    }
-  );
-});
-
-// Issue #2092 — minimal renders its own NEW chip at LOGICAL top-start
+// Issue #2092 — the base card renders its own NEW chip at LOGICAL top-start
 // (`absolute top-2 start-2`) but its `resolveCardBadges` call never passed
 // `newOrBrandBadgeReserved`, so a merchant's `top-left` custom badge resolved
-// straight onto the NEW chip (demo-boutique runs minimal). No wishlist heart on
-// minimal, so the avoidance target is the other top corner.
-describe('NEW-badge corner — minimal (#2092)', () => {
+// straight onto the NEW chip. No wishlist heart on
+// the base card, so the avoidance target is the other top corner.
+describe('NEW-badge corner — base card (#2092)', () => {
   // The NEW chip is the merchant's choice (Ruling D1016-NEW-1): these cases turn it on.
   beforeEach(() => {
     storeState.store.theme = { showNewBadge: true };
@@ -702,7 +571,7 @@ describe('NEW-badge corner — minimal (#2092)', () => {
   });
   it('LTR: a top-left badge on a NEW product moves off the NEW chip to top-right', () => {
     const html = render(
-      MinimalProductCard,
+      BaseProductCard,
       { ...NO_SALE, ...LABEL, isNew: true },
       { layout: layoutWith({ position: 'top-left', color: BADGE_COLOR }) }
     );
@@ -713,7 +582,7 @@ describe('NEW-badge corner — minimal (#2092)', () => {
 
   it('RTL: NEW sits at physical top-right, so a top-right badge moves to top-left', () => {
     const html = render(
-      MinimalProductCard,
+      BaseProductCard,
       { ...NO_SALE, ...LABEL, isNew: true },
       { language: 'ar', layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }) }
     );
@@ -723,7 +592,7 @@ describe('NEW-badge corner — minimal (#2092)', () => {
 
   it('a product that is NOT new keeps the top-left corner (no regression)', () => {
     const html = render(
-      MinimalProductCard,
+      BaseProductCard,
       { ...NO_SALE, ...LABEL, isNew: false },
       { layout: layoutWith({ position: 'top-left', color: BADGE_COLOR }) }
     );

@@ -5,7 +5,7 @@
  *  - the Dahab home document (hero slides, collection list, featured grid,
  *    image-with-text, product spotlight, testimonials, trust badges,
  *    newsletter) on the `dahab` skin, Arabic and English;
- *  - the same new sections on the `modern` skin (they are platform sections,
+ *  - the same new sections on the `qamar` skin (they are platform sections,
  *    so they must render on every skin);
  *  - the Dahab product page presentation component.
  *
@@ -201,13 +201,13 @@ function renderDoc(template: TemplateId, language: 'en' | 'ar'): string {
 
 describe('Dahab home document', () => {
   it('is a valid PageDefinition (the editor and the API accept it)', () => {
-    for (const t of ['dahab', 'modern'] as const) {
+    for (const t of ['dahab', 'qamar'] as const) {
       const res = validateDefinitionSync(JSON.parse(JSON.stringify(dahabDocument(t))));
       expect(res.errors).toEqual([]);
     }
   });
 
-  for (const template of ['dahab', 'modern'] as const) {
+  for (const template of ['dahab', 'qamar'] as const) {
     it(`renders every new section on the ${template} skin (en + ar snapshot)`, async () => {
       const parts: string[] = [];
       for (const language of ['ar', 'en'] as const) {
@@ -248,7 +248,7 @@ describe('Dahab home document', () => {
   });
 
   it('hand-picked spotlight products keep their order', () => {
-    const html = renderDoc('modern', 'en');
+    const html = renderDoc('qamar', 'en');
     const spot = html.slice(html.indexOf('data-section="product-spotlight"'));
     expect(spot.indexOf(PRODUCTS[2].slug)).toBeLessThan(spot.indexOf(PRODUCTS[0].slug));
   });

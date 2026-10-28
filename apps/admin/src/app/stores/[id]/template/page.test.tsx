@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { builtLooks } from '@ebda/shared';
+import { RETIRED_TEMPLATES, builtLooks, normalizeLegacyTemplate } from '@ebda/shared';
 
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 
@@ -32,7 +32,7 @@ import StoreTemplatePage from './page';
 const looks = builtLooks();
 const target = looks[1]!;
 
-function storeWith(look: string | null, template = 'modern') {
+function storeWith(look: string | null, template = 'qamar') {
   apiGet.mockResolvedValue({ data: { store: { name: 'S', template, look } } });
 }
 
@@ -50,20 +50,25 @@ afterEach(cleanup);
 
 describe('template page (looks)', () => {
   it('does not offer the legacy skins and shows the current legacy skin when look is null', async () => {
-    storeWith(null, 'classic');
+    storeWith(null, RETIRED_TEMPLATES[1]);
     render(<StoreTemplatePage />);
     await screen.findAllByRole('tab');
     expect(screen.queryByText('Elegant')).toBeNull();
-    expect(screen.getByTestId('legacy-skin').textContent).toContain('skins.classic');
+    // a retired skin is shown as the Ebda template it renders as (Ruling SKIN-DEL-1).
+    expect(screen.getByTestId('legacy-skin').textContent).toContain(
+      `skins.${normalizeLegacyTemplate(RETIRED_TEMPLATES[1])}`
+    );
     expect(screen.getByText('legacyNote')).toBeTruthy();
   });
 
   it('a stored look id that is not registered renders as "choose a look", without crashing', async () => {
-    storeWith('qamar.removed', 'minimal');
+    storeWith('qamar.removed', RETIRED_TEMPLATES[2]);
     render(<StoreTemplatePage />);
     await screen.findAllByRole('tab');
     // Treated exactly like a legacy store: the current skin + the "pick a look" note, no look selected.
-    expect(screen.getByTestId('legacy-skin').textContent).toContain('skins.minimal');
+    expect(screen.getByTestId('legacy-skin').textContent).toContain(
+      `skins.${normalizeLegacyTemplate(RETIRED_TEMPLATES[2])}`
+    );
     expect(screen.getByText('legacyNote')).toBeTruthy();
     for (const radio of screen.getAllByRole('radio'))
       expect(radio.getAttribute('aria-checked')).not.toBe('true');

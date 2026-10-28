@@ -45,7 +45,7 @@ describe('GET /public/redirects/resolve', () => {
         ownerId: user.id,
         status: 'active',
         currency: 'EGP',
-        template: 'modern',
+        template: 'qamar',
       },
     });
     testStoreId = store.id;

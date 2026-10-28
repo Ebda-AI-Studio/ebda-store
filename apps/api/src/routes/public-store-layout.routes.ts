@@ -8,8 +8,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma, withStore } from '@ebda/database';
 import { lookupStore } from '../lib/definer';
-import { isSectionPageKind, resolveLayoutSettings } from '@ebda/shared';
-import type { TemplateId } from '@ebda/shared';
+import { isSectionPageKind, normalizeLegacyTemplate, resolveLayoutSettings } from '@ebda/shared';
 import { redis } from '../services/redis.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import {
@@ -68,7 +67,7 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
       });
       return;
     }
-    const templateId = store.template as TemplateId;
+    const templateId = normalizeLegacyTemplate(store.template);
 
     // Real-time preview path (Ahmad 2026-05-20): when the merchant clicks
     // "Preview unsaved changes" in admin page-builder, the storefront iframe

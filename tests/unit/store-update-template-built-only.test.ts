@@ -1,9 +1,10 @@
 /**
- * Admin switcher API for EXISTING stores: a store may keep (re-save) its current skin, but cannot
- * switch INTO a bare skin (legacy skins closed; built ones only via a look, gated on registry status).
+ * Admin switcher API for EXISTING stores: a store may keep (re-save) its current Ebda template, but
+ * cannot switch INTO a bare one (built ones only via a look, gated on registry status). The retired
+ * Force skins are refused on every write, even as a re-save (Rulings SKIN-DEL-1, SKIN-DEL-8).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LOOKS, builtSkins } from '@ebda/shared';
+import { LOOKS, RETIRED_TEMPLATES, builtSkins } from '@ebda/shared';
 
 const m = vi.hoisted(() => ({ update: vi.fn() }));
 
@@ -15,7 +16,7 @@ vi.mock('@ebda/database', async importOriginal => ({
 
 import { StoreService } from '@api/services/store.service';
 
-const LEGACY = ['modern', 'elegant', 'classic', 'minimal', 'bold'] as const;
+const LEGACY = RETIRED_TEMPLATES;
 
 function existing(template: string, look: string | null = null) {
   vi.spyOn(StoreService, 'getById').mockResolvedValue({ id: 's1', template, look } as never);
@@ -29,22 +30,34 @@ beforeEach(() => {
 });
 
 describe('StoreService.updateTemplate', () => {
-  it.each(LEGACY)('cannot switch INTO legacy skin %s', async skin => {
+  it.each(LEGACY)('cannot switch INTO retired skin %s (TEMPLATE_RETIRED)', async skin => {
     existing(builtSkins()[0]!);
     await expect(StoreService.updateTemplate('s1', skin)).rejects.toMatchObject({
-      code: 'INVALID_TEMPLATE',
+      code: 'TEMPLATE_RETIRED',
     });
     expect(m.update).not.toHaveBeenCalled();
   });
 
-  it('an existing legacy store can re-save its own current skin (not a switch)', async () => {
-    existing('classic');
-    await StoreService.updateTemplate('s1', 'classic');
+  it.each(LEGACY)(
+    'a store still holding retired skin %s cannot re-save it either: no write, no cache bust',
+    async skin => {
+      existing(skin);
+      await expect(StoreService.updateTemplate('s1', skin)).rejects.toMatchObject({
+        code: 'TEMPLATE_RETIRED',
+      });
+      expect(m.update).not.toHaveBeenCalled();
+      expect(StoreService.invalidateCache).not.toHaveBeenCalled();
+    }
+  );
+
+  it('an Ebda store can re-save its own current template (not a switch)', async () => {
+    existing('qamar');
+    await StoreService.updateTemplate('s1', 'qamar');
     expect(m.update).toHaveBeenCalledTimes(1);
   });
 
   it('cannot switch into a bare built skin either: Qamar is only reachable through a look (Ruling B1-17)', async () => {
-    existing('classic');
+    existing(LEGACY[0]);
     await expect(StoreService.updateTemplate('s1', builtSkins()[0]!)).rejects.toMatchObject({
       code: 'INVALID_TEMPLATE',
     });
@@ -56,7 +69,7 @@ describe('StoreService.updateTemplate', () => {
     const designed = LOOKS[LOOKS.length - 1]!;
     (designed as { status: string }).status = 'designed';
     try {
-      existing('classic', null);
+      existing(LEGACY[0], null);
       await expect(
         StoreService.applyLook('s1', designed.id, { design: 'keep' })
       ).rejects.toMatchObject({ code: 'LOOK_NOT_AVAILABLE' });

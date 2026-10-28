@@ -36,7 +36,7 @@ const asStorefront = (raw: unknown, t: TemplateId): StoreLayoutSettings =>
   resolveLayoutSettings(JSON.parse(JSON.stringify(resolveLayoutSettings(raw, t))));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const baseDef = (): PageDefinition =>
-  layoutToDefinition(asStorefront(loadLayoutFixture('default-flow'), 'modern'));
+  layoutToDefinition(asStorefront(loadLayoutFixture('default-flow'), 'qamar'));
 
 // ── deterministic generator ────────────────────────────────────────────────
 function rng(seed: number) {
@@ -125,7 +125,7 @@ describe('adapter round trip', () => {
   it('golden layouts produce valid documents (malformed: only its own layout defects)', () => {
     for (const fixture of LAYOUT_FIXTURES) {
       const res = validateDefinitionSync(
-        layoutToDefinition(asStorefront(loadLayoutFixture(fixture), 'modern'))
+        layoutToDefinition(asStorefront(loadLayoutFixture(fixture), 'qamar'))
       );
       if (fixture === 'malformed') continue;
       expect(res.errors, fixture).toEqual([]);
@@ -134,7 +134,7 @@ describe('adapter round trip', () => {
 
   it('500 generated layouts round-trip both ways', () => {
     for (let seed = 1; seed <= 500; seed++) {
-      const L = asStorefront(generateLayout(seed), 'modern');
+      const L = asStorefront(generateLayout(seed), 'qamar');
       const D = layoutToDefinition(L);
       // hideOnTablet equal to hideOnDesktop is the legacy two-way mode either way
       const normalise = (x: StoreLayoutSettings) =>
@@ -166,7 +166,7 @@ describe('adapter round trip', () => {
         },
         bestSellers: { enabled: false, limit: 4, hideOnDesktop: true },
       },
-      'modern'
+      'qamar'
     );
     const D = layoutToDefinition(L);
     const na = D.sections.find(s => s.id === 'new-arrivals')!;
@@ -222,7 +222,7 @@ describe('adapter round trip', () => {
           { id: 'extra feat', productSource: 'featured', limit: 2 },
         ],
       },
-      'modern'
+      'qamar'
     );
     const D = layoutToDefinition(L);
     const extras = D.sections.filter(s => s.type === 'product-carousel');
@@ -516,7 +516,7 @@ describe('validation', () => {
   });
 
   it('section groups: header/footer types live in their groups only', () => {
-    const D = layoutToDefinition(asStorefront(loadLayoutFixture('fully-customised'), 'modern'));
+    const D = layoutToDefinition(asStorefront(loadLayoutFixture('fully-customised'), 'qamar'));
     expect(D.sectionGroups.header.map(s => s.type)).toEqual(['announcement', 'header']);
     expect(D.sectionGroups.footer.map(s => s.type)).toEqual(['footer']);
     expect(validateDefinitionSync(D).errors).toEqual([]);

@@ -11,21 +11,8 @@ import {
   getSectionDefinition,
   layoutToDefinition,
   resolveLayoutSettings,
-  type TemplateId,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
-
-const TEMPLATES: readonly string[] = [
-  'modern',
-  'classic',
-  'minimal',
-  'bold',
-  'elegant',
-  'dahab',
-  'qamar',
-  'souq',
-  'jasmine',
-  'lamma',
-];
 
 const unique = (xs: readonly string[]) => [...new Set(xs)];
 
@@ -38,10 +25,7 @@ export function flowOrder(
     mix && mix.length > 0
       ? mix.map(s => s.type)
       : layoutToDefinition(
-          resolveLayoutSettings(
-            {},
-            (TEMPLATES.includes(template ?? '') ? template : 'modern') as TemplateId
-          )
+          resolveLayoutSettings({}, normalizeLegacyTemplate(template))
         ).sections.map(n => n.type);
   return unique(types.filter(t => getSectionDefinition(t)?.group === 'template'));
 }

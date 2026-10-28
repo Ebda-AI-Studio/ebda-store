@@ -89,16 +89,6 @@ const APPS: AppSpec[] = [
         cls: 'text-destructive',
         why: 'filled wishlist heart',
       },
-      {
-        file: 'src/templates/modern/Footer.tsx',
-        cls: 'text-xs text-destructive',
-        why: 'merchant-coloured footer surface',
-      },
-      {
-        file: 'src/templates/elegant/Footer.tsx',
-        cls: 'mt-3 text-xs tracking-wide text-destructive',
-        why: 'merchant-coloured footer surface',
-      },
     ],
   },
   { name: 'ui', root: join(REPO, 'packages/ui') },

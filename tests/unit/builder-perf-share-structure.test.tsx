@@ -12,7 +12,7 @@ import { shareStructure, layoutToDefinition, resolveLayoutSettings } from '@ebda
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 const base = () => {
-  let d = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+  let d = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
   return d;
 };
 
@@ -83,7 +83,7 @@ describe('DocumentSectionBody memoization', () => {
       featured: [],
       extra: [],
       categories: [],
-      templateId: 'modern' as never,
+      templateId: 'qamar' as never,
       editorMode: true,
       showPrice: true,
       layout: {} as never,

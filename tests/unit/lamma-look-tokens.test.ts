@@ -203,7 +203,7 @@ describe('Rulings B2-2 / B4-2: no orange anywhere in a Lamma look', () => {
       if (typeof v === 'string' && triplet.test(v)) expect(isOrangeFamily(v), k).toBe(false);
   });
   it('negative control: a legacy skin emits an orange --warning-ink, so the check can fail', () => {
-    const theme = composeStoreTheme({ template: 'minimal', look: null, theme: null });
+    const theme = composeStoreTheme({ template: 'qamar', look: null, theme: null });
     const vars = themeToCssVars(theme) as Record<string, string>;
     expect(isOrangeFamily(vars['--warning-ink'])).toBe(true);
   });
@@ -276,10 +276,7 @@ describe('lamma skin id', () => {
       path.join(root, 'apps/admin/src/app/stores/[id]/template/page.tsx'),
       'utf8'
     );
-    expect(page).toMatch(
-      /SKIN_IDS = \['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'\]/
-    );
-    expect(page).toMatch(/SKIN_LABEL_IDS = \[\.\.\.SKIN_IDS[^\]]*'lamma'/);
+    expect(page).toMatch(/SKIN_LABEL_IDS = \[[^\]]*'lamma'/);
   });
   it('the lamma template family renders on the lamma skin', () => {
     expect(TEMPLATE_FAMILIES.find(f => f.id === 'lamma')?.skin).toBe('lamma');

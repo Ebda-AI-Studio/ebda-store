@@ -5,8 +5,8 @@
  * labels, which registry sections each one composes); the presets themselves
  * are built and visually evaluated in Phase 2 against the shortlist rubric.
  *
- * These are page-composition presets, distinct from the five legacy component
- * skins (`TemplateId`: modern/elegant/classic/minimal/bold).
+ * These are page-composition presets, distinct from the component skins
+ * (`TemplateId`), although each family now names the skin it renders on.
  */
 import type { BlockNode, PageDefinition, SectionNode } from './schema';
 import type { TemplateId } from '../types/store-theme';

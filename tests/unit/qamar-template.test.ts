@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import {
+  BASE_IDENTITY,
   TEMPLATE_THEMES,
   TEMPLATE_LAYOUT_BASELINES,
+  buildTemplateBaseline,
   TEMPLATES,
   getTemplateTheme,
 } from '@ebda/shared';
@@ -29,10 +31,10 @@ describe('qamar skin id', () => {
     expect(TEMPLATE_LAYOUT_BASELINES.qamar).toBeDefined();
     // Muted footer links on a primary-coloured footer fail AA on every Qamar look (B1-25).
     expect(TEMPLATE_LAYOUT_BASELINES.qamar.footer?.bgColor).toBeUndefined();
-    expect(TEMPLATE_LAYOUT_BASELINES.minimal.footer?.bgColor).toBe('token:primary');
-    // The photo is the card on every surface (B1-1, B1-25); minimal keeps its frame.
+    expect(buildTemplateBaseline(BASE_IDENTITY).footer?.bgColor).toBe('token:primary');
+    // The photo is the card on every surface (B1-1, B1-25); the shared base identity keeps its frame.
     expect(TEMPLATE_LAYOUT_BASELINES.qamar.productCardDefaults?.showCardFrame).toBe(false);
-    expect(TEMPLATE_LAYOUT_BASELINES.minimal.productCardDefaults?.showCardFrame).toBe(true);
+    expect(buildTemplateBaseline(BASE_IDENTITY).productCardDefaults?.showCardFrame).toBe(true);
     expect(TEMPLATES.find(t => t.id === 'qamar')?.nameAr).toBe('قمر');
     // The skin theme is the neutral base under a look: true white page, ink text, no dividers.
     const t = getTemplateTheme('qamar');

@@ -46,7 +46,7 @@ describe('storefront footer', () => {
   });
   it('every theme footer wires the plan decision into the attribution (none can drop the prop)', async () => {
     const { readFileSync } = await import('node:fs');
-    for (const t of ['bold', 'classic', 'elegant', 'minimal', 'modern']) {
+    for (const t of ['base']) {
       const src = readFileSync(`apps/web/src/templates/${t}/Footer.tsx`, 'utf8');
       expect(src, t).toContain('<PoweredByEbda hidden={hidePoweredBy} />');
     }

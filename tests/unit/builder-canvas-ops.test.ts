@@ -39,7 +39,7 @@ const doc = (): PageDefinition =>
         header: {},
         footer: {},
       } as never,
-      'modern'
+      'qamar'
     )
   );
 const ids = (d: PageDefinition) => d.sections.map(n => n.id);

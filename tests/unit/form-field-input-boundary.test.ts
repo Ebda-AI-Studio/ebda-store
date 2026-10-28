@@ -62,7 +62,7 @@ describe('stores with saved colours keep their field colour (N1)', () => {
     // an unregistered look id renders as legacy too
     expect(
       composeStoreTheme({
-        template: 'minimal',
+        template: 'qamar',
         look: 'qamar.removed',
         theme: { borderColor: '1 2% 3%' },
       }).inputColor
@@ -72,7 +72,7 @@ describe('stores with saved colours keep their field colour (N1)', () => {
   it('an explicitly saved input colour wins; a look store keeps its muted input', () => {
     expect(
       composeStoreTheme({
-        template: 'minimal',
+        template: 'qamar',
         theme: { borderColor: '12 40% 30%', inputColor: '0 0% 40%' },
       }).inputColor
     ).toBe('0 0% 40%');
