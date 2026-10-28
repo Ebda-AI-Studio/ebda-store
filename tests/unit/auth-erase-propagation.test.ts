@@ -84,6 +84,7 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     pushSubscription: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    providerVerification: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     loyaltyTransaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -219,8 +220,37 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
         oneSignalPlayerIds: ['player-a', 'player-b'],
         // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
         storeId: CUSTOMER.storeId,
+        // Customer Intelligence: no proven phone here, and the scope is the account's own (zero) orders
+        ciProven: undefined,
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [], sinceDay: undefined },
       },
     });
+  });
+
+  it('scopes the CI erase to the shopper\u2019s OWN orders (ids + keys), never the key alone, and nulls the keys on the orders', async () => {
+    mockPrisma.order.findMany.mockImplementation(
+      async (args: { select?: { buyerKey?: boolean } }) =>
+        args?.select?.buyerKey
+          ? [
+              { id: 'o1', buyerKey: 'k1', createdAt: new Date('2026-11-03T10:00:00Z') },
+              { id: 'o2', buyerKey: 'k1', createdAt: new Date('2026-11-01T10:00:00Z') },
+              { id: 'o3', buyerKey: null, createdAt: new Date('2026-11-05T10:00:00Z') },
+            ]
+          : []
+    );
+    await AuthService.eraseAccount(CUSTOMER.id);
+    const data = sendMock.mock.calls.at(-1)![0].data;
+    expect(data.ciScope).toEqual({
+      storeId: CUSTOMER.storeId,
+      orderIds: ['o1', 'o2', 'o3'],
+      buyerKeys: ['k1'],
+      sinceDay: '2026-10-30', // first order 2026-11-01 minus the 2-day margin
+    });
+    expect(data.ciProven).toBeUndefined(); // no proven phone: no buyer-key erase
+    expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ buyerKey: null, areaKey: null }) })
+    );
+    mockPrisma.order.findMany.mockReset().mockResolvedValue([]);
   });
 
   it('erases the shopper\u2019s passkeys in the same transaction (Ruling PASSKEY-1)', async () => {
@@ -269,7 +299,13 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
-      data: { userId: CUSTOMER.id, oneSignalPlayerIds: [], storeId: CUSTOMER.storeId },
+      data: {
+        userId: CUSTOMER.id,
+        oneSignalPlayerIds: [],
+        storeId: CUSTOMER.storeId,
+        ciProven: undefined,
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [], sinceDay: undefined },
+      },
     });
   });
 });
@@ -716,5 +752,39 @@ describe("AuthService.updateProfile — phone change ends the old number's Whats
     (mockPrisma.storeWhatsAppConsent.updateMany as any).mockClear();
     await AuthService.updateProfile(CUSTOMER.id, { phone: '+201001234567' });
     expect(mockPrisma.storeWhatsAppConsent.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('WA-CONSENT-PROOF-1: account/erased carries a buyerKey only for a PROVEN phone', () => {
+  const setup = (delivered: boolean) => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...CUSTOMER,
+      phone: '01001234567', // the (possibly someone else's) number on the profile
+      email: 'a@b.co',
+    });
+    mockPrisma.order.findMany.mockImplementation(async (args: any) =>
+      delivered && args?.where?.status === 'delivered'
+        ? [{ shippingAddress: { phone: '+201001234567' } }]
+        : []
+    );
+    mockPrisma.storeWhatsAppConsent.findMany.mockResolvedValue([]);
+    sendMock.mockClear();
+  };
+  const erasedEvent = () =>
+    sendMock.mock.calls.map(c => c[0]).find((e: any) => e?.name === 'account/erased');
+
+  it("an attacker who typed a victim's number (no order proves it) sends NO buyerKey: WhatsApp keeps the victim's contact", async () => {
+    setup(false);
+    await AuthService.eraseAccount(CUSTOMER.id);
+    const ev = erasedEvent();
+    expect(ev).toBeTruthy();
+    expect(ev.data.buyerKey).toBeUndefined();
+  });
+
+  it("the proven owner's erasure carries the buyerKey", async () => {
+    setup(true);
+    await AuthService.eraseAccount(CUSTOMER.id);
+    expect(erasedEvent().data.buyerKey).toMatch(/^[0-9a-f]{64}$/);
   });
 });

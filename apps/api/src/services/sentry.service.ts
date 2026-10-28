@@ -3,6 +3,7 @@ import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { isWorkers } from '../lib/runtime';
 import { Prisma } from '@ebda/database';
 import { isExpectedClientError } from '../middleware/error-handler';
 import { redactSensitiveQuery, scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
@@ -13,6 +14,17 @@ import { redactSensitiveQuery, scrubSentryBreadcrumb, scrubSentryEvent } from '@
 
 export class SentryService {
   private static isInitialized = false;
+
+  /**
+   * Is a Sentry client expected to be active? In Node, only after init(). On Workers `init` is a stub
+   * and the client belongs to the request (`Sentry.withSentry`, options from env), so a module-scope
+   * init() that ran before the secrets were readable (config.sentryDsn empty) must not switch every
+   * capture off: the 5xx handler and the explicit captures gated on isInitialized were silently
+   * dropped on Workers.
+   */
+  private static get active(): boolean {
+    return this.isInitialized || isWorkers;
+  }
 
   /**
    * Initialize Sentry
@@ -98,7 +110,7 @@ export class SentryService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         ['P2002', 'P2003', 'P2025'].includes(err.code);
       const code = ownStatus;
-      if (this.isInitialized && !expected && (!code || code >= 500)) {
+      if (this.active && !expected && (!code || code >= 500)) {
         const {
           authorization,
           cookie,
@@ -138,7 +150,7 @@ export class SentryService {
       extra?: Record<string, unknown>;
     }
   ): string {
-    if (!this.isInitialized) {
+    if (!this.active) {
       logger.error({ err: error }, '[SENTRY] Not initialized, logging error');
       return '';
     }
@@ -165,7 +177,7 @@ export class SentryService {
       extra?: Record<string, unknown>;
     }
   ): string {
-    if (!this.isInitialized) {
+    if (!this.active) {
       logger.info({ level, message }, '[SENTRY] Not initialized, logging message');
       return '';
     }
@@ -183,7 +195,7 @@ export class SentryService {
    * 2026-05-22 audit P2.
    */
   static setUser(user: { id: string; email?: string; role?: string }): void {
-    if (!this.isInitialized) return;
+    if (!this.active) return;
     Sentry.setUser({ id: user.id, role: user.role });
   }
 
@@ -191,7 +203,7 @@ export class SentryService {
    * Clear user context
    */
   static clearUser(): void {
-    if (!this.isInitialized) return;
+    if (!this.active) return;
     Sentry.setUser(null);
   }
 
@@ -204,7 +216,7 @@ export class SentryService {
     level?: 'debug' | 'info' | 'warning' | 'error';
     data?: Record<string, unknown>;
   }): void {
-    if (!this.isInitialized) return;
+    if (!this.active) return;
     Sentry.addBreadcrumb({
       category: breadcrumb.category,
       message: breadcrumb.message,
@@ -233,7 +245,7 @@ export class SentryService {
    * Flush pending events before shutdown
    */
   static async close(timeout = 2000): Promise<void> {
-    if (!this.isInitialized) return;
+    if (!this.active) return;
     await Sentry.close(timeout);
   }
 }

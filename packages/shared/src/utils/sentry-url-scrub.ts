@@ -77,10 +77,38 @@ export function urlCarriesSensitiveQuery(
   return false;
 }
 
+/**
+ * SEC-8: secrets that travel IN the path, not the query. The Bosta webhook is
+ * `/webhooks/shipping/bosta/:storeId/:token` (the per-store secret is the last segment), and
+ * request logs, Workers Logs, Logpush and Sentry would otherwise keep it for 30 days.
+ * Two rules, path-only (rule 2 only when `anyLongSegment`, the default: API request logs. Sentry and
+ * PostHog strings get rule 1 only, so ordinary long product slugs stay readable in analytics) (a `/` must precede the segment and a delimiter must follow it):
+ *   1. the segment after `/shipping/bosta/<storeId>/` is always masked;
+ *   2. any other 24+ char token-looking segment (letters/digits/_/-, at least one digit,
+ *      not a UUID) is masked. Slugs without digits and UUID ids stay readable.
+ */
+const BOSTA_TOKEN_RE = /(\/shipping\/bosta\/[^/?#\s"']+\/)[^/?#\s"']+/gi;
+const LONG_SEGMENT_RE = /(\/)([A-Za-z0-9_-]{24,})(?=[/?#\s"']|$)/g;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function redactPathSecrets(
+  text: string,
+  opts: { anyLongSegment?: boolean } = { anyLongSegment: true }
+): string {
+  if (typeof text !== 'string' || !text.includes('/')) return text;
+  const bosta = text.replace(BOSTA_TOKEN_RE, `$1${REDACTED_QUERY_VALUE}`);
+  if (!opts.anyLongSegment) return bosta;
+  return bosta.replace(LONG_SEGMENT_RE, (whole, slash: string, seg: string) =>
+    UUID_RE.test(seg) || !/\d/.test(seg) ? whole : `${slash}${REDACTED_QUERY_VALUE}`
+  );
+}
+
 /** Replace the value of every sensitive query parameter in `text` with `[Filtered]`. */
 export function redactSensitiveQuery(text: string): string {
-  if (typeof text !== 'string' || !text.includes('=')) return text;
-  return text.replace(PARAM_RE, (whole, lead: string, key: string, value: string) => {
+  if (typeof text !== 'string') return text;
+  const withPath = text.includes('/') ? redactPathSecrets(text, { anyLongSegment: false }) : text;
+  if (!withPath.includes('=')) return withPath;
+  return withPath.replace(PARAM_RE, (whole, lead: string, key: string, value: string) => {
     if (!value || !isSensitiveKey(key)) return whole;
     return `${lead}${key}=${REDACTED_QUERY_VALUE}`;
   });

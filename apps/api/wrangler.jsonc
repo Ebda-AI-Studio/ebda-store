@@ -62,7 +62,14 @@
   },
   // StoreDO nightly backups (Ruling INFRA-CF-1 Phase 0): the EXISTING private bucket, prefix store-do-backups/.
   // No new bucket (Ruling INFRA-PREVIEW-1).
-  "r2_buckets": [{ "binding": "STORE_BACKUPS", "bucket_name": "ebda-private" }],
+  "r2_buckets": [
+    { "binding": "STORE_BACKUPS", "bucket_name": "ebda-private" },
+    // Customer Intelligence (CI-1): the source of truth for commerce outcomes. PRIVATE, 24-month
+    // lifecycle on outcomes/ (scripts/ops/ci-r2-lifecycle.sh). Create it before the first deploy.
+    { "binding": "CI_BUCKET", "bucket_name": "ebda-ci" },
+  ],
+  // Customer Intelligence dashboards: one point per outcome, no buyer key, no order id (lib/ci/sink.ts).
+  "analytics_engine_datasets": [{ "binding": "CI_OUTCOMES", "dataset": "ebda_commerce_outcomes" }],
 
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop
@@ -96,6 +103,8 @@
       // Store -> Ebda WhatsApp events (contract 2026-10-24; lib/wa/events.ts). Ebda WhatsApp consumes it.
       { "binding": "WA_EVENTS_QUEUE", "queue": "ebda-wa-events" },
       { "binding": "JOBS_QUEUE", "queue": "ebda-jobs" },
+      // Customer Intelligence capture (lib/ci/port.ts): validated commerce_outcomes envelopes.
+      { "binding": "CI_EVENTS_QUEUE", "queue": "ebda-ci-events" },
       { "binding": "EMAIL_QUEUE", "queue": "ebda-email" },
       { "binding": "SMS_QUEUE", "queue": "ebda-sms" },
     ],
@@ -140,6 +149,17 @@
         "dead_letter_queue": "ebda-jobs-dlq",
       },
       { "queue": "ebda-jobs-dlq", "max_batch_size": 1, "max_retries": 2 },
+      // Customer Intelligence sink (lib/ci/sink.ts): R2 + Analytics Engine. 25 per batch keeps the
+      // Analytics Engine writes of one invocation small; an unreadable event retries into the DLQ (pages).
+      {
+        "queue": "ebda-ci-events",
+        "max_batch_size": 25,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-ci-events-dlq",
+      },
+      { "queue": "ebda-ci-events-dlq", "max_batch_size": 10, "max_retries": 2 },
       { "queue": "ebda-sms-dlq", "max_batch_size": 10, "max_retries": 2 },
     ],
   },
@@ -239,7 +259,7 @@
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
     // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
     // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
-    "JOBS_CF_GROUPS": "1,2,3",
+    "JOBS_CF_GROUPS": "1,2,3,4",
     // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
     // comma list of function ids or "all"; "" = every schedule stays a cron.
     "JOBS_CF_ALARMS": "",

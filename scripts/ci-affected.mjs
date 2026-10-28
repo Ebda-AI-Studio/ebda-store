@@ -56,6 +56,7 @@ export const UNIT_PATHS = {
   'packages/shared': ['packages/shared/src'],
   'packages/database': ['packages/database/src'],
   'packages/cf-schema': ['packages/cf-schema'],
+  'packages/repo': ['packages/repo'],
   'apps/web': ['apps/web'],
   'apps/admin': ['apps/admin/src'],
   'apps/orders': ['apps/orders'],
@@ -65,6 +66,9 @@ export const UNIT_PATHS = {
  * it or the API changes (a signature change must fail CI, not the next manual eval run).
  */
 export const SEARCH_EVAL_TSCONFIG = 'tests/search-eval/tsconfig.json';
+
+/** Files the generated CF schema is derived from (prisma schema + raw SQL migrations). */
+const PRISMA_INPUT = /^packages\/database\/prisma\/(schema\.prisma|migrations\/)/;
 
 /** Always part of the unit lane when any code changed: cross-app source pins. */
 export const BASE_UNIT_PATHS = ['tests/unit'];
@@ -171,6 +175,10 @@ export function classify(files, workspaces) {
   const unit = new Set();
   if (code) BASE_UNIT_PATHS.forEach(p => unit.add(p));
   for (const w of ws) (UNIT_PATHS[w.dir] ?? []).forEach(p => unit.add(p));
+  // The generated Cloudflare schema is a function of schema.prisma + the SQL migrations. It must be re-checked
+  // whenever either moves, even if someone later takes packages/database out of GLOBAL_WORKSPACES (2026-10-27:
+  // #218 added models, cf-schema went red on main and nothing noticed).
+  if (codeFiles.some(f => PRISMA_INPUT.test(f))) unit.add('packages/cf-schema');
   if (runAllUnit)
     Object.values(UNIT_PATHS)
       .flat()

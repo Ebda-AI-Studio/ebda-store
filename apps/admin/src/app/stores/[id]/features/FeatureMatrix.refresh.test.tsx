@@ -94,8 +94,10 @@ describe('FeatureMatrix → hidden-from-merchants features (WHATSAPP-OFF-1)', ()
       </ToastProvider>
     );
     expect(await screen.findByText('WhatsApp Notifications')).toBeTruthy();
-    // whatsapp (WHATSAPP-OFF-1) and b2b.wholesale (hidden from merchants until its UI ships, B2B Task 8 removes the flag).
-    expect(screen.getAllByText('row.hiddenFromMerchants').length).toBe(2);
+    // whatsapp (WHATSAPP-OFF-1), b2b.wholesale (hidden from merchants until its UI ships, B2B Task 8 removes the flag)
+    // and eta_ereceipt (Ruling ETA-1: a super-admin switches the ETA e-receipt connector on per store).
+    expect(screen.getAllByText('row.hiddenFromMerchants').length).toBe(3);
+    expect(screen.getByText('ETA e-receipts (Egypt)')).toBeTruthy();
     expect(screen.getByText('Wholesale pricing')).toBeTruthy();
     expect(screen.queryByText('SEO Tools')).toBeNull();
 
