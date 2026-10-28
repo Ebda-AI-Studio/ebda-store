@@ -26,3 +26,7 @@ Cart-add p50 of 5.3 s is the current serial-hop cost (Worker to Hyperdrive to Ne
 request transaction); it is the number the DO path must beat, and the likeliest place for a large win.
 
 Re-run: `node bench/baseline.mjs --store-id <uuid> --n 200 --c 4` (add `--cold` after 10 idle minutes).
+
+## Frozen evidence (2026-10-28)
+
+`src/repo.ts` and `src/schema.ts` are the Phase 0 ORM-decision snapshots. They used to be guarded by `tests/unit/store-do-spike-drift.test.ts` against the shipped StoreDO copy; PR C replaced that copy (full cf-schema, real money core), so the guard is removed and these files no longer track production code.
