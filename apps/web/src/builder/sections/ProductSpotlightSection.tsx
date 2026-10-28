@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import { sanitizeUrl } from '@ebda/shared';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';

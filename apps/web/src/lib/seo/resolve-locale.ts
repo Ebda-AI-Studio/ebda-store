@@ -1,4 +1,5 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { LOCALE_PATH_HEADER } from '../locale-paths';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
 /**
@@ -36,6 +37,9 @@ export type StorefrontLocale = 'en' | 'ar';
 export async function resolveStorefrontLocale(
   storeDefaultLanguage: string | null | undefined
 ): Promise<StorefrontLocale> {
+  // A `/ar|/en` URL (LOCALE-PATHS-1) decides the language before any cookie does.
+  const urlLang = (await headers()).get(LOCALE_PATH_HEADER);
+  if (urlLang === 'ar' || urlLang === 'en') return urlLang;
   const cookieStore = await cookies();
   const cookieLang = cookieStore.get('force-language')?.value;
   if (cookieLang === 'ar' || cookieLang === 'en') return cookieLang;

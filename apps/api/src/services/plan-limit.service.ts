@@ -31,6 +31,7 @@
  */
 
 import { upgradePlanFor } from '@ebda/shared';
+import { sortOwnerStores } from './billing/billing-parent';
 import { prisma, withStore, withUser, type Prisma } from '@ebda/database';
 import {
   PLAN_LIMIT_ERROR_CODE,
@@ -128,12 +129,13 @@ export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> 
   // (Ruling EBDA-FUNNEL-13; same rule as account.service ownerStoreAllowance).
   // An additional store's own subscription never grants more stores, so a
   // lapsed parent cannot be worked around through a child.
-  const stores = await withUser(ownerId, tx =>
-    tx.store.findMany({
-      where: { ownerId, deletedAt: null },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: { id: true },
-    })
+  const stores = sortOwnerStores(
+    await withUser(ownerId, tx =>
+      tx.store.findMany({
+        where: { ownerId, deletedAt: null },
+        select: { id: true, createdAt: true },
+      })
+    )
   );
   if (stores.length === 0) return;
   const e = await getEntitlements(stores[0].id);

@@ -132,7 +132,12 @@ router.post(
       if (!pageKey) return;
       const body = publishBody.parse(req.body);
       const { storeId } = req.params;
-      const r = await publishDraft({ storeId, pageKey, baseRev: body.baseRev });
+      const r = await publishDraft({
+        storeId,
+        pageKey,
+        baseRev: body.baseRev,
+        userId: getAuthUser(req).userId,
+      });
       if (!r.ok) return sendFailure(res, r);
       await auditLog({
         action: 'store.page.published',

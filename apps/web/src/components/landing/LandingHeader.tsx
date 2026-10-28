@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../StoreLink';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { BRAND } from '@ebda/shared';
 

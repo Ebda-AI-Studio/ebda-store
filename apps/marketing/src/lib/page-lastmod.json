@@ -1,46 +1,70 @@
 {
   "home": {
-    "hash": "2a409c8adcd39b6a",
-    "date": "2026-10-25"
+    "hash": "0ea0fdd1dcd9c140",
+    "date": "2026-10-27"
   },
   "features": {
-    "hash": "eb131d5a1a54d706",
-    "date": "2026-10-24"
+    "hash": "60756a1755a0effe",
+    "date": "2026-10-26"
+  },
+  "whatsapp": {
+    "hash": "a4581f7080575404",
+    "date": "2026-10-26"
   },
   "compare/zid": {
-    "hash": "f7ccffa3d821b340",
-    "date": "2026-10-24"
+    "hash": "f3fc441090043f7f",
+    "date": "2026-10-26"
   },
   "compare/shopify": {
-    "hash": "02606da776b1e778",
-    "date": "2026-10-24"
+    "hash": "e4d85633ef9c2909",
+    "date": "2026-10-26"
   },
   "compare/wuilt": {
-    "hash": "9bff83d9d2eb5100",
-    "date": "2026-10-24"
+    "hash": "ebad8e1de3ceace2",
+    "date": "2026-10-26"
   },
   "compare/youcan": {
-    "hash": "ed4d05e4e4ba83c6",
-    "date": "2026-10-24"
+    "hash": "f52977c6956b543a",
+    "date": "2026-10-26"
   },
   "compare/easyorders": {
-    "hash": "b5ac91755615d702",
-    "date": "2026-10-24"
+    "hash": "d5cc7a7074d87905",
+    "date": "2026-10-26"
   },
   "compare/expandcart": {
-    "hash": "1d3132f49571b489",
-    "date": "2026-10-24"
+    "hash": "c2ad800490c02f54",
+    "date": "2026-10-26"
+  },
+  "for/fashion": {
+    "hash": "320bf781638127b1",
+    "date": "2026-10-26"
+  },
+  "for/electronics": {
+    "hash": "481aa187adf73180",
+    "date": "2026-10-26"
+  },
+  "for/beauty": {
+    "hash": "8c0c28ab183f0520",
+    "date": "2026-10-26"
+  },
+  "for/food": {
+    "hash": "cfd10cae73bedb69",
+    "date": "2026-10-26"
+  },
+  "for/jewellery": {
+    "hash": "08a1aae723aa06cb",
+    "date": "2026-10-26"
   },
   "about": {
-    "hash": "ca22acf942c9d746",
-    "date": "2026-10-24"
+    "hash": "106639a481bdc789",
+    "date": "2026-10-26"
   },
   "contact": {
-    "hash": "809ea052ea7e9aeb",
-    "date": "2026-10-24"
+    "hash": "f66f302394615e1d",
+    "date": "2026-10-26"
   },
   "credits": {
-    "hash": "aad1c3043725e9f5",
-    "date": "2026-10-24"
+    "hash": "2378290a9fdfff26",
+    "date": "2026-10-26"
   }
 }

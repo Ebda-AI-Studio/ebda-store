@@ -449,12 +449,12 @@ function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
                 <p className="font-medium">{f.question}</p>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {f.aiDrafted && !f.manuallyEdited && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary-ink">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-ink">
                       {t('aiBadge')}
                     </span>
                   )}
                   {f.manuallyEdited && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                       {t('editedBadge')}
                     </span>
                   )}
@@ -518,12 +518,12 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
                     {t('stepCount', { count: h.stepCount })}
                   </span>
                   {h.aiDrafted && !h.manuallyEdited && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary-ink">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-ink">
                       {t('aiBadge')}
                     </span>
                   )}
                   {h.manuallyEdited && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                       {t('editedBadge')}
                     </span>
                   )}
@@ -784,7 +784,7 @@ function CollapsiblePanel({
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-medium text-sm text-foreground">{title}</span>
           {badge && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary-ink">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary-ink">
               {badge}
             </span>
           )}

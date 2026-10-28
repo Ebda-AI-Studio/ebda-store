@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from './StoreLink';
 import { ReactNode } from 'react';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';

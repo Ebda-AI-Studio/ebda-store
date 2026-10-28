@@ -6,7 +6,7 @@ import { useCardStepperLine } from '../../templates/shared/card-stepper-context'
 import { requestStepperFocus, takeStepperFocus } from '../../templates/shared/card-stepper-focus';
 import { pickLocalizedName } from '../../templates/shared/display-helpers';
 import { canBuyNow } from '@/lib/can-buy-now';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { useStoreNumerals } from '../../hooks/useNumerals';

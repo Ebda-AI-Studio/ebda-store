@@ -280,7 +280,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
             {entry.capabilities.methods.map(m => (
               <span
                 key={m}
-                className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
               >
                 {t(`capabilities.${m}`)}
               </span>
@@ -326,7 +326,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
                 >
                   {t(`modes.${m}`)}
                   {activeMode === m && config && (
-                    <span className="ms-2 rounded-full bg-success/10 px-1.5 py-0.5 text-[11px] text-success-ink">
+                    <span className="ms-2 rounded-full bg-success/10 px-1.5 py-0.5 text-xs text-success-ink">
                       {t('modes.active')}
                     </span>
                   )}
@@ -476,7 +476,7 @@ export function CarrierConnectCard({ entry, config, storeId, onChanged }: Props)
             <div className="rounded-lg border border-border bg-background p-3 text-sm">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <p className="font-medium text-foreground">{t('webhook.label')}</p>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {entry.webhook.delivery === 'per-request'
                     ? t('webhook.automatic')
                     : t('webhook.pasteIt')}

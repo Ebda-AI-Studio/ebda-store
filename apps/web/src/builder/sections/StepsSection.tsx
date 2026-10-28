@@ -17,7 +17,7 @@
  *   Clinic playful detail; the tick is a static CSS state keyed on data-done, globals.css).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import {
   sanitizeUrl,
   type BlockNode,

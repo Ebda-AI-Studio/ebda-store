@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type RefObject } from 'react';
-import Link from 'next/link';
+import Link from '../StoreLink';
 import { CartIcon } from '@ebda/ui';
 import { useAnchorOffscreen } from './useAnchorOffscreen';
 import { useStickyBarHeight } from './useStickyBarHeight';

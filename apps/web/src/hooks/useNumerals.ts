@@ -10,10 +10,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useStore } from '../contexts/StoreContext';
 
 /**
- * The digit system for THIS render (Ruling NUMERALS-1): Western (0-9) unless
- * the merchant opted into Arabic-Indic (`StoreTheme.arabicNumerals`, admin:
- * "شكل الأرقام في المتجر") AND the shopper is reading Arabic. Pass it to
- * `formatPrice` / `intlLocale` / `<Price numerals>`.
+ * The digit system for THIS render: Western (0-9), always (Ruling DIGITS-1; the
+ * per-store Arabic-Indic opt-in is retired). Pass it to `formatPrice` /
+ * `intlLocale` / `<Price numerals>`.
  */
 export function useStoreNumerals(): Numerals {
   const { language } = useLanguage();

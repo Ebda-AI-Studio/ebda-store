@@ -37,6 +37,7 @@ const OFFICIAL_HOSTS = [
   'developers.kashier.io',
   'merchant.kashier.io',
   'developer.fawrystaging.com',
+  'docs.geidea.net',
   'atfawry.fawrystaging.com',
   // shipping carriers (the shipping batch)
   'docs.bosta.co',
@@ -54,7 +55,7 @@ const kashier = getProviderEntry('kashier')!;
 describe('provider catalog', () => {
   it('lists exactly the supported payment providers (Ahmad, 2026-10-07)', () => {
     expect([...PAYMENT_PROVIDER_CODES].sort()).toEqual(
-      ['cod', 'fawry', 'instapay', 'kashier', 'paymob'].sort()
+      ['cod', 'fawry', 'geidea', 'instapay', 'kashier', 'paymob'].sort()
     );
     const codes = PROVIDER_CATALOG.map(p => p.code);
     expect(new Set(codes).size).toBe(codes.length);
@@ -62,7 +63,14 @@ describe('provider catalog', () => {
 
   it('every gateway has an adapter with a connection test and webhook wiring', () => {
     const gateways = PROVIDER_CATALOG.filter(p => p.kind === 'payments' && !p.manual);
+    // PROVIDERS-3: a gateway with no documented harmless call has no testConnection ("unverified").
+    const NO_SAFE_CHECK = ['geidea'];
     for (const g of gateways) {
+      if (NO_SAFE_CHECK.includes(g.code)) {
+        expect(getProviderV2(g.code), g.code).toBeDefined();
+        expect(getProviderV2(g.code)?.testConnection, g.code).toBeUndefined();
+        continue;
+      }
       expect(getProviderV2(g.code)?.testConnection, g.code).toBeTypeOf('function');
     }
     expect([...GATEWAY_WEBHOOK_PROVIDERS].sort()).toEqual(gateways.map(g => g.code).sort());
@@ -136,7 +144,8 @@ describe('provider gate (PROVIDERS-3)', () => {
     expect(isProviderUsable('fawry')).toBe(true);
     expect(isProviderUsable('cod')).toBe(true);
     expect(isProviderUsable('instapay')).toBe(true);
-    expect(isProviderUsable('geidea')).toBe(false);
+    expect(isProviderUsable('geidea')).toBe(true);
+    expect(isProviderUsable('nope')).toBe(false);
   });
 });
 

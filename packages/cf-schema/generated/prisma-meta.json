@@ -6252,7 +6252,7 @@
       "table": "orders",
       "db": "store-do",
       "pk": ["id"],
-      "uniques": [["orderNumber"], ["idempotencyKey"]],
+      "uniques": [["orderNumber"], ["idempotencyKey"], ["storeId", "checkoutIdempotencyKey"]],
       "fields": {
         "id": {
           "kind": "scalar",
@@ -6594,6 +6594,20 @@
           "kind": "scalar",
           "type": "DateTime",
           "column": "webhook_processed_at",
+          "list": false,
+          "optional": true
+        },
+        "checkoutIdempotencyKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "checkout_idempotency_key",
+          "list": false,
+          "optional": true
+        },
+        "checkoutRequestHash": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "checkout_request_hash",
           "list": false,
           "optional": true
         },
@@ -18463,6 +18477,13 @@
           "list": false,
           "optional": true
         },
+        "billingAnchorDay": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "billing_anchor_day",
+          "list": false,
+          "optional": true
+        },
         "dunningAttempts": {
           "kind": "scalar",
           "type": "Int",
@@ -18954,6 +18975,20 @@
           "list": false,
           "optional": true
         },
+        "imageDeletedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "image_deleted_at",
+          "list": false,
+          "optional": true
+        },
+        "personalScrubbedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "personal_scrubbed_at",
+          "list": false,
+          "optional": true
+        },
         "createdAt": {
           "kind": "scalar",
           "type": "DateTime",
@@ -19263,6 +19298,170 @@
         }
       }
     },
+    "BillingReferral": {
+      "table": "billing_referrals",
+      "db": "d1",
+      "pk": ["referredStoreId"],
+      "uniques": [],
+      "fields": {
+        "referredStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "referred_store_id",
+          "list": false,
+          "optional": false,
+          "id": true
+        },
+        "referrerStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "referrer_store_id",
+          "list": false,
+          "optional": false
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
+    "BillingGrant": {
+      "table": "billing_grants",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [["idempotencyKey"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "kind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "kind",
+          "list": false,
+          "optional": false
+        },
+        "beneficiaryId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "beneficiary_id",
+          "list": false,
+          "optional": false
+        },
+        "counterpartId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "counterpart_id",
+          "list": false,
+          "optional": true
+        },
+        "months": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "months",
+          "list": false,
+          "optional": false,
+          "default": "1"
+        },
+        "valueMinor": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "value_minor",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"pending\""
+        },
+        "sourceEventId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source_event_id",
+          "list": false,
+          "optional": true
+        },
+        "sourceStoreId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source_store_id",
+          "list": false,
+          "optional": true
+        },
+        "revokedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "revoked_at",
+          "list": false,
+          "optional": true
+        },
+        "revokeReason": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "revoke_reason",
+          "list": false,
+          "optional": true
+        },
+        "restoredAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "restored_at",
+          "list": false,
+          "optional": true
+        },
+        "idempotencyKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "idempotency_key",
+          "list": false,
+          "optional": false
+        },
+        "periodEndBefore": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "period_end_before",
+          "list": false,
+          "optional": true
+        },
+        "periodEndAfter": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "period_end_after",
+          "list": false,
+          "optional": true
+        },
+        "appliedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "applied_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
     "BillingWebhookEvent": {
       "table": "billing_webhook_events",
       "db": "d1",
@@ -19405,6 +19604,13 @@
           "kind": "scalar",
           "type": "String",
           "column": "created_by",
+          "list": false,
+          "optional": true
+        },
+        "publishedBy": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "published_by",
           "list": false,
           "optional": true
         },

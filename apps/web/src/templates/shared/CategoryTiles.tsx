@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useStore } from '../../contexts/StoreContext';
 import { SectionHeading } from './SectionHeading';
 import { pickLocalizedName } from './display-helpers';

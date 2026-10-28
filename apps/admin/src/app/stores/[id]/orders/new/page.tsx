@@ -515,7 +515,7 @@ export default function NewOrderPage() {
                           </span>
                         )}
                         {c.isGuest && (
-                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning-ink">
+                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
                             {t('customerSection.guestBadge')}
                           </span>
                         )}

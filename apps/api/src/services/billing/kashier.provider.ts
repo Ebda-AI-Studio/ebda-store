@@ -282,6 +282,58 @@ export class KashierBillingProvider implements BillingProvider {
     };
   }
 
+  /**
+   * What became of a charge whose answer was lost (M-023). Kashier can only be asked by TRANSACTION id (the
+   * documented transaction-details API, the same read that confirms webhooks, PROVIDERS-17). A charge whose
+   * answer never arrived has no transaction id yet, and a lookup by merchant order id is not documented, so
+   * without an id this THROWS (cannot tell) instead of claiming "not found": the sweep then leaves the row
+   * pending and raises a P1; it never retries a charge it cannot rule out.
+   */
+  async getChargeStatus(req: {
+    idempotencyKey: string;
+    merchantOrderId: string;
+    chargeId: string | null;
+  }): Promise<ChargeResult | null> {
+    if (!req.chargeId) {
+      throw new BillingProviderError(
+        'Kashier cannot be asked about a charge without a transaction id (no documented lookup by merchant order id)',
+        false
+      );
+    }
+    const { status, json } = await this.call(
+      'GET',
+      kashierTransactionDetailsPath(req.chargeId),
+      undefined
+    );
+    if (status >= 400) {
+      throw new BillingProviderError(`Kashier transaction details answered ${status}`, false);
+    }
+    let txn;
+    try {
+      txn = classifyKashierTransaction(json, {
+        transactionId: req.chargeId,
+        merchantOrderId: req.merchantOrderId,
+      });
+    } catch (err) {
+      throw new BillingProviderError(
+        `Kashier did not answer clearly: ${(err as Error).message}`,
+        false
+      );
+    }
+    if (txn.kind !== 'payment') {
+      throw new BillingProviderError(`Kashier reports a ${txn.kind}, not a charge`, false);
+    }
+    const raw = stripTokens(json);
+    if (txn.status === 'SUCCESS') return { status: 'succeeded', chargeId: req.chargeId, raw };
+    if (txn.status === 'PENDING') return { status: 'pending', chargeId: req.chargeId, raw };
+    return {
+      status: 'failed',
+      chargeId: req.chargeId,
+      failureReason: 'declined (gateway lookup)',
+      raw,
+    };
+  }
+
   async refund(req: RefundRequest): Promise<RefundResult> {
     // Order operations live on the FEP host (API reference `updateOrder`: test-fep.kashier.io /
     // fep.kashier.io), not on the dashboard API host the other calls use.

@@ -107,4 +107,37 @@ describe('apiRequest 402 handling', () => {
     // details with both languages are localized for every code now (English here).
     expect(error?.code).toBe('NOT_TRIALING');
   });
+
+  it('raises the upsell for a 403 FEATURE_DISABLED only when the API names the plan that unlocks it', async () => {
+    respond(403, {
+      success: false,
+      error: 'Feature not available',
+      code: 'FEATURE_DISABLED',
+      feature: 'loyalty',
+      upgradeTo: { code: 'growth', nameEn: 'Growth', nameAr: 'النمو' },
+      messageEn: 'This feature is available on the Growth plan.',
+      messageAr: 'الميزة دي متاحة في باقة النمو.',
+    });
+    const { apiGet } = await loadApi();
+    const { error } = await apiGet('/api/v1/stores/s1/loyalty');
+    expect(error?.status).toBe(403);
+    expect(upsells).toHaveLength(1);
+    expect(upsells[0].detail).toMatchObject({
+      code: 'FEATURE_DISABLED',
+      message: 'This feature is available on the Growth plan.',
+      upgradeTo: { code: 'growth' },
+    });
+  });
+
+  it('stays silent for a FEATURE_DISABLED that is a toggle (no upgrade target)', async () => {
+    respond(403, {
+      success: false,
+      error: 'Feature not available',
+      code: 'FEATURE_DISABLED',
+      feature: 'coupons',
+    });
+    const { apiGet } = await loadApi();
+    await apiGet('/api/v1/stores/s1/coupons');
+    expect(upsells).toHaveLength(0);
+  });
 });

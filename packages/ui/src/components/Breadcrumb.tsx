@@ -175,6 +175,8 @@ export const Breadcrumb = forwardRef<HTMLElement, BreadcrumbProps>(
                     href={item.href}
                     className={cn(
                       'text-muted-foreground hover:text-foreground transition-colors',
+                      // WCAG 2.2 AA 2.5.8: a 24px-high target (audit UI-10: breadcrumb links were 20px)
+                      'inline-flex min-h-6 items-center',
                       'focus:outline-none focus:underline'
                     )}
                   >

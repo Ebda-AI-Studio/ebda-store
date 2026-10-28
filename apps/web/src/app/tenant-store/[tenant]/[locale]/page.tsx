@@ -1,6 +1,6 @@
+import { storefrontAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
-import { storeAbsoluteUrl } from '@/lib/structured-data';
 import { HomePageBody } from '@/app/HomePageBody';
 
 // NOTE: no `generateStaticParams` here — deliberate, see the layout's
@@ -18,7 +18,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { tenant } = await params;
   const store = await getStoreByTenantParam(tenant);
-  return { alternates: { canonical: storeAbsoluteUrl(store, '') } };
+  return { alternates: await storefrontAlternates(store, '', true) };
 }
 
 export default async function StoreHomePage({

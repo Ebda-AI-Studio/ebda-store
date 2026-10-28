@@ -237,7 +237,7 @@ function BundleGroup({ entry }: { entry: Extract<ReturnDetailsEntry, { kind: 'gr
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="mb-2 flex items-center gap-1.5">
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {t('bundleBadge')}
         </span>
         <p className="text-sm font-semibold text-foreground">{name}</p>

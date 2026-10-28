@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import Image from 'next/image';
 import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';

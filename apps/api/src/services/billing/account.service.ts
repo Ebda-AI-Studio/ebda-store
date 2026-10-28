@@ -13,6 +13,7 @@
  *    and activates the period in ONE transaction, idempotent on the payer's
  *    reference. A merchant's "I paid" claim never activates anything by itself.
  */
+import { restoreRevokedGrants, revokeGrantsForEvent } from './grants.service';
 import crypto from 'crypto';
 import { prisma, withStore, withUser, acrossStores, type Prisma } from '@ebda/database';
 import { AppError } from '../../middleware/error-handler';
@@ -25,8 +26,10 @@ import {
   INSTAPAY_GRACE_DAYS,
   addDays,
   addInterval,
+  isGrantedPlan,
   isInterval,
   type BillingInterval,
+  addIntervalAnchored,
 } from './period';
 import { normalizeInstapayReference, type InstapayReceiptFields } from '@ebda/shared';
 import {
@@ -41,6 +44,8 @@ import { getEntityStoreId, lookupStore } from '../../lib/definer';
 import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
+import { billingParentOf, childCoverage, isBillableStore, sortOwnerStores } from './billing-parent';
+import { goLiveVerdict } from './go-live-verdict';
 import {
   chargeFor,
   ledgerVat,
@@ -81,7 +86,21 @@ export async function suspendForBilling(
     storeId,
     details: { reason },
   });
+  // The parent stopped paying: the children it covers go down with it (EBDA-FUNNEL-18).
+  if (reason === 'unpaid') await suspendCoveredChildren(storeId, now);
   return true;
+}
+
+async function suspendCoveredChildren(parentStoreId: string, now: Date): Promise<void> {
+  const parent = await withStore(parentStoreId, tx =>
+    tx.store.findUnique({ where: { id: parentStoreId }, select: { ownerId: true } })
+  );
+  if (!parent?.ownerId) return;
+  const stores = await ownerStores(parent.ownerId);
+  if (billingParentOf(stores) !== parentStoreId) return; // only the parent cascades
+  for (const child of stores.slice(1)) {
+    if (child.status === 'active') await suspendForBilling(child.id, 'unpaid', now);
+  }
 }
 
 /**
@@ -128,14 +147,16 @@ async function afterStatusChange(storeId: string): Promise<void> {
 // ─────────────────────────── store allowance ──────────────────────────────
 
 /** Owner's stores, oldest first (the order that decides who is kept). */
-async function ownerStores(ownerId: string) {
-  return withUser(ownerId, tx =>
+export async function ownerStores(ownerId: string) {
+  // ONE ordering for "who is the parent": sortOwnerStores (billing-parent.ts), shared with
+  // assertOwnerMayCreateStore and the pure coverage predicate, never a second DB orderBy.
+  const rows = await withUser(ownerId, tx =>
     tx.store.findMany({
       where: { ownerId, deletedAt: null },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: { id: true, status: true, billingSuspendedReason: true },
+      select: { id: true, createdAt: true, status: true, billingSuspendedReason: true },
     })
   );
+  return sortOwnerStores(rows);
 }
 
 /**
@@ -198,6 +219,102 @@ export async function enforceStoreAllowance(
 }
 
 /**
+ * Is this CHILD store paid for by its billing parent right now? The loader around the pure
+ * `childCoverage`: reads only the owner's store rows, the parent's subscription and the
+ * parent's plan allowance (platform data - portable to the D1 path unchanged).
+ * `parentVerdictCode` is why the parent is not in good standing (for the go-live message).
+ */
+export async function childStoreCoverage(storeId: string, now: Date = new Date()) {
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+  );
+  const none = { covered: false as const, reason: 'no_parent' as const, parentVerdictCode: null };
+  if (!store?.ownerId) return none;
+  const stores = await ownerStores(store.ownerId);
+  const parentId = billingParentOf(stores);
+  if (!parentId) return none;
+  const parentSub = await withStore(parentId, tx =>
+    tx.storeSubscription.findUnique({ where: { storeId: parentId } })
+  );
+  // `_mode` is ignored by the verdict; the trial card mode does not matter for a parent here.
+  const verdict = goLiveVerdict(parentSub, 'pay_at_trial_end', now);
+  const cover = childCoverage({
+    storeId,
+    stores,
+    allowance: await ownerStoreAllowance(store.ownerId),
+    parentInGoodStanding: verdict.ok,
+  });
+  return {
+    ...cover,
+    parentVerdictCode: verdict.ok ? null : verdict.code,
+  };
+}
+
+/**
+ * Keep every COVERED child's own subscription row in step with its parent, so entitlements
+ * (read from the child's own row) follow the parent's plan and the row can never come due:
+ * same plan code, no period, no provider, no method, no trial. Idempotent; a child that is
+ * not covered is left alone (the allowance suspends it instead). Also heals children created
+ * before parent/child billing existed (EBDA-FUNNEL-18).
+ */
+export async function syncChildSubscriptions(ownerId: string, now: Date = new Date()) {
+  const stores = await ownerStores(ownerId);
+  const parentId = billingParentOf(stores);
+  if (!parentId || stores.length < 2) return;
+  const parent = await withStore(parentId, tx =>
+    tx.storeSubscription.findUnique({ where: { storeId: parentId } })
+  );
+  if (!parent) return;
+  const featureTier = (await prisma.plan.findUnique({ where: { code: parent.planCode } }))
+    ?.featureTier;
+  for (const child of stores.slice(1)) {
+    if (!(await childStoreCoverage(child.id, now)).covered) continue;
+    const status = isGrantedPlan(parent.planCode) ? 'comped' : 'active';
+    const { count } = await withStore(child.id, async tx => {
+      const r = await tx.storeSubscription.updateMany({
+        where: {
+          storeId: child.id,
+          NOT: {
+            planCode: parent.planCode,
+            status,
+            currentPeriodEnd: null,
+            provider: null,
+            billingMethod: null,
+            pendingPlanCode: null,
+            trialEndsAt: null,
+            cancelAtPeriodEnd: false,
+          },
+        },
+        data: {
+          planCode: parent.planCode,
+          status,
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+          trialEndsAt: null,
+          provider: null,
+          providerCustomerId: null,
+          providerSubscriptionId: null,
+          providerPaymentMethodRef: null,
+          billingMethod: null,
+          pendingPlanCode: null,
+          nextRetryAt: null,
+          dunningAttempts: 0,
+          cancelAtPeriodEnd: false,
+        },
+      });
+      if (r.count > 0 && featureTier) {
+        await tx.store.update({ where: { id: child.id }, data: { plan: featureTier } });
+      }
+      return r;
+    });
+    if (count > 0) {
+      await featureService.invalidateCache(child.id).catch(() => undefined);
+      logger.info({ childId: child.id, planCode: parent.planCode }, '[billing] child plan synced');
+    }
+  }
+}
+
+/**
  * After any plan/payment change of a store: lift an `unpaid` suspension once the
  * subscription is in good standing, then re-apply the owner's store allowance.
  */
@@ -217,12 +334,22 @@ export async function reconcileStoreAccess(storeId: string): Promise<void> {
       await restoreFromBilling(storeId, 'unpaid');
     }
   }
-  if (store.ownerId) await enforceStoreAllowance(store.ownerId);
+  if (!store.ownerId) return;
+  await enforceStoreAllowance(store.ownerId);
+  // Children follow the parent: copy its plan onto their rows, and lift an `unpaid`
+  // suspension the parent's lapse caused once the parent is in good standing again.
+  await syncChildSubscriptions(store.ownerId);
+  const stores = await ownerStores(store.ownerId);
+  for (const child of stores.slice(1)) {
+    if (child.billingSuspendedReason === 'unpaid' && (await childStoreCoverage(child.id)).covered) {
+      await restoreFromBilling(child.id, 'unpaid');
+    }
+  }
 }
 
 // ─────────────────────────── payment method ───────────────────────────────
 
-function newPaymentReference(): string {
+export function newPaymentReference(): string {
   // Crockford-ish alphabet (no 0/O/1/I): easy to read out and type on a phone.
   const alphabet = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
   const bytes = crypto.randomBytes(8);
@@ -264,9 +391,27 @@ export async function instapayDetails(storeId: string) {
 }
 
 /**
- * Paying for a store beyond the owner's store allowance buys nothing: the allowance
- * follows the OLDEST store's plan, so the extra store would be suspended again at once
- * (audit M4). Refuse with the store to pay on instead (409 PAY_ON_PARENT_STORE).
+ * Fail-closed money predicate for the charge paths (renewal): true only when this store is
+ * billed on its own - the owner's oldest store, or a store with no owner family. A store the
+ * owner list does not contain answers false, so a charge is never raised on an unknown child.
+ */
+export async function isBillableStoreId(storeId: string): Promise<boolean> {
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+  );
+  if (!store) return false; // unknown/hidden store: never raise a charge on it
+  if (!store.ownerId) return true;
+  return isBillableStore(storeId, await ownerStores(store.ownerId));
+}
+
+/**
+ * Only the billing PARENT (the owner's oldest store) is ever charged or asked to pay; every
+ * other store is a CHILD, included in the parent's plan (R-EBDA-PRICING-6, Ruling
+ * EBDA-FUNNEL-18). Paying on a child either buys nothing (beyond the allowance: it would be
+ * suspended again at once, audit M4) or double-charges (within the allowance: the parent's
+ * plan already pays for it). Refuse both with the store to pay on (409 PAY_ON_PARENT_STORE;
+ * `details.included` tells the UI which message to show). Every money-IN entry point calls
+ * this: checkout, card setup, trial plan, plan change, InstaPay choice/receipt/manual payment.
  */
 export async function assertPayableStore(storeId: string): Promise<void> {
   const store = await withStore(storeId, tx =>
@@ -275,17 +420,23 @@ export async function assertPayableStore(storeId: string): Promise<void> {
       select: { ownerId: true, billingSuspendedReason: true },
     })
   );
-  if (!store?.ownerId) return;
-  const { rank, allowance } = await storeRank(storeId);
-  if (store.billingSuspendedReason !== 'over_store_limit' && (rank < 0 || rank < allowance)) return;
+  if (!store) {
+    throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // fail closed
+  }
+  if (!store.ownerId) return; // platform-operated store: billed on its own, no owner family
   const stores = await ownerStores(store.ownerId);
-  const parentStoreId = stores[0]?.id ?? null;
-  if (!parentStoreId || parentStoreId === storeId) return;
+  if (isBillableStore(storeId, stores)) return;
+  const parentStoreId = billingParentOf(stores);
+  const { rank, allowance } = await storeRank(storeId);
+  const included =
+    rank >= 0 && rank < allowance && store.billingSuspendedReason !== 'over_store_limit';
   throw new AppError(
     409,
     'PAY_ON_PARENT_STORE',
-    'This store is paused because your plan allows fewer stores. Upgrade your main store to bring it back.',
-    { parentStoreId, allowance: Number.isFinite(allowance) ? allowance : null }
+    included
+      ? "This store is included in your main store's plan. Manage billing on the main store."
+      : 'This store is paused because your plan allows fewer stores. Upgrade your main store to bring it back.',
+    { parentStoreId, allowance: Number.isFinite(allowance) ? allowance : null, included }
   );
 }
 
@@ -379,7 +530,12 @@ export async function chooseInstapayPlan(args: {
  * starts now. Pure: unit-tested and mutation-checked.
  */
 export function manualPeriodFor(
-  sub: { status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null } | null,
+  sub: {
+    status: string;
+    trialEndsAt: Date | null;
+    currentPeriodEnd: Date | null;
+    billingAnchorDay?: number | null;
+  } | null,
   interval: BillingInterval,
   now: Date
 ): { periodStart: Date; periodEnd: Date } {
@@ -393,7 +549,21 @@ export function manualPeriodFor(
   ) {
     start = sub.currentPeriodEnd;
   }
-  return { periodStart: start, periodEnd: addInterval(start, interval) };
+  // clamp from the cycle's anchor day (M-125); a store with none yet anchors on this period's start
+  // The anchor only continues a LIVE cycle (the period starts where the previous one ended). A period that starts
+  // now (lapsed / canceled / first payment) begins a new cycle on its own day, whatever an old anchor says.
+  const continuesCycle =
+    !!sub?.currentPeriodEnd &&
+    start.getTime() === sub.currentPeriodEnd.getTime() &&
+    sub.status !== 'trialing';
+  return {
+    periodStart: start,
+    periodEnd: addIntervalAnchored(
+      start,
+      interval,
+      continuesCycle ? (sub?.billingAnchorDay ?? start.getUTCDate()) : start.getUTCDate()
+    ),
+  };
 }
 
 export async function suggestManualPeriod(
@@ -664,6 +834,8 @@ export type ManualPaymentResult = {
   billingEventId: string;
   periodStart?: Date;
   periodEnd?: Date;
+  /** @internal receipts approved by this payment; consumed (and stripped) by recordManualPayment */
+  approvedReceiptIds?: string[];
 };
 
 /** The idempotency key of a manual payment: one per (method, payer reference). */
@@ -736,6 +908,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       where: { idempotencyKey: key, storeId: input.storeId },
     });
     if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
+    // Row lock first: a free-month grant (grants.service) moves currentPeriodEnd under the same lock, so the
+    // period computed below is never from a read a grant is about to change.
+    await tx.$queryRaw`SELECT id FROM store_subscriptions WHERE store_id = ${input.storeId} FOR UPDATE`;
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
@@ -796,6 +971,13 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       billingInterval: input.interval,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
+      // keep the cycle's anchor day; the first paid period anchors on its own start (M-125)
+      billingAnchorDay:
+        !explicit &&
+        sub?.billingAnchorDay &&
+        sub.currentPeriodEnd?.getTime() === periodStart.getTime()
+          ? sub.billingAnchorDay
+          : periodStart.getUTCDate(),
       trialEndsAt: null,
       pendingPlanCode: null,
       cancelAtPeriodEnd: false,
@@ -835,20 +1017,28 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       where: { storeId: input.storeId, billingEventId: eventId },
       select: { id: true },
     });
+    let approvedReceiptIds: string[] = [];
     if (confirmed.length) {
-      await tx.instapayReceipt.updateMany({
-        where: {
-          storeId: input.storeId,
-          claimId: { in: confirmed.map(c => c.id) },
-          status: 'submitted',
-        },
-        data: { status: 'approved', reviewedBy: input.actorId, reviewedAt: now },
-      });
+      approvedReceiptIds = await InstapayReceiptService.approveSubmitted(
+        tx,
+        input.storeId,
+        { claimIds: confirmed.map(c => c.id) },
+        input.actorId,
+        now
+      );
     }
-    return { duplicate: false, billingEventId: eventId, periodStart, periodEnd };
+    return {
+      duplicate: false,
+      billingEventId: eventId,
+      periodStart,
+      periodEnd,
+      approvedReceiptIds,
+    };
   });
 
   if (!result.duplicate) {
+    // the approved receipts' screenshots are deleted now that the approval has committed (M-003; a miss is retried weekly)
+    await InstapayReceiptService.deleteImages(input.storeId, result.approvedReceiptIds ?? []);
     await featureService.invalidateCache(input.storeId).catch(() => undefined);
     await reconcileStoreAccess(input.storeId);
     await runBillingEffects([
@@ -862,7 +1052,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       { kind: 'subscription_paid', storeId: input.storeId, billingEventId: result.billingEventId },
     ]);
   }
-  return result;
+  const { approvedReceiptIds: _internal, ...publicResult } = result;
+  return publicResult;
 }
 
 // ───────────────────────── manual refund / void ───────────────────────────
@@ -977,6 +1168,9 @@ export async function recordManualRefund(input: ManualRefundInput) {
     const fullReversal =
       amount === remaining && (prior._sum.amountMinor ?? 0) + amount >= charge.amountMinor;
 
+    // FOUNDING-3: a full reversal also takes back the free months this payment earned, BEFORE the period is read
+    // below, so `ownsCurrentPeriod` sees the end the payment itself set (a granted month would hide it).
+    if (fullReversal) await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
     // Period: a full reversal gives back exactly the time it bought; a partial
     // refund changes the period only when the operator says so.
     const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
@@ -1077,6 +1271,7 @@ export async function recordManualRefund(input: ManualRefundInput) {
   });
   if (!out.duplicate) {
     await featureService.invalidateCache(storeId).catch(() => undefined);
+    await restoreRevokedGrants().catch(() => undefined); // a referrer's side lives in another tenant
   }
   return { ...out, storeId };
 }

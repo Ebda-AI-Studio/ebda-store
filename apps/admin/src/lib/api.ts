@@ -676,6 +676,16 @@ export async function apiRequest<T = unknown>(
         errObj?.details
       );
       if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
+      else if (response.status === 403 && errCode === 'FEATURE_DISABLED') {
+        // Only when the API says the PLAN withholds it (it names the unlocking sold plan).
+        const flat = data as unknown as Record<string, unknown>;
+        if (flat.upgradeTo) {
+          const text = adminUiLocale() === 'ar' ? flat.messageAr : flat.messageEn;
+          dispatchUpsell(errCode, typeof text === 'string' && text ? text : message, {
+            upgradeTo: flat.upgradeTo,
+          });
+        }
+      }
       return {
         data: null,
         error: {

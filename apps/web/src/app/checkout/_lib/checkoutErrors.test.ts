@@ -92,8 +92,8 @@ describe('checkout order payload locale', () => {
 
   it('CheckoutClient sends it on api.createOrder (Arabic variant snapshot + email language)', () => {
     const src = readFileSync(join(__dirname, '..', 'CheckoutClient.tsx'), 'utf8');
-    const call = src.slice(src.indexOf('api.createOrder({'));
-    const body = call.slice(0, call.indexOf('});'));
+    const call = src.slice(src.indexOf('api.createOrder('));
+    const body = call.slice(0, call.indexOf('idempotencyKey'));
     expect(body).toContain('locale: orderLocale(language)');
   });
 });

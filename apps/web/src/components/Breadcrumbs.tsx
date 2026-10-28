@@ -9,7 +9,7 @@
  * (`rtl:-scale-x-100`) and is hidden from assistive tech; the last crumb is the
  * current page (`aria-current="page"`, not a link).
  */
-import Link from 'next/link';
+import Link from './StoreLink';
 import type { CSSProperties, ReactNode } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 

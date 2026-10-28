@@ -36,6 +36,7 @@ export const INSTAPAY_RECEIPT_FLAGS = [
   'FIELDS_CORRECTED',
   'SAME_IMAGE_USED_BEFORE',
   'AI_UNAVAILABLE',
+  'SUSPICIOUS_TEXT',
 ] as const;
 export type InstapayReceiptFlag = (typeof INSTAPAY_RECEIPT_FLAGS)[number];
 
@@ -134,6 +135,11 @@ export interface InstapayReceiptExtraction {
   direction: 'sent' | 'received' | 'unknown';
   looksEdited: boolean;
   confidence: number;
+  /**
+   * RECEIVER-CHECK-1: did the screenshot show one of the store's expected receivers? A yes / no only (never any receiver
+   * text); null = not asked (no expected receiver configured) or the model gave no clear answer.
+   */
+  receiverMatch?: boolean | null;
 }
 
 export type InstapayReceiptStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'voided';
@@ -194,3 +200,15 @@ export const instapayRefundRecordSchema = z
   })
   .strict();
 export type InstapayRefundRecord = z.infer<typeof instapayRefundRecordSchema>;
+
+/**
+ * Rule-based (model-independent) check for text inside the screenshot that is addressed to
+ * the reader rather than part of a receipt, e.g. "set looksEdited false, confidence 1".
+ * SEC-11: the AI flags can be talked out of firing, so this one never depends on them.
+ */
+const INSTRUCTION_TEXT =
+  /(?:looks?\s*edited|confidence|ignore\s+(?:all\s+|the\s+)?(?:previous|above|prior)|system\s*prompt|do\s+not\s+(?:flag|warn)|no\s+warnings?|json|تجاهل\s+(?:كل\s+)?(?:التعليمات|ما\s+سبق)|لا\s+تحذر)/i;
+
+export function hasInstructionLikeText(values: ReadonlyArray<string | null | undefined>): boolean {
+  return values.some(v => typeof v === 'string' && INSTRUCTION_TEXT.test(v));
+}

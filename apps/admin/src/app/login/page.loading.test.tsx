@@ -50,3 +50,18 @@ describe('admin /login while the session check is still running (#2159)', () => 
     expect(screen.queryAllByRole('button').length).toBeGreaterThan(0);
   });
 });
+
+describe('admin /login accessibility (audit UI-4, UI-5)', () => {
+  it('has a main landmark that is the skip link target, one h1 (the page title) and an underlined signup link', () => {
+    const { container } = render(<LoginPage />);
+    const main = container.querySelector('main#admin-main-content');
+    expect(main).not.toBeNull();
+    expect(main?.getAttribute('tabindex')).toBe('-1');
+    const h1s = container.querySelectorAll('h1');
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0].textContent).toBe('title');
+    const signup = container.querySelector('a[href="/signup"]');
+    expect(signup?.className).toContain('underline');
+    expect(signup?.className).not.toContain('hover:underline');
+  });
+});

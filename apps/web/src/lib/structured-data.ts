@@ -196,7 +196,12 @@ export function productJsonLd(
     : undefined;
   const storeName = localizedField(store.name, store.nameAr, locale);
   const productUrl = storeAbsoluteUrl(store, `/products/${product.slug}`);
-  const image = product.images?.[0]?.url;
+  // Every gallery image (Google shows up to 10 for a merchant listing); one image stays a plain string.
+  const gallery = (product.images ?? [])
+    .map(i => i.url)
+    .filter(Boolean)
+    .slice(0, 10);
+  const image = gallery.length > 1 ? gallery : gallery[0];
   // The same answer as the buy button (X-03): read the server's stock flags, not
   // raw `inventory` (0 on every variant product, which told search engines a
   // stocked sized product was out of stock); a backorderable item is BackOrder.

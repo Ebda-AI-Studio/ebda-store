@@ -168,7 +168,7 @@ function BundleGroupRow({
     <li className="py-3 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t('bundleBadge')}
           </span>
           <p className="text-sm font-semibold text-foreground line-clamp-1 min-w-0">{name}</p>

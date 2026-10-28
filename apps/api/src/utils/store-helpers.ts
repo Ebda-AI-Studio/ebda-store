@@ -4,6 +4,7 @@ import { AppError } from '../middleware/error-handler';
 import { AuthPayload } from '../middleware/auth';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, resolveStoreId } from '../lib/definer';
+import { captureEdgeSnapshot } from '../lib/edge-gens';
 
 /**
  * Extracts the authenticated user from the request.
@@ -42,8 +43,13 @@ export async function resolvePublicStoreId(req: Request): Promise<string | undef
     RESOLVED_PUBLIC_STORE
   ];
   if (memo) return memo;
-  const pending = lookupPublicStoreId(req).then(id => {
-    if (id) setResolvedStoreId(req, id);
+  const pending = lookupPublicStoreId(req).then(async id => {
+    if (id) {
+      setResolvedStoreId(req, id);
+      // Edge-cache fill (SEO-3): stamp the cache generations before any data read, so a write that lands
+      // while this request reads can only make the stored copy invalid, never wrongly valid.
+      await captureEdgeSnapshot(req, id);
+    }
     return id;
   });
   (req as unknown as Record<symbol, Promise<string | undefined>>)[RESOLVED_PUBLIC_STORE] = pending;

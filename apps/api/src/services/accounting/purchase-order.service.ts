@@ -191,6 +191,9 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
   }> = [];
 
   const po = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+    // Serialise receives of ONE purchase order (M-022): the PO row lock first, the PO read AFTER it, so a double
+    // click / two staff see each other's receipt (the qty guard and `qtyReceived` are judged on the locked state).
+    await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${input.poId} AND store_id = ${input.storeId} FOR UPDATE`;
     const po = await tx.purchaseOrder.findUnique({
       where: { id: input.poId, storeId: input.storeId },
       include: { items: true },
@@ -203,6 +206,21 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         'PO_NOT_RECEIVABLE',
         `This purchase order can no longer be received (status: ${po.status}).`
       );
+
+    // Lock the PRODUCTS being received (sorted, so two receives cannot deadlock) before anything about them is read:
+    // a receive of a DIFFERENT PO for the same product would otherwise read the same open backorder lines and the same
+    // on-hand / cost, and both would write absolute values (backorder `qtyFulfilled`, the weighted-average cost).
+    const lockIds = [
+      ...new Set(
+        input.receipts
+          .filter(r => r.qtyReceived > 0)
+          .map(r => po.items.find(i => i.id === r.poItemId)?.productId)
+          .filter((x): x is string => !!x)
+      ),
+    ].sort();
+    if (lockIds.length > 0) {
+      await tx.$queryRaw`SELECT id FROM products WHERE id = ANY(${lockIds}::text[]) AND store_id = ${input.storeId} ORDER BY id FOR UPDATE`;
+    }
 
     for (const receipt of input.receipts) {
       if (receipt.qtyReceived <= 0) continue;
@@ -398,7 +416,9 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
           const pRes = await tx.product.updateMany({
             where: { id: item.productId, storeId: input.storeId },
             data: {
-              inventory: onHandBefore + remainingToProcess,
+              // a relative write: an absolute `onHandBefore + n` (built from an earlier read) overwrote a customer
+              // order that decremented the shelf in between, bringing the sold unit back as stock (M-022)
+              inventory: { increment: remainingToProcess },
               costPrice: newCost,
               lastCostUpdateAt: new Date(),
             },
@@ -512,13 +532,19 @@ export async function getPurchaseOrder(storeId: string, id: string) {
 export async function cancelPurchaseOrder(storeId: string, id: string) {
   const po = await prisma.purchaseOrder.findFirst({ where: { id, storeId } });
   if (!po) throw new AppError(404, 'PO_NOT_FOUND', 'Purchase order not found.');
-  if (po.status === 'received')
+  // ONE conditional update (it row-locks the PO, so a receive that is committing `received` is waited for and then
+  // re-judged): a fully received PO - stock and accounts payable already posted - is never overwritten to cancelled.
+  const done = await prisma.purchaseOrder.updateMany({
+    where: { id, storeId, status: { not: 'received' } },
+    data: { status: 'cancelled' },
+  });
+  if (done.count !== 1)
     throw new AppError(
       409,
       'PO_ALREADY_RECEIVED',
       'A fully-received purchase order cannot be cancelled.'
     );
-  return prisma.purchaseOrder.update({ where: { id, storeId }, data: { status: 'cancelled' } });
+  return prisma.purchaseOrder.findFirstOrThrow({ where: { id, storeId } });
 }
 
 /**

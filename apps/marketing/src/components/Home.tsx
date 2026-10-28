@@ -326,6 +326,7 @@ export function Home({ locale }: { locale: Locale }) {
             <div className="hero-copy">
               <h1 id="hero-h">{c.hero.h1}</h1>
               <p className="hero-sub">{c.hero.sub}</p>
+              <p className="hero-saving">{c.hero.saving}</p>
               <p className="actions">
                 <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
                   {c.hero.cta}

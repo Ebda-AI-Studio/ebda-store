@@ -7,9 +7,9 @@
  * elsewhere (all of the repo's zoned crons).
  */
 import { allJobs } from './registry';
-import { matchesLocal, parseCron, utcCronsFor } from './cron-expr';
+import { matchesLocal, parseCron, tickKey, utcCronsFor } from './cron-expr';
 
-export { matchesLocal, parseCron, utcCronsFor };
+export { matchesLocal, parseCron, tickKey, utcCronsFor };
 import { jobRunsOnCf } from './flag';
 import { jobRunsOnAlarm } from './alarm-flag';
 import { startJob } from './start';
@@ -51,7 +51,7 @@ export async function runScheduledJobs(
     if (!matchesLocal(expr, at)) continue;
     try {
       const result = await startJob(job, {
-        id: `cron-${job.id}-${scheduledTime}`,
+        id: `cron-${job.id}-${tickKey(expr, at)}`,
         name: 'inngest/scheduled.timer',
         data: { cron: expr },
         ts: scheduledTime,

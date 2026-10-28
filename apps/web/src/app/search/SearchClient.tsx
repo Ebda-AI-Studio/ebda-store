@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { api, type Category, type Product } from '@/lib/api';
 import { Select } from '@ebda/ui';
 import { ShopChrome } from '../../components';

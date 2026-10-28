@@ -244,7 +244,7 @@ export default function AddressesClient() {
         </div>
         {!isAdding && (
           <Button onClick={() => setIsAdding(true)}>
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -379,7 +379,7 @@ export default function AddressesClient() {
                 type="checkbox"
                 checked={formData.isDefault}
                 onChange={e => setFormData({ ...formData, isDefault: e.target.checked })}
-                className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                className="h-6 w-6 rounded border-input text-primary focus:ring-primary"
               />
               <span className="text-sm text-foreground">
                 {t('Set as default address', 'تعيين كعنوان افتراضي')}
@@ -410,7 +410,7 @@ export default function AddressesClient() {
               }`}
             >
               {address.isDefault && (
-                <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                <span className="absolute end-4 top-4 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                   {t('Default', 'الافتراضي')}
                 </span>
               )}

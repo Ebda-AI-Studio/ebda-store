@@ -35,6 +35,19 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
+/**
+ * Legal pages that are not Ebda Store acceptance documents (they have no row in LEGAL_POLICIES): the data
+ * deletion page and the three Ebda WhatsApp documents. They are legal pages for every other purpose (sitemap
+ * date, layout, tests); their own version and date live in legal-extra-*.ts.
+ */
+export const LEGAL_EXTRA_SLUGS = [
+  'legal/data-deletion',
+  'legal/whatsapp-terms',
+  'legal/whatsapp-privacy',
+  'legal/whatsapp-dpa',
+  'refund',
+] as const;
+export type LegalExtraSlug = (typeof LEGAL_EXTRA_SLUGS)[number];
 export const COMPARE_SLUGS = [
   'zid',
   'shopify',
@@ -44,8 +57,23 @@ export const COMPARE_SLUGS = [
   'expandcart',
 ] as const;
 export type CompareSlug = (typeof COMPARE_SLUGS)[number];
+/** The per-vertical ad landing pages (/for/<slug>/): see lib/verticals.ts. */
+export const FOR_SLUGS = ['fashion', 'electronics', 'beauty', 'food', 'jewellery'] as const;
+export type ForSlug = (typeof FOR_SLUGS)[number];
+export type ForPage = `for/${ForSlug}`;
+export const FOR_PAGES: readonly ForPage[] = FOR_SLUGS.map(s => `for/${s}` as const);
 export type ComparePage = `compare/${CompareSlug}`;
-export type PageSlug = '' | 'about' | 'contact' | 'credits' | 'features' | ComparePage | LegalSlug;
+export type PageSlug =
+  | ''
+  | 'about'
+  | 'contact'
+  | 'credits'
+  | 'features'
+  | 'whatsapp'
+  | ComparePage
+  | ForPage
+  | LegalSlug
+  | LegalExtraSlug;
 
 /** The comparison pages (/compare/{zid,shopify,wuilt,youcan,easyorders,expandcart}), as page slugs. */
 export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
@@ -56,11 +84,14 @@ export const COMPARE_PAGES: readonly ComparePage[] = COMPARE_SLUGS.map(
 export const SITE_PAGES = [
   '',
   'features',
+  'whatsapp',
   ...COMPARE_PAGES,
+  ...FOR_PAGES,
   'about',
   'contact',
   'credits',
   ...LEGAL_SLUGS,
+  ...LEGAL_EXTRA_SLUGS,
 ] as const satisfies readonly PageSlug[];
 
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */

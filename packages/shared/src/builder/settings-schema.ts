@@ -396,13 +396,6 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
         labelEn: 'Uppercase headings',
         labelAr: 'عناوين بأحرف كبيرة',
       },
-      {
-        id: 'arabicNumerals',
-        type: 'checkbox',
-        // Ruling NUMERALS-1: unchecked = Western 123 (default, both languages).
-        labelEn: 'Store numerals: ١٢٣ on Arabic pages (default 123)',
-        labelAr: 'شكل الأرقام في المتجر: ١٢٣ في الصفحات العربية (الافتراضي 123)',
-      },
     ],
   },
   {

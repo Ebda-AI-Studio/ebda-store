@@ -1,3 +1,4 @@
+import { InstapayReceiptService } from './payment-providers/instapay-receipt.service';
 import { scrubProviderVerifier } from './provider-verification.service';
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
@@ -2039,14 +2040,15 @@ export class AuthService {
       // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
       // Must run before the orders lose their customer link below. Already-delivered payloads on
       // the merchant's own server cannot be recalled.
+      const erasedOrderIds = (
+        await tx.order.findMany({
+          where: { customerId: userId, storeId: eraseStoreId },
+          select: { id: true },
+        })
+      ).map(o => o.id);
       await redactWebhookCustomerData(tx, {
         storeId: eraseStoreId,
-        orderIds: (
-          await tx.order.findMany({
-            where: { customerId: userId, storeId: eraseStoreId },
-            select: { id: true },
-          })
-        ).map(o => o.id),
+        orderIds: erasedOrderIds,
         email: user.email,
       });
       const ownOrders = await tx.order.findMany({
@@ -2063,6 +2065,9 @@ export class AuthService {
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
         : undefined;
+      // InstaPay receipts of those orders: the payer's typed / AI-read personal fields and the screenshot go (M-025);
+      // the amount, reference and status stay with the order's financial record.
+      await InstapayReceiptService.scrubForOrders(tx, eraseStoreId, erasedOrderIds);
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before

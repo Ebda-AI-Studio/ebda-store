@@ -9,6 +9,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
 import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
+import { AiSwitchCard } from '../../../../components/ai/AiSwitchCard';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useT } from '../../../../i18n/useT';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
@@ -355,6 +356,10 @@ export default function AiToolsPage() {
         </Link>
       }
     >
+      <div className="mb-4">
+        <AiSwitchCard storeId={storeId} />
+      </div>
+
       {/* ── AI quota summary — visible before any sweep button ────── */}
       <div className="mb-6">
         <AiUsageSummaryCard storeId={storeId} embedded={true} />

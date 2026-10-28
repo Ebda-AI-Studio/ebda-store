@@ -2,7 +2,7 @@
 
 import { signedText } from '@/lib/bidi';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { Button, Select } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
@@ -435,7 +435,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                       type="checkbox"
                       checked={selectedBundleGroupIds.has(row.bundleGroupId)}
                       onChange={() => toggleBundleGroup(row.bundleGroupId)}
-                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                      className="h-6 w-6 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.name}
@@ -453,7 +453,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                       type="checkbox"
                       checked={selectedItemIds.has(row.item.id)}
                       onChange={() => toggleItem(row.item.id)}
-                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                      className="h-6 w-6 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.item.product?.name || `Item #${row.item.id.slice(0, 8)}`}

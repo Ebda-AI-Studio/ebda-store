@@ -1,5 +1,12 @@
 import type { MetadataRoute } from 'next';
-import { LEGAL_SLUGS, LOCALES, SITE_URL, SITE_PAGES, pagePath } from '@/lib/site';
+import {
+  LEGAL_EXTRA_SLUGS,
+  LEGAL_SLUGS,
+  LOCALES,
+  SITE_URL,
+  SITE_PAGES,
+  pagePath,
+} from '@/lib/site';
 import { LEGAL_UPDATED } from '@/lib/content';
 import lastmod from '@/lib/page-lastmod.json';
 
@@ -7,8 +14,9 @@ export const dynamic = 'force-static';
 
 const abs = (p: string) => (p === '/' ? `${SITE_URL}/` : `${SITE_URL}${p}/`);
 
-/** Product pages (features, comparisons) rank above the legal pages. */
-const marketing = (page: string) => page === 'features' || page.startsWith('compare/');
+/** Product pages (features, Ebda WhatsApp, comparisons) rank above the legal pages. */
+const marketing = (page: string) =>
+  page === 'features' || page === 'whatsapp' || page.startsWith('compare/');
 
 /**
  * <lastmod> is real: non-legal pages take the date recorded in page-lastmod.json, which is tied to a hash of the
@@ -20,7 +28,7 @@ const DATES = lastmod as Record<string, { hash: string; date: string }>;
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModifiedFor = (page: string) =>
     new Date(
-      (LEGAL_SLUGS as readonly string[]).includes(page)
+      ([...LEGAL_SLUGS, ...LEGAL_EXTRA_SLUGS] as readonly string[]).includes(page)
         ? String(LEGAL_UPDATED)
         : (DATES[page || 'home']?.date ??
             (() => {

@@ -179,5 +179,5 @@ export const fawrySettingsSchema = z.object({
 export type FawrySettings = z.infer<typeof fawrySettingsSchema>;
 
 /** The Egyptian gateway adapters (online payment providers). */
-export const EGYPT_GATEWAY_PROVIDERS = ['paymob', 'kashier', 'fawry'] as const;
+export const EGYPT_GATEWAY_PROVIDERS = ['paymob', 'kashier', 'fawry', 'geidea'] as const;
 export type EgyptGatewayProvider = (typeof EGYPT_GATEWAY_PROVIDERS)[number];

@@ -8,12 +8,12 @@ describe('formatDate day preset (delivery window)', () => {
   it('english is weekday day month, no comma, no year', () => {
     expect(formatDate(d, { style: 'day', language: 'en' })).toBe('Wed 21 Oct');
   });
-  it('arabic has no comma after the weekday and keeps the chosen digits', () => {
+  it('arabic has no comma after the weekday and always uses Western digits (DIGITS-1)', () => {
     const latn = formatDate(d, { style: 'day', language: 'ar', numerals: 'latn' });
     expect(latn).toBe('الأربعاء 21 أكتوبر');
     expect(latn).not.toMatch(/[,،]/);
-    expect(formatDate(d, { style: 'day', language: 'ar', numerals: 'arab' })).toBe(
-      'الأربعاء ٢١ أكتوبر'
+    expect(formatDate(d, { style: 'day', language: 'ar', numerals: 'arab' as never })).toBe(
+      'الأربعاء 21 أكتوبر'
     );
   });
   it('reads the day in the store timezone and survives a bad zone', () => {
@@ -31,10 +31,10 @@ describe('formatDate medium preset (receipt date)', () => {
   it('english is day month year, never month-first', () => {
     expect(formatDate(d, { style: 'medium', language: 'en' })).toBe('21 Oct 2026');
   });
-  it('arabic keeps western digits by default and arabic-indic when the store opts in', () => {
+  it('arabic keeps Western digits, even when the retired opt-in is passed (DIGITS-1)', () => {
     expect(formatDate(d, { style: 'medium', language: 'ar' })).toBe('21 أكتوبر 2026');
-    expect(formatDate(d, { style: 'medium', language: 'ar', numerals: 'arab' })).toBe(
-      '٢١ أكتوبر ٢٠٢٦'
+    expect(formatDate(d, { style: 'medium', language: 'ar', numerals: 'arab' as never })).toBe(
+      '21 أكتوبر 2026'
     );
   });
 });

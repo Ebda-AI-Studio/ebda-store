@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { CRON_SCHEDULE } from '@api/cf/cron';
-import { matchesLocal, parseCron, utcCronsFor } from '@api/lib/jobs/schedule';
+import { matchesLocal, parseCron, tickKey, utcCronsFor } from '@api/lib/jobs/schedule';
 import { collectCronFunctions } from '../helpers/inngest-cron-budget';
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -110,5 +110,31 @@ describe('wrangler.jsonc Cron Triggers', () => {
     expect(sub30).toEqual(['*/15 * * * *']);
     // and no job cron is more frequent than every 30 minutes
     for (const c of jobCrons) expect(/^(\*|\*\/\d+) /.test(c), c).toBe(false);
+  });
+});
+
+describe('zoned crons across the UTC day boundary (M-126, Ruling P18-3)', () => {
+  it('a monthly Cairo cron whose hour wraps fires on the previous UTC day-of-month', () => {
+    // the 15th at 01:00 Cairo is the 14th at 23:00 / 22:00 UTC
+    expect(utcCronsFor('TZ=Africa/Cairo 0 1 15 * *')).toEqual(['0 23 14 * *', '0 22 14 * *']);
+  });
+  it('a monthly cron that does not wrap keeps its day-of-month', () => {
+    expect(utcCronsFor('TZ=Africa/Cairo 0 6 15 * *')).toEqual(['0 4 15 * *', '0 3 15 * *']);
+  });
+  it('refuses a day-1 cron whose hour wraps instead of silently never firing', () => {
+    expect(() => utcCronsFor('TZ=Africa/Cairo 0 1 1 * *')).toThrow(/previous UTC day/);
+    expect(() => utcCronsFor('TZ=Africa/Cairo 0 2 1 * *')).toThrow(/hour >= 3/);
+    expect(utcCronsFor('TZ=Africa/Cairo 0 3 1 * *')).toEqual(['0 1 1 * *', '0 0 1 * *']);
+  });
+  it('the repeated local hour on the night Egypt falls back gets ONE start id', () => {
+    const expr = 'TZ=Africa/Cairo 30 23 * * *';
+    const first = new Date('2026-10-29T20:30:00Z'); // 23:30 at +03
+    const second = new Date('2026-10-29T21:30:00Z'); // 23:30 again at +02
+    expect(matchesLocal(expr, first)).toBe(true);
+    expect(matchesLocal(expr, second)).toBe(true);
+    expect(tickKey(expr, first)).toBe(tickKey(expr, second));
+    // a different local day is a different key, and a UTC cron still keys by the tick time
+    expect(tickKey(expr, new Date('2026-10-30T21:30:00Z'))).not.toBe(tickKey(expr, first));
+    expect(tickKey('7 * * * *', first)).toBe(String(first.getTime()));
   });
 });
