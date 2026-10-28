@@ -1,0 +1,5 @@
+# PROVIDERS-14
+
+> Section: 2026-10-07 — Shipping carriers on the provider catalog (branch `feat/shipping-batch`)
+
+Ruling PROVIDERS-14 — COD reconciliation (R-EBDA-004) is unchanged: no Egyptian carrier exposes a remittance/settlement API in the docs we fetched, so a settlement stays "delivered + COD amount" plus the CSV statement import (`lib/cod-reconciliation.ts`, column aliases, idempotent by line). The carrier list in the admin reconciliation page and the shipments filter is now bosta, shipblu, mylerz, aramex, manual. NOT done: per-carrier statement column maps (no official statement format is published) and recording Bosta's collected `cod` from the Delivered webhook (`cod` is in the payload; storing it as a remittance fact needs Ahmad's call on whether a webhook may create money facts). COD amounts are integer piastres end to end and converted at the edge (`piastresToEgp`); the unit each carrier expects is UNVERIFIED for ShipBlu, Mylerz and Aramex (EGP assumed, asserted at 1, 29, 12345 and 999999 piastres). Cost if wrong: a carrier that wants piastres would be sent 100x too little; caught at the first sandbox run, which is why none is verified.

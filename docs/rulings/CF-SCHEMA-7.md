@@ -1,0 +1,5 @@
+# CF-SCHEMA-7
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling CF-SCHEMA-7 (2026-10-25) - the legacy WhatsApp bridge is gone from the Cloudflare schema: migration `20261103000100_drop_legacy_wa_bridge` (#223, merged and deployed) removed `whatsapp_templates`, the ten Store columns (`wbs_*`, `bot_*`, `meta_catalog_id`, `meta_business_id`, `wa_customer_ordering_enabled`), `store_credentials.wbs_api_key` / `meta_access_token` and `ebda_wbs_bridge_keys()`. `model-split.json` drops `WhatsAppTemplate` (StoreDO 114 -> 113 models, 119 -> 118 tables; the 145 models, 21 D1 and Store 105 -> 95 scalar pins in the tests follow), the generated DDL and Drizzle are regenerated, and the fn-map keeps `ebda_wbs_bridge_keys` as `deleted-by-construction` because the inventory counts every historical CREATE. Nothing is recreated on the DO/D1 side; the erasure registry names none of these tables, so it needed no entry. Cost if wrong: a WhatsApp table or column resurrected in the DO schema would have no Postgres counterpart to import from.

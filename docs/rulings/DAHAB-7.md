@@ -1,0 +1,5 @@
+# DAHAB-7
+
+> Section: 2026-10-07 — Dahab template, builder Phase 3 pilot (branch `feat/template-dahab`)
+
+Ruling DAHAB-7 — accepted residual: Lighthouse mobile performance is 75 on the Dahab home and product pages (local production build, simulated slow 4G; accessibility 100, best practices 96, SEO 100), short of the ≥ 90 target. Evidence: the same store on the `elegant` skin scores 75/75 on the same stack and data; LCP (the hero / product photo) is dominated by ≈ 600 KB of platform JavaScript and 9 preloaded platform font files sharing the simulated link, and Cloudflare serves storefront images unoptimized (no srcset). Dahab-side mitigations taken: byte budgets on the photography (mobile hero ≤ 50 KB), later slides mounted after load, hover photos only on hover devices, no eager card images on the homepage, one display font file. On the live preview (real network from Egypt, data cache warm): home 70 / product 75 performance, accessibility 100, best practices 96 (SEO 69/58 only because preview responses are `noindex`). Cost if wrong: the ≥ 90 target needs platform work (JS split, font set, image resizing) before any template can meet it.

@@ -1,0 +1,5 @@
+# EP-1
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling EP-1 (Task 10, 2026-10-22) - whether an editor control is shown is a declared rule, not a render accident. `shownFor` (`{ templates?, looks?, variants? }`, or a list = any) on a setting, one pure `isShown` for the settings panel, the theme pane, the audit matrix and the tests. Absent = shown everywhere; an unknown template or a legacy store matches no narrowed rule and still gets every universal control. Narrowed only where the flip probe proves the skin or variant ignores the control (category-card Aspect, Show name and Hover outside the scrolling row and Modern's grid, tile Colours outside `lamma.market`, menu tabs outside the menu layout, the header chrome controls); `hiddenButWired()` and `shown-for.test.ts` fail the build if a rule hides a control that works. Cost if wrong: a control hidden that some renderer reads; the probe and the inverse test catch it before merge.

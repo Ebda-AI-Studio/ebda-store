@@ -1,0 +1,5 @@
+# CAMP-PLAN-2
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling CAMP-PLAN-2 (2026-10-21) - the campaign daily send cap is per plan. No per-plan quota existed (one flat `CAMPAIGN_DAILY_SEND_CAP`, 1000). `campaignDailyCap(plan)` now returns Growth 1000 (unchanged), Business 5000, other tiers 500 (reachable only through a super-admin override); an explicit env value still overrides every plan (the ops kill switch). The platform-wide pacer (1 send/s across all stores) is unchanged, so a 5000-email Business campaign takes about 83 minutes. Consent and unsubscribe enforcement are untouched (EC-1: active newsletter subscribers only, re-checked per recipient at send time, per-recipient one-click link and RFC 8058 headers). Evidence: `tests/unit/campaign-plan-gating.test.ts`, existing `campaign-send-job` and `campaign-routes` suites. Cost if wrong: a Business store hits its cap earlier than it expects, or the shared Resend sender reputation takes more volume from one store than the 1000 default allowed.

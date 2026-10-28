@@ -1,0 +1,5 @@
+# PROVIDERS-1
+
+> Section: 2026-10-07 — Provider catalog, Batch 0 + payments Batch 1 (PROVIDERS-\*)
+
+Ruling PROVIDERS-1 — `payment_configs.provider` is a TEXT catalog code (closed enum retired) and a store's gateway credentials are ONE AES-256-GCM JSON blob `{sandbox:{field:value}, live:{...}}` keyed by the catalog's field names. Expand-then-contract: migration `20261007210000_payment_provider_codes` converts the column, adds `credentials` / `credential_hints` / `connection_test`, keeps the four legacy credential columns readable (`toProviderCredentials` falls back to them when the blob is NULL) and does NOT drop the enum type; the contract migration (drop legacy columns + type) is a later PR once every row has a blob. Evidence: coordinator ruling 2026-10-07 (0 merchants in production; not re-read here). Accepted residual: the column type change is not expand-safe for a still-running OLD API instance during the deploy window (its enum-typed parameters no longer compare with a TEXT column), so payment-config reads on the old instance error until it is replaced. Cost if wrong: for the length of one deploy swap, checkout payment-method lists on old instances fail.

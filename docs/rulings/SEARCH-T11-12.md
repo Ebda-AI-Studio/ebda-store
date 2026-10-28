@@ -1,0 +1,5 @@
+# SEARCH-T11-12
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T11-12 (review M7) — `requestStoreReindex` sends only after the caller's writes commit, in and out of requests: a request defers to its COMMIT (`deferAfterTenantCommit`); a `runInTenantContext` transaction outside a request registers the send with the new `afterTenantTxCommit` (`@ebda/database`: callbacks run after that transaction's COMMIT, outside its context, and are dropped on rollback); with no transaction (`runInStoreScope`, plain code) every statement is already committed, so it sends at once. Inside a caller's own transaction that `runInTenantContext` did not open (`scopeTransaction` around `$transaction`/`withMoneyTx`) it cannot know the commit, so it sends nothing and warns; the backstop catches the change within 6 h (no current caller does this). Evidence: `tests/integration/product-index.test.ts` "review M7" (nothing sent inside the transaction, one event after COMMIT, none after a rollback) — red before the change (sent inside). Cost if wrong: a warned, unsent event delays reindexing up to 6 h.

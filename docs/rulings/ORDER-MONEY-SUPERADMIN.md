@@ -1,0 +1,5 @@
+# ORDER-MONEY-SUPERADMIN
+
+> Section: ORDER-MONEY-SUPERADMIN (2026-10-08)
+
+Ruling ORDER-MONEY-SUPERADMIN — Ebda's super-admin can no longer mark a store's order paid (single or bulk) or refund it through the gateway, and those routes now require `orders:manage` / `orders:refund` like their InstaPay siblings. Evidence: background security review flagged gate parity after #51 removed super_admin from confirm-instapay only; `mark-paid` and `bulk-mark-paid` had no permission check at all. **Closed 2026-10-10 (Ahmad, binding):** `PUT /orders/:id/status` also now requires `store_admin`/`staff` — super-admin approves subscriptions only, never a store's own order workflow (confirm/ship/cancel/refund-record). The e2e order suite's status-update tests were moved onto a dedicated `store_admin` fixture instead of the super-admin login; the GET-order test keeps the super-admin token since reads are unaffected. Cost if wrong: none expected — no admin surface calls this route as super-admin (checked `apps/admin/src`), and `tests/integration/instapay-receipts.test.ts` now asserts the 403 directly.

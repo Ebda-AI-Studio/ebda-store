@@ -1,0 +1,5 @@
+# EBDA-MONEYA-1
+
+> Section: 2026-10-08 — Money batch A: InstaPay proof, subscription billing fixes (branch `fix/money-a`, EBDA-MONEYA-\*)
+
+Ruling EBDA-MONEYA-1 — Whoever pays by InstaPay uploads the receipt SCREENSHOT; a typed reference alone is no longer proof. `POST /payments/instapay/:orderId/reference` and `POST /stores/:id/billing/payment-claims` answer 410 `RECEIPT_REQUIRED`. The image lives ONLY in the private bucket (`StorageService.putPrivate`, fail-closed 503, never a URL; reviewers get bytes from an authorised route). New table `instapay_receipts` (store-scoped, strict RLS, migration `20261008130000_instapay_receipts`). Nothing activates on a receipt: approval goes through the existing money paths (`recordManualPayment`, `InstapayService.confirm`). Evidence: `tests/integration/instapay-receipts.test.ts` ("activates nothing", mutation MA-2 red). Cost if wrong: a shopper/merchant without a screenshot (e.g. paid from someone else's phone) must ask for one before paying is recognised.

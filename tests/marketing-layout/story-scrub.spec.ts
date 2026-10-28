@@ -40,7 +40,7 @@ for (const { w, h } of SIZES) {
     await page.waitForTimeout(3000);
     const total = await page.evaluate(() => {
       const s = document.getElementById('story')!;
-      window.scrollTo(0, s.getBoundingClientRect().top + scrollY - 10);
+      window.scrollTo({ top: s.getBoundingClientRect().top + scrollY - 10, behavior: 'instant' });
       const win = window as unknown as Record<string, unknown>;
       win.__t0 = performance.now();
       win.__gaps = [] as number[];
@@ -98,7 +98,7 @@ test('story: the space bar scrolls it (native scroll, no hijack)', async ({ page
   await page.waitForTimeout(1200);
   await page.evaluate(() => {
     const s = document.getElementById('story')!;
-    window.scrollTo(0, s.getBoundingClientRect().top + scrollY - 10);
+    window.scrollTo({ top: s.getBoundingClientRect().top + scrollY - 10, behavior: 'instant' });
   });
   await page.focus('body');
   const seen: number[] = [];
@@ -143,4 +143,53 @@ test('story: reduced motion shows the finished store in normal flow', async ({ b
   expect(s.f4).toBe('1');
   expect(s.toast).toBe('1');
   await ctx.close();
+});
+
+test('story: without JavaScript there is no pinned dead scroll, just the finished store', async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 1280, height: 800 },
+  });
+  const page = await ctx.newPage();
+  await page.goto('/', { waitUntil: 'load' });
+  const s = await page.evaluate(() => {
+    const el = document.getElementById('story')!;
+    return {
+      sticky: getComputedStyle(el.querySelector('.story-sticky')!).position,
+      h: el.offsetHeight,
+      vh: innerHeight,
+      f4: getComputedStyle(el.querySelector('.story-frame[data-f="4"]')!).opacity,
+      step1: getComputedStyle(el.querySelector('.story-steps li')!).opacity,
+    };
+  });
+  expect(s.sticky).toBe('static');
+  expect(s.h).toBeLessThan(s.vh * 2);
+  expect(s.f4).toBe('1');
+  expect(s.step1).toBe('1');
+  await ctx.close();
+});
+
+test('story glide: wheel ticks are smoothed (desktop), the page still ends where the wheel says', async ({
+  page,
+}) => {
+  await page.goto('/', { waitUntil: 'load' });
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForTimeout(2000);
+  await page.evaluate(() => {
+    const s = document.getElementById('story')!;
+    window.scrollTo({ top: s.getBoundingClientRect().top + scrollY + 50, behavior: 'instant' });
+  });
+  const y0 = await page.evaluate(() => scrollY);
+  await page.mouse.move(640, 400);
+  await page.mouse.wheel(0, 400);
+  // one frame later the scroll has started but not finished: that is the glide
+  await page.waitForTimeout(40);
+  const mid = await page.evaluate(() => scrollY);
+  await page.waitForTimeout(1200);
+  const end = await page.evaluate(() => scrollY);
+  expect(mid - y0).toBeGreaterThan(0);
+  expect(mid - y0).toBeLessThan(400);
+  expect(Math.abs(end - y0 - 400)).toBeLessThan(2);
 });

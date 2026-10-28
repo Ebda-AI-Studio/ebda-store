@@ -1,0 +1,5 @@
+# SEARCH-T11-20
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T11-20 (PR3 final review minor 3) — `product.upserted` (ProductService create/update) and `product.deleted` (ProductService.delete) are now sent after COMMIT through the shared `sendEventAfterCommit` (`apps/api/src/lib/inngest/send-after-commit.ts`, the same routing `requestStoreReindex` uses since SEARCH-T11-12): the request's COMMIT, else the ambient `runInTenantContext` COMMIT, else at once with no transaction; dropped on rollback. They were `void inngest.send(...)` inside the request transaction, so a consumer (Meta catalogue sync, autofill, the search indexer) could read an uncommitted or rolled-back product (the debounce masked it). Unlike the reindex event, these use `ifUnhookable: 'send'`: inside a caller's own unhookable transaction they keep the old immediate send, because Meta sync has no hash backstop. Evidence: `tests/integration/product-index.test.ts` "PR3 minor 3" (`ProductService.update` inside a tenant transaction: 0 events inside, 1 after COMMIT, 0 after a rollback; red before). Cost if wrong: none; a request that rolls back no longer fans out phantom events.

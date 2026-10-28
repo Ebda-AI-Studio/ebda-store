@@ -1,0 +1,7 @@
+# PR66-SECURITY-BASELINE
+
+> Section: BOSTA-LIVE-READONLY (2026-10-08)
+
+## Ruling PR66-SECURITY-BASELINE — released fixes plus explicit upstream blocker
+
+Apply released security fixes to existing MCP SDK, OpenTelemetry instrumentation, selector-parser and Lighthouse dependencies alongside the reviewed payment display correction. Use scoped Lighthouse overrides for both LHCI consumers; do not run audit-force's unrelated downgrades/framework migrations or invent patched versions. The audit started at26affected packages (15high/11moderate). After these fixes the runtime audit is0/0/0/0 and the full audit retains8high findings, all deriving from braces in development-tool dependencies. Registry and [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) confirm braces3.0.3 remains the latest release with no patched version. Lighthouse13.5 removes the vulnerable extract-zip path rather than pretending extract-zip2.0.1 is patched. The extract-zip residual accepted in AUDIT-11c is superseded: that dependency is absent from the current lockfile. This explicitly flags dependency rule1's full-audit-zero exception while an upstream braces fix is unavailable; required validation gates remain in place. Cost if wrong: an overlooked consumer or untrusted build-pattern input could make the residual exploitable, so preserve the exact dependency evidence and do not claim a zero full audit. See `docs/ebda/dependency-security-baseline.md`.

@@ -1,0 +1,5 @@
+# LOOKS-14
+
+> Section: 2026-10-14 — Security batch (branch `fix/security-batch-2026-10-14`, audit: `docs/security/audit-2026-10-14.md`)
+
+Ruling LOOKS-14 — brand surfaces outside the storefront (store emails, invoices, campaign mail, the setup guide) read the brand through `storeBrandTheme` (`apps/api/src/lib/store-brand-theme.ts`): a look store is composed with `composeStoreTheme` (the look's colours, the merchant's stored keys still win), a legacy store (no or unknown look) keeps reading its stored theme as-is, and the setup guide's brand step is complete for a store with a registered look. Evidence: the final Phase S review found every look store's emails and invoices in the platform fallback colour and its brand step unticked, because a look store stores no `primaryColor`; `tests/unit/looks-brand-surfaces.test.ts`. Composing legacy stores too would recolour every existing merchant's mail from the fallback to the skin primary, which is a change nobody asked for. Cost if wrong: a legacy store with no stored colour keeps the fallback colour in its mail while its storefront shows the skin primary (unchanged from before looks).

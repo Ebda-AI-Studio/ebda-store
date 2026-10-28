@@ -1,0 +1,5 @@
+# PASSKEY-1
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling PASSKEY-1 (passkeys, 2026-10-21) — `passkey_credentials` is user-keyed under strict RLS with NO `store_id` column: the user row is already the tenant (a shopper's `users.store_id`, a merchant's NULL), so it follows `refresh_tokens` / `legal_acceptances`; policy `user_id = app.current_user_id` (USING and WITH CHECK, no super_admin read), FORCE RLS, FK `ON DELETE CASCADE`, only the PUBLIC key stored. Pre-identity sign-in reads it through the unguarded SECURITY DEFINER `ebda_passkey_lookup(credential_id)` (public material only); erasure through the guarded `ebda_passkeys_delete(user_id)`. Evidence: `tests/integration/passkey-credentials-rls.test.ts` as the real `ebda_app` login (7 cases: own rows only, contextless/super_admin see none, no write for someone else, unique credential id, lookup shape, guarded erase, cascade) and `rls-ebda-app.test.ts` (USER_KEYED list). Cost if wrong: a store_id-keyed table would have joined the strict store policy enumeration; moving later needs a data migration.

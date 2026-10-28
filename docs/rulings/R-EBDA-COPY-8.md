@@ -1,0 +1,5 @@
+# R-EBDA-COPY-8
+
+> Section: 2026-10-07 — Marketing copy and design (R-EBDA-COPY-\*)
+
+Ruling R-EBDA-COPY-8 (superseded 2026-10-14 by MKT-1/MKT-6: the laptop/tablet device frames, `scripts/storefront-capture/` and `npm run capture:stores` were removed; the kept story phone now shows the Dahab look A, rendered by `scripts/story-frames/make.mjs`) — what is inside the device frames on ebda.app is the REAL storefront: the five example stores (one per template family, `applyTemplateFamily`) are seeded into a throw-away local Postgres, served by the real API as `ebda_app` and a production build of apps/web, and captured at true device viewports (phone 390x844 @3x, tablet 820x1180 @2x, laptop 1440x900 @2x), then scaled down whole. Pipeline: `npm run capture:stores -w apps/marketing` (`scripts/storefront-capture/`, needs a checkout with the builder families, currently PR #23). Captures are Arabic only (Arabic-first storefront) and shown on both locales. Evidence: Ahmad 2026-10-07 via the coordinator; pipeline run end to end 2026-10-07. Cost if wrong: the captures go stale when the templates change, until someone re-runs the pipeline.

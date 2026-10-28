@@ -32,6 +32,8 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
       - run: npm ci
+      # @ebda/shared resolves to ./dist; the (ar)/for/* pages import it, so build it before the tests (as ci.yml does).
+      - run: npm run build -w packages/shared
       - run: npx vitest run tests/unit/marketing-site.test.tsx tests/unit/marketing-seo.test.ts
       - name: Build marketing (static export to apps/marketing/out)
         # Public ids, inlined at build (docs/ebda/ads-tracking.md). Unset = that provider never loads.

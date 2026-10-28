@@ -1,0 +1,5 @@
+# SEARCH-T12-4
+
+> Section: 2026-10-16 — Search program, PR 4 (P1c, hybrid ranking): SEARCH-T12-\*
+
+Ruling SEARCH-T12-4 — paging through a ranked list is deterministic, with one residual. The order is fixed for given legs (RRF ties break by id; the keyword leg orders by similarity then id; the vector leg by distance then product id), pages and cursors slice the same list in memory, and a cursor id no longer in the list yields an empty page (the merchant-order path's rule). The residual: a page whose vector leg degraded (race lost, budget, limiter) is keyword-ordered, so a walk mixing degraded and full pages can repeat or skip a product. Mitigation: the query vector is cached per isolate for 10 minutes, so after the first success the following pages reuse it; failures are not cached. Evidence: `hybrid-search.test.ts` "page and cursor paging walk the same deterministic order". Cost if wrong: a shopper paging deep into a search during a Workers AI slowdown sees one product twice or misses one.

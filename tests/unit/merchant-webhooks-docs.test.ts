@@ -24,7 +24,7 @@ describe('merchant webhooks docs match reality', () => {
     }
   });
   it('M11: states the rebinding residual honestly (a 200 character read, bounded by Workers)', () => {
-    const wh6 = read('docs/RULINGS.md').split('Ruling WH-6')[1]?.split('Ruling WH-7')[0] ?? '';
+    const wh6 = read('docs/rulings/WH-6.md');
     expect(wh6).toMatch(/200[- ]character/);
     expect(wh6).not.toMatch(/not a read oracle|one blind POST/i);
     expect(wh6).toMatch(/Workers/);

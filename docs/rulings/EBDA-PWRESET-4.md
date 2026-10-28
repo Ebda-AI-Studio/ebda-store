@@ -1,0 +1,5 @@
+# EBDA-PWRESET-4
+
+> Section: 2026-10-07 — Ebda Store forgot/reset password (branch `feat/password-reset`)
+
+Ruling EBDA-PWRESET-4 — a reset does NOT bypass MFA and does NOT disable it: `mfaEnabled`/`mfaSecret` are untouched, so the next login still returns `mfaRequired` + challenge token (pinned by the integration case "MFA survives a reset"). A merchant who lost both password and authenticator uses backup codes; there is no email-only MFA recovery. Accepted residuals: (a) the not-found branch still skips one indexed INSERT the found branch performs (sub-millisecond, under network jitter); (b) the storefront customer reset (`apps/web` `/auth/reset-password`) is untouched apart from the shared hardening above; (c) `/forgot-password` on a soft-deleted admin account still issues a link (`includeDeleted: true`, inherited) — login refuses the account regardless. (d) PR #42 adds `DocumentTitle` inside `PublicShell`; until it merges, these two pages carry the root layout's "Ebda Store" title rather than a per-page one — they pick it up on rebase with no change. Cost if wrong: (c) a deleted merchant gets a working-looking link that leads to a login that refuses them.

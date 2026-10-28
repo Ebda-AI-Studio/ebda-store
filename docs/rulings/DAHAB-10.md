@@ -1,0 +1,5 @@
+# DAHAB-10
+
+> Section: 2026-10-07 — Dahab template, builder Phase 3 pilot (branch `feat/template-dahab`)
+
+Ruling DAHAB-10 — the preview stack is fully separate (doc → "Preview stack"): Neon branch `preview` with a FRESH database migrated from this branch — Neon refused a schema-only branch ("legacy web access role"), so the branch was created normally and its copied `neondb` dropped, leaving no production row in preview; own Hyperdrive/KV/queues/rate-limit namespace/secrets, no crons, no Resend/Inngest/Sentry/OneSignal/payment keys; each Worker has a custom domain AND a `<host>/*` zone route (zone routes beat custom domains: the first deploy without it was answered by production `ebda-web`); `X-Robots-Tag: noindex` on every preview response; the preview storefront runs its own OpenNext data cache (R2 `ebda-preview-isr-cache`) because uncached renders took 5–11 s; smart placement on the preview API was tried and reverted (it made ~half the requests wait 20 s for a pooled client → 503). Cost if wrong: preview-only resources to delete (teardown list in the doc).

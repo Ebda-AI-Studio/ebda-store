@@ -1,0 +1,5 @@
+# LIFE-4
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+- Ruling LIFE-4 - consent: these are onboarding emails from the platform to the store owner, not marketing to shoppers. Each carries a signed one-click unsubscribe link (`/public/lifecycle-emails/unsubscribe`, GET confirms, POST acts, store in the HMAC, no address in the URL, key derived from ENCRYPTION_KEY so no new env var). The unsubscribe is a `kind = optout` row in the same table; while it exists every kind is recorded `skipped: opted_out`. Order, billing and security emails are unaffected. `EmailService.sendLifecycleEmail` throws without an unsubscribe URL. Update (same day, Ruling LIFE-6): `EmailOptions.headers` now exists and lifecycle mail carries RFC 8058 `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` pointing at the signed URL (https origins only); campaign, newsletter and cart-recovery sends already did. Order and billing mail carries none. Cost if wrong: outside production (non-https API URL) the header is omitted and only the in-body link applies.

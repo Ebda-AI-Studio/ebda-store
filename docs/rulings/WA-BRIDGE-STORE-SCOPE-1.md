@@ -1,0 +1,5 @@
+# WA-BRIDGE-STORE-SCOPE-1
+
+> Section: 2026-10-21 — Phase B2 Souq (B2-\*)
+
+Ruling WA-BRIDGE-STORE-SCOPE-1 (issue 28) — `waBridgeAuth` runs the rest of the request in `runInStoreScope(store.id)` for the one store the API key resolved (an unknown key is 401, never a default store). Before, every handler queried with no ambient store, which under `ebda_app` strict RLS and the tenant guard reads nothing or throws. `runInStoreScope` rather than `tenantContext` because the bridge handlers await third parties. `POST /cart/redeem` has no key, so it scopes the store named by the signed token via `withStore`: a non-uuid id is 400 `TOKEN_INVALID`, an unknown store 404 `STORE_NOT_FOUND` (was 403 `STORE_WBS_DISABLED` for both), a disabled one still 403. Every handler query already carries the authenticated `storeId`; no cross-store read found. Evidence: `tests/unit/contract-wbs-bridge.test.ts` "store context" block (red when the scope wrap is removed). Cost if wrong: WBS treating a `STORE_WBS_DISABLED` 403 as the only redeem refusal would now see a 404 for a deleted store.

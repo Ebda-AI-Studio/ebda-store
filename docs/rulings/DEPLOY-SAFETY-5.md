@@ -1,0 +1,5 @@
+# DEPLOY-SAFETY-5
+
+> Section: 2026-10-08 - Deploy safety after the `Prisma.dmmf` outage (branch `ci/deploy-safety`)
+
+Ruling DEPLOY-SAFETY-5 - mutation proof. `scripts/ci/deploy-guard.mjs` (14 mutations applied one at a time, 13 KILLED, `tests/unit/deploy-guard.test.ts` run each time, file restored byte-identical): 5xx tolerated as a match, commit check removed, success short-circuit, "no previous version" guard removed, `wrangler rollback` exit code ignored, rollback confirmation ignored, split-traffic accepted as a rollback target, migration warning removed, unreachable counted as healthy, `some` instead of `every`, `GITHUB_OUTPUT` write removed, `--yes` removed, lookup error handling inverted: killed. One survivor per file, both equivalent: dropping the `curl exit` throw (status 0 still fails the probe) and in `workerd-smoke.mjs` the `>= 500` clause (the following `!== want` check rejects a 5xx as well). Cost if wrong: an equivalent mutant that is not actually equivalent hides a path with no test.

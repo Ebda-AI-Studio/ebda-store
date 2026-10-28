@@ -1,0 +1,5 @@
+# CUSTOM-HOSTNAMES-1
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling CUSTOM-HOSTNAMES-1 (2026-10-27) - merchant custom domains use Cloudflare for SaaS with the existing `ebda-web` Worker as the fallback-origin handler: a `*/*` zone route on `ebda.app` for ebda-web, made safe by an explicit zone route for every other hostname (apex -> ebda-marketing, accounts, api, store, orders, docs, help, status; media stays a Worker-less exclusion). Workers for Platforms is NOT needed: the docs' own recommended Worker-as-fallback-origin pattern is `*/*`. Evidence: Cloudflare docs "Workers as your fallback origin" and "Routes: matching behavior" (most specific pattern wins); tests/unit/cf-route-precedence.test.ts. Cost if wrong: if a catch-all out-ranked a Custom Domain, the apex or accounts would serve the storefront until `*/*` is deleted (one API call, rollback note in docs/DEPLOYMENT.md); the plan removes that risk by deploying marketing and accounts routes first and verifying each host.

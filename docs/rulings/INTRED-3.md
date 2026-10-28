@@ -1,0 +1,5 @@
+# INTRED-3
+
+> Section: Main integration lane red (2026-10-22, branch `fix/main-integration-red`)
+
+- Ruling INTRED-3 - fixtures follow #111 (built looks only, registry default look for a new store). `store-look` fixture look `jasmine.clinic` (designed) -> `souq.catalogue` (built); `onboarding-look` iterates `builtLookTemplates()` and asserts a designed look is a 400 with no store created (new case); "no lookId keeps look null" -> "starts on the registry default look" (`look` = `defaultNewStoreLook().id`, was `null`); `PUT /template` with a bare legacy skin is now asserted as 400 `INVALID_TEMPLATE` (look untouched) and a re-save of the current skin as the case that clears the look; `self-serve-onboarding` restyles through a look, asserts the bare template 400, and the setup guide starts at `brand` done (a look IS a brand palette) before taking the look off to prove the legacy logo/colour signals. The Vitrine case applies Atelier first so Atelier seeds the content the assertion says is kept. Cost if wrong: the assertions describe the new contract; if #111 is reverted they must revert with it.
