@@ -2,7 +2,9 @@
 
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { shouldRenderShell } from '@/lib/auth-gate';
 import { StoreProvider } from '@/contexts/StoreContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ToastProvider } from '@/contexts/ToastContext';
@@ -32,6 +34,24 @@ function AuthedProviders({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Holds the protected shell back until a session is known (Ruling AUTH-FLASH-1); /login always renders. */
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const pathname = usePathname();
+  if (shouldRenderShell({ isLoading, hasUser: !!user, isPublic: pathname === '/login' })) {
+    return <>{children}</>;
+  }
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      className="flex min-h-screen items-center justify-center bg-background"
+    >
+      <div className="h-10 w-10 motion-safe:animate-spin rounded-full border-4 border-muted border-t-primary" />
+    </div>
+  );
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerServiceWorker();
@@ -42,7 +62,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ToastProvider>
         <PostHogProvider>
           <AuthProvider>
-            <AuthedProviders>{children}</AuthedProviders>
+            <AuthedProviders>
+              <AuthGate>{children}</AuthGate>
+            </AuthedProviders>
           </AuthProvider>
         </PostHogProvider>
       </ToastProvider>

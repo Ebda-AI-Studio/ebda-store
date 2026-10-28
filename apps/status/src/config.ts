@@ -32,6 +32,22 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     expectBody: '"status":\\s*"ok"',
   },
   {
+    id: 'orders',
+    product: 'store',
+    name: { en: 'Orders app', ar: 'تطبيق الطلبات' },
+    url: `https://${d.orders}/health`,
+    expectStatus: 200,
+    expectBody: '"status":\\s*"ok"',
+  },
+  {
+    id: 'accounts',
+    product: 'store',
+    name: { en: 'Sign-in (accounts)', ar: 'تسجيل الدخول' },
+    url: `https://accounts.${d.marketing}/health`,
+    expectStatus: 200,
+    expectBody: '"status":\\s*"ok"',
+  },
+  {
     id: 'api',
     product: 'store',
     name: { en: 'API', ar: 'واجهة البرمجة' },
