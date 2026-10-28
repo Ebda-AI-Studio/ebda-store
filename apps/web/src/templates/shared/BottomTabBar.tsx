@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { usePathname } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage } from '../../contexts/LanguageContext';

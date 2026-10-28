@@ -181,6 +181,7 @@ dist-cf/
 apps/api/.wrangler.deploy.jsonc
 # workerd smoke copy of the API config without the AI binding (scripts/ci/workerd-smoke.mjs)
 apps/api/.wrangler.smoke.jsonc
+apps/*/.wrangler.smoke.jsonc
 # local dev copy of the API config without the AI binding (scripts/cf-api-local-config.mjs)
 apps/api/.wrangler.local.jsonc
 

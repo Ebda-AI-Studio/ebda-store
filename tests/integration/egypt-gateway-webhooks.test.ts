@@ -307,7 +307,7 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
       const right = await send(gateway, w, '', s.id);
       expect(right.status).toBe(200);
       const after = await state(order.id);
-      expect(after.payment.status).toBe('completed');
+      expect(after.payment.status, JSON.stringify(right.body)).toBe('completed');
       expect(after.order.paymentStatus).toBe('paid');
     });
 

@@ -60,7 +60,7 @@ describe('ThemeSettingsPanel order and header controls', () => {
 
   it('a skin that draws its own header gets no Header group at all, and the rest stays', () => {
     render(
-      <ThemeSettingsPanel theme={undefined} storeTemplate="modern" onSave={async () => true} />
+      <ThemeSettingsPanel theme={undefined} storeTemplate="dahab" onSave={async () => true} />
     );
     expect(legends()).not.toContain('Header');
     expect(legends()[0]).toBe('Colours');

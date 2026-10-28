@@ -46,7 +46,11 @@ describe('platform root redirect', () => {
     const stripComments = (src: string) =>
       src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-    const merchantSurfaces = ['components/StoreNotFound.tsx', 'app/HomePageContent.tsx'];
+    const merchantSurfaces = [
+      'components/StoreNotFound.tsx',
+      'components/StoreNotFoundBody.tsx',
+      'app/HomePageContent.tsx',
+    ];
     for (const file of merchantSurfaces) {
       const code = stripComments(web(file));
       expect(code, `${file} imports the platform pitch URL`).not.toContain(

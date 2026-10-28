@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Button, Input, useToast } from '@ebda/ui';
 import { withNumerals } from '@ebda/shared';
-import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../lib/api';
+import { AccountsError, accountsFetch, accountsToken } from '../../lib/accounts';
 import { isPasskeyCancel, passkeyRegistration, passkeysSupported } from '../../lib/passkeys';
 import { useT } from '../../i18n/useT';
 
@@ -14,6 +14,23 @@ import { useT } from '../../i18n/useT';
  * TOTP code when TOTP is on): the API answers 403 STEP_UP_REQUIRED and this panel asks, then retries
  * (Ruling PASSKEY-7). Removing a passkey signs the account out everywhere (PASSKEY-9).
  */
+/** An identity-service refusal in the shape this panel's error handling expects. */
+interface ApiError {
+  code?: string;
+  message?: string;
+}
+
+/** Authenticated call to the identity service: a fresh 15 minute token as Bearer. */
+async function acct<T>(path: string, json?: unknown): Promise<T> {
+  const grant = await accountsToken();
+  try {
+    return await accountsFetch<T>(path, { json, bearer: grant.access_token });
+  } catch (e) {
+    if (e instanceof AccountsError) throw { code: e.code, message: e.message } satisfies ApiError;
+    throw e;
+  }
+}
+
 interface PasskeyItem {
   id: string;
   name: string;
@@ -25,8 +42,22 @@ interface PasskeyItem {
 
 type Action = () => Promise<void>;
 
-export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
+export function PasskeysPanel({
+  mfaEnabled,
+  isAdmin = false,
+  onCount,
+  onSignInAgain,
+}: {
+  mfaEnabled: boolean;
+  /** A platform administrator's FIRST factor also needs the operator's one-time enrolment token. */
+  isAdmin?: boolean;
+  /** Reports how many passkeys the account has (the page needs it to know whether a TOTP would be a FIRST factor). */
+  onCount?: (n: number) => void;
+  /** The first factor of a platform admin ends every session: the page signs them out to sign in again with it. */
+  onSignInAgain?: () => void;
+}) {
   const t = useT('account.security.passkeys');
+  const ts = useT('account.security');
   const tc = useT('common');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const { success: toastSuccess, error: toastError } = useToast();
@@ -40,10 +71,22 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
   const [removeId, setRemoveId] = useState<string | null>(null);
   // Step-up form: shown when an action was refused for lack of a recent re-auth.
   const pending = useRef<Action | null>(null);
+  // The identity service asks for the password (and a TOTP code when TOTP is on) with EACH sensitive call; they are held only
+  // for the one retry after the step-up form and then dropped.
+  const creds = useRef<{
+    password: string;
+    code?: string;
+    emailCode?: string;
+    enrolmentToken?: string;
+  } | null>(null);
   const [askStepUp, setAskStepUp] = useState(false);
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [stepUpError, setStepUpError] = useState('');
+  // The FIRST sign-in factor of an account (no TOTP, no passkey) also needs a code e-mailed to the account.
+  const [emailCode, setEmailCode] = useState('');
+  const [enrolToken, setEnrolToken] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
 
   const fmt = (iso: string) =>
     new Date(iso).toLocaleDateString(
@@ -52,14 +95,34 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
     );
 
   const load = useCallback(async () => {
-    const { data, error } = await apiGet<{ passkeys: PasskeyItem[] }>('/api/v1/auth/passkeys');
-    if (error || !data) {
+    try {
+      const data = await acct<{
+        passkeys: Array<{
+          id: string;
+          name: string;
+          rp_id: string;
+          backed_up: number;
+          created_at: string;
+          last_used_at: string | null;
+        }>;
+      }>('/passkeys');
+      onCount?.(data.passkeys.length);
+      setItems(
+        data.passkeys.map(p => ({
+          id: p.id,
+          name: p.name,
+          createdAt: p.created_at,
+          lastUsedAt: p.last_used_at,
+          backedUp: !!p.backed_up,
+          // Registered for a different host than this page: the browser will not offer it here.
+          needsReenrol: p.rp_id !== window.location.hostname,
+        }))
+      );
+    } catch {
       toastError(t('errorLoad'), undefined);
       setItems([]);
-      return;
     }
-    setItems(data.passkeys);
-  }, [t, toastError]);
+  }, [t, toastError, onCount]);
 
   useEffect(() => {
     setSupported(passkeysSupported());
@@ -73,7 +136,12 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
       await action();
     } catch (e) {
       const err = e as Partial<ApiError> & { name?: string };
-      if (err.code === 'STEP_UP_REQUIRED') {
+      if (
+        err.code === 'STEP_UP_REQUIRED' ||
+        err.code === 'MFA_REQUIRED' ||
+        err.code === 'EMAIL_CODE_REQUIRED' ||
+        err.code === 'EMAIL_CODE_INVALID'
+      ) {
         pending.current = action;
         setStepUpError('');
         setAskStepUp(true);
@@ -85,19 +153,37 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
     }
   }
 
-  const fail = (error: ApiError): never => {
-    throw error;
+  const needCreds = (): {
+    password: string;
+    code?: string;
+    emailCode?: string;
+    enrolmentToken?: string;
+  } => {
+    if (!creds.current) throw { code: 'STEP_UP_REQUIRED' } satisfies ApiError;
+    return creds.current;
   };
 
   const addPasskey: Action = async () => {
-    const begin = await apiPost<never>('/api/v1/auth/passkeys/register/begin', {});
-    if (begin.error || !begin.data) return fail(begin.error as ApiError);
-    const response = await passkeyRegistration(begin.data);
-    const fin = await apiPost('/api/v1/auth/passkeys/register/finish', {
-      response,
-      name: name.trim() || undefined,
-    });
-    if (fin.error) return fail(fin.error);
+    const c = needCreds();
+    try {
+      const options = await acct<never>('/passkey/register/options', c);
+      creds.current = null; // one use
+      const response = await passkeyRegistration(options);
+      const done = await acct<{ requiresSignIn?: boolean }>('/passkey/register/verify', {
+        response,
+        name: name.trim() || undefined,
+        ...(c.emailCode ? { emailCode: c.emailCode } : {}),
+        ...(c.enrolmentToken ? { enrolmentToken: c.enrolmentToken } : {}),
+      });
+      if (done?.requiresSignIn) {
+        toastSuccess(t('added'), undefined);
+        onSignInAgain?.();
+        return;
+      }
+    } catch (e) {
+      creds.current = null;
+      throw e;
+    }
     setName('');
     toastSuccess(t('added'), undefined);
     await load();
@@ -106,8 +192,7 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
   const renamePasskey =
     (id: string, value: string): Action =>
     async () => {
-      const r = await apiPatch(`/api/v1/auth/passkeys/${id}`, { name: value });
-      if (r.error) return fail(r.error);
+      await acct(`/passkeys/${id}/rename`, { name: value });
       setRenameId(null);
       toastSuccess(t('renamed'), undefined);
       await load();
@@ -116,8 +201,9 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
   const removePasskey =
     (id: string): Action =>
     async () => {
-      const r = await apiDelete(`/api/v1/auth/passkeys/${id}`);
-      if (r.error) return fail(r.error);
+      const c = needCreds();
+      creds.current = null;
+      await acct(`/passkeys/${id}/delete`, c);
       setRemoveId(null);
       toastSuccess(t('removed'), undefined);
       await load();
@@ -128,16 +214,17 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
     setStepUpError('');
     setBusy(true);
     try {
-      const { error } = await apiPost('/api/v1/auth/passkeys/step-up', {
+      creds.current = {
         password,
         ...(mfaEnabled ? { code: code.trim() } : {}),
-      });
-      if (error) {
-        setStepUpError(t('stepUpFailed'));
-        return;
-      }
+        ...(emailCode.trim() ? { emailCode: emailCode.trim() } : {}),
+        ...(enrolToken.trim() ? { enrolmentToken: enrolToken.trim() } : {}),
+      };
       setPassword('');
       setCode('');
+      setEmailCode('');
+      setEnrolToken('');
+      setCodeSent(false);
       setAskStepUp(false);
       const next = pending.current;
       pending.current = null;
@@ -223,6 +310,68 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
               />
             </div>
           )}
+          {!mfaEnabled && (items?.length ?? 0) === 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{ts('firstFactorEmailHint')}</p>
+              {isAdmin && (
+                <div>
+                  <label
+                    htmlFor="passkey-enrol-token"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    {ts('bootstrapTokenLabel')}
+                  </label>
+                  <Input
+                    id="passkey-enrol-token"
+                    type="text"
+                    dir="ltr"
+                    autoComplete="off"
+                    value={enrolToken}
+                    onChange={e => setEnrolToken(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label
+                    htmlFor="passkey-email-code"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    {ts('bootstrapCodeLabel')}
+                  </label>
+                  <Input
+                    id="passkey-email-code"
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    autoComplete="off"
+                    maxLength={6}
+                    value={emailCode}
+                    onChange={e => setEmailCode(e.target.value)}
+                    className="mt-1 text-center tracking-widest"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={busy || !password}
+                  onClick={async () => {
+                    setStepUpError('');
+                    try {
+                      await acct('/mfa/bootstrap/code', { password });
+                      setCodeSent(true);
+                    } catch (e) {
+                      setStepUpError((e as ApiError).message || t('errorGeneric'));
+                    }
+                  }}
+                >
+                  {codeSent ? ts('bootstrapResend') : ts('bootstrapSend')}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-3">
             <Button
               type="button"
@@ -237,7 +386,17 @@ export function PasskeysPanel({ mfaEnabled }: { mfaEnabled: boolean }) {
             >
               {tc('cancel')}
             </Button>
-            <Button type="submit" className="min-h-11 flex-1" disabled={busy || !password}>
+            <Button
+              type="submit"
+              className="min-h-11 flex-1"
+              disabled={
+                busy ||
+                !password ||
+                (!mfaEnabled &&
+                  (items?.length ?? 0) === 0 &&
+                  (emailCode.trim().length !== 6 || (isAdmin && !enrolToken.trim())))
+              }
+            >
               {t('stepUpConfirm')}
             </Button>
           </div>

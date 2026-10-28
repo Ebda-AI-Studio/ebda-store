@@ -5,7 +5,7 @@ import { canBuyNow } from '@/lib/can-buy-now';
 import type React from 'react';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useEffect, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';

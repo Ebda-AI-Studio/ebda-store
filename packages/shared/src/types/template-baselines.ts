@@ -11,13 +11,14 @@ import type {
 } from './store-layout';
 import { DEFAULT_LAYOUT_SETTINGS } from './store-layout';
 import type { TemplateId } from './store-theme';
+import { mapRetiredTemplate } from '../templates/legacy-skin-map';
 
 /**
  * The shared structural baseline — demo-shop's real (already-tokenized) layout
  * with CONTENT stripped (hero images, marketing copy) and content-gating flags
  * reset to the safe new-store defaults (testimonials/reviews OFF — KW Law
- * 39/2014 fake-reviews posture). This IS the `elegant` baseline; the other four
- * templates derive from it via `buildTemplateBaseline` (see below).
+ * 39/2014 fake-reviews posture). The Ebda templates derive from it via
+ * `buildTemplateBaseline` (see below).
  *
  * Every color is a `token:*` ref so the Phase-1 brand engine paints it.
  */
@@ -189,75 +190,25 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
   return b;
 }
 
-/** Per-template identities. elegant = the calibrated base (no delta). */
-export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar' | 'souq' | 'jasmine' | 'lamma'>,
-  TemplateIdentity
-> = {
-  // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
-  modern: {
-    productCardSize: 'sm',
-    categoryCardSize: 'xs',
-    frameWidth: 'normal',
-    frameSize: 'normal',
-    cardGap: 'normal',
-    desktopColumns: 4,
-    mobileColumns: 2,
-    cardShape: 'rounded-square',
-    productAspect: 'square',
-    productImageAspect: '1:1',
-    categoryShape: 'rounded-square',
-    categoryCaption: 'below',
-    categoryShowFrame: true,
-  },
-  // Classic — heritage/boutique: CIRCLE category bubbles, caption below, no frame.
-  classic: {
-    productCardSize: 'md',
-    categoryCardSize: 'sm',
-    frameWidth: 'thin',
-    frameSize: 'comfortable',
-    cardGap: 'normal',
-    desktopColumns: 3,
-    mobileColumns: 3,
-    cardShape: 'soft',
-    productAspect: 'portrait',
-    productImageAspect: '3:4',
-    categoryShape: 'circle',
-    categoryCaption: 'below',
-    categoryShowFrame: false,
-  },
-  // Minimal — stark catalog: bare SQUARE tiles, no frame, caption below.
-  minimal: {
-    productCardSize: 'sm',
-    categoryCardSize: 'xs',
-    frameWidth: 'thin',
-    frameSize: 'spacious',
-    cardGap: 'loose',
-    desktopColumns: 4,
-    mobileColumns: 3,
-    cardShape: 'square',
-    productAspect: 'square',
-    productImageAspect: '1:1',
-    categoryShape: 'square',
-    categoryCaption: 'below',
-    categoryShowFrame: false,
-  },
-  // Bold — editorial poster: large 2-up tiles, caption OVERLAY on the image.
-  bold: {
-    productCardSize: 'lg',
-    categoryCardSize: 'lg',
-    frameWidth: 'thick',
-    frameSize: 'compact',
-    cardGap: 'tight',
-    desktopColumns: 2,
-    mobileColumns: 2,
-    cardShape: 'rounded-square',
-    productAspect: 'square',
-    productImageAspect: '1:1',
-    categoryShape: 'rounded-square',
-    categoryCaption: 'overlay',
-    categoryShowFrame: false,
-  },
+/**
+ * The identity every Ebda template builds its layout baseline from (stark catalog: bare SQUARE
+ * tiles, no frame, caption below). It was one entry of a five-skin table; the other
+ * four identities went with the skins (Ruling SKIN-DEL-1).
+ */
+export const BASE_IDENTITY: TemplateIdentity = {
+  productCardSize: 'sm',
+  categoryCardSize: 'xs',
+  frameWidth: 'thin',
+  frameSize: 'spacious',
+  cardGap: 'loose',
+  desktopColumns: 4,
+  mobileColumns: 3,
+  cardShape: 'square',
+  productAspect: 'square',
+  productImageAspect: '1:1',
+  categoryShape: 'square',
+  categoryCaption: 'below',
+  categoryShowFrame: false,
 };
 
 /**
@@ -308,7 +259,7 @@ export function buildDahabBaseline(): StoreLayoutSettings {
 }
 
 function buildQamarBaseline(): StoreLayoutSettings {
-  const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);
+  const b = buildTemplateBaseline(BASE_IDENTITY);
   b.footer = {};
   b.productCardDefaults = { ...b.productCardDefaults, showCardFrame: false };
   return b;
@@ -320,7 +271,7 @@ function buildQamarBaseline(): StoreLayoutSettings {
  * souq's Night primary (brass). Cards keep their frame (a catalogue card is a framed tile).
  */
 function buildSouqBaseline(): StoreLayoutSettings {
-  const b = buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal);
+  const b = buildTemplateBaseline(BASE_IDENTITY);
   b.footer = {};
   // Ruling B2-22: a Souq look owns its section bands (Night's inverse band, the others sit on the
   // page). The branded base paints whole sections in `token:primary` with `token:card` headings,
@@ -345,11 +296,6 @@ function buildSouqBaseline(): StoreLayoutSettings {
 
 /** The packaged per-template baselines. Stores with empty layout inherit by template. */
 export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> = {
-  elegant: BASE_BRANDED_LAYOUT,
-  modern: buildTemplateBaseline(TEMPLATE_IDENTITIES.modern),
-  classic: buildTemplateBaseline(TEMPLATE_IDENTITIES.classic),
-  minimal: buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal),
-  bold: buildTemplateBaseline(TEMPLATE_IDENTITIES.bold),
   dahab: buildDahabBaseline(),
   // The look owns the card ratio on a look store (LOOKS-15); minimal is the fallback.
   // Footer: the section-alt surface, not `token:primary`. The shared minimal footer paints
@@ -367,5 +313,6 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */
 export function getTemplateBaseline(templateId: TemplateId): StoreLayoutSettings {
-  return TEMPLATE_LAYOUT_BASELINES[templateId] ?? DEFAULT_LAYOUT_SETTINGS;
+  const key = mapRetiredTemplate(templateId) as TemplateId;
+  return TEMPLATE_LAYOUT_BASELINES[key] ?? DEFAULT_LAYOUT_SETTINGS;
 }

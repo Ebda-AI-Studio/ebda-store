@@ -21,13 +21,13 @@ interface SearchResult {
  * with everyday synonyms; a result opens the page at the exact control (?setting=). Role- and
  * feature-gated exactly like the sidebar and the ⌘K palette.
  */
-export function SettingsSearch() {
+export function SettingsSearch({ storeId: storeIdProp }: { storeId?: string } = {}) {
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const isRtl = locale === 'ar';
   const t = useT('settings.settingsSearch');
   const router = useRouter();
   const params = useParams<{ id?: string }>();
-  const storeId = typeof params?.id === 'string' ? params.id : '';
+  const storeId = storeIdProp ?? (typeof params?.id === 'string' ? params.id : '');
   const { user } = useAuth();
   const { isEnabled, isLoading: featuresLoading } = useFeatures();
 

@@ -20,7 +20,7 @@ vi.mock('../../contexts/StoreContext', () => ({
     layout: layoutState.layout,
   }),
   useStoreUrl: () => (p: string) => p,
-  useStoreTemplate: () => 'modern',
+  useStoreTemplate: () => 'qamar',
 }));
 vi.mock('../../contexts/LanguageContext', () => ({
   useLanguage: () => ({
@@ -175,16 +175,4 @@ describe('X-01 (fix round): a MERCHANT-placed sale chip and the sold-out marker 
       );
     }
   );
-
-  it('classic card: merchant chip at the START corner → the ribbon takes the end corner', async () => {
-    languageState.language = 'en';
-    layoutState.layout = { productCardDefaults: { discountBadge: { position: 'top-left' } } };
-    const { default: ClassicProductCard } = await import('../classic/ProductCard');
-    const { container } = render(
-      <ClassicProductCard product={OOS_ON_SALE as never} isRtl={false} />
-    );
-    expect(container.querySelector('[data-oos-corner]')?.getAttribute('data-oos-corner')).toBe(
-      'top-end'
-    );
-  });
 });

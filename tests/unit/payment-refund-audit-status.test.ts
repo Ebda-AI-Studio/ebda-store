@@ -5,18 +5,27 @@
  * compare the slice against the ORIGINAL amount, so the final slice of a
  * piecewise refund was audited as partially_refunded on a refunded payment.
  */
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
 const h = vi.hoisted(() => ({
   paymentFindFirst: vi.fn(),
+  paymentFindUnique: vi.fn(),
+  auditLog: vi.fn(),
+  sendAlert: vi.fn(),
   refund: vi.fn(),
   recordPaymentEvent: vi.fn(),
+  resolve: vi.fn(),
 }));
 
 vi.mock('@ebda/database', () => ({
-  prisma: { payment: { findFirst: (...a: unknown[]) => h.paymentFindFirst(...a) } },
+  prisma: {
+    payment: {
+      findFirst: (...a: unknown[]) => h.paymentFindFirst(...a),
+      findUnique: (...a: unknown[]) => h.paymentFindUnique(...a),
+    },
+  },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   withStore: (_s: string, fn: () => unknown) => fn(),
 }));
@@ -25,7 +34,7 @@ vi.mock('@api/lib/definer', () => ({
   getOrderStoreId: vi.fn(),
   getPaymentStoreId: vi.fn(),
   resolvePaymentEventsStore: vi.fn(),
-  resolveStoreFromWebhookRef: vi.fn().mockResolvedValue('s1'),
+  resolveStoreFromWebhookRef: (...a: unknown[]) => h.resolve(...a),
 }));
 vi.mock('@api/middleware/auth', () => ({
   rejectImpersonated: (_req: any, _res: any, next: any) => next(),
@@ -42,7 +51,10 @@ vi.mock('@api/middleware/security', () => ({
   paymentLimiter: (_req: any, _res: any, next: any) => next(),
   uploadLimiter: (_req: any, _res: any, next: any) => next(),
   dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
-  auditLog: vi.fn().mockResolvedValue(undefined),
+  auditLog: (...a: unknown[]) => h.auditLog(...a),
+}));
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: (...a: unknown[]) => h.sendAlert(...a),
 }));
 vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
@@ -67,6 +79,12 @@ beforeAll(async () => {
   app.use(errorHandler);
 });
 afterEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  h.auditLog.mockResolvedValue(undefined);
+  h.sendAlert.mockResolvedValue(undefined);
+  h.recordPaymentEvent.mockResolvedValue(undefined);
+  h.resolve.mockResolvedValue('s1');
+});
 
 function paymentRow(refundedAmount: number) {
   return {
@@ -84,6 +102,7 @@ describe('POST /payments/refund — audit toStatus', () => {
   it('audits the final slice of a piecewise refund as refunded', async () => {
     h.paymentFindFirst.mockResolvedValue(paymentRow(2000));
     h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_2', amount: 3000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'refunded' });
 
     const res = await request(app)
       .post('/api/v1/payments/refund')
@@ -98,6 +117,7 @@ describe('POST /payments/refund — audit toStatus', () => {
   it('audits a first partial slice as partially_refunded (control)', async () => {
     h.paymentFindFirst.mockResolvedValue(paymentRow(0));
     h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
 
     await request(app)
       .post('/api/v1/payments/refund')
@@ -106,5 +126,70 @@ describe('POST /payments/refund — audit toStatus', () => {
     expect(h.recordPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({ toStatus: 'partially_refunded' })
     );
+  });
+
+  it('a failing audit write AFTER the money moved still answers 200 and raises a P1 alert (M-128)', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
+    h.auditLog.mockRejectedValue(new Error('audit db down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.refund.refundId).toBe('rf_1');
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'payment.refund.audit_failed' })
+    );
+  });
+
+  it('a failing REFUND still surfaces as an error and writes no audit row', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockRejectedValue(new Error('provider down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(h.auditLog).not.toHaveBeenCalled();
+    expect(h.recordPaymentEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('payment lookups by provider reference stay inside the named provider (Ruling ITEST-14)', () => {
+  it('refund: the optional provider reaches the store resolver', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000, provider: 'kashier' });
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_1', provider: 'kashier' });
+  });
+
+  it('refund: without a provider the lookup is unchanged', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_1', provider: undefined });
+  });
+
+  it('refund: an unknown provider name is refused before any lookup', async () => {
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000, provider: 'tap' });
+    expect(res.status).toBe(400);
+    expect(h.resolve).not.toHaveBeenCalled();
+  });
+
+  it('status: the ?provider= query narrows the store lookup', async () => {
+    h.resolve.mockResolvedValue(null); // 404 right after the lookup; only the call matters here
+    const res = await request(app).get('/api/v1/payments/status/txn_9?provider=fawry');
+    expect(res.status).toBe(404);
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_9', provider: 'fawry' });
   });
 });

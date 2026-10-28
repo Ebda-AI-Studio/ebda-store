@@ -49,6 +49,7 @@ const PAYMENT_PROVIDER: Record<string, LabelPair> = {
   paymob: ['Paymob', 'باي موب'],
   kashier: ['Kashier', 'كاشير'],
   fawry: ['Fawry', 'فوري'],
+  geidea: ['Geidea', 'جيديا'],
 };
 
 const PAYMENT_METHOD: Record<string, LabelPair> = {

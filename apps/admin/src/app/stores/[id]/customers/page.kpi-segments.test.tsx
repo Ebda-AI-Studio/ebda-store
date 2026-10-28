@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   unwrapList: (d: unknown) => (Array.isArray(d) ? d : []),
 }));
 const nav = vi.hoisted(() => ({ query: '', replace: vi.fn() }));
+const auth = vi.hoisted(() => ({ role: 'store_admin' }));
 
 vi.mock('next-intl', () => {
   const t = Object.assign((key: string) => key, { has: () => true });
@@ -34,9 +35,17 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('../../../../components/AdminLayout', () => ({
-  AdminLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AdminLayout: ({ children, actions }: { children: ReactNode; actions?: ReactNode }) => (
+    <div>
+      {actions}
+      {children}
+    </div>
+  ),
 }));
 vi.mock('../../../../lib/api', () => api);
+vi.mock('../../../../lib/auth', () => ({
+  useAuth: () => ({ user: { id: 'u', role: auth.role } }),
+}));
 
 import { ToastProvider } from '@ebda/ui';
 import CustomersPage from './page';
@@ -101,6 +110,7 @@ function renderPage() {
 
 beforeEach(() => {
   nav.query = '';
+  auth.role = 'store_admin';
   mockApi(() => listResponse());
 });
 afterEach(() => {
@@ -210,7 +220,7 @@ describe('Customers page table + filters', () => {
 
   it('uses the shared debounced SearchInput and sends search server-side', async () => {
     renderPage();
-    const input = await screen.findByRole('textbox', { name: 'searchPlaceholder' });
+    const input = await screen.findByRole('searchbox', { name: 'searchPlaceholder' });
     fireEvent.change(input, { target: { value: 'ahm' } });
     await waitFor(
       () =>
@@ -287,7 +297,7 @@ describe('Customers page — segment filter integrity (#2222, #2234)', () => {
       return Promise.resolve(listResponse());
     });
     renderPage();
-    const input = await screen.findByRole('textbox', { name: 'searchPlaceholder' });
+    const input = await screen.findByRole('searchbox', { name: 'searchPlaceholder' });
     fireEvent.change(input, { target: { value: 'ahm' } });
     await screen.findByText('Ahmed S', {}, { timeout: 2000 });
     await act(async () => {
@@ -322,5 +332,19 @@ describe('Customers page — erasure review banner (#2229)', () => {
     renderPage();
     await screen.findByText('Ahmed S');
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('Customers page — export is an owner action (SEC-14)', () => {
+  it('shows the Excel export to the owner', async () => {
+    renderPage();
+    await screen.findByTestId('customers-kpi-strip');
+    expect(screen.queryAllByRole('button').map(b => b.textContent)).toContain('exportXlsx');
+  });
+  it('hides it from staff (the API answers 403 to them)', async () => {
+    auth.role = 'staff';
+    renderPage();
+    await screen.findByTestId('customers-kpi-strip');
+    expect(screen.queryAllByRole('button').map(b => b.textContent)).not.toContain('exportXlsx');
   });
 });

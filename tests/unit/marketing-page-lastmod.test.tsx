@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import lastmod from '../../apps/marketing/src/lib/page-lastmod.json';
 import sitemap from '../../apps/marketing/src/app/sitemap';
 import { DATED_PAGES, pageHash } from '../../apps/marketing/src/lib/page-markup';
-import { LEGAL_SLUGS, SITE_PAGES } from '../../apps/marketing/src/lib/site';
+import { LEGAL_EXTRA_SLUGS, LEGAL_SLUGS, SITE_PAGES } from '../../apps/marketing/src/lib/site';
 
 /**
  * Sitemap <lastmod> is real: each dated page's recorded date belongs to a hash of its rendered markup (both
@@ -12,9 +12,9 @@ const REG = lastmod as Record<string, { hash: string; date: string }>;
 
 describe('sitemap lastmod is tied to the rendered page', () => {
   it('every non-legal sitemap page is dated, and nothing else is', () => {
-    const want = SITE_PAGES.filter(p => !(LEGAL_SLUGS as readonly string[]).includes(p)).map(
-      p => p || 'home'
-    );
+    const want = SITE_PAGES.filter(
+      p => !([...LEGAL_SLUGS, ...LEGAL_EXTRA_SLUGS] as readonly string[]).includes(p)
+    ).map(p => p || 'home');
     expect(Object.keys(REG).sort()).toEqual([...want].sort());
     expect(DATED_PAGES.map(p => p || 'home').sort()).toEqual([...want].sort());
   });

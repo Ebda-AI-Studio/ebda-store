@@ -126,11 +126,11 @@ async function main() {
       `API_URL=${base}`,
       'BUILD_COMMIT_SHA=smoke',
       'JWT_SECRET=smoke-only-jwt-secret-0123456789abcdef',
+      'SUITE_BUYER_KEY_SECRET=smoke-only-suite-buyer-key-secret-0123456789',
       `ENCRYPTION_KEY=${'0'.repeat(64)}`,
       'TAP_API_KEY=k',
       'TAP_SECRET_KEY=s',
       'TAP_WEBHOOK_SECRET=smoke-only-tap-webhook-secret',
-      'INNGEST_EVENT_KEY=smoke',
       // No AI binding in the smoke (stripAiBinding): say so explicitly, so a `true` set in the
       // config's vars cannot fail the boot check here for a reason production does not have.
       'SEARCH_SEMANTIC_ENABLED=false',

@@ -132,7 +132,7 @@ describe('fontUrlProblem', () => {
   });
 });
 
-const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const BASE = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const pageApp = () => {
   const a = express();
   a.use(express.json());
@@ -153,7 +153,7 @@ describe('the page document refuses a foreign font, on save, publish and rollbac
     vi.clearAllMocks();
     m.store.findUnique.mockResolvedValue({
       layoutSettings: {},
-      template: 'modern',
+      template: 'qamar',
       slug: 's',
       domain: null,
       theme: {},

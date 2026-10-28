@@ -11,8 +11,10 @@ export interface JobEvent {
 }
 
 export interface JobStep {
+  /** Set by the Workflow step only: code outside `run` has no database connection there. */
+  cfWorkflow?: true;
   /** One durable, retried unit. Its result is JSON (Dates become strings), as on Inngest. */
-  run<T>(id: string, fn: () => Promise<T> | T): Promise<T>;
+  run<T>(id: string, fn: () => T): Promise<Awaited<T>>;
   /** `'30s'`, `'5m'`, `'2h'`, `'1d'` or milliseconds. */
   sleep(id: string, duration: string | number): Promise<void>;
   sleepUntil(id: string, until: Date | string | number): Promise<void>;
@@ -32,7 +34,8 @@ export type JobHandler = (ctx: JobCtx) => Promise<unknown>;
 
 export interface JobFailureCtx {
   /** `inngest/function.failed`-shaped: `event.data.event` is the original trigger. */
-  event: { name: string; data: Record<string, unknown> };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  event: { name: string; data: any };
   error: Error;
 }
 

@@ -1,4 +1,4 @@
-import { z, type ZodRawShape } from 'zod';
+import { z, type ZodRawShape } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpStore } from '../resolve-store';
 import { OrderService } from '../../services/order.service';

@@ -1,0 +1,9 @@
+{
+  "allow": {
+    "VITEST": "test-runner marker read by rate-limit skip guards; never set in any deployed environment",
+    "EBDA_CHROMIUM": "local-only override path to a Chromium binary for the site-kit gates; never set in a deployed environment",
+    "PLAYWRIGHT_BROWSERS_PATH": "tooling path for the site-kit chromium gate; local/CI only, not an app setting",
+    "CF_PAGES": "platform-injected Cloudflare Pages/OpenNext marker (read-only), not configured by us",
+    "OPEN_NEXT_CLOUDFLARE": "set by the OpenNext Cloudflare build itself (read-only), not configured by us"
+  }
+}

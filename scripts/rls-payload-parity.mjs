@@ -134,7 +134,7 @@ async function seedFixtures(db) {
         status: 'active',
         plan: 'enterprise',
         currency: 'EGP',
-        template: 'modern',
+        template: 'qamar',
         theme: { primaryColor: '36 36% 52%', showBranchesInFooter: true },
         marketingPixels: {},
         blogEnabled: true,
@@ -360,7 +360,6 @@ function startApi(label, port, databaseUrl) {
     // Migrations are never run by this harness; DIRECT_URL only needs to parse.
     DIRECT_URL: OWNER_URL,
     NODE_ENV: 'test',
-    INNGEST_DRY_RUN: 'true',
     ALLOW_BYPASSRLS_ROLE: 'true',
     LOAD_TEST_BYPASS_TOKEN: LOAD_TEST_TOKEN,
     // Each server gets its own Redis namespace. Sharing one would let the

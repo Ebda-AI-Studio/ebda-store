@@ -29,11 +29,7 @@ vi.mock('../../hooks/useNumerals', () => ({
 }));
 
 const themes = {
-  modern: (await import('../modern/CartTable')).default,
-  classic: (await import('../classic/CartTable')).default,
-  elegant: (await import('../elegant/CartTable')).default,
-  minimal: (await import('../minimal/CartTable')).default,
-  bold: (await import('../bold/CartTable')).default,
+  base: (await import('../base/CartTable')).default,
 };
 
 const line = (extra: Partial<CartTableItem> = {}): CartTableItem => ({

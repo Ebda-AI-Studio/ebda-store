@@ -5,7 +5,7 @@ import { Fragment, useState, useEffect, useRef, useCallback, type ReactNode } fr
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { Button, Badge, useToast } from '@ebda/ui';

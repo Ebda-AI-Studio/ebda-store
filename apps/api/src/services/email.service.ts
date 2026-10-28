@@ -7,7 +7,7 @@ import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { storeBrandTheme } from '../lib/store-brand-theme';
-import { ResendService } from './resend.service';
+import { StoreMailer } from './store-mailer.service';
 import { sendMail } from './mail-transport';
 // Static import is safe despite the email-queue↔email-service cycle: both sides
 // use the other only at call-time (sendForStore / the queue's drain), never at
@@ -354,7 +354,7 @@ export class EmailService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Load store, wrap content in renderBrandedShell, ship via ResendService.
+   * Load store, wrap content in renderBrandedShell, ship via StoreMailer.
    * Used by all customer-facing send* methods.
    */
   private static async sendForStore(
@@ -421,7 +421,7 @@ export class EmailService {
       });
       return;
     }
-    await ResendService.sendBrandedEmail(storeId, {
+    await StoreMailer.sendBrandedEmail(storeId, {
       to: args.to,
       subject: args.subject,
       html,
@@ -485,10 +485,10 @@ export class EmailService {
 
   /**
    * Replay a queued email that already has a storeId — ships via
-   * ResendService so the store's verified sender is used.
+   * StoreMailer so the store's verified sender is used.
    */
   static async sendRaw(storeId: string, options: EmailOptions): Promise<void> {
-    await ResendService.sendBrandedEmail(storeId, {
+    await StoreMailer.sendBrandedEmail(storeId, {
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -998,7 +998,7 @@ export class EmailService {
     // the queue drainer, where a transient failure retries 3x instead of
     // vanishing. Before this, the whole chain was fired-and-forgotten past
     // the response and died on a committed transaction (P2028) at
-    // `resend.service.ts` — every return confirmation silently unsent.
+    // `store-mailer.service.ts` — every return confirmation silently unsent.
     await this.sendForStore(
       storeId,
       { to: data.email, subject, content, language: lang },

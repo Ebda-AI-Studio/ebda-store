@@ -268,7 +268,7 @@ describe('resolveCardBadges — rule 3: same corner, custom badge wins', () => {
   });
 
   it('never suppresses the discount badge on a surface with no corners', () => {
-    // `minimal` renders its discount as inline text under the price, and the
+    // the base card renders its discount as inline text under the price, and the
     // PDP renders both as inline <Badge>s in a flex row. Neither can collide,
     // so the corner arm must not fire and steal the discount indicator.
     const r = resolveCardBadges({

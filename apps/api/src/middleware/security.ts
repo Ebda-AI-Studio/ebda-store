@@ -9,6 +9,7 @@ import rateLimit, {
 import { RedisStore } from 'rate-limit-redis';
 import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
@@ -134,9 +135,18 @@ export async function generateCsrfToken(
  * never reach this code (they return early — a header the browser never
  * attaches by itself cannot be ridden).
  */
-function csrfPrincipal(req: Request): string {
+async function csrfPrincipal(req: Request): Promise<string> {
   const cookieToken = req.cookies?.token as string | undefined;
   if (!cookieToken) return ANONYMOUS_CSRF_PRINCIPAL;
+
+  // Identity-service (ES256) cookie: same rule, signature verified, expiry ignored.
+  if (isAccountsToken(cookieToken)) {
+    try {
+      return (await verifyAccountsToken(cookieToken, { ignoreExpiration: true })).sub;
+    } catch {
+      return ANONYMOUS_CSRF_PRINCIPAL;
+    }
+  }
 
   try {
     const payload = jwt.verify(cookieToken, config.jwtSecret, {
@@ -676,7 +686,8 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // Always verify the CSRF token for state-changing requests (POST/PUT/PATCH/DELETE).
   // Previously this check was only applied when an Authorization header was present,
   // which left unauthenticated state-changing endpoints unprotected.
-  verifyCsrfToken(sessionId, csrfToken, csrfPrincipal(req))
+  csrfPrincipal(req)
+    .then(principal => verifyCsrfToken(sessionId, csrfToken, principal))
     .then(valid => {
       if (!valid) {
         res.status(403).json({
@@ -1071,50 +1082,6 @@ export function createResetEmailLimiter(opts?: {
 }
 
 export const resetEmailLimiter = createResetEmailLimiter();
-
-/**
- * Dedicated bucket for `POST /api/v1/inngest` (issue 2063).
- *
- * Signed Inngest step callbacks skip the global 200/15min mutation cap
- * (Bypass 4 in global-rate-limit-skip.ts) because Inngest Cloud's small IP
- * pool legitimately exceeds it. But the bypass keys on a header NAME, so
- * without this an unsigned caller sending `x-inngest-signature: x` was
- * unbounded — each request a full 10 MB JSON parse plus an HMAC before the
- * SDK's 401. Only a CALLER-fault answer (4xx other than 429) is counted:
- * forged traffic (401) and malformed traffic (400/405/413) are capped at 300
- * per 15 minutes per IP, while signed traffic never spends the budget.
- *
- * Issue 2314: this used to count every answer ≥400. During an incident (Redis
- * down, Neon failover, a bad deploy) a failing step answers 5xx so Inngest
- * retries — and Inngest Cloud delivers EVERY function from a small shared IP
- * pool, so 300 real failures in 15 minutes made the limiter refuse healthy
- * signed callbacks (refund reversals, status fanout, the stuck sweeps that
- * would recover them) for the rest of the window. Its own 429 was counted
- * too, so the bucket stayed saturated. A 5xx is our failure, not the
- * caller's, and a 429 is the limiter's own answer: neither is counted now.
- * Mounted in index.ts BEFORE the body parser, so a capped caller is refused
- * before its body is read.
- */
-export function inngestRequestWasSuccessful(statusCode: number): boolean {
-  return !(statusCode >= 400 && statusCode < 500 && statusCode !== 429);
-}
-
-export const inngestLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'inngest'),
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  skipSuccessfulRequests: true,
-  requestWasSuccessful: (_req, res) => inngestRequestWasSuccessful(res.statusCode),
-  message: {
-    success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  passOnStoreError: true,
-  skip: skipForLoadTestOrTests,
-  keyGenerator: req => `inngest-${ipKeyGenerator(req.ip ?? '')}`,
-});
 
 /**
  * Address-wide ceiling on account emails to ONE inbox (issue 2228), stacked in
@@ -1684,6 +1651,41 @@ export const newsletterLimiter = rateLimit({
     const sessionId = req.headers['x-session-id'] as string;
     return `${sessionId || 'anon'}:${ipKeyGenerator(req.ip ?? '') || 'noip'}`;
   },
+});
+
+// WhatsApp marketing-consent: per-CALLER ceiling (the signed-in customer), applied to grants AND
+// revocations so one customer cannot spam, but keyed on the user so nobody else's traffic can exhaust it.
+export const whatsappConsentUserLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-user'),
+  windowMs: 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => `u:${req.user?.userId ?? 'anon'}`,
+});
+
+// WhatsApp marketing-consent GRANTS: a per-STORE ceiling, keyed on the RESOLVED store id (set by the
+// opt-in chain before this runs), never on a raw client header.
+export const whatsappConsentStoreLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-store'),
+  windowMs: 60 * 1000,
+  max: Number(process.env.WA_CONSENT_STORE_RATE_LIMIT_PER_MIN) || 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: (req, res) =>
+    `s:${(res.locals.waStoreId as string | undefined) ?? ipKeyGenerator(req.ip ?? '')}`,
 });
 
 // Coupon validate limiter — public brute-force discovery protection.

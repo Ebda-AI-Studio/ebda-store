@@ -77,6 +77,17 @@ export function buildBundleTestApp(): Express {
  * starts from an empty cart and reports the REAL failure twice, rather
  * than the real failure once and an accumulation artefact after it.
  */
+/**
+ * A client IP no other test shares, for the `X-Forwarded-For` of requests to the LIVE API (one trusted hop,
+ * app.ts). The API budgets writes per IP (`writeLimiter`, Redis) and every file in the tier calls from the same
+ * runner address, so a test that places orders can be answered 429 by what other files already spent
+ * (order-personalisation-http, run 40234150651). Per-call IP isolates the limiter key; the limit stays as is.
+ */
+export function uniqueClientIp(): string {
+  const b = () => Math.floor(Math.random() * 254) + 1;
+  return `10.${b()}.${b()}.${b()}`;
+}
+
 let cartSessionSeq = 0;
 export function cartSessionId(label: string): string {
   return `session-${label}-${Date.now().toString(36)}-${process.pid}-${++cartSessionSeq}`;
@@ -112,7 +123,7 @@ export async function seedBundleStore(suffix: string): Promise<FixtureStore> {
       data: {
         name: `bundle-fixture-store-${suffix}`,
         slug: `bundle-fixture-${suffix}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
@@ -151,7 +162,7 @@ export async function seedStoreWithoutBundlesFeature(suffix: string): Promise<Fi
       data: {
         name: `bundle-fixture-nofeature-store-${suffix}`,
         slug: `bundle-fixture-nofeature-${suffix}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

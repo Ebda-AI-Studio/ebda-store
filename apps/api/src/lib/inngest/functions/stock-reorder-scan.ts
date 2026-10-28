@@ -1,5 +1,6 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
@@ -21,7 +22,7 @@ import { REGION } from '@ebda/shared';
  * Each per-store scan is wrapped in step.run() so Inngest retries only the
  * failing store without re-running healthy ones.
  */
-export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
+export const stockReorderScanCron: JobDef = inngest.createFunction(
   {
     id: 'stock-reorder-scan-cron',
     name: 'Reorder scan — daily cron (AI)',
@@ -29,7 +30,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * *` }], // 06:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     // runReorderScan already calls withRlsBypass internally for its per-store reads.
     const stores = await step.run('list-stores', () =>
@@ -40,7 +41,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
           s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
           isAiEligiblePlan(s.plan as StorePlan)
-      ).then(list => list.map(s => ({ id: s.id })))
+      ).then(list => list.filter(storeFilter(event)).map(s => ({ id: s.id })))
     );
 
     let totalSuggested = 0;
@@ -83,7 +84,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
  * Fired by the admin "Re-scan now" button (super_admin only).
  * Event: `stock/reorder-scan-requested` with data: { storeId, requestedBy? }
  */
-export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunction(
+export const stockReorderScanOnDemand: JobDef = inngest.createFunction(
   {
     id: 'stock-reorder-scan-on-demand',
     name: 'Reorder scan — on-demand (AI)',
@@ -97,17 +98,20 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // Feature gate — inventory.basic (see the cron handler above for why this
     // is not inventory.purchase_orders).
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
+    // One step for both gates: on a Workflow only step bodies hold a database connection.
+    const { enabled, store } = await step.run('gates', async () => ({
+      enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
+      store: await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    }));
     if (!enabled) {
       logger.info({ storeId }, 'stock-reorder-scan-on-demand: inventory.basic disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
     }
 
-    // Plan gate — inventory.basic is in the `free` baseline so a lapsed
-    // merchant can still see their stock; it must not buy them AI spend.
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    // Plan gate: inventory.basic is in the `free` baseline so a lapsed merchant can still see their
+    // stock; it must not buy them AI spend.
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

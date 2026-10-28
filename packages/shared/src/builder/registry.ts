@@ -17,7 +17,7 @@
  * renderers), so every entry maps onto a legacy layout key (`legacyKey`).
  * Adding a section type is a registry entry, not three hand-kept key lists.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { storeLayoutSchema } from './layout-schema';
 import {
   imageTextSchema,
@@ -264,11 +264,10 @@ const DAHAB_FIXED_CARD: Record<string, ShownFor> = Object.fromEntries(
 const DAHAB_NO_KICKER: Record<string, ShownFor> = Object.fromEntries(
   ['kicker', 'showKickerLines', 'showSubtitleLines'].map(id => [id, NOT_DAHAB])
 );
-/** Category cards honour Aspect / Name / Hover in the scrolling row, and Modern's own grid card does. */
+/** Category cards honour Aspect / Name / Hover in the scrolling row. */
 const CATEGORY_CARD_LOOK: ShownFor = [
   // the scrolling row of every skin but Dahab (its tiles are the look's own)
   { ...NOT_DAHAB, variants: { layout: ['horizontal'] } },
-  { templates: ['modern'] },
 ];
 const NO_WIDTH = ['maxWidth'] as const;
 const NO_HERO_SPACING = ['paddingTop', 'paddingBottom', 'maxWidth'] as const;
@@ -443,7 +442,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt(3, '3', '3'),
       ]),
       // The grid and the aisle tiles ignore these on every skin built since the looks (their
-      // cards are their own); the scrolling row, and Modern's grid card, read them.
+      // cards are their own); the scrolling row reads them.
       ...narrowed(cardSettings(), {
         ...DAHAB_FIXED_CARD,
         cardAspect: CATEGORY_CARD_LOOK,

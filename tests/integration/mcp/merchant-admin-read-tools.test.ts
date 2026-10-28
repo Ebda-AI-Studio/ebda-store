@@ -72,7 +72,7 @@ async function seedStore(tag: string, withFeature: boolean): Promise<Fixture> {
       data: {
         name: `mcp-read ${suffix}`,
         slug: `mcp-read-${suffix}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

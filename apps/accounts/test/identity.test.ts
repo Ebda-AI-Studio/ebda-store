@@ -1,13 +1,35 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 import { decodeProtectedHeader, decodeJwt, SignJWT, generateKeyPair } from 'jose';
-import { call, cookieOf, fakes, login, seedUser, verifyAsProduct } from './helpers';
+import { call, emailCodeFor, cookieOf, fakes, login, seedUser, verifyAsProduct } from './helpers';
 import { totpAt } from '../src/totp';
 
 beforeEach(() => {
   fakes.stores = [];
   fakes.mails.length = 0;
   fakes.directoryDown = false;
+});
+
+describe('404', () => {
+  it('a browser on a wrong URL gets the studio 404 page: real 404, noindex, search box, links', async () => {
+    const r = await call('/no-such-page', {
+      headers: { accept: 'text/html', 'accept-language': 'en' },
+    });
+    expect(r.status).toBe(404);
+    expect(r.headers.get('content-type')).toContain('text/html');
+    expect(r.headers.get('x-robots-tag')).toContain('noindex');
+    const page = await r.text();
+    expect(page.includes('The page you&#39;re looking for can&#39;t be found.')).toBe(true);
+    expect(page.includes('role="search"')).toBe(true);
+    expect(page.includes('href="https://ebda.app/"')).toBe(true);
+  });
+
+  it('an API caller keeps the JSON 404', async () => {
+    const r = await call('/no-such-page');
+    expect(r.status).toBe(404);
+    expect(r.headers.get('content-type')).toContain('application/json');
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
+  });
 });
 
 describe('discovery', () => {
@@ -64,8 +86,14 @@ describe('login and the access token contract', () => {
 
   it('a super admin carries pa, an unknown audience is refused', async () => {
     const u = await seedUser({ role: 'super_admin' });
-    const { body } = await login(u);
-    expect((decodeJwt(body.access_token) as { pa?: string }).pa).toBe('super_admin');
+    const { body, cookie } = await login(u);
+    // password alone never carries pa (Ruling ID-15); a session created with a second factor does
+    expect((decodeJwt(body.access_token) as { pa?: string }).pa).toBeUndefined();
+    await env.DB.prepare(`UPDATE sessions SET amr = 'pwd,otp' WHERE user_id = ?1`).bind(u.id).run();
+    const minted = (await (await call('/token?aud=store', { cookie })).json()) as {
+      data: { access_token: string };
+    };
+    expect((decodeJwt(minted.data.access_token) as { pa?: string }).pa).toBe('super_admin');
     const bad = await call('/login', {
       json: { email: u.email, password: u.password, aud: 'evil' },
     });
@@ -362,7 +390,7 @@ describe('MFA (TOTP)', () => {
     ).toBe(400);
     const verify = (await (
       await call('/mfa/enroll/verify', {
-        json: { code: await totpAt(secret) },
+        json: { code: await totpAt(secret), emailCode: await emailCodeFor(u, s.body.access_token) },
         bearer: s.body.access_token,
       })
     ).json()) as { data: { backupCodes: string[] } };
@@ -375,7 +403,7 @@ describe('MFA (TOTP)', () => {
     await env.DB.prepare(`UPDATE users SET mfa_last_step = mfa_last_step - 5 WHERE id = ?1`)
       .bind(u.id)
       .run();
-    expect(row!.mfa_secret.startsWith('v1.')).toBe(true);
+    expect(row!.mfa_secret.startsWith('v3.')).toBe(true);
     expect(row!.mfa_secret).not.toContain(secret);
 
     const first = await call('/login', { json: { email: u.email, password: u.password } });
@@ -428,7 +456,7 @@ describe('MFA (TOTP)', () => {
       ).json()) as { data: { secret: string } }
     ).data.secret;
     await call('/mfa/enroll/verify', {
-      json: { code: await totpAt(secret) },
+      json: { code: await totpAt(secret), emailCode: await emailCodeFor(u, s.body.access_token) },
       bearer: s.body.access_token,
     });
     const ch = (

@@ -6,6 +6,7 @@
  * Egypt days. The JSON key is no longer written.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { RETIRED_TEMPLATES } from '@ebda/shared';
 
 const { storeCreate, taxRateCreate, subUpdate } = vi.hoisted(() => ({
   storeCreate: vi.fn(),
@@ -61,8 +62,8 @@ vi.mock('../../apps/api/src/services/email.service', () => ({
 vi.mock('../../apps/api/src/services/domain-provider', () => ({
   resolveDomainService: () => ({ providerName: 'x', addDomain: vi.fn(), removeDomain: vi.fn() }),
 }));
-vi.mock('../../apps/api/src/services/resend.service', () => ({
-  ResendService: { provisionStoreDomain: vi.fn() },
+vi.mock('../../apps/api/src/services/store-mailer.service', () => ({
+  StoreMailer: { provisionStoreDomain: vi.fn() },
 }));
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
@@ -139,7 +140,7 @@ describe('provisioning template (new stores start on a built Ebda skin)', () => 
 
   it('refuses a legacy Force skin', async () => {
     await expect(
-      ProvisioningService.provisionStore({ ...base, template: 'modern' })
+      ProvisioningService.provisionStore({ ...base, template: RETIRED_TEMPLATES[0] })
     ).rejects.toMatchObject({ code: 'TEMPLATE_NOT_AVAILABLE' });
     expect(storeCreate).not.toHaveBeenCalled();
   });

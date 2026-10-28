@@ -20,5 +20,7 @@ await runA11y({
     '/merchant-api/',
     '/api-reference/',
     '/search/',
+    '/no-such-page/',
+    '/ar/no-such-page/',
   ],
 });

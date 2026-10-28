@@ -17,7 +17,9 @@ vi.mock('@api/config', () => ({
 }));
 vi.mock('@ebda/database', () => ({ prisma: {}, withStore: vi.fn() }));
 vi.mock('@api/lib/logger', () => ({ default: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => ({ ResendService: { isConfigured: () => true } }));
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { isConfigured: () => true },
+}));
 vi.mock('@api/services/email-queue.service', () => ({ emailQueue: { enqueue: m.enqueue } }));
 vi.mock('@api/middleware/security', () => ({ publicLimiter: (_q: any, _r: any, n: any) => n() }));
 vi.mock('@api/services/lifecycle-emails.service', () => ({

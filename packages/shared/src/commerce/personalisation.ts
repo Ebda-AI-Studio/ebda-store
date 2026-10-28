@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /** Hard cap on a personalisation note, whatever the merchant's maxLength says. */
 export const PERSONALISATION_NOTE_MAX = 200;

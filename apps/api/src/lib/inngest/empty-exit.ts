@@ -16,6 +16,8 @@
  */
 export interface StepLike {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
+  /** Cloudflare Workflow step (lib/jobs/step-adapter.ts): the un-stepped probe has no database. */
+  cfWorkflow?: true;
 }
 
 export async function stepRunUnlessEmpty<T>(
@@ -23,6 +25,9 @@ export async function stepRunUnlessEmpty<T>(
   id: string,
   fn: () => Promise<T[]> | T[]
 ): Promise<T[]> {
+  // On a Workflow steps are not billed per execution and only step bodies have a database
+  // connection, so the probe would fail: always read inside the step.
+  if (step.cfWorkflow) return step.run(id, async () => fn());
   const probe = await fn();
   if (probe.length === 0) return probe;
   return step.run(id, async () => fn());

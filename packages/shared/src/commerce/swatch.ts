@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const swatchHexSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use #RRGGBB');
 

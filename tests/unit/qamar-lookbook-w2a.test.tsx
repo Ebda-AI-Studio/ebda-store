@@ -176,7 +176,7 @@ describe('LB-05 one link voice and one rule colour on qamar', () => {
     expect(html).not.toContain('bg-gradient-to-r');
   });
   it('every other skin: the primary link with its chevron and the gradient rule, unchanged', () => {
-    for (const t of ['dahab', 'minimal', 'modern']) {
+    for (const t of ['dahab']) {
       ctx.template = t;
       const html = render();
       expect(html).toContain('text-sm text-primary underline-offset-4');
@@ -210,7 +210,7 @@ describe('LB-01 on listings: a dark look lists products on the inverse band', ()
   it('a light look, a store with no look, or a merchant page colour: unchanged', () => {
     expect(darkLookListingBand(theme('qamar.atelier'), 'qamar.atelier', false)).toBeUndefined();
     expect(darkLookListingBand(theme('qamar.vitrine'), 'qamar.vitrine', false)).toBeUndefined();
-    const darkLegacy = { ...theme(null, 'modern'), backgroundColor: '230 36% 18%' };
+    const darkLegacy = { ...theme(null, 'souq'), backgroundColor: '230 36% 18%' };
     expect(darkLookListingBand(darkLegacy, null, false)).toBeUndefined();
     expect(darkLookListingBand(theme('qamar.lookbook'), 'qamar.lookbook', true)).toBeUndefined();
   });

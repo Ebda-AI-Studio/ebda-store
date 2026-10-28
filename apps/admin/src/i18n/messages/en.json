@@ -21,7 +21,17 @@
         "code": "404",
         "title": "Page not found",
         "message": "The page you are looking for does not exist or has been moved.",
-        "goHome": "Go to Dashboard"
+        "goHome": "Go to Dashboard",
+        "line": "The page you're looking for can't be found.",
+        "hint": "Search the settings, or jump to a section.",
+        "quickLinks": "Go to",
+        "linkDashboard": "Dashboard",
+        "linkStores": "Your stores",
+        "linkProducts": "Products",
+        "linkOrders": "Orders",
+        "linkCustomers": "Customers",
+        "linkSettings": "Settings",
+        "backToSite": "Back to the Ebda AI Studio site"
       },
       "boundary": {
         "title": "Something went wrong",
@@ -54,6 +64,12 @@
       "previous": "Previous page",
       "next": "Next page",
       "pageOf": "Page {page} of {totalPages}"
+    },
+    "liveSearch": {
+      "loading": "Searching…",
+      "empty": "No results for “{q}”",
+      "error": "Search is unavailable right now. Try again.",
+      "count": "{n, plural, one {{n} result} other {{n} results}}"
     }
   },
   "nav": {
@@ -2079,6 +2095,10 @@
       "webhooks": {
         "title": "Webhooks",
         "description": "Send order and product events to your own server"
+      },
+      "qrCodes": {
+        "title": "QR codes & barcodes",
+        "description": "QR codes, product barcode labels and the receipt barcode, with scan checks"
       }
     },
     "metaCatalogCard": {
@@ -2218,12 +2238,6 @@
         "title": "Show quick-add (+) on product carousels",
         "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
       },
-      "arabicNumerals": {
-        "title": "Store numerals: 123 / ١٢٣",
-        "hint": "How numbers look on your Arabic storefront (prices, quantities, dates). 123 (Western) is the default; ١٢٣ shows Arabic-Indic digits to Arabic-reading customers only. English pages, order numbers and this dashboard always use 123.",
-        "western": "Western digits (123) — default",
-        "arabic": "Arabic-Indic digits (١٢٣)"
-      },
       "socialIconColors": {
         "title": "Social icon colors",
         "hint": "By default social icons inherit the footer's text color (monochrome). Enable original brand colors to show each platform in its registered color (Instagram pink, WhatsApp green, etc.).",
@@ -2234,11 +2248,6 @@
         "title": "Storefront web push",
         "hint": "Off by default. When on, shoppers can subscribe to web push (requires the Push Notifications plan feature).",
         "enableLabel": "Enable storefront web push opt-in"
-      },
-      "personaChrome": {
-        "title": "Persona chrome completion",
-        "hint": "Off by default on existing stores; new stores are created with this on. Adds theme-specific chrome using your existing colors: hairline-flanked heading + whisper see-all link on Elegant, circular category tiles on Classic, bordered header + inverted footer on Bold. No change to card sizes, product name/price text, fonts, or colors.",
-        "enableLabel": "Enable persona chrome completion"
       },
       "cardFrameDedup": {
         "title": "Remove doubled card frame",
@@ -4940,11 +4949,6 @@
       "lookTitle": "Choose a look",
       "invalidLook": "That look is not available any more. Pick another one.",
       "skins": {
-        "modern": "Modern",
-        "classic": "Classic",
-        "minimal": "Minimal",
-        "bold": "Bold",
-        "elegant": "Elegant",
         "dahab": "Dahab",
         "qamar": "Qamar",
         "souq": "Souq",
@@ -5283,6 +5287,28 @@
       "inactive": "Inactive",
       "activeOnly": "Active only",
       "hiddenInactive": "{count} inactive hidden (still kept in order)"
+    },
+    "suggest": {
+      "title": "Let the assistant suggest your categories",
+      "intro": "Your store has no categories yet. The assistant reads your product names and descriptions and proposes a grouping. You review it, rename or remove anything, and nothing is created until you press Create.",
+      "ask": "Suggest categories",
+      "asking": "Looking at your products…",
+      "reviewTitle": "Suggested categories",
+      "reviewHint": "Rename a category, remove it, or untick products. Only what you see here is created.",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "products": "{count} products",
+      "remove": "Remove this category",
+      "unassigned": "{count} products are not in any suggested category. You can add them later.",
+      "create": "Create these categories",
+      "creating": "Creating…",
+      "discard": "Discard",
+      "none": "The assistant could not group your products. Add a few more products or create categories by hand.",
+      "noProducts": "Add some products first; the suggestion is built from them.",
+      "exist": "You already have categories, so there is nothing to suggest.",
+      "aiOff": "AI is turned off for your store. Turn it on in AI usage to use this.",
+      "quota": "The daily AI limit was reached. Try again tomorrow.",
+      "failed": "The suggestion did not work. Try again in a moment."
     }
   },
   "reviews": {
@@ -5409,10 +5435,13 @@
       "serverError": "Server returned an invalid response. Please try again.",
       "accessDenied": "Access denied. Admin or staff privileges required.",
       "mfaVerifyFailed": "Verification failed",
+      "emailNotVerified": "Please verify your email first. We sent you a code.",
+      "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
       "forgotPassword": "Forgot password?",
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
-      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password."
+      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
+      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue."
     },
     "forgot": {
       "title": "Reset your password",
@@ -5590,7 +5619,8 @@
         "agentKey": "AI agent key",
         "merchantKeys": "Merchant MCP keys",
         "billing": "Billing",
-        "webhooks": "Webhooks"
+        "webhooks": "Webhooks",
+        "qr": "QR codes & barcodes"
       }
     },
     "notificationBell": {
@@ -6303,7 +6333,7 @@
       "subtitle": "Record exchange rates for non-EGP transactions",
       "multiCurrencyAccounting": "Multi-Currency Accounting",
       "featureInactive": "Feature not active",
-      "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Contact your account manager to enable it on an Enterprise plan.",
+      "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Upgrade to the Business plan to turn it on.",
       "recordNewRate": "Record a New Rate",
       "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate EGP.",
       "rateExample": "Example: USD at 50.00 means 1 USD = 50.00 EGP.",
@@ -7061,6 +7091,7 @@
     "lockedBadge": "Locked",
     "availableOn": "Available on the {plan} plan and above.",
     "upgradeCta": "Upgrade to {plan}",
+    "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "alsoIncluded": "Also included in this plan"
   },
@@ -7425,7 +7456,17 @@
         "removed": "Passkey removed",
         "errorLoad": "Could not load your passkeys",
         "errorGeneric": "Something went wrong. Nothing was changed."
-      }
+      },
+      "passwordLabel": "Confirm your password",
+      "bootstrapIntro": "To add your first sign-in method we e-mail a code to this account, so a stolen password alone cannot add one. Platform administrators also need the one-time enrolment token their operator script printed.",
+      "bootstrapTokenLabel": "Enrolment token",
+      "bootstrapPasswordLabel": "Your password (to send the e-mailed code)",
+      "bootstrapSend": "E-mail me the code",
+      "bootstrapResend": "Send again",
+      "bootstrapCodeLabel": "E-mailed code (6 digits)",
+      "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
+      "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
+      "savedSignInAgainButton": "Saved, sign me out"
     }
   },
   "answerEngine": {
@@ -7494,7 +7535,7 @@
     "page": {
       "title": "Payment Abandonments",
       "subtitle": "Shoppers who reached the payment gateway but did not complete payment.",
-      "enterprise": "Payment abandonment capture is an Enterprise feature.",
+      "enterprise": "Payment abandonment capture is available on the Business plan.",
       "empty": "No gateway abandoners found in this period.",
       "emptyHint": "The sweep runs every 30 minutes and marks orders whose gateway link was generated but never paid.",
       "statsTotal": "Total abandoners (all time)",
@@ -7569,6 +7610,19 @@
       "cancelButton": "Cancel",
       "removingButton": "Removing…",
       "removeButton": "Remove"
+    },
+    "invites": {
+      "title": "Pending invitations",
+      "description": "These people have an account already and have not accepted yet. Revoking a link makes it stop working at once.",
+      "expires": "Expires {date}",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke this invitation?",
+      "revokeBody": "The link sent to {email} will stop working. You can invite them again later.",
+      "revokedTitle": "Invitation revoked",
+      "revokedDesc": "The link sent to {email} no longer works.",
+      "revokeFailed": "Could not revoke the invitation",
+      "sentTitle": "Invitation sent",
+      "sentDesc": "{email} will get an email to accept. Nothing changes on their account until they do."
     }
   },
   "blog": {
@@ -7678,7 +7732,12 @@
       "daysAheadTitle": "Delivery date",
       "daysAheadHint": "Let customers pick a delivery date instead of only today or tomorrow. The date, and the time window if you use them, are checked again when the order is placed.",
       "daysAheadLabel": "Days to offer",
-      "daysAheadOff": "Off (today or tomorrow only)"
+      "daysAheadOff": "Off (today or tomorrow only)",
+      "orderBarcodeMoved": {
+        "title": "Order barcode",
+        "body": "The barcode on receipts, packing slips and invoices now lives with your other codes.",
+        "link": "Open QR codes & barcodes"
+      }
     }
   },
   "customerGroups": {
@@ -8345,6 +8404,8 @@
     },
     "payOnStoreTitle": "This store is paused",
     "payOnStoreBody": "This store is paused because your plan allows fewer stores. Upgrade your main store to bring it back.",
+    "payOnStoreIncludedTitle": "Included in your main store's plan",
+    "payOnStoreIncludedBody": "This store is included in your main store's plan, so there is nothing to pay here. Manage billing on the main store.",
     "payOnStoreLink": "Go to the main store billing",
     "chooseThisPlan": "Choose this plan",
     "instapayPlanNote": "The new plan applies when Ebda Store confirms your payment.",
@@ -8434,7 +8495,13 @@
       "resend": "Send a new link",
       "resending": "Sending…",
       "resent": "If the address is eligible, a new link is on its way.",
-      "backToLogin": "Back to sign in"
+      "backToLogin": "Back to sign in",
+      "passwordTitle": "Confirm your password",
+      "passwordBody": "Enter the password you chose when you signed up to finish verifying your email.",
+      "password": "Password",
+      "verifyButton": "Verify my email",
+      "wrongPassword": "That is not the password this verification was created with.",
+      "forgotPassword": "Forgot your password?"
     },
     "flow": {
       "title": "Set up your store",
@@ -8651,6 +8718,23 @@
       "support": "Need help?",
       "footer": "Your store. Your brand.",
       "back": "Back to Ebda Store"
+    },
+    "acceptInvite": {
+      "title": "Staff invitation",
+      "working": "Accepting your invitation…",
+      "successTitle": "You now have access",
+      "successBody": "You were added as staff. Open the dashboard to start.",
+      "signInAgainTitle": "Sign in again to continue",
+      "signInAgainBody": "Your account is now a staff account. Sign in again to open the store.",
+      "continue": "Continue",
+      "signIn": "Sign in",
+      "missing": "This invitation link is incomplete. Open the link from the email again.",
+      "invalid": "This invitation link is invalid or has expired. Ask the store owner to send it again.",
+      "mismatch": "You are signed in with a different email address from the one invited. Sign out and sign in with the invited address.",
+      "notVerified": "Verify your email address first (use the verification email we sent you), then open this invitation link again.",
+      "ownsStore": "This account owns a store, so it cannot become a staff account. Ask the store to invite a different email address.",
+      "limit": "This store has reached its staff limit. Ask the owner to make room or upgrade.",
+      "generic": "We could not accept the invitation. Try again in a moment."
     }
   },
   "legalNotice": {
@@ -8725,7 +8809,8 @@
     "tabs": {
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
-      "claims": "Payment claims"
+      "claims": "Payment claims",
+      "grants": "Free months"
     },
     "plans": {
       "basic": "Basic",
@@ -8884,6 +8969,34 @@
       "duplicate": "This reference was already recorded. Nothing changed.",
       "failed": "We could not record this. Please try again.",
       "voidedFreed": "Reference freed. To record this transfer for the right store, use Record payment and paste this voided payment ID: {id}"
+    },
+    "grants": {
+      "title": "Free months",
+      "loading": "Loading free months...",
+      "failedToLoad": "Could not load the free months.",
+      "empty": "No free months granted yet.",
+      "foundingUsed": "Founding-20: {used} of {slots} used",
+      "referralGrants": "Referral rewards: {count} (max {max} per referrer)",
+      "totalValue": "Value granted: {amount}",
+      "columns": {
+        "date": "Date",
+        "store": "Store",
+        "kind": "Type",
+        "counterpart": "Other side",
+        "months": "Months",
+        "value": "Worth",
+        "status": "Status",
+        "paidThrough": "Paid through"
+      },
+      "kinds": {
+        "founding": "Founding-20",
+        "referral_referrer": "Referral (referrer)",
+        "referral_referred": "Referral (referred)"
+      },
+      "statuses": {
+        "pending": "Waiting for a billing period",
+        "applied": "Applied"
+      }
     }
   },
   "codReconciliation": {
@@ -9216,7 +9329,8 @@
     "tabs": {
       "sections": "Sections",
       "theme": "Theme",
-      "history": "History"
+      "history": "History",
+      "ai": "Ask AI"
     },
     "viewport": {
       "label": "Preview size",
@@ -9397,7 +9511,12 @@
       "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
       "more": "Load more",
       "confirmRestoreTitle": "Restore this version?",
-      "restoreConfirmButton": "Restore"
+      "restoreConfirmButton": "Restore",
+      "by": {
+        "named": "by {name}",
+        "removed": "Removed user"
+      },
+      "restoredFrom": "Restored from version {rev}"
     },
     "pages": {
       "label": "Page",
@@ -9448,6 +9567,39 @@
       "dividers": "Section dividers",
       "video": "Background video",
       "pageSwitcher": "Switch the page you edit"
+    },
+    "aiPatch": {
+      "tab": "Ask AI",
+      "title": "Ask AI to edit this page",
+      "intro": "Describe the change in Arabic or English. You will see exactly what changes before anything is saved.",
+      "placeholder": "For example: make the banner slideshow slower, or add a newsletter section",
+      "ask": "Suggest a change",
+      "asking": "Thinking…",
+      "example1": "Add a newsletter section",
+      "example2": "Hide the testimonials",
+      "changesTitle": "What will change",
+      "none": "Nothing to change: the page already looks like that, or the request cannot be done safely. Try describing it differently.",
+      "skipped": "{count} part(s) were skipped because the page does not support them.",
+      "apply": "Apply to draft",
+      "applying": "Applying…",
+      "discard": "Discard",
+      "draftNote": "This only changes your draft. Nothing goes live until you publish, and Undo works.",
+      "applied": "Applied to your draft.",
+      "failed": "The assistant could not make a change right now. Try again in a moment.",
+      "quota": "The daily AI limit was reached. Try again tomorrow.",
+      "moved": "The page changed since the suggestion. Ask again.",
+      "saveFirst": "Your latest edits could not be saved yet. Try again.",
+      "from": "was",
+      "to": "now",
+      "hidden": "hidden",
+      "shown": "shown",
+      "added": "Add section",
+      "removed": "Remove section",
+      "moved_to": "Move to position {pos}",
+      "theme": "Theme",
+      "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
+      "on": "on",
+      "off": "off"
     }
   },
   "instapayReceipt": {
@@ -9503,7 +9655,8 @@
       "LOOKS_EDITED": "Image looks edited",
       "FIELDS_CORRECTED": "Details were changed after the automatic read",
       "SAME_IMAGE_USED_BEFORE": "This image was used before",
-      "AI_UNAVAILABLE": "Automatic read was unavailable"
+      "AI_UNAVAILABLE": "Automatic read was unavailable",
+      "SUSPICIOUS_TEXT": "Text on the image reads like an instruction, not a receipt"
     },
     "review": {
       "status": {
@@ -9514,6 +9667,7 @@
         "voided": "Voided"
       },
       "confidence": "Read confidence {pct}%",
+      "aiAdvisory": "The AI read is advisory and can be fooled by text inside the image. Always check the amount, receiver and date yourself.",
       "flagsTitle": "Automatic checks",
       "amountMismatch": "Amount on the receipt is {paid} but {expected} is due.",
       "imageLoading": "Loading the screenshot…",
@@ -10155,6 +10309,11 @@
       "french-fries": "French fries",
       "hot-dog": "Hot dog",
       "cookie": "Cookie"
+    },
+    "scan": {
+      "checking": "Checking that it scans…",
+      "ok": "Scans correctly",
+      "fail": "This shape does not scan at receipt size"
     }
   },
   "ebdaReceipt": {
@@ -10205,7 +10364,9 @@
   },
   "providerUnverified": {
     "chip": "New connection",
-    "note": "This provider has not been run against a live account yet. Save your credentials: we check them straight away, and your first real order confirms the full flow. If anything is off, the Ebda Store team sees it immediately and fixes it."
+    "note": "This provider has not been run against a live account yet. Save your credentials: we check them straight away, and your first real order confirms the full flow. If anything is off, the Ebda Store team sees it immediately and fixes it.",
+    "pendingChip": "Pending verification",
+    "pendingNote": "You can connect this provider, but it is NOT offered to your customers at checkout yet: Ebda Store cannot confirm its payments until the provider confirms how it notifies us. We switch it on for your store the moment that is confirmed."
   },
   "providerVerification": {
     "title": "Provider verification",
@@ -10221,5 +10382,277 @@
     "verifiedConfirmed": "Verified {at}",
     "ready": "Ready to verify",
     "confirm": "Confirm verified"
+  },
+  "aiSwitch": {
+    "title": "Use AI features",
+    "onHint": "The assistant can translate, write SEO text, tag products and draft campaigns for this store. Turn it off and no AI call is made for your store.",
+    "offHint": "AI is off for your store. Nothing is sent to an AI model, and every AI button and automatic fill is paused until you turn it back on.",
+    "failed": "Could not change this setting. Try again."
+  },
+  "eta": {
+    "title": "ETA e-receipts (Egypt)",
+    "intro": "Send each VAT order to the Egyptian Tax Authority as an electronic receipt, using your own ETA credentials. Start on PreProd; switch to Production once the check passes.",
+    "loading": "Loading the ETA connection...",
+    "loadFailed": "Could not load the ETA connection.",
+    "environment": "Environment",
+    "envPreprod": "Test (PreProd)",
+    "envProd": "Production",
+    "enabled": "Send receipts to the ETA",
+    "clientId": "Client id",
+    "clientSecret": "Client secret",
+    "secretHint": "Stored encrypted. Only the last four characters are shown after saving.",
+    "posSerial": "POS serial number",
+    "preSharedKey": "Pre-shared key (if your ETA profile has one)",
+    "branchCode": "Branch code",
+    "activityCode": "Activity code",
+    "itemCode": "Registered item code",
+    "itemCodeHint": "An EGS code the ETA approved for you, like EG-123456789-1001. It is used on every receipt line.",
+    "addressTitle": "Branch address",
+    "governate": "Governorate",
+    "regionCity": "Region / city",
+    "street": "Street",
+    "buildingNumber": "Building number",
+    "postalCode": "Postal code (optional)",
+    "bridgeTitle": "Signing bridge (advanced)",
+    "bridgeHint": "Receipts are sent unsigned today. If you run a signing service next to your eSeal token, enter its address; Ebda Store never holds your key.",
+    "bridgeUrl": "Signing bridge address (https)",
+    "bridgeToken": "Signing bridge token",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved.",
+    "saveFailed": "Could not save.",
+    "check": "Check connection",
+    "checking": "Checking...",
+    "checkOk": "Connected: the ETA accepted these credentials.",
+    "checkRefused": "The ETA refused the sign-in ({code}). Check the client id, secret, POS serial and pre-shared key.",
+    "checkFailed": "Could not run the check.",
+    "lastCheckOk": "Last check: connected.",
+    "lastCheckRefused": "Last check: refused ({code}).",
+    "order": {
+      "title": "ETA e-receipt",
+      "kindSale": "Sale receipt",
+      "kindReturn": "Return receipt",
+      "reason": "Reason code",
+      "openInPortal": "Open in the ETA portal",
+      "issueAgain": "Issue again",
+      "qrAlt": "ETA receipt QR code",
+      "status": {
+        "queued": "Queued",
+        "retrying": "Retrying",
+        "submitted": "Submitted, waiting for the ETA",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "failed": "Failed",
+        "late": "Late (24 h passed)",
+        "manual": "Waiting for your return reason"
+      },
+      "reasonIntro": "This refund returned money without sending items back. The ETA needs a reason to issue it as a return without reference.",
+      "reasonLabel": "ETA return reason (required)",
+      "reasonPlaceholder": "Choose a reason",
+      "reasonSubmit": "Issue return receipt"
+    }
+  },
+  "qr": {
+    "page": {
+      "title": "QR codes",
+      "subtitle": "Print a code that opens your store, a product, a category or your WhatsApp chat. Every scan is counted."
+    },
+    "target": {
+      "title": "What should the code open?",
+      "store": "My store",
+      "product": "A product",
+      "category": "A category",
+      "whatsapp": "WhatsApp chat",
+      "productSearch": "Search your products",
+      "productPlaceholder": "Type a product name",
+      "categoryPlaceholder": "Choose a category",
+      "noResults": "No product found",
+      "noWhatsapp": "Add your WhatsApp number in Branding, then Contact info, to make this code.",
+      "linkLabel": "Link inside the code",
+      "pickFirst": "Pick one to see the code."
+    },
+    "look": {
+      "title": "Looks",
+      "style": "Dots",
+      "finder": "Corners",
+      "frame": "Frame",
+      "styles": {
+        "square": "Square",
+        "rounded": "Rounded",
+        "dots": "Dots"
+      },
+      "finders": {
+        "square": "Square",
+        "rounded": "Rounded",
+        "circle": "Round"
+      },
+      "frames": {
+        "none": "None",
+        "card": "Card",
+        "badge": "Label"
+      }
+    },
+    "colors": {
+      "title": "Colours",
+      "fg": "Code colour",
+      "bg": "Background",
+      "frameColor": "Frame colour",
+      "hex": "Hex colour",
+      "swatch": "Use {color}",
+      "lowContrast": "These colours are too close. Make the code darker or the background lighter (contrast {ratio}:1, needs at least 4.5:1).",
+      "inverted": "The code must be darker than its background, or many phones will not scan it.",
+      "ratio": "Contrast {ratio}:1"
+    },
+    "logo": {
+      "title": "Store logo in the centre",
+      "use": "Show my logo in the middle",
+      "noLogo": "Add a store logo in Branding to use this.",
+      "loadFail": "We could not load your logo for the code. Re-upload it in Branding and try again.",
+      "hint": "The code switches to the strongest error correction (H) and leaves room around the logo."
+    },
+    "cta": {
+      "title": "Line under the code",
+      "text": "Text",
+      "placeholder": "Scan to shop",
+      "lang": "Language",
+      "ar": "Arabic",
+      "en": "English",
+      "needFrame": "Choose the card or label frame to add a line.",
+      "remaining": "{count} left"
+    },
+    "whatsapp": {
+      "textLabel": "First message",
+      "textPlaceholder": "Hi, I would like to ask about…",
+      "hint": "Opens the chat with this message already written."
+    },
+    "preview": {
+      "title": "Live preview",
+      "checking": "Checking that it scans…",
+      "scanOk": "Scans correctly",
+      "scanFail": "This design does not scan. Change the colours or remove the logo.",
+      "alt": "QR code preview"
+    },
+    "download": {
+      "title": "Download",
+      "png": "PNG",
+      "svg": "SVG",
+      "pdf": "PDF for print",
+      "pngSize": "PNG size",
+      "printSize": "Print size",
+      "blocked": "Downloads are off until the code scans correctly.",
+      "error": "Could not create the file. Try again.",
+      "pdfNote": "The PDF is 300 dpi, sized for print. Use the SVG for sign makers.",
+      "cm": "{n} cm"
+    },
+    "stats": {
+      "title": "Scans",
+      "last30": "Last 30 days",
+      "empty": "No scans yet. They show up here after the first scan.",
+      "scans": "{count} scans",
+      "kinds": {
+        "store": "Store",
+        "product": "Product",
+        "category": "Category",
+        "whatsapp": "WhatsApp chat"
+      }
+    },
+    "actions": {
+      "save": "Save design",
+      "saving": "Saving…",
+      "saved": "Design saved",
+      "saveError": "Could not save. Try again.",
+      "unsaved": "Unsaved changes"
+    },
+    "loadError": "Could not load your QR settings."
+  },
+  "codes": {
+    "page": {
+      "title": "QR codes & barcodes",
+      "subtitle": "Print codes for your store, products and chats, and labels with scannable barcodes."
+    },
+    "tabs": {
+      "qr": "QR codes",
+      "labels": "Product labels",
+      "receipt": "Receipt barcode"
+    },
+    "receipt": {
+      "intro": "The barcode of the order number printed on receipts, packing slips and invoices."
+    }
+  },
+  "labels": {
+    "loadError": "Could not load your label settings.",
+    "items": {
+      "title": "Products and variants",
+      "search": "Search",
+      "searchPlaceholder": "Search by name, SKU or barcode",
+      "empty": "No products found.",
+      "noBarcode": "No barcode",
+      "qty": "Copies",
+      "loadMore": "Show more",
+      "generateBody": "Give every product and variant without a barcode its own code.",
+      "generateButton": "Generate missing barcodes",
+      "generating": "Generating…",
+      "generateError": "Could not generate barcodes. Try again.",
+      "pickFirst": "Tick products to print their labels. The preview shows a sample until then.",
+      "missingSkipped": "{count} selected without a barcode will be skipped."
+    },
+    "shape": {
+      "title": "Barcode style",
+      "hint": "Shapes always keep a real Code 128 scan strip at the bottom. They need a tall label or a continuous roll; small labels use plain bars."
+    },
+    "content": {
+      "title": "What goes on the label",
+      "name": "Name",
+      "variant": "Variant",
+      "price": "Price",
+      "digits": "Digits under the bars",
+      "qr": "Store QR",
+      "lang": "Label language",
+      "langAr": "Arabic",
+      "langEn": "English"
+    },
+    "size": {
+      "title": "Label size",
+      "sheets": "A4 sticker sheets",
+      "rolls": "Thermal rolls and labels",
+      "presets": {
+        "a4-3x7": "A4, 3 x 7 (63.5 x 38.1 mm, 21 per sheet)",
+        "a4-4x10": "A4, 4 x 10 (45.7 x 25.4 mm, 40 per sheet)",
+        "a4-5x13": "A4, 5 x 13 (38.1 x 21.2 mm, 65 per sheet)",
+        "roll-58": "58 mm roll",
+        "roll-80": "80 mm roll",
+        "roll-40x30": "40 x 30 mm label",
+        "roll-50x25": "50 x 25 mm label"
+      }
+    },
+    "preview": {
+      "title": "Live preview",
+      "labelAlt": "Label preview",
+      "sheetAlt": "Sheet preview",
+      "sheet": "Sheet",
+      "sampleNote": "Sample product shown. Tick products to preview theirs.",
+      "checking": "Checking that the barcode scans…",
+      "ok": "Barcode scans correctly",
+      "notPrintable": "The bars are too thin to print at this size. Choose a bigger label, plain bars, or a roll.",
+      "unreadable": "The barcode could not be read back. Change the style or the size.",
+      "dropped": "Left out because the label is small: {parts}.",
+      "copies": "{labels} labels on {pages} pages"
+    },
+    "actions": {
+      "save": "Save design",
+      "saving": "Saving…",
+      "saved": "Design saved",
+      "saveError": "Could not save. Try again.",
+      "unsaved": "Unsaved changes",
+      "pdf": "Download PDF",
+      "print": "Print",
+      "working": "Working…",
+      "blocked": "Downloads are off until the barcode scans correctly.",
+      "downloadError": "Could not create the file. Try again.",
+      "failedItems": "These labels do not scan, so nothing was created: {names}.",
+      "tooMany": "That is more than {max} labels in one go. Print in smaller batches."
+    },
+    "testNote": "Print one label and scan it with a phone before you print a whole sheet.",
+    "loading": "Loading"
   }
 }

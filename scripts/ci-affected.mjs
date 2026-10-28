@@ -22,6 +22,13 @@
  *              and scripts); no per-workspace lint/typecheck
  *   tests      tests/** -> unit tests only
  *
+ * Integration tier (2026-10-25, #227): the Postgres integration tests (tests/integration) are NOT part of the PR lane
+ * by default, and #227 merged four edited integration test files that never ran. `integrationPlan()` decides when a PR
+ * must run them: a changed tests/integration/*.test.ts runs exactly that file; a changed source file that an
+ * integration test imports (the services/routes/middleware those tests cover) runs the tests that import it; a changed
+ * shared test helper/fixture or anything under packages/database runs them all. Output: `integration` (bool) and
+ * `integration_paths` (`all` or a space list of test files).
+ *
  * The Worker dry-run (`workers`) is narrower than "affected": it costs ~9
  * billed minutes per Next app (OpenNext build), so it runs only when something
  * that can move the Worker bundle or its start-up changed: the app's own
@@ -69,6 +76,9 @@ export const GLOBAL_WORKSPACES = ['packages/shared', 'packages/database'];
 export const UNIT_PATHS = {
   'packages/shared': ['packages/shared/src'],
   'packages/database': ['packages/database/src'],
+  'packages/cf-schema': ['packages/cf-schema'],
+  'packages/cf-migrate': ['packages/cf-migrate'],
+  'packages/repo': ['packages/repo'],
   'apps/web': ['apps/web'],
   'apps/admin': ['apps/admin/src'],
   'apps/orders': ['apps/orders'],
@@ -78,6 +88,9 @@ export const UNIT_PATHS = {
  * it or the API changes (a signature change must fail CI, not the next manual eval run).
  */
 export const SEARCH_EVAL_TSCONFIG = 'tests/search-eval/tsconfig.json';
+
+/** Files the generated CF schema is derived from (prisma schema + raw SQL migrations). */
+const PRISMA_INPUT = /^packages\/database\/prisma\/(schema\.prisma|migrations\/)/;
 
 /** Always part of the unit lane when any code changed: cross-app source pins. */
 export const BASE_UNIT_PATHS = ['tests/unit'];
@@ -98,6 +111,85 @@ const WORKER_ROOT =
   /^(package\.json|package-lock\.json|scripts\/(cf-build\.sh|cf-setup-local\.sh|assert-cf-cache-bindings\.sh))$/;
 
 const DOCS_ONLY = /^(docs\/|.*\.md$|\.github\/ISSUE_TEMPLATE\/|\.vscode\/|\.editorconfig$)/;
+
+/** Integration tests that have their own CI jobs (and are excluded from the shared integration run). */
+const OWN_JOB_INTEGRATION = new Set([
+  'tests/integration/rls-ebda-app.test.ts',
+  'tests/integration/rls-pooler-isolation.test.ts',
+]);
+/** More affected test files than this and the whole tier runs (a list that long is "everything" anyway). */
+const INTEGRATION_ALL_ABOVE = 40;
+const SRC_EXT = ['.ts', '.tsx', '.mts', '/index.ts'];
+
+function walkTests(dir, out = []) {
+  if (!existsSync(dir)) return out;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walkTests(p, out);
+    else if (/\.test\.ts$/.test(e.name)) out.push(p);
+  }
+  return out;
+}
+
+/** Repo-relative, extension-less target of an import specifier written in `testFile`, or null for packages. */
+function resolveImport(spec, testFile, root) {
+  let abs = null;
+  if (spec.startsWith('@api/')) abs = path.join(root, 'apps/api/src', spec.slice(5));
+  else if (spec.startsWith('.')) abs = path.resolve(path.dirname(testFile), spec);
+  if (!abs) return null;
+  return path.relative(root, abs).replace(/\.(ts|tsx|mts|js|mjs)$/, '');
+}
+
+/**
+ * Which integration tests must run for this change set?
+ * @returns {{ integration: boolean, paths: 'all' | string[] }}
+ */
+export function integrationPlan(files, root = ROOT) {
+  const changed = files.filter(Boolean).filter(f => !DOCS_ONLY.test(f));
+  const testDir = path.join(root, 'tests/integration');
+  const tests = walkTests(testDir);
+  const rel = f => path.relative(root, f);
+  const run = new Set();
+  let all = false;
+
+  for (const f of changed) {
+    if (/^tests\/integration\/.*\.test\.ts$/.test(f)) {
+      if (!OWN_JOB_INTEGRATION.has(f)) run.add(f);
+    } else if (
+      f.startsWith('tests/integration/') || // fixtures, snapshots, golden files, stubs
+      f.startsWith('tests/helpers/') ||
+      f.startsWith('tests/stubs/') ||
+      /^packages\/database\//.test(f) // schema, migrations, the client every integration test uses
+    ) {
+      all = true;
+    }
+  }
+
+  const srcChanged = new Set(
+    changed
+      .filter(f => /^apps\/api\/src\//.test(f))
+      .map(f => f.replace(/\.(ts|tsx|mts|js|mjs)$/, ''))
+  );
+  if (srcChanged.size && !all) {
+    for (const t of tests) {
+      const tr = rel(t);
+      if (OWN_JOB_INTEGRATION.has(tr)) continue;
+      const text = readFileSync(t, 'utf8');
+      for (const m of text.matchAll(/(?:from|mock\(|import\()\s*['"]([^'"]+)['"]/g)) {
+        const target = resolveImport(m[1], t, root);
+        if (!target) continue;
+        // a bare directory import resolves to its index
+        if (srcChanged.has(target) || srcChanged.has(`${target}/index`)) {
+          run.add(tr);
+          break;
+        }
+      }
+    }
+  }
+
+  if (all || run.size > INTEGRATION_ALL_ABOVE) return { integration: true, paths: 'all' };
+  return { integration: run.size > 0, paths: [...run].sort() };
+}
 
 export function loadWorkspaces(root = ROOT) {
   const out = [];
@@ -184,6 +276,10 @@ export function classify(files, workspaces) {
   const unit = new Set();
   if (code) BASE_UNIT_PATHS.forEach(p => unit.add(p));
   for (const w of ws) (UNIT_PATHS[w.dir] ?? []).forEach(p => unit.add(p));
+  // The generated Cloudflare schema is a function of schema.prisma + the SQL migrations. It must be re-checked
+  // whenever either moves, even if someone later takes packages/database out of GLOBAL_WORKSPACES (2026-10-27:
+  // #218 added models, cf-schema went red on main and nothing noticed).
+  if (codeFiles.some(f => PRISMA_INPUT.test(f))) unit.add('packages/cf-schema');
   if (runAllUnit)
     Object.values(UNIT_PATHS)
       .flat()
@@ -212,7 +308,7 @@ function git(...args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 }
 
-function formatOutputs(r) {
+function formatOutputs(r, integration = { integration: false, paths: [] }) {
   const lines = {
     code: String(r.code),
     all: String(r.all),
@@ -226,6 +322,8 @@ function formatOutputs(r) {
     build_apps: JSON.stringify(r.buildApps),
     has_build_apps: String(r.buildApps.length > 0),
     affected: r.workspaces.join(' '),
+    integration: String(integration.integration),
+    integration_paths: integration.paths === 'all' ? 'all' : integration.paths.join(' '),
   };
   return Object.entries(lines).map(([k, v]) => `${k}=${v}`);
 }
@@ -248,7 +346,7 @@ function main(argv) {
       files = git('diff', '--name-only', base, arg('head') ?? 'HEAD').split('\n');
     }
   }
-  const lines = formatOutputs(classify(files, loadWorkspaces()));
+  const lines = formatOutputs(classify(files, loadWorkspaces()), integrationPlan(files));
   console.log(lines.join('\n'));
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join('\n')}\n`);
 }

@@ -118,16 +118,25 @@ export default function OrdersListPage() {
 
   // ── Search state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
+  // The 404's "Search orders" opens this list with the box focused (the term is typed here, never put in a URL).
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('focus') === 'search') {
+      searchInputRef.current?.focus();
+    }
+  }, []);
   // Search runs server-side over every order (it used to filter only the
   // fetched page), so it is debounced rather than sent per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 150);
     return () => clearTimeout(id);
   }, [search]);
   // Latest-request-wins: a filter change, a page change and the background
   // poll overlap; only the newest response may paint the list.
   const requestSeq = useRef(0);
+  // The superseded request is also ABORTED (not only ignored): typing fast never queues stale searches.
+  const abortRef = useRef<AbortController | null>(null);
 
   // ── Bulk selection state ──────────────────────────────────────────────────
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -142,6 +151,9 @@ export default function OrdersListPage() {
       if (!selectedStoreId) return;
       const mine = ++requestSeq.current;
       const isLatest = () => mine === requestSeq.current;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       if (!opts?.silent) setIsLoading(true);
       setError(null);
       try {
@@ -175,7 +187,11 @@ export default function OrdersListPage() {
           orders: Order[];
           meta?: Pagination;
           pagination?: Pagination;
-        }>(`/api/v1/stores/${selectedStoreId}/orders?${qs}`, searchQueryHeaders(debouncedSearch));
+        }>(
+          `/api/v1/stores/${selectedStoreId}/orders?${qs}`,
+          searchQueryHeaders(debouncedSearch),
+          controller.signal
+        );
         if (!isLatest()) return;
 
         if (apiError) {
@@ -211,6 +227,7 @@ export default function OrdersListPage() {
 
   useEffect(() => {
     fetchOrders();
+    return () => abortRef.current?.abort();
   }, [fetchOrders]);
 
   // Background poll.
@@ -414,7 +431,7 @@ export default function OrdersListPage() {
         )}
 
         {/* ── Search box ── */}
-        <div className="mb-3 relative">
+        <div className="mb-3 relative" role="search">
           <span
             className="absolute top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             style={{ [dir === 'rtl' ? 'right' : 'left']: '0.875rem' }}
@@ -436,6 +453,7 @@ export default function OrdersListPage() {
             </svg>
           </span>
           <input
+            ref={searchInputRef}
             type="search"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -446,6 +464,11 @@ export default function OrdersListPage() {
               paddingInlineEnd: search ? '2.5rem' : '1rem',
             }}
           />
+          <p role="status" aria-live="polite" className="sr-only">
+            {debouncedSearch && !isLoading
+              ? t.search.count.replace('{count}', String(orders.length))
+              : ''}
+          </p>
           {search && (
             <button
               type="button"

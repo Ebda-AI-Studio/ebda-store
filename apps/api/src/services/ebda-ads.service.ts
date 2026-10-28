@@ -17,7 +17,7 @@
  * account that did not consent to marketing tracking at signup.
  */
 import crypto from 'crypto';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   BRAND_STORE_APP_URL,
   normalizeEgyptianMobile,

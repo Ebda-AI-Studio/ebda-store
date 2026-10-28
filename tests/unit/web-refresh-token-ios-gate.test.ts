@@ -134,14 +134,19 @@ describe('admin + orders — a non-iOS refresh removes the residue copy (#2034)'
     expect(localStorage.getItem('refreshToken'), 'elsewhere it is removed').toBeNull();
   });
 
+  // Rulings ID-1/ID-2: admin and orders no longer hold ANY refresh token in JS; the session is the identity service's own
+  // HttpOnly cookie. Their refresh asks it for a Store token and exchanges that for the API cookie.
   it.each(['apps/admin/src/lib/api.ts', 'apps/orders/src/lib/api.ts'])(
-    '%s: refreshAccessToken reads through the helper',
+    '%s: refreshAccessToken uses the identity service and reads/writes no refresh token',
     async file => {
       const { readFileSync } = await import('fs');
       const path = await import('path');
       const src = readFileSync(path.resolve(__dirname, '../..', file), 'utf-8');
-      const fn = src.slice(src.indexOf('export function refreshAccessToken('));
-      expect(fn.slice(0, fn.indexOf('fetch('))).toMatch(/readStoredRefreshToken\(ios\)/);
+      const start = src.indexOf('export function refreshAccessToken(');
+      const fn = src.slice(start, src.indexOf('\n  return refreshInFlight;\n}', start));
+      expect(fn).toMatch(/accountsToken\(\)/);
+      expect(fn).toMatch(/establishApiSession\(/);
+      expect(fn).not.toMatch(/refreshToken|\/auth\/refresh/);
     }
   );
 });

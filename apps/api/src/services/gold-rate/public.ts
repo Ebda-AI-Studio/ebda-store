@@ -126,9 +126,21 @@ const PUBLIC_SNAPSHOT_KEYS = [
  * The full snapshot holds the margin, the making charge and the rate row id; those stay with the
  * merchant (Ruling B5-13). Used by every customer-facing order read; the admin read is unfiltered.
  */
-export function redactOrderForCustomer<T extends { items?: unknown }>(order: T): T {
+export function redactOrderForCustomer<T extends { items?: unknown }>(input: T): T {
+  // Customer Intelligence columns (CI-1) are the platform's, not the shopper's: never in a customer-facing order.
+  if (!('buyerKey' in input) && !('areaKey' in input) && !Array.isArray(input.items)) return input;
+  const {
+    buyerKey: _buyerKey,
+    areaKey: _areaKey,
+    ...order
+  } = input as T & {
+    buyerKey?: unknown;
+    areaKey?: unknown;
+  };
+  void _buyerKey;
+  void _areaKey;
   const items = (order.items ?? null) as Array<Record<string, unknown>> | null;
-  if (!Array.isArray(items)) return order;
+  if (!Array.isArray(items)) return order as T;
   return {
     ...order,
     items: items.map(item => {
@@ -143,7 +155,7 @@ export function redactOrderForCustomer<T extends { items?: unknown }>(order: T):
       }
       return { ...rest, goldSnapshot: goldSnapshot ?? null };
     }),
-  };
+  } as unknown as T;
 }
 
 /**
@@ -164,4 +176,72 @@ export function goldLineNote(
   return lang === 'ar'
     ? `عيار ${String(karat)} · ${grams} جم · ${money(ratePerGram)} للجرام`
     : `${String(karat)} karat · ${grams} g · ${money(ratePerGram)} per gram`;
+}
+
+const GUEST_ORDER_FIELDS = [
+  'id',
+  'orderNumber',
+  'status',
+  'paymentStatus',
+  'currency',
+  'createdAt',
+  'total',
+  'subtotal',
+  'shipping',
+  'discount',
+  'codFee',
+  'tax',
+  'taxIncludedInPrice',
+  'walletAmount',
+] as const;
+
+const GUEST_ITEM_FIELDS = [
+  'id',
+  'productId',
+  'variantId',
+  'quantity',
+  'price',
+  'product',
+  'variantName',
+  'variantNameAr',
+  'goldSnapshot',
+  'bundleId',
+  'bundleGroupId',
+  'bundleName',
+  'bundleNameAr',
+] as const;
+
+const pick = (src: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (k in src) out[k] = src[k];
+  return out;
+};
+
+/**
+ * A GUEST order for a viewer who does not hold its view token (SEC-15 / M-137): the order UUID alone
+ * is a capability URL that leaks through history and screenshots. The masked view is built from an
+ * ALLOWLIST, so a field added to the order later (notes, extra-amount note, InstaPay details, buyer
+ * contact, personalisation text...) is absent by default. Status, lines and money stay (the success
+ * page and the payment-return page still work); the address shrinks to city / state / country.
+ */
+export function maskGuestOrderView(order: object): Record<string, unknown> {
+  const o = order as Record<string, unknown>;
+  const out = pick(o, GUEST_ORDER_FIELDS);
+  if (Array.isArray(o.items)) {
+    out.items = o.items.map(i => pick(i as Record<string, unknown>, GUEST_ITEM_FIELDS));
+  }
+  if (Array.isArray(o.payments)) {
+    out.payments = o.payments.map(p => {
+      const x = p as Record<string, unknown>;
+      return { provider: x.provider ?? null, method: x.method ?? null };
+    });
+  }
+  const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
+  out.shippingAddress = {
+    city: a.city ?? null,
+    state: a.state ?? null,
+    country: a.country ?? null,
+  };
+  out.viewMasked = true;
+  return out;
 }

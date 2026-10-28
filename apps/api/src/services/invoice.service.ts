@@ -397,6 +397,7 @@ export class InvoiceService {
     // Western digits in both languages (Ruling NUMERALS-1): bare `ar-EG` is ٠-٩.
     const dateLocale = intlLocale(ar ? 'ar' : 'en');
     const dateText = heading.issuedAt.toLocaleDateString(dateLocale, {
+      numberingSystem: 'latn',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -847,7 +848,7 @@ export class InvoiceService {
         ${docs.refunds
           .map(
             r =>
-              `<div class="body"><span dir="ltr">${escapeHtml(r.number)}</span> · ${escapeHtml(r.docType === 'credit_note' ? labels.creditNote : labels.refundReceipt)} · ${escapeHtml(new Date(r.issuedAt).toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: order.store.timezone || 'Africa/Cairo' }))} · −${formatPrice(r.totalAmount)}${r.vatAmount > 0 ? ` (${escapeHtml(labels.vat(null))} ${formatPrice(r.vatAmount)})` : ''}</div>`
+              `<div class="body"><span dir="ltr">${escapeHtml(r.number)}</span> · ${escapeHtml(r.docType === 'credit_note' ? labels.creditNote : labels.refundReceipt)} · ${escapeHtml(new Date(r.issuedAt).toLocaleDateString(dateLocale, { numberingSystem: 'latn', year: 'numeric', month: 'short', day: 'numeric', timeZone: order.store.timezone || 'Africa/Cairo' }))} · −${formatPrice(r.totalAmount)}${r.vatAmount > 0 ? ` (${escapeHtml(labels.vat(null))} ${formatPrice(r.vatAmount)})` : ''}</div>`
           )
           .join('')}
       </section>`

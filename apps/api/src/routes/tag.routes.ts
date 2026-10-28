@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';

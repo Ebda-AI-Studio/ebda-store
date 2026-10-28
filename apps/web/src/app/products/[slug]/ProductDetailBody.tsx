@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { permanentRedirect, notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
+import { StoreTemporarilyUnavailableError } from '../../../lib/store-unavailable';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
@@ -151,6 +152,9 @@ export function buildProductMetadata(
   };
 }
 
+/** Statuses that mean "try again" (rate limit, bad gateway, load shed, gateway timeout), not "broken". */
+const TRANSIENT_STATUS = new Set([429, 502, 503, 504]);
+
 export async function fetchInitialProduct(slug: string, store: { id: string; domain?: string }) {
   const storeId = store.id !== 'demo' ? store.id : null;
   if (!storeId) return null;
@@ -159,16 +163,36 @@ export async function fetchInitialProduct(slug: string, store: { id: string; dom
   // /stores/:id/products/:slug call always 401'd before this fallback.
   // NOTE: network errors intentionally propagate (no try/catch) — a transient
   // fetch failure must 500, not be swallowed into a false 404.
-  const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-    next: { revalidate: 60, tags: [`products:${store.id}`] },
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Store-ID': store.id,
-      ...(store.domain ? { 'x-store-domain': store.domain } : {}),
-    },
-  });
+  const request = (fresh: boolean) =>
+    fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
+      // the retry skips the data cache so a shed 503 can never be the cached answer
+      ...(fresh
+        ? { cache: 'no-store' as const }
+        : { next: { revalidate: 60, tags: [`products:${store.id}`] } }),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Store-ID': store.id,
+        ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+      },
+    });
+  let response = await request(false);
+  // The API sheds load with a 503 (+ Retry-After) when its DB pool is saturated: one short, bounded retry rides
+  // out a burst (audit UI-7: a 500 on a Lamma product page at 16:14 UTC, during a 10-minute load-shed episode).
+  if (TRANSIENT_STATUS.has(response.status)) {
+    const after = Number(response.headers?.get?.('retry-after'));
+    await new Promise(r =>
+      setTimeout(r, Math.min(Number.isFinite(after) && after > 0 ? after * 1000 : 300, 1000))
+    );
+    response = await request(true);
+  }
   if (response.status === 404) return null; // definitive miss → caller resolves redirect / 404s
-  if (!response.ok) throw new Error(`product fetch failed: ${response.status}`); // transient (5xx) → let it 500
+  if (!response.ok) {
+    // still shed / unreachable: the shopper gets the "try again" screen (digest -> error.tsx), never a bare 500;
+    // never a 404 (that tells Google the product is gone).
+    if (TRANSIENT_STATUS.has(response.status))
+      throw new StoreTemporarilyUnavailableError(`product fetch failed: ${response.status}`);
+    throw new Error(`product fetch failed: ${response.status}`); // anything else (a 500) → let it 500
+  }
   const data = await response.json();
   return data?.data?.product ?? null;
 }

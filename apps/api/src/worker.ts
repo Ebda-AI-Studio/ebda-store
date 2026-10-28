@@ -30,20 +30,32 @@ import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
+import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
+import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
 import { runJobWorkflow } from './lib/jobs/run-workflow';
 import type { JobParams } from './lib/jobs/start';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
+import { servePublicEdge, stripFillMarker, type CacheLike } from './cf/public-edge-cache';
+import { readEdgeGens } from './lib/edge-gens';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   sendCodeMail,
   storesForUser,
+  storeLive,
+  storeActive,
   type CodeMail,
+  type NoticeMail,
+  sendNoticeMail,
   type StoreClaim,
 } from './lib/identity-directory';
+import { listStoreMembers, memberRole } from './lib/store-members';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import { assertEmbeddingConfig } from './lib/search/embedding-provider';
+import { assertWhatsAppLinkConfig } from './lib/wa/config';
+import { assertCiCaptureConfig, CI_EVENTS_DLQ, CI_EVENTS_QUEUE } from './lib/ci/config';
+import { handleCiEventsBatch } from './lib/ci/sink';
 import * as Sentry from '@sentry/cloudflare';
 import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
@@ -51,6 +63,7 @@ export { AuthState } from './cf/auth-state';
 export { StoreRealtime } from './cf/store-realtime';
 export { StoreDO } from './cf/store-do/store-do';
 export { JobGate } from './cf/job-gate';
+export { StoreSchedule } from './cf/store-schedule-do';
 
 // The Worker's `process.on('unhandledRejection')` (index.ts, Node): a rejection nobody awaited
 // (a late socket error from a closing pg connection, a fire-and-forget that failed) is logged with
@@ -118,6 +131,7 @@ function withTrustedClientIp(request: Request): Request {
 }
 
 let embeddingConfigChecked = false;
+let whatsAppConfigChecked = false;
 
 function prepare(env: CfBindings): void {
   setCfBindings(env);
@@ -126,6 +140,12 @@ function prepare(env: CfBindings): void {
   if (!embeddingConfigChecked) {
     assertEmbeddingConfig(logger);
     embeddingConfigChecked = true;
+  }
+  // The WhatsApp link needs SUITE_BUYER_KEY_SECRET; fail loud here, not on the first order.
+  if (!whatsAppConfigChecked) {
+    assertWhatsAppLinkConfig(env);
+    assertCiCaptureConfig(env);
+    whatsAppConfigChecked = true;
   }
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
   redisReady ??= redis.connect();
@@ -277,7 +297,7 @@ async function floodGuard(
   env: CfBindings,
   path: string
 ): Promise<Response | null> {
-  if (!env.RATE_LIMITER || path === '/health' || path.startsWith('/api/v1/inngest')) return null;
+  if (!env.RATE_LIMITER || path === '/health') return null;
   const ip = request.headers.get('cf-connecting-ip');
   if (!ip) return null;
   try {
@@ -313,30 +333,54 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
     // The upgrade is authenticated in the DO via the API; the Express app is not involved.
     return routeRealtime(request, env);
   }
-  const forwarded = withTrustedClientIp(request);
-  try {
-    return await withWorkerContext(
-      env,
-      ctx,
-      () => handleAsNodeRequest(PORT, forwarded, env, ctx),
-      request.signal
-    );
-  } catch (err) {
-    if (err instanceof ClientPoolTimeout) {
-      if (err.reason === 'aborted') return new Response(null, { status: 499 }); // client already gone
-      logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
-      // Shed load instead of letting the isolate hit its memory limit.
-      return Response.json(
-        { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },
-        { status: 503, headers: { 'retry-after': '1' } }
+  const origin = async (req: Request): Promise<Response> => {
+    const forwarded = withTrustedClientIp(req);
+    try {
+      return await withWorkerContext(
+        env,
+        ctx,
+        () => handleAsNodeRequest(PORT, forwarded, env, ctx),
+        req.signal
       );
+    } catch (err) {
+      if (err instanceof ClientPoolTimeout) {
+        if (err.reason === 'aborted') return new Response(null, { status: 499 }); // client already gone
+        logger.warn({ pool: isolateDb?.stats(), reason: err.message }, '[database] request shed');
+        // Shed load instead of letting the isolate hit its memory limit.
+        return Response.json(
+          { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },
+          { status: 503, headers: { 'retry-after': '1' } }
+        );
+      }
+      throw err;
     }
-    throw err;
+  };
+  // Ruling EDGE-API-1: anonymous public catalogue reads are answered from the Workers Cache API while their
+  // cache generations are unchanged (cf/public-edge-cache.ts). Everything else, and any doubt, goes to Express.
+  const edgeCache = (globalThis as unknown as { caches?: { default?: CacheLike } }).caches?.default;
+  if (edgeCache && env.PUBLIC_EDGE_CACHE !== '0') {
+    return servePublicEdge(request, ctx, origin, {
+      cache: edgeCache,
+      now: Date.now,
+      readGens: async names => {
+        prepare(env);
+        await redisReady;
+        return readEdgeGens(names);
+      },
+    });
   }
+  return origin(stripFillMarker(request));
 }
 
 async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promise<void> {
-  await withWorkerContext(env, ctx, () => handleQueueBatch(batch));
+  await withWorkerContext(env, ctx, () =>
+    // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
+    batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ
+      ? handleStoreEventsBatch(batch)
+      : batch.queue === CI_EVENTS_QUEUE || batch.queue === CI_EVENTS_DLQ
+        ? handleCiEventsBatch(batch, env)
+        : handleQueueBatch(batch)
+  );
 }
 
 async function scheduled(
@@ -354,7 +398,7 @@ async function scheduled(
  * runs inside `withWorkerContext`, so it has the bindings and its own leased database client
  * exactly like a request or a queue batch.
  */
-export class JobWorkflow extends WorkflowEntrypoint<CfBindings, JobParams> {
+class JobWorkflowBase extends WorkflowEntrypoint<CfBindings, JobParams> {
   async run(
     event: { payload: Readonly<JobParams>; instanceId: string },
     step: Parameters<typeof runJobWorkflow>[0]['step']
@@ -382,30 +426,64 @@ export class StoreDirectory extends WorkerEntrypoint<CfBindings> {
   async storesForUser(userId: string): Promise<StoreClaim[]> {
     return withWorkerContext(this.env, this.ctx as Ctx, () => storesForUser(userId));
   }
+  /** Identity v1.3: does this store still exist? (integrator clients of a deleted store are refused at once). */
+  async storeExists(storeId: string): Promise<boolean> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => storeLive(storeId));
+  }
+  /** Identity v1.3: may this store's integrator clients act now (not deleted, not suspended)? */
+  async storeActive(storeId: string): Promise<boolean> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => storeActive(storeId));
+  }
+}
+/**
+ * Service Binding RPC for Ebda WhatsApp (identity contract v1.4). Wired ONLY in ebda-whatsapp's wrangler config. Each method is
+ * authorised by the calling USER against live membership (never token claims) and fails closed.
+ */
+export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
+  /** The owner and active staff of a store, for seat assignment. Only the store's owner may ask. */
+  async listStoreMembers(storeId: string, asUserId: string) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => listStoreMembers(storeId, asUserId));
+  }
+  /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
+  async memberRole(storeId: string, userId: string) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => memberRole(storeId, userId));
+  }
 }
 export class IdentityMailer extends WorkerEntrypoint<CfBindings> {
   async sendCode(input: CodeMail): Promise<void> {
     return withWorkerContext(this.env, this.ctx as Ctx, () => sendCodeMail(input));
   }
+  async sendNotice(input: NoticeMail): Promise<void> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => sendNoticeMail(input));
+  }
 }
 
 // Errors, cron and queue failures go to Sentry (`@sentry/cloudflare`); with no SENTRY_DSN the
 // client is disabled and this is a pass-through.
-export default Sentry.withSentry(
-  (env: CfBindings) => ({
-    dsn: typeof env.SENTRY_DSN === 'string' ? env.SENTRY_DSN : undefined,
-    enabled: typeof env.SENTRY_DSN === 'string' && env.SENTRY_DSN.length > 0,
-    environment: typeof env.NODE_ENV === 'string' ? env.NODE_ENV : undefined,
-    release:
-      typeof env.BUILD_COMMIT_SHA === 'string' && env.BUILD_COMMIT_SHA
-        ? env.BUILD_COMMIT_SHA
-        : undefined,
-    tracesSampleRate: 0.1,
-    // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
-    // a transaction or a breadcrumb (search log review, fix-the-class).
-    beforeSend: event => scrubSentryEvent(event),
-    beforeSendTransaction: event => scrubSentryEvent(event),
-    beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
-  }),
-  handler as never
-);
+const sentryOptions = (env: CfBindings): Sentry.CloudflareOptions => ({
+  dsn: typeof env.SENTRY_DSN === 'string' ? env.SENTRY_DSN : undefined,
+  enabled: typeof env.SENTRY_DSN === 'string' && env.SENTRY_DSN.length > 0,
+  environment: typeof env.NODE_ENV === 'string' ? env.NODE_ENV : undefined,
+  release:
+    typeof env.BUILD_COMMIT_SHA === 'string' && env.BUILD_COMMIT_SHA
+      ? env.BUILD_COMMIT_SHA
+      : undefined,
+  tracesSampleRate: 0.1,
+  // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+  // a transaction or a breadcrumb (search log review, fix-the-class).
+  beforeSend: event => scrubSentryEvent(event),
+  beforeSendTransaction: event => scrubSentryEvent(event),
+  beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
+});
+
+/**
+ * The job Workflow, instrumented: a run that fails after its retries (and its steps' spans) reaches
+ * Sentry like a request, queue batch or cron does. Inngest never reported to Sentry; this is the
+ * parity-plus (the failure also fires `inngest/function.failed` -> alerts-failure-watch).
+ */
+export const JobWorkflow = Sentry.instrumentWorkflowWithSentry(
+  sentryOptions,
+  JobWorkflowBase as never
+) as unknown as typeof JobWorkflowBase;
+
+export default Sentry.withSentry(sentryOptions, handler as never);

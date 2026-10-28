@@ -167,6 +167,12 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'renders persisted order items',
     reads: { ar: 1, en: 1 },
   },
+  'routes/barcode-labels.routes.ts': {
+    category: 'admin-display',
+    reason:
+      'BARCODE-1 label picker: the merchant prints the LIST price (variant price, else product price) on a shelf tag; display only, nothing is charged from it',
+    reads: { 'GET /:storeId/barcodes/items': 5 },
+  },
   'routes/order.routes.ts': {
     category: 'persisted',
     reason: 'order detail / timeline reads of persisted items',

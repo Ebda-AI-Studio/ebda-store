@@ -92,7 +92,7 @@ import { NewsletterSection } from '../../apps/web/src/builder/sections/Newslette
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
-const doc = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const doc = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 
 function app() {
   const a = express();

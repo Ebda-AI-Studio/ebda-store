@@ -7,6 +7,7 @@
  */
 import { codProvider } from './cod.provider';
 import { fawryProvider } from './fawry.provider';
+import { geideaProvider } from './geidea.provider';
 import { instapayProvider } from './instapay.provider';
 import { kashierProvider } from './kashier.provider';
 import { paymobProvider } from './paymob.provider';
@@ -34,3 +35,4 @@ registerProviderV2(instapayProvider);
 registerProviderV2(paymobProvider);
 registerProviderV2(kashierProvider);
 registerProviderV2(fawryProvider);
+registerProviderV2(geideaProvider);

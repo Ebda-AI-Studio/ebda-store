@@ -18,6 +18,11 @@ const BANNED =
 const ALLOWED: Record<string, string> = {
   'src/lib/legal-en.ts': 'sub-processor disclosure (legal duty)',
   'src/lib/legal-ar.ts': 'sub-processor disclosure (legal duty)',
+  'src/lib/legal-privacy-stack.ts': 'post-cutover sub-processor disclosure (legal duty)',
+  'src/lib/legal-wa-en.ts':
+    'Ebda WhatsApp DPA sub-processor list (generated from the legal source)',
+  'src/lib/legal-wa-ar.ts':
+    'Ebda WhatsApp DPA sub-processor list (generated from the legal source)',
   'src/app/robots.ts': 'crawler user-agent tokens (GPTBot, ClaudeBot) must be the real names',
 };
 

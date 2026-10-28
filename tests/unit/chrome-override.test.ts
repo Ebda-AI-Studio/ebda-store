@@ -91,11 +91,10 @@ describe('the controls', () => {
     expect(THEME_SETTINGS_SCHEMA[0].id).toBe('header');
   });
 
-  it('logo position is offered on the skins built on the minimal header, search on Souq only', () => {
+  it('logo position is offered on the skins built on the shared base header, search on Souq only', () => {
     for (const t of ['qamar', 'souq', 'jasmine', 'lamma'])
       expect(isShown(logo, { template: t })).toBe(true);
-    for (const t of ['modern', 'dahab', 'classic'])
-      expect(isShown(logo, { template: t })).toBe(false);
+    for (const t of ['dahab']) expect(isShown(logo, { template: t })).toBe(false);
     expect(isShown(search, { template: 'souq' })).toBe(true);
     expect(isShown(search, { template: 'qamar' })).toBe(false);
   });

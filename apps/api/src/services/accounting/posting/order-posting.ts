@@ -17,6 +17,8 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
   paymob: '1000',
   kashier: '1010',
   fawry: '1000',
+  // Geidea: a card-first hosted gateway, booked like Kashier (an accounting choice, not an amount).
+  geidea: '1010',
   cod: '1020',
   // InstaPay: a bank transfer the merchant confirmed (SP6a), booked with the instant methods.
   instapay: '1000',

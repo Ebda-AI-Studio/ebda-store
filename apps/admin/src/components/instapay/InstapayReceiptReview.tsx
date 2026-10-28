@@ -138,6 +138,10 @@ export function InstapayReceiptReview({
           ))}
         </ul>
       )}
+      {/* SEC-11: an empty flag list is never a positive signal. */}
+      <p role="note" className="text-xs text-muted-foreground" data-testid="instapay-ai-advisory">
+        {t('aiAdvisory')}
+      </p>
       {amountMismatch && receipt.expectedAmountMinor !== null && (
         <p role="alert" className="text-sm font-semibold text-destructive-ink">
           {t('amountMismatch', {

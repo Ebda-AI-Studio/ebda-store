@@ -187,10 +187,9 @@ describe('K-02: bg-primary is paired with text-primary-foreground', () => {
     expect(hits).toEqual([]);
   });
 
-  // Shared storefront code only: a skin's documented hero CTA glow
-  // (templates/modern|bold/DESIGN.md "CTA Glow") is skin identity, and the look
-  // tokens that govern it are W2.
-  const SKIN = /apps\/web\/src\/templates\/(?:modern|bold|classic|elegant|minimal|dahab)\//;
+  // Shared storefront code only: a template's own components are skin identity, and the look
+  // tokens that govern them are W2.
+  const SKIN = /apps\/web\/src\/templates\/(?:base|dahab|qamar|souq|jasmine|lamma)\//;
   it('no coloured primary glow on a shared storefront element', () => {
     const hits = files
       .filter(f => !SKIN.test(f))

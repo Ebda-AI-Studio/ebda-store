@@ -35,3 +35,6 @@ c8e3b3ba15048ba4c9c9d741d902698ef06a3355:.github/workflows/ci.yml:generic-api-ke
 # The field is now `asset` (no hit in the current tree); these pin the history.
 312745de0dc8f742437d34ca3f170adc0bfc8833:scripts/dahab-demo/photos.json:generic-api-key:263
 312745de0dc8f742437d34ca3f170adc0bfc8833:scripts/dahab-demo/photos.json:generic-api-key:273
+
+# GITLEAKS-SCOPE-1 (docs/rulings/GITLEAKS-SCOPE-1.md): an Axiom dataset NAME in prose, not a credential (controller-approved 2026-10-27).
+9f19e0deff468e1b41f2bac8722d95a257ee10f5:docs/DEPLOYMENT.md:generic-api-key:362

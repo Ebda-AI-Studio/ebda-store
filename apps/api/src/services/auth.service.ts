@@ -1,6 +1,9 @@
+import { InstapayReceiptService } from './payment-providers/instapay-receipt.service';
+import { scrubProviderVerifier } from './provider-verification.service';
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { forgotIdentityPassword, revokeIdentityIfManaged } from '../lib/identity-client';
 import crypto from 'crypto';
 import {
   prisma,
@@ -37,9 +40,19 @@ import {
   JWT_MFA_AUDIENCE,
   PASSWORD_RESET_TTL_MINUTES,
   registrationEventId as registrationEventIdFor,
+  toE164,
 } from '@ebda/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
+import { buyerKeyForErasure } from '../lib/wa/buyer-key';
+import { exportCiOutcomes } from '../lib/ci/export';
+import { ciSinceDay } from '../lib/ci/layout';
+import {
+  WhatsAppConsentService,
+  lockAccountConsent,
+  phoneOnOwnOrder,
+  revokeForPhoneChangeInTx,
+} from '../lib/wa/consent';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
@@ -314,6 +327,19 @@ async function pushTokenVersion(userId: string, tv: number, source: string): Pro
     }
   }
 }
+
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  avatar: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
@@ -813,6 +839,17 @@ export class AuthService {
     // still log in with its password — `status` was recorded but never read.
     loginGate.assertActive(user);
 
+    // Merchants, staff and super admins sign in at the shared identity service (Rulings ID-1/ID-2). This legacy path would
+    // accept a password hash the identity service no longer controls (a reset there would not reach it), so it is closed for
+    // them: the right password here proves nothing and issues nothing.
+    if (user.storeId === null && user.role !== 'customer') {
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
+    }
+
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
     // TOTP code via /auth/mfa/verify to exchange it for a real session.
@@ -886,6 +923,15 @@ export class AuthService {
     // (`deletedAt: null`), and this path must not either.
     if (user.status !== 'active' || user.deletedAt) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+    }
+    // The only place a legacy (HS256) session is minted for a login: closed for identity-managed accounts, which sign in at
+    // the identity service. Covers the passkey and MFA completions that reach here.
+    if (user.storeId === null && user.role !== 'customer') {
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
     }
 
     const tokens = await this.generateTokens({
@@ -1122,6 +1168,11 @@ export class AuthService {
       })
     );
     if (!tokenOwner) {
+      throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
+    }
+    // A legacy refresh token of an identity-managed account is dead: the session now lives at the identity service
+    // (Ruling ID-5: one re-login). Nothing here can mint a Store token for it.
+    if (tokenOwner.storeId === null && tokenOwner.role !== 'customer') {
       throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
     }
     const storedToken = { ...storedRow, user: tokenOwner };
@@ -1426,6 +1477,43 @@ export class AuthService {
     userId: string,
     data: { firstName?: string; lastName?: string; phone?: string }
   ) {
+    // WA-CONSENT-1: the old number's WhatsApp marketing consent ends with the number (the new one needs
+    // a fresh tick and proof). For a store customer the revoke and the phone write are ONE transaction
+    // holding the account's consent lock, the same lock a grant takes, so a grant can never land on a
+    // number that was just replaced. A failed revoke aborts the whole update: the phone is unchanged.
+    const scope =
+      data.phone !== undefined
+        ? await withUser(userId, () =>
+            prisma.user.findUnique({
+              where: { id: userId },
+              select: { phone: true, storeId: true },
+            })
+          )
+        : null;
+    if (scope?.storeId) {
+      const storeId = scope.storeId;
+      return runInTenantContext(
+        storeId,
+        async () => {
+          await lockAccountConsent(userId);
+          const user = await prisma.user.findUnique({ where: { id: userId } });
+          if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+          if (user.phone && toE164(user.phone) !== toE164(data.phone!)) {
+            await revokeForPhoneChangeInTx(storeId, userId, user.phone);
+          }
+          return prisma.user.update({
+            where: { id: userId },
+            data: {
+              ...(data.firstName !== undefined && { firstName: data.firstName }),
+              ...(data.lastName !== undefined && { lastName: data.lastName }),
+              phone: data.phone,
+            },
+            select: PROFILE_SELECT,
+          });
+        },
+        userId
+      );
+    }
     return withUser(userId, async () => {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
@@ -1439,18 +1527,7 @@ export class AuthService {
           ...(data.lastName !== undefined && { lastName: data.lastName }),
           ...(data.phone !== undefined && { phone: data.phone }),
         },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          role: true,
-          avatar: true,
-          emailVerified: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: PROFILE_SELECT,
       });
 
       return updated;
@@ -1562,6 +1639,11 @@ export class AuthService {
       logger.error({ err, userId }, '[auth.revokeAllSessions] tokenVersion push failed')
     );
 
+    // Merchant / staff / super-admin sessions live in the identity service (Rulings ID-1/ID-2): end them THERE too, or the
+    // user's 15 minute token and the refresh behind it keep working after every revocation reason handled here (password
+    // change, logout everywhere, admin suspension). Fails loud: a revocation that did not reach the source is not a revocation.
+    await revokeIdentityIfManaged(userId, reason);
+
     // Revoke all live refresh tokens — prevents session resumption via
     // token rotation even before the access token's tv is checked.
     //
@@ -1653,6 +1735,7 @@ export class AuthService {
           firstName: true,
           lastName: true,
           storeId: true,
+          role: true,
           language: true,
         },
       },
@@ -1662,6 +1745,17 @@ export class AuthService {
     if (!user || (await ownsDemoStore(user.id))) {
       // Silently return to prevent email enumeration (and never mail the demo owner, B1-13)
       return null;
+    }
+
+    if (user.storeId === null && user.role !== 'customer') {
+      // Admin namespace (merchant / staff / operator): the credential lives in the identity service, which issues and mails
+      // its own one-time code. The Store issues no password token for these accounts (Ruling ID-2).
+      cfWaitUntil(
+        forgotIdentityPassword(user.email).catch(err =>
+          logger.error({ err, userId: user.id }, 'identity password-reset request failed')
+        )
+      );
+      return { userId: user.id };
     }
 
     const resetToken = await this.issuePasswordSetToken(user.id);
@@ -1681,23 +1775,6 @@ export class AuthService {
           },
           language
         ).catch(err => logger.error({ err, userId: user.id }, 'password-reset mail failed'))
-      );
-    } else {
-      // Admin namespace (merchant / staff / operator on Ebda Store): no store
-      // context, so the platform sender. Until 2026-10-07 this branch sent
-      // NOTHING — a merchant who forgot their password had no way back in.
-      cfWaitUntil(
-        sendMerchantPasswordResetEmail(
-          {
-            email: user.email,
-            name,
-            resetUrl: `${storeAppOrigin()}/reset-password?token=${resetToken}`,
-            expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
-          },
-          language
-        ).catch(err =>
-          logger.error({ err, userId: user.id }, 'merchant password-reset mail failed')
-        )
       );
     }
     return { userId: user.id };
@@ -1922,8 +1999,23 @@ export class AuthService {
       )
     ).map(s => s.playerId);
 
+    // The suite buyer key of this person's phone (Ebda WhatsApp contract `customer.erased`), taken
+    // BEFORE the scrub removes the phone. Undefined when no phone or the secret is not configured.
+    const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
+    // Customer Intelligence erase scope, collected BEFORE the scrub nulls the keys: the account's OWN orders in
+    // its store (and the keys on them) are always erased; a buyer-key erase happens only for a phone the
+    // account proved it holds (`eraseProvenBuyerKey`, the WA-CONSENT-1 proof) and only in the store that proof was made in. A buyer key is a hash of a phone
+    // someone typed at checkout, so it never widens the scope on its own.
+    let ciScope:
+      | { storeId: string; orderIds: string[]; buyerKeys: string[]; sinceDay?: string }
+      | undefined;
+    let ciProven: { storeId: string; buyerKeys: string[] } | undefined;
+    // The buyer key of the profile phone, ONLY when that phone is proven to be this account's (a delivered
+    // order). Set inside `anonymize`; it is what the `account/erased` event carries, so an attacker who
+    // typed a victim's number cannot make WhatsApp erase the victim's contact (WA-CONSENT-PROOF-1).
+    let eraseProvenBuyerKey: string | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
@@ -1932,19 +2024,50 @@ export class AuthService {
       // The ambient store of this erasure: the shopper's own store (self-service,
       // retention cron) or the merchant route's store (== user.storeId, checked above).
       const eraseStoreId = user.storeId ?? currentStoreId();
+      // ORDERING: the WhatsApp-consent ownership proof reads the shopper's delivered orders, so it MUST run
+      // before the order scrub below nulls `customerId` and the address snapshots (afterwards it would
+      // always be false and the current number's consent row would silently survive the erasure). It runs
+      // on THIS transaction (tenant + user context, ebda_app under RLS) with the same store id as the
+      // erase; a missing store id fails loud.
+      const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
+      if (!consentStoreId)
+        throw new Error('[auth.eraseAccount] no store id for the consent erasure');
+      eraseProvenBuyerKey =
+        buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
+          ? buyerKey
+          : undefined;
+
       // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
       // Must run before the orders lose their customer link below. Already-delivered payloads on
       // the merchant's own server cannot be recalled.
+      const erasedOrderIds = (
+        await tx.order.findMany({
+          where: { customerId: userId, storeId: eraseStoreId },
+          select: { id: true },
+        })
+      ).map(o => o.id);
       await redactWebhookCustomerData(tx, {
         storeId: eraseStoreId,
-        orderIds: (
-          await tx.order.findMany({
-            where: { customerId: userId, storeId: eraseStoreId },
-            select: { id: true },
-          })
-        ).map(o => o.id),
+        orderIds: erasedOrderIds,
         email: user.email,
       });
+      const ownOrders = await tx.order.findMany({
+        where: { customerId: userId, storeId: eraseStoreId },
+        select: { id: true, buyerKey: true, createdAt: true },
+      });
+      ciScope = {
+        storeId: eraseStoreId,
+        orderIds: ownOrders.map(o => o.id),
+        buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+        // The prefix pass starts at the sink's partition day of the first order minus a margin (lib/ci/layout.ts).
+        sinceDay: ciSinceDay(ownOrders.map(o => o.createdAt)),
+      };
+      ciProven = eraseProvenBuyerKey
+        ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
+        : undefined;
+      // InstaPay receipts of those orders: the payer's typed / AI-read personal fields and the screenshot go (M-025);
+      // the amount, reference and status stay with the order's financial record.
+      await InstapayReceiptService.scrubForOrders(tx, eraseStoreId, erasedOrderIds);
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -1957,6 +2080,9 @@ export class AuthService {
           shippingAddress: anonymizedAddressJson,
           billingAddress: anonymizedAddressJson,
           customerNotes: null,
+          // CI-1: the pseudonymous buyer key and the coarse area go with the identity.
+          buyerKey: null,
+          areaKey: null,
         },
       });
 
@@ -1981,6 +2107,9 @@ export class AuthService {
       // connection would commit independently — the hazard eraseAccount was
       // moved off).
       await deleteUserAddresses(userId);
+
+      // Platform state that names the user (a super-admin who confirmed a provider): null the id, keep the fact.
+      await scrubProviderVerifier(tx, userId);
 
       await tx.abandonedCart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
       await tx.cart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
@@ -2205,6 +2334,10 @@ export class AuthService {
           OR: smsConsentOr,
         },
       });
+      // WhatsApp marketing consent (Ruling WA-CONSENT-1): keyed by the suite buyer key, gone with the
+      // account. The consent observer announces the resulting `false` to Ebda WhatsApp.
+      // (the proof, `eraseProvenBuyerKey`, was computed at the START of this transaction, before the order scrub)
+      await WhatsAppConsentService.eraseForAccount(tx, consentStoreId, userId, eraseProvenBuyerKey);
 
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
@@ -2314,7 +2447,19 @@ export class AuthService {
     // DROPS it if the transaction failed. Outside a request (self-service,
     // retention cron) it runs inline, unchanged.
     void deferAfterTenantCommit('auth.eraseAccount.propagate', () =>
-      inngest.send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })
+      inngest.send({
+        name: 'account/erased',
+        // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
+        // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
+        data: {
+          userId,
+          oneSignalPlayerIds,
+          storeId: user.storeId ?? undefined,
+          buyerKey: eraseProvenBuyerKey,
+          ciProven,
+          ciScope,
+        },
+      })
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );
@@ -2490,6 +2635,36 @@ export class AuthService {
         },
       }),
     ]);
+    // WhatsApp marketing consent (Ruling WA-CONSENT-1): what was ticked, when, where, and any withdrawal.
+    const exportBuyerKey = await buyerKeyForErasure(
+      typeof user.phone === 'string' ? user.phone : null
+    );
+    // Only for a PROVEN number: a profile phone is self-declared, and an export must not reveal whether
+    // someone else's number opted in (same rule as the checkout box state).
+    const provenKey =
+      exportBuyerKey &&
+      typeof user.phone === 'string' &&
+      (await phoneOnOwnOrder(storeId, userId, user.phone))
+        ? exportBuyerKey
+        : undefined;
+    // Rows this account created (any earlier number) plus the current number's row when proven.
+    const whatsappMarketingConsent = await WhatsAppConsentService.exportForAccount(
+      storeId,
+      userId,
+      provenKey
+    );
+
+    // Customer Intelligence: the commerce outcomes recorded under this person's buyer key(s), pseudonymous.
+    const customerIntelligence = await exportCiOutcomes({
+      storeId,
+      orderIds: orders.map(o => o.id),
+      buyerKeys: [
+        ...new Set([
+          ...orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
+          ...(provenKey ? [provenKey] : []),
+        ]),
+      ],
+    });
 
     return {
       exportedAt: new Date().toISOString(),
@@ -2509,6 +2684,8 @@ export class AuthService {
       onesignalSubscriptions,
       passkeys,
       smsMarketingConsents,
+      whatsappMarketingConsent,
+      customerIntelligence,
       wholesaleApplications,
     };
   }

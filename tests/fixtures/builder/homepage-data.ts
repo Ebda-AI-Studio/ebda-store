@@ -25,7 +25,7 @@ export function loadLayoutFixture(name: LayoutFixture): unknown {
   return JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, `${name}.json`), 'utf8'));
 }
 
-export const TEMPLATES = ['modern', 'elegant', 'classic', 'minimal', 'bold'] as const;
+export const TEMPLATES = ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] as const;
 
 const baseStore = {
   slug: 'char-store',

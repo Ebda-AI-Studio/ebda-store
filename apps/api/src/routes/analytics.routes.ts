@@ -3,11 +3,11 @@ import { featureService } from '../services/feature.service';
 import { activeVariants, lineAllowsBackorder } from '../lib/effective-inventory';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
-import { AnalyticsService } from '../services/analytics.service';
+import { AnalyticsService, currentMonthStart } from '../services/analytics.service';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@ebda/database';
 import logger from '../lib/logger';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { analyticsPeriodSchema, parseReportRange, type ReportRange } from '@ebda/shared';
 
 const router = Router({ mergeParams: true });
@@ -50,7 +50,7 @@ router.get(
       // GL cards follow the period picker like every other widget on the
       // page. Month-to-date only when the caller sends no range.
       const now = new Date();
-      const glFrom = dateRange?.startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
+      const glFrom = dateRange?.startDate ?? currentMonthStart(now);
       const glTo = dateRange?.endDate ?? now;
 
       // 2026-05-21: switched Promise.all -> Promise.allSettled so a single
@@ -437,7 +437,7 @@ router.get(
       // GL gross profit follows an explicit range when one is sent;
       // month-to-date otherwise.
       const now = new Date();
-      const glFrom = dateRange?.startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
+      const glFrom = dateRange?.startDate ?? currentMonthStart(now);
       const glTo = dateRange?.endDate ?? now;
 
       const [performance, glThisMonth] = await Promise.all([

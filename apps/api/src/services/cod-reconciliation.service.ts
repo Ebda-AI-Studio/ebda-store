@@ -41,8 +41,15 @@ export interface ReconRow {
   result: ReconResult;
 }
 
+/** Most rows one report reads; past it the report says so instead of reconciling a partial set (M-101). */
+export const COD_REPORT_MAX_SHIPMENTS = 5000;
+export const COD_REPORT_MAX_LINES = 20000;
+
 export interface ReconReport {
-  summary: ReconSummary;
+  /** `null` when the report was capped: totals over a partial set would read as truth (unknown, not zero). */
+  summary: ReconSummary | null;
+  /** Which read hit its cap, or `null` when the report is complete. */
+  truncated: { shipments: boolean; lines: boolean } | null;
   rows: ReconRow[];
   total: number;
   unmatched: Array<{
@@ -122,7 +129,7 @@ export class CodReconciliationService {
     const page = Math.max(1, opts.page ?? 1);
     const limit = Math.min(100, Math.max(1, opts.limit ?? 25));
 
-    const [shipments, lines] = await Promise.all([
+    const [shipmentsRead, linesRead] = await Promise.all([
       prisma.shipment.findMany({
         where: {
           storeId,
@@ -142,14 +149,20 @@ export class CodReconciliationService {
           order: { select: { orderNumber: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: 5000,
+        take: COD_REPORT_MAX_SHIPMENTS + 1,
       }),
       prisma.codRemittance.findMany({
         where: { storeId, ...(opts.carrier ? { carrier: opts.carrier } : {}) },
         orderBy: { remittedAt: 'asc' },
-        take: 20000,
+        take: COD_REPORT_MAX_LINES + 1,
       }),
     ]);
+    const capped = {
+      shipments: shipmentsRead.length > COD_REPORT_MAX_SHIPMENTS,
+      lines: linesRead.length > COD_REPORT_MAX_LINES,
+    };
+    const shipments = shipmentsRead.slice(0, COD_REPORT_MAX_SHIPMENTS);
+    const lines = linesRead.slice(0, COD_REPORT_MAX_LINES);
 
     // A line belongs to its shipment by id, or (when it was imported before the shipment
     // existed) by carrier + tracking number.
@@ -198,10 +211,13 @@ export class CodReconciliationService {
       };
     });
 
-    const summary = summarize(
-      all.map(r => r.result),
-      unmatched
-    );
+    const isTruncated = capped.shipments || capped.lines;
+    const summary = isTruncated
+      ? null
+      : summarize(
+          all.map(r => r.result),
+          unmatched
+        );
     const filtered = all.filter(r =>
       !opts.status
         ? true
@@ -211,6 +227,7 @@ export class CodReconciliationService {
     );
     return {
       summary,
+      truncated: isTruncated ? capped : null,
       rows: filtered.slice((page - 1) * limit, page * limit),
       total: filtered.length,
       unmatched: unmatched.map(l => ({

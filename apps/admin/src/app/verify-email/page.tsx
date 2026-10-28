@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiPost } from '../../lib/api';
-import { getEbdaTracker } from '../../lib/ebda-tracker';
+import { AccountsError, accountsFetch } from '../../lib/accounts';
 import { useAuth } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
 
 type Phase =
+  | { kind: 'form' }
   | { kind: 'verifying' }
   | { kind: 'success' }
   | { kind: 'error'; reason: 'invalid' | 'expired' | 'missing' | 'generic' };
@@ -21,6 +22,9 @@ export default function VerifyEmailPage() {
   const { isAuthenticated } = useAuth();
   const [phase, setPhase] = useState<Phase>({ kind: 'verifying' });
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [wrongPassword, setWrongPassword] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   // The token is single-use: React strict mode runs effects twice in dev, and
@@ -30,30 +34,41 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const token = new URLSearchParams(window.location.search).get('token');
-    // The token is a credential: take it out of the address bar before
-    // analytics, error reporting or the history can record the full URL.
+    // The emailed link is `/verify-email?email=…#code=…`: the code lives in the fragment, which no server, Referer header or
+    // analytics pageview ever sees. Take both out of the address bar before anything records the URL.
+    const mail = new URLSearchParams(window.location.search).get('email') ?? '';
+    const raw = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('code') ?? '';
     window.history.replaceState(null, '', window.location.pathname);
-    if (!token) {
+    if (!/^\d{6}$/.test(raw) || !mail) {
       setPhase({ kind: 'error', reason: 'missing' });
       return;
     }
-    apiPost<{ registrationEventId?: string }>('/api/v1/auth/verify-email', { token }).then(
-      ({ data, error }) => {
-        if (!error) {
-          setPhase({ kind: 'success' });
-          // CompleteRegistration: same event_id as the server's Conversions API event (dedup).
-          if (data?.registrationEventId) {
-            getEbdaTracker()?.track('registration_completed', {
-              eventId: data.registrationEventId,
-            });
-          }
-        } else if (error.code === 'TOKEN_EXPIRED') setPhase({ kind: 'error', reason: 'expired' });
-        else if (error.code === 'TOKEN_INVALID') setPhase({ kind: 'error', reason: 'invalid' });
-        else setPhase({ kind: 'error', reason: 'generic' });
-      }
-    );
+    setEmail(mail);
+    setCode(raw);
+    // Verifying also needs the password chosen at signup (a code mailed because someone else typed this address cannot
+    // activate their password on the owner's behalf), so the visitor types it now.
+    setPhase({ kind: 'form' });
   }, []);
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!password) return;
+    setWrongPassword(false);
+    setPhase({ kind: 'verifying' });
+    try {
+      await accountsFetch('/otp/verify', { json: { email, code, password } });
+      setPhase({ kind: 'success' });
+    } catch (err) {
+      if (err instanceof AccountsError && err.code === 'INVALID_CODE') {
+        setWrongPassword(true);
+        setPhase({ kind: 'form' });
+      } else
+        setPhase({
+          kind: 'error',
+          reason: err instanceof AccountsError && err.status === 429 ? 'generic' : 'invalid',
+        });
+    }
+  }
 
   function goOn() {
     router.push(isAuthenticated ? '/onboarding' : '/login?returnTo=%2Fonboarding');
@@ -67,6 +82,32 @@ export default function VerifyEmailPage() {
     await apiPost('/api/v1/auth/merchant/resend-verification', { email: email.trim() });
     setResending(false);
     setResent(true);
+  }
+
+  if (phase.kind === 'form') {
+    return (
+      <PublicShell title={t('passwordTitle')} subtitle={t('passwordBody')}>
+        <form className="space-y-4" onSubmit={handleVerify}>
+          <Input
+            id="verify-password"
+            type="password"
+            label={t('password')}
+            autoComplete="current-password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            error={wrongPassword ? t('wrongPassword') : undefined}
+          />
+          <Button type="submit" className="w-full" disabled={!password}>
+            {t('verifyButton')}
+          </Button>
+          <p className="text-center text-sm">
+            <Link href="/forgot-password" className="text-primary-ink hover:underline">
+              {t('forgotPassword')}
+            </Link>
+          </p>
+        </form>
+      </PublicShell>
+    );
   }
 
   if (phase.kind === 'verifying') {

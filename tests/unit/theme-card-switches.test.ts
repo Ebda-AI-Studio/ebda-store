@@ -70,7 +70,7 @@ describe('product-card theme switches (VE-17)', () => {
   });
 
   it('Smart Palette never writes them', () => {
-    const doc = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const doc = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     const out = applySmartPalette(doc, {}, Object.fromEntries(KEYS.map(k => [k, true])));
     for (const k of KEYS) expect(out.theme?.[k], k).toBeUndefined();
   });

@@ -19,7 +19,7 @@ vi.mock('@api/services/feature.service', () => ({
 vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/config', () => ({ config: {} }));
 vi.mock('@api/lib/logger', () => ({ default: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => ({ ResendService: {} }));
+vi.mock('@api/services/store-mailer.service', () => ({ StoreMailer: {} }));
 
 import { PoweredByEbda } from '../../apps/web/src/templates/shared/PoweredByEbda';
 import {
@@ -46,7 +46,7 @@ describe('storefront footer', () => {
   });
   it('every theme footer wires the plan decision into the attribution (none can drop the prop)', async () => {
     const { readFileSync } = await import('node:fs');
-    for (const t of ['bold', 'classic', 'elegant', 'minimal', 'modern']) {
+    for (const t of ['base']) {
       const src = readFileSync(`apps/web/src/templates/${t}/Footer.tsx`, 'utf8');
       expect(src, t).toContain('<PoweredByEbda hidden={hidePoweredBy} />');
     }

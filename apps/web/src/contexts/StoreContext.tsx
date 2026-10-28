@@ -1,5 +1,7 @@
 'use client';
 
+import { useLocalePath } from './LocalePathContext';
+import { localizeHref } from '../lib/locale-paths';
 import {
   createContext,
   useCallback,
@@ -175,6 +177,7 @@ export interface StoreData {
   smsMarketingOptIn?: boolean;
   /** See `ResolvedStore.cartEmailOptIn` in lib/store-resolver.ts. */
   cartEmailOptIn?: boolean;
+  whatsappMarketingOptIn?: boolean;
   enabledFeatures?: string[];
   /**
    * Slugs of CMS pages the merchant has explicitly disabled
@@ -263,7 +266,7 @@ const DEFAULT_STORE: StoreData = {
   status: 'active',
   currency: REGION.currency,
   timezone: 'Africa/Cairo',
-  template: 'modern',
+  template: 'qamar',
   theme: DEFAULT_THEME,
   socialLinks: {},
 };
@@ -561,7 +564,10 @@ export function useStoreContact() {
  * dozens of call sites build links through it.
  */
 export function useStoreUrl() {
-  return useCallback((path: string) => path, []);
+  // On a `/ar|/en` page of a store with language-in-the-URL ON (LOCALE-PATHS-1) an internal link to an indexable
+  // route carries the page's language prefix; everywhere else this is still the identity.
+  const locale = useLocalePath();
+  return useCallback((path: string) => localizeHref(path, locale), [locale]);
 }
 
 /**

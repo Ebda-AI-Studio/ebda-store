@@ -452,18 +452,18 @@ describe('look section mix', () => {
       ],
     };
     const noDesign: Mix = { sections: [{ type: 'hero' }, { type: 'category-grid' }] };
-    const layoutPage = (skin: 'minimal' | 'qamar') =>
+    const layoutPage = (skin: 'souq' | 'qamar') =>
       layoutToDefinition(resolveLayoutSettings({}, skin, null));
 
     it('the probe: a layout-built page holds skin values that differ from preset 0', () => {
-      const page = layoutPage('minimal');
+      const page = layoutPage('souq');
       expect(byType(page, 'hero').settings.presentation).toBe('full-bleed');
       expect(byType(page, 'category-grid').settings.desktopColumns).toBe(4);
       expect(defaultsOf('category-grid').desktopColumns).not.toBe(4);
     });
 
     it("keep from a legacy store applies the incoming look's design (framed hero, 2 columns)", () => {
-      for (const skin of ['minimal', 'qamar'] as const) {
+      for (const skin of ['souq', 'qamar'] as const) {
         const doc = applyTemplateFamily(layoutPage(skin), 'qamar', framedTwo, {
           from: null,
           design: 'keep',

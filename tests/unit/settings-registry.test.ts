@@ -213,6 +213,7 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
     'builder.page-switcher',
     'builder.look-switch',
     'builder.history',
+    'builder.ai-patch',
     'builder.add-section',
   ];
   const builder = SETTINGS.filter(s => s.route === '/builder');

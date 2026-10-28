@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { loadS3 } from '../../lazy-modules';
 import { prisma, isOwnerRole, withOwnerTx } from '@ebda/database';
@@ -112,7 +112,7 @@ async function collectReferencedKeys(): Promise<Set<string>> {
   });
 }
 
-export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
+export const r2OrphanSweep: JobDef = inngest.createFunction(
   {
     id: 'r2-orphan-sweep',
     name: 'R2 orphan sweep (weekly cron, report-only by default)',

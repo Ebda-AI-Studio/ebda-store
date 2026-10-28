@@ -32,7 +32,6 @@ import { AppError } from '../middleware/error-handler';
 import { redis } from './redis.service';
 import type { DomainProvider } from './domain-provider';
 import { bustStoreCaches } from './store.service';
-import { ResendService } from './resend.service';
 
 export type DomainClaimState = 'pending' | 'active' | 'failed';
 
@@ -327,28 +326,6 @@ export class DomainClaimService {
     await withStore(storeId, tx =>
       tx.store.update({ where: { id: storeId }, data: { llmsTxt: null } })
     ).catch(err => logger.warn({ err, storeId }, '[DOMAIN CLAIM] failed to clear stale llms.txt'));
-
-    // Resend: remove the OLD sender domain BEFORE provisioning the new one
-    // (provisionStoreDomain would overwrite the row's emailDomainId otherwise).
-    const emailRow = await withStore(storeId, tx =>
-      tx.store.findUnique({
-        where: { id: storeId },
-        select: { emailDomainId: true },
-      })
-    );
-    if (emailRow?.emailDomainId) {
-      await ResendService.removeStoreDomain(storeId).catch(err =>
-        logger.error({ err, storeId }, '[DOMAIN CLAIM] failed to remove old Resend domain')
-      );
-    }
-    if (newDomain) {
-      await ResendService.provisionStoreDomain(storeId).catch(err =>
-        logger.warn(
-          { err, storeId, domain: newDomain },
-          '[DOMAIN CLAIM] Resend provision failed (storefront still works; email stays on platform fallback)'
-        )
-      );
-    }
 
     // Old hostname leaves the provider only AFTER the DB points at the new one.
     if (oldDomain) {

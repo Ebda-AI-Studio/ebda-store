@@ -6,6 +6,9 @@ import {
   getBaselineFeatures,
   isInBaseline,
   lowestPlanForFeature,
+  publicPlanLabelForFeature,
+  publicPlanForStorePlan,
+  upgradeTargetForDisabledFeature,
   type StorePlan,
 } from '../plan-baselines';
 import { FEATURE_KEYS_ARRAY, FEATURE_REGISTRY, type FeatureKey } from '../features';
@@ -242,5 +245,44 @@ describe('StorePlan type', () => {
   it('compiles with type-correct plan references', () => {
     const p: StorePlan = 'starter';
     expect(getBaselineFeatures(p).length).toBeGreaterThan(0);
+  });
+});
+
+describe('merchant-facing plan names (audit DOC-6): only Basic / Growth / Business', () => {
+  const SOLD = ['Basic', 'Growth', 'Business'];
+  it('names a sold plan for every feature that any tier unlocks', () => {
+    for (const key of Object.keys(FEATURE_REGISTRY) as FeatureKey[]) {
+      const label = publicPlanLabelForFeature(key);
+      if (label) expect(SOLD).toContain(label.en);
+    }
+  });
+  it('maps each tier to its sold plan; free is not sold', () => {
+    expect(publicPlanForStorePlan('starter')?.en).toBe('Basic');
+    expect(publicPlanForStorePlan('professional')?.en).toBe('Growth');
+    expect(publicPlanForStorePlan('enterprise')?.en).toBe('Business');
+    expect(publicPlanForStorePlan('free')).toBeNull();
+  });
+  it('loyalty is Growth, affiliate is Business, email campaigns stay Growth', () => {
+    expect(publicPlanLabelForFeature('loyalty')?.code).toBe('growth');
+    expect(publicPlanLabelForFeature('affiliate')?.code).toBe('business');
+    expect(publicPlanLabelForFeature('email_campaigns')?.code).toBe('growth');
+  });
+});
+
+describe('upgradeTargetForDisabledFeature', () => {
+  it('offers Growth to a Basic store missing loyalty', () => {
+    expect(upgradeTargetForDisabledFeature('basic', 'loyalty')?.code).toBe('growth');
+  });
+  it('offers Business to a Growth store missing affiliate', () => {
+    expect(upgradeTargetForDisabledFeature('growth', 'affiliate')?.code).toBe('business');
+  });
+  it('is null when the plan already includes it (a toggle turned it off)', () => {
+    expect(upgradeTargetForDisabledFeature('growth', 'loyalty')).toBeNull();
+    expect(upgradeTargetForDisabledFeature('business', 'affiliate')).toBeNull();
+  });
+  it('is null for hidden or unknown plans and for features no sold plan unlocks', () => {
+    expect(upgradeTargetForDisabledFeature('comped', 'loyalty')).toBeNull();
+    expect(upgradeTargetForDisabledFeature('nope', 'loyalty')).toBeNull();
+    expect(upgradeTargetForDisabledFeature('basic', 'customer_wallet')).toBeNull();
   });
 });

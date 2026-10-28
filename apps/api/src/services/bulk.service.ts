@@ -7,11 +7,13 @@ import {
   GOLD_KARATS,
   minorToDecimalString,
   mgToGramsString,
+  parseBarcodeInput,
   parseGramsToMg,
   slugifyWithFallback,
   type GoldKarat,
 } from '@ebda/shared';
 import { GoldRateService } from './gold-rate/gold-rate.service';
+import { fillMissingAfterImport, lockStoreBarcodes } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { stampHumanEdits } from './ai-autofill.service';
@@ -198,6 +200,25 @@ async function createVariantsForProductTx(
     prior.flatMap(o => o.values.map(v => [`${o.name}|${v.value}`, v] as const))
   );
 
+  // BARCODE-1: a re-import replaces the variants, so a row with no barcode column must keep the
+  // code the variant already had (it may be on a printed label). Matched by sku, else by title.
+  const priorVariants = await tx.productVariant.findMany({
+    where: { productId, barcode: { not: null } },
+    select: { sku: true, title: true, barcode: true },
+  });
+  const priorBarcodeBySku = new Map(
+    priorVariants.filter(v => v.sku).map(v => [v.sku as string, v.barcode as string])
+  );
+  const priorBarcodeByTitle = new Map(priorVariants.map(v => [v.title, v.barcode as string]));
+  const typedInThisImport = new Set(variants.map(v => v.barcode).filter(Boolean) as string[]);
+  const carriedBarcodes = new Set<string>();
+  const carryBarcode = (sku: string | null, title: string): string | null => {
+    const code = (sku ? priorBarcodeBySku.get(sku) : undefined) ?? priorBarcodeByTitle.get(title);
+    if (!code || typedInThisImport.has(code) || carriedBarcodes.has(code)) return null;
+    carriedBarcodes.add(code);
+    return code;
+  };
+
   // Clear existing options/variants (cascades to values + junction rows).
   //
   // P1-4 (final review): `bundle_items.variant_id` is ON DELETE RESTRICT, so
@@ -298,7 +319,7 @@ async function createVariantsForProductTx(
       productId,
       title: buildVariantTitle(pairs.map(p => p.value)),
       sku: v.sku || null,
-      barcode: v.barcode || null,
+      barcode: v.barcode || carryBarcode(v.sku || null, buildVariantTitle(pairs.map(p => p.value))),
       price: v.price ?? null,
       compareAtPrice: v.compareAtPrice ?? null,
       costPrice: v.costPrice ?? null,
@@ -615,7 +636,7 @@ export class BulkService {
       '', // compareAtPrice
       '', // costPrice
       'SKU-001-1KG', // variant sku
-      '1234567890124', // variant barcode
+      '1234567890128', // variant barcode (valid EAN-13 check digit)
       '40', // variant inventory
       '', // lowStockThreshold
       'true', // trackInventory
@@ -758,6 +779,78 @@ export class BulkService {
     // withMoneyTx batch. Only the SAME product re-asserting its sku is safe.
     const skuClaimedBy = new Map<string, string>();
 
+    // BARCODE-1: validate every barcode in the file before anything is written, so one bad or
+    // duplicate code fails ITS ROW instead of aborting a whole batch on the unique index.
+    // `barcodeHeldBy`: code -> product ids that hold it in the DB (a product, or the parent of a
+    // variant). `barcodeClaimedBy`: code -> who in THIS file takes it.
+    const barcodeHeldBy = new Map<string, Set<string>>();
+    const barcodeClaimedBy = new Map<string, string>();
+    {
+      const wanted = new Set<string>();
+      for (const line of dataRows) {
+        const raw = this.mapRowToObject(headers, this.parseCSVLine(line)).barcode;
+        const parsed = raw ? parseBarcodeInput(String(raw)) : null;
+        if (parsed?.ok) wanted.add(parsed.value);
+      }
+      if (wanted.size > 0) {
+        const codes = [...wanted];
+        // Serialise with every other barcode writer in this store until the request commits.
+        await lockStoreBarcodes(
+          prisma as unknown as Parameters<typeof lockStoreBarcodes>[0],
+          storeId
+        );
+        const heldProducts = await prisma.product.findMany({
+          where: { storeId, barcode: { in: codes }, deletedAt: null },
+          select: { id: true, barcode: true },
+        });
+        const heldVariants = await prisma.productVariant.findMany({
+          where: { barcode: { in: codes }, product: { storeId, deletedAt: null } },
+          select: { productId: true, barcode: true },
+        });
+        for (const h of [
+          ...heldProducts.map(p => ({ id: `p:${p.id}`, barcode: p.barcode })),
+          ...heldVariants.map(v => ({ id: `v:${v.productId}`, barcode: v.barcode })),
+        ]) {
+          if (!h.barcode) continue;
+          const set = barcodeHeldBy.get(h.barcode) ?? new Set<string>();
+          set.add(h.id);
+          barcodeHeldBy.set(h.barcode, set);
+        }
+      }
+    }
+    /** Returns the normalised barcode, undefined when blank, or an error message for the row. */
+    const checkBarcode = (
+      raw: unknown,
+      claimant: string,
+      /** Who may already hold it: a product row only its own product code, a variant row only
+       *  variants of its parent (they are replaced by this import). */
+      allowedHolder: string | undefined
+    ): { value?: string; error?: string } => {
+      const text = raw === undefined || raw === null ? '' : String(raw).trim();
+      if (!text) return {};
+      const parsed = parseBarcodeInput(text);
+      if (!parsed.ok) {
+        return {
+          error:
+            parsed.reason === 'check-digit'
+              ? `Barcode "${text}" has a wrong check digit (EAN-13 and UPC-A codes must be exact)`
+              : `Barcode "${text}" is not valid (${parsed.reason})`,
+        };
+      }
+      const claimedBy = barcodeClaimedBy.get(parsed.value);
+      if (claimedBy !== undefined && claimedBy !== claimant) {
+        return { error: `Duplicate barcode "${parsed.value}" within this import` };
+      }
+      const held = barcodeHeldBy.get(parsed.value);
+      if (held && ![...held].every(id => id === allowedHolder)) {
+        return {
+          error: `Barcode "${parsed.value}" already belongs to another product in this store`,
+        };
+      }
+      barcodeClaimedBy.set(parsed.value, claimant);
+      return { value: parsed.value };
+    };
+
     // Parsed row data for Phase 3
     interface ParsedRow {
       rowIndex: number;
@@ -820,10 +913,20 @@ export class BulkService {
             });
             continue;
           }
+          const variantBarcode = checkBarcode(
+            row.barcode,
+            `variant:${parentSku}:${rowIndex}`,
+            productBySku.get(parentSku) ? `v:${productBySku.get(parentSku)!.id}` : undefined
+          );
+          if (variantBarcode.error) {
+            result.failed++;
+            result.errors.push({ row: rowIndex, error: variantBarcode.error });
+            continue;
+          }
           const variant: VariantImportRow = {
             parentSku,
             sku: row.sku?.toString().trim() || undefined,
-            barcode: row.barcode?.toString().trim() || undefined,
+            barcode: variantBarcode.value,
             price: toFils(row.price),
             compareAtPrice: toFils(row.compareAtPrice),
             costPrice: toFils(row.costPrice),
@@ -952,6 +1055,20 @@ export class BulkService {
             continue;
           }
           skuClaimedBy.set(row.sku, target);
+        }
+
+        if (row.barcode) {
+          const checked = checkBarcode(
+            row.barcode,
+            existing?.id ?? `new:${rowIndex}`,
+            existing?.id
+          );
+          if (checked.error) {
+            result.failed++;
+            result.errors.push({ row: rowIndex, error: checked.error });
+            continue;
+          }
+          row.barcode = checked.value;
         }
 
         // Ensure unique slug using the in-memory Set (avoid DB round-trip)
@@ -1139,7 +1256,8 @@ export class BulkService {
                 compareAtPrice: row.compareAtPrice ? parseInt(String(row.compareAtPrice)) : null,
                 costPrice: row.costPrice ? parseInt(String(row.costPrice)) : null,
                 sku: row.sku || null,
-                barcode: row.barcode || null,
+                // BARCODE-1: blank = leave alone on update (a code may be on a printed label).
+                ...(row.barcode || !existing ? { barcode: row.barcode || null } : {}),
                 inventory: row.inventory ? parseInt(String(row.inventory)) : 0,
                 lowStockThreshold: row.lowStockThreshold
                   ? parseInt(String(row.lowStockThreshold))
@@ -1465,6 +1583,9 @@ export class BulkService {
     // Imported rows changed product text: ask the search indexer to look at this store once
     // (Task 11). Each batch above already committed; inside a request this waits for its COMMIT.
     if (result.created + result.updated > 0) await requestStoreReindex(storeId, 'bulk-import');
+
+    // BARCODE-1: rows imported without a barcode get one (inventory.barcode stores only).
+    if (result.created + result.updated > 0) await fillMissingAfterImport(storeId);
 
     return result;
   }

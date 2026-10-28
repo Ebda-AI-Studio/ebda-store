@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { recommendationService } from '../../../services/recommendation.service';
 import logger from '../../logger';
@@ -19,7 +19,7 @@ import { inngest } from '../client';
  * After deletion, the cache of each source product that previously referenced
  * the deleted product is invalidated so stale recommendation lists are not served.
  */
-export const aiAutofillCleanup: InngestFunction.Any = inngest.createFunction(
+export const aiAutofillCleanup: JobDef = inngest.createFunction(
   {
     id: 'ai-autofill-cleanup',
     name: 'AI-first: clean up recommendations on product delete',

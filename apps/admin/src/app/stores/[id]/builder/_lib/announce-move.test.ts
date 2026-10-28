@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { layoutToDefinition, resolveLayoutSettings, reduceDocument } from '@ebda/shared';
 import { describeMove, describeStructure } from './announce-move';
 
-const doc = () => layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const doc = () => layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 
 describe('describeMove', () => {
   it('names the section that moved up, with its new position', () => {

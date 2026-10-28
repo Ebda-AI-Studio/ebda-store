@@ -1,5 +1,6 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { storeDirectory, withStore } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { notifyMerchantOfApplications } from '../../wholesale-merchant-notify';
@@ -34,7 +35,7 @@ export async function nudgeStore(storeId: string, now: Date = new Date()): Promi
   return pending;
 }
 
-export const wholesalePendingNudgeCron: InngestFunction.Any = inngest.createFunction(
+export const wholesalePendingNudgeCron: JobDef = inngest.createFunction(
   {
     id: 'wholesale-pending-nudge-cron',
     name: 'Wholesale applications - 48h merchant nudge',
@@ -42,9 +43,9 @@ export const wholesalePendingNudgeCron: InngestFunction.Any = inngest.createFunc
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 7 * * *' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     const stores = await step.run('list-stores', () =>
-      storeDirectory().then(list => list.map(s => ({ id: s.id })))
+      storeDirectory(storeFilter(event)).then(list => list.map(s => ({ id: s.id })))
     );
     let nudged = 0;
     for (const store of stores) {

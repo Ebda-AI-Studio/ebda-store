@@ -18,8 +18,8 @@ const h = vi.hoisted(() => {
   };
 });
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: h.send, createFunction: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendMarketingEmail: h.sendMarketingEmail },
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendMarketingEmail: h.sendMarketingEmail },
   ResendSendError: class extends Error {
     constructor(
       readonly code: string,
@@ -49,6 +49,7 @@ import {
 } from '@api/services/cart-email-optin.service';
 import { buildCampaignAudience, audienceCount } from '@api/services/campaign.service';
 import { signCartRestoreToken, verifyCartRestoreToken } from '@api/lib/cart-restore-token';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const hasDb = !!OWNER_URL && !OWNER_URL.includes('localhost:5432/test_db');
@@ -107,7 +108,7 @@ describe.skipIf(!hasDb)('cart-recovery email on real Postgres as ebda_app', () =
 
   beforeAll(async () => {
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-    await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+    await setAppRoleLogin(owner, APP_PASSWORD);
     await cleanup();
     const u = await owner.user.create({
       data: {

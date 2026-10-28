@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import {
   LIFECYCLE_DELAY_DAYS,
   TRIAL_RECAP_DAYS_BEFORE_END,
@@ -91,5 +91,5 @@ const firstOrderFn = inngest.createFunction(
   }
 );
 
-export const lifecycleEmails: InngestFunction.Any = lifecycleEmailsFn;
-export const lifecycleFirstOrder: InngestFunction.Any = firstOrderFn;
+export const lifecycleEmails: JobDef = lifecycleEmailsFn;
+export const lifecycleFirstOrder: JobDef = firstOrderFn;

@@ -25,7 +25,7 @@
  *
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext, storeDirectory, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -97,7 +97,7 @@ export async function ingestStoreGsc(
 // Daily cron — 04:00 UTC
 // ---------------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating directly here breaks TS's inference of `step.run`'s
 // return type once its result is threaded through `chunk()` (a generic
 // helper). Same trap documented in bulk-ai-translate.ts / the citation scan
@@ -122,17 +122,6 @@ const gscIngestCronFn = inngest.createFunction(
       });
       return { configured: false, stores: 0, ingested: 0, skipped: 0, errored: 0 };
     }
-
-    // INNGEST_DEPLOY_ID re-sync trap: this is a BRAND-NEW cron. Inngest only
-    // re-syncs the function manifest (which crons/events it knows about)
-    // when it detects a deploy-version change — see client.ts's
-    // INNGEST_DEPLOY_ID mapping comment. Until the next Railway deploy bumps
-    // that id, this cron trigger is invisible to Inngest's scheduler even
-    // though it's registered in code (the event-triggered
-    // `gscIngestOnDemand` twin works immediately since events don't depend
-    // on the cron manifest sync). No action needed beyond a normal deploy —
-    // called out here so a future "why isn't the daily ingest running"
-    // investigation finds this fast.
 
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set yet).
@@ -178,13 +167,13 @@ const gscIngestCronFn = inngest.createFunction(
   }
 );
 
-export const gscIngestCron: InngestFunction.Any = gscIngestCronFn;
+export const gscIngestCron: JobDef = gscIngestCronFn;
 
 // ---------------------------------------------------------------------------
 // On-demand — triggered by `gsc/ingest-requested` event
 // ---------------------------------------------------------------------------
 
-export const gscIngestOnDemand: InngestFunction.Any = inngest.createFunction(
+export const gscIngestOnDemand: JobDef = inngest.createFunction(
   {
     id: 'gsc-ingest-on-demand',
     name: 'GSC daily ingestion — on-demand (force-managed)',

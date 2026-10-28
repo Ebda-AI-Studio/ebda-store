@@ -4,7 +4,7 @@ on:
   # Auto-deploy (Ahmad, 2026-10-25): a merge that changes anything the API Worker is built from deploys it,
   # so main and production cannot drift (before this a push never redeployed the API and the frontends rolled
   # on without it). Same gates as a manual run: workerd smoke, migrate, deploy, /health commit verify with
-  # automatic rollback, Inngest sync. The concurrency group below queues deploys and never cancels one.
+  # automatic rollback. The concurrency group below queues deploys and never cancels one.
   push:
     branches: [main]
     paths:
@@ -123,19 +123,6 @@ jobs:
             --probe "https://api.ebda.app/api/v1/public/stores/ebda-deploy-probe-nonexistent|404" \
             --rollback-probe "https://api.ebda.app/health|200" \
             --rollback-probe "https://api.ebda.app/api/v1/public/stores/ebda-deploy-probe-nonexistent|404"
-      - name: Sync Inngest with the deployed function list
-        # Ruling INNGEST-SYNC-1. Inngest only knows the functions of its LAST sync; nothing here
-        # re-synced after a deploy, so crons and event handlers added since (gold-rate feed #151,
-        # among others) silently never ran in production until a manual PUT on 2026-10-23.
-        # Fail the job loudly if the sync is refused, so a deploy never ships unregistered functions.
-        run: |
-          for attempt in 1 2 3; do
-            body=$(curl -sS -X PUT -m 30 https://api.ebda.app/api/v1/inngest || true)
-            echo "attempt $attempt: $body"
-            echo "$body" | grep -q '"message":"Successfully registered"' && exit 0
-            sleep 10
-          done
-          echo "::error::Inngest sync failed after 3 attempts" && exit 1
 
   # OPS-5: a failed deploy used to be silent (the storefront stayed on an old build for days). Alerts the Telegram bridge;
   # no secrets configured = skip, never fail.

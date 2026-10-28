@@ -24,7 +24,7 @@
  * A draft may hold half-typed rows (blank label or blank link) so autosave can
  * persist them; publish drops blank rows, exactly like the classic editor's save.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { isSafeUrl } from '../utils/safe-url';
 
 /** A blank link is allowed in a draft (a row being typed); anything else must be safe. */

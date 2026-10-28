@@ -21,7 +21,7 @@ const store = {
   currency: 'EGP',
   status: 'active',
   timezone: 'Africa/Cairo',
-  template: 'modern',
+  template: 'qamar',
   theme: {},
   socialLinks: {},
 } as never;
@@ -137,5 +137,30 @@ describe('merchantReturnPolicyJsonLd', () => {
       returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
     });
     expect(ld.hasMerchantReturnPolicy).not.toHaveProperty('merchantReturnDays');
+  });
+});
+
+describe('Product JSON-LD images (audit M-170)', () => {
+  const img = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ url: `https://media.ebda.app/p${i}.webp` }));
+  it('one image stays a plain string', () => {
+    const ld = productJsonLd({ ...(product as object), images: img(1) } as never, store) as {
+      image: unknown;
+    };
+    expect(ld.image).toBe('https://media.ebda.app/p0.webp');
+  });
+  it('a gallery lists every image, at most 10', () => {
+    const ld = productJsonLd({ ...(product as object), images: img(3) } as never, store) as {
+      image: unknown;
+    };
+    expect(ld.image).toEqual(img(3).map(i => i.url));
+    const many = productJsonLd({ ...(product as object), images: img(14) } as never, store) as {
+      image: string[];
+    };
+    expect(many.image).toHaveLength(10);
+  });
+  it('no images, no image field', () => {
+    const ld = productJsonLd(product, store) as Record<string, unknown>;
+    expect('image' in ld).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
@@ -23,7 +24,7 @@ import { REGION } from '@ebda/shared';
  * Each per-store scan is wrapped in step.run() so Inngest retries only the
  * failing store without re-running healthy ones.
  */
-export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunction(
+export const stockDeadstockScanCron: JobDef = inngest.createFunction(
   {
     id: 'stock-deadstock-scan-cron',
     name: 'Dead-stock scan — weekly cron (AI)',
@@ -31,7 +32,7 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * 0` }], // Sunday 06:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set).
     // runDeadstockScan() already wraps its own DB work in withRlsBypass.
@@ -43,7 +44,7 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
           s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
           isAiEligiblePlan(s.plan as StorePlan)
-      ).then(list => list.map(s => ({ id: s.id })))
+      ).then(list => list.filter(storeFilter(event)).map(s => ({ id: s.id })))
     );
 
     let totalFlagged = 0;
@@ -81,7 +82,7 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
  * Fired by the admin "Re-scan now" button (super_admin only).
  * Event: `stock/deadstock-scan-requested` with data: { storeId, requestedBy? }
  */
-export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFunction(
+export const stockDeadstockScanOnDemand: JobDef = inngest.createFunction(
   {
     id: 'stock-deadstock-scan-on-demand',
     name: 'Dead-stock scan — on-demand (AI)',
@@ -94,7 +95,13 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
     logger.info({ storeId, requestedBy }, 'stock-deadstock-scan-on-demand: starting');
 
     // Feature gate — skip when inventory.basic is disabled.
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
+    // One step for both gates: on a Workflow only step bodies hold a database connection.
+    const { enabled, store } = await step.run('gates', async () => ({
+      enabled: await featureService.isFeatureEnabled(storeId, 'inventory.basic'),
+      store: await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    }));
     if (!enabled) {
       logger.info(
         { storeId },
@@ -103,11 +110,8 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
     }
 
-    // Plan gate — inventory.basic is in the `free` baseline so a lapsed
-    // merchant can still see their stock; it must not buy them AI spend.
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    // Plan gate: inventory.basic is in the `free` baseline so a lapsed merchant can still see their
+    // stock; it must not buy them AI spend.
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

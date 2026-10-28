@@ -306,6 +306,7 @@ export function AdminLayout({
     shipping: tcp('pages.shipping'),
     tax: tcp('pages.tax'),
     pwa: tcp('pages.pwa'),
+    qr: tcp('pages.qr'),
     template: tcp('pages.template'),
     language: tcp('pages.language'),
     staff: tcp('pages.staff'),
@@ -401,7 +402,7 @@ export function AdminLayout({
           />
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
-        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] lg:inline-block">
+        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
           ⌘K
         </kbd>
       </button>

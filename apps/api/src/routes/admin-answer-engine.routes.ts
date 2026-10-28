@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { requireMfaEnrolled } from '../middleware/require-mfa';

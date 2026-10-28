@@ -31,6 +31,7 @@ import {
   upsertModel,
 } from '../../apps/api/src/services/product-model.service';
 import { ProductService } from '../../apps/api/src/services/product.service';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -103,7 +104,7 @@ async function freshStore(tag: string): Promise<string> {
     },
   });
   const s = await owner.store.create({
-    data: { slug: `${PREFIX}${tag}`, name: tag, ownerId: u.id, template: 'modern' },
+    data: { slug: `${PREFIX}${tag}`, name: tag, ownerId: u.id, template: 'qamar' },
   });
   return s.id;
 }
@@ -143,7 +144,7 @@ async function productWithOptions(storeId: string, tag: string) {
 
 beforeAll(async () => {
   owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-  await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+  await setAppRoleLogin(owner, APP_PASSWORD);
   ids.storeA = await freshStore('a');
   ids.storeB = await freshStore('b');
   const a = await productWithOptions(ids.storeA, 'pa');

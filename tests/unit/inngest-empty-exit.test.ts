@@ -32,4 +32,12 @@ describe('stepRunUnlessEmpty', () => {
     expect(await stepRunUnlessEmpty(step, 'find', () => [])).toEqual([]);
     expect(step.run).not.toHaveBeenCalled();
   });
+
+  it('Cloudflare Workflow step: the read happens only inside the step (no database outside it), even when empty', async () => {
+    const step = { ...countingStep(), cfWorkflow: true as const };
+    const read = vi.fn(async () => [] as number[]);
+    expect(await stepRunUnlessEmpty(step, 'find', read)).toEqual([]);
+    expect(step.run).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(1); // once, inside the step
+  });
 });

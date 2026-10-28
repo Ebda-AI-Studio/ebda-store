@@ -1,5 +1,6 @@
 'use client';
 
+import { localizeHref, splitLocalePrefix } from '../lib/locale-paths';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@ebda/ui';
 import type { PublicGoldPricing } from '@ebda/shared';
@@ -340,7 +341,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           // Plain navigation, not useRouter: this provider also renders outside
           // the app router (tests, the layout render harnesses).
           if (item.slug && typeof window !== 'undefined') {
-            window.location.assign(`/products/${encodeURIComponent(item.slug)}`);
+            // a `/ar|/en` page keeps its language prefix (LOCALE-PATHS-1)
+            window.location.assign(
+              localizeHref(
+                `/products/${encodeURIComponent(item.slug)}`,
+                splitLocalePrefix(window.location.pathname)?.locale ?? null
+              )
+            );
           }
           return false;
         } else {

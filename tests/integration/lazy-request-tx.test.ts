@@ -31,6 +31,7 @@ import { publicStoreContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const PREFIX = 'lazytx-';
@@ -63,9 +64,7 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
 
   beforeAll(async () => {
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-    await owner.$executeRawUnsafe(
-      `ALTER ROLE ebda_app WITH LOGIN PASSWORD '${process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'}'`
-    );
+    await setAppRoleLogin(owner, process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw');
     await cleanup();
     const run = crypto.randomUUID().slice(0, 8);
     const mk = async (tag: string) => {

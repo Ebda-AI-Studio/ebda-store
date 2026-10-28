@@ -13,6 +13,7 @@ import {
   parseStoreHost,
   isReservedSlug,
   validateStoreSlugFormat,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
@@ -137,6 +138,8 @@ export interface ResolvedStore {
    * store's plan has abandoned-cart recovery AND the merchant turned the email channel on.
    */
   cartEmailOptIn?: boolean;
+  /** Ebda WhatsApp is linked: show the WhatsApp marketing-consent box (Ruling WA-CONSENT-1). */
+  whatsappMarketingOptIn?: boolean;
 
   // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.
   // NULL/undefined means the merchant never declared one, and the storefront
@@ -231,7 +234,7 @@ const DEFAULT_STORE: ResolvedStore = {
   status: 'active',
   currency: REGION.currency,
   timezone: 'Africa/Cairo',
-  template: 'modern',
+  template: 'qamar',
   theme: DEFAULT_THEME,
   socialLinks: {},
   heroTitle: null,
@@ -418,11 +421,11 @@ async function fetchStoreByDomain(
       descriptionAr: storeData.descriptionAr,
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
-      template: storeData.template || 'modern',
+      template: normalizeLegacyTemplate(storeData.template),
       look: storeData.look ?? null,
       isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
-        template: storeData.template || 'modern',
+        template: normalizeLegacyTemplate(storeData.template),
         look: storeData.look,
         theme: customTheme,
       }),
@@ -469,6 +472,7 @@ async function fetchStoreByDomain(
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       cartEmailOptIn: storeData.cartEmailOptIn === true,
+      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -594,11 +598,11 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       descriptionAr: storeData.descriptionAr,
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
-      template: storeData.template || 'modern',
+      template: normalizeLegacyTemplate(storeData.template),
       look: storeData.look ?? null,
       isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
-        template: storeData.template || 'modern',
+        template: normalizeLegacyTemplate(storeData.template),
         look: storeData.look,
         theme: customTheme,
       }),
@@ -645,6 +649,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       cartEmailOptIn: storeData.cartEmailOptIn === true,
+      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -934,11 +939,11 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       descriptionAr: storeData.descriptionAr,
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
-      template: storeData.template || 'modern',
+      template: normalizeLegacyTemplate(storeData.template),
       look: storeData.look ?? null,
       isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
-        template: storeData.template || 'modern',
+        template: normalizeLegacyTemplate(storeData.template),
         look: storeData.look,
         theme: customTheme,
       }),
@@ -985,6 +990,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       cartEmailOptIn: storeData.cartEmailOptIn === true,
+      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

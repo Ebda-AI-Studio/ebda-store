@@ -9,6 +9,7 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
+import { recordReferral } from './billing/grants.service';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
   getLook,
@@ -174,6 +175,8 @@ export class OnboardingService {
       language?: 'ar' | 'en';
       /** Plan chosen at signup (billed at trial end); defaults to Growth monthly. */
       plan?: TrialChoice;
+      /** Referrer's store slug (FOUNDING-1): recorded only for the owner's first store. */
+      ref?: string;
     }
   ) {
     const user = await withUser(owner.userId, tx =>
@@ -268,6 +271,15 @@ export class OnboardingService {
             userId: owner.userId,
             storeId: result.store.id,
           });
+        }
+        // FOUNDING-1: remember who referred this store (best effort; the reward is paid at the first PAID month).
+        if (input.ref && ownedNow === 0 && !owner.isSuperAdmin) {
+          await recordReferral(result.store.id, input.ref).catch(err =>
+            logger.warn(
+              { err, storeId: result.store.id },
+              '[ONBOARDING] recording the referral failed'
+            )
+          );
         }
         // Only a failed look application is reported (the default look is applied like a chosen one).
         const lookApplied = await this.applyChosenLook(result.store.id, look.id, owner.userId);

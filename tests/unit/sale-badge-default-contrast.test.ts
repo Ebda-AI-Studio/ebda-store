@@ -70,7 +70,8 @@ describe('K-01: the default sale badge reads at AA', () => {
   const users = walk(WEB).filter(f => readFileSync(f, 'utf8').includes('getDiscountBadgeColor('));
 
   it('finds every card path that reads the badge colour', () => {
-    expect(users.length).toBeGreaterThanOrEqual(8);
+    // StorefrontProductCard, base/ProductCard, ProductCarousel, ProductListItem
+    expect(users.length).toBeGreaterThanOrEqual(4);
   });
 
   it('a label painted in the colour asks for the text default; a chip asks for the fill', () => {

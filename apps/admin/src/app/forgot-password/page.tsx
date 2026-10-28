@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button, Input } from '@ebda/ui';
 import { PASSWORD_RESET_TTL_MINUTES, isValidEmail } from '@ebda/shared';
 import { PublicShell } from '../../components/onboarding/PublicShell';
-import { apiPost } from '../../lib/api';
+import { AccountsError, accountsFetch } from '../../lib/accounts';
 import { useT } from '@/i18n/useT';
 
 /**
@@ -31,13 +31,17 @@ export default function ForgotPasswordPage() {
       return;
     }
     setSubmitting(true);
-    // No storeId: the admin namespace, i.e. Ebda Store accounts.
-    const { error } = await apiPost('/api/v1/auth/forgot-password', { email: value });
-    setSubmitting(false);
-    if (error) {
-      setFormError(error.status === 429 ? t('rateLimited') : t('generic'));
+    // The shared identity service owns merchant sign-in and answers identically whether or not the address exists.
+    try {
+      await accountsFetch('/password/forgot', { json: { email: value } });
+    } catch (e) {
+      setSubmitting(false);
+      setFormError(
+        e instanceof AccountsError && e.status === 429 ? t('rateLimited') : t('generic')
+      );
       return;
     }
+    setSubmitting(false);
     setSentTo(value);
   }
 

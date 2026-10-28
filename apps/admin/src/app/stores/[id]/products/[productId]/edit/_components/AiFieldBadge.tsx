@@ -39,7 +39,7 @@ export function AiFieldBadge({
   if (owner === 'ai') {
     return (
       <span
-        className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary-ink"
+        className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary-ink"
         title={t('aiGeneratedTitle')}
       >
         ✨ {t('aiLabel')}
@@ -66,7 +66,7 @@ export function AiFieldBadge({
           }
           onReset?.(field, data.value);
         }}
-        className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-50 ${
+        className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium disabled:opacity-50 ${
           failed
             ? 'bg-destructive/10 text-destructive-ink'
             : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'

@@ -179,7 +179,7 @@ describe.skipIf(!hasDb)('gold-rate service, repricer and gate (ebda_app + tenant
         data: {
           name: `gold-${run}`,
           slug: `gold-${run}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: o.id,
           status: 'active',
@@ -752,7 +752,7 @@ describe.skipIf(!hasDb)('gold-rate service, repricer and gate (ebda_app + tenant
         data: {
           name: `gold-cap-${run}`,
           slug: `gold-cap-${run}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: u.id,
           status: 'active',

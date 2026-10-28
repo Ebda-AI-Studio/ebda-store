@@ -57,7 +57,7 @@ Effect:
 
 - `cf-{web,admin,orders,marketing}-deploy.yml` each re-run on the push and `wrangler deploy` the reverted Worker (~3–5 min, only the apps whose paths changed since that workflow's last successful run)
 - the API auto-deploys on a push to `main` that touches `apps/api/**`, `packages/**`, the lockfile or the deploy config (`cf-api-deploy.yml`, Ruling API-AUTODEPLOY-1, 2026-10-25); `scripts/rollback.sh` also dispatches it explicitly; a manual `git revert && git push` must also run `gh workflow run cf-api-deploy.yml`, or the API stays on the old commit while the frontends roll back
-- Inngest functions auto-redeploy on next API Worker boot
+- Background jobs (Workflows, Queues, Cron Triggers) ship with the API Worker version, so a rollback restores the previous job code too (Ruling G5-3: no Inngest fallback)
 - OneSignal apps unchanged (no rebuild)
 
 ### C. Data rollback (PITR first, dump restore as fallback)
@@ -262,3 +262,7 @@ The RLS-via-AsyncLocalStorage pattern (`runInTenantContext`) sets `app.current_s
 ## Semantic search indexer — stop the Workers AI spend
 
 Flipping `SEARCH_SEMANTIC_ENABLED` to `false` (or rolling the API back to a version with it `false`) does **NOT** stop the indexer: `search-product-index` and `search-index-backstop` embed products whenever the `AI` binding exists (Ruling SEARCH-T11-8). The stop is `SEARCH_EMBED_STORE_DAILY_CAP=0` — see `docs/ENVIRONMENT.md` → "Semantic search — emergency stop" for the durable (wrangler `vars` + `cf-api-deploy.yml`) and emergency (dashboard variable, undone by the next deploy) routes. Rolling back to a version WITHOUT the `ai` binding (before PR 3) also stops it, at the cost of every other change since.
+
+## Page revision publisher (`20261107000220_store_page_revisions_published_by`)
+
+Additive, nullable. Rollback: `ALTER TABLE store_page_revisions DROP COLUMN published_by;` (history then simply shows no publisher; nothing else reads them).

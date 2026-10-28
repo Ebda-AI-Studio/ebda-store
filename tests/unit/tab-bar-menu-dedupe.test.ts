@@ -21,7 +21,7 @@ describe('one mobile menu', () => {
     expect(tabBarShownOn('/account/orders/abc')).toBe(false);
   });
 
-  it.each(['minimal', 'bold', 'classic', 'elegant', 'modern', 'dahab'])(
+  it.each(['base', 'dahab'])(
     '%s header hides its menu button below md when the tab bar shows',
     skin => {
       const src = readFileSync(

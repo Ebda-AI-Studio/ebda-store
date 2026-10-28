@@ -11,8 +11,8 @@
  * released while the run sleeps and re-taken after, released on success and on failure.
  */
 import logger from '../logger';
-import { dispatchEventsToAll } from './dispatch-all';
-import { failedEvent, runOnFailure } from './failure';
+import { dispatchEventsToAll } from './dispatch';
+import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,
   debounceFor,
@@ -128,8 +128,8 @@ export async function runJobWorkflow(a: RunWorkflowArgs): Promise<void> {
     await step.do('on-failure', NO_RETRY, () =>
       a.withContext(async () => {
         await runOnFailure(def, event, a.instanceId, error);
-        await dispatchEventsToAll(failedEvent(def, event, a.instanceId, error));
-        return null;
+        // The step output is the proof of delivery: alert outcome + Sentry event id + flush result.
+        return reportJobFailure(def, event, a.instanceId, error);
       })
     );
     if (isNonRetriable(error)) throw new a.NonRetryable(error.message);

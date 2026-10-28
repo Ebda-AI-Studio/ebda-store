@@ -14,6 +14,8 @@ const pages = [
   '/en/',
   '/search/',
   '/en/search/',
+  '/no-such-page/',
+  '/en/no-such-page/',
   ...slugs.flatMap(s => [`/${s}/`, `/en/${s}/`]),
 ];
 

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -58,7 +58,7 @@ interface AbandonCandidate {
   payments: { provider: string | null }[];
 }
 
-export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFunction(
+export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
   {
     id: 'payment-abandonment-sweep',
     name: 'Payment-gateway abandonment capture (hourly cron, Enterprise)',
@@ -69,11 +69,11 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
     triggers: [{ cron: '7 * * * *' }], // hourly
   },
   async ({ step }) => {
-    const threshold = new Date(Date.now() - PAYMENT_ABANDON_MINUTES * 60_000);
-
     // Cross-tenant sweep — bypass RLS (no HTTP tenant GUC on a cron).
-    const candidates = (await stepRunUnlessEmpty(step, 'find-gateway-abandoners', () =>
-      sweepAcrossStores({
+    const candidates = (await stepRunUnlessEmpty(step, 'find-gateway-abandoners', () => {
+      // Inside the step: the cutoff is part of the memoised read, not re-derived on replay.
+      const threshold = new Date(Date.now() - PAYMENT_ABANDON_MINUTES * 60_000);
+      return sweepAcrossStores({
         fetch: storeId =>
           prisma.order.findMany({
             where: {
@@ -112,8 +112,8 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
           }),
         orderKey: r => r.createdAt,
         take: SWEEP_CAP,
-      })
-    )) as AbandonCandidate[];
+      });
+    })) as AbandonCandidate[];
 
     if (candidates.length === 0) {
       logger.debug('[payment-abandonment-sweep] no gateway abandoners found this tick');
@@ -127,15 +127,20 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
 
     // Per-store Enterprise feature check — only stamp for enabled stores.
     const storeIds = [...new Set(candidates.map((c: AbandonCandidate) => c.storeId))];
-    const featureMap = new Map<string, boolean>();
-    await Promise.all(
-      storeIds.map(async (sid: string) => {
-        const enabled = await featureService.isFeatureEnabled(sid, 'payment_abandonment');
-        featureMap.set(sid, enabled);
+    // In a step: on a Workflow only step bodies hold a database connection.
+    const enabledStoreIds = new Set(
+      await step.run('check-features', async () => {
+        const flags = await Promise.all(
+          storeIds.map(
+            async (sid: string) =>
+              [sid, await featureService.isFeatureEnabled(sid, 'payment_abandonment')] as const
+          )
+        );
+        return flags.filter(([, on]) => on).map(([sid]) => sid);
       })
     );
 
-    const eligible = candidates.filter((c: AbandonCandidate) => featureMap.get(c.storeId) === true);
+    const eligible = candidates.filter((c: AbandonCandidate) => enabledStoreIds.has(c.storeId));
     const skipped = candidates.length - eligible.length;
 
     if (eligible.length === 0) {
@@ -146,14 +151,12 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
       return { stamped: 0, skipped };
     }
 
-    let stamped = 0;
-    const now = new Date();
-
     // Stamp each order in its own tenant context so RLS is correct for the
     // UPDATE. step.run gives Inngest per-item retry isolation.
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       eligible.map((order: AbandonCandidate) =>
         step.run(`stamp-${order.id}`, async () => {
+          const now = new Date();
           const res = await runInTenantContext(order.storeId, () =>
             prisma.order.updateMany({
               where: {
@@ -170,9 +173,8 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
           // count === 0 → the guard didn't match (already stamped or paid in the
           // race window). Skip both the counter and the alert so we never
           // double-notify. This is what makes the push exactly-once per order.
-          if (res.count === 0) return;
+          if (res.count === 0) return false;
 
-          stamped += 1;
           logger.info(
             { orderId: order.id, storeId: order.storeId, orderNumber: order.orderNumber },
             '[payment-abandonment-sweep] stamped'
@@ -196,9 +198,12 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
               '[payment-abandonment-sweep] abandoned-checkout push failed'
             );
           }
+          return true;
         })
       )
     );
+    // Counted from the step results (memoised), not a closure counter a replay would reset.
+    const stamped = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
 
     logger.info({ stamped, skipped }, '[payment-abandonment-sweep] tick complete');
     return { stamped, skipped };

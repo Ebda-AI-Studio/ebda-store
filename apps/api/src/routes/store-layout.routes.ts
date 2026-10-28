@@ -8,15 +8,15 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import {
   resolveLayoutSettings,
   storeLayoutSchema,
   heroSlideSchema,
   pageOwnedKeysIn,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
-import type { TemplateId } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -53,7 +53,7 @@ router.get(
       });
       const layout = resolveLayoutSettings(
         store?.layoutSettings ?? {},
-        store?.template as TemplateId | undefined,
+        store?.template ? normalizeLegacyTemplate(store.template) : undefined,
         store?.look
       );
       res.json({ success: true, data: { layout } });
@@ -100,7 +100,9 @@ router.put(
         select: { layoutSettings: true, template: true, look: true, slug: true, domain: true },
       });
       const previousLayout = current?.layoutSettings ?? {};
-      const currentTemplate = current?.template as TemplateId | undefined;
+      const currentTemplate = current?.template
+        ? normalizeLegacyTemplate(current.template)
+        : undefined;
       const merged = resolveLayoutSettings(
         {
           ...resolveLayoutSettings(previousLayout, currentTemplate, current?.look),

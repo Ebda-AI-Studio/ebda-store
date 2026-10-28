@@ -7,6 +7,7 @@ import {
   SlugEntityType,
   withStore,
 } from '@ebda/database';
+import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
 import { effectiveInventory, enrichStockFlags } from '../lib/effective-inventory';
 import {
@@ -153,6 +154,8 @@ interface CreateProductData {
   discountValue?: number | null;
   /** `null` clears the SKU; `undefined` leaves the stored value alone. */
   sku?: string | null;
+  /** BARCODE-1: typed/scanned code; `''`/`null` clears (update), omitted = auto-generate on create. */
+  barcode?: string | null;
   inventory?: number;
   /** Per-product threshold for the LOW STOCK badge / merchant alerts. */
   lowStockThreshold?: number;
@@ -731,6 +734,10 @@ export class ProductService {
       data as unknown as Record<string, unknown>
     );
 
+    // BARCODE-1: a typed barcode must be valid and unused anywhere in the store.
+    const typedBarcode = data.barcode?.trim() ? parseBarcodeOrThrow(data.barcode) : undefined;
+    if (typedBarcode) await assertBarcodeAvailable(storeId, typedBarcode);
+
     const product = await prisma.product.create({
       data: {
         storeId,
@@ -752,6 +759,7 @@ export class ProductService {
         discountType: data.discountType ?? null,
         discountValue: data.discountValue ?? null,
         sku: data.sku,
+        ...(typedBarcode ? { barcode: typedBarcode } : {}),
         inventory: data.inventory ?? 0,
         ...(data.lowStockThreshold !== undefined
           ? { lowStockThreshold: data.lowStockThreshold }
@@ -790,6 +798,13 @@ export class ProductService {
       },
     });
 
+    // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
+    // A product that later gets variants carries its codes on the variants.
+    if (!typedBarcode) {
+      const auto = await ensureBarcode(storeId, { productId: product.id });
+      if (auto) (product as { barcode?: string | null }).barcode = auto;
+    }
+
     await this.invalidateStoreProductCache(storeId);
 
     // Fire product.upserted for Meta Catalog sync (Phase A — native catalog bot).
@@ -819,6 +834,17 @@ export class ProductService {
   }
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
+    // BARCODE-1: validate a changed barcode; '' / null clears it.
+    let barcodeUpdate: { barcode?: string | null } = {};
+    if (data.barcode !== undefined) {
+      const raw = data.barcode?.trim();
+      if (!raw) barcodeUpdate = { barcode: null };
+      else {
+        const value = parseBarcodeOrThrow(raw);
+        await assertBarcodeAvailable(storeId, value, { productId });
+        barcodeUpdate = { barcode: value };
+      }
+    }
     await assertB2bProductFields(storeId, data);
     await this.assertCategoriesInStore(storeId, data.categories);
     await assertSizeChartInStore(storeId, data.sizeChartId);
@@ -972,6 +998,7 @@ export class ProductService {
           ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
           ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
           ...(data.sku !== undefined ? { sku: data.sku } : {}),
+          ...barcodeUpdate,
           // Card badge — null clears, an omitted key leaves it alone. Same
           // convention as nameAr / description / excerpt above.
           ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
@@ -1015,6 +1042,7 @@ export class ProductService {
         },
       });
       if (Object.keys(setSources).length > 0 || removedSources.length > 0) {
+        // wa-catalog: not-catalog-data (ai_field_sources is internal; the product update above is observed)
         // Per-key merge on the row as it is NOW (this UPDATE holds its lock): concurrent
         // stamps on other keys survive. store_id keeps the raw statement tenant-keyed.
         const merged = await tx.$queryRaw<Array<{ ai_field_sources: unknown }>>`

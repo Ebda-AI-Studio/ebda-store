@@ -7,7 +7,7 @@
  *    (`TrustLine`: /payments/config + store.returnWindowDays), on the default
  *    PDP and the Dahab PDP.
  *  - Receipt: the delivery window (from the order's date) and a WhatsApp link.
- *  - Footer: a labelled WhatsApp contact line on all 5 skins + Dahab.
+ *  - Footer: a labelled WhatsApp contact line on the shared base and Dahab.
  */
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -68,11 +68,7 @@ import { fetchCodOffer } from '../../apps/web/src/lib/cod-offer';
 import { useStorePaymentConfig } from '../../apps/web/src/hooks/useStorePaymentConfig';
 import { renderToString } from 'react-dom/server';
 import { ReceiptPrinter } from '../../apps/web/src/components/commerce/ReceiptPrinter';
-import Minimal from '../../apps/web/src/templates/minimal/Footer';
-import Classic from '../../apps/web/src/templates/classic/Footer';
-import Modern from '../../apps/web/src/templates/modern/Footer';
-import Elegant from '../../apps/web/src/templates/elegant/Footer';
-import Bold from '../../apps/web/src/templates/bold/Footer';
+import Base from '../../apps/web/src/templates/base/Footer';
 import Dahab from '../../apps/web/src/templates/dahab/Footer';
 
 const cod = {
@@ -285,11 +281,7 @@ describe('S-02: the receipt repeats the delivery window and offers WhatsApp', ()
 });
 
 const FOOTERS = {
-  minimal: Minimal,
-  classic: Classic,
-  modern: Modern,
-  elegant: Elegant,
-  bold: Bold,
+  base: Base,
   dahab: Dahab,
 };
 describe.each(Object.entries(FOOTERS))('S-02: %s footer WhatsApp line', (_n, Footer) => {

@@ -20,6 +20,7 @@ vi.mock('../lib/store-resolver', () => ({
 }));
 
 vi.mock('next/headers', () => ({
+  headers: async () => new Headers(),
   cookies: async () => ({
     get: (k: string) =>
       k === 'force-language' && cookieRef.lang ? { value: cookieRef.lang } : undefined,

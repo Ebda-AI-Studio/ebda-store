@@ -62,7 +62,7 @@ async function seed(): Promise<Seeded> {
         data: {
           name: `crmerase-store-${tag}`,
           slug: `${PREFIX}store-${tag}-${uniq}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

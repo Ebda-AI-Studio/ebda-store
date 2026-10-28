@@ -43,19 +43,11 @@ vi.mock('../../apps/web/src/lib/api', () => ({
 }));
 
 import { CART_CHECKOUT_CTA } from '../../apps/web/src/lib/checkout-cta';
-import Minimal from '../../apps/web/src/templates/minimal/OrderSummary';
-import Modern from '../../apps/web/src/templates/modern/OrderSummary';
-import Classic from '../../apps/web/src/templates/classic/OrderSummary';
-import Elegant from '../../apps/web/src/templates/elegant/OrderSummary';
-import Bold from '../../apps/web/src/templates/bold/OrderSummary';
+import Base from '../../apps/web/src/templates/base/OrderSummary';
 import Dahab from '../../apps/web/src/templates/dahab/OrderSummary';
 
 const SKINS = {
-  minimal: Minimal,
-  modern: Modern,
-  classic: Classic,
-  elegant: Elegant,
-  bold: Bold,
+  base: Base,
   dahab: Dahab,
 };
 

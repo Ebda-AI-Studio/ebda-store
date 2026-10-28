@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { redactPathSecrets } from '@ebda/shared';
 import logger from '../lib/logger';
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
@@ -23,7 +24,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     logFn(
       {
         method: req.method,
-        path: req.path,
+        // SEC-8: the Bosta webhook secret is a path segment; never log it.
+        path: redactPathSecrets(req.path),
         statusCode,
         durationMs: duration,
         userId: req.user?.userId,

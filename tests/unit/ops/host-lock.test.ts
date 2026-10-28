@@ -114,8 +114,9 @@ describe('host-lock.sh', () => {
     // cheap checks first, expensive ones last
     const at = (needle: string) => gate.indexOf(needle);
     expect(at('check-action-pins')).toBeLessThan(at('npm run lint'));
-    expect(at('npm run format:check')).toBeLessThan(at('tsc --noEmit'));
-    expect(at('npm run lint')).toBeLessThan(at('tsc --noEmit'));
-    expect(at('tsc --noEmit')).toBeLessThan(at('npm run test:unit'));
+    // (the full legacy gate; PREPUSH-1's affected-only branch above it runs its own cheap checks first)
+    expect(at('npm run format:check')).toBeLessThan(at('tsc --noEmit -p apps/api'));
+    expect(at('npm run lint\n')).toBeLessThan(at('tsc --noEmit -p apps/api'));
+    expect(at('tsc --noEmit -p apps/api')).toBeLessThan(at('npm run test:unit'));
   });
 });

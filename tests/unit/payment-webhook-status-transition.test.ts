@@ -24,9 +24,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── Mocks (declared before the module-under-test import) ────────────────
 
 const paymentFindFirst = vi.fn();
+const paymentEventCreateMock = vi.fn().mockResolvedValue({});
+const paymentEventFindManyMock = vi.fn().mockResolvedValue([]);
 const paymentUpdateMany = vi.fn();
 const paymentUpdate = vi.fn().mockResolvedValue({});
+const inngestSend = vi.fn().mockResolvedValue(undefined);
+const notifyFailure = vi.fn().mockResolvedValue(undefined);
 const orderUpdate = vi.fn().mockResolvedValue({});
+// the paid / failed transitions are conditional claims (payment-state-claims): one updateMany each
+const orderUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const orderFindUnique = vi.fn().mockResolvedValue({ storeId: 'store_1' });
 const paymentConfigFindMany = vi.fn();
 let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = null;
@@ -35,6 +41,7 @@ const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 vi.mock('@ebda/database', () => ({
   currentStoreId: () => STORE_ID,
   prisma: {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
       // handleWebhook resolves the payment with findMany({ take: 2 }) so an
@@ -47,10 +54,15 @@ vi.mock('@ebda/database', () => ({
       },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
-      findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
+      // lockPayment (refund-settle) and PaymentService.refund both re-read the payment: serve the current fixture
+      findUnique: async () => {
+        const r = (await paymentFindFirst()) as Record<string, unknown> | undefined;
+        return r ? { ...r, metadata: r.metadata ?? {} } : { metadata: {} };
+      },
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),
+      updateMany: (...a: unknown[]) => orderUpdateMany(...a),
       findUnique: (...a: unknown[]) => orderFindUnique(...a),
     },
     store: { findUnique: vi.fn() },
@@ -61,13 +73,15 @@ vi.mock('@ebda/database', () => ({
     $transaction: (ops: unknown[]) => txMock(ops),
     // PaymentService.refund's ledger rows (claim / completed / released).
     paymentEvent: {
-      create: vi.fn().mockResolvedValue({}),
-      findMany: vi.fn().mockResolvedValue([]),
+      create: (...a: unknown[]) => paymentEventCreateMock(...a),
+      findMany: (...a: unknown[]) => paymentEventFindManyMock(...a),
     },
   },
   Prisma: {},
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
+  hasTenantContext: () => true,
+  currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
   // The factory reads a store's provider configs inside that store's scope.
   withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
@@ -99,11 +113,15 @@ vi.mock('@api/services/socket.service', () => ({
 }));
 
 vi.mock('@api/lib/inngest/client', () => ({
-  inngest: { send: vi.fn().mockResolvedValue(undefined) },
+  inngest: { send: (...a: unknown[]) => inngestSend(...a) },
 }));
 
 vi.mock('@api/services/onesignal.service', () => ({
-  OneSignalService: { sendToStore: vi.fn(), sendToUser: vi.fn() },
+  OneSignalService: {
+    sendToStore: vi.fn(),
+    sendToUser: vi.fn(),
+    notifyAdminsOfPaymentFailure: (...a: unknown[]) => notifyFailure(...a),
+  },
 }));
 
 vi.mock('@api/services/redis.service', () => ({
@@ -354,10 +372,85 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('pending', 'confirmed');
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID, storeId: STORE_ID },
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        paymentStatus: { in: ['unpaid', 'failed'] },
+      }),
       data: { status: 'confirmed', paymentStatus: 'paid' },
     });
+  });
+
+  it('a verify that already paid the order: the webhook claims nothing, so no second fan-out (M-049)', async () => {
+    mockPaymentForWebhook('confirmed', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      amount: 5000,
+      currency: 'EGP',
+      paidAt: new Date(),
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    // both claim shapes (confirming, then already-fulfilled) match nothing: it is already paid
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 0 });
+    orderFindUnique.mockResolvedValueOnce({ paymentStatus: 'paid' });
+
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+
+    expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('a late or replayed webhook never moves a captured / refunded payment row off its state (payment write guard)', async () => {
+    for (const [incoming, notIn] of [
+      ['pending', ['completed', 'refunded', 'partially_refunded', 'disputed']],
+      ['processing', ['completed', 'refunded', 'partially_refunded', 'disputed']],
+      ['completed', ['refunded', 'partially_refunded', 'disputed']],
+    ] as const) {
+      vi.clearAllMocks();
+      mockPaymentForWebhook('confirmed', 'completed');
+      providerParseWebhook.mockReturnValue({
+        transactionId: TRANSACTION_ID,
+        status: incoming,
+        amount: 5000,
+        currency: 'EGP',
+      });
+      assertValidTransitionMock.mockImplementation(() => undefined);
+      paymentUpdateMany.mockResolvedValue({ count: 0 });
+      orderUpdateMany.mockResolvedValue({ count: 0 });
+      orderFindUnique.mockResolvedValue({ paymentStatus: 'paid' });
+      await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+      const write = paymentUpdateMany.mock.calls.find(
+        c => (c[0] as { data?: { status?: string } }).data?.status === incoming
+      );
+      expect(write, `payment write for ${incoming}`).toBeTruthy();
+      expect((write![0] as { where: { status?: unknown } }).where.status).toEqual({ notIn });
+    }
+  });
+
+  it('a late FAILED webhook on a PAID order changes nothing and pushes no failure alert (M-064)', async () => {
+    mockPaymentForWebhook('confirmed', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'expired',
+      amount: 5000,
+      currency: 'EGP',
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+    orderFindUnique.mockResolvedValueOnce({ paymentStatus: 'paid' });
+
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+
+    // the payment row is only touched through a guard that excludes a completed payment
+    const writes = paymentUpdateMany.mock.calls.filter(
+      c => (c[0] as { data?: { status?: string } }).data?.status === 'expired'
+    );
+    for (const w of writes)
+      expect((w[0] as { where: { status?: unknown } }).where.status).toEqual({
+        notIn: ['completed', 'refunded', 'partially_refunded', 'disputed'],
+      });
+    expect(notifyFailure).not.toHaveBeenCalled();
   });
 });
 
@@ -416,9 +509,13 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     ).rejects.toThrow('Cannot transition from cancelled to confirmed');
 
     expect(orderUpdate).not.toHaveBeenCalled();
+    expect(orderUpdateMany).not.toHaveBeenCalled();
     // The critical new assertion: the payment row must not have been mutated
     // before the assert rejected.
     expect(paymentUpdate).not.toHaveBeenCalled();
+    expect(
+      paymentUpdateMany.mock.calls.some(c => (c[0] as { data?: { status?: string } }).data?.status)
+    ).toBe(false);
   });
 
   it('refund branch: a failed applyRefundEffects leaves the idempotency metadata UNWRITTEN (retryable, not silently lost)', async () => {
@@ -816,6 +913,53 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
 
     expect(await alertSources()).toContain('payment.refund.held_provenance_unknown');
     expect(await alertSources()).not.toContain('payment.refund.held_unaccounted');
+  });
+
+  const claimRow = (claimId: string, amount: number, ageMs = 1000) => ({
+    eventType: 'refund_initiated',
+    createdAt: new Date(Date.now() - ageMs),
+    details: { claimId, amount },
+  });
+  const absorbedEvents = () =>
+    paymentEventCreateMock.mock.calls
+      .map(c => (c[0] as { data: { eventType: string; details: Record<string, unknown> } }).data)
+      .filter(d => d.eventType === 'refund_webhook_absorbed');
+
+  it('a settle webhook that outruns the in-band id write is absorbed: total unchanged, the CLAIM is consumed (event carries its id)', async () => {
+    paymentEventFindManyMock.mockResolvedValueOnce([claimRow('claim-1', 1000)]);
+    webhookFor(
+      {
+        refundedAmount: 3000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      },
+      { refundId: 'rf_new', amount: 1000 }
+    );
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+    const write = paymentUpdate.mock.calls.at(-1)?.[0] as { data: { refundedAmount?: number } };
+    expect(write.data.refundedAmount).toBe(3000);
+    expect(absorbedEvents()).toEqual([
+      expect.objectContaining({
+        details: expect.objectContaining({ claimId: 'claim-1', refundId: 'rf_new' }),
+      }),
+    ]);
+    expect(recordRefundOutsideReturn).not.toHaveBeenCalled();
+  });
+
+  it('a STALE claim (older than the window) does not absorb: the same webhook is a new refund and adds', async () => {
+    paymentEventFindManyMock.mockResolvedValueOnce([claimRow('claim-old', 1000, 10 * 60_000)]);
+    webhookFor(
+      {
+        refundedAmount: 3000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      },
+      { refundId: 'rf_new', amount: 1000 }
+    );
+    await PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID);
+    const write = paymentUpdate.mock.calls.at(-1)?.[0] as { data: { refundedAmount?: number } };
+    expect(write.data.refundedAmount).toBe(4000);
+    expect(absorbedEvents()).toEqual([]);
   });
 
   it('the settle notice for an already-counted refund raises nothing (control)', async () => {

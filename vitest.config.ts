@@ -31,11 +31,19 @@ export default defineConfig({
       'apps/status/**',
       // apps/accounts runs on workerd with a local D1 (npm run test:accounts).
       'apps/accounts/**',
+      // packages/repo/workers-test runs prisma-lite on a real Durable Object (workerd): npm run test:repo-workers.
+      'packages/repo/workers-test/**',
       // apps/api/workers-test runs the BUILT Worker on workerd via @cloudflare/vitest-pool-workers
       // (npm run cf:test -w apps/api).
       'apps/api/workers-test/**',
       // apps/api/workers-do runs the real StoreDO + D1 + R2 on local workerd (npm run cf:test:do -w apps/api).
       'apps/api/workers-do/**',
+      // Playwright specs (their own playwright.<name>.config.ts), not vitest: collecting them throws
+      // "Playwright Test did not expect test() to be called here" and failed `vitest list` in the
+      // Orphan test coverage job (Ruling ITEST-3).
+      'tests/{dahab,jasmine,lamma,marketing-layout,qamar,souq}/**',
+      // spikes/* are self-contained packages with their own vitest config (workerd pool: `cloudflare:test`).
+      'spikes/**',
     ],
     coverage: {
       provider: 'v8',

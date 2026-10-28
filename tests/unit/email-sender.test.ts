@@ -1,9 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-
-// Provider switch: the verified-merchant-domain cases pin the legacy (resend) path; everything
-// else pins the Cloudflare path. `emailProvider` is flipped per describe.
-const cfg = vi.hoisted(() => ({ emailProvider: 'cloudflare', resendApiKey: '' }));
-vi.mock('@api/config', () => ({ config: cfg }));
+import { describe, it, expect } from 'vitest';
 
 import {
   resolveSender,
@@ -100,7 +95,7 @@ describe('resolveSender (platform domain)', () => {
     );
   });
 
-  it('ignores a verified merchant domain on Cloudflare (it is not our zone)', () => {
+  it('ignores a merchant domain: mail always leaves from ebda.app (not our zone)', () => {
     const r = resolveSender(
       baseStore({ domain: 'demo-shop.example', emailDomainStatus: 'verified' })
     );
@@ -119,29 +114,6 @@ describe('resolveSender (platform domain)', () => {
       email: 'orders.demo-shop@ebda.app',
       name: 'Ahmad Best Shop',
     });
-  });
-});
-
-describe('resolveSender (legacy provider, verified merchant domain)', () => {
-  it('uses the merchant domain with the merchant prefix', () => {
-    cfg.emailProvider = 'resend';
-    try {
-      expect(
-        resolveSender(baseStore({ domain: 'demo-shop.example', emailDomainStatus: 'verified' }))
-          .from
-      ).toBe('Demo Shop <noreply@demo-shop.example>');
-      expect(
-        resolveSender(
-          baseStore({
-            domain: 'demo-shop.example',
-            emailDomainStatus: 'verified',
-            emailSenderLocalPart: 'hello',
-          })
-        ).from
-      ).toBe('Demo Shop <hello@demo-shop.example>');
-    } finally {
-      cfg.emailProvider = 'cloudflare';
-    }
   });
 });
 

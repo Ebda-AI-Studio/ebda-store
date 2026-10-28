@@ -11,7 +11,7 @@
  * It never re-activates an unsubscribed address: anyone can type anyone's email into a checkout
  * form, so a deliberate "no" must not be undone by a stranger's checkbox.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { verifyCartRestoreToken } from '../lib/cart-restore-token';
 import logger from '../lib/logger';

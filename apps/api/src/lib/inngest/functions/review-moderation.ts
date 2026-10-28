@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
@@ -12,17 +12,20 @@ import { featureService } from '../../../services/feature.service';
  * Task 28). Runs spam detection first — short-circuits translate if the
  * review is clearly junk so we don't burn tokens on spam.
  *
- * Status thresholds:
+ * Status thresholds (lib/ai/review-moderation-policy.ts, SEC-2):
  *   spamScore < 0.3  → published (auto-approve, genuine review)
  *   0.3-0.7          → pending   (merchant manual review)
  *   > 0.7            → spam      (hidden from storefront)
+ *   no finite score  → pending   (FAIL CLOSED: missing / null / NaN / unparseable reply)
+ *   link, phone, profanity or text addressed to the moderator → never published,
+ *                                  whatever the model scored (deterministic pre-filter)
  *
  * Translation failure is non-blocking: the review keeps its AI-derived
  * status even if the translation call errors out.
  *
  * Guard against Inngest sync UI test payloads (data: {}).
  */
-export const reviewModeration: InngestFunction.Any = inngest.createFunction(
+export const reviewModeration: JobDef = inngest.createFunction(
   {
     id: 'review-moderation',
     name: 'AI review moderation — translate + spam check',
@@ -38,7 +41,10 @@ export const reviewModeration: InngestFunction.Any = inngest.createFunction(
     }
 
     // Feature gate — skip AI moderation when reviews feature is disabled.
-    const reviewsEnabled = await featureService.isFeatureEnabled(storeId, 'reviews');
+    // In a step: on a Workflow only step bodies hold a database connection.
+    const reviewsEnabled = await step.run('check-feature', () =>
+      featureService.isFeatureEnabled(storeId, 'reviews')
+    );
     if (!reviewsEnabled) {
       logger.info({ storeId, reviewId }, '[REVIEW-MODERATION] reviews feature disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'reviews' };

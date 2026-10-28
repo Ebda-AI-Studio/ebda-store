@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { CRON_SCHEDULE } from '@api/cf/cron';
-import { matchesLocal, parseCron, utcCronsFor } from '@api/lib/jobs/schedule';
+import { matchesLocal, parseCron, tickKey, utcCronsFor } from '@api/lib/jobs/schedule';
 import { collectCronFunctions } from '../helpers/inngest-cron-budget';
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -33,9 +33,9 @@ describe('utcCronsFor', () => {
   });
   it('a weekly Cairo cron whose hour wraps past midnight moves to the previous weekday', () => {
     // Sunday 01:00 Cairo is Saturday 23:00 / 22:00 UTC.
-    expect(utcCronsFor('TZ=Africa/Cairo 0 1 * * 0')).toEqual(['0 23 * * 6', '0 22 * * 6']);
+    expect(utcCronsFor('TZ=Africa/Cairo 0 1 * * 0')).toEqual(['0 23 * * SAT', '0 22 * * SAT']);
     // Monday 00:00 Cairo is Sunday.
-    expect(utcCronsFor('TZ=Africa/Cairo 0 0 * * 1')).toEqual(['0 22 * * 0', '0 21 * * 0']);
+    expect(utcCronsFor('TZ=Africa/Cairo 0 0 * * 1')).toEqual(['0 22 * * SUN', '0 21 * * SUN']);
   });
   it('refuses a zoned expression it cannot translate (no silent wrong schedule)', () => {
     expect(() => utcCronsFor('TZ=Africa/Cairo */5 * * * *')).toThrow();
@@ -48,6 +48,21 @@ describe('utcCronsFor', () => {
       min: 0,
       dow: 0,
     });
+  });
+});
+
+describe('Cloudflare cron validity (the schedules PUT rejects a numeric weekday 0)', () => {
+  it('weekdays are always names: 0 is invalid on Cloudflare and 1 means Sunday there', () => {
+    expect(utcCronsFor('0 3 * * 0')).toEqual(['0 3 * * SUN']);
+    expect(utcCronsFor('0 2 * * 1')).toEqual(['0 2 * * MON']);
+    expect(utcCronsFor('0 2 * * 1-5')).toEqual(['0 2 * * MON-FRI']);
+    expect(utcCronsFor('0 2 * * 7')).toEqual(['0 2 * * SUN']);
+  });
+  it('every Cron Trigger in wrangler.jsonc has a Cloudflare-valid weekday field (* or names)', () => {
+    for (const c of wrangler.triggers.crons) {
+      const dow = c.trim().split(/\s+/)[4];
+      expect(dow, c).toMatch(/^(\*|[A-Z]{3}(-[A-Z]{3})?(,[A-Z]{3}(-[A-Z]{3})?)*)$/);
+    }
   });
 });
 
@@ -95,5 +110,31 @@ describe('wrangler.jsonc Cron Triggers', () => {
     expect(sub30).toEqual(['*/15 * * * *']);
     // and no job cron is more frequent than every 30 minutes
     for (const c of jobCrons) expect(/^(\*|\*\/\d+) /.test(c), c).toBe(false);
+  });
+});
+
+describe('zoned crons across the UTC day boundary (M-126, Ruling P18-3)', () => {
+  it('a monthly Cairo cron whose hour wraps fires on the previous UTC day-of-month', () => {
+    // the 15th at 01:00 Cairo is the 14th at 23:00 / 22:00 UTC
+    expect(utcCronsFor('TZ=Africa/Cairo 0 1 15 * *')).toEqual(['0 23 14 * *', '0 22 14 * *']);
+  });
+  it('a monthly cron that does not wrap keeps its day-of-month', () => {
+    expect(utcCronsFor('TZ=Africa/Cairo 0 6 15 * *')).toEqual(['0 4 15 * *', '0 3 15 * *']);
+  });
+  it('refuses a day-1 cron whose hour wraps instead of silently never firing', () => {
+    expect(() => utcCronsFor('TZ=Africa/Cairo 0 1 1 * *')).toThrow(/previous UTC day/);
+    expect(() => utcCronsFor('TZ=Africa/Cairo 0 2 1 * *')).toThrow(/hour >= 3/);
+    expect(utcCronsFor('TZ=Africa/Cairo 0 3 1 * *')).toEqual(['0 1 1 * *', '0 0 1 * *']);
+  });
+  it('the repeated local hour on the night Egypt falls back gets ONE start id', () => {
+    const expr = 'TZ=Africa/Cairo 30 23 * * *';
+    const first = new Date('2026-10-29T20:30:00Z'); // 23:30 at +03
+    const second = new Date('2026-10-29T21:30:00Z'); // 23:30 again at +02
+    expect(matchesLocal(expr, first)).toBe(true);
+    expect(matchesLocal(expr, second)).toBe(true);
+    expect(tickKey(expr, first)).toBe(tickKey(expr, second));
+    // a different local day is a different key, and a UTC cron still keys by the tick time
+    expect(tickKey(expr, new Date('2026-10-30T21:30:00Z'))).not.toBe(tickKey(expr, first));
+    expect(tickKey('7 * * * *', first)).toBe(String(first.getTime()));
   });
 });

@@ -19,6 +19,8 @@ import {
   unlinkUserAuditLogs,
 } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
+import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
+import { config as appConfig } from '../config';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
@@ -32,12 +34,23 @@ import {
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
   LOOK_OWNED_THEME_KEYS,
+  mergeClientSettings,
+  stripServerOwnedSettings,
+  isRetiredTemplate,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
+import {
+  deleteStoreClients,
+  eraseIdentityUser,
+  getAccountState,
+  isIdentityManagedUser,
+  setAccountStatus,
+} from '../lib/identity-client';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { sendAlert } from './alerts.service';
 import { StorageService } from './storage.service';
@@ -49,6 +62,7 @@ import {
   assertPlanAllows,
   assertWithinLimit,
 } from './plan-limit.service';
+import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
 
@@ -438,22 +452,24 @@ export class StoreService {
                   : ('enterprise' as const),
               }
             : {}),
-          settings: data.settings || {
+          settings: ((data.settings && typeof data.settings === 'object'
+            ? stripServerOwnedSettings(data.settings as Record<string, unknown>)
+            : null) || {
             currency: REGION.currency,
             locale: 'ar-EG',
             defaultLanguage: REGION.defaultLocale,
-          },
-          // 2026-07-12 design structural batch: new stores get the persona-chrome
-          // completion + card-frame dedup ON by default (Ahmad-approved for NEW
+          }) as Prisma.InputJsonValue,
+          // 2026-07-12 design structural batch: new stores get the card-frame dedup
+          // ON by default (Ahmad-approved for NEW
           // stores only — every existing store keeps these flags undefined/false
           // and renders unchanged). Merchant can still toggle either off via
           // Branding → Theme.
           // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
           // OOS ribbon (harmonizes better than the platform's original fixed
           // terracotta). Existing stores keep it undefined and render unchanged.
-          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8).
+          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8); nor is
+          // `personaChromeV2`: only the deleted Force skins read it (Ruling SKIN-DEL-5).
           theme: {
-            personaChromeV2: true,
             frameChromeDedup: true,
             oosRibbonColor: '#6b7280',
           },
@@ -534,11 +550,11 @@ export class StoreService {
     // Merge settings instead of replacing entirely
     let mergedSettings = data.settings;
     if (data.settings && typeof data.settings === 'object') {
-      const existingSettings = (store.settings as Record<string, unknown>) || {};
-      mergedSettings = {
-        ...existingSettings,
-        ...(data.settings as Record<string, unknown>),
-      } as Prisma.InputJsonValue;
+      // Server-owned keys (SERVER_OWNED_SETTINGS_KEYS) can be neither added, changed nor erased here.
+      mergedSettings = mergeClientSettings(
+        (store.settings as Record<string, unknown>) || {},
+        data.settings as Record<string, unknown>
+      ) as Prisma.InputJsonValue;
     }
 
     const updatedStore = await withStore(storeId, tx =>
@@ -641,141 +657,211 @@ export class StoreService {
    */
   static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
+    // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
+    // owner still has other live stores would strand the paid period and re-parent the
+    // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
+    if (store.ownerId) {
+      const family = sortOwnerStores(
+        await withUser(store.ownerId, tx =>
+          tx.store.findMany({
+            where: { ownerId: store.ownerId!, deletedAt: null },
+            select: { id: true, createdAt: true },
+          })
+        )
+      );
+      if (family.length > 1 && family[0].id === storeId) {
+        throw new AppError(
+          409,
+          'STORE_IS_BILLING_PARENT',
+          'This is the main (billing) store and the owner has other stores. Move billing to another store first.'
+        );
+      }
+    }
+    // The owner's identity (credential + sessions) lives in the shared identity service. If this deletion also removes the
+    // owner's profile row, the identity is deactivated FIRST (ends their sessions at once) and erased only after the commit;
+    // if the transaction fails the identity is re-activated (compensating rollback).
+    let deactivatedOwnerId: string | null = null;
+    let erasedOwnerId: string | null = null;
 
-    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-      // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
-      // statements because the Prisma-typed approach kept hitting
-      // P2003 (journal_entries_store_id_fkey) even with explicit
-      // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
-      //   1. unambiguous about which table + column the delete targets
-      //      (no Prisma client cache / schema drift)
-      //   2. easier to debug — each step logs storeId + affected row
-      //      count via $executeRaw's number return value
-      //   3. order-explicit — Postgres processes statements sequentially
-      //      so any FK cascade chain is committed before the next step
-      //
-      // Order matters. Each step listed below corresponds to a Store FK
-      // that's either Restrict OR a child whose own FK to Product is
-      // NoAction. Cascade-from-Store relations clean themselves up via
-      // store.delete() at the end. Schema audit done 2026-05-21:
-      //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
-      //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
-      //   JournalEntry(Restrict), BackorderLine.product(NoAction),
-      //   AuditLog.store(NoAction nullable).
-      // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
-      // to zero rows. The accounting tables (journal_entries, expenses,
-      // stock_adjustments, accounts, sequences) have row-level-security
-      // policies that match only the transaction's store, and this
-      // transaction had none set, so DELETE matched 0 rows even though rows
-      // existed. The FK violation at store.delete then fired because the
-      // journal_entries rows were never actually touched.
-      //
-      // The transaction is scoped to THIS store with a transaction-local
-      // set_config (no bypass flag exists any more). It dies on commit/rollback,
-      // and this is a super-admin-only code path (the route gates on role).
-      // The acting super_admin is set too: unlinking the owner's audit rows below
-      // happens AFTER the store row is gone, so the definer's "user of the caller's
-      // store" test cannot match; the caller's own role (ebda_is_super_admin) is
-      // what authorises it.
-      // `scopeTransaction` also makes this the ambient tenant transaction, so the
-      // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
-      return scopeTransaction(
-        tx,
-        { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
-        async () => {
-          logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
+    try {
+      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+        // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
+        // statements because the Prisma-typed approach kept hitting
+        // P2003 (journal_entries_store_id_fkey) even with explicit
+        // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
+        //   1. unambiguous about which table + column the delete targets
+        //      (no Prisma client cache / schema drift)
+        //   2. easier to debug — each step logs storeId + affected row
+        //      count via $executeRaw's number return value
+        //   3. order-explicit — Postgres processes statements sequentially
+        //      so any FK cascade chain is committed before the next step
+        //
+        // Order matters. Each step listed below corresponds to a Store FK
+        // that's either Restrict OR a child whose own FK to Product is
+        // NoAction. Cascade-from-Store relations clean themselves up via
+        // store.delete() at the end. Schema audit done 2026-05-21:
+        //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
+        //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
+        //   JournalEntry(Restrict), BackorderLine.product(NoAction),
+        //   AuditLog.store(NoAction nullable).
+        // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
+        // to zero rows. The accounting tables (journal_entries, expenses,
+        // stock_adjustments, accounts, sequences) have row-level-security
+        // policies that match only the transaction's store, and this
+        // transaction had none set, so DELETE matched 0 rows even though rows
+        // existed. The FK violation at store.delete then fired because the
+        // journal_entries rows were never actually touched.
+        //
+        // The transaction is scoped to THIS store with a transaction-local
+        // set_config (no bypass flag exists any more). It dies on commit/rollback,
+        // and this is a super-admin-only code path (the route gates on role).
+        // The acting super_admin is set too: unlinking the owner's audit rows below
+        // happens AFTER the store row is gone, so the definer's "user of the caller's
+        // store" test cannot match; the caller's own role (ebda_is_super_admin) is
+        // what authorises it.
+        // `scopeTransaction` also makes this the ambient tenant transaction, so the
+        // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
+        return scopeTransaction(
+          tx,
+          { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
+          async () => {
+            logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 
-          // Ruling MONEYB-4: refuse while money is in flight, then copy every
-          // fiscal record the deletes below would cascade away (legacy orders
-          // without an issued document, Ebda's billing_events VAT ledger) into
-          // the immutable 6-year archive. Issued invoices / receipts / credit
-          // notes live there already (no FK to stores) and survive as they are.
-          await assertNoMoneyInFlight(tx, storeId);
-          await archiveFiscalRecords(tx, storeId);
+            // Ruling MONEYB-4: refuse while money is in flight, then copy every
+            // fiscal record the deletes below would cascade away (legacy orders
+            // without an issued document, Ebda's billing_events VAT ledger) into
+            // the immutable 6-year archive. Issued invoices / receipts / credit
+            // notes live there already (no FK to stores) and survive as they are.
+            await assertNoMoneyInFlight(tx, storeId);
+            await archiveFiscalRecords(tx, storeId);
 
-          const reviewCount =
-            await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
+            const reviewCount =
+              await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
 
-          const returnCount =
-            await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
+            const returnCount =
+              await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
 
-          const orderCount =
-            await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
+            const orderCount =
+              await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
 
-          const expenseCount =
-            await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
+            const expenseCount =
+              await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
 
-          const stockAdjCount =
-            await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
+            const stockAdjCount =
+              await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
 
-          const poCount =
-            await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
+            const poCount =
+              await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
 
-          const journalCount =
-            await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
+            const journalCount =
+              await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
 
-          const backorderCount =
-            await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
-          logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
+            const backorderCount =
+              await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
+            logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
-          // Detach historical audit logs by nulling their storeId (preserves trail).
-          // A definer: nulling store_id leaves the store scope, which the policy's
-          // WITH CHECK would reject.
-          const auditCount = await detachStoreAuditLogs(storeId, tx);
-          logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
+            // Detach historical audit logs by nulling their storeId (preserves trail).
+            // A definer: nulling store_id leaves the store scope, which the policy's
+            // WITH CHECK would reject.
+            const auditCount = await detachStoreAuditLogs(storeId, tx);
+            logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
-          // Verification: count any rows that would still block the store delete.
-          // If any of these come back > 0, we know exactly which table.
-          const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
+            // Verification: count any rows that would still block the store delete.
+            // If any of these come back > 0, we know exactly which table.
+            const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
           SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM public.orders WHERE store_id = ${storeId}
           UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM public.journal_entries WHERE store_id = ${storeId}
           UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM public.expenses WHERE store_id = ${storeId}
           UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM public.stock_adjustments WHERE store_id = ${storeId}
           UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM public.purchase_orders WHERE store_id = ${storeId}
         `;
-          const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
-          if (stillBlocking.length > 0) {
-            logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
-          }
-
-          // Final delete — cascades products, categories, customers, pages,
-          // carts, coupons, accounts, suppliers, backorders, etc.
-          await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
-          logger.info({ storeId }, '[STORE_DELETE] store deleted');
-
-          // If the owner was a store_admin and this was their only store,
-          // delete the user too. Otherwise they remain in the system as a
-          // login-able account with no stores to manage — confusing UI and
-          // dead weight on the users list. Super-admins are never deleted
-          // here (they own the platform, not specific stores). Cleaned up
-          // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
-          // The owner's row is outside this store's scope (users.store_id NULL): only the
-          // platform operator may read and delete it ('platform-operator' hatch, checked by
-          // `ebda_is_super_admin()` in this same transaction).
-          if (!actorUserId) return;
-          await asPlatformOperator(actorUserId, async () => {
-            const owner = await tx.user.findUnique({
-              where: { id: store.ownerId },
-              select: { id: true, role: true, _count: { select: { stores: true } } },
-            });
-            if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
-              await unlinkUserAuditLogs(owner.id, tx);
-              // User-keyed rows: deleted through the guarded definer (the acting user is
-              // the super_admin, not the owner).
-              await deleteUserTokens(owner.id);
-              await tx.user.delete({ where: { id: owner.id } });
+            const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
+            if (stillBlocking.length > 0) {
+              logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
             }
-          });
-        }
+
+            // Final delete — cascades products, categories, customers, pages,
+            // carts, coupons, accounts, suppliers, backorders, etc.
+            await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
+            logger.info({ storeId }, '[STORE_DELETE] store deleted');
+
+            // If the owner was a store_admin and this was their only store,
+            // delete the user too. Otherwise they remain in the system as a
+            // login-able account with no stores to manage — confusing UI and
+            // dead weight on the users list. Super-admins are never deleted
+            // here (they own the platform, not specific stores). Cleaned up
+            // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
+            // The owner's row is outside this store's scope (users.store_id NULL): only the
+            // platform operator may read and delete it ('platform-operator' hatch, checked by
+            // `ebda_is_super_admin()` in this same transaction).
+            if (!actorUserId) return;
+            await asPlatformOperator(actorUserId, async () => {
+              const owner = await tx.user.findUnique({
+                where: { id: store.ownerId },
+                select: { id: true, role: true, _count: { select: { stores: true } } },
+              });
+              if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
+                await unlinkUserAuditLogs(owner.id, tx);
+                // User-keyed rows: deleted through the guarded definer (the acting user is
+                // the super_admin, not the owner).
+                await deleteUserTokens(owner.id);
+                // Only an ACTIVE owner is flipped (and restored on rollback): a suspended owner stays suspended either way.
+                const managed = await isIdentityManagedUser(owner.id);
+                if (managed) {
+                  const acc = await getAccountState(owner.id);
+                  if (acc?.status === 'active') {
+                    await setAccountStatus(owner.id, 'inactive', 'store-deleted');
+                    deactivatedOwnerId = owner.id;
+                  }
+                }
+                await tx.user.delete({ where: { id: owner.id } });
+                if (managed) erasedOwnerId = owner.id;
+              }
+            });
+          }
+        );
+      });
+    } catch (err) {
+      if (deactivatedOwnerId) {
+        await setAccountStatus(deactivatedOwnerId, 'active', 'store-delete-rolled-back').catch(e =>
+          logger.error(
+            { err: e, userId: deactivatedOwnerId },
+            '[STORE_DELETE] could not re-activate owner identity'
+          )
+        );
+      }
+      throw err;
+    }
+    // Integrator clients (identity v1.3) are bound to the store and die with it. Post-commit (a rolled-back deletion never gets
+    // here, so no client is lost with a store that still exists) and idempotent, so it is retried; a final failure is logged loudly:
+    // the store is gone, so its clients' tokens reach nothing, but the rows stay until the next attempt.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await deleteStoreClients(store.id);
+        break;
+      } catch (e) {
+        if (attempt === 3)
+          logger.error(
+            { err: e, storeId: store.id },
+            '[STORE_DELETE] integrator clients not removed (retry deleteStoreClients)'
+          );
+      }
+    }
+    if (erasedOwnerId) {
+      await eraseIdentityUser(erasedOwnerId).catch(e =>
+        logger.error(
+          { err: e, userId: erasedOwnerId },
+          '[STORE_DELETE] identity erase failed (account stays inactive)'
+        )
       );
-    });
+    }
 
     // Invalidate store cache (best-effort, post-commit)
     try {
@@ -938,11 +1024,16 @@ export class StoreService {
   }
 
   static async updateTemplate(storeId: string, template: string) {
+    // The five Force skins are deleted (Ruling SKIN-DEL-8): the strict writer refuses them, even
+    // as a re-save of a store that still holds one. Readers keep mapping them (no write).
+    if (isRetiredTemplate(template)) {
+      throw new AppError(400, 'TEMPLATE_RETIRED', 'That template has been retired; choose a look');
+    }
     const store = await this.getById(storeId);
 
-    // Existing stores keep their current skin (a re-save of it is allowed), but nobody can switch
-    // INTO a bare skin: the five legacy Force skins are closed to new choices and Qamar is only
-    // reachable through a look (Ruling B1-17). Switching is `applyLook`, gated on built looks.
+    // Existing stores keep their current template (a re-save of it is allowed), but nobody can
+    // switch INTO a bare template: Qamar and the rest are only reachable through a look (Ruling
+    // B1-17). Switching is `applyLook`, gated on built looks.
     if (template !== store.template) {
       throw new AppError(
         400,
@@ -994,7 +1085,10 @@ export class StoreService {
       ...preview,
       look: look.id,
       // the skin (header, cards, buttons) is not drawn in the preview: say when it will change
-      skinChange: store.template !== look.skin ? { from: store.template, to: look.skin } : null,
+      skinChange:
+        normalizeLegacyTemplate(store.template) !== look.skin
+          ? { from: normalizeLegacyTemplate(store.template), to: look.skin }
+          : null,
     };
   }
 
@@ -1098,6 +1192,11 @@ export class StoreService {
     }
   ) {
     const store = await this.getById(storeId);
+    assertMediaOriginOrUnchanged(
+      { logo: branding.logo, logoAr: branding.logoAr },
+      store as { logo?: string | null; logoAr?: string | null },
+      appConfig.storagePublicUrl
+    );
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({
@@ -1238,6 +1337,37 @@ export class StoreService {
   // new sub-key in, write back. Same posture as the announcement-bar
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
+  /**
+   * QR-1: replace `settings.qr` only. One atomic jsonb_set so a concurrent write of another
+   * settings key (floating widget, announcement, ...) is never overwritten by a stale read-merge-write.
+   */
+  static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{qr}', ${JSON.stringify(qr)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
+  /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
+  static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{labels}', ${JSON.stringify(labels)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
   static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
     const store = await this.getById(storeId);
     const existingSettings = (store.settings as Record<string, unknown>) || {};
@@ -1296,6 +1426,11 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
     const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
+    assertMediaOriginOrUnchanged(
+      { ogImage: seo.ogImage },
+      { ogImage: previousOgImage },
+      appConfig.storagePublicUrl
+    );
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({

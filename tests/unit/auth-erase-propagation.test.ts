@@ -72,6 +72,10 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     review: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     address: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     smsMarketingConsent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    storeWhatsAppConsent: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     abandonedCart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     cart: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     wishlist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -80,6 +84,7 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     pushSubscription: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    providerVerification: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     loyaltyTransaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -210,8 +215,42 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
-      data: { userId: CUSTOMER.id, oneSignalPlayerIds: ['player-a', 'player-b'] },
+      data: {
+        userId: CUSTOMER.id,
+        oneSignalPlayerIds: ['player-a', 'player-b'],
+        // for Ebda WhatsApp's customer.erased: the store, and the hashed phone when configured
+        storeId: CUSTOMER.storeId,
+        // Customer Intelligence: no proven phone here, and the scope is the account's own (zero) orders
+        ciProven: undefined,
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [], sinceDay: undefined },
+      },
     });
+  });
+
+  it('scopes the CI erase to the shopper\u2019s OWN orders (ids + keys), never the key alone, and nulls the keys on the orders', async () => {
+    mockPrisma.order.findMany.mockImplementation(
+      async (args: { select?: { buyerKey?: boolean } }) =>
+        args?.select?.buyerKey
+          ? [
+              { id: 'o1', buyerKey: 'k1', createdAt: new Date('2026-11-03T10:00:00Z') },
+              { id: 'o2', buyerKey: 'k1', createdAt: new Date('2026-11-01T10:00:00Z') },
+              { id: 'o3', buyerKey: null, createdAt: new Date('2026-11-05T10:00:00Z') },
+            ]
+          : []
+    );
+    await AuthService.eraseAccount(CUSTOMER.id);
+    const data = sendMock.mock.calls.at(-1)![0].data;
+    expect(data.ciScope).toEqual({
+      storeId: CUSTOMER.storeId,
+      orderIds: ['o1', 'o2', 'o3'],
+      buyerKeys: ['k1'],
+      sinceDay: '2026-10-30', // first order 2026-11-01 minus the 2-day margin
+    });
+    expect(data.ciProven).toBeUndefined(); // no proven phone: no buyer-key erase
+    expect(mockPrisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ buyerKey: null, areaKey: null }) })
+    );
+    mockPrisma.order.findMany.mockReset().mockResolvedValue([]);
   });
 
   it('erases the shopper\u2019s passkeys in the same transaction (Ruling PASSKEY-1)', async () => {
@@ -260,7 +299,13 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     expect(sendMock).toHaveBeenCalledWith({
       name: 'account/erased',
-      data: { userId: CUSTOMER.id, oneSignalPlayerIds: [] },
+      data: {
+        userId: CUSTOMER.id,
+        oneSignalPlayerIds: [],
+        storeId: CUSTOMER.storeId,
+        ciProven: undefined,
+        ciScope: { storeId: CUSTOMER.storeId, orderIds: [], buyerKeys: [], sinceDay: undefined },
+      },
     });
   });
 });
@@ -606,5 +651,140 @@ describe('AuthService.eraseAccount — erasure scope (Ruling W-7)', () => {
         details: expect.objectContaining({ forfeitedFils: 0, notesScrubbed: true }),
       }),
     ]);
+  });
+});
+
+describe('AuthService.eraseAccount — WhatsApp marketing consent (WA-CONSENT-1), whole flow', () => {
+  it('a number proven by a delivered order loses its consent row: the proof runs BEFORE the order scrub', async () => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    const { buyerKeyFor } = await import('@ebda/shared');
+    const { consentChangeTarget } = await import('@api/lib/wa/consent-state');
+    const key = (await buyerKeyFor(process.env.SUITE_BUYER_KEY_SECRET, '01001234567'))!;
+    const consents: Array<Record<string, unknown>> = [
+      { storeId: 'store-1', buyerKey: key, userId: null, granted: true },
+    ];
+    let scrubbed = false;
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...CUSTOMER,
+      phone: '01001234567',
+      email: 'a@b.co',
+    });
+    // The delivered order proves the phone, but ONLY until the erasure scrubs the orders.
+    mockPrisma.order.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === 'delivered' && !scrubbed
+        ? [{ shippingAddress: { phone: '+201001234567' } }]
+        : []
+    );
+    mockPrisma.order.updateMany.mockImplementation(async () => {
+      scrubbed = true;
+      return { count: 1 };
+    });
+    mockPrisma.storeWhatsAppConsent.findMany.mockImplementation(async ({ where }: any) =>
+      consents.filter(
+        r =>
+          r.storeId === where.storeId &&
+          where.OR.some(
+            (c: any) => c.buyerKey === r.buyerKey || (c.userId && c.userId === r.userId)
+          )
+      )
+    );
+    mockPrisma.storeWhatsAppConsent.deleteMany.mockImplementation(async ({ where }: any) => {
+      const i = consents.findIndex(
+        r => r.buyerKey === where.buyerKey && r.storeId === where.storeId
+      );
+      if (i >= 0) consents.splice(i, 1);
+      return { count: i >= 0 ? 1 : 0 };
+    });
+
+    await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(consents).toHaveLength(0);
+    // the proof read happened before the scrub
+    const proofCall = mockPrisma.order.findMany.mock.calls.findIndex(
+      (c: any[]) => c[0]?.where?.status === 'delivered'
+    );
+    // the proof read used THIS store and THIS account (not another scope)
+    expect(mockPrisma.order.findMany.mock.calls[proofCall]![0].where).toMatchObject({
+      storeId: 'store-1',
+      customerId: CUSTOMER.id,
+      status: 'delivered',
+    });
+    expect(mockPrisma.order.findMany.mock.invocationCallOrder[proofCall]).toBeLessThan(
+      mockPrisma.order.updateMany.mock.invocationCallOrder[0]!
+    );
+    // the delete is exactly what the consent observer attributes and announces as consent_changed=false
+    const del = mockPrisma.storeWhatsAppConsent.deleteMany.mock.calls[0]![0];
+    expect(
+      consentChangeTarget({
+        model: 'StoreWhatsAppConsent',
+        operation: 'deleteMany',
+        args: del,
+        result: { count: 1 },
+      })
+    ).toEqual({ storeId: 'store-1', buyerKey: key });
+  });
+});
+
+describe("AuthService.updateProfile — phone change ends the old number's WhatsApp consent", () => {
+  it('revokes the OLD number in the SAME transaction as the phone write, under the account lock; a failed revoke aborts the update', async () => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: CUSTOMER.id,
+      storeId: 'store-1',
+      phone: '01001234567',
+    });
+    mockPrisma.user.update.mockClear();
+    mockPrisma.storeWhatsAppConsent.updateMany = vi.fn().mockRejectedValue(new Error('db down'));
+    await expect(AuthService.updateProfile(CUSTOMER.id, { phone: '01112345678' })).rejects.toThrow(
+      'db down'
+    );
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+
+    mockPrisma.storeWhatsAppConsent.updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    mockPrisma.$executeRaw.mockClear();
+    await AuthService.updateProfile(CUSTOMER.id, { phone: '01112345678' });
+    const lock = mockPrisma.$executeRaw.mock.invocationCallOrder[0]!;
+    const rev = (mockPrisma.storeWhatsAppConsent.updateMany as any).mock.invocationCallOrder[0]!;
+    const write = mockPrisma.user.update.mock.invocationCallOrder[0]!;
+    expect(lock).toBeLessThan(rev);
+    expect(rev).toBeLessThan(write);
+    // a formatting-only change (same E.164) revokes nothing
+    (mockPrisma.storeWhatsAppConsent.updateMany as any).mockClear();
+    await AuthService.updateProfile(CUSTOMER.id, { phone: '+201001234567' });
+    expect(mockPrisma.storeWhatsAppConsent.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('WA-CONSENT-PROOF-1: account/erased carries a buyerKey only for a PROVEN phone', () => {
+  const setup = (delivered: boolean) => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'ebda-suite-buyer-key-test-v1-padded-to-32-chars';
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...CUSTOMER,
+      phone: '01001234567', // the (possibly someone else's) number on the profile
+      email: 'a@b.co',
+    });
+    mockPrisma.order.findMany.mockImplementation(async (args: any) =>
+      delivered && args?.where?.status === 'delivered'
+        ? [{ shippingAddress: { phone: '+201001234567' } }]
+        : []
+    );
+    mockPrisma.storeWhatsAppConsent.findMany.mockResolvedValue([]);
+    sendMock.mockClear();
+  };
+  const erasedEvent = () =>
+    sendMock.mock.calls.map(c => c[0]).find((e: any) => e?.name === 'account/erased');
+
+  it("an attacker who typed a victim's number (no order proves it) sends NO buyerKey: WhatsApp keeps the victim's contact", async () => {
+    setup(false);
+    await AuthService.eraseAccount(CUSTOMER.id);
+    const ev = erasedEvent();
+    expect(ev).toBeTruthy();
+    expect(ev.data.buyerKey).toBeUndefined();
+  });
+
+  it("the proven owner's erasure carries the buyerKey", async () => {
+    setup(true);
+    await AuthService.eraseAccount(CUSTOMER.id);
+    expect(erasedEvent().data.buyerKey).toMatch(/^[0-9a-f]{64}$/);
   });
 });

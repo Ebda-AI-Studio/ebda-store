@@ -814,9 +814,18 @@ test('page settings: filters on the collection page start from the baseline, car
   await filters.locator('summary').click();
   await filters.getByRole('switch').first().click();
   await waitSaved(page);
-  expect(
-    ((await state(page, 'collection')).draft!.definition as any).siteSettings.filterSidebar
-  ).toEqual({ enabled: false, defaultOpen: true });
+  // Poll the server-side draft instead of reading it once: `save-status` still says "saved" from the page
+  // open until the debounced autosave of THIS edit has marked it dirty, so on a slower runner the single read
+  // ran before any collection draft existed (null; red on 4 of 6 viewports in run 40234150651, Ruling ITEST-6).
+  await expect
+    .poll(
+      async () =>
+        ((await state(page, 'collection')).draft?.definition as any)?.siteSettings?.filterSidebar,
+      {
+        timeout: 15_000,
+      }
+    )
+    .toEqual({ enabled: false, defaultOpen: true });
 
   await openPage(page, 'cart');
   if (narrow(page))

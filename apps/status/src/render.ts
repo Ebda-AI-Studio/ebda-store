@@ -1,6 +1,8 @@
-// Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
+// Public status page: server-rendered HTML and inline CSS; it works with NO JavaScript. The only script is the
+// optional live search box (served from this same Worker, /assets/typeahead.js): without it the box is a plain GET form.
 import {
   BRAND,
+  BRAND_MARKETING_URL,
   SITE_NAV_CSS,
   brandMarkSvg,
   brandAppIconSvg,
@@ -49,7 +51,8 @@ const T = {
     bars: 'كل شريط يوم واحد (بالتوقيت العالمي)، من الأقدم إلى الأحدث.',
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}`,
+    // a function of the YEAR: a module-level `new Date()` is evaluated while the Worker's clock is frozen at 0 (1970)
+    footer: (year: number) => `© ${year} ${BRAND.company.shortNameAr}`,
   },
   en: {
     title: `${BRAND.company.shortNameEn} Status`,
@@ -87,7 +90,7 @@ const T = {
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}`,
+    footer: (year: number) => `© ${year} ${BRAND.company.shortNameEn}`,
   },
 } as const;
 
@@ -125,7 +128,7 @@ function component(c: ComponentSnapshot, lang: Lang): string {
   const checked = c.lastChecked
     ? ` · ${t.checked}: <time datetime="${new Date(c.lastChecked).toISOString()}">${fmt(c.lastChecked)}</time>`
     : '';
-  return `<li class="comp">
+  return `<li class="comp" id="c-${esc(c.id)}">
 <div class="comp-head"><h3>${esc(name)}</h3><span class="pill ${c.status}"><span class="dot" aria-hidden="true"></span>${esc(t.status[c.status])}</span></div>
 ${bars(c, lang)}
 <p class="muted small">${esc(t.uptime(up, HISTORY_DAYS))}${checked}</p>
@@ -136,7 +139,7 @@ function incident(i: Incident, lang: Lang): string {
   const t = T[lang];
   const title = lang === 'ar' && i.titleAr ? i.titleAr : i.title;
   const cfg = i.component ? COMPONENTS.find(c => c.id === i.component) : null;
-  return `<li class="inc inc-${i.impact}">
+  return `<li class="inc inc-${i.impact}" id="i-${i.id}">
 <h3>${esc(title)}</h3>
 <p class="muted small"><span class="tag">${esc(t.inc[i.status])}</span> ${cfg ? esc(cfg.name[lang]) + ' · ' : ''}<time datetime="${new Date(i.openedAt).toISOString()}">${fmt(i.openedAt)}</time></p>
 <ul class="upd">${i.updates
@@ -159,7 +162,7 @@ a{color:var(--lift);text-underline-offset:3px}a:hover{color:var(--fg)}
 .wrap{max-width:860px;margin-inline:auto;padding-inline:16px}
 .skip{position:absolute;inset-inline-start:8px;top:-80px;background:var(--lift);color:var(--night);padding:10px 14px;border-radius:8px;font-weight:600}
 .skip:focus{top:8px;color:var(--night)}
-header{border-bottom:1px solid var(--line)}
+header{border-bottom:1px solid var(--line);overflow-x:clip}
 .header-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding-block:12px}.wm-site{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px}
 .wordmark{display:inline-flex;gap:8px;align-items:center;color:var(--fg);text-decoration:none}
@@ -173,11 +176,11 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .operational .dot{background:var(--ok)}.degraded .dot{background:var(--warn)}.outage .dot{background:var(--bad)}
 .muted{color:var(--muted)}.small{font-size:.875rem}
 .prod h3{font-size:.95rem;margin:1.2em 0 .5em;color:var(--muted)}.comps,.incs,.upd{list-style:none;padding:0;margin:0}
-.comp{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--panel)}
+.comp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--panel)}
 .comp-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:.875rem;font-weight:600}
 .pill.operational{color:var(--ok)}.pill.degraded{color:var(--warn)}.pill.outage{color:var(--bad)}.pill.unknown{color:var(--muted)}
-.bars{display:flex;gap:2px;height:30px;direction:ltr;margin-bottom:6px}
+.bars{display:flex;gap:2px;height:30px;direction:ltr;margin-bottom:6px;min-width:0;overflow:hidden}
 .b{flex:1 1 0;min-width:2px;border-radius:2px;background:var(--line)}
 .b.up{background:var(--ok)}.b.part{background:var(--warn)}.b.down{background:var(--bad)}
 .inc{border:1px solid var(--line);border-inline-start:4px solid var(--warn);border-radius:10px;padding:12px 16px;margin-bottom:12px;background:var(--panel)}
@@ -185,7 +188,108 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .tag{border:1px solid var(--gold);color:var(--lift);border-radius:999px;padding:0 8px;font-size:.78rem}
 .upd{margin-top:8px}.upd li{padding:6px 0;border-top:1px solid var(--line)}
 footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
+.sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.search{position:relative;display:flex;gap:6px;margin-inline-start:auto}
+.search input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0;width:190px;font:inherit}
+.search button{background:var(--gold);color:var(--night);border:0;border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.ta-list,.ta-note{position:absolute;inset-inline-end:0;top:calc(100% + 6px);z-index:30;inline-size:min(420px,calc(100vw - 32px));margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.45);text-align:start}
+.ta-note{padding:12px 14px;color:var(--muted)}
+.ta-list[hidden],.ta-note[hidden]{display:none}
+.ta-list a{display:flex;flex-direction:column;gap:2px;min-block-size:44px;justify-content:center;padding:8px 12px;border-radius:8px;color:var(--fg);text-decoration:none}
+.ta-list a[aria-selected=true],.ta-list a:hover{background:var(--raise);outline:1px solid var(--gold)}
+.ta-list mark{background:transparent;color:var(--lift);font-weight:700}
+.ta-sec{color:var(--muted);font-size:.8125rem}
+.ta-all{color:var(--muted)!important;font-size:.9rem}
 `.replace(/\n/g, '') + SITE_NAV_CSS;
+
+const SEARCH = {
+  ar: { label: 'بحث', placeholder: 'دوّر في الخدمات والأحداث والمساعدة' },
+  en: { label: 'Search', placeholder: 'Search services, incidents and help' },
+};
+const HELP = `https://${BRAND.domains.help}`;
+
+/** The header search: components + incidents from this Worker, and the help articles that mention the status page. */
+function searchForm(lang: Lang): string {
+  const c = SEARCH[lang];
+  const sources = [
+    `/search.json?lang=${lang}||docs`,
+    `${HELP}/search-index.${lang}.json|${HELP}|index|${lang === 'ar' ? 'حالة,انقطاع,status' : 'status,outage,incident'}`,
+  ].join(';');
+  return `<form class="search" role="search" action="${HELP}${lang === 'ar' ? '' : '/en'}/search/" method="get" data-sources="${esc(sources)}">
+<label class="sr-only" for="q">${esc(c.label)}</label>
+<input id="q" name="q" type="search" placeholder="${esc(c.placeholder)}" autocomplete="off" enterkeyhint="search">
+<button type="submit">${esc(c.label)}</button>
+</form>`;
+}
+
+/**
+ * The status page's own searchable content (components and incidents), localized: the live search loads it as
+ * `/search.json` and indexes it in the browser. Hrefs are on-page anchors, so a result scrolls to the item.
+ */
+export function statusSearchDocs(s: Snapshot, lang: Lang) {
+  const t = T[lang];
+  const home = lang === 'ar' ? '/' : '/en';
+  const comps = s.components.map(c => {
+    const cfg = COMPONENTS.find(x => x.id === c.id);
+    const product = PRODUCTS.find(p => p.id === cfg?.product);
+    return {
+      id: `${home}#c-${c.id}`,
+      title: cfg ? cfg.name[lang] : c.id,
+      section: product ? product.name[lang] : t.components,
+      snippet: t.status[c.status],
+    };
+  });
+  const incs = [...s.active, ...s.recent].map(i => ({
+    id: `${home}#i-${i.id}`,
+    title: lang === 'ar' && i.titleAr ? i.titleAr : i.title,
+    section: t.recentIncidents,
+    snippet:
+      `${t.inc[i.status]} ${i.updates.map(u => (lang === 'ar' && u.bodyAr ? u.bodyAr : u.body)).join(' ')}`.slice(
+        0,
+        200
+      ),
+  }));
+  return [...comps, ...incs];
+}
+
+/** Social card (og + twitter) and JSON-LD for the status page: the shared 1200x630 card, the studio as publisher. */
+function socialHead(
+  t: { title: string; explain: string; site: string },
+  lang: Lang,
+  origin: string,
+  home: string
+): string {
+  const url = origin + (home === '/' ? '/' : home);
+  const image = `${BRAND_MARKETING_URL}/og.png`;
+  const ld = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${BRAND_MARKETING_URL}/#organization`,
+        name: lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+        url: BRAND_MARKETING_URL,
+        logo: `${BRAND_MARKETING_URL}/icon-512.png`,
+      },
+      {
+        '@type': 'WebSite',
+        url,
+        name: t.site,
+        inLanguage: lang,
+        publisher: { '@id': `${BRAND_MARKETING_URL}/#organization` },
+      },
+    ],
+  }).replace(/</g, '\\u003c');
+  return (
+    `<meta property="og:title" content="${esc(t.title)}"><meta property="og:description" content="${esc(t.explain)}">` +
+    `<meta property="og:url" content="${url}"><meta property="og:type" content="website">` +
+    `<meta property="og:site_name" content="${esc(t.site)}"><meta property="og:locale" content="${lang === 'ar' ? 'ar_EG' : 'en_US'}">` +
+    `<meta property="og:image" content="${image}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` +
+    `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(t.title)}">` +
+    `<meta name="twitter:description" content="${esc(t.explain)}"><meta name="twitter:image" content="${image}">` +
+    `<script type="application/ld+json">${ld}</script>`
+  );
+}
 
 export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): string {
   const t = T[lang];
@@ -210,6 +314,7 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <link rel="alternate" hreflang="ar" href="${origin}/">
 <link rel="alternate" hreflang="en" href="${origin}/en">
 <link rel="icon" href="${icon}">
+${socialHead(t, lang, origin, home)}
 <style>${CSS}</style>
 </head>
 <body>
@@ -217,6 +322,7 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <header class="site-header"><div class="wrap header-row">
 ${siteWordmarkHtml({ lang, href: home, siteLabel: t.site, markHtml: brandMarkSvg({ size: 28, cls: 'wm-mk' }) })}
 ${siteNavHtml(lang, 'status')}
+${searchForm(lang)}
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>
 <main id="main" class="wrap">
@@ -235,7 +341,9 @@ ${PRODUCTS.map(prod => {
 ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>
 </main>
-<footer><div class="wrap muted small">${esc(t.footer)} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
+<footer><div class="wrap muted small">${esc(t.footer(new Date(s.generatedAt).getUTCFullYear()))} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
+<script src="/assets/site-nav.js" defer></script>
+<script src="/assets/typeahead.js" defer></script>
 </body>
 </html>
 `;

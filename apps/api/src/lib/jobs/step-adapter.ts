@@ -122,7 +122,9 @@ export function durableStep(wf: WorkflowStepLike, o: DurableStepOptions): JobSte
       })
     );
   return {
-    run,
+    run: run as JobStep['run'],
+    // Marker read by `stepRunUnlessEmpty`: code between steps has no database on a Workflow.
+    cfWorkflow: true,
     async sleep(id, duration) {
       await o.aroundSleep?.before();
       await wf.sleep(name(id), parseDurationMs(duration));
@@ -146,7 +148,7 @@ export function inlineStep(o: {
   dispatch: (payload: JobEvent | JobEvent[]) => Promise<unknown>;
 }): JobStep {
   return {
-    async run(_id, fn) {
+    async run<T>(_id: string, fn: () => T): Promise<Awaited<T>> {
       return normaliseResult(await fn());
     },
     async sleep() {

@@ -18,6 +18,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
 import { prisma } from '@ebda/database';
+import { RETIRED_TEMPLATES } from '@ebda/shared';
 import { planService } from '@api/services/plan.service';
 import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import authRoutes from '@api/routes/auth.routes';
@@ -454,7 +455,7 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       const bare = await api()
         .put(`/api/v1/stores/${storeId}/template`)
         .set(bearer(jwt))
-        .send({ template: 'elegant' });
+        .send({ template: RETIRED_TEMPLATES[2] });
       expect(bare.status).toBe(400);
 
       const product = await api().post(`/api/v1/stores/${storeId}/products`).set(bearer(jwt)).send({

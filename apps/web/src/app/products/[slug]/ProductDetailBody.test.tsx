@@ -33,7 +33,8 @@ vi.mock('../../../lib/slug-redirect', async importOriginal => {
 
 // Imported AFTER the mocks above so it picks up the mocked navigation +
 // slug-redirect modules.
-import { ProductDetailBody } from './ProductDetailBody';
+import { ProductDetailBody, fetchInitialProduct } from './ProductDetailBody';
+import { STORE_UNAVAILABLE_DIGEST } from '../../../lib/store-unavailable';
 
 const mockedPermanentRedirect = vi.mocked(permanentRedirect);
 const mockedNotFound = vi.mocked(notFound);
@@ -154,5 +155,34 @@ describe('ProductDetailBody — redirect-on-miss', () => {
     expect(mockedPermanentRedirect).not.toHaveBeenCalled();
     expect(mockedNotFound).not.toHaveBeenCalled();
     expect(mockedFetchSlugRedirect).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchInitialProduct under API load shedding (audit UI-7)', () => {
+  const store = { id: 'store1', domain: undefined };
+  const ok = { ok: true, status: 200, json: async () => ({ data: { product: { id: 'p1' } } }) };
+  const shed = { ok: false, status: 503, headers: { get: () => '0' } };
+
+  it('a 503 that clears on the one bounded retry returns the product, not a 500', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(shed).mockResolvedValueOnce(ok);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await expect(fetchInitialProduct('mahshi-koronb', store)).resolves.toEqual({ id: 'p1' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // the retry bypasses the data cache so a shed answer is never the cached one
+    expect((fetchMock.mock.calls[1][1] as RequestInit).cache).toBe('no-store');
+  });
+
+  it('a 503 that persists becomes the "try again" error (digest), never a 404 and never a bare 500', async () => {
+    global.fetch = vi.fn().mockResolvedValue(shed) as unknown as typeof fetch;
+    await expect(fetchInitialProduct('mahshi-koronb', store)).rejects.toMatchObject({
+      digest: STORE_UNAVAILABLE_DIGEST,
+    });
+  });
+
+  it('a real 500 is still a plain error and is not retried', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await expect(fetchInitialProduct('x', store)).rejects.toThrow('product fetch failed: 500');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

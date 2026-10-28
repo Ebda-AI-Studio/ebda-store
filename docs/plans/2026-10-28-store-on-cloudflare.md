@@ -43,7 +43,7 @@ Prisma 7 supports D1 and DO SQLite through driver adapters, but the per-request 
 ## Draft phases (each ends merged, deployed and verified; nothing big-bang)
 
 0. **Spike (2–3 days):** a StoreDO with the SQLite schema for 5 core tables (store, product, variant, cart, order), Drizzle, behind a feature flag on ONE demo store; measure cold and warm latency, the cost per request and the DO alarm backup. Gate: p95 below today's and the backup restores.
-1. **Schema port:** generate the SQLite schema from `schema.prisma` (146 models → split into platform (D1) vs store (DO)); enums become CHECK constraints; JSON stays TEXT JSON; money stays integer piastres. A parity test compares the model list and fields to the Prisma schema.
+1. **Schema port:** generate the SQLite schema from `schema.prisma` (146 models → split into platform (D1) vs store (DO)); enums become CHECK constraints; JSON stays TEXT JSON; money stays integer piastres. A parity test compares the model list and fields to the Prisma schema. `StaffInvite` (`staff_invites`, added 2026-10-24, Ruling ID-13) is a store table: it ports into the StoreDO schema beside `store_staff`, with the same single-transaction consume-and-create rule.
 2. **Data access layer:** a `StoreRepo` interface implemented for BOTH Postgres (today) and the DO, so services switch per store via a flag. The 233 raw SQL sites get rewritten behind the repo.
 3. **Money and stock correctness:** port checkout, the stock reservation, coupons (distinct-code limiter), gold repricing, refunds, COD and InstaPay holds; the 93 functions/triggers become explicit DO methods. Gate: every money/stock invariant test is green on the DO backend, plus a concurrency test (100 parallel checkouts on one SKU).
 4. **Migration tooling:** a per-store export from Postgres into the StoreDO (idempotent, row-count and checksum verified) plus the platform data into D1. Dry-run on a copy.
@@ -666,3 +666,7 @@ Paths: new package `packages/cf-schema/` (`src/platform/*.ts` for D1, `src/store
 
 - Estimates from the draft stand (guess); Phase 0 report refreshes them on 30 Oct.
 - Open for Ahmad: (1) go/no-go after Phase 0; (2) rollback window policy after first DO write (task 5.2); (3) Neon deletion approval (7.3).
+
+## Status log
+
+- 2026-10-24: Phase 1 (tasks 1.1 to 1.6) implemented in `packages/cf-schema` (PR feat/cf-phase1-schema). Paths differ from the task text: `docs/cf/fn-map.json` (82 distinct names, 88 definitions), tests under `packages/cf-schema/test/` (fn-inventory lives there so the PR unit lane runs it). Rulings CF-SCHEMA-1 to 5.

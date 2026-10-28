@@ -26,8 +26,9 @@
  *
  */
 
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInTenantContext, storeDirectory } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -75,7 +76,7 @@ export async function runStoreRollupSteps(
 /** Events per `step.sendEvent` call — keeps each request well under Inngest's payload limit. */
 export const FANOUT_BATCH = 500;
 
-export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunction(
+export const analyticsDailyRollupCron: JobDef = inngest.createFunction(
   {
     id: 'analytics-daily-rollup',
     name: 'Insights — nightly cohort/funnel/rfm rollup',
@@ -83,12 +84,14 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 2 * * *` }], // 02:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set). Ids only.
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer (id order).
-      storeDirectory(s => s.accountingEnabled).then(list => list.map(s => ({ id: s.id })))
+      storeDirectory(storeFilter(event, s => s.accountingEnabled)).then(list =>
+        list.map(s => ({ id: s.id }))
+      )
     );
 
     // One event per store, sent in bounded batches: the per-store work runs in
@@ -113,7 +116,7 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
 // On-demand — triggered by `insights/rollup-requested` event
 // ---------------------------------------------------------------------------
 
-export const analyticsRollupOnDemand: InngestFunction.Any = inngest.createFunction(
+export const analyticsRollupOnDemand: JobDef = inngest.createFunction(
   {
     id: 'analytics-rollup-on-demand',
     name: 'Insights — per-store rollup (nightly fan-out + on-demand)',

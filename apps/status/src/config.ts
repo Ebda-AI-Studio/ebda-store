@@ -67,6 +67,16 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     expectBody: 'data-zone=',
   },
   {
+    id: 'storefront-product',
+    product: 'store',
+    name: { en: 'Storefront product pages', ar: 'صفحات المنتجات في المتاجر' },
+    // A product page renders through a different route than the home page (one returned a one-off 500, audit UI-7),
+    // so it is probed on its own: the seeded Lamma demo product. `data-zone=` as above.
+    url: `https://storedemo-lamma${d.storeSuffix}/products/mahshi-koronb`,
+    expectStatus: 200,
+    expectBody: 'data-zone=',
+  },
+  {
     id: 'docs',
     product: 'studio',
     name: { en: 'Developer docs', ar: 'وثائق المطوّرين' },

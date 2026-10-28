@@ -35,14 +35,14 @@ describe('hero focus', () => {
   it('shared HeroBanner paints the focus on a full-bleed image, not on a framed one', async () => {
     const { HeroBanner } = await import('../../apps/web/src/templates/shared/HeroBanner');
     const full = renderToStaticMarkup(
-      <HeroBanner image="a.webp" focus="top" isRtl={false} pack="minimal" />
+      <HeroBanner image="a.webp" focus="top" isRtl={false} pack="qamar" />
     );
     expect(full).toMatch(/object-position:50% 0%/);
     const framed = renderToStaticMarkup(
-      <HeroBanner image="a.webp" focus="top" isRtl={false} pack="minimal" presentation="framed" />
+      <HeroBanner image="a.webp" focus="top" isRtl={false} pack="qamar" presentation="framed" />
     );
     expect(framed).not.toMatch(/object-position/);
-    const none = renderToStaticMarkup(<HeroBanner image="a.webp" isRtl={false} pack="minimal" />);
+    const none = renderToStaticMarkup(<HeroBanner image="a.webp" isRtl={false} pack="qamar" />);
     expect(none).not.toMatch(/object-position/);
   });
   it('Dahab hero paints the same focus', async () => {

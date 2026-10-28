@@ -5,7 +5,7 @@ import { signedText } from '@/lib/bidi';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
 import { MinimalChrome } from '../../components';
@@ -53,6 +53,8 @@ import {
   fromMinor,
   REGION,
   isValidEgyptianMobile,
+  WHATSAPP_OPTIN_LABEL,
+  WHATSAPP_OPTIN_NOTE,
 } from '@ebda/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
@@ -326,6 +328,8 @@ export default function CheckoutClient() {
   // server and we know it isn't empty. Firing on mount (before hydration)
   // would miss the event because cartContextItems starts empty.
   const pixelFiredRef = useRef(false);
+  // One Idempotency-Key per checkout attempt, kept across retries.
+  const checkoutKeyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (pixelFiredRef.current) return;
     if (!cartIsReady || (cartContextItems.length === 0 && cartContextBundles.length === 0)) return;
@@ -500,6 +504,15 @@ export default function CheckoutClient() {
   const showCartEmailOptIn = store?.cartEmailOptIn === true;
   const cartEmailRecorded = useRef(false);
   const showSmsOptIn = store?.smsMarketingOptIn === true;
+  // "Send me offers and reminders on WhatsApp": MARKETING consent (Ruling WA-CONSENT-1). Unticked by
+  // default, shown only when the store has Ebda WhatsApp linked. Ticking records consent against
+  // the phone (server stores only the hashed buyer key); unticking withdraws it.
+  const [whatsAppOptIn, setWhatsAppOptIn] = useState(false);
+  // Needs an account: the number comes from the account, never from this form (security review).
+  const showWhatsAppOptIn = store?.whatsappMarketingOptIn === true && isAuthenticated;
+  const whatsAppRecorded = useRef(false);
+  // Shown under the box when the number cannot be proven yet (no silent failure).
+  const [whatsAppUnproven, setWhatsAppUnproven] = useState(false);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -720,7 +733,12 @@ export default function CheckoutClient() {
                 methods: [m.code],
               }));
             }
-            return [{ id: p, name: p === 'kashier' ? 'Card / wallet' : p }];
+            return [
+              {
+                id: p,
+                name: p === 'kashier' ? 'Card / wallet' : p === 'geidea' ? 'Card (Geidea)' : p,
+              },
+            ];
           });
 
           // Add COD as a provider option if enabled
@@ -1062,6 +1080,49 @@ export default function CheckoutClient() {
     }, 600);
     return () => clearTimeout(timeoutId);
   }, [showCartEmailOptIn, cartEmailOptIn, formData.email, language]);
+
+  // Show the customer's REAL current consent (they may have ticked it on an earlier visit), so
+  // an already-granted box can be unticked to withdraw.
+  useEffect(() => {
+    if (!showWhatsAppOptIn) return;
+    let cancelled = false;
+    api
+      .get<{ granted: boolean; proven: boolean }>('/public/cart/whatsapp-optin')
+      .then(res => {
+        if (cancelled || !res.success) return;
+        if (res.data?.proven === false) setWhatsAppUnproven(true);
+        if (res.data?.granted !== true) return;
+        whatsAppRecorded.current = true;
+        setWhatsAppOptIn(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showWhatsAppOptIn]);
+
+  // Record / withdraw the WhatsApp marketing consent. Debounced; only withdraws if a tick was
+  // actually recorded. No phone is sent: the server uses the signed-in customer's own number.
+  useEffect(() => {
+    if (!showWhatsAppOptIn) return;
+    if (!whatsAppOptIn && !whatsAppRecorded.current) return;
+    const timeoutId = setTimeout(() => {
+      api
+        .post('/public/cart/whatsapp-optin', { consent: whatsAppOptIn, language })
+        .then(res => {
+          if (res.success) {
+            whatsAppRecorded.current = whatsAppOptIn;
+            setWhatsAppUnproven(false);
+          } else if (whatsAppOptIn) {
+            // PHONE_UNPROVEN (or no phone on the account): untick and explain, the box stays usable.
+            setWhatsAppOptIn(false);
+            setWhatsAppUnproven(true);
+          }
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(timeoutId);
+  }, [showWhatsAppOptIn, whatsAppOptIn, language]);
 
   const autoAppliedPromoRef = useRef(false);
   useEffect(() => {
@@ -1528,58 +1589,63 @@ export default function CheckoutClient() {
           )})\n${formData.notes}`
         : formData.notes;
 
-      const orderResult = await api.createOrder({
-        shippingAddress: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          address1: composedAddress1,
-          address2: formData.landmark,
-          // Structured address fields — custom area AR names fall back to the rate row.
-          area: selectedEgyptArea?.en ?? formData.area,
-          areaAr: selectedEgyptArea?.ar ?? rateRow?.areaAr ?? '',
-          governorate: selectedGov?.en ?? formData.governorate,
-          governorateAr: selectedGov?.ar ?? rateRow?.governorateAr ?? '',
-          // Additional structured fields for delivery logistics
-          street: formData.street,
-          building: formData.building,
-          floor: formData.floor,
-          apartment: formData.apartment,
-          city: '',
-          // Use the country from the rate row when available (multi-country stores),
-          // falling back to "Egypt" — matches the Address.country default + the
-          // "Egypt" value every Egypt rate row carries (don't mix legacy codes / "Egypt").
-          country: rateRow?.country ?? REGION.countryName.en,
-          phone: formData.phone,
-          email: formData.email,
+      // ONE key per checkout attempt, kept across retries of the same submit (double tap, timeout) and dropped once an order exists
+      checkoutKeyRef.current ??= crypto.randomUUID();
+      const orderResult = await api.createOrder(
+        {
+          shippingAddress: {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            address1: composedAddress1,
+            address2: formData.landmark,
+            // Structured address fields — custom area AR names fall back to the rate row.
+            area: selectedEgyptArea?.en ?? formData.area,
+            areaAr: selectedEgyptArea?.ar ?? rateRow?.areaAr ?? '',
+            governorate: selectedGov?.en ?? formData.governorate,
+            governorateAr: selectedGov?.ar ?? rateRow?.governorateAr ?? '',
+            // Additional structured fields for delivery logistics
+            street: formData.street,
+            building: formData.building,
+            floor: formData.floor,
+            apartment: formData.apartment,
+            city: '',
+            // Use the country from the rate row when available (multi-country stores),
+            // falling back to "Egypt" — matches the Address.country default + the
+            // "Egypt" value every Egypt rate row carries (don't mix legacy codes / "Egypt").
+            country: rateRow?.country ?? REGION.countryName.en,
+            phone: formData.phone,
+            email: formData.email,
+          },
+          // The provider only: the method (card / Meeza / ...) belongs to /payments/create.
+          paymentMethod: selectedProvider.split(':')[0],
+          // A date store: the SERVER writes the delivery line from the structured pick (Ruling B4-7).
+          notes: dateMode ? formData.notes : notesWithDelivery,
+          ...(dateMode && selectedDeliveryDate
+            ? {
+                deliveryDate: selectedDeliveryDate,
+                ...(selectedDeliveryWindowId ? { deliveryWindowId: selectedDeliveryWindowId } : {}),
+              }
+            : {}),
+          couponCode: appliedCoupon?.code,
+          // Only send a redemption request when the customer opted in AND the
+          // amount clears the store minimum. The server re-validates against the
+          // real balance + caps regardless.
+          pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
+          // The total the buyer is looking at, as computed by the SERVER's quote for exactly these inputs and this cart. If the
+          // server prices the order differently (approval revoked, tier edited, plan changed) it answers 409 PRICE_CHANGED and
+          // nothing is charged. Undefined when no fresh quote exists (the quote request failed), in which case the server
+          // simply charges its own price as before.
+          expectedTotal: expectedTotalFor(heldQuote, currentQuoteKey),
+          // Only sent when the customer ticked "Use wallet balance" on a store
+          // where the API reports wallet checkout as available.
+          useWallet: walletApplied > 0 ? true : undefined,
+          // Only an explicit tick on a rendered box is sent; omitted otherwise.
+          smsOptIn: showSmsOptIn && smsOptIn ? true : undefined,
+          // Arabic variant titles + email language follow the shopper's language.
+          locale: orderLocale(language),
         },
-        // The provider only: the method (card / Meeza / ...) belongs to /payments/create.
-        paymentMethod: selectedProvider.split(':')[0],
-        // A date store: the SERVER writes the delivery line from the structured pick (Ruling B4-7).
-        notes: dateMode ? formData.notes : notesWithDelivery,
-        ...(dateMode && selectedDeliveryDate
-          ? {
-              deliveryDate: selectedDeliveryDate,
-              ...(selectedDeliveryWindowId ? { deliveryWindowId: selectedDeliveryWindowId } : {}),
-            }
-          : {}),
-        couponCode: appliedCoupon?.code,
-        // Only send a redemption request when the customer opted in AND the
-        // amount clears the store minimum. The server re-validates against the
-        // real balance + caps regardless.
-        pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
-        // The total the buyer is looking at, as computed by the SERVER's quote for exactly these inputs and this cart. If the
-        // server prices the order differently (approval revoked, tier edited, plan changed) it answers 409 PRICE_CHANGED and
-        // nothing is charged. Undefined when no fresh quote exists (the quote request failed), in which case the server
-        // simply charges its own price as before.
-        expectedTotal: expectedTotalFor(heldQuote, currentQuoteKey),
-        // Only sent when the customer ticked "Use wallet balance" on a store
-        // where the API reports wallet checkout as available.
-        useWallet: walletApplied > 0 ? true : undefined,
-        // Only an explicit tick on a rendered box is sent; omitted otherwise.
-        smsOptIn: showSmsOptIn && smsOptIn ? true : undefined,
-        // Arabic variant titles + email language follow the shopper's language.
-        locale: orderLocale(language),
-      });
+        { idempotencyKey: checkoutKeyRef.current }
+      );
 
       if (!orderResult.success || !orderResult.data?.order) {
         // Throw the API error CODE (not message) so the catch maps it to
@@ -1595,6 +1661,7 @@ export default function CheckoutClient() {
       }
 
       const order = orderResult.data.order;
+      checkoutKeyRef.current = undefined;
       createdOrderId = order.id;
 
       // Paid in full from the customer wallet: the order was created paid and
@@ -1841,6 +1908,20 @@ export default function CheckoutClient() {
             'This payment method is not available right now. Please choose another option.',
             'طريقة الدفع دي مش متاحة دلوقتي. اختار طريقة تانية.'
           );
+          break;
+        case 'CART_CHANGED':
+          friendly = t(
+            'Your cart changed or was already checked out. Please review it and try again.',
+            'السلة اتغيّرت أو الطلب اتأكد قبل كده. راجع السلة وحاول تاني.'
+          );
+          checkoutKeyRef.current = undefined;
+          break;
+        case 'IDEMPOTENCY_CONFLICT':
+          friendly = t(
+            'This order was already submitted with different details. Please review it and place the order again.',
+            'الطلب ده اتبعت قبل كده بتفاصيل تانية. راجع بياناتك وأكّد الطلب تاني.'
+          );
+          checkoutKeyRef.current = undefined;
           break;
         case 'EMPTY_CART':
           friendly = t(
@@ -2338,6 +2419,38 @@ export default function CheckoutClient() {
                           error={formErrors.phone}
                           className={CHECKOUT_FIELD}
                         />
+                        {showWhatsAppOptIn && (
+                          <label
+                            data-whatsapp-marketing-optin
+                            className="mt-2 flex min-h-11 cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={whatsAppOptIn}
+                              onChange={e => {
+                                setWhatsAppUnproven(false);
+                                setWhatsAppOptIn(e.target.checked);
+                              }}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="text-sm text-foreground">
+                                {t(WHATSAPP_OPTIN_LABEL.en, WHATSAPP_OPTIN_LABEL.ar)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t(WHATSAPP_OPTIN_NOTE.en, WHATSAPP_OPTIN_NOTE.ar)}
+                              </span>
+                              {whatsAppUnproven && (
+                                <span role="status" className="text-xs font-medium text-foreground">
+                                  {t(
+                                    'WhatsApp offers turn on after your first order with this number',
+                                    'نقدر نفعّل رسايل واتساب بعد أول طلب ليك بالرقم ده'
+                                  )}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        )}
                         {showSmsOptIn && (
                           <label
                             data-sms-marketing-optin
@@ -2347,7 +2460,7 @@ export default function CheckoutClient() {
                               type="checkbox"
                               checked={smsOptIn}
                               onChange={e => setSmsOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                              className="mt-0.5 h-6 w-6 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2389,7 +2502,7 @@ export default function CheckoutClient() {
                               type="checkbox"
                               checked={cartEmailOptIn}
                               onChange={e => setCartEmailOptIn(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                              className="mt-0.5 h-6 w-6 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                             />
                             <span className="flex flex-col gap-0.5">
                               <span className="text-sm text-foreground">
@@ -2572,7 +2685,7 @@ export default function CheckoutClient() {
                           type="checkbox"
                           checked={saveInfo}
                           onChange={e => setSaveInfo(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
+                          className="mt-0.5 h-6 w-6 shrink-0 rounded border-input text-primary accent-primary focus:ring-2 focus:ring-primary"
                         />
                         <span className="flex flex-col gap-0.5">
                           <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">

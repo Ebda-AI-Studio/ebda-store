@@ -22,7 +22,7 @@ import { resolve } from 'node:path';
 import { render, cleanup } from '@testing-library/react';
 
 const state: { template: string; theme: Record<string, unknown> } = {
-  template: 'minimal',
+  template: 'qamar',
   theme: { showNewBadge: true },
 };
 
@@ -75,11 +75,7 @@ const adapters = await import('./adapters');
 const { isProductNew } = await import('./shared/ProductCardCta');
 const { RenderClockProvider } = await import('../contexts/RenderClockContext');
 const { StorefrontProductCard } = await import('./shared/StorefrontProductCard');
-const { default: ModernProductCard } = await import('./modern/ProductCard');
-const { default: ElegantProductCard } = await import('./elegant/ProductCard');
-const { default: ClassicProductCard } = await import('./classic/ProductCard');
-const { default: BoldProductCard } = await import('./bold/ProductCard');
-const { default: MinimalProductCard } = await import('./minimal/ProductCard');
+const { default: BaseProductCard } = await import('./base/ProductCard');
 const { ProductCarousel } = await import('./shared/ProductCarousel');
 
 type Tpl = import('./types').TemplateProduct;
@@ -128,7 +124,7 @@ const MAPPERS: Array<[string, (createdAt: string) => Tpl]> = [
 ];
 
 // ── Card render paths ────────────────────────────────────────────────────────
-const PACKS = ['modern', 'elegant', 'classic', 'minimal', 'bold', 'dahab'] as const;
+const PACKS = ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] as const;
 type Path = [string, (p: Tpl, onAdd: (id: string) => void) => React.ReactElement];
 function direct(Card: unknown): Path[1] {
   return function renderDirect(product, onAdd) {
@@ -144,11 +140,7 @@ function direct(Card: unknown): Path[1] {
   };
 }
 const PATHS: Path[] = [
-  ['modern/ProductCard', direct(ModernProductCard)],
-  ['elegant/ProductCard', direct(ElegantProductCard)],
-  ['classic/ProductCard', direct(ClassicProductCard)],
-  ['minimal/ProductCard', direct(MinimalProductCard)],
-  ['bold/ProductCard', direct(BoldProductCard)],
+  ['base/ProductCard', direct(BaseProductCard)],
   ...PACKS.map(
     (pack): Path => [
       `StorefrontProductCard, ${pack} pack`,
@@ -189,7 +181,7 @@ const PATHS: Path[] = [
 
 afterEach(() => {
   cleanup();
-  state.template = 'minimal';
+  state.template = 'qamar';
   state.theme = { showNewBadge: true };
 });
 
@@ -242,11 +234,7 @@ describe('the store setting decides (default OFF, Ruling D1016-NEW-1)', () => {
 describe('one New rule on every card path', () => {
   it('no card reads the raw product.isNew; each decides with isProductNew', () => {
     const files = [
-      'modern/ProductCard.tsx',
-      'elegant/ProductCard.tsx',
-      'classic/ProductCard.tsx',
-      'minimal/ProductCard.tsx',
-      'bold/ProductCard.tsx',
+      'base/ProductCard.tsx',
       'dahab/ProductCard.tsx',
       'shared/StorefrontProductCard.tsx',
       'shared/ProductCarousel.tsx',
@@ -291,7 +279,7 @@ describe('one New rule on every card path', () => {
         RenderClockProvider,
         { now: later } as never,
         React.createElement(
-          MinimalProductCard as never,
+          BaseProductCard as never,
           {
             product: p,
             isRtl: true,

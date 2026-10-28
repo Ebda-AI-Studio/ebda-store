@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { RETIRED_TEMPLATES, normalizeLegacyTemplate } from '@ebda/shared';
 
 /**
  * A storefront that fails to resolve must say so.
@@ -84,12 +85,30 @@ describe('slug resolution logs why it found no store', () => {
   it('stays silent on the happy path', async () => {
     const slug = uniq('ok');
     fetchMock.mockResolvedValue(
-      json({ success: true, data: { store: { id: 'store-1', slug, template: 'modern' } } })
+      json({ success: true, data: { store: { id: 'store-1', slug, template: 'qamar' } } })
     );
 
     await expect(resolveStoreBySlug(slug)).resolves.not.toBeNull();
     expect(errorSpy).not.toHaveBeenCalled();
   });
+});
+
+describe('a store row still holding a retired Force skin (Ruling SKIN-DEL-8)', () => {
+  it.each(RETIRED_TEMPLATES)(
+    '%s renders as its mapped Ebda template at read time, with no write and no error',
+    async stored => {
+      const mapped = normalizeLegacyTemplate(stored);
+      const slug = uniq(`legacy-${stored}`);
+      fetchMock.mockResolvedValue(
+        json({ success: true, data: { store: { id: 'store-1', slug, template: stored } } })
+      );
+
+      const store = await resolveStoreBySlug(slug);
+
+      expect(store?.template).toBe(mapped);
+      expect(errorSpy).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('domain resolution — the path that takes a whole storefront dark', () => {

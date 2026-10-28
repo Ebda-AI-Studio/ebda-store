@@ -10,9 +10,7 @@
  *   DELETE /stores/:storeId/staff/:userId    — remove a staff member
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { randomBytes } from 'crypto';
-import { z } from 'zod';
-import bcrypt from 'bcryptjs';
+import { z } from 'zod/v3';
 import { withStore, withUser, UserRole } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -20,13 +18,26 @@ import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
+import { getAccountState, inviteIdentity } from '../lib/identity-client';
+import { STAFF_INVITE_TTL_MINUTES, signStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
-import { AuthService, RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
+import { RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
 import { sendStaffInviteEmail } from '../services/platform-mailer';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
+
+/** A customer or platform-admin account can never be staff; the identity's REAL role decides, not a literal. */
+function assertInvitableRole(role: string): void {
+  if (role === 'customer' || role === 'super_admin') {
+    throw new AppError(
+      409,
+      'ROLE_CONFLICT',
+      'This email belongs to a customer or platform admin account and cannot be used for store staff.'
+    );
+  }
+}
 
 const inviteStaffSchema = z.object({
   email: z.string().email(),
@@ -106,19 +117,127 @@ router.post(
       // definer: it returns the existing account untouched, or creates a staff
       // account. The password is only hashed when no account exists yet.
       const exists = await findUserIdByEmail(input.email, null, { includeDeleted: true });
-      let passwordHash = '';
+      const storeNameForInvite = req.store?.name ?? 'your store';
+      const requestedId = crypto.randomUUID();
+      // ONE rule for an address that already has an account (Ruling ID-13): a store is never attached to someone else's
+      // account silently. A brand-new address gets a fresh identity and an emailed code. An address whose account is
+      // unverified, mid-signup, has no Store profile yet, or is a merchant (store_admin) gets an invitation e-mail with an
+      // explicit ACCEPT step (POST /staff-invites/accept, signed in as that very address). Only an already-verified staff
+      // account is added at once (it already is staff; the notice mail below tells them).
+      let pendingAcceptance = false;
+      let staffUser: Awaited<ReturnType<typeof ensureAdminUser>> | undefined;
       if (!exists) {
-        // Cryptographically-strong fallback password (never Math.random for secrets).
-        const password = input.password ?? randomBytes(18).toString('base64url') + 'A1!';
-        passwordHash = await bcrypt.hash(password, 12);
+        const invited = await inviteIdentity({
+          id: requestedId,
+          email: input.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          role: 'staff',
+          language: 'ar',
+          storeName: storeNameForInvite,
+        });
+        if (invited.created) {
+          // The profile row must carry the id THIS request generated: an identity that answers with another id is someone
+          // else's account and is never bound (cross-tenant takeover).
+          if (invited.id !== requestedId) {
+            throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
+          }
+          await withUser(invited.id, tx =>
+            tx.user.create({
+              data: {
+                id: invited.id,
+                storeId: null,
+                email: input.email,
+                passwordHash: '!pending',
+                firstName: input.firstName,
+                lastName: input.lastName,
+                role: UserRole.staff,
+                emailVerified: false,
+                language: 'ar',
+              },
+            })
+          );
+          staffUser = {
+            id: invited.id,
+            created: true,
+            role: 'staff',
+            status: 'active',
+            email: input.email,
+            firstName: input.firstName,
+            lastName: input.lastName,
+          };
+        } else {
+          assertInvitableRole(invited.role);
+          pendingAcceptance = true;
+        }
+      } else {
+        const acc = await getAccountState(exists);
+        if (!acc) {
+          throw new AppError(409, 'ROLE_CONFLICT', 'This account cannot be invited as staff.');
+        }
+        assertInvitableRole(acc.role);
+        if (!acc.emailVerified || acc.role !== 'staff') {
+          pendingAcceptance = true;
+        } else {
+          staffUser = await ensureAdminUser({
+            email: input.email,
+            passwordHash: '',
+            firstName: input.firstName,
+            lastName: input.lastName,
+            role: UserRole.staff,
+          });
+          if (staffUser.id !== exists) {
+            throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
+          }
+        }
       }
-      const staffUser = await ensureAdminUser({
-        email: input.email,
-        passwordHash,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        role: UserRole.staff,
-      });
+
+      if (pendingAcceptance || !staffUser) {
+        // The link is honoured only while this pending row exists: any earlier pending invite to the same address is
+        // superseded, and the row is consumed by the accept in the same transaction that creates the membership.
+        const inviteEmail = input.email.toLowerCase();
+        const inviteId = crypto.randomUUID();
+        await withStore(storeId, async tx => {
+          await tx.staffInvite.updateMany({
+            where: { storeId, email: inviteEmail, status: 'pending' },
+            data: { status: 'revoked', decidedAt: new Date() },
+          });
+          await tx.staffInvite.create({
+            data: {
+              id: inviteId,
+              storeId,
+              email: inviteEmail,
+              role: 'staff',
+              invitedBy: req.user!.userId,
+              expiresAt: new Date(Date.now() + STAFF_INVITE_TTL_MINUTES * 60_000),
+            },
+          });
+        });
+        const token = signStaffInviteToken({ email: inviteEmail, storeId, jti: inviteId });
+        await sendStaffInviteEmail(
+          {
+            email: input.email,
+            name: `${input.firstName} ${input.lastName}`.trim() || input.email,
+            storeName: storeNameForInvite,
+            loginUrl: `${storeAppOrigin()}/login`,
+            setPasswordUrl: null,
+            acceptUrl: `${storeAppOrigin()}/accept-invite#token=${token}`,
+            expiresInMinutes: STAFF_INVITE_TTL_MINUTES,
+          },
+          'ar'
+        ).catch(err => logger.error({ err }, 'staff-invite acceptance mail failed'));
+        await auditLog({
+          action: 'staff.invited',
+          userId: req.user!.userId,
+          resourceType: 'store',
+          resourceId: storeId,
+          details: { storeId, staffEmail: input.email },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        res.status(202).json({ success: true, data: { status: 'invitation_sent' } });
+        return;
+      }
 
       // User exists — must already be a staff or store_admin role
       if (staffUser.role === UserRole.customer || staffUser.role === UserRole.super_admin) {
@@ -143,11 +262,14 @@ router.post(
         );
       }
 
-      const membership = await withStore(storeId, tx =>
-        tx.storeStaff.create({
+      // The seat check and the insert are ONE atomic step (store row locked FOR UPDATE), so two simultaneous adds or
+      // accepts cannot both take the last seat.
+      const membership = await withStore(storeId, async tx => {
+        await assertWithinLimit(storeId, 'maxStaff', { tx });
+        return tx.storeStaff.create({
           data: { storeId, userId: staffUser.id },
-        })
-      );
+        });
+      });
 
       // Consent/notice (lens-2, 2026-09-22 audit): every staff add now mails the
       // invitee, instead of leaving it to the owner to tell them out of band. A
@@ -171,7 +293,7 @@ router.post(
       // nested-transaction shape `r2-cleanup.service.ts` already declares
       // `connections: 2` for; the global deferred-work cap needs both counted.
       const staffName = `${staffUser.firstName} ${staffUser.lastName}`.trim() || staffUser.email;
-      const storeName = req.store?.name ?? 'your store';
+      const storeName = storeNameForInvite;
       void deferAfterTenantCommit(
         'staff.invite.notify',
         async () => {
@@ -179,9 +301,9 @@ router.post(
             tx.user.findUnique({ where: { id: staffUser.id }, select: { language: true } })
           );
           const language = (existingUser?.language as 'en' | 'ar' | undefined) ?? undefined;
-          const setPasswordUrl = staffUser.created
-            ? `${storeAppOrigin()}/reset-password?token=${await AuthService.issueStaffInviteToken(staffUser.id)}`
-            : null;
+          // A brand-new account already received its invitation (with the set-password code) from the identity service.
+          if (staffUser.created) return;
+          const setPasswordUrl = null;
           await sendStaffInviteEmail(
             {
               email: staffUser.email,
@@ -230,6 +352,64 @@ router.post(
   }
 );
 
+// ─── Pending invitations: list and revoke (Ruling ID-13) ──────────────────
+
+router.get(
+  '/invites',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('staff_accounts'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const invites = await withStore(storeId, tx =>
+        tx.staffInvite.findMany({
+          where: { storeId, status: 'pending', expiresAt: { gt: new Date() } },
+          select: { id: true, email: true, createdAt: true, expiresAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        })
+      );
+      res.json({ success: true, data: { invites } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.delete(
+  '/invites/:inviteId',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('staff_accounts'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, inviteId } = req.params;
+      const { count } = await withStore(storeId, tx =>
+        tx.staffInvite.updateMany({
+          where: { id: inviteId, storeId, status: 'pending' },
+          data: { status: 'revoked', decidedAt: new Date() },
+        })
+      );
+      if (count === 0) throw new AppError(404, 'NOT_FOUND', 'No pending invitation with this id.');
+      await auditLog({
+        action: 'staff.invite_revoked',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: { storeId, inviteId },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { revoked: true } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Remove a staff member ────────────────────────────────────────────────
 
 router.delete(
@@ -245,6 +425,7 @@ router.delete(
       const membership = await withStore(storeId, tx =>
         tx.storeStaff.findUnique({
           where: { userId_storeId: { userId, storeId } },
+          include: { user: { select: { email: true } } },
         })
       );
 
@@ -259,6 +440,15 @@ router.delete(
       await withStore(storeId, tx =>
         tx.storeStaff.delete({
           where: { userId_storeId: { userId, storeId } },
+        })
+      );
+
+      // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
+      // cannot come back through an old link.
+      await withStore(storeId, tx =>
+        tx.staffInvite.updateMany({
+          where: { storeId, email: membership.user.email.toLowerCase(), status: 'pending' },
+          data: { status: 'expired', decidedAt: new Date() },
         })
       );
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from './StoreLink';
 import { useConsent } from '../contexts/ConsentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStoreUrl } from '../contexts/StoreContext';

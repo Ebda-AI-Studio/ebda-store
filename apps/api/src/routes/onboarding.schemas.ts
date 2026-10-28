@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { getLook, isBuiltLook, isBuiltSkin } from '@ebda/shared';
 import { SIGNUP_PLAN_CODES } from '../services/billing/trial';
 
@@ -19,6 +19,8 @@ export const createStoreSchema = z.object({
     .refine(id => isBuiltLook(id), { message: 'This look is not available for new stores' })
     .optional(),
   language: z.enum(['ar', 'en']).optional(),
+  /** Referral link: the referrer's store slug (FOUNDING-1). Unknown or self slugs are ignored. */
+  ref: z.string().trim().min(1).max(60).optional(),
   /** Plan chosen at signup (marketing deep link / plan step); billed at trial end. */
   plan: z
     .object({

@@ -16,7 +16,7 @@ import {
   type PageDefinition,
 } from '@ebda/shared';
 
-const base = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const base = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const withTheme = (theme: unknown) => ({ ...base(), theme }) as unknown;
 
 describe('draft theme schema', () => {
