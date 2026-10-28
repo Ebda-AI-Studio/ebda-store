@@ -20,7 +20,8 @@
  * session IDs and store IDs in headers.
  */
 
-import { hasSessionHintCookie, isIosWebkit, sessionHintCookieClears } from '@ebda/shared';
+import { hasSessionHintCookie, sessionHintCookieClears } from '@ebda/shared';
+import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -102,14 +103,6 @@ export function getApiUrl(): string {
  * N times and trip reuse-detection on all but the first).
  */
 let refreshInFlight: Promise<string | null> | null = null;
-
-/**
- * Stand-in returned by refreshAccessToken() when the server rotated the
- * httpOnly cookies without putting the token pair in the response body (the
- * pure-cookie path). NOT a token — never send it as a Bearer credential; it
- * exists only so callers keep a truthy "the refresh succeeded, retry" signal.
- */
-const COOKIE_ROTATED = 'cookie-rotated';
 
 /**
  * A refresh the server THROTTLED, as opposed to one it rejected.
@@ -202,73 +195,19 @@ export function refreshAccessToken(): Promise<string | null> {
 
   refreshInFlight = (async (): Promise<string | null> => {
     if (typeof window === 'undefined') return null;
-    // On iOS/iPadOS the refresh token lives in localStorage (httpOnly cookie
-    // is unreliable). On all other browsers send an empty body and let the
-    // server read from req.cookies.refresh_token instead.
-    const ios = isIosWebkit();
-    // On iOS with no locally stored refresh token there is nothing to
-    // exchange (the cookie can't be trusted there either) — every caller
-    // that reaches this function (checkAuth's direct refreshSession() path
-    // included, not just the refreshToken() callback) skips the doomed
-    // network round-trip instead of hitting /auth/refresh only to be
-    // rejected. This was previously checked only inside the unused
-    // refreshToken() callback, so checkAuth's own refresh path missed it.
-    //
-    // …unless this browser holds a session (#2320). The `staleRefreshToken`
-    // heal below drops the stored token and continues on the rotated COOKIE;
-    // bailing on the missing token then skipped every later refresh, so the
-    // next access-token expiry signed the user out of a live session. With
-    // session evidence the cookie lane is tried (apps/web never bails);
-    // a dead cookie answers 400 → `rejected` → clearStoredSession(), which
-    // removes the evidence, so a signed-out iOS client still skips the call.
-    if (ios && !localStorage.getItem('refreshToken') && !hasSessionEvidence()) return null;
-    const storedRefreshToken = readStoredRefreshToken(ios);
-
+    // The session lives at the shared identity service (accounts.ebda.app, Rulings ID-1/ID-2): ask it for a fresh 15 minute
+    // Store token with its own HttpOnly cookie, then exchange the token for the Store API's cookie. Nothing credential-like
+    // is kept in JS. (The evidence / per-tab-probe gate for anonymous visitors (#2163) stays in the callers, as before.)
     try {
-      const res = await fetch(`${getApiUrl()}/api/v1/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
-      });
-      if (res.status === 429) throw new RefreshThrottledError();
-      if (!res.ok) return null;
-      const json = await res.json();
-      if (json?.success && json.data) {
-        // Only persist new tokens to localStorage on iOS/iPadOS. On other
-        // browsers the httpOnly cookie was already rotated by the server
-        // response — no JS-visible token storage needed.
-        if (ios) {
-          if (json.data.accessToken) localStorage.setItem('accessToken', json.data.accessToken);
-          if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
-          if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
-        }
-        // The server rotated the COOKIE session because our stored token was
-        // dead (issue 2170). The stored refresh token would trip reuse
-        // detection (every session revoked) and the stored access token is a
-        // dead Bearer that outranks the fresh cookie — drop both and continue
-        // on the cookie.
-        if (json.data.staleRefreshToken) {
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('accessToken');
-          // The session lives on in the cookie: record it, so the iOS bail-out
-          // above lets the next refresh through (#2320).
-          markSessionEvidence();
-        }
-        // On the cookie path the server rotates the httpOnly cookies but
-        // deliberately withholds the token pair from the body (a merchant
-        // custom origin must never be able to READ a session token — see
-        // apps/api/src/routes/auth.routes.ts POST /auth/refresh), so
-        // `refreshed` is the success signal there, not accessToken. The return
-        // value is only ever used as a truthy "retry now" flag.
-        return json.data.accessToken ?? (json.data.refreshed ? COOKIE_ROTATED : null);
-      }
-      return null;
+      const grant = await accountsToken();
+      await establishApiSession(grant.access_token);
+      markSessionEvidence();
+      return grant.access_token;
     } catch (error) {
-      // A throttle is not a network error — it must reach the caller, or the
-      // blanket `return null` here re-collapses 429 into "signed out" and the
-      // credential clear in auth.tsx fires anyway.
-      if (error instanceof RefreshThrottledError) throw error;
+      // A throttle is not "signed out": it must reach the caller or the credential-clear fires anyway.
+      if (error instanceof AccountsError && error.status === 429) throw new RefreshThrottledError();
+      // 401 NO_SESSION (signed out / revoked) and every other refusal mean there is no session to keep.
+      if (error instanceof AccountsError && error.status === 503) throw new RefreshThrottledError();
       return null;
     }
   })().finally(() => {
@@ -433,17 +372,28 @@ export function clearPendingLogout(): void {
 }
 
 async function postLogout(apiUrl: string, refreshToken: string | null): Promise<boolean> {
-  try {
-    const res = await fetch(`${apiUrl}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  // BOTH ends must confirm: the identity service (revokes the session for every Ebda product) and the Store API (clears its
+  // cookie). A logout that reached only one is "pending" and is re-sent.
+  const results = await Promise.all([
+    accountsLogout().then(
+      () => true,
+      () => false
+    ),
+    (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    })(),
+  ]);
+  return results.every(Boolean);
 }
 
 /**

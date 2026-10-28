@@ -7,6 +7,13 @@ import { getUserState } from '../lib/definer';
 import logger from '../lib/logger';
 import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 import { isPlatformOrigin } from '../lib/cors-cache';
+import { isIdentityManagedUser } from '../lib/identity-client';
+import {
+  isAccountsToken,
+  sessionRevoked,
+  verifyAccountsToken,
+  type AccountsClaims,
+} from '../lib/accounts-token';
 
 import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 export interface AuthPayload {
@@ -113,6 +120,79 @@ async function resolveTokenVersionAndStatus(
   return { tokenVersion: currentTv, blocked: u ? u.status !== 'active' : false };
 }
 
+/**
+ * Map an identity-service token (Rulings ID-1/ID-2) onto the Store's request identity.
+ *
+ * role: `pa: super_admin` -> super_admin; owning at least one store (or none yet: a merchant who has not created a store) ->
+ * store_admin; only staff memberships -> staff. Store ACCESS is still decided from the database (requireStoreAccess:
+ * ownerId / StoreStaff), not from the claim: the claim is up to 15 minutes old, the database is not (Ruling ID-9).
+ */
+/** Maximum age of the login behind a platform-admin token. */
+export const SUPER_ADMIN_MAX_AUTH_AGE_SECONDS = 12 * 3600;
+
+export function accountsUser(c: AccountsClaims, profileRole?: string): AuthPayload {
+  // The identity-managed profile row's role is authoritative for store_admin vs staff (the stores[] claim cannot express a
+  // mixed owner+staff user); a platform admin is only ever what the token's `pa` claim says.
+  const role =
+    c.pa === 'super_admin'
+      ? 'super_admin'
+      : profileRole === 'staff' || profileRole === 'store_admin'
+        ? profileRole
+        : c.stores.length > 0 && !c.stores.some(s => s.role === 'owner')
+          ? 'staff'
+          : 'store_admin';
+  return { userId: c.sub, email: c.email ?? '', role, storeId: null };
+}
+
+/** Verify an identity-service token and its session. Throws AppError on any failure. */
+export async function authenticateAccounts(
+  token: string,
+  opts: { allowMissingProfile?: boolean } = {}
+): Promise<{ user: AuthPayload; claims: AccountsClaims }> {
+  let claims: AccountsClaims;
+  try {
+    claims = await verifyAccountsToken(token);
+  } catch {
+    throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token');
+  }
+  // A platform admin's power needs a FRESH login (Ruling ID-15): at most 12 h since the interactive login that created the
+  // session. A token without `auth_time` cannot prove it, so it is refused too. (The identity service stops minting `pa` for an
+  // older session as well; this is the Store's own check.)
+  if (claims.pa === 'super_admin') {
+    const age = Date.now() / 1000 - (claims.authTime ?? 0);
+    if (!claims.authTime || age > SUPER_ADMIN_MAX_AUTH_AGE_SECONDS) {
+      throw new AppError(
+        401,
+        'REAUTH_REQUIRED',
+        'Sign in again to continue as a platform administrator'
+      );
+    }
+  }
+  let revoked: boolean;
+  try {
+    revoked = await sessionRevoked(claims.sid);
+  } catch (err) {
+    // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
+    logger.error({ err: (err as Error).message }, '[auth] identity revocation check failed');
+    throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
+  }
+  if (revoked) throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
+
+  // Defence in depth (NEVER-stale class: account status / existence, no cache): the Store's own profile row must also exist, be
+  // live and be active. Every Store path that suspends, deletes or revokes a user also calls the identity service, but a path
+  // that missed it must not leave a valid 15 minute token working. A missing row is refused here; only `POST /auth/session`
+  // (allowMissingProfile) may create one, and only from an identity that still exists.
+  const st = await getUserState(claims.sub);
+  if (!st) {
+    if (!opts.allowMissingProfile) throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
+  } else if (st.deletedAt) {
+    throw new AppError(401, 'TOKEN_REVOKED', 'Account not found');
+  } else if (st.status !== 'active') {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+  }
+  return { user: accountsUser(claims, st?.role), claims };
+}
+
 export async function authenticate(
   req: Request,
   _res: Response,
@@ -122,6 +202,24 @@ export async function authenticate(
 
   if (!token) {
     return next(new AppError(401, 'UNAUTHORIZED', 'Authentication required'));
+  }
+
+  // Identity-service (ES256) token: merchants, staff and super admins. Customer and impersonation tokens stay HS256.
+  if (isAccountsToken(token)) {
+    try {
+      const { user, claims } = await authenticateAccounts(token);
+      req.user = user;
+      (req as any).tokenJti = claims.jti;
+      (req as any).accountsSid = claims.sid;
+      (req as any).accountsStores = claims.stores;
+      return next();
+    } catch (err) {
+      return next(
+        err instanceof AppError
+          ? err
+          : new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token')
+      );
+    }
   }
 
   try {
@@ -231,6 +329,19 @@ export async function optionalAuthenticate(
   // are observable separately; the I/O branch still fails toward guest (the
   // safe default — we do not want to grant an identity we could not confirm
   // is unrevoked), but now logs loudly instead of silently.
+  if (isAccountsToken(token)) {
+    try {
+      const { user, claims } = await authenticateAccounts(token);
+      req.user = user;
+      (req as any).tokenJti = claims.jti;
+      (req as any).accountsSid = claims.sid;
+      (req as any).accountsStores = claims.stores;
+    } catch {
+      /* invalid, revoked or unconfirmable: continue as a guest, like every other failure on this path */
+    }
+    return next();
+  }
+
   let payload: (AuthPayload & { type?: string; purpose?: string }) | null = null;
   try {
     payload = jwt.verify(token, config.jwtSecret, {
@@ -380,4 +491,30 @@ export function rejectAdminOnMerchantOrigin(req: Request, res: Response, next: N
       message: 'This endpoint is not available from this origin',
     },
   });
+}
+
+/**
+ * Credential management (password, MFA, passkeys) of a merchant, staff or super-admin account belongs to the identity service
+ * (Rulings ID-1/ID-2). A change made here would only touch a profile row the identity service ignores, so it would LOOK
+ * enrolled while protecting nothing. Mount AFTER `authenticate`. Customers are unaffected.
+ */
+export async function rejectIdentityManaged(req: Request, _res: Response, next: NextFunction) {
+  try {
+    if (
+      req.user &&
+      req.user.role !== 'customer' &&
+      (await isIdentityManagedUser(req.user.userId))
+    ) {
+      return next(
+        new AppError(
+          409,
+          'USE_IDENTITY_SERVICE',
+          'Manage sign-in settings in your Ebda AI Studio account settings'
+        )
+      );
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 }

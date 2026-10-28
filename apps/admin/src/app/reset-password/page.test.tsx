@@ -8,12 +8,25 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 
-const { apiPost, push, replace } = vi.hoisted(() => ({
-  apiPost: vi.fn(),
+const { accountsFetch, push, replace } = vi.hoisted(() => ({
+  accountsFetch: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
 }));
-vi.mock('../../lib/api', () => ({ apiPost }));
+
+vi.mock('../../lib/accounts', () => ({
+  accountsFetch,
+  AccountsError: class AccountsError extends Error {
+    constructor(
+      public status: number,
+      public code: string,
+      message: string
+    ) {
+      super(message);
+    }
+  },
+}));
+
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace }) }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -30,7 +43,10 @@ vi.mock('@/i18n/useT', () => {
 
 import ResetPasswordPage from './page';
 
-const TOKEN = 'a'.repeat(64);
+const EMAIL = 'owner@shop.test';
+const CODE = '123456';
+/** The emailed link: the address in the query, the code in the fragment. */
+const LINK = `?email=${encodeURIComponent(EMAIL)}#code=${CODE}`;
 const STRONG = 'N3w!Passw0rd';
 
 function visit(search: string) {
@@ -59,67 +75,63 @@ afterEach(() => {
 });
 
 describe('reset-password page', () => {
-  it('removes the token from the address bar on load', async () => {
-    visit(`?token=${TOKEN}`);
+  it('removes the address and the code from the address bar on load', async () => {
+    visit(LINK);
     renderPage();
     await screen.findByLabelText('auth.reset.password');
     expect(window.location.search).toBe('');
-    expect(window.location.href).not.toContain(TOKEN);
+    expect(window.location.hash).toBe('');
+    expect(window.location.href).not.toContain(CODE);
   });
 
-  it('posts token + password and lands on the success screen with a sign-in action', async () => {
-    visit(`?token=${TOKEN}`);
-    apiPost.mockResolvedValue({ data: { message: 'ok' }, error: null });
+  it('posts email + code + new password to the identity service and lands on the success screen', async () => {
+    visit(LINK);
+    accountsFetch.mockResolvedValue({ reset: true });
     renderPage();
     await fill(STRONG);
     expect(await screen.findByText('auth.reset.successTitle')).toBeTruthy();
-    expect(apiPost).toHaveBeenCalledWith('/api/v1/auth/reset-password', {
-      token: TOKEN,
-      password: STRONG,
+    expect(accountsFetch).toHaveBeenCalledWith('/password/reset', {
+      json: { email: EMAIL, code: CODE, newPassword: STRONG },
     });
     fireEvent.click(screen.getByRole('button', { name: 'auth.reset.signIn' }));
     expect(replace).toHaveBeenCalledWith('/login');
   });
 
   it('refuses a weak password and a mismatch before any request', async () => {
-    visit(`?token=${TOKEN}`);
+    visit(LINK);
     renderPage();
     await fill('weakpass');
     expect(screen.getByText('auth.reset.passwordWeak')).toBeTruthy();
     await fill(STRONG, `${STRONG}x`);
     expect(screen.getByText('auth.reset.mismatch')).toBeTruthy();
-    expect(apiPost).not.toHaveBeenCalled();
+    expect(accountsFetch).not.toHaveBeenCalled();
   });
 
-  it.each([[''], ['?token=abc'], ['?token=' + 'Z'.repeat(64)]])(
-    'a missing or malformed token (%s) shows the invalid-link screen without calling the API',
+  it.each([[''], ['?email=a%40b.test#code=abc'], ['#code=123456'], ['?email=a%40b.test']])(
+    'a missing or malformed link (%s) shows the invalid-link screen without calling the API',
     async search => {
       visit(search);
       renderPage();
       expect(await screen.findByText('auth.reset.invalidTitle')).toBeTruthy();
-      expect(apiPost).not.toHaveBeenCalled();
+      expect(accountsFetch).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'auth.reset.requestNew' }));
       expect(push).toHaveBeenCalledWith('/forgot-password');
     }
   );
 
-  it('a used / expired token (TOKEN_INVALID) shows the invalid-link screen', async () => {
-    visit(`?token=${TOKEN}`);
-    apiPost.mockResolvedValue({
-      data: null,
-      error: { code: 'TOKEN_INVALID', message: 'x', status: 400 },
-    });
+  it('a used / expired code (INVALID_CODE) shows the invalid-link screen', async () => {
+    visit(LINK);
+    const { AccountsError } = await import('../../lib/accounts');
+    accountsFetch.mockRejectedValue(new AccountsError(400, 'INVALID_CODE', 'x'));
     renderPage();
     await fill(STRONG);
     expect(await screen.findByText('auth.reset.invalidTitle')).toBeTruthy();
   });
 
   it('a 429 keeps the form with a rate-limit message', async () => {
-    visit(`?token=${TOKEN}`);
-    apiPost.mockResolvedValue({
-      data: null,
-      error: { code: 'RATE_LIMITED', message: 'x', status: 429 },
-    });
+    visit(LINK);
+    const { AccountsError } = await import('../../lib/accounts');
+    accountsFetch.mockRejectedValue(new AccountsError(429, 'TOO_MANY_ATTEMPTS', 'x'));
     renderPage();
     await fill(STRONG);
     expect(await screen.findByText('auth.reset.rateLimited')).toBeTruthy();

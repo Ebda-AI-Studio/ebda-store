@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod/v3';
 import jwt from 'jsonwebtoken';
-import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
+import {
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  rejectIdentityManaged,
+  rejectImpersonated,
+} from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
 import { withUser } from '@ebda/database';
 import { encryption } from '../services/encryption.service';
@@ -56,6 +61,7 @@ const verifyBodySchema = z.object({
 router.post(
   '/enroll/begin',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req, res, next) => {
@@ -112,6 +118,7 @@ router.post(
 router.post(
   '/enroll/verify',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   authLimiter,
@@ -285,6 +292,7 @@ router.post('/verify', authLimiter, async (req, res, next) => {
 router.post(
   '/disable',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   authLimiter,

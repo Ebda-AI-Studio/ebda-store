@@ -13,14 +13,20 @@ const h = vi.hoisted(() => ({
   deleted: [] as any[],
   keyRevokes: [] as any[],
   passkeyTouches: [] as string[],
+  inviteExpiries: [] as any[],
 }));
 
 vi.mock('@ebda/database', () => {
   const tx = {
     storeStaff: {
-      findUnique: async ({ where }: any) => ({ id: 'ss-1', ...where.userId_storeId }),
+      findUnique: async ({ where }: any) => ({
+        id: 'ss-1',
+        ...where.userId_storeId,
+        user: { email: 'Victim@Example.com' },
+      }),
       delete: async (a: any) => void h.deleted.push(a.where.userId_storeId),
     },
+    staffInvite: { updateMany: async (a: any) => void h.inviteExpiries.push(a) },
     merchantApiKey: { updateMany: async (a: any) => void h.keyRevokes.push(a.where) },
     passkeyCredential: new Proxy(
       {},
@@ -77,6 +83,7 @@ beforeEach(() => {
   h.deleted = [];
   h.keyRevokes = [];
   h.passkeyTouches = [];
+  h.inviteExpiries = [];
 });
 
 describe('DELETE /stores/:storeId/staff/:userId (PASSKEY-11)', () => {
@@ -86,6 +93,12 @@ describe('DELETE /stores/:storeId/staff/:userId (PASSKEY-11)', () => {
     expect(res.status).toBe(200);
     expect(h.deleted).toEqual([{ userId: 'victim', storeId: 'store-a' }]);
     expect(h.keyRevokes).toEqual([{ storeId: 'store-a', userId: 'victim', revokedAt: null }]);
+    // pending invitations to the removed address die with the membership (Ruling ID-13)
+    expect(h.inviteExpiries[0].where).toEqual({
+      storeId: 'store-a',
+      email: 'victim@example.com',
+      status: 'pending',
+    });
     expect(h.revokeAllSessions).not.toHaveBeenCalled();
     expect(h.passkeyTouches).toEqual([]);
   });

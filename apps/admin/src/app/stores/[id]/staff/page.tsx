@@ -22,6 +22,13 @@ interface StaffMember {
   createdAt: string;
 }
 
+interface PendingInvite {
+  id: string;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export default function StoreStaffPage() {
   const { gate } = useRequireFeature('staff_accounts');
 
@@ -50,14 +57,17 @@ export default function StoreStaffPage() {
     email: '',
     firstName: '',
     lastName: '',
-    password: '',
   });
+
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
+  const [revokeTarget, setRevokeTarget] = useState<PendingInvite | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   const [removeTarget, setRemoveTarget] = useState<StaffMember | null>(null);
   const [removing, setRemoving] = useState(false);
 
   function resetInviteForm() {
-    setInviteForm({ email: '', firstName: '', lastName: '', password: '' });
+    setInviteForm({ email: '', firstName: '', lastName: '' });
     setInviteError(null);
   }
 
@@ -81,6 +91,10 @@ export default function StoreStaffPage() {
       } else if (apiError) {
         setError(apiError.message || t('errors.loadFailed'));
       }
+      const inv = await apiGet<{ invites: PendingInvite[] }>(
+        `/api/v1/stores/${storeId}/staff/invites`
+      );
+      setInvites(inv.data?.invites ?? []);
     } catch {
       setError(t('errors.networkError'));
     } finally {
@@ -97,12 +111,19 @@ export default function StoreStaffPage() {
     setInviteError(null);
     setInviting(true);
     try {
-      const { error: apiError } = await apiPost(`/api/v1/stores/${storeId}/staff`, inviteForm);
+      const { data: added, error: apiError } = await apiPost<{ status?: string }>(
+        `/api/v1/stores/${storeId}/staff`,
+        inviteForm
+      );
       if (apiError) {
         setInviteError(apiError.message || t('toasts.addFailedDefault'));
         return;
       }
-      toastSuccess(t('toasts.addedTitle'), t('toasts.addedDesc', { name: inviteForm.firstName }));
+      if (added?.status === 'invitation_sent') {
+        toastSuccess(t('invites.sentTitle'), t('invites.sentDesc', { email: inviteForm.email }));
+      } else {
+        toastSuccess(t('toasts.addedTitle'), t('toasts.addedDesc', { name: inviteForm.firstName }));
+      }
       setInviteOpen(false);
       resetInviteForm();
       await fetchStaff();
@@ -110,6 +131,30 @@ export default function StoreStaffPage() {
       setInviteError(t('errors.networkError'));
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleRevoke() {
+    if (!revokeTarget) return;
+    setRevoking(true);
+    try {
+      const { error: apiError } = await apiDelete(
+        `/api/v1/stores/${storeId}/staff/invites/${revokeTarget.id}`
+      );
+      if (apiError) {
+        toastError(t('invites.revokeFailed'), apiError.message);
+        return;
+      }
+      toastSuccess(
+        t('invites.revokedTitle'),
+        t('invites.revokedDesc', { email: revokeTarget.email })
+      );
+      setRevokeTarget(null);
+      await fetchStaff();
+    } catch {
+      toastError(t('toasts.errorTitle'), t('errors.networkError'));
+    } finally {
+      setRevoking(false);
     }
   }
 
@@ -269,6 +314,37 @@ export default function StoreStaffPage() {
         />
       )}
 
+      {invites.length > 0 && (
+        <section className="mt-8" aria-labelledby="pending-invites-title">
+          <h2 id="pending-invites-title" className="text-sm font-semibold text-foreground">
+            {t('invites.title')}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t('invites.description')}</p>
+          <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
+            {invites.map(inv => (
+              <li key={inv.id} className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground" dir="ltr">
+                    {inv.email}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('invites.expires', { date: formatDate(inv.expiresAt) })}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="max-md:min-h-11 max-md:px-4"
+                  onClick={() => setRevokeTarget(inv)}
+                >
+                  {t('invites.revoke')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Add staff modal */}
       <Modal
         isOpen={inviteOpen}
@@ -313,19 +389,6 @@ export default function StoreStaffPage() {
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="staff-password">{t('addModal.passwordLabel')}</Label>
-              <Input
-                id="staff-password"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={inviteForm.password}
-                onChange={e => setInviteForm({ ...inviteForm, password: e.target.value })}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">{t('addModal.passwordHint')}</p>
-            </div>
             {inviteError && (
               <p className="text-sm text-destructive-ink" role="alert">
                 {inviteError}
@@ -349,6 +412,31 @@ export default function StoreStaffPage() {
             </Button>
           </ModalFooter>
         </form>
+      </Modal>
+
+      {/* Revoke invitation modal */}
+      <Modal
+        isOpen={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        title={t('invites.revokeTitle')}
+        size="sm"
+      >
+        <p className="text-sm text-muted-foreground">
+          {t('invites.revokeBody', { email: revokeTarget?.email ?? '' })}
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setRevokeTarget(null)} disabled={revoking}>
+            {t('removeModal.cancelButton')}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleRevoke}
+            disabled={revoking}
+            isLoading={revoking}
+          >
+            {t('invites.revoke')}
+          </Button>
+        </div>
       </Modal>
 
       {/* Remove confirmation modal */}

@@ -365,7 +365,11 @@ describe.each([
     it('recovers via the OUTER (mount-level) retry even when the inner refresh ladder alone would still be throttled', async () => {
       let refreshCalls = 0;
       globalThis.fetch = vi.fn(async (url: unknown) => {
-        if (String(url).includes('/auth/refresh')) {
+        // Admin and orders refresh through the identity service (Rulings ID-1/ID-2): a token request, then /auth/session.
+        if (String(url).includes('/auth/session')) {
+          return res(200, { success: true, data: { user: { id: 'u1' } } });
+        }
+        if (String(url).includes('/token?aud=')) {
           refreshCalls += 1;
           // The inner ladder (refreshSessionWaitingOutThrottle) makes exactly
           // 2 attempts per call on its own (1 + THROTTLE_RETRY_DELAYS_MS.length
@@ -373,7 +377,7 @@ describe.each([
           // is IMPOSSIBLE unless checkSession is invoked a second time by the
           // outer, mount-level ladder.
           return refreshCalls >= 3
-            ? res(200, { success: true, data: { refreshed: true } })
+            ? res(200, { success: true, data: { access_token: 't', expires_at: 1 } })
             : res(429);
         }
         // /auth/me: 401 until a refresh has actually succeeded.
@@ -390,7 +394,7 @@ describe.each([
 
     it('gives up after a bounded budget rather than hanging when the throttle never clears', async () => {
       globalThis.fetch = vi.fn(async (url: unknown) =>
-        String(url).includes('/auth/refresh') ? res(429) : res(401, {})
+        String(url).includes('/token?aud=') ? res(429) : res(401, {})
       ) as never;
       const { checkSessionWithMountRetries } = await load();
 

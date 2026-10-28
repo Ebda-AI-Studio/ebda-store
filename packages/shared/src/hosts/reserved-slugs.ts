@@ -34,6 +34,8 @@ export const RESERVED_SLUGS = [
   'hub',
   'id',
   'accounts',
+  // Ebda WhatsApp (https://wa.ebda.app), a product host and an allow-listed identity origin.
+  'wa',
 ] as const;
 
 export type ReservedSlug = (typeof RESERVED_SLUGS)[number];

@@ -177,10 +177,14 @@ export async function assertAnalyticsTier(
 export async function assertWithinLimit(
   storeId: string,
   limitKey: GatedLimitKey,
-  opts: { delta?: number } = {}
+  opts: { delta?: number; tx?: Tx } = {}
 ): Promise<void> {
   const delta = opts.delta ?? 1;
-  const e = await getEntitlements(storeId);
+  // With a transaction the check is ATOMIC with the caller's insert: the store row is locked FOR NO KEY UPDATE first (it serialises seat takers against each other but, unlike FOR UPDATE, does not block the FK inserts - orders, carts, products - that take FOR KEY SHARE on it), so concurrent
+  // seat takers queue behind each other and each counts the previous one's row (no N-racers-one-seat overshoot).
+  if (opts.tx)
+    await opts.tx.$queryRaw`SELECT id FROM public.stores WHERE id = ${storeId} FOR NO KEY UPDATE`;
+  const e = await getEntitlements(storeId, opts.tx);
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
   const limit = e.limits[limitKey];
@@ -191,7 +195,7 @@ export async function assertWithinLimit(
 
   if (limit === null) return; // unlimited (comped, or a plan that sets no ceiling)
   if (typeof limit !== 'number') return;
-  const used = (await countUsage(storeId, limitKey)) ?? 0;
+  const used = (await countUsage(storeId, limitKey, opts.tx)) ?? 0;
   if (used + delta > limit) throw limitError(e, limitKey, limit, used, delta);
 }
 

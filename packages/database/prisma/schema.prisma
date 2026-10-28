@@ -497,6 +497,7 @@ model Store {
   instapayReceipts           InstapayReceipt[]
   billingReminders           BillingReminder[]
   lifecycleEmails            StoreLifecycleEmail[]
+  staffInvites               StaffInvite[]
 
   @@index([ownerId])
   @@index([status])
@@ -599,6 +600,32 @@ model StoreStaff {
   @@index([storeId])
   @@index([userId])
   @@map("store_staff")
+}
+
+/// A staff invitation sent to an address that already has an account (Ruling ID-13). `id` is the jti of the signed link:
+/// the link is valid only while this row is `pending` and unexpired, and accepting it flips the row in the SAME transaction
+/// that creates the StoreStaff row, so a link works once. Removing the member, re-inviting the address, or the owner revoking
+/// the invite ends it. RLS: strict store policy. Moves to the StoreDO schema with the other store tables.
+model StaffInvite {
+  id         String    @id @default(uuid())
+  storeId    String    @map("store_id")
+  /// lower-cased address the link was sent to
+  email      String
+  /// staff (the only role an invitation can grant)
+  role       String    @default("staff")
+  /// pending | accepted | revoked | expired
+  status     String    @default("pending")
+  invitedBy  String?   @map("invited_by")
+  acceptedBy String?   @map("accepted_by")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  decidedAt  DateTime? @map("decided_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status])
+  @@index([storeId, email])
+  @@map("staff_invites")
 }
 
 // ==========================================

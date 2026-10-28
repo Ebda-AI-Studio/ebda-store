@@ -23,6 +23,10 @@
     "target": "d1",
     "reason": "staff login resolves cross-store membership by user"
   },
+  "StaffInvite": {
+    "target": "d1",
+    "reason": "an invitation is resolved by its token across stores, like store_staff membership"
+  },
   "SlugRedirect": {
     "target": "d1",
     "reason": "host/slug directory: resolves host to store before any DO is reachable"
