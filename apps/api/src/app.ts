@@ -24,6 +24,7 @@ import {
   rateLimitRedisClient,
   inngestLimiter,
 } from './middleware/security';
+import { writeFreeze } from './middleware/write-freeze';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
 import routes from './routes';
@@ -134,6 +135,8 @@ setDbHopObserver(recordHop);
 
 // Request ID for tracing
 app.use(requestId);
+// Cutover read-only window (WRITES_FROZEN=1, docs/runbooks/cutover-cf.md): 503 to every write, reads stay open.
+app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
