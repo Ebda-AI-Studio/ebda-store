@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1423,
+    "wired": 1438,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -2948,6 +2948,45 @@
       "control": "cardColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|cardHeart",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|cardSwatches",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "dahab|theme|cardTags",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "dahab|theme|fontFamily",
@@ -6770,6 +6809,45 @@
       "control": "cardColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|cardHeart",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "jasmine|theme|cardSwatches",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "jasmine|theme|cardTags",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "jasmine|theme|fontFamily",
@@ -10620,6 +10698,45 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|cardHeart",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "lamma|theme|cardSwatches",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "lamma|theme|cardTags",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "lamma|theme|fontFamily",
       "skin": "lamma",
       "looks": [
@@ -14455,6 +14572,45 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|cardHeart",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "qamar|theme|cardSwatches",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "qamar|theme|cardTags",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "qamar|theme|fontFamily",
       "skin": "qamar",
       "looks": [
@@ -18288,6 +18444,45 @@
       "control": "cardColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|cardHeart",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "cardHeart",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|cardSwatches",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "cardSwatches",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
+      "id": "souq|theme|cardTags",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "cardTags",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "souq|theme|fontFamily",

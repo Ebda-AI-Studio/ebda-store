@@ -40,6 +40,10 @@ export function traitDefault(key: string, lookId?: string | null): string | bool
         ? 'accent'
         : 'text';
     }
+    case 'cardHeart':
+    case 'cardSwatches':
+    case 'cardTags':
+      return getLook(lookId) ? 'off' : undefined;
     case 'heroRatio':
       return undefined; // the look's own mock ratio; the editor shows "same as the look"
     default:
@@ -51,6 +55,9 @@ export function traitDefault(key: string, lookId?: string | null): string | bool
 export const TRAIT_ATTRS = {
   headingWeight: 'data-heading-weight',
   priceColour: 'data-price-colour',
+  cardHeart: 'data-card-heart',
+  cardSwatches: 'data-card-swatches',
+  cardTags: 'data-card-tags',
 } as const;
 
 /** The look accent reaches 4.5:1 on the page and the card (when the theme carries those colours; else assumed fine). */

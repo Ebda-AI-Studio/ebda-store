@@ -18,7 +18,10 @@ export function FactChips({
   if (!rows.length) return null;
   const lang = language === 'ar' ? 'ar' : 'en';
   return (
-    <div className={`flex flex-wrap items-center gap-1 ${className}`.trim()}>
+    <div
+      data-card-chrome="tags"
+      className={`flex flex-wrap items-center gap-1 ${className}`.trim()}
+    >
       {rows.map((f, i) => (
         <span
           key={i}

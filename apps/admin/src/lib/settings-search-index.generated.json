@@ -1566,6 +1566,45 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.card-heart",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Wishlist heart on home cards",
+    "ar": "قلب المفضلة على كروت الرئيسية",
+    "synEn": "wishlist heart favourite button card home hide show",
+    "synAr": "قلب المفضلة زر الكارت الرئيسية اخفاء اظهار",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
+    "id": "builder.card-swatches",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Colour dots on home cards",
+    "ar": "نقط الألوان على كروت الرئيسية",
+    "synEn": "colour dots swatches card variants home hide show",
+    "synAr": "نقط الالوان الكارت الرئيسية اخفاء اظهار",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
+    "id": "builder.card-tags",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Tag chips on home cards",
+    "ar": "شارات التصنيف على كروت الرئيسية",
+    "synEn": "tag chips labels material card home hide show",
+    "synAr": "شارات تصنيف الخامة الكارت الرئيسية اخفاء اظهار",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.heading-weight",
     "kind": "setting",
     "route": "/builder",

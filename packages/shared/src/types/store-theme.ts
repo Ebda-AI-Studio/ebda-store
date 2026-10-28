@@ -21,6 +21,7 @@ import type {
   TabBarMode,
   HeadingWeight,
   PriceColour,
+  CardChrome,
   CardCta,
   CardHover,
   CardBadge,
@@ -182,6 +183,10 @@ export interface StoreTheme {
   // TEMPLATES-MOCK-6: section heading weight and card price colour; unset = the look's own.
   headingWeight?: HeadingWeight;
   priceColour?: PriceColour;
+  // TEMPLATES-MOCK-7: card chrome on home grids; unset = off on a look store (the mock's bare cards).
+  cardHeart?: CardChrome;
+  cardSwatches?: CardChrome;
+  cardTags?: CardChrome;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no

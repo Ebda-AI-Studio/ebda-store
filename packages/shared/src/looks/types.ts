@@ -61,6 +61,9 @@ export type HeadingWeight = (typeof HEADING_WEIGHTS)[number];
 /** Product price colour on cards (TEMPLATES-MOCK-6): the look's accent (made readable) or the plain text colour. */
 export const PRICE_COLOURS = ['accent', 'text'] as const;
 export type PriceColour = (typeof PRICE_COLOURS)[number];
+/** A bit of card chrome on home grids (TEMPLATES-MOCK-7): the wishlist heart, colour dots, tag chips. Unset = off on a look store. */
+export const CARD_CHROME = ['on', 'off'] as const;
+export type CardChrome = (typeof CARD_CHROME)[number];
 export const TAB_BARS = ['always', 'inner', 'never'] as const;
 export type TabBarMode = (typeof TAB_BARS)[number];
 export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
@@ -262,6 +265,9 @@ export const MOCK_TRAIT_KEYS = [
   'tabBar',
   'headingWeight',
   'priceColour',
+  'cardHeart',
+  'cardSwatches',
+  'cardTags',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
 /** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */

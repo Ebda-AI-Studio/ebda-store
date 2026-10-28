@@ -21,6 +21,7 @@ import {
   TAB_BARS,
   HEADING_WEIGHTS,
   PRICE_COLOURS,
+  CARD_CHROME,
 } from '@ebda/shared';
 
 /**
@@ -86,6 +87,9 @@ export const themeSchema = z
       tabBar: TAB_BARS,
       headingWeight: HEADING_WEIGHTS,
       priceColour: PRICE_COLOURS,
+      cardHeart: CARD_CHROME,
+      cardSwatches: CARD_CHROME,
+      cardTags: CARD_CHROME,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

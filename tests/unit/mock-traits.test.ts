@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DRAFT_THEME_KEYS,
   HERO_RATIOS,
+  CARD_CHROME,
   HEADING_WEIGHTS,
   PRICE_COLOURS,
   lookTraitAttrs,
@@ -104,13 +105,13 @@ describe('headingWeight + priceColour (P4)', () => {
   });
 
   it('body attributes: merchant beats look; a store with no look gets none', () => {
-    expect(lookTraitAttrs({}, 'qamar.atelier')).toEqual({
+    expect(lookTraitAttrs({}, 'qamar.atelier')).toMatchObject({
       'data-heading-weight': 'bold',
       'data-price-colour': 'accent',
     });
     expect(
       lookTraitAttrs({ headingWeight: 'regular', priceColour: 'text' }, 'qamar.atelier')
-    ).toEqual({
+    ).toMatchObject({
       'data-heading-weight': 'regular',
       'data-price-colour': 'text',
     });
@@ -142,5 +143,24 @@ describe('headingWeight + priceColour (P4)', () => {
         'qamar.lookbook'
       )['data-price-colour']
     ).toBe('text');
+  });
+});
+
+describe('card chrome (P5)', () => {
+  it('heart, swatches and tags are validated, draftable, look-owned, shown on all five skins', () => {
+    for (const k of ['cardHeart', 'cardSwatches', 'cardTags']) validated(k, CARD_CHROME);
+  });
+
+  it('a look store defaults to bare cards; a merchant pick restores each piece on its own', () => {
+    expect(lookTraitAttrs({}, 'jasmine.bloom')).toMatchObject({
+      'data-card-heart': 'off',
+      'data-card-swatches': 'off',
+      'data-card-tags': 'off',
+    });
+    expect(lookTraitAttrs({ cardHeart: 'on' }, 'jasmine.bloom')).toMatchObject({
+      'data-card-heart': 'on',
+      'data-card-swatches': 'off',
+    });
+    expect(lookTraitAttrs({ cardHeart: 'on' }, null)).toEqual({}); // no look: cards untouched
   });
 });

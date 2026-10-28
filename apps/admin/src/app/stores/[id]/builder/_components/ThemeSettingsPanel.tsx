@@ -261,6 +261,24 @@ export function ThemeSettingsPanel({
                     {field}
                   </div>
                 );
+              if (s.id === 'cardHeart')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-heart">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'cardSwatches')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-swatches">
+                    {field}
+                  </div>
+                );
+              if (s.id === 'cardTags')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.card-tags">
+                    {field}
+                  </div>
+                );
               if (s.id === 'headingWeight')
                 return (
                   <div key={s.id} className="space-y-1" data-setting-id="builder.heading-weight">

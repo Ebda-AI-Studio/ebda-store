@@ -856,6 +856,27 @@ export const SETTINGS: SettingEntry[] = [
         'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
       ],
       [
+        'builder.card-heart',
+        'builder.theme.cardHeart',
+        'select=theme',
+        'wishlist heart favourite button card home hide show',
+        'قلب المفضلة زر الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.card-swatches',
+        'builder.theme.cardSwatches',
+        'select=theme',
+        'colour dots swatches card variants home hide show',
+        'نقط الالوان الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
+        'builder.card-tags',
+        'builder.theme.cardTags',
+        'select=theme',
+        'tag chips labels material card home hide show',
+        'شارات تصنيف الخامة الكارت الرئيسية اخفاء اظهار',
+      ],
+      [
         'builder.heading-weight',
         'builder.theme.headingWeight',
         'select=theme',

@@ -336,6 +336,7 @@ function StorefrontProductCardImpl({
       {!row && (
         <button
           type="button"
+          data-card-chrome="heart"
           onClick={handleWishlist}
           aria-label={cardActionLabel('wishlist-add', isRtl, name)}
           aria-pressed={isWishlisted}

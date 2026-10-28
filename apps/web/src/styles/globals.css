@@ -1969,6 +1969,16 @@ html[lang='en'] [data-look] .font-display {
 [data-heading-weight='bold'] [data-part='section-title'] {
   font-weight: 700;
 }
+/*
+ * TEMPLATES-MOCK-7 (P5): bare cards on the home page's sections. `lookTraitAttrs` writes data-card-heart /
+ * data-card-swatches / data-card-tags (merchant value, else the look's default 'off'); only elements inside a
+ * home/builder section are hidden, so the product list, product page and wishlist keep their controls.
+ */
+[data-card-heart='off'] [data-section] [data-card-chrome='heart'],
+[data-card-swatches='off'] [data-section] [data-card-chrome='swatches'],
+[data-card-tags='off'] [data-section] [data-card-chrome='tags'] {
+  display: none;
+}
 [data-price-colour='accent'] span[data-zone='productPrice'] {
   color: hsl(var(--look-price-colour, var(--foreground)));
 }

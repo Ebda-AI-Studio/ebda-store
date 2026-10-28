@@ -493,6 +493,42 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
     labelAr: 'كروت المنتجات',
     settings: [
       {
+        id: 'cardHeart',
+        type: 'select',
+        labelEn: 'Wishlist heart on home cards',
+        labelAr: 'قلب المفضلة على كروت الرئيسية',
+        hintEn:
+          'The heart button on each product card in home page sections. Product pages keep theirs.',
+        hintAr: 'زر القلب على كل كارت منتج في أقسام الصفحة الرئيسية. صفحات المنتج بتفضل فيها.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'cardSwatches',
+        type: 'select',
+        labelEn: 'Colour dots on home cards',
+        labelAr: 'نقط الألوان على كروت الرئيسية',
+        hintEn:
+          'The small colour dots under the price. Hidden, the card stays clean; the colours still show on the product page.',
+        hintAr:
+          'النقط الصغيرة تحت السعر. لو مخفية الكارت بيفضل نضيف، والألوان بتظهر في صفحة المنتج.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'cardTags',
+        type: 'select',
+        labelEn: 'Tag chips on home cards',
+        labelAr: 'شارات التصنيف على كروت الرئيسية',
+        hintEn: 'The small outlined tags (material, origin...) on each card.',
+        hintAr: 'الشارات الصغيرة (الخامة والمنشأ...) على كل كارت.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
         id: 'showBrandBadge',
         type: 'checkbox',
         labelEn: 'Store name on cards',
