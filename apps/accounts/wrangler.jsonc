@@ -1,5 +1,5 @@
 // accounts.ebda.app: the shared Ebda AI Studio identity service (Ruling ID-1/ID-2). Its OWN Worker + D1.
-// Secrets (wrangler secret put): JWT_PRIVATE_JWK, MFA_KEY. No preview environment exists or will (INFRA-PREVIEW-1).
+// Secrets (wrangler secret put): JWT_PRIVATE_JWK, MFA_KEY, CLIENT_SECRET_PEPPER (integrator client secrets; 32+ random bytes, base64; without it the client endpoints answer 503). No preview environment exists or will (INFRA-PREVIEW-1).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ebda-accounts",
