@@ -1,0 +1,5 @@
+# SEARCH-T14-6
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling SEARCH-T14-6 (coordinator, Task 14 round 2) — planner and index tests run as `ebda_app`. `tests/helpers/app-role-planner.ts` runs the production statements as `ebda_app` under a store scope and reads each index's own scan counter (`pg_stat_user_indexes.idx_scan`, also sees statements nested in a function); `tests/unit/planner-tests-run-as-app-role.test.ts` fails CI for any test file that EXPLAINs, toggles `enable_*` or reads `idx_scan` without importing it. The only exception is a pure SQL-shape check marked `planner-owner-ok: <reason>` (two files carry it: the immutable embed-doc inlining check and the shape check that the product match calls the definer); the marker is refused in a file that toggles `enable_*`. Red first: the gate failed on `product-embeddings-schema.test.ts` and `search-normalize-parity.test.ts`; the owner-only "planner can use both doc indexes" case was deleted and the `order-search-guest-contact` BitmapOr case was replaced by the `ebda_app` counters. Cost if wrong: a marker is a promise in a comment; a reviewer must read the reason.

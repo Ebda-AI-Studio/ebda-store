@@ -1,0 +1,5 @@
+# EBDA-FUNNEL-6
+
+> Section: 2026-10-07 — Signup funnel: plan choice, card on file or InstaPay, 14-day Growth trial (branch `feat/signup-funnel`, stacks on #10)
+
+Ruling EBDA-FUNNEL-6 — Trial-end charge = the existing `claimEvent → provider → settle` pattern. Ownership is declared by the UNIQUE `billing_events.idempotency_key` (`sub:<id>:trial-end:<iso>`) BEFORE the irreversible call. A definitive provider answer is now settled with 3 retries (`settleDefinitive`). If they all fail, the row stays `pending` (owned: no later run can re-send the key), the ledger page lists it as stuck, and a P1 alert carries the provider reference. Settlement is idempotent (guarded transitions), so the webhook or an operator completes it. No automatic refund is the compensator: the charge is the merchant's real subscription fee, and an auto-refund on a DB blip would lose revenue. Evidence: "trial-end job run twice (and concurrently) charges once" (M1). Cost if wrong: during a long DB outage a charged merchant stays `trialing` until the webhook or an operator settles the row.

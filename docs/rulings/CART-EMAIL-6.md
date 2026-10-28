@@ -1,0 +1,5 @@
+# CART-EMAIL-6
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling CART-EMAIL-6 (2026-10-21, review item 5) - cart mail has its own cap AND spends the shared budget. Per-store `CART_EMAIL_DAILY_CAP` (default 200 per rolling 24 h, counted from `abandoned_carts.email_sent_at`, index `(store_id, email_sent_at)`); past it the reminder is skipped as `daily_cap` (a next-day reminder is stale mail). `sentInLast24h` now adds cart emails to campaign recipients, so a store that sent 200 reminders has that much less campaign headroom (the campaign cap check is unchanged, only its input grew). The sweep reads the config of every store first and only scans carts for stores with `email_enabled`; a row left `queued` more than 30 min (process died after the claim) is re-emitted with the same event id, never failed. Residual: stores that switched the channel off keep any `queued` row until it is re-enabled. Cost if wrong: a very large store may want a higher cart cap than 200/day; set the env.

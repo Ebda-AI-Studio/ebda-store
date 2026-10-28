@@ -1,0 +1,5 @@
+# PREPUSH-1
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling PREPUSH-1 (Ahmad 2026-10-26) - the pre-push gate runs only the cheap checks (action pins, gitleaks on the push range, prettier on the changed files) plus lint/typecheck of the AFFECTED workspaces and `vitest related` on the changed files, planned by `scripts/ci/pre-push-plan.mjs` (built on the CI planner `scripts/ci-affected.mjs`), all inside the one host-lock hold. Whenever the planner cannot narrow the push (lockfile, package.json, root config, `packages/shared`, `packages/database`, no merge base) it runs the full legacy gate; a docs-only push runs only the cheap checks. The full suite stays in CI and nightly. Evidence: every queued push waited behind a ~10-minute full gate under the one lock (2026-10-25/26); `tests/unit/pre-push-plan.test.ts` proves a touched file runs its own tests and a lockfile change runs everything. Cost if wrong: a cross-file break that `vitest related` (import-graph based) misses reaches CI instead of being caught locally, costing one red PR run and a fix-up push rather than a blocked local queue.

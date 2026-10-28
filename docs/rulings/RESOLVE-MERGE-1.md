@@ -1,0 +1,5 @@
+# RESOLVE-MERGE-1
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling RESOLVE-MERGE-1 (2026-10-22) — the store-resolve fill reads a store's active FAQs, active HowTos and unpublished CMS page slugs in ONE round trip (`fetchStoreExtras`, `routes/public.routes.ts`) instead of three sequential queries (about 100 ms each from the Worker to Postgres; inside the one request transaction concurrency cannot help, the connection is single). Same filters, same ordering, same field names and types; it still runs inside `readInStoreContext`, so RLS filters all three tables. Evidence: `tests/integration/store-resolve-parity.test.ts` pins the whole payload byte-for-byte (ids, timestamps and the run suffix normalised) for a fixture store with disabled pages, FAQs, HowTos and locations and for a bare store, golden files produced by the pre-change code; a deliberate mutation of one filter turns it red. Not merged here (unchanged, still separate reads): tax, SMS/cart-email availability, locations, the store row. Cost if wrong: a field or ordering drift in the store payload every page uses (the golden test is the guard).

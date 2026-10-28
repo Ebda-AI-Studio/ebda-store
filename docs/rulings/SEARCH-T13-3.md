@@ -1,0 +1,5 @@
+# SEARCH-T13-3
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling SEARCH-T13-3 (revisits SEARCH-T8-2) — the loose AI words do not hurt PRECISION; no new filter. Keyword-only with words vs without: core hit-rate@10 0.49 → 0.72, MRR 0.48 → 0.70, Franco 0.10 → 0.62; negatives in the keyword top 10 0.03 → 0.06 per query, and no absent-product query was answered by keyword either way. Every intrusion traced is a genuinely shared word, not an invented attribute: `fool` → peanuts (`فول سوداني`), `shay` → a tea glass, `sa3a` → a wall clock, `3asal` → molasses (`عسل أسود`), `sama3a` → a hearing aid, `jeans` → a denim skirt; each is the true word for that product too, so a type filter would also delete correct words. APPENDED to the doc, the words diluted the vector (hybrid msa 0.98 → 0.94, hard msa 1.00 → 0.70, typos 0.80 → 0.70); embedded on their OWN (SEARCH-T13-7) they add recall without that cost. Cost if wrong: a shopper typing a shared word sees one off-type product among the first five.

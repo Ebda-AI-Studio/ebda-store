@@ -1,0 +1,5 @@
+# LOOKS-16
+
+> Section: 2026-10-14 — Security batch (branch `fix/security-batch-2026-10-14`, audit: `docs/security/audit-2026-10-14.md`)
+
+Ruling LOOKS-16 — accepted residual for Phase S: the skin baseline still paints its brand-colour section bands (`bgColor: token:primary` on hero, categories, best sellers, testimonials, footer) on a look store, so a dark-primary look shows near-black bands, and the minimal skin's below-image category caption (`text-muted-foreground`) is low-contrast on such a band (it is on a legacy minimal store's coloured band too). Evidence: final browser check screenshots `look-qamar-*-home.png`, `look-lamma-*-home.png`. Not changed here because which sections a look colours is a design decision for each look's skin in Phase B, reviewed by Ahmad in a browser before a look is flipped to `built` (none is yet, so the showroom shows none of this). Cost if wrong: a merchant onboarded with a look before Phase B sees dark bands with faint category captions until the skins ship.

@@ -1,0 +1,5 @@
+# CF-SCHEMA-4
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling CF-SCHEMA-4 (2026-10-24) - the raw Postgres invariants that live only in migration SQL are carried, not lost: 103 named CHECK constraints and the partial/expression indexes are replayed in migration order and translated to SQLite (regexes become GLOB templates; an untranslatable expression fails the generator). The only ones not carried are those of identity/analytics models and the Postgres trigram GIN indexes (FTS5 replaces them in task 3.7); each is listed with its reason in the manifest. Row guards that must survive a buggy repo method stay SQLite triggers (`0002_invariants.sql`: fiscal immutability, gold price guard through `do_flags.gold_reprice`, append-only `commerce_outcomes` and `billing_events`); the 82 distinct Postgres functions/triggers are mapped in `docs/cf/fn-map.json` (replacement + test) and a new SQL function fails `fn-inventory.test.ts` until mapped. Cost if wrong: a missed invariant is a missing CHECK that the contract tests of phases 2 and 3 would exercise before any store moves.

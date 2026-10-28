@@ -1,0 +1,5 @@
+# MKT-4
+
+> Section: 2026-10-14 — Security batch (branch `fix/security-batch-2026-10-14`, audit: `docs/security/audit-2026-10-14.md`)
+
+Ruling MKT-4 — the marketing page is a quiet light canvas: a neutral off-white (`#fafafa`, chroma 0, not a warm paper), brand gold as accent only (primary button, active states, small marks; gold used as TEXT is the brand gold mixed 70% toward black, `--accent-text`, because raw `#B08D57` is 2.96:1 on the canvas). The looks section stays on the LIGHT canvas; the page has exactly two deliberate dark bands, the 3D stage (`.dahab.band-dark`) and the footer. Evidence: Ahmad 2026-10-14 (MKT-1) + a screenshot comparison of both looks bands at 1440 and 390 px: on dark the near-black phone bezels vanish into the night canvas and the phones lose their silhouette, on light the bezel frames each phone and the pale Qamar screens still separate from the canvas by the bezel; a third dark band would also dilute the 3D stage. Cost if wrong: the looks band reads as less dramatic than a dark stage; flipping it is one class (`band-dark` on the looks `<Section>`).

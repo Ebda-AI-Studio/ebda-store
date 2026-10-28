@@ -1,0 +1,5 @@
+# SEARCH-T11-21
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T11-21 (PR3 final review minor 7; refines the outage clause of SEARCH-T11-10/15) — a Workers AI outage seen by the indexer (every product of a batch failed retryably, twice) no longer fails that store's run: the run ends `{ outage: true }` with nothing quarantined, and ONE platform P1 (`search-index.outage`) is raised per 6-hour window across all stores (`alertOutageOnce`, Redis `SET NX EX 21600` — the backstop's period; without Redis it alerts every time rather than stay silent). Before, each store's run threw `NonRetriableError`, so `alerts-failure-watch` raised one P1 per store per backstop tick during an outage. The stores are retried by their next event or the next backstop tick. Evidence: `tests/integration/product-index.test.ts` "PR3 minor 7" (two stores in an outage: both runs return `outage`, nothing quarantined, exactly one `search-index.outage` alert; red before: the run threw). Cost if wrong: a second, distinct outage inside the same 6 h window is not re-alerted.

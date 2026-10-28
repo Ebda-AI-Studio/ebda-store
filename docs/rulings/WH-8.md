@@ -1,0 +1,5 @@
+# WH-8
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling WH-8 (2026-10-21, review I1) — the two upstream producers that send `order/created` (COD/wallet, `order.service.ts` ~1874) and `order/status-changed` (~2351) from INSIDE the request transaction are NOT moved to after-commit in this PR. Reasons: `order/status-changed` has an inline-fanout fallback on enqueue rejection that `sendEventAfterCommit` would swallow, both feed money-adjacent post-purchase fan-outs outside this feature's blast radius, and the consumer-side fix (re-read the row, require the announced state, bounded wait-and-retry, then drop) makes the webhook fan-out correct regardless of timing. Follow-up filed in the report: move both sends to `deferAfterTenantCommit` together with their fallback. Evidence: `tests/unit/webhook-events.test.ts` (I1 cases), `tests/unit/webhook-fanout-run.test.ts`. Cost if wrong: other consumers of those two events (emails, accounting) keep their existing race; a webhook whose source row never reaches the announced state within about 7.5 minutes is dropped with a warning.

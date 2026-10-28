@@ -1,0 +1,5 @@
+# CART-EMAIL-1
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling CART-EMAIL-1 (2026-10-21) - cart-recovery email consent is the newsletter opt-in, nothing looser. Cart recovery is promotional, and the schema has no other email-marketing consent (customers have none, `Order.smsOptIn` is SMS-only; EC-1). A cart email goes only to an ACTIVE `newsletter_subscribers` row of the SAME store with the cart's address (case-insensitive); if ANY casing variant has unsubscribed, nothing is sent. Re-checked at send time, not only when claimed. Each email carries the per-subscriber one-click unsubscribe (`signSubscriberUnsubscribeToken`, same public route, RFC 8058 headers). Consequence: shoppers who never subscribed to the newsletter get no cart email, only the existing push/SMS channels. Evidence: `tests/unit/cart-recovery-email.test.ts` (consent, unsubscribed, casing-variant, other-store cases; dropping the unsubscribed check turned 2 tests red). Cost if wrong: a store with few subscribers sees a small email recovery volume; widening to "any customer with an email" would be a legal change, not a code tweak.
