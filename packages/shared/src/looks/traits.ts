@@ -8,6 +8,8 @@ export function traitDefault(key: string, _lookId?: string | null): string | boo
   switch (key) {
     case 'headerWordmark':
       return 'lockup';
+    case 'heroRatio':
+      return undefined; // the look's own mock ratio; the editor shows "same as the look"
     default:
       return undefined;
   }

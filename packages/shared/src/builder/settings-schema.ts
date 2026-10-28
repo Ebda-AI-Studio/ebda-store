@@ -514,6 +514,23 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
           opt('brandColor', 'Brand colour', 'لون العلامة'),
         ],
       },
+      {
+        id: 'heroRatio',
+        type: 'select',
+        labelEn: 'Hero height on phones',
+        labelAr: 'طول الصورة الرئيسية على الموبايل',
+        hintEn:
+          'Tall portrait, square, or the wide landscape strip. Phones only; the look picks one until you do.',
+        hintAr:
+          'طويلة (بورتريه) أو مربعة أو شريط عريض. على الموبايل بس، والشكل بيختار لحد ما تختار انت.',
+        options: [
+          opt('tall', 'Tall (4:5)', 'طويلة (4:5)'),
+          opt('square', 'Square (1:1)', 'مربعة (1:1)'),
+          opt('wide', 'Wide strip', 'شريط عريض'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
       themeColor('bgPage', 'Page background', 'خلفية الصفحة'),
       themeColor('bgSectionAlt', 'Alternate section background', 'خلفية الأقسام البديلة'),
     ],

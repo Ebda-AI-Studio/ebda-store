@@ -17,6 +17,7 @@ import {
   HEADER_LOGO_PLACEMENTS,
   HEADER_SEARCH_PLACEMENTS,
   HEADER_WORDMARKS,
+  HERO_RATIOS,
 } from '@ebda/shared';
 
 /**
@@ -78,6 +79,7 @@ export const themeSchema = z
       headerLogoPlacement: HEADER_LOGO_PLACEMENTS,
       headerSearch: HEADER_SEARCH_PLACEMENTS,
       headerWordmark: HEADER_WORDMARKS,
+      heroRatio: HERO_RATIOS,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

@@ -1566,6 +1566,19 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.hero-ratio",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Hero height on phones",
+    "ar": "طول الصورة الرئيسية على الموبايل",
+    "synEn": "hero height ratio tall portrait square wide banner image phone",
+    "synAr": "طول الهيرو نسبة بورتريه مربع عريض البانر الصورة الرئيسية الموبايل",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.fonts",
     "kind": "setting",
     "route": "/builder",

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1403,
+    "wired": 1408,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3000,6 +3000,19 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|heroRatio",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "dahab|theme|mutedColor",
@@ -6783,6 +6796,19 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|heroRatio",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "jasmine|theme|mutedColor",
@@ -10581,6 +10607,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|heroRatio",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
+    },
+    {
       "id": "lamma|theme|mutedColor",
       "skin": "lamma",
       "looks": [
@@ -14362,6 +14401,19 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|heroRatio",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "qamar|theme|mutedColor",
@@ -18158,6 +18210,19 @@
       "control": "headingFont",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|heroRatio",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "heroRatio",
+      "status": "wired",
+      "evidence": "static (mock-tokens.ts)"
     },
     {
       "id": "souq|theme|mutedColor",

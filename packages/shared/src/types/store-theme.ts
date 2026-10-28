@@ -16,6 +16,7 @@ import type {
   HeaderLogoPlacement,
   HeaderSearchPlacement,
   HeaderWordmark,
+  HeroRatio,
   CardCta,
   CardHover,
   CardBadge,
@@ -170,6 +171,8 @@ export interface StoreTheme {
   headerSearch?: HeaderSearchPlacement;
   // TEMPLATES-MOCK-3: the designed wordmark lockup for a store without a logo; unset = lockup, `plain` opts out.
   headerWordmark?: HeaderWordmark;
+  // TEMPLATES-MOCK-4: mobile hero ratio; unset = the look's mock ratio.
+  heroRatio?: HeroRatio;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
@@ -1007,7 +1010,7 @@ export function lookCssVars(
   if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
   if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
   if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];
-  Object.assign(v, mockCssVars(lookId));
+  Object.assign(v, mockCssVars(lookId, theme));
   return v;
 }
 

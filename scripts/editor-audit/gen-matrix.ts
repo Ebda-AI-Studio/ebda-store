@@ -150,6 +150,10 @@ export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern:
     file: 'packages/shared/src/looks/compose.ts',
     pattern: /theme\?\.headerWordmark/,
   },
+  'theme/heroRatio': {
+    file: 'packages/shared/src/looks/mock-tokens.ts',
+    pattern: /theme\?\.heroRatio/,
+  },
   'testimonials/verifiedOnly': {
     file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /layout\.testimonials\.verifiedOnly/,

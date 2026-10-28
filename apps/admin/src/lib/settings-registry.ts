@@ -856,6 +856,13 @@ export const SETTINGS: SettingEntry[] = [
         'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
       ],
       [
+        'builder.hero-ratio',
+        'builder.theme.heroRatio',
+        'select=theme',
+        'hero height ratio tall portrait square wide banner image phone',
+        'طول الهيرو نسبة بورتريه مربع عريض البانر الصورة الرئيسية الموبايل',
+      ],
+      [
         'builder.fonts',
         'builder.search.fonts',
         'select=theme',

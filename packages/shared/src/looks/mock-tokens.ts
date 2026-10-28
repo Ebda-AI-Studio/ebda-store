@@ -30,12 +30,28 @@ export function mockTokensFor(lookId: string | null | undefined): MockTokens {
   return (lookId && MOCK_TOKENS[lookId as LookId]) || {};
 }
 
-/** The `--look-*` CSS variables of a look's mock tokens. Empty for a look with none. */
-export function mockCssVars(lookId: string | null | undefined): Record<string, string> {
+/** Ratio of each merchant `heroRatio` pick; `wide` is the pre-mock landscape crop (no look variable at all). */
+const HERO_RATIO_ASPECT = { tall: '4 / 5', square: '1 / 1' } as const;
+
+/**
+ * The `--look-*` CSS variables of a look's mock tokens, after the merchant's overrides (TEMPLATES-MOCK-3):
+ * merchant > look > skin. Empty for a look with none.
+ */
+export function mockCssVars(
+  lookId: string | null | undefined,
+  theme?: { heroRatio?: string } | null
+): Record<string, string> {
   const t = mockTokensFor(lookId);
   const v: Record<string, string> = {};
-  if (t.heroAspect) {
-    v['--look-hero-aspect'] = t.heroAspect;
+  const pick = theme?.heroRatio;
+  const aspect =
+    pick === 'wide'
+      ? undefined
+      : pick === 'tall' || pick === 'square'
+        ? HERO_RATIO_ASPECT[pick]
+        : t.heroAspect;
+  if (aspect) {
+    v['--look-hero-aspect'] = aspect;
     // A portrait hero is taller than 45vh on a phone: lift the ceiling for looks that set a ratio.
     v['--look-hero-maxh'] = 'none';
   }

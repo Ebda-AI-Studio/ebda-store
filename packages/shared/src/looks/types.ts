@@ -44,6 +44,12 @@ export type HeaderLogoPlacement = (typeof HEADER_LOGO_PLACEMENTS)[number];
  */
 export const HEADER_WORDMARKS = ['lockup', 'plain'] as const;
 export type HeaderWordmark = (typeof HEADER_WORDMARKS)[number];
+/**
+ * The merchant's mobile hero ratio (TEMPLATES-MOCK-4): `tall` 4:5 portrait, `square` 1:1, `wide` the old landscape
+ * crop. Unset = the look's own mock ratio (`MOCK_TOKENS.heroAspect`). Phones only; desktop is unchanged.
+ */
+export const HERO_RATIOS = ['tall', 'square', 'wide'] as const;
+export type HeroRatio = (typeof HERO_RATIOS)[number];
 export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
 export type WordmarkSize = (typeof LOOK_WORDMARK_SIZES)[number];
 export type OverPhotoChrome = (typeof LOOK_OVER_PHOTO_CHROMES)[number];
@@ -237,9 +243,13 @@ export const HEADER_CHROME_OVERRIDE_KEYS = [
   'headerWordmark',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
+/** The merchant's mock-trait overrides (TEMPLATES-MOCK-2/-3): absent until picked, cleared by a design reset. */
+export const MOCK_TRAIT_KEYS = ['heroRatio'] as const satisfies readonly (keyof StoreTheme)[];
+
 /** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */
 export const LOOK_OWNED_THEME_KEYS = [
   ...LOOK_TOKEN_KEYS,
   ...LOOK_UI_TOKEN_KEYS,
   ...HEADER_CHROME_OVERRIDE_KEYS,
+  ...MOCK_TRAIT_KEYS,
 ] as const;
