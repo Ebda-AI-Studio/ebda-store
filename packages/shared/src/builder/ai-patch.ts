@@ -9,7 +9,7 @@
  * Pure: no I/O, never mutates its input. The merchant sees `changes` (before/after) and applies or
  * rejects; applying goes through the normal draft save, so it is undoable and never publishes.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { reduceDocument, locateSection, type ReduceResult } from './editor/document-reducer';
 import { DRAFT_THEME_KEYS, draftThemeSchema } from './theme-draft';
 import { SECTION_REGISTRY, getSectionDefinition, sectionAllowedOnPage } from './registry';

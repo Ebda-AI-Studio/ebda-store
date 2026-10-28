@@ -8,7 +8,7 @@
  * text is merchant data and travels as a JSON string value, never as instructions (AIService owns the prompt).
  * Every id the model returns is checked against the products we actually showed it.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { AIService } from './ai.service';
 import { invalidateCached } from '../lib/public-cache';
