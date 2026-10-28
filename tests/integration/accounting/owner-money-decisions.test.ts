@@ -80,7 +80,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
     ownerId = owner.id;
     const slug = uid('store');
     const store = await prisma.store.create({
-      data: { name: slug, slug, ownerId, currency: 'EGP', template: 'modern' },
+      data: { name: slug, slug, ownerId, currency: 'EGP', template: 'qamar' },
     });
     storeId = store.id;
     await seedCoaForStore(storeId);

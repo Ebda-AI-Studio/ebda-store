@@ -45,11 +45,7 @@ vi.mock('../../hooks/useNumerals', numeralsMock);
 
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 import { formatPrice as formatPriceBase } from '@/lib/format';
-import Minimal from '../../templates/minimal/OrderSummary';
-import Modern from '../../templates/modern/OrderSummary';
-import Classic from '../../templates/classic/OrderSummary';
-import Elegant from '../../templates/elegant/OrderSummary';
-import Bold from '../../templates/bold/OrderSummary';
+import Base from '../../templates/base/OrderSummary';
 import Dahab from '../../templates/dahab/OrderSummary';
 
 afterEach(() => {
@@ -63,11 +59,7 @@ const DISCOUNT = 30000;
 const TOTAL = SUBTOTAL - DISCOUNT;
 
 describe.each([
-  ['minimal', Minimal],
-  ['modern', Modern],
-  ['classic', Classic],
-  ['elegant', Elegant],
-  ['bold', Bold],
+  ['base', Base],
   ['dahab', Dahab],
 ] as const)('%s cart: sticky bar value == summary total value (after discount)', (_n, Summary) => {
   for (const [l, n] of [

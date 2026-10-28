@@ -44,7 +44,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
         data: {
           name: 'prs-test-store',
           slug: `prs-test-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

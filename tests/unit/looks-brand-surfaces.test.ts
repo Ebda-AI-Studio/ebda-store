@@ -48,7 +48,7 @@ const MERCHANT = '200 50% 40%';
 
 type Kind = 'look' | 'legacy' | 'override';
 const storeFor = (kind: Kind) => ({
-  template: 'minimal',
+  template: 'qamar',
   look: kind === 'legacy' ? null : LOOK,
   theme: kind === 'override' ? { primaryColor: MERCHANT } : {},
 });

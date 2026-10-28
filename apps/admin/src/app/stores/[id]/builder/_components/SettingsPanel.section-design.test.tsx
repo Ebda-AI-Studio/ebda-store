@@ -22,7 +22,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { nextTypography, typographyRolesFor } from './SectionTypographyField';
 import { dividerSlotsFor } from './DividersField';
 
-const doc = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const doc = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const section = doc.sections.find(n => n.type === 'category-grid')!;
 
 function renderPanel(extra: Partial<Parameters<typeof SettingsPanel>[0]> = {}) {

@@ -84,7 +84,7 @@ const findKey = (o: any, key: string): any => {
   return undefined;
 };
 
-const setStore = (template: 'minimal' | 'dahab' | 'qamar', language: 'ar' | 'en' = 'ar') => {
+const setStore = (template: 'souq' | 'dahab' | 'qamar', language: 'ar' | 'en' = 'ar') => {
   ctx.language = language;
   ctx.store = {
     ...STORES.A,
@@ -155,7 +155,7 @@ describe('occasion bands', () => {
       line: 'bg-border text-foreground',
     }));
 
-  for (const skin of ['minimal', 'dahab', 'qamar'] as const)
+  for (const skin of ['souq', 'dahab', 'qamar'] as const)
     it(`each block is a full-width band on its tone, text on the matching foreground (${skin})`, () => {
       setStore(skin);
       const html = bands();
@@ -213,10 +213,10 @@ describe('occasion bands', () => {
     ]);
   });
 
-  it('the heading follows the pack alignment: start on qamar, centred on minimal', () => {
+  it('the heading follows the pack alignment: start on qamar, centred on dahab', () => {
     setStore('qamar');
     expect(bands()).not.toContain('text-center');
-    setStore('minimal');
+    setStore('dahab');
     expect(bands()).toContain('text-center');
   });
 

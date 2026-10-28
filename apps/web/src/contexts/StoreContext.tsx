@@ -266,7 +266,7 @@ const DEFAULT_STORE: StoreData = {
   status: 'active',
   currency: REGION.currency,
   timezone: 'Africa/Cairo',
-  template: 'modern',
+  template: 'qamar',
   theme: DEFAULT_THEME,
   socialLinks: {},
 };

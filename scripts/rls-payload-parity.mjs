@@ -134,7 +134,7 @@ async function seedFixtures(db) {
         status: 'active',
         plan: 'enterprise',
         currency: 'EGP',
-        template: 'modern',
+        template: 'qamar',
         theme: { primaryColor: '36 36% 52%', showBranchesInFooter: true },
         marketingPixels: {},
         blogEnabled: true,

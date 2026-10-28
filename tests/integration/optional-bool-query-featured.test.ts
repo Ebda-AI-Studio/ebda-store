@@ -61,7 +61,7 @@ describe.skipIf(!hasDb)('optional boolean query params: featured filter', () => 
         data: {
           name: 'bq-test-store',
           slug: `bq-test-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
           status: 'active',
@@ -228,7 +228,7 @@ describe.skipIf(!hasDb)(
           data: {
             name: 'as-test-store',
             slug: `as-test-${suffix}`,
-            template: 'modern',
+            template: 'qamar',
             currency: 'EGP',
             ownerId: owner.id,
             status: 'active',

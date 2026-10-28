@@ -328,7 +328,7 @@ describe('MenuSection', () => {
     ).toEqual(['Tagines', 'Sweets', 'Pantry', 'More']);
   });
   it('renders sanely on every skin, never on one tenant', () => {
-    for (const pack of ['minimal', 'qamar', 'souq', 'dahab', 'lamma', 'jasmine'] as const) {
+    for (const pack of ['qamar', 'souq', 'dahab', 'lamma', 'jasmine'] as const) {
       setStore(pack, 'ar', null);
       const { container } = render(
         <MenuSection

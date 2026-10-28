@@ -28,7 +28,7 @@ const doc = (): PageDefinition =>
         header: {},
         footer: {},
       } as never,
-      'modern'
+      'qamar'
     )
   );
 

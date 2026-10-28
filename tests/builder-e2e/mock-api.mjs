@@ -53,7 +53,7 @@ function freshState() {
         titleAr: 'تسوق حسب الفئة',
       },
     },
-    'modern'
+    'qamar'
   );
   return {
     rev: 0,
@@ -86,7 +86,7 @@ const store = {
   slug: 'e2e-store',
   domain: null,
   status: 'active',
-  template: 'modern',
+  template: 'qamar',
   look: null,
   theme: S.theme,
 };
@@ -129,7 +129,7 @@ function route(method, path, body, query = new URLSearchParams()) {
       (S = freshState()),
       (store.theme = S.theme),
       (store.look = null),
-      (store.template = 'modern'),
+      (store.template = 'qamar'),
       ok({})
     );
   if (method === 'POST' && p === '/__test/bump') {

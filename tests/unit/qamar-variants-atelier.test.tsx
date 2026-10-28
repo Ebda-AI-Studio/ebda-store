@@ -88,7 +88,7 @@ describe('image-text full-bleed', () => {
   it('exposes a solid scrim colour and opacity for the contrast test', () => {
     expect(FULL_BLEED_SCRIM).toEqual({ color: '#141414', opacity: 0.88 });
   });
-  for (const skin of ['minimal', 'dahab', 'qamar'] as const)
+  for (const skin of ['dahab', 'qamar'] as const)
     it(`renders edge to edge with text over a scrim on ${skin}`, () => {
       ctx.store = { ...STORES.A, template: skin, theme: getTemplateTheme(skin) };
       const html = renderToStaticMarkup(

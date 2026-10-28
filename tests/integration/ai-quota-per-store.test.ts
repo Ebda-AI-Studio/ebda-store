@@ -54,7 +54,7 @@ describe.skipIf(!hasDb)('assertAiQuota — per-store slice + interactive headroo
           data: {
             name: `aiq-${n}`,
             slug: `aiq-${n}-${suffix}`,
-            template: 'modern',
+            template: 'qamar',
             currency: 'EGP',
             ownerId: owner.id,
           },

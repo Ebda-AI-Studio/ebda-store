@@ -54,7 +54,7 @@ describe('Public Storefront API', () => {
         ownerId: user.id,
         status: 'active',
         currency: 'EGP',
-        template: 'modern',
+        template: 'qamar',
         theme: {
           primaryColor: '26 100% 50%',
           fontFamily: 'default',

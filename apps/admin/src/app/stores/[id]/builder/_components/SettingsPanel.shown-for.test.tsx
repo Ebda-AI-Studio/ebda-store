@@ -25,7 +25,7 @@ vi.mock('../../../../../lib/api', () => ({
 
 import { SettingsPanel } from './SettingsPanel';
 
-const base = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const base = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const grid = base.sections.find(n => n.type === 'category-grid')!;
 
 function panel(template: string, layout: string | undefined, look: string | null = null) {
@@ -71,11 +71,6 @@ describe('SettingsPanel: controls follow the template (EP-1)', () => {
     expect(has('Card shape ratio')).toBe(true);
     expect(has('Show name')).toBe(true);
     expect(has('Hover effect')).toBe(true);
-  });
-
-  it('Modern grid keeps them (its own card reads them)', () => {
-    panel('modern', 'grid');
-    expect(has('Card shape ratio')).toBe(true);
   });
 
   it('aisle tile colours: only the Lamma market look, only on tiles', () => {

@@ -25,9 +25,9 @@ export function useTemplateComponents() {
         }
       } catch (err) {
         console.error(`Failed to load template '${templateId}':`, err);
-        // Fallback to modern
+        // Fallback to the default Ebda template
         if (!cancelled) {
-          const fallback = await getTemplateComponents('modern');
+          const fallback = await getTemplateComponents(null);
           setComponents(fallback);
         }
       } finally {

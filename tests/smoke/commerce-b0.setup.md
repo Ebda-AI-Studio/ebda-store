@@ -14,7 +14,7 @@ The spec drives the Phase B0 flow against a LOCAL stack. It never runs in CI and
 ## 2. Store fixture (create once; names must match the defaults or override with env)
 
 - Owner user: any `store_admin` with a bcrypt password (email verified, status active).
-- Store: slug `b0-minimal`, template `minimal`, currency `EGP`, `settings.defaultLanguage = 'ar'`, name "B0 Minimal" / "بي زيرو مينيمال".
+- Store: slug `b0-minimal`, template `qamar`, currency `EGP`, `settings.defaultLanguage = 'ar'`, name "B0 Minimal" / "بي زيرو مينيمال".
 - Category `abayas` ("Abayas" / "عبايات"); a few filler products help the "you might also like" row.
 - Product **Linen Abaya**, slug `linen-abaya`, name "عباية كتان", price `149000` (minor units), status active, in that category, at least one image.
   - Options: **Colour** (Teal `#1F4E54`, Rose `#C98B8B` plus a swatch image URL, Black `#141414`), **Size** (S, M, L), **Length** (52, 54, 56; Arabic "52 سم" etc.).

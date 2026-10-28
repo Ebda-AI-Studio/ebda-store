@@ -48,7 +48,7 @@ const art = (label, c1, c2) =>
 const swatchArt = art('', '#7a5c3a', '#c9a96e');
 
 const CAT = { slug: 'abayas', name: 'Abayas', nameAr: 'عبايات' };
-const STORES = ['modern', 'elegant', 'classic', 'minimal', 'bold', 'dahab'].map(t => ({
+const STORES = ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'].map(t => ({
   slug: 'fu-' + t,
   template: t,
   name: 'FU ' + t,

@@ -82,7 +82,7 @@ function hueHasSolution(role: string, surfaces: string[]): boolean {
 }
 const INFO = '199 89% 48%'; // not a theme field: the storefront default
 
-const TEMPLATES: TemplateId[] = ['modern', 'elegant', 'classic', 'minimal', 'bold'];
+const TEMPLATES: TemplateId[] = ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'];
 const HOSTILE: Array<[string, Partial<StoreTheme>]> = [
   // A pale warning on a cream card: the bare role reads ~1.3:1.
   ['pale warning on cream', { warningColor: '50 100% 70%', cardColor: '40 60% 95%' }],

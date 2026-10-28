@@ -1,5 +1,5 @@
 /**
- * Renders the real Footer component from all 5 themes and asserts the
+ * Renders the real Footer component from every template and asserts the
  * opt-in "Branches" column's two hardest promises — the ones a unit test of
  * `resolveFooterBranches` alone cannot make:
  *
@@ -64,19 +64,9 @@ vi.mock('../../lib/api', () => ({
 }));
 
 // Imported AFTER the mocks so every footer picks them up.
-const { default: ClassicFooter } = await import('../classic/Footer');
-const { default: ModernFooter } = await import('../modern/Footer');
-const { default: MinimalFooter } = await import('../minimal/Footer');
-const { default: BoldFooter } = await import('../bold/Footer');
-const { default: ElegantFooter } = await import('../elegant/Footer');
+const { default: BaseFooter } = await import('../base/Footer');
 
-const FOOTERS = [
-  ['classic', ClassicFooter],
-  ['modern', ModernFooter],
-  ['minimal', MinimalFooter],
-  ['bold', BoldFooter],
-  ['elegant', ElegantFooter],
-] as const;
+const FOOTERS = [['base', BaseFooter]] as const;
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 

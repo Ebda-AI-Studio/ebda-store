@@ -74,8 +74,7 @@ export default [
     },
   },
   {
-    // Templates intentionally use bespoke colors (bold = gray-950, modern
-    // header uses gray-900 backdrop, etc.) to express their own aesthetic;
+    // Templates intentionally use bespoke colors to express their own aesthetic;
     // don't block hardcoded colors there.
     files: ['src/templates/**/*.{ts,tsx}'],
     rules: {

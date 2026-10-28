@@ -28,8 +28,8 @@ function jasmineCss(): string {
 
 describe('PACK_STYLES.jasmine', () => {
   const pack = getPackStyles('jasmine');
-  it('is its own pack (not the modern fallback)', () => {
-    expect(pack).not.toBe(getPackStyles('modern'));
+  it('is its own pack (not the base fallback)', () => {
+    expect(pack).not.toBe(getPackStyles('base'));
     expect(pack.card).toContain('rounded-[var(--radius)]');
   });
   it('takes its radius from the look: Apothecary 4px(sm), Bloom 12px(lg), Clinic 8px(md) via var(--radius) only', () => {
@@ -57,7 +57,7 @@ describe('Jasmine card paths are unchanged (Ruling B3-1: no card render path add
   it('the jasmine skin re-exports the minimal card, grid and category components', () => {
     const src = readFileSync(path.join(root, 'apps/web/src/templates/jasmine/index.ts'), 'utf8');
     for (const c of ['ProductCard', 'ProductGrid', 'CategoryCard', 'CategoryGrid'])
-      expect(src).toContain(`export { default as ${c} } from '../minimal/${c}'`);
+      expect(src).toContain(`export { default as ${c} } from '../base/${c}'`);
     const own = readdirSync(path.join(root, 'apps/web/src/templates/jasmine'));
     expect(own.sort()).toEqual(['Header.tsx', 'index.ts']);
   });

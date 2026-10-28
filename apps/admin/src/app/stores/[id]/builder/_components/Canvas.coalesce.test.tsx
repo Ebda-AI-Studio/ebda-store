@@ -40,7 +40,7 @@ const runFrame = () => {
 };
 
 function mount() {
-  const base = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+  const base = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
   const props = {
     storefrontUrl: ORIGIN,
     token: 't',

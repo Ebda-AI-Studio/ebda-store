@@ -33,17 +33,17 @@ describe('isShown', () => {
   });
 
   it('needs every variant key of one rule (AND) and any rule of a list (OR)', () => {
-    const rule: ShownFor = { templates: ['modern'], variants: { layout: ['grid'], tone: ['a'] } };
+    const rule: ShownFor = { templates: ['souq'], variants: { layout: ['grid'], tone: ['a'] } };
     expect(
-      isShown({ shownFor: rule }, { template: 'modern', variant: variantOf({ layout: 'grid' }) })
+      isShown({ shownFor: rule }, { template: 'souq', variant: variantOf({ layout: 'grid' }) })
     ).toBe(false);
     expect(
       isShown(
         { shownFor: rule },
-        { template: 'modern', variant: variantOf({ layout: 'grid', tone: 'a' }) }
+        { template: 'souq', variant: variantOf({ layout: 'grid', tone: 'a' }) }
       )
     ).toBe(true);
-    const either: ShownFor = [{ variants: { layout: ['horizontal'] } }, { templates: ['modern'] }];
+    const either: ShownFor = [{ variants: { layout: ['horizontal'] } }, { templates: ['souq'] }];
     expect(
       isShown({ shownFor: either }, { template: 'qamar', variant: variantOf({ layout: 'grid' }) })
     ).toBe(false);
@@ -53,7 +53,7 @@ describe('isShown', () => {
         { template: 'qamar', variant: variantOf({ layout: 'horizontal' }) }
       )
     ).toBe(true);
-    expect(isShown({ shownFor: either }, { template: 'modern' })).toBe(true);
+    expect(isShown({ shownFor: either }, { template: 'souq' })).toBe(true);
   });
 
   it('takes a variant rule as satisfied when the caller has no section in hand', () => {
@@ -75,8 +75,8 @@ describe('the registry rules', () => {
     expect(
       isShown(aspect, { template: 'qamar', variant: variantOf({ layout: 'horizontal' }) })
     ).toBe(true);
-    expect(isShown(aspect, { template: 'modern', variant: variantOf({ layout: 'grid' }) })).toBe(
-      true
+    expect(isShown(aspect, { template: 'souq', variant: variantOf({ layout: 'grid' }) })).toBe(
+      false
     );
   });
 

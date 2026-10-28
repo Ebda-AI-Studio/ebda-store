@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { layoutToDefinition, resolveLayoutSettings, type PageDefinition } from '@ebda/shared';
 
-const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const BASE = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const LIVE_SETTINGS = {
   contact: { phone: '010' },
   navMenu: [{ label: 'Old', href: '/old' }],
@@ -86,7 +86,7 @@ function app() {
 
 const STORE = {
   layoutSettings: {},
-  template: 'modern',
+  template: 'qamar',
   slug: 'acme',
   domain: 'acme.example.com',
   theme: { primaryColor: '1 1% 1%' },
@@ -289,7 +289,7 @@ describe('classic builder save keeps a pending visual draft (E2)', () => {
     return publishLegacyLayout({
       storeId: 'store-1',
       // the classic builder changed ONE thing: a sticky header
-      layout: resolveLayoutSettings({ header: { sticky: true } }, 'modern'),
+      layout: resolveLayoutSettings({ header: { sticky: true } }, 'qamar'),
       userId: 'user-1',
     });
   }

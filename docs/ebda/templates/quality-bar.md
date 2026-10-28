@@ -81,7 +81,7 @@ Every shopper-facing full sentence is Egyptian Arabic. Labels and buttons use ne
 
 | Rule                                                                                                                                                                                                                                                           | Check                                                          |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Precedence is merchant value > look token > skin baseline. A store with no look renders unchanged. [L-02]                                                                                                                                                      | test + shot diff (minimal store)                               |
+| Precedence is merchant value > look token > skin baseline. A store with no look renders unchanged. [L-02]                                                                                                                                                      | test + shot diff (a no-look store)                             |
 | `imageRatio`, `radius`, `accent`, `cardCta`, badge, wordmark size, over-photo material and card hover all come from the look. A shared component never hard-codes a radius, hue, glow shadow or font family. [L-01, L-12, K-01, K-06, T-01]                    | lint + shot                                                    |
 | Every radius derives from `--radius`. `rounded-full` is allowed only on swatches, avatars and dots, with a comment. [K-06]                                                                                                                                     | lint                                                           |
 | A card control that only navigates is not rendered when the look says `cardCta: none`; the card is the link. A card button exists only for an action the photo tap cannot do. [L-01]                                                                           | test                                                           |
@@ -176,7 +176,7 @@ Run it at the end of every template or look task, after the tests pass and befor
    - **820 Arabic**;
    - **1280×800 English**.
 
-   Shoot each look changed, plus one no-look `minimal` store to prove its defaults did not move. Save the shots in the task's report directory.
+   Shoot each look changed, plus one no-look store to prove its defaults did not move. Save the shots in the task's report directory.
 
 3. **Skills, in this order:**
    1. `impeccable` **critique**, then **polish** (Nielsen score, anti-patterns, the polish checklist);

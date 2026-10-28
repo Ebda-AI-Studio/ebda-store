@@ -424,7 +424,7 @@ describe('StepsSection', () => {
     expect(container.querySelector('button')!.textContent).toBe('إضافة الكل للسلة');
   });
   it('renders on every skin (platform section, never one tenant)', () => {
-    for (const template of ['minimal', 'dahab', 'qamar', 'souq', 'jasmine']) {
+    for (const template of ['dahab', 'qamar', 'souq', 'jasmine']) {
       setStore(template);
       const { container } = render(S(THREE));
       expect(container.querySelectorAll('li'), template).toHaveLength(3);

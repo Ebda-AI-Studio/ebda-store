@@ -59,12 +59,12 @@ const base = {
   currency: 'EGP',
   timezone: 'Africa/Cairo',
 };
-async function html(look: string | null, template = 'minimal') {
+async function html(look: string | null, template = 'qamar') {
   current = {
     ...base,
     look,
     template,
-    theme: composeStoreTheme({ template: template as 'minimal', look, theme: {} }),
+    theme: composeStoreTheme({ template: template as 'qamar', look, theme: {} }),
   };
   return renderToStaticMarkup(await RootLayout({ children: <main>x</main> }));
 }
@@ -92,9 +92,9 @@ describe('RootLayout: look hooks', () => {
     current = {
       ...base,
       look: 'qamar.atelier',
-      template: 'minimal',
+      template: 'qamar',
       theme: composeStoreTheme({
-        template: 'minimal',
+        template: 'qamar',
         look: 'qamar.atelier',
         theme: { headingFont: 'Cairo' },
       }),
@@ -115,8 +115,8 @@ describe('RootLayout: look hooks', () => {
     current = {
       ...base,
       look: null,
-      template: 'minimal',
-      theme: composeStoreTheme({ template: 'minimal', theme: { density: 'airy' } }),
+      template: 'qamar',
+      theme: composeStoreTheme({ template: 'qamar', theme: { density: 'airy' } }),
     };
     const out = renderToStaticMarkup(await RootLayout({ children: <main>x</main> }));
     expect(out).not.toContain('--space-unit');

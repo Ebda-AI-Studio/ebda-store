@@ -50,7 +50,7 @@ const inactiveStore = {
   name: 'My shop',
   slug: 'my-shop',
   status: 'inactive',
-  template: 'modern',
+  template: 'qamar',
   look: null,
   host: 'my-shop.ebda.app',
   url: 'https://my-shop.ebda.app',

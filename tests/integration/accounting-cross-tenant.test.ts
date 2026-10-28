@@ -54,7 +54,7 @@ describe.skipIf(!hasDb)('accounting services refuse cross-tenant ids', () => {
         data: {
           name: 'xt-attacker',
           slug: `xt-attacker-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },
@@ -65,7 +65,7 @@ describe.skipIf(!hasDb)('accounting services refuse cross-tenant ids', () => {
         data: {
           name: 'xt-victim',
           slug: `xt-victim-${suffix}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },
