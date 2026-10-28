@@ -40,7 +40,7 @@ describe('planner lane', () => {
     expect(ci).toContain('$PLANNER_EXCLUDES');
     expect(ci).toContain('lane="$(bash scripts/ci/planner-lane.sh list)"');
     expect(ci).toMatch(/npx vitest run \$lane --no-file-parallelism/);
-    const parallel = ci.indexOf('npx vitest run tests/integration apps/api/src');
+    const parallel = ci.indexOf('npx vitest run $targets');
     const serial = ci.indexOf('--no-file-parallelism');
     expect(parallel).toBeGreaterThan(-1);
     expect(serial).toBeGreaterThan(parallel);
