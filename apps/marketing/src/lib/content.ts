@@ -312,7 +312,7 @@ export const COPY: Record<Locale, Copy> = {
       whatsappBlurb: 'كلّم عملاءك على واتساب من مكان واحد',
       contact: 'تواصل معنا',
       more: 'المزيد',
-      about: 'عن ابدأ',
+      about: 'عن الاستوديو',
     },
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
@@ -731,7 +731,7 @@ export const COPY: Record<Locale, Copy> = {
       whatsappBlurb: 'Talk to your customers on WhatsApp, from one inbox',
       contact: 'Contact',
       more: 'More',
-      about: 'About us',
+      about: 'About the studio',
     },
     hero: {
       h1: 'Open your online store in minutes.',
