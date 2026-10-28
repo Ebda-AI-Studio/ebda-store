@@ -6,4 +6,4 @@ DROP TABLE IF EXISTS "billing_referrals";
 
 -- After running this, delete the migration's row too, or a later `prisma migrate deploy` treats it
 -- as applied and never recreates what was rolled back:
---   DELETE FROM _prisma_migrations WHERE migration_name = '20261106000230_billing_free_month_grants';
+--   DELETE FROM _prisma_migrations WHERE migration_name = '20261107000230_billing_free_month_grants';

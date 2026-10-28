@@ -7,8 +7,15 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // MFA key rotation job (re-seals TOTP secrets onto the current key; a no-op when none are left).
+  "triggers": { "crons": ["23 * * * *"] },
+  // /health reports the running version: the deployment id from this binding and the commit from BUILD_COMMIT_SHA, which the
+  // deploy workflow overrides per deploy (`wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA`).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
   "logpush": true,
+  // The zone route is REQUIRED beside the custom domain: zone routes run before custom domains, so without
+  // `accounts.ebda.app/*` the storefront wildcard (`*.ebda.app/*`) answers this host (as it did help/docs/status, 2026-10-24).
   "routes": [
     { "pattern": "accounts.ebda.app", "custom_domain": true },
     // M-072: out-ranks the storefront's `*/*` and `*.ebda.app/*` zone routes (cf-routes.cjs).
@@ -30,8 +37,13 @@
   ],
   "vars": {
     "ISSUER": "https://accounts.ebda.app",
-    "ALLOWED_ORIGINS": "https://store.ebda.app,https://orders.ebda.app",
+    "ALLOWED_ORIGINS": "https://store.ebda.app,https://orders.ebda.app,https://wa.ebda.app",
     "PASSKEY_ORIGINS": "https://store.ebda.app,https://orders.ebda.app",
+    "BUILD_COMMIT_SHA": "",
+    // Verified 2026-10-25: no production secret is sealed in a legacy format (0 users with a TOTP), so legacy v1/v2 are refused from day one.
+    "MFA_REJECT_LEGACY": "true",
     "PRODUCTS": "store,whatsapp,crm,erp",
+    // Least privilege: a browser origin may only obtain tokens for ITS product audience (an XSS on one product cannot mint another's).
+    "ORIGIN_PRODUCTS": "https://store.ebda.app=store,https://orders.ebda.app=store,https://wa.ebda.app=whatsapp",
   },
 }

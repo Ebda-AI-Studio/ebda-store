@@ -324,3 +324,65 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 ### Web Worker `ebda-web` (`apps/web`)
 
 - `STOREFRONT_FRAME_ANCESTORS` — optional; extra builder-preview parent origins (`builder/preview/allowed-parent-origins.ts`). Set: wrangler var.
+
+## Shared identity service (Rulings ID-1/ID-2)
+
+| Name                        | Where                                | Meaning                                                                                                                                                                                                                                    |
+| --------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_ACCOUNTS_URL`  | admin, orders (build time, optional) | Base URL of the identity service the browser calls for sign-in, MFA, passkeys and token refresh. Defaults to `https://accounts.ebda.app`.                                                                                                  |
+| `JWT_PRIVATE_JWK`           | `ebda-accounts` secret               | ES256 private key (JWK with `kid`) that signs access tokens. Never in the repo.                                                                                                                                                            |
+| `MFA_KEY`                   | `ebda-accounts` secret               | Base64 AES-256 key that seals TOTP secrets at rest.                                                                                                                                                                                        |
+| `ACCOUNTS`                  | `ebda-api` Service Binding           | `ebda-accounts` (entrypoint `Accounts`): JWKS over fetch, `isRevoked` / `getAccountState` / `setStatus` / `setRole` / `eraseUser` / `exportUser` / `createUser` over RPC. The API refuses sign-in-dependent work (503) when it is missing. |
+| `STORE_DIRECTORY`, `MAILER` | `ebda-accounts` Service Bindings     | `ebda-api` entrypoints (`StoreDirectory`, `IdentityMailer`): the stores a user may act on, and the Store's platform mailer for the one-time codes.                                                                                         |
+
+- **Allowed browser origins** (`ALLOWED_ORIGINS`, exact match, https, no wildcard): `store.ebda.app`, `orders.ebda.app`, `wa.ebda.app` (Ebda WhatsApp, product audience `whatsapp`). `PASSKEY_ORIGINS` stays the Store hosts only.
+
+### Identity secrets: where they live and how to rotate (no values here)
+
+| Secret (Worker `ebda-accounts`) | What it is                                                                                                                  | Backup (macOS Keychain, account `ebda-identity`) |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `JWT_PRIVATE_JWK`               | ES256 (P-256) private JWK with a `kid`; signs every access token. The public half is published at `/.well-known/jwks.json`. | service `ebda-accounts-JWT_PRIVATE_JWK`          |
+| `MFA_KEY`                       | 32 random bytes, base64; seals TOTP secrets at rest (AES-GCM).                                                              | service `ebda-accounts-MFA_KEY`                  |
+
+Read a backup: `security find-generic-password -a ebda-identity -s <service> -w` (it prompts; never paste the value into chat, a ticket or a log). Both were generated on 2026-10-25, set with `wrangler secret put ... --name ebda-accounts` (value on stdin), and are Cloudflare-account secrets (personal account `69188202efc4df480140dd76545aa3ab`).
+
+**Rotate the signing key (no downtime, tokens live 15 minutes):**
+
+1. Generate a new P-256 JWK with a new `kid` (same recipe as the first: `crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' })`, export as JWK, add `kid`, `alg: ES256`, `use: sig`).
+2. Put the OLD key's PUBLIC JWK into `JWT_PREVIOUS_PUBLIC_JWKS` (a JSON array of public JWKs) so tokens signed with it keep verifying for 24 hours; `wrangler secret put JWT_PREVIOUS_PUBLIC_JWKS --name ebda-accounts`.
+3. `wrangler secret put JWT_PRIVATE_JWK --name ebda-accounts` with the NEW private JWK; update the Keychain entry (`security add-generic-password -U -a ebda-identity -s ebda-accounts-JWT_PRIVATE_JWK -w`).
+4. Verify `/.well-known/jwks.json` now lists both keys, and a fresh login's token header carries the new `kid`. After 24 hours drop `JWT_PREVIOUS_PUBLIC_JWKS`.
+   Products cache the JWKS for at most 10 minutes and refetch once on an unknown `kid`, so they pick the new key up on their own.
+
+**Rotate `MFA_KEY` (no downtime, no re-enrolment):** sealed TOTP secrets name their key (`v3.<kid>.<iv>.<ct>`, AES-GCM bound to the owner by AAD `v3|kid|userId`; legacy `v1`/`v2` carry no owner binding and are refused when `MFA_REJECT_LEGACY=true`, which production sets from day one: verified 0 production users had a sealed TOTP on 2026-10-25), and the worker holds a keyring: `MFA_KEY` (current, seals everything new) and `MFA_KEY_PREV` (opens old secrets only).
+
+1. Generate a new 32-byte key (`openssl rand -base64 32`), update the Keychain entry.
+2. Set both in ONE deployment: `wrangler secret bulk` with `{ "MFA_KEY_PREV": "<old>", "MFA_KEY": "<new>" }` on stdin (never a file in the repo). If you must use two puts, set `MFA_KEY_PREV` FIRST: the reverse order leaves the ring as `{new}` only and every TOTP user gets 503 until the second put lands.
+3. The hourly job (`scheduled`, cron `23 * * * *`; or `Accounts.reencryptMfa()` over the Service Binding) re-seals every secret on the new key with a per-row compare-and-set. Wait until it reports `remaining: 0` (verify with `SELECT count(*) FROM users WHERE mfa_secret IS NOT NULL AND mfa_secret NOT LIKE 'v3.<new kid>.%'`; the kid is the first 8 hex chars of sha256 of the key bytes).
+4. Only when the report shows `remaining: 0` AND `failed: 0`: `wrangler secret delete MFA_KEY_PREV --name ebda-accounts`. Keep the old key in the Keychain until then. A secret copied onto another user's row does not open (owner-bound AAD).
+   A secret sealed with a key that is in neither slot answers 503 `MFA_UNAVAILABLE` (never a pass); putting the old key back as `MFA_KEY_PREV` restores service with no data loss.
+
+**Lost both?** Redeploy with new values: tokens signed by the old key stop verifying (everyone signs in again), and TOTP users re-enrol.
+
+### Cutover order (Ruling ID-16): the identity service goes live BEFORE the Store stops accepting its own logins
+
+Merging the stage-3 PR deploys ebda-api (legacy login, refresh and session issue are CLOSED for every merchant/staff/admin account), admin and orders (they sign in only at accounts.ebda.app). They deploy in parallel and nothing orders them, so the identity service, its secrets and the migrated accounts must already exist:
+
+1. Deploy `ebda-accounts` (`apps/accounts`; the `accounts.ebda.app/*` ZONE route is required beside the custom domain, because zone routes run before custom domains and the storefront wildcard would otherwise answer the host).
+2. `wrangler secret put JWT_PRIVATE_JWK` and `MFA_KEY` for `ebda-accounts` (never in a file, never through an agent's chat).
+3. `wrangler d1 migrations apply ebda-identity --remote` (0001 identity, 0002 enrolment tokens).
+4. `node apps/accounts/scripts/migrate-from-pg.mjs --apply --remote` (read-only Postgres export; refuses users with MFA; verifies row counts and a checksum).
+5. Verify live: `/health`, `/.well-known/jwks.json`, one real login and token.
+6. ONLY THEN merge the PR. Every merchant re-logs in once (refresh rows are copied but can never match, Ruling ID-5).
+
+Each browser origin may only request ITS product audience (`ORIGIN_PRODUCTS`): store and orders get `store` tokens, `wa.ebda.app` only `whatsapp`.
+
+### Platform administrators (Ruling ID-15)
+
+- **Create or promote one (you run it, you type the password):** `cd apps/accounts && CLOUDFLARE_ACCOUNT_ID=69188202efc4df480140dd76545aa3ab node scripts/upsert-super-admin.mjs --email=you@example.com --remote` shows the plan (dry run is the default and writes nothing); add `--apply` to be asked for the password twice at a hidden prompt (14+ characters, all four classes). The script refuses a `--password` argument and refuses to run `--apply` without a terminal, so the password never passes through an agent, a pipe or shell history. Only a bcrypt hash is written, through a 0600 temp file that is deleted afterwards. Idempotent: running it again re-sets the password and ends the account's sessions.
+- **A super admin has no admin power until a second factor is used.** `pa: "super_admin"` is minted only for a session created with TOTP or a passkey (`amr` contains `otp` or `hwk`). A first password sign-in works but the token has no `pa`, and the response carries `mfaEnrollmentRequired` so the admin app sends the person to `/account/security` to enrol; enrolled admins sign in with password + code (or a passkey).
+- **First-factor bootstrap.** A password-only session cannot bind the FIRST factor of a super admin (a leaked or phished password must not be enough). `/mfa/enroll/verify` and `/passkey/register/verify` for a `super_admin` with no factor require BOTH the one-time enrolment token the script printed to your terminal (30 minutes, single use, stored only as a sha256 hash in `enrolment_tokens`) AND a one-time code e-mailed to the account (`POST /mfa/bootstrap/code`, needs the password). Promoting an existing account DELETES its old TOTP secret, backup codes and passkeys (the dry run says so) and issues a token; re-running for a super admin who already has a factor keeps it and issues nothing unless `--reset-factors`. The admin UI's first-factor step is TOTP (it asks for the token and the e-mailed code); add a passkey afterwards from the same page.
+- **Every factor enrolment is gated, decided at BEGIN.** `/mfa/enroll` and `/passkey/register/options` record an enrolment ticket (bound to the session) with the policy for that account: `bootstrap` (super admin with no factor: operator token + e-mailed code, required at completion whatever the account looks like by then), `step-up` (the account already has a factor: the session must come from a login that used TOTP or a passkey in the last 10 minutes, or a current TOTP code is sent), or `password` (any other account's first factor: it needs a one-time code e-mailed to the account, the same trust a password reset needs, so a phished password cannot bind a factor that a reset would then keep, Ruling ID-8; `POST /mfa/bootstrap/code` sends it). Every bound factor also mails a "new sign-in method added" notice. Completion (`/mfa/enroll/verify`, `/passkey/register/verify`) refuses without a matching ticket and re-checks the CURRENT state (a factor that appeared meanwhile only makes it stricter). A successful bootstrap deletes every pending enrolment of the account and ends its other sessions.
+- **A passkey alone is a complete state for a platform admin.** Its sessions carry `pa` (amr `hwk`); a password-only sign-in for such an account returns `{ secondFactorRequired: true }` and creates NO session (no token, no cookie), and the admin app asks for the passkey; removing a platform admin's passkey also needs a fresh second-factor session. **Lost the only passkey (no TOTP)?** Only the operator can recover: re-run `upsert-super-admin.mjs --email=... --reset-factors --apply`, which clears the factors and prints a new one-time enrolment token. Hold two factors (a passkey plus a TOTP, or two passkeys) to avoid it. The security page shows the passkey panel to admins too (first passkey: token + e-mailed code), and adding a TOTP to a passkey-only admin needs only a fresh passkey session.
+- **Fresh login.** The token carries `auth_time` (the interactive login behind the session). The identity service stops minting for a platform-admin session older than 12 h (401 `REAUTH_REQUIRED`) and the Store refuses a `pa` token whose `auth_time` is missing or older than 12 h (same code), so a stale or stolen long-lived session cannot act as a platform admin. Only `aud=store` tokens are accepted by the Store.
+- The old `scripts/admin-upsert-super-admin.mjs` (Postgres) is superseded after the cutover and says so in its header.

@@ -130,10 +130,11 @@
       }
     },
     "d1": {
-      "tables": 27,
+      "tables": 28,
       "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
+        "staff_invites": 10,
         "SlugRedirect": 7,
         "webhook_events": 16,
         "system_settings": 7,
@@ -1130,6 +1131,18 @@
       "name": "orders_buyer_key_check",
       "table": "orders",
       "disposition": "store-do:orders"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_role_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_status_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
     },
     {
       "kind": "check",

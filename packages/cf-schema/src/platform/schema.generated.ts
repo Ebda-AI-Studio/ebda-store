@@ -385,6 +385,24 @@ export const SlugRedirect = sqliteTable('SlugRedirect', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const staffInvites = sqliteTable('staff_invites', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  email: text('email').notNull(),
+  role: text('role').notNull().default('staff'),
+  status: text('status').notNull().default('pending'),
+  invitedBy: text('invited_by'),
+  acceptedBy: text('accepted_by'),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  decidedAt: integer('decided_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const storeFeatures = sqliteTable('store_features', {
   id: text('id')
     .primaryKey()

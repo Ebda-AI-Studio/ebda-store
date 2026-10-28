@@ -9,11 +9,20 @@ export interface MailerRpc {
   /** Send a one-time code mail (verification or password reset) through the Store mail pipeline. */
   sendCode(input: {
     to: string;
-    kind: 'email_verify' | 'password_reset';
+    kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
     code: string;
     language: 'en' | 'ar';
     firstName: string;
     ttlMinutes: number;
+    storeName?: string;
+  }): Promise<void>;
+  /** A security notice with no code (a sign-in method was added). */
+  sendNotice(input: {
+    to: string;
+    kind: 'factor_added';
+    factor: 'totp' | 'passkey';
+    language: 'en' | 'ar';
+    firstName: string;
   }): Promise<void>;
 }
 
@@ -32,8 +41,17 @@ declare global {
       PASSKEY_ORIGINS: string;
       /** Comma list of valid `aud` values. */
       PRODUCTS: string;
+      /** Set per deploy (`--var BUILD_COMMIT_SHA:$GITHUB_SHA`); empty locally. */
+      BUILD_COMMIT_SHA?: string;
+      CF_VERSION_METADATA?: { id?: string; tag?: string };
+      /** `origin=product` pairs: the only audience a browser origin may request. */
+      ORIGIN_PRODUCTS: string;
       /** AES-256-GCM key (base64) for TOTP secrets at rest (wrangler secret). */
       MFA_KEY?: string;
+      /** The previous MFA key while a rotation is in flight (opens old secrets; never used to seal). */
+      MFA_KEY_PREV?: string;
+      /** 'true' after the re-encrypt job reports 0 remaining: refuse legacy v1/v2 sealed secrets. */
+      MFA_REJECT_LEGACY?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
       TEST_MIGRATIONS?: D1Migration[];
