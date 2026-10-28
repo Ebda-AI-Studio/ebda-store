@@ -234,14 +234,19 @@ async function doVerify(request, { sql }) {
   return json({ ok: true, tables, fk });
 }
 
-/** every application table of this DO (not sqlite_*, not the cf_* bookkeeping), with all its columns and pk */
+// DO-side bookkeeping and DERIVED state (the full cf-schema StoreDO carries these next to the data tables): they hold
+// blobs and are rebuilt from the rows, so neither a seal baseline nor a verify digest covers them. Mirrors
+// apps/api/src/cf/store-do/tables.ts.
+const NOT_DATA =
+  /^(sqlite_|_cf_|cf_|_migrations$|_identity$|search_dirty$|product_vector_state$|product_search_fts|customer_search_fts)/;
+
+/** every application table of this DO (not sqlite_*, not the cf_* / _cf_* bookkeeping, not derived search state), with all its columns and pk */
 function appTables(sql) {
   const names = sql
-    .exec(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE 'cf\\_%' ESCAPE '\\' ORDER BY name`
-    )
+    .exec(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`)
     .toArray()
-    .map(r => r.name);
+    .map(r => r.name)
+    .filter(n => !NOT_DATA.test(n));
   return names.map(name => {
     const info = sql.exec(`SELECT name, pk FROM pragma_table_info(?) ORDER BY cid`, name).toArray();
     return {

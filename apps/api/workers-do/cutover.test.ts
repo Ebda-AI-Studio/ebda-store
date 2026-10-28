@@ -18,16 +18,17 @@ const call = (store: string, action: string, init: RequestInit = {}) =>
     e
   ) as Promise<Response>;
 
-const page = (n: number, name = 'Store') =>
+// `stores` lives in D1 now; the StoreDO carries the per-store tables, so the cutover pages target affiliate_configs.
+const page = (n: number) =>
   [
     JSON.stringify({
       batch: 'cut-test-1',
-      table: 'stores',
+      table: 'affiliate_configs',
       page: n,
-      columns: ['id', 'slug', 'name', 'currency', 'created_at', 'updated_at'],
+      columns: ['id', 'store_id'],
       pk: ['id'],
     }),
-    JSON.stringify([`s${n}`, `slug${n}`, name, 'EGP', 1, 1]),
+    JSON.stringify([`s${n}`, `st${n}`]),
   ].join('\n');
 
 describe('cutover admin surface on the real StoreDO', () => {
@@ -63,15 +64,15 @@ describe('cutover admin surface on the real StoreDO', () => {
       body: JSON.stringify({
         tables: [
           {
-            table: 'stores',
-            columns: ['id', 'slug', 'name', 'currency', 'created_at', 'updated_at'],
+            table: 'affiliate_configs',
+            columns: ['id', 'store_id'],
             pk: ['id'],
           },
         ],
       }),
     });
-    const j = (await r.json()) as { tables: { stores: { count: number } } };
-    expect(j.tables.stores.count).toBe(1);
+    const j = (await r.json()) as { tables: { affiliate_configs: { count: number } } };
+    expect(j.tables.affiliate_configs.count).toBe(1);
   });
 
   it('no bearer: 401 and nothing is written', async () => {
