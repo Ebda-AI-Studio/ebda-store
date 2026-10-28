@@ -1,0 +1,5 @@
+# SEC-B2B-3
+
+> Section: B2B wholesale pricing (feat/b2b-wholesale, 2026-10-21)
+
+Ruling SEC-B2B-3 (controller, 2026-10-21; push security review of 92bbc72d0, "rate-limit bypass / fail-open") - The distinct-code coupon gate (`couponDistinctGate` in `apps/api/src/middleware/security.ts`) stays FAIL-OPEN on a rate-limit store error. This is the same posture every limiter in the file already takes (`passOnStoreError: true`, from the adversarial audit's P2 ruling: an unavailable store must not 500 the whole write surface). The gate adds no new failure mode, and its store error is logged at warn. A caller cannot trigger it: the key is an IP and a sha256 hash, the store is the AuthState Durable Object in production, and no request input reaches the store beyond those. Fail-closed here would block every checkout that carries a coupon during a store outage, and that costs real orders. Cost if wrong: during a rate-limit store outage, coupon codes can be enumerated through quote/order without a per-IP bound, for as long as the outage lasts; the coupon still has to be valid and active to be worth anything.

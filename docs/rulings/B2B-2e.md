@@ -1,0 +1,5 @@
+# B2B-2e
+
+> Section: B2B wholesale pricing (feat/b2b-wholesale, 2026-10-21)
+
+Ruling B2B-2e (coordinator, 2026-10-21) - Group membership for promotions and coupons is decided by the SAME `BuyerIdentity` as prices. `resolveCustomerContext(storeId, typed, buyer)` takes the group from `loadBuyerGroup(storeId, buyer)` (session via `customers.user_id`, or a merchant's explicit pick) and ignores the typed phone / email and the self-edited `User.phone`. Guest checkout has NO group benefits. First-order status keeps its typed-identity logic (it can only reduce what a typed identity gets). `assignByIdentity` never overwrites an existing row's email, phone or names; with a `userId` it matches/creates the row linked to that registered shopper (contact fields only where free), without one it matches phone then email and attaches the group only. Callers covered: `order.service` create + `createAdminOrder`, `coupon.routes` validate, `promotion.routes` preview. Cost if wrong: a guest who is a real VIP but checks out without signing in loses the VIP promo until they sign in; the merchant can issue a code instead.

@@ -1,0 +1,5 @@
+# SEARCH-T11-16
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T11-16 (review N-M3) — the single pass and the single retry run in memoized steps of `ISOLATE_CHUNK` = 5 products (`single-<round>-<chunk>`, `retry-<round>-<chunk>`). Worst case per step: 5 × (15 s `EMBED_TIMEOUT_MS` + 200 ms throttle) ≈ 76 s and ≤ ~50 KB of output. Documented limits: Inngest allows a step "up to 2 hours, subject to the function host's shorter timeout" and 4 MiB of step output (inngest.com/docs/usage-limits/inngest, read 2026-10-16); the host is a Worker HTTP request, which has no wall-clock limit while the caller stays connected but a 20-minute grace when the Workers runtime is updated (developers.cloudflare.com/workers/platform/limits). A chunk that is cut short is retried as a step (memoized chunks before it are not re-paid). Evidence: `tests/integration/product-index.test.ts` "review N-M3" (7 products → `single-0-0` with 5 and `single-0-1` with 2; red before: one `single-0` step). Cost if wrong: a slower retry of one 5-product chunk.

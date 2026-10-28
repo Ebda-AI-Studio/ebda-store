@@ -1,0 +1,5 @@
+# CF-SCHEMA-1
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling CF-SCHEMA-1 (2026-10-24) - the Cloudflare SQLite schema is GENERATED from `schema.prisma` (`packages/cf-schema/scripts/generate.mjs`), never hand-edited, and `generated-current.test.ts` fails when a Prisma change is not regenerated. Encodings: enum -> TEXT + CHECK; Json and String[] -> TEXT + `json_valid`; Boolean -> INTEGER 0/1 + CHECK; DateTime -> INTEGER epoch ms UTC; Decimal(p,s) -> INTEGER scaled by 10^s (9 columns, listed in `generated/manifest.json`); money stays integer piastres; foreign keys exist only where both ends live in the same database (store_id references the D1 directory, so it is a plain column in the DO). Evidence: 41 tests in `packages/cf-schema/test` (parity three ways: DMMF, SQLite catalog, Drizzle config; mutation-checked by renaming a column). Cost if wrong: a wrong encoding would be fixed by regenerating and a new migration, bounded because nothing reads these tables in production until the flag-gated slices in phases 2 and 3.

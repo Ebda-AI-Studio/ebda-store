@@ -1,0 +1,5 @@
+# INTRED-4
+
+> Section: Main integration lane red (2026-10-22, branch `fix/main-integration-red`)
+
+- Ruling INTRED-4 - `instapay-expiry` cron assertion `*/15 * * * *` -> `7 * * * *` (hourly, INNGEST-BUDGET-1, #118). `locked-pricing-catalog` replays the later B2B migration's `plans.limits` UPDATEs after the locked_pricing INSERTs (the history in order), so the blob keeps `wholesalePricing` as DEFAULT_PLAN_SEEDS has it; the assertion is unchanged. `sms-marketing-consent` expects the Arabic opt-out label (`إيقاف العروض`) for a store with no defaultLanguage (region default Egyptian Arabic; SMS_OPT_OUT_LABEL.ar). `card-testing-guard` mock gains `rejectImpersonated` (payment.routes uses it); `feature.service.public-cache-bust` mock gains `storeFeature.delete`/`deleteMany` on the `withStore` tx (feature.service deletes through `withStore` since #116). `report-filters-apply` registers its customers on the store (`users.store_id`), as the customer search contract requires, and keeps the real `hasPermission`. Cost if wrong: the SMS case pins the Arabic default only; an English-default store is not covered here.

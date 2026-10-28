@@ -1,0 +1,5 @@
+# ROLE-GUARD-1
+
+> Section: 2026-10-07 — cache generation counters + fail-closed Node DB role guard (branch `fix/cache-gen-and-role-guard`)
+
+Ruling ROLE-GUARD-1 — FIXED on the Node shell: the DB role guard in `apps/api/src/index.ts` ran fire-and-forget after `listen()` and swallowed query errors (FIX-003, P2 for Ebda; the Workers guard was already fail-closed in 23acd07b). It now lives in `apps/api/src/lib/database-role-guard.ts`, is awaited before `server.listen`, reports `rolbypassrls` and `rolsuper` separately (the old query OR-ed them into one column named `rolbypassrls`), and in production exits 1 on a failed query or a missing `pg_roles` row. CI's integration grep now requires `current_user=ebda_app rolbypassrls=false rolsuper=false`. Evidence: `tests/unit/database-role-guard-boot.test.ts`; restoring the swallow-and-continue catch turns 3 red. Cost if wrong: a DB unreachable for the whole retry window at Node boot now crash-loops the process instead of serving with an unverified role — intended.

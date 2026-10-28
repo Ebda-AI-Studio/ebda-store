@@ -1,0 +1,5 @@
+# CART-EMAIL-5
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling CART-EMAIL-5 (2026-10-21, review item 3) - only a permanent 4xx marks a cart email failed. The send step rethrows everything except the Resend codes that are the request's fault (`validation_error`, `missing_required_field`, `invalid_from_address`, `invalid_to`, `invalid_parameter`, `invalid_access`, `restricted_api_key`, `not_found`): 5xx (`application_error`), rate limits, unknown codes and network errors retry through Inngest's 4 retries, safe because the Resend idempotency key is `cart-recovery-email/<cart>`; `onFailure` marks the row failed when they run out. Before, a 30 s Resend blip silently dropped every in-flight reminder (one reminder per cart, never retried). Evidence: `tests/unit/cart-recovery-email.test.ts` (3 transient + 3 permanent cases). Cost if wrong: an unrecognised permanent code is retried 4 times before failing, delaying the failed mark by the retry backoff.

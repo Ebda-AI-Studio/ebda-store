@@ -1,0 +1,5 @@
+# SEARCH-T11-8
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T11-8 (coordinator, review Q1) — the indexer and the backstop run whenever the Workers AI binding exists, also while `SEARCH_SEMANTIC_ENABLED` is `"false"`: the plan requires the catalogue to be embedded BEFORE the flag is turned on (STOP-3b), so deploying PR 3 with the `ai` binding starts the backfill on the first backstop tick. Ahmad authorised the production backfill pre-launch (2026-10-15; production has 0 products). The kill switch is `SEARCH_EMBED_STORE_DAILY_CAP=0`: every plan step then reports `capped` before picking a batch, so there is no Workers AI call at all (the only remaining work is one plan step per event and the NULL-doc/unindexable prunes). Evidence: `tests/unit/search-index-kill-switch.test.ts` (indexStore and the Inngest handler with a bound provider and stale rows: 0 provider calls; a control with the cap lifted reaches the provider; a mutant that ignores the cap turns 2 of 3 red). Cost if wrong: Workers AI spend before semantic search is visible to shoppers — bounded by the daily cap per store.

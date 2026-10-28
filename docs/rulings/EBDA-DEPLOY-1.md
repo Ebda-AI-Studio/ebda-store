@@ -1,0 +1,5 @@
+# EBDA-DEPLOY-1
+
+> Section: 2026-10-07 — Legal pages v1.0 (branch `docs/legal-pages`)
+
+Ruling EBDA-DEPLOY-1 — the storefront Worker owns ONLY `*.ebda.app/*`; the inherited Ebda Store `ebda.app` custom domain + `cf.ebda.app` + `*/*` routes are removed from `scripts/cf-routes.cjs` and the committed `apps/web/wrangler.jsonc`. Evidence 2026-10-07: the apex is served by `ebda-marketing` (custom domain, live), and `tests/unit/ebda-cf-generated-routes.test.ts` was asserting the web Worker claim `ebda.app` — a deploy from main would have taken the apex off the marketing site. Zone routes run before custom domains (Cloudflare docs, Custom Domains → Interaction with Routes), so `media.ebda.app/*` and `preview.ebda.app/*` got Worker-less exclusion routes; all six hosts were measured serving their own origin after the storefront deploy. Cost if wrong: merchant custom domains (Cloudflare-for-SaaS) have no fallback route until that feature adds one, and any NEW subdomain without its own route answers with the storefront's store-not-found.

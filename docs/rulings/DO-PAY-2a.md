@@ -1,0 +1,5 @@
+# DO-PAY-2a
+
+> Section: Lifecycle emails and referral attribution (2026-10-22, branch `feat/lifecycle-emails`)
+
+Ruling DO-PAY-2a (2026-10-26) - final Opus review (MERGE OK, no double-pay path): a claim whose answered id was already filed under another same-amount claim is closed (`id_match_reassigned`) so no Kashier claim can stay open forever; the operator match also requires the held webhook's amount to equal the claim's; Fawry amount-less notices are never silently 'seen' and their ref is never filed as accounted (a repeat is held + alerted unless an executed unconsumed claim matches); the refresh route files the resolved refund id. RESIDUAL, ruled: the executed-write alert is sent inside the transaction (a rollback would leave a false alert); `already_matched` is returned even when the claim was absorbed under a different id; the Fawry `paymentRefrenceNumber` uniqueness is NOT VERIFIED (sandbox / docs) - the hold-and-alert fallback makes it safe either way; `drainEntityIndexOutbox` has no scheduler/alert consumer yet (Worker glue). Cost if wrong: extra operator work on a held webhook, never an overpay.

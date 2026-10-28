@@ -1,0 +1,5 @@
+# PROVIDERS-2
+
+> Section: 2026-10-07 — Provider catalog, Batch 0 + payments Batch 1 (PROVIDERS-\*)
+
+Ruling PROVIDERS-2 — a provider not verified against its real sandbox is not selectable: the catalog flag `verified` (with `verification.sandboxVerifiedAt`) is false for Paymob, Kashier and FawryPay, the admin shows them as "قريبًا / Coming soon", a merchant gets 403 `PROVIDER_NOT_AVAILABLE` on save/test, a super admin may save and Test connection (that is how verification happens) but NOBODY can enable (409 `PROVIDER_NOT_VERIFIED`), and the payment factory skips an unverified gateway even if a row says enabled (runtime second line). `PAYMENT_PROVIDERS_ALLOW_UNVERIFIED=1` lifts the gate for the stub suites only and is ignored under `NODE_ENV=production`. Evidence: `tests/unit/provider-connect.test.ts`, `tests/integration/provider-connect-routes.test.ts` (both delete the seam); mutations below. Cost if wrong: online card/wallet payments stay unavailable until someone runs `scripts/provider-sandbox-check.mjs` with sandbox keys and flips the flag.

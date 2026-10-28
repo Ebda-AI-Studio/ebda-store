@@ -1,0 +1,5 @@
+# CART-EMAIL-9
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling CART-EMAIL-9 (2026-10-21, review item 6; refines CART-EMAIL-2) - the email channel stays OFF by default, with a dismissible nudge. Reasons that are not the visual-features rule: the mail goes out in the merchant's name and sender, so they should see sender, copy and delay once; a bad domain/sender config would otherwise mail every opted-in shopper with a cart on day one; consent is enforced per recipient either way, so OFF is a product call, not a legal one. The Abandoned carts page shows one `CartEmailNudge` ("Get abandoned carts back by email", Review settings / Not now) while `email_enabled` is false; dismissal is a per-viewer, per-store localStorage convenience (try/catch, renders without it), never state anything depends on. Flip the default to ON for NEW stores only (a migration default change plus a store-creation seed) once Ahmad has seen the checkout opt-in in use. Evidence: `CartEmailNudge.test.tsx` (4). Cost if wrong: merchants who ignore the nudge never get email recovery; the cost of ON-by-default is mail they never reviewed.

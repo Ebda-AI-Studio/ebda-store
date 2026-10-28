@@ -1,0 +1,5 @@
+# EBDA-MONEYA-3
+
+> Section: 2026-10-08 — Money batch A: InstaPay proof, subscription billing fixes (branch `fix/money-a`, EBDA-MONEYA-\*)
+
+Ruling EBDA-MONEYA-3 — Automatic checks FLAG, never block (AMOUNT_MISMATCH, RECEIVER_MISMATCH/MISSING against `EBDA_INSTAPAY_HANDLE` or the merchant's handle/phone, DATE_BEFORE_ORDER / DATE_TOO_OLD / DATE_IN_FUTURE, LOW_CONFIDENCE < 0.7, LOOKS_EDITED, FIELDS_CORRECTED, SAME_IMAGE_USED_BEFORE, AI_UNAVAILABLE). The ONE hard block: a transfer reference already live anywhere (any store, subscription or order) is refused 409 `DUPLICATE_REFERENCE` by the UNIQUE `instapay_receipts.reference_key` (normalised digits, 8-20), which RLS cannot hide. A rejected or voided receipt frees its key. "Image looks edited" is the model's best-effort opinion only. Evidence: unit `tests/unit/instapay-receipt.test.ts` (each flag), integration "cannot pay twice, anywhere" (mutation MA-1 red). Cost if wrong: a forged screenshot with a fresh reference still reaches a human, who must check their InstaPay app before approving.

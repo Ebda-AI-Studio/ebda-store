@@ -1,0 +1,5 @@
+# SEARCH-P2-9
+
+> Section: 2026-10-16 — Search program, PR 4, Task 13 (quality eval): SEARCH-T13-\*
+
+Ruling SEARCH-P2-9 (review I2; extends SEARCH-T5-8) — the term of an admin search travels in the `X-Search-Query` request header (percent-encoded), not in the URL, on the ⌘K route (`GET /stores/:storeId/search`, which accepts no `?q=`), the customers list and export, the customer typeahead, the orders list and export, the stock-scan order lookup and the Orders PWA list. A GET with no term is the empty state. The old `?search=` / `?q=` forms stay accepted on the older routes for already-deployed clients and are deprecated; remove them one release after the clients ship. Responses to a header-borne term send `Vary: X-Search-Query` and `Cache-Control: private, no-store`. A test fails if an admin or PWA source puts the term in such a URL (`tests/unit/admin-search-no-pii-in-url.test.ts`). The storefront → API term is still open under SEARCH-T5-8. Cost if wrong: a deployed older client keeps writing typed phones into Workers Logs until it updates.

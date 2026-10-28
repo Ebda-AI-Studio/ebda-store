@@ -1,0 +1,5 @@
+# PASSKEY-13
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling PASSKEY-13 (security review I1) — a password CHANGE removes every passkey too, exactly like a reset, in the same transaction as the new hash, with a `passkey.purged` audit row and a notice (count and reason, ar and en). Before, an attacker who held the password and a session could register a passkey (it satisfies MFA, PASSKEY-4); the owner, told by the "added" mail, changed the password, which killed the attacker's session but not their passkey, and the attacker signed straight back in. Evidence: `tests/unit/passkey-password-change.test.ts` — attacker-added passkey + owner password change: the passkey is gone and its assertion is refused (red before: 1 row left); audit and mail asserted; a wrong current password leaves everything alone; a copy-vs-code test pins each "changing/resetting your password removes every passkey" sentence to `changePassword`/`resetPassword`. Cost if wrong: an owner who changes their password re-enrols their own devices.

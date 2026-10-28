@@ -1,0 +1,5 @@
+# SEARCH-T9-2
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T9-2 (revised 2026-10-16, review I1/M5) — every Postgres that runs the migrations moves to `pgvector/pgvector:0.8.0-pg17`: the 5 `ci.yml` services, the `cf-api-deploy.yml` pre-deploy smoke, both compose files, and the buy-flow parity harness (`scripts/buy-flow-parity/run.mjs`), whose container is renamed `ebda-buyflow-pgvector17` because the harness reuses an existing container by name and would keep its old image. `tests/unit/ci-lean-structure.test.ts` (`postgres image parity`) reads all five files and fails on any postgres/pgvector image reference (`image:` with or without quotes or `docker.io/library/`, or a quoted `name:tag` argument) that is not the pinned tag. A local compose volume created by `postgres:16-alpine` will not start on 17: dump/restore into a fresh volume, or drop it and re-migrate (noted in both compose files). Cost if wrong: a forgotten Postgres fails loudly at `CREATE EXTENSION vector`, never silently.

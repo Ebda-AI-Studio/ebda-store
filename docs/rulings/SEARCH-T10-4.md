@@ -1,0 +1,5 @@
+# SEARCH-T10-4
+
+> Section: 2026-10-15 — Phase B1 Qamar (B1-\*)
+
+Ruling SEARCH-T10-4 (round 1, review M5) — local dev boots the API without the Workers AI binding. Measured 2026-10-16 with wrangler 4.116 and no login (empty HOME): `wrangler dev` with the `ai` line printed `env.AI … remote`, then `Failed to start the remote proxy session … it's necessary to set a CLOUDFLARE_API_TOKEN`, and never served. `npm run cf:dev -w apps/api` now runs `scripts/cf-api-local-config.mjs` (the same `stripAiBinding` as the workerd smoke) and `wrangler dev --config .wrangler.local.jsonc`; `stage1-exit-run.sh` does the same. Re-measured: it starts with no login and logs `[search] embedding provider: none; semantic search OFF`. `npm run cf:dev:ai` is the plain `wrangler dev` for someone logged in. A second wrangler `env` without `ai` was rejected: wrangler envs do not inherit bindings, so every binding would be declared twice and drift. Evidence: `tests/unit/workerd-smoke-config.test.ts` (cf:dev, cf:dev:ai, the exit runner, `.gitignore`, same strip). Cost if wrong: someone testing semantic search locally gets "none" from `cf:dev` and has to use `cf:dev:ai`.

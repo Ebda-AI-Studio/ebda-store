@@ -1,0 +1,5 @@
+# EBDA-BILLFU-2
+
+> Section: 2026-10-07 — Legal pages v1.0 (branch `docs/legal-pages`)
+
+Ruling EBDA-BILLFU-2 — Support contact fallback: `supportContact()` (`services/billing/manual-config.ts`) always returns an email (`EBDA_SUPPORT_EMAIL`, unset or malformed = `BRAND.supportEmail` = `hello@ebda.app`, see EBDA-BILLFU-5) plus the wa.me link only when `EBDA_SUPPORT_WHATSAPP` is set. Every surface that used the WhatsApp link now falls back to a mailto: reminder + suspension emails (`email-templates/subscription-billing.ts`), the billing-page notice and the store-wide banner (urgent notices only), via `SupportLink`. The storefront's suspended page stays the neutral maintenance page with no billing details or contacts (EBDA-FUNNEL-10, unchanged). Evidence: `tests/unit/billing-followups.test.ts` (both email kinds, both languages: mailto present, `wa.me` absent) and the billing page test "never an empty wa.me". Cost if wrong: merchants email hello@ebda.app until a WhatsApp number exists; that mailbox must be read.

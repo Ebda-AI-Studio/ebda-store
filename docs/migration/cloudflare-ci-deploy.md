@@ -47,7 +47,7 @@ edge certs automatically on first deploy (needs the token's Zone DNS+SSL perms).
 
 It runs on **GitHub-hosted runners (`ubuntu-latest`)** under the current policy
 (`vars.USE_SELF_HOSTED == 'false'`, the same variable `ci.yml`/`deploy.yml` use;
-[Ruling CI-CRON-1](../RULINGS.md#ruling-ci-cron-1--scheduled-runs-stay-on-self-hosted-pushpr-dispatch-on-cloud-2026-10-03)),
+[Ruling CI-CRON-1](../rulings/CI-CRON-1.md)),
 so it **bills cloud Actions minutes** like every other push/PR job; it is not
 zero-cost (the CI-CRON-1 estimate covers the crons only, see Ruling CI-CRON-2). If
 the variable is set back to `true` it runs on the self-hosted WSL2 runner instead,
@@ -168,7 +168,7 @@ a soak), exactly as demo-merchant was cut over for the storefront.
 Every job in `cf-deploy.yml` (including `detect` and `notify-failure`) picks its
 runner from `vars.USE_SELF_HOSTED`, and the workflow has no `schedule:` trigger, so
 it does not read `SCHEDULED_ON_CLOUD`. Per
-[Ruling CI-CRON-1](../RULINGS.md#ruling-ci-cron-1--scheduled-runs-stay-on-self-hosted-pushpr-dispatch-on-cloud-2026-10-03)
+[Ruling CI-CRON-1](../rulings/CI-CRON-1.md)
 the repo runs push, PR and dispatch on cloud (`USE_SELF_HOSTED=false`); only
 `schedule:` runs in other workflows are pinned to the self-hosted runner. Runner
 outage handling for those crons is not covered by an in-repo runbook.
