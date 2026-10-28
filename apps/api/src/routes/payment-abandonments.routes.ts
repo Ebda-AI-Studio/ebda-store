@@ -13,7 +13,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { rangeOrLegacyDays } from '../lib/report-range';
 import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';

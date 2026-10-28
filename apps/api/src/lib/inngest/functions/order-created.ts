@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { EmailService, type OrderEmailData } from '../../../services/email.service';
@@ -22,7 +22,7 @@ import { resolveOrderInvoiceRecipient } from '../../order-notification-address';
 // Re-exported for its existing unit test; the rule lives with the refund path's (FU46-1a).
 export { resolveOrderInvoiceRecipient };
 
-export const orderCreated: InngestFunction.Any = inngest.createFunction(
+export const orderCreated: JobDef = inngest.createFunction(
   {
     id: 'order-created-fanout',
     name: 'Order created — email + push + dispatcher fan-out',

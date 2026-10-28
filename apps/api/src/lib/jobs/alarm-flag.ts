@@ -1,8 +1,7 @@
 /**
  * Which per-store schedules run as Durable Object alarms instead of one global cron that lists every
  * store. `JOBS_CF_ALARMS` (wrangler var, flipped by PR + deploy): a comma list of function ids, or
- * `all`; empty = every one stays a cron. A job needs BOTH: its group on Cloudflare (`JOBS_CF_GROUPS`)
- * AND to be alarm-ready (its handler sweeps only `event.data.storeId` for an alarm run).
+ * `all`; empty = every one stays a cron. A job must also be alarm-ready (its handler sweeps only `event.data.storeId` for an alarm run).
  */
 import { cfBindings } from '../../cf/bindings';
 import { jobRunsOnCf } from './flag';

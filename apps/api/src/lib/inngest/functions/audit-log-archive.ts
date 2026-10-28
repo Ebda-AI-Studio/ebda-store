@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { loadS3 } from '../../lazy-modules';
 import { auditRetention } from '../../definer';
 import logger from '../../logger';
@@ -21,7 +21,7 @@ const RETENTION_DAYS = 90;
 const DELETE_BATCH = 5000;
 const EXPORT_PAGE = 5000;
 
-export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
+export const auditLogArchive: JobDef = inngest.createFunction(
   {
     id: 'audit-log-archive-weekly',
     name: 'Archive + delete audit_logs older than 90d',

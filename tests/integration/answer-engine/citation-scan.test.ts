@@ -557,7 +557,10 @@ describe('citation scan resume survives a crashed attempt (issue 2076)', () => {
   const P2 = { text: `resume prompt two ${Date.now()}`, locale: 'en' as const };
   const answer = async () => ({ text: 'Answer', citedUrls: [], grounded: false });
   const dbNow = async () =>
-    new Date((await prisma.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`)[0].now);
+    new Date(
+      (await prisma.$queryRaw<Array<{ now: Date }>>`SELECT (now() AT TIME ZONE 'UTC') AS now`)[0]
+        .now
+    );
 
   it('a row written before the crash is kept, and the retry does not re-query it', async () => {
     const runStartedAt = await dbNow();

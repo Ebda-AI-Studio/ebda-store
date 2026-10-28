@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { getLook, isBuiltLook, isBuiltSkin } from '@ebda/shared';
 import { SIGNUP_PLAN_CODES } from '../services/billing/trial';
 

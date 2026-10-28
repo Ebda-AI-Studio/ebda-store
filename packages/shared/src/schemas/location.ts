@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Canonical Egypt address schema — shared across all three address Zod

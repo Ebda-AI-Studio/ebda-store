@@ -72,7 +72,7 @@ describe.skipIf(!hasDb)(
       );
     const backdate = (minutes: number) =>
       owner.query(
-        `update gold_rates_current set applied_at = now() - make_interval(mins => $2) where store_id = $1 and karat = 21`,
+        `update gold_rates_current set applied_at = (now() AT TIME ZONE 'UTC') - make_interval(mins => $2) where store_id = $1 and karat = 21`,
         [fx.storeId, minutes]
       );
     const stock = async (id: string) =>

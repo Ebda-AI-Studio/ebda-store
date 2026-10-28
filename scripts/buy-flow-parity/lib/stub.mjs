@@ -201,7 +201,7 @@ export function createStub({ secretKey, apiKey }) {
         return json(res, 503, { error: 'blocked by buy-flow-parity harness' });
       }
 
-      // Inngest (INNGEST_BASE_URL points here). The SDK registers its function
+      // Legacy Inngest wire shape (no longer used by the API). It registered its function
       // configs at POST /fn/register and sends events to POST /e/<key>.
       if (path === '/fn/register' && req.method === 'POST') {
         state.functions = Array.isArray(body?.functions) ? body.functions : [];

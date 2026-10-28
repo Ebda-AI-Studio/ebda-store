@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInStoreScope, runInTenantContext } from '@ebda/database';
 import {
   applyFill,
@@ -94,7 +94,7 @@ export async function handleAiAutofillProduct({
   logger.info({ storeId, productId, op, filled, calls: gen.calls }, '[ai-autofill] product filled');
 }
 
-export const aiAutofillProduct: InngestFunction.Any = inngest.createFunction(
+export const aiAutofillProduct: JobDef = inngest.createFunction(
   {
     id: 'ai-autofill-product',
     name: 'AI-first: autofill product fields on create/update',

@@ -1,7 +1,7 @@
 /**
- * #1194: package.json's overrides force qs to 6.16.0 (a GHSA-x5fp-wj9c-mxmx
+ * #1194: package.json's overrides force qs to 6.16.2 (a GHSA-x5fp-wj9c-mxmx
  * fix) into express@4.22.2 and body-parser@1.20.8, which still declare
- * `qs: ~6.15.1` — a range that EXCLUDES 6.16.0. npm honours the override
+ * `qs: ~6.15.1` — a range that EXCLUDES 6.16.2. npm honours the override
  * anyway (nothing fails at install time), but the advisory itself changes
  * how qs parses bracket-key comma input for array-limit enforcement — a
  * parsing-semantics change on the hot path every request.query and every
@@ -20,11 +20,11 @@ import { describe, it, expect } from 'vitest';
 // The real resolved qs — same one express/body-parser get via the override.
 import qs from 'qs';
 
-describe('#1194: forced qs 6.16.0 parses the shapes this API relies on', () => {
-  it('is actually resolved to 6.16.0 (guards against the override silently lapsing)', () => {
+describe('#1194: forced qs 6.16.2 parses the shapes this API relies on', () => {
+  it('is actually resolved to 6.16.2 (guards against the override silently lapsing)', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pkg = require('qs/package.json') as { version: string };
-    expect(pkg.version).toBe('6.16.0');
+    expect(pkg.version).toBe('6.16.2');
   });
 
   it('a comma-separated single query value stays a STRING, not an array', () => {

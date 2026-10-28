@@ -4,7 +4,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearCfBindings, setCfBindings } from '@api/cf/bindings';
 import { clearJobRegistry, registerJob } from '@api/lib/jobs/registry';
-import { setRawInngestSend } from '@api/lib/jobs/dispatch-all';
 import { runJobWorkflow } from '@api/lib/jobs/run-workflow';
 import {
   handleJobsBatch,
@@ -68,7 +67,6 @@ const gateStub = (id: string) => ({
   touch: async () => 'tok',
 });
 let latest = true;
-const raw = vi.fn(async () => ({ ids: [] }));
 const qsend = vi.fn(async () => undefined);
 
 beforeEach(() => {
@@ -78,13 +76,11 @@ beforeEach(() => {
   now = 0;
   acquireFails = 0;
   latest = true;
-  raw.mockClear();
   qsend.mockClear();
   clearJobRegistry();
   sendAlert.mockClear();
   captureException.mockClear();
   flush.mockClear();
-  setRawInngestSend(raw);
   setCfBindings({
     HYPERDRIVE: { connectionString: 'x' },
     JOBS_WORKFLOW: { create: async () => ({ id: 'i' }) },
@@ -225,7 +221,6 @@ describe('runJobWorkflow', () => {
     expect(failure.event.name).toBe('inngest/function.failed');
     expect(failure.event.data.event.name).toBe('x/y');
     expect(failure.error.message).toBe('boom');
-    expect(raw).not.toHaveBeenCalled(); // the failed event has no Cloudflare subscriber here and `inngest/*` is never sent to Inngest
     expect(calls).toContain('do:on-failure');
     // Exactly one direct alert + one Sentry capture, with job, group, instance id and error, no event data.
     expect(sendAlert).toHaveBeenCalledTimes(1);
@@ -332,7 +327,6 @@ describe('handleJobsBatch', () => {
     expect(last.ack).toHaveBeenCalled();
     expect(last.retry).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(raw).not.toHaveBeenCalled(); // no inngest/* event is involved any more
     // The failed attempts alerted nothing; the final failure alerts exactly once (queue job).
     expect(sendAlert).toHaveBeenCalledTimes(1);
     expect((sendAlert.mock.calls as unknown as Array<[Record<string, any>]>)[0]![0]).toMatchObject({

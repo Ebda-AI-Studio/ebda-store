@@ -5,7 +5,7 @@
  * the published `PageDefinition`. Their validators live here (strict Zod);
  * their settings descriptors are in the registry.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { colorValue, sectionPaddingMaxWidthVisibility } from './layout-schema';
 import { isSafeUrl } from '../utils/safe-url';
 

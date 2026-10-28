@@ -6,6 +6,7 @@ import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { classifyToolCall, resolveAgentAuth } from '../mcp/agent-auth';
 import { AppError } from '../middleware/error-handler';
 import { rejectBatches } from '../mcp/reject-batches';
+import { mcpRequestGuard } from '../mcp/request-guard';
 import logger from '../lib/logger';
 import { searcherFromIp } from '../lib/search/embed-budget';
 
@@ -49,6 +50,7 @@ import { searcherFromIp } from '../lib/search/embed-budget';
 const router = Router();
 // One JSON-RPC message per POST: a batch would run up to 100 calls for one limiter token.
 router.use(rejectBatches);
+router.use(mcpRequestGuard);
 router.use(publicLimiter);
 
 /**

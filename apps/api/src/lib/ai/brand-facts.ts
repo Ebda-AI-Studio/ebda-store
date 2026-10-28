@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Write-side schema for `Store.aboutJson` from the bulk-ai-brand-facts sweep

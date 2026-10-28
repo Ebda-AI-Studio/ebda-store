@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
@@ -25,7 +25,7 @@ import { featureService } from '../../../services/feature.service';
  *
  * Guard against Inngest sync UI test payloads (data: {}).
  */
-export const reviewModeration: InngestFunction.Any = inngest.createFunction(
+export const reviewModeration: JobDef = inngest.createFunction(
   {
     id: 'review-moderation',
     name: 'AI review moderation — translate + spam check',

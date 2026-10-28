@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
 import { acrossOpts } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -51,7 +51,7 @@ export function toJsonSafeRows<T extends Record<string, unknown>>(
   );
 }
 
-export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
+export const storeUsageSnapshot: JobDef = inngest.createFunction(
   {
     id: 'store-usage-snapshot',
     name: 'Monthly per-store usage snapshot',

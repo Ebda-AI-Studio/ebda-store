@@ -112,7 +112,6 @@ const PROBE_BINDINGS = {
   TAP_API_KEY: 'k',
   TAP_SECRET_KEY: 's',
   TAP_WEBHOOK_SECRET: 'budget-only-tap-webhook-secret',
-  INNGEST_EVENT_KEY: 'budget',
 };
 
 async function profileOnce(outdir, compat) {

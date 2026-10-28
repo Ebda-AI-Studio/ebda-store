@@ -15,8 +15,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
 import express from 'express';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
@@ -56,29 +54,15 @@ const req = (over: Partial<Request> = {}): Request =>
     ...over,
   }) as unknown as Request;
 
-// Builds a request carrying (or not) the Inngest signature header, matching
-// how express's `req.header()` reads it case-insensitively.
-const inngestReq = (opts: { signature?: string; path?: string; method?: string } = {}): Request =>
-  req({
-    method: opts.method ?? 'POST',
-    path: opts.path ?? '/api/v1/inngest',
-    header: (name: string) =>
-      name.toLowerCase() === 'x-inngest-signature' ? opts.signature : undefined,
-  });
-
 // Bypass 0 short-circuits on the test env, so every other branch is dead under
 // vitest unless these are cleared. Without this the suite would pass no matter
 // what the predicate said.
 const SAVED = {
   node: process.env.NODE_ENV,
   vitest: process.env.VITEST,
-  signingKey: process.env.INNGEST_SIGNING_KEY,
 };
 beforeEach(() => {
-  // A production deploy WITH a signing key — the only state in which the
-  // Inngest bypass may apply (issue 2064). Individual cases below break it.
   process.env.NODE_ENV = 'production';
-  process.env.INNGEST_SIGNING_KEY = 'signkey-test-0000';
   delete process.env.VITEST;
   delete process.env.LOAD_TEST_BYPASS_TOKEN;
 });
@@ -86,8 +70,6 @@ afterEach(() => {
   if (SAVED.node !== undefined) process.env.NODE_ENV = SAVED.node;
   else delete process.env.NODE_ENV;
   if (SAVED.vitest !== undefined) process.env.VITEST = SAVED.vitest;
-  if (SAVED.signingKey !== undefined) process.env.INNGEST_SIGNING_KEY = SAVED.signingKey;
-  else delete process.env.INNGEST_SIGNING_KEY;
 });
 
 describe('the global mutation limiter skips the refresh route', () => {
@@ -152,60 +134,6 @@ describe('the global mutation limiter skips the refresh route', () => {
       '/api/v2/AUTH/refresh',
     ]) {
       expect(skipGlobalRateLimit(req({ path })), `${path} must stay counted`).toBe(false);
-    }
-  });
-});
-
-describe('the global mutation limiter skips signed Inngest step callbacks', () => {
-  it('lets a signed POST /api/v1/inngest past uncounted', () => {
-    expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(true);
-  });
-
-  // issue 2064 — mutation-proof: dropping `inngestSignatureIsEnforced()` from
-  // the Bypass 4 predicate reddens both cases.
-  it('does NOT skip when the deploy has no INNGEST_SIGNING_KEY (the SDK cannot verify)', () => {
-    delete process.env.INNGEST_SIGNING_KEY;
-    expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(false);
-  });
-
-  it('does NOT skip on a deployed service whose NODE_ENV is not production (SDK dev mode)', () => {
-    process.env.NODE_ENV = 'staging';
-    expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(false);
-  });
-
-  it('does NOT skip an unsigned POST /api/v1/inngest (dev-mode / attacker without the key)', () => {
-    expect(skipGlobalRateLimit(inngestReq({ signature: undefined }))).toBe(false);
-    expect(skipGlobalRateLimit(inngestReq({ signature: '' }))).toBe(false);
-  });
-
-  it('does not open the bypass to lookalike paths', () => {
-    // The negative control. A predicate keyed on a prefix or substring match
-    // instead of an exact path would let these through.
-    for (const path of [
-      '/api/v1/inngest-x',
-      '/api/v1/inngest/extra',
-      '/api/v1/inngest/../stores',
-      '/inngest',
-      '/api/v2/inngest',
-    ]) {
-      expect(
-        skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', path })),
-        `${path} must stay counted even with a signature header`
-      ).toBe(false);
-    }
-  });
-
-  it('does not extend the bypass to other methods on that path', () => {
-    expect(skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', method: 'PUT' }))).toBe(false);
-    expect(skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', method: 'DELETE' }))).toBe(false);
-  });
-
-  it('still counts every other mutation, signature header notwithstanding', () => {
-    for (const path of ['/api/v1/orders', '/api/v1/webhooks/payment/tap', '/api/v1/auth/login']) {
-      expect(
-        skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', path })),
-        `${path} must stay counted`
-      ).toBe(false);
     }
   });
 });
@@ -288,44 +216,5 @@ describe('req.path at app-level really is the full mounted path', () => {
     expect(status).toBe(200);
     expect(seenPath).toBe('/api/v1/auth/refresh');
     expect(seenSkip).toBe(true);
-  });
-
-  it('is /api/v1/inngest, not /inngest, and only skips with the signature header', async () => {
-    const app = express();
-    const seen: Array<{ path: string; skip: boolean }> = [];
-    app.use((r, _res, next) => {
-      seen.push({ path: r.path, skip: skipGlobalRateLimit(r) });
-      next();
-    });
-    app.use(
-      '/api/v1',
-      express.Router().post('/inngest', (_r, res) => res.json({ ok: true }))
-    );
-
-    await dispatch(app, 'POST', '/api/v1/inngest', { 'x-inngest-signature': 't=123&s=abc' });
-    await dispatch(app, 'POST', '/api/v1/inngest');
-
-    expect(seen[0]).toEqual({ path: '/api/v1/inngest', skip: true });
-    expect(seen[1]).toEqual({ path: '/api/v1/inngest', skip: false });
-  });
-});
-
-/**
- * issue 2063 — the Inngest path is exempt from the shared cap but NOT
- * unbounded: its own bucket is mounted on /api/v1/inngest ahead of the body
- * parser and the serve handler. Mutation-proof: deleting the mount (or moving
- * it after `express.json`) reddens this.
- */
-describe('the Inngest path has its own bucket, ahead of body parsing (issue 2063)', () => {
-  it('app.ts mounts inngestLimiter on /api/v1/inngest before express.json and inngestServe', () => {
-    const src = fs.readFileSync(path.resolve(process.cwd(), 'apps/api/src/app.ts'), 'utf8');
-    const mount = src.indexOf("app.use('/api/v1/inngest', inngestLimiter)");
-    const json = src.indexOf("app.use(express.json({ limit: '10mb' }))");
-    const serveMount = src.indexOf("'/api/v1/inngest',\n  inngestServe(");
-    expect(mount, 'inngestLimiter is not mounted').toBeGreaterThan(-1);
-    expect(json).toBeGreaterThan(-1);
-    expect(serveMount).toBeGreaterThan(-1);
-    expect(mount).toBeLessThan(json);
-    expect(mount).toBeLessThan(serveMount);
   });
 });

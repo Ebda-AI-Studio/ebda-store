@@ -50,8 +50,8 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
                      │                  │                  │
                      ▼                  ▼                  ▼
 ┌──────────────────────────┐  ┌─────────────────┐  ┌──────────────┐
-│ NEON Launch (~$17-150/mo) │  │ CLOUDFLARE R2   │  │ INNGEST CLOUD│
-│ PostgreSQL serverless     │  │ (per-tenant     │  │ 30 functions │
+│ NEON Launch (~$17-150/mo) │  │ CLOUDFLARE R2   │  │ CF WORKFLOWS │
+│ PostgreSQL serverless     │  │ (per-tenant     │  │ + QUEUES     │
 │ 83 models, RLS-backed     │  │  media storage) │  │              │
 │ daily local pg_dump       │  │  *.r2.dev       │  │              │
 └──────────────────────────┘  └─────────────────┘  └──────────────┘
@@ -359,7 +359,7 @@ When any of these fire, the path to real staging is:
 - Neon branch `staging` from `main` + seed fixtures script at `scripts/seed-staging.mjs`
 - Custom domain `api-staging.ebda.app` → CNAME → Railway service
 - Preview environment `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://api-staging.ebda.app`
-- Per-provider sandbox credentials: Paymob/Kashier/Fawry test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `ebda-api-railway-staging`
+- Per-provider sandbox credentials: Paymob/Kashier/Fawry test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Axiom dataset `ebda-api-railway-staging`
 - Documentation in this section updated with the URLs + dashboards
 
 Estimated effort: ~4h focused session.
@@ -368,14 +368,14 @@ Estimated effort: ~4h focused session.
 
 See `docs/audits/2026-05-22-comprehensive-saas-audit.md` §6 for the authoritative per-service forecast (idle / 10k MAU / 100k MAU scenarios). Snapshot of current scale:
 
-| Service                                     | Plan       | Monthly Cost                                                 |
-| ------------------------------------------- | ---------- | ------------------------------------------------------------ |
-| Cloudflare Workers (admin + web + orders)   | Workers    | see linked audit doc §6 (Vercel no longer part of the stack) |
-| Railway (API + Redis)                       | Hobby      | ~$6-16                                                       |
-| Neon Postgres                               | Launch     | $0-17 (today)                                                |
-| Cloudflare R2                               | Free tier  | $0                                                           |
-| Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers | $0                                                           |
-| **Total at current scale**                  |            | **see linked audit doc §6 for the current forecast**         |
+| Service                                   | Plan       | Monthly Cost                                                 |
+| ----------------------------------------- | ---------- | ------------------------------------------------------------ |
+| Cloudflare Workers (admin + web + orders) | Workers    | see linked audit doc §6 (Vercel no longer part of the stack) |
+| Railway (API + Redis)                     | Hobby      | ~$6-16                                                       |
+| Neon Postgres                             | Launch     | $0-17 (today)                                                |
+| Cloudflare R2                             | Free tier  | $0                                                           |
+| OneSignal, Sentry, R2, Gemini, etc        | Free tiers | $0                                                           |
+| **Total at current scale**                |            | **see linked audit doc §6 for the current forecast**         |
 
 ---
 
@@ -441,7 +441,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 - **Wired call sites**:
   - `process.on('uncaughtException')` in `apps/api/src/index.ts` → P0 platform
   - Payment HMAC repeated fail (3+ in 5min via Redis counter) → P0 store-scoped (`payment.factory.ts`)
-  - Inngest function failure past final retry → P1 platform (`alerts-failure-watch.ts` listening on `inngest/function.failed`)
+  - Background job failure past final retry → P1 platform (`reportJobFailure`, `lib/jobs/failure.ts`, Ruling G5-4)
   - `/api/v1/health` deep-check degradation → P1 platform (`index.ts`)
 
 ### 5. Log drain — Axiom via `@axiomhq/pino` transport (persistent log retention)

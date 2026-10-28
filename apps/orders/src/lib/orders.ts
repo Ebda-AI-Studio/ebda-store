@@ -4,7 +4,7 @@
  * (OrderService) already emits. No new endpoints.
  */
 
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@ebda/shared';
 
 export interface OrderCustomer {

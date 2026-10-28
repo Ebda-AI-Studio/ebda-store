@@ -1,3 +1,5 @@
+> **Historical (Ruling G5-3, 2026-10-25).** Inngest was removed; background jobs run on Cloudflare Workflows and Queues, billed with Workers. The execution budget below no longer applies and its guard test is deleted. Kept for the reasoning behind the hourly cadences.
+
 # Inngest execution budget
 
 Ruling INNGEST-BUDGET-1 (docs/RULINGS.md). Ebda is on the Inngest **Hobby** plan: 50,000 executions a month.

@@ -18,7 +18,7 @@
  * Only keys the editor's schema declares are accepted, with the value type the
  * setting declares — this is a smaller surface than the legacy theme PUT.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { THEME_SETTINGS_SCHEMA } from './settings-schema';
 
 const EDITABLE = new Map<string, 'string' | 'boolean'>();

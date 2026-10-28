@@ -29,6 +29,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 let authToken: string;
 let testStoreId: string;
+let fixtureOrderId: string;
+const fixtureUserIds: string[] = [];
 
 // IDs created by this test run — cleaned up in afterAll
 const createdReturnIds: string[] = [];
@@ -44,12 +46,49 @@ beforeAll(async () => {
   const loginJson = await loginRes.json();
   authToken = loginJson.data?.accessToken as string;
 
-  // Resolve a test store
-  const storeRes = await fetch(`${API_URL}/admin/stores?limit=1`, {
-    headers: { Authorization: `Bearer ${authToken}` },
+  // The store is THIS file's own fixture. It used to be `/admin/stores?limit=1`, i.e. whatever store another
+  // test file (running in parallel) had just created: when that file tore it down, the affiliate insert hit
+  // `affiliates_store_id_fkey`, and the return-timeline test silently skipped whenever that store had no order.
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const owner = await prisma.user.create({
+    data: {
+      email: `lc-owner-${suffix}@test.local`,
+      passwordHash: 'x',
+      firstName: 'LC',
+      lastName: 'Owner',
+      role: 'store_admin',
+      emailVerified: true,
+    },
   });
-  const storeJson = await storeRes.json();
-  testStoreId = storeJson.data?.stores?.[0]?.id as string;
+  const customer = await prisma.user.create({
+    data: {
+      email: `lc-customer-${suffix}@test.local`,
+      passwordHash: 'x',
+      firstName: 'LC',
+      lastName: 'Customer',
+      role: 'customer',
+      emailVerified: true,
+    },
+  });
+  fixtureUserIds.push(owner.id, customer.id);
+  const store = await prisma.store.create({
+    data: { name: `lc-${suffix}`, slug: `lc-${suffix}`, ownerId: owner.id, status: 'active' },
+  });
+  testStoreId = store.id;
+  const order = await prisma.order.create({
+    data: {
+      storeId: store.id,
+      customerId: customer.id,
+      orderNumber: `LC-${suffix}`,
+      status: 'delivered',
+      paymentStatus: 'paid',
+      subtotal: 10_000,
+      total: 10_000,
+      shippingAddress: {},
+      billingAddress: {},
+    },
+  });
+  fixtureOrderId = order.id;
 });
 
 afterAll(async () => {
@@ -66,6 +105,13 @@ afterAll(async () => {
       where: { affiliateId: { in: createdAffiliateIds } },
     });
     await prisma.affiliate.deleteMany({ where: { id: { in: createdAffiliateIds } } });
+  }
+  if (testStoreId) {
+    await prisma.order.deleteMany({ where: { storeId: testStoreId } }).catch(() => undefined);
+    await prisma.store.deleteMany({ where: { id: testStoreId } }).catch(() => undefined);
+  }
+  if (fixtureUserIds.length) {
+    await prisma.user.deleteMany({ where: { id: { in: fixtureUserIds } } }).catch(() => undefined);
   }
 });
 
@@ -107,22 +153,16 @@ describe('Return lifecycle timeline endpoint', () => {
       return;
     }
 
-    // Need a valid order with a customer in this store
-    const order = await prisma.order.findFirst({
-      where: { storeId: testStoreId, deletedAt: null },
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: fixtureOrderId },
       select: { id: true, customerId: true },
     });
-
-    if (!order?.customerId) {
-      console.warn('No order with customerId in test store — skipping');
-      return;
-    }
 
     const returnRecord = await prisma.return.create({
       data: {
         storeId: testStoreId,
         orderId: order.id,
-        customerId: order.customerId,
+        customerId: order.customerId!,
         returnNumber: `RET-TEST-${Date.now()}`,
         type: 'return',
         reason: 'Integration test return',

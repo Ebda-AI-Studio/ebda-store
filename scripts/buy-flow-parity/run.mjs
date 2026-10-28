@@ -332,11 +332,6 @@ async function startApi({ dir, dbUrlApp, dbUrlOwner, redisUrl, port, stubUrl, lo
     DIRECT_URL: dbUrlOwner,
     REDIS_URL: redisUrl,
     ...SECRETS,
-    // Inngest: real client, events delivered to the stub (recorded). Dry-run is
-    // NOT used: it would swallow `payment/webhook.received` and the webhook
-    // would never be processed.
-    INNGEST_BASE_URL: stubUrl,
-    INNGEST_DEV: stubUrl,
     BFP_STUB_URL: stubUrl,
     ...HARNESS_ENV,
   };

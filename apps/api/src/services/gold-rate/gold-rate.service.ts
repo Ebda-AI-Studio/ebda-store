@@ -21,7 +21,7 @@ import {
   type GoldRateSettings,
   type GoldRoundingStep,
 } from '@ebda/shared';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { AppError } from '../../middleware/error-handler';
 import { auditLog } from '../../middleware/security';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';

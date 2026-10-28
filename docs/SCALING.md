@@ -128,7 +128,7 @@ safe for multiple replicas.
 
 - **Neon cold-start latency** — the first query after a serverless compute pause takes 200–800 ms
   regardless of replica count. Use the pgbouncer URL and keep traffic active.
-- **Inngest function concurrency** — Inngest deduplicates crons centrally; replica count has no
-  effect on Inngest job fanout.
+- **Job concurrency** — jobs run on Cloudflare Workflows/Queues; `limit <= 3` concurrency is a `JobGate`
+  lease, so Worker instance count has no effect on job fanout (`docs/cf/jobs-map.md`).
 - **Railway egress costs** — more replicas = more outbound traffic billed. Verify Railway plan
   limits before scaling beyond 3 replicas.

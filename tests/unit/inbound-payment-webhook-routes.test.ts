@@ -140,7 +140,11 @@ describe.each(cases)('inbound $provider webhook route', c => {
   });
 
   it('replay: an already-processed delivery is acknowledged and NOT processed again', async () => {
-    m.findOrder.mockResolvedValue({ orderId: 'o1', webhookProcessedAt: new Date() });
+    m.findOrder.mockResolvedValue({
+      orderId: 'o1',
+      storeId: STORE,
+      webhookProcessedAt: new Date(),
+    });
     const res = await post(c, path, true);
     expect(res.status).toBe(200);
     expect(res.body.data.message).toBe('Webhook already processed');
@@ -215,6 +219,46 @@ describe.each(cases)('inbound $provider webhook route', c => {
     expect(m.inngestSend).not.toHaveBeenCalled();
   });
 
+  it('WEBHOOK-SCOPE-1: the same ref in two stores resolves only inside the signed store', async () => {
+    // Both stores hold this ref; the resolver is asked for the URL store and must be told to prefer it.
+    m.resolveStore.mockImplementation(
+      async (a: { preferStoreId?: string | null }) => a.preferStoreId ?? OTHER
+    );
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(200);
+    expect(m.resolveStore).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: c.provider, preferStoreId: STORE })
+    );
+    expect(m.inboxRecord).toHaveBeenCalledWith(expect.objectContaining({ storeId: STORE }));
+  });
+
+  it('WEBHOOK-SCOPE-1: a cross-store ref is refused (503, nothing stored, nothing enqueued)', async () => {
+    m.resolveStore.mockResolvedValue(OTHER);
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(503);
+    expect(m.inboxRecord).not.toHaveBeenCalled();
+    expect(m.inngestSend).not.toHaveBeenCalled();
+    expect(m.handleWebhook).not.toHaveBeenCalled();
+  });
+
+  it('WEBHOOK-SCOPE-1: an order another store already settled under the same key is NOT a duplicate here', async () => {
+    m.findOrder.mockResolvedValue({
+      orderId: 'oB',
+      storeId: OTHER,
+      webhookProcessedAt: new Date(),
+    });
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).not.toBe('Webhook already processed');
+    expect(m.inboxRecord).toHaveBeenCalledWith(expect.objectContaining({ storeId: STORE }));
+  });
+
+  it('WEBHOOK-SCOPE-1: the delivery is stored and deduped under a store-prefixed key', async () => {
+    await post(c, `${path}/s/${STORE}`, true);
+    expect(m.findOrder.mock.calls[0][0]).toMatch(new RegExp(`^${STORE}:`));
+    expect(m.inboxRecord.mock.calls[0][0].idempotencyKey).toMatch(new RegExp(`^${STORE}:`));
+  });
+
   it('WEBHOOK-ORDER-1: a VALID signature on a known payment answers 200', async () => {
     const res = await post(c, `${path}/s/${STORE}`, true);
     expect(res.status).toBe(200);
@@ -278,7 +322,11 @@ describe.each(cases)('inbound $provider webhook route', c => {
     // failures are counted per store and source
     expect(m.incr).toHaveBeenCalledWith(expect.stringMatching(/^webhook-sigfail:/), 300);
     // a forged body learns nothing about processed payments and writes no audit row
-    m.findOrder.mockResolvedValue({ orderId: 'o1', webhookProcessedAt: new Date() });
+    m.findOrder.mockResolvedValue({
+      orderId: 'o1',
+      storeId: STORE,
+      webhookProcessedAt: new Date(),
+    });
     const again = await post(c, path, true);
     expect(again.status).toBe(401);
     expect(m.audit).not.toHaveBeenCalled();
@@ -338,7 +386,7 @@ describe('legacy-keyed Paymob replay is a no-op on EVERY entry path', () => {
     'POST %s dedupes on the stored legacy key',
     async path => {
       m.findOrder.mockImplementation(async (k: string) =>
-        k === legacyKey ? { orderId: 'o1', webhookProcessedAt: new Date() } : null
+        k === legacyKey ? { orderId: 'o1', storeId: STORE, webhookProcessedAt: new Date() } : null
       );
       const res = await request(app)
         .post(`/api/v1/webhooks${path}`)

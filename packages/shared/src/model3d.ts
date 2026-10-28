@@ -5,7 +5,7 @@
  * sends 15 MB over a phone connection. The server copy is the gate; the client
  * copy is only feedback. See docs/plans/2026-10-07-product-3d-viewer.md.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /** Hard cap for one uploaded model or USDZ file (bytes). */
 export const MODEL3D_MAX_BYTES = 15 * 1024 * 1024;

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -35,7 +35,7 @@ import type { LowStockAlertItem } from '../../../services/email-templates/low-st
  * work in withRlsBypass (same pattern as stock-reorder-scan and
  * stock-deadstock-scan).
  */
-export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunction(
+export const stockLowStockAlertCron: JobDef = inngest.createFunction(
   {
     id: 'stock-low-stock-alert-cron',
     name: 'Low-stock alert — 6-hourly cron',
@@ -180,7 +180,7 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
  * short SET NX before it enters a digest.
  * Event: `stock/low-stock-scan-requested` with data: { storeId, requestedBy? }
  */
-export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFunction(
+export const stockLowStockAlertOnDemand: JobDef = inngest.createFunction(
   {
     id: 'stock-low-stock-alert-on-demand',
     name: 'Low-stock alert — on-demand',

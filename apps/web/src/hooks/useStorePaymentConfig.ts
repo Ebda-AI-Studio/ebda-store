@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { useStore } from '../contexts/StoreContext';
 import { api } from '../lib/api';
 import type { PaymentConfigResponse } from '../lib/accepted-payment-badges';
