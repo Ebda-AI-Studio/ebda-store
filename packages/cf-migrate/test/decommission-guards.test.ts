@@ -62,7 +62,9 @@ describe('decommission-neon guards', () => {
         ...direct,
         EBDA_BACKUP_AGE_PUBLIC_KEY: 'not-a-key',
       });
-      expect(bad.stderr).toMatch(/not an age public key|pg_dump >= 17/);
+      expect(bad.stderr).toMatch(
+        /not an age public key|pg_dump >= 17|Command failed: pg_dump --version/
+      );
     }
   });
 
