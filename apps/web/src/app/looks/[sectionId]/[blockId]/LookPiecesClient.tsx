@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../../../components/StoreLink';
 import type { Product, ProductVariant } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';

@@ -50,6 +50,7 @@ function formatPaymentMethod(method: string | undefined): string {
     paymob: 'Paymob',
     kashier: 'Kashier',
     fawry: 'Fawry',
+    geidea: 'Geidea',
     visa: 'Visa',
     mastercard: 'Mastercard',
     meeza: 'Meeza',

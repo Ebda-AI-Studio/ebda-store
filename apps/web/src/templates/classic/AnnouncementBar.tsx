@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { sanitizeUrl } from '@ebda/shared';
 import type { AnnouncementBarProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';

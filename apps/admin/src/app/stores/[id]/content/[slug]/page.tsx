@@ -583,7 +583,7 @@ function BlockEditor({
   return (
     <div className="rounded-lg border border-border bg-card p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {t(`blockType.${block.type}`)}
         </span>
         <div className="flex items-center gap-1">

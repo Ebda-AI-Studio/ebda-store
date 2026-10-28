@@ -19,6 +19,8 @@ import {
   unlinkUserAuditLogs,
 } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
+import { assertMediaOriginOrUnchanged } from '../lib/media-url-guard';
+import { config as appConfig } from '../config';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
@@ -58,6 +60,7 @@ import {
   assertPlanAllows,
   assertWithinLimit,
 } from './plan-limit.service';
+import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
 
@@ -652,6 +655,26 @@ export class StoreService {
    */
   static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
+    // The owner's oldest store is the BILLING PARENT (EBDA-FUNNEL-18): deleting it while the
+    // owner still has other live stores would strand the paid period and re-parent the
+    // children onto a stale row. Refuse; the operator moves billing (re-orders plans) first.
+    if (store.ownerId) {
+      const family = sortOwnerStores(
+        await withUser(store.ownerId, tx =>
+          tx.store.findMany({
+            where: { ownerId: store.ownerId!, deletedAt: null },
+            select: { id: true, createdAt: true },
+          })
+        )
+      );
+      if (family.length > 1 && family[0].id === storeId) {
+        throw new AppError(
+          409,
+          'STORE_IS_BILLING_PARENT',
+          'This is the main (billing) store and the owner has other stores. Move billing to another store first.'
+        );
+      }
+    }
     // The owner's identity (credential + sessions) lives in the shared identity service. If this deletion also removes the
     // owner's profile row, the identity is deactivated FIRST (ends their sessions at once) and erased only after the commit;
     // if the transaction fails the identity is re-activated (compensating rollback).
@@ -1159,6 +1182,11 @@ export class StoreService {
     }
   ) {
     const store = await this.getById(storeId);
+    assertMediaOriginOrUnchanged(
+      { logo: branding.logo, logoAr: branding.logoAr },
+      store as { logo?: string | null; logoAr?: string | null },
+      appConfig.storagePublicUrl
+    );
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({
@@ -1357,6 +1385,11 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
     const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
+    assertMediaOriginOrUnchanged(
+      { ogImage: seo.ogImage },
+      { ogImage: previousOgImage },
+      appConfig.storagePublicUrl
+    );
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({

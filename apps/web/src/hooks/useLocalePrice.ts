@@ -8,10 +8,8 @@ import { useStoreNumerals } from './useNumerals';
 /**
  * Locale-aware price formatter — the ONE price formatter of the storefront.
  *
- * Arabic shoppers read `450 ج.م` (Western digits, the default in both
- * languages); English shoppers read `EGP 450`. Arabic-Indic digits
- * (`٤٥٠ ج.م`) only when the merchant opted in via `theme.arabicNumerals`
- * (Ruling NUMERALS-1). A whole amount drops its zero fraction.
+ * Arabic shoppers read `450 ج.م` and English shoppers `EGP 450`, with Western digits
+ * in both (Ruling DIGITS-1). A whole amount drops its zero fraction.
  */
 export function useLocalePrice(): (amount: number) => string {
   const { language } = useLanguage();

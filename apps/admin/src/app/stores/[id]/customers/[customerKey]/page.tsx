@@ -116,7 +116,7 @@ function StatusChip({ status }: { status: string }) {
         : 'bg-warning/10 text-warning-ink';
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${cls}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${cls}`}
     >
       {status}
     </span>
@@ -494,7 +494,7 @@ export default function CustomerDetailPage() {
                       <dd className="font-medium text-foreground text-end">
                         {customer.firstName} {customer.lastName}
                         {customer.isGuest && (
-                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning-ink">
+                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
                             {t('guestBadge')}
                           </span>
                         )}

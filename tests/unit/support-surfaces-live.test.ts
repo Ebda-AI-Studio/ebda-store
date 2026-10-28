@@ -28,7 +28,9 @@ describe.each([
     if (app === 'docs') expect(read('apps/docs/out/ar/index.html')).toContain(titleAr);
     const home = read('apps', app, 'out', app === 'help' ? 'en/index.html' : 'index.html');
     expect(home).toContain('Ebda Store');
-    expect(home).not.toMatch(/Ebda (WhatsApp|CRM|ERP)/); // a product gets its section the day it ships
+    // a product gets its section the day it ships; the shared header's Products menu (NAV-1) lists the live products
+    const withoutNav = home.replace(/<nav class="top-nav"[\s\S]*?<\/nav>/, '');
+    expect(withoutNav).not.toMatch(/Ebda (WhatsApp|CRM|ERP)/);
   });
 
   it('has its own sitemap, robots and a security.txt with its own canonical', () => {

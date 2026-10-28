@@ -12,10 +12,13 @@ import { featureService } from '../../../services/feature.service';
  * Task 28). Runs spam detection first — short-circuits translate if the
  * review is clearly junk so we don't burn tokens on spam.
  *
- * Status thresholds:
+ * Status thresholds (lib/ai/review-moderation-policy.ts, SEC-2):
  *   spamScore < 0.3  → published (auto-approve, genuine review)
  *   0.3-0.7          → pending   (merchant manual review)
  *   > 0.7            → spam      (hidden from storefront)
+ *   no finite score  → pending   (FAIL CLOSED: missing / null / NaN / unparseable reply)
+ *   link, phone, profanity or text addressed to the moderator → never published,
+ *                                  whatever the model scored (deterministic pre-filter)
  *
  * Translation failure is non-blocking: the review keeps its AI-derived
  * status even if the translation call errors out.

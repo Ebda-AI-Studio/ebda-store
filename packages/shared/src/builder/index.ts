@@ -24,3 +24,4 @@ export * from './page-kinds';
 export * from './page-defaults';
 export * from './page-settings';
 export * from './look-diff';
+export * from './ai-patch';

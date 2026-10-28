@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { categorySizeClass, cardAspectClass, cardShapeClasses } from '../shared/card-size';

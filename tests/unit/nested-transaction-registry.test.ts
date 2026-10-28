@@ -81,6 +81,11 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   // RLS GUCs — `transactionWithGucs` — so it no longer reads strict tables as
   // empty; the separate commit is unchanged.) So these batches are atomic
   // among themselves but not with the rest of the request.
+  // AI category apply (wave 2): one transaction creates the approved categories and their product links. It reads
+  // only rows committed before the request (products, existing slugs), every write goes through `tx`, and the
+  // handler writes nothing through the proxy first, so no uncommitted row can be invisible to it.
+  'services/store-category-suggest.service.ts':
+    'creates categories + product links in one transaction over committed products; no prior write in the request',
   'routes/category.routes.ts':
     'reorder batches (category.updateMany / productCategory.updateMany) over existing rows; no prior write in the request',
   'routes/product.routes.ts':
@@ -107,7 +112,6 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'services/inventory.service.ts',
   'services/loyalty-automation.service.ts',
   'services/loyalty.service.ts',
-  'services/payment-confirm.service.ts',
   'services/shipping-carrier.service.ts',
   'services/shipping.service.ts',
   // Surfaced by widening the scan to all of apps/api/src and counting

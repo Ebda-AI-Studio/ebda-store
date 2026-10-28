@@ -482,6 +482,20 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
+      # Marketing performance budget (marketing-levelup P2): up-front JS/CSS/HTML weight per page, no browser, fails the PR.
+      - name: Marketing page-weight budget
+        if: matrix.app == 'marketing'
+        run: node scripts/ci/marketing-perf-budget.mjs --record "$RUNNER_TEMP/marketing-perf-budget.json"
+
+      # Mobile LCP < 2.5 s (Lighthouse mobile, simulated throttling, median of 3). Needs Chromium, so it installs the one
+      # Playwright already caches on the runner; a stalled install or run is bounded by the step timeout.
+      - name: Marketing mobile LCP budget
+        if: matrix.app == 'marketing'
+        timeout-minutes: 12
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/ci/marketing-perf-budget.mjs --lcp
+
       - name: Dry-run the ${{ matrix.app }} deploy (wrangler starts on the deploy's Node)
         if: matrix.app != 'status' && matrix.app != 'accounts'
         working-directory: apps/${{ matrix.app }}

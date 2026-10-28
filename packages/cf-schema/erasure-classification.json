@@ -971,12 +971,13 @@
     "db": "store-do",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["created_by"],
+    "piiColumns": ["created_by", "published_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "userIdColumns": ["created_by"],
+    "userIdColumns": ["created_by", "published_by"],
     "actorScrub": {
-      "created_by": null
+      "created_by": null,
+      "published_by": null
     }
   },
   "store-do:store_tax_profiles": {
@@ -1423,5 +1424,21 @@
     "piiColumns": ["address", "credentials_enc"],
     "subjectKeys": [],
     "note": "merchant ETA credentials (encrypted) and branch address; destroyed with the store"
+  },
+  "d1:billing_grants": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
+  },
+  "d1:billing_referrals": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
   }
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { BRAND } from '@ebda/shared/brand';
+import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { NavBehavior } from './NavBehavior';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import {
@@ -14,6 +15,29 @@ import {
 } from '../lib/site';
 
 type Page = PageSlug;
+
+/** The product icon (shared paths from the brand module, so docs/help/status draw the same one). */
+function ProductIcon({ id }: { id: SiteNavProductId }) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      {SITE_NAV_ICONS[id].map(p =>
+        p.fill ? (
+          <path key={p.d} d={p.d} fill="currentColor" />
+        ) : (
+          <path
+            key={p.d}
+            d={p.d}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )
+      )}
+    </svg>
+  );
+}
 
 /** `offHome`: rendered on a page that is not the home (the 404), so nav anchors link to the home. */
 export function Header({
@@ -30,7 +54,21 @@ export function Header({
   const home = HOME[locale];
   /** The master brand (BRAND-ARCH-1): the studio lockup, never a bare product or a bare Ebda. */
   const studio = locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
-  const store = locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn;
+  /** The Products menu: Ebda Store, then Ebda WhatsApp (the same two entries as docs, help and status; BRAND-ARCH-1). */
+  const products = [
+    {
+      id: 'store' as const,
+      href: home,
+      name: locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn,
+      blurb: c.nav.storeBlurb,
+    },
+    {
+      id: 'whatsapp' as const,
+      href: pagePath(locale, 'whatsapp'),
+      name: locale === 'ar' ? BRAND.productWhatsapp.nameAr : BRAND.productWhatsapp.nameEn,
+      blurb: c.nav.whatsappBlurb,
+    },
+  ];
   const anchor = (id: string) =>
     page === '' && !offHome ? `#${id}` : `${home === '/' ? '' : home}/#${id}`;
   /** "Features" is the real /features/ page; every other item is a home section, absolute off the home. */
@@ -53,12 +91,19 @@ export function Header({
               <details>
                 <summary>{c.nav.products}</summary>
                 <ul>
-                  <li>
-                    <Link href={home}>
-                      <b>{store}</b>
-                      <span>{c.nav.storeBlurb}</span>
-                    </Link>
-                  </li>
+                  {products.map(p => (
+                    <li key={p.id}>
+                      <Link href={p.href}>
+                        <span className="np-ico">
+                          <ProductIcon id={p.id} />
+                        </span>
+                        <span className="np-txt">
+                          <b>{p.name}</b>
+                          <span>{p.blurb}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </details>
             </li>
@@ -80,8 +125,15 @@ export function Header({
               <span className="menu-label">{c.nav.menu}</span>
             </summary>
             <ul>
-              <li>
-                <Link href={home}>{store}</Link>
+              <li className="menu-group">
+                <p>{c.nav.products}</p>
+                <ul>
+                  {products.map(p => (
+                    <li key={p.id}>
+                      <Link href={p.href}>{p.name}</Link>
+                    </li>
+                  ))}
+                </ul>
               </li>
               {NAV_ANCHORS.map(n => (
                 <li key={n.key}>{navLink(n)}</li>
@@ -121,6 +173,7 @@ export function Header({
           </SiteLink>
         </div>
       </div>
+      <NavBehavior />
     </header>
   );
 }

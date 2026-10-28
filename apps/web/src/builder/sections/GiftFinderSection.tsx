@@ -15,7 +15,7 @@
  * hint instead.
  */
 import React from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { toMinor, type BlockNode, type SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import type { Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';

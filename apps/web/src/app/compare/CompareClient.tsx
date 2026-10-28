@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { isOnSale } from '../../lib/product-pricing';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import Image from 'next/image';
 import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';

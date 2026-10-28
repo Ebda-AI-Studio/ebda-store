@@ -17,7 +17,11 @@ The three models are derivatives, optimised for the web with gltf-transform (mes
 
 | lamma-clay-pot.glb | [Ceramic Pot](https://polyhaven.com/a/ceramic_pot) (a lidded earthenware cooking pot; Poly Haven's licence page: https://polyhaven.com/license) | Aron Łyczek | Poly Haven | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Optimised for the web (meshopt, WebP 1024 px; 3,540 triangles, 235 KB). CC0 needs no attribution; it is given as a courtesy |
 
-The stills in public/3d/stills are renders of these three models by scripts/3d/make-stills.mjs, so the same credit applies. public/3d/qr holds build-time QR codes (scripts/3d/make-qr.ts).
+| jasmine-serum.glb | Jasmine serum bottle (modelled in code, scripts/3d/make-models.mjs) | Ebda AI Studio | none (our own work) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Meshopt; 3,936 triangles, 29 KB. Ahmad to confirm the CC0 dedication (Ruling ASSETS-AI-1) |
+
+| dahab-solitaire.glb | Dahab solitaire ring (modelled in code, scripts/3d/make-models.mjs) | Ebda AI Studio | none (our own work) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Meshopt; 6,616 triangles, 34 KB. Ahmad to confirm the CC0 dedication (Ruling ASSETS-AI-1) |
+
+The stills in public/3d/stills are renders of these models by scripts/3d/make-stills.mjs, so the same credit applies. public/3d/qr holds build-time QR codes (scripts/3d/make-qr.ts).
 
 ## Dahab story capture
 

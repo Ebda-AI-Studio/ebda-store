@@ -105,6 +105,7 @@ interface RevisionRow {
   baseRev: number | null;
   note: string | null;
   createdBy: string | null;
+  publishedBy: string | null;
   createdAt: Date;
   updatedAt: Date;
   publishedAt: Date | null;
@@ -144,6 +145,7 @@ const META_SELECT = {
   baseRev: true,
   note: true,
   createdBy: true,
+  publishedBy: true,
   createdAt: true,
   updatedAt: true,
   publishedAt: true,
@@ -507,6 +509,51 @@ function publishedThemeData(
   return { document: snapshotted as unknown as object, docBytes: docBytes(snapshotted) };
 }
 
+/**
+ * Who published/restored a revision is recorded as the user ID only (`published_by`, pseudonymised with
+ * the user on offboarding, OFFBOARD-1). The NAME is never copied onto the revision: history resolves it at
+ * read time (`publisherNames`), so an erased user's name cannot linger in page history.
+ */
+function publisherStamp(userId: string | null): { publishedBy: string | null } {
+  return { publishedBy: userId };
+}
+
+/**
+ * Names for the publishers on one page of history, read live. Under strict RLS only the store's owner and
+ * its staff are visible to the acting user, which is exactly who can publish. A user who is gone, soft
+ * deleted or erased resolves to nothing, and the UI then says "Removed user".
+ */
+async function publisherNames(storeId: string, ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  const fullName = (u: { firstName: string; lastName: string; deletedAt: Date | null }) =>
+    u.deletedAt ? '' : `${u.firstName} ${u.lastName}`.trim();
+  const select = { firstName: true, lastName: true, deletedAt: true } as const;
+  try {
+    const [staff, store] = await Promise.all([
+      prisma.storeStaff.findMany({
+        where: { storeId, userId: { in: ids } },
+        select: { userId: true, user: { select } },
+      }),
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { ownerId: true, owner: { select } },
+      }),
+    ]);
+    for (const m of staff) {
+      const n = fullName(m.user);
+      if (n) out.set(m.userId, n);
+    }
+    if (store && ids.includes(store.ownerId)) {
+      const n = fullName(store.owner);
+      if (n) out.set(store.ownerId, n);
+    }
+  } catch {
+    // history must still load; unresolved names show as "Removed user"
+  }
+  return out;
+}
+
 /** Promote `row` (or a fresh row) to published inside a savepoint; archive the old one. */
 async function promote(
   storeId: string,
@@ -633,12 +680,29 @@ async function applyPublishedLayout(
 }
 
 /** Exported for the purge-contract test. */
+/**
+ * Staleness class: NEVER-stale. Page content must be what the merchant just published, so the purge is
+ * EVENT invalidation on every publish path (publish, rollback, the legacy layout PUT, look apply) and
+ * clears every layer `bustStoreCaches` owns (Redis, in-memory, the `layout:<storeId>` Next tag). The
+ * storefront's 60 s revalidate is only a backstop, never the mechanism: a failed purge is therefore
+ * retried (3 attempts, short backoff) and, if it still fails, raised as an error log for alerting.
+ */
+const PURGE_ATTEMPTS = 3;
 export function purgePublishedCaches(storeId: string, slug: string, domain: string | null): void {
-  void deferAfterTenantCommit('page-builder.publish.purge', () =>
-    bustStoreCaches(storeId, slug, domain)
-  ).catch(err =>
-    // Bounded staleness on failure: the storefront fetch revalidates in 60s.
-    logger.error({ err, storeId }, '[page-builder] publish cache purge failed')
+  void deferAfterTenantCommit('page-builder.publish.purge', async () => {
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= PURGE_ATTEMPTS; attempt++) {
+      try {
+        await bustStoreCaches(storeId, slug, domain);
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < PURGE_ATTEMPTS) await new Promise(r => setTimeout(r, 200 * attempt));
+      }
+    }
+    throw lastErr;
+  }).catch(err =>
+    logger.error({ err, storeId }, '[page-builder] publish cache purge failed after retries')
   );
 }
 
@@ -646,6 +710,7 @@ export async function publishDraft(args: {
   storeId: string;
   pageKey: string;
   baseRev: number;
+  userId?: string | null;
 }): Promise<ServiceResult<{ rev: number; layout: StoreLayoutSettings }>> {
   const { storeId, pageKey, baseRev } = args;
   const store = await loadStore(storeId);
@@ -682,12 +747,14 @@ export async function publishDraft(args: {
       errors: readinessErrors,
     };
 
+  const stamp = publisherStamp(args.userId ?? null);
   const outcome = await promote(storeId, pageKey, async () => {
     const { count } = await prisma.storePageRevision.updateMany({
       where: { id: draft.id, storeId, rev: baseRev, status: 'draft' },
       data: {
         status: 'published',
         publishedAt: new Date(),
+        ...stamp,
         ...publishedThemeData(draft.document, store.theme, store.typography),
       },
     });
@@ -722,6 +789,7 @@ async function publishNewRevision(args: {
 }): Promise<'ok' | 'conflict'> {
   const { storeId, pageKey, definition } = args;
   const rev = args.baseRev + 1;
+  const stamp = publisherStamp(args.userId);
   return promote(storeId, pageKey, async () => {
     if (args.archiveDraft)
       await prisma.storePageRevision.updateMany({
@@ -741,6 +809,7 @@ async function publishNewRevision(args: {
         note: args.note,
         createdBy: args.userId,
         publishedAt: new Date(),
+        ...stamp,
       },
     });
     await args.afterCreate?.(rev);
@@ -1140,8 +1209,15 @@ export async function listRevisions(args: {
     select: META_SELECT,
   });
   const page = rows.slice(0, limit);
+  const names = await publisherNames(args.storeId, [
+    ...new Set(page.map(r => r.publishedBy).filter((x): x is string => !!x)),
+  ]);
   return {
-    revisions: page,
+    revisions: page.map(r => ({
+      ...r,
+      // null with publishedBy set = the user is gone or erased ("Removed user")
+      publishedByName: r.publishedBy ? (names.get(r.publishedBy) ?? null) : null,
+    })),
     nextCursor: rows.length > limit ? page[page.length - 1].rev : null,
   };
 }

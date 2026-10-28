@@ -22,12 +22,14 @@ import {
 } from '../../apps/api/src/services/billing/types';
 import {
   assertBillingConfigAtBoot,
+  billingProviderUnsetWarning,
   createBillingProvider,
   resolveBillingProviderName,
 } from '../../apps/api/src/services/billing';
 import { StubBillingProvider } from '../../apps/api/src/services/billing/stub.provider';
 import {
   addInterval,
+  addIntervalAnchored,
   renewalKey,
   DUNNING_RETRY_DAYS,
 } from '../../apps/api/src/services/billing/period';
@@ -333,9 +335,129 @@ describe('provider selection', () => {
   it('an unset provider does not stop boot in production', () => {
     expect(() => assertBillingConfigAtBoot({ NODE_ENV: 'production' })).not.toThrow();
   });
+  it('an unset provider in production is LOUD (P1 text) but BILLING_PROVIDER=none / kashier / non-production are not (M-032)', () => {
+    expect(billingProviderUnsetWarning({ NODE_ENV: 'production' })).toMatch(
+      /BILLING_PROVIDER is not set/
+    );
+    expect(
+      billingProviderUnsetWarning({ NODE_ENV: 'production', BILLING_PROVIDER: '  ' })
+    ).not.toBeNull();
+    expect(
+      billingProviderUnsetWarning({ NODE_ENV: 'production', BILLING_PROVIDER: 'none' })
+    ).toBeNull();
+    expect(
+      billingProviderUnsetWarning({ NODE_ENV: 'production', BILLING_PROVIDER: 'kashier' })
+    ).toBeNull();
+    expect(billingProviderUnsetWarning({ NODE_ENV: 'development' })).toBeNull();
+  });
+  it('BILLING_PROVIDER=none is the explicit InstaPay-only choice: card billing refuses cleanly', () => {
+    expect(() =>
+      resolveBillingProviderName({ NODE_ENV: 'production', BILLING_PROVIDER: 'none' })
+    ).toThrow(/Card billing is disabled/);
+    expect(() =>
+      assertBillingConfigAtBoot({ NODE_ENV: 'production', BILLING_PROVIDER: 'none' })
+    ).not.toThrow();
+    expect(() =>
+      assertBillingConfigAtBoot({
+        NODE_ENV: 'production',
+        BILLING_PROVIDER: 'none',
+        BILLING_TRIAL_CARD_MODE: 'pay_at_trial_end',
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertBillingConfigAtBoot({
+        NODE_ENV: 'production',
+        BILLING_PROVIDER: 'none',
+        BILLING_TRIAL_CARD_MODE: 'card_on_file',
+      })
+    ).toThrow(/needs a card provider/);
+  });
+});
+
+describe('Kashier getChargeStatus (M-023 stuck-charge lookup)', () => {
+  const mkGet = (status: number, json: unknown) => {
+    const calls: string[] = [];
+    const impl = (async (url: string) => {
+      calls.push(url);
+      return new Response(JSON.stringify(json), { status });
+    }) as unknown as typeof fetch;
+    return {
+      calls,
+      p: new KashierBillingProvider({
+        baseUrl: 'https://kashier.test/',
+        merchantId: 'MID-1',
+        secretKey: 'sk',
+        apiKey: API_KEY,
+        fetchImpl: impl,
+      }),
+    };
+  };
+  const details = (over: Record<string, unknown> = {}) => ({
+    body: {
+      transactionId: 'TX-1',
+      merchantOrderId: ORDER,
+      trxType: 'pay',
+      status: 'SUCCESS',
+      ...over,
+    },
+  });
+  const ask = (p: KashierBillingProvider, chargeId: string | null) =>
+    p.getChargeStatus({ idempotencyKey: 'k', merchantOrderId: ORDER, chargeId });
+
+  it('reads the gateway record for the transaction id: success, failure, pending', async () => {
+    const ok = mkGet(200, details());
+    expect(await ask(ok.p, 'TX-1')).toMatchObject({ status: 'succeeded', chargeId: 'TX-1' });
+    expect(ok.calls[0]).toBe('https://kashier.test/v2/aggregator/transactions/TX-1');
+    expect(await ask(mkGet(200, details({ status: 'FAILURE' })).p, 'TX-1')).toMatchObject({
+      status: 'failed',
+    });
+    expect(await ask(mkGet(200, details({ status: 'PENDING' })).p, 'TX-1')).toMatchObject({
+      status: 'pending',
+    });
+  });
+
+  it('with NO transaction id it throws (cannot tell) and never claims "not found"; so does anything unclear', async () => {
+    const f = mkGet(200, details());
+    await expect(ask(f.p, null)).rejects.toThrow(/without a transaction id/);
+    expect(f.calls).toHaveLength(0); // no network call, no guess
+    await expect(ask(mkGet(200, details({ transactionId: 'OTHER' })).p, 'TX-1')).rejects.toThrow(
+      /did not answer clearly/
+    );
+    await expect(ask(mkGet(200, details({ trxType: 'refund' })).p, 'TX-1')).rejects.toThrow(
+      /not a charge/
+    );
+    await expect(ask(mkGet(500, {}).p, 'TX-1')).rejects.toThrow();
+  });
 });
 
 describe('period helpers', () => {
+  it('M-125: the anchor day survives short months (Jan 31 -> Feb 28 -> Mar 31 -> Apr 30 -> May 31) and leap years', () => {
+    let d = new Date('2027-01-31T10:00:00Z');
+    const seen: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      d = addIntervalAnchored(d, 'monthly', 31);
+      seen.push(d.toISOString().slice(0, 10));
+    }
+    expect(seen).toEqual(['2027-02-28', '2027-03-31', '2027-04-30', '2027-05-31']);
+    // without an anchor the old clamp-from-previous behaviour is unchanged
+    expect(
+      addIntervalAnchored(new Date('2027-02-28T10:00:00Z'), 'monthly').toISOString().slice(0, 10)
+    ).toBe('2027-03-28');
+    // yearly from Feb 29 and back to Feb 29 on the next leap year
+    expect(
+      addIntervalAnchored(new Date('2028-02-29T00:00:00Z'), 'yearly', 29).toISOString().slice(0, 10)
+    ).toBe('2029-02-28');
+    expect(
+      addIntervalAnchored(new Date('2031-02-28T00:00:00Z'), 'yearly', 29).toISOString().slice(0, 10)
+    ).toBe('2032-02-29');
+    // an invalid anchor falls back to the day of `from`
+    expect(
+      addIntervalAnchored(new Date('2027-01-15T00:00:00Z'), 'monthly', 99)
+        .toISOString()
+        .slice(0, 10)
+    ).toBe('2027-02-15');
+  });
+
   it('adds a month in UTC with day clamping', () => {
     expect(addInterval(new Date('2026-01-31T10:00:00Z'), 'monthly').toISOString()).toBe(
       '2026-02-28T10:00:00.000Z'

@@ -33,7 +33,7 @@ const SEGMENT_COLORS: Record<string, string> = {
   potential: 'bg-cyan-100 text-cyan-900 border-cyan-200',
   new_customer: 'bg-green-100 text-green-900 border-green-200',
   at_risk: 'bg-amber-100 text-amber-900 border-amber-200',
-  hibernating: 'bg-orange-100 text-orange-900 border-orange-200',
+  hibernating: 'bg-yellow-100 text-yellow-900 border-yellow-200',
   lost: 'bg-red-100 text-red-900 border-red-200',
 };
 

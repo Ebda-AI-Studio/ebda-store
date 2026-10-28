@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from './StoreLink';
 import type { ResolvedStore } from '../lib/store-resolver';
 
 /**

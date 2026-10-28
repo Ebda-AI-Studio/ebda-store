@@ -4,6 +4,12 @@ import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { OrderService, assertValidTransition } from '../order.service';
+import {
+  claimOrderFailed,
+  claimOrderPaid,
+  lockPaymentRow,
+  paymentStatusesNotOverwrittenBy,
+} from '../payment-state-claims';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
@@ -30,7 +36,7 @@ import { callThroughBreaker } from './provider-health';
 import { withProviderDeadline } from './provider-call';
 import { getProviderV2, MANUAL_PROVIDERS } from './registry';
 import { toProviderCredentials } from './credentials';
-import { isProviderUsable } from './provider-gate';
+import { isOfferableAtCheckout, isProviderUsable } from './provider-gate';
 import { recordPaymentSettled, recordProviderOperation } from '../provider-verification.service';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { V2ProviderBridge } from './v2-bridge';
@@ -197,6 +203,14 @@ class PaymentFactory {
             // not). The enable gate (`assertEnableAllowed`: a passing Test connection of exactly
             // the stored credentials, and a credential edit disables the row) is what keeps an
             // untested gateway from being enabled; this only drops a code the catalog no longer has.
+            // GEIDEA-2: a provider Ebda cannot confirm is never offered to buyers (or created).
+            if (!isOfferableAtCheckout(dbConfig.provider, storeId)) {
+              logger.warn(
+                { provider: dbConfig.provider, storeId },
+                '[PAYMENT] Skipping provider: no confirmation path, hidden from checkout (GEIDEA-2)'
+              );
+              continue;
+            }
             if (!isProviderUsable(dbConfig.provider)) {
               logger.warn(
                 { provider: dbConfig.provider, storeId },
@@ -2251,14 +2265,63 @@ export class PaymentService {
     // write keeps the rows consistent; payment-reconcile-sweep now watches
     // for the captured-on-cancelled shape that arises when the capture
     // happened anyway at the provider.
-    if (webhookData.status !== 'pending' && webhookData.status !== 'processing' && payment.order) {
+    // A failure never sets the order status (only its paymentStatus, conditionally below), so only the
+    // confirming and refunding statuses assert a transition.
+    if (
+      (webhookData.status === 'completed' || webhookData.status === 'refunded') &&
+      payment.order &&
+      // processing / shipped / delivered are marked paid without moving their fulfilment status (claimOrderPaid)
+      !(
+        webhookData.status === 'completed' &&
+        ['processing', 'shipped', 'delivered'].includes(payment.order.status)
+      )
+    ) {
       assertValidTransition(payment.order.status, orderStatus);
     }
 
-    // Update payment
+    // Order first, as ONE conditional update (M-049 / M-064): the webhook, the guest verify-on-return and the admin
+    // Refresh can all settle the same order. Whoever wins `claimed` writes + fans out; a late "failed/expired"
+    // never touches a paid order. (A refund event keeps its own path above.)
+    // payment row first, then the order (the order every refund path locks in): no lock-order flip, no deadlock
+    if (webhookData.status !== 'refunded') await lockPaymentRow(payment.id);
+    let orderClaim: 'claimed' | 'already' | 'blocked' | 'none' = 'none';
+    if (webhookData.status === 'completed') {
+      const c = await claimOrderPaid(payment.orderId, payment.order?.storeId ?? currentStoreId());
+      orderClaim = c === 'claimed' ? 'claimed' : c === 'already_paid' ? 'already' : 'blocked';
+    } else if (
+      webhookData.status === 'failed' ||
+      webhookData.status === 'expired' ||
+      webhookData.status === 'cancelled'
+    ) {
+      const c = await claimOrderFailed(payment.orderId, payment.order?.storeId ?? currentStoreId());
+      orderClaim = c === 'claimed' ? 'claimed' : c === 'already_failed' ? 'already' : 'blocked';
+    }
+    if (orderClaim === 'blocked') {
+      logger.warn(
+        { paymentId: payment.id, orderId: payment.orderId, provider, status: webhookData.status },
+        '[PAYMENT WEBHOOK] order already settled or no longer confirmable; order not changed'
+      );
+      if (webhookData.status === 'completed') {
+        // Captured money on an order that went terminal between the assert above and the claim: the same loud
+        // answer as the assert (retried, then dead-lettered into the existing P0 path), never a quiet 200.
+        const cur = await prisma.order.findUnique({
+          where: { id: payment.orderId, storeId: payment.order?.storeId ?? currentStoreId() },
+          select: { status: true },
+        });
+        assertValidTransition(cur?.status ?? 'cancelled', 'confirmed');
+      }
+    }
+
+    // Update payment. A terminal failure never overwrites a captured / refunded payment.
     const prevPaymentStatus = payment.status;
-    await prisma.payment.update({
-      where: { id: payment.id },
+    await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        // never move captured / refunded money off its state (a late `pending`, a replayed `completed`)
+        ...(webhookData.status === 'refunded'
+          ? {}
+          : { status: { notIn: paymentStatusesNotOverwrittenBy(webhookData.status) } }),
+      },
       data: {
         status: webhookData.status,
         paidAt: webhookData.paidAt,
@@ -2299,21 +2362,18 @@ export class PaymentService {
       },
     });
 
-    // Update order — the transition was already asserted ABOVE, before the
-    // payment write, so this block can no longer be reached with an invalid
-    // transition.
-    if (webhookData.status !== 'pending' && webhookData.status !== 'processing') {
+    // completed / failed were settled above by the conditional claim. A `refunded` status keeps its original
+    // unconditional write (the refund paths own that state).
+    if (webhookData.status === 'refunded') {
       await prisma.order.update({
         where: { id: payment.orderId, storeId: currentStoreId() },
-        data: {
-          status: orderStatus,
-          paymentStatus: orderPaymentStatus,
-        },
+        data: { status: orderStatus, paymentStatus: orderPaymentStatus },
       });
-      // Bust the admin aggregated-customers snapshot — this paymentStatus
-      // transition changes the paid/failed/refunded counts it aggregates.
-      if (payment.order?.storeId) await invalidateCustomersCache(payment.order.storeId);
+      orderClaim = 'claimed';
     }
+    // Bust the admin aggregated-customers snapshot — a paymentStatus transition changes its counts.
+    if (orderClaim === 'claimed' && payment.order?.storeId)
+      await invalidateCustomersCache(payment.order.storeId);
 
     // Online-payment notifications fire HERE, not at order creation. order.service.ts
     // intentionally skips its inngest.send + socket emit for non-COD orders so a
@@ -2332,7 +2392,7 @@ export class PaymentService {
       shipping.email ||
       'Customer';
 
-    if (webhookData.status === 'completed') {
+    if (webhookData.status === 'completed' && orderClaim === 'claimed') {
       // PROVIDERS-3: a settled live payment is evidence for the provider (same call as the pull-side confirm).
       void recordPaymentSettled({
         storeId: order.storeId,
@@ -2370,9 +2430,10 @@ export class PaymentService {
         );
       }
     } else if (
-      webhookData.status === 'failed' ||
-      webhookData.status === 'expired' ||
-      webhookData.status === 'cancelled'
+      orderClaim === 'claimed' &&
+      (webhookData.status === 'failed' ||
+        webhookData.status === 'expired' ||
+        webhookData.status === 'cancelled')
     ) {
       // Card-testing bookkeeping (SP5 task 4): only a DECLINE counts, not a
       // customer who cancelled / let the invoice expire. Idempotent per payment

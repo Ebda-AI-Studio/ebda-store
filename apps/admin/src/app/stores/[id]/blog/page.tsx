@@ -248,7 +248,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                             {post.title}
                           </p>
                           <span
-                            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
                               post.isPublished
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : 'bg-amber-100 text-amber-800'

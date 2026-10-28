@@ -16,6 +16,7 @@
  */
 import crypto from 'crypto';
 import {
+  BillingProviderError,
   BillingSignatureError,
   headerValue,
   type BillingProvider,
@@ -60,6 +61,9 @@ export class StubBillingProvider implements BillingProvider {
   declineAll = false;
   private failRemaining = 0;
   private pendingRemaining = 0;
+  private refundFailRemaining = 0;
+  private timeoutRemaining = 0;
+  private timeoutCharged = false;
   /** Every NEW charge the stub processed (replays of a key are not counted). */
   readonly chargeCalls: ChargeRequest[] = [];
   /**
@@ -79,6 +83,18 @@ export class StubBillingProvider implements BillingProvider {
   failNextCharges(n: number): void {
     this.failRemaining = n;
   }
+  /** The next `n` NEW refund requests come back rejected by the gateway. */
+  failNextRefunds(n: number): void {
+    this.refundFailRemaining = n;
+  }
+  /**
+   * The next `n` charges TIME OUT (outcome unknown to the caller). `charged` = the gateway really took the money
+   * (the answer was lost), which `getChargeStatus` then reveals.
+   */
+  timeoutNextCharges(n: number, charged: boolean): void {
+    this.timeoutRemaining = n;
+    this.timeoutCharged = charged;
+  }
   pendingNextCharges(n: number): void {
     this.pendingRemaining = n;
   }
@@ -86,6 +102,9 @@ export class StubBillingProvider implements BillingProvider {
     this.declineAll = false;
     this.failRemaining = 0;
     this.pendingRemaining = 0;
+    this.refundFailRemaining = 0;
+    this.timeoutRemaining = 0;
+    this.timeoutCharged = false;
     this.chargeCalls.length = 0;
     this.chargeRequests.length = 0;
     this.refundCalls.length = 0;
@@ -120,6 +139,17 @@ export class StubBillingProvider implements BillingProvider {
     this.chargeCalls.push(req);
     const chargeId = `stub_ch_${short(req.idempotencyKey)}`;
     let result: ChargeResult;
+    if (this.timeoutRemaining > 0) {
+      this.timeoutRemaining--;
+      // the gateway processed it (or declined it) but the answer was lost on the way back
+      this.charges.set(req.idempotencyKey, {
+        status: this.timeoutCharged ? 'succeeded' : 'failed',
+        chargeId,
+        ...(this.timeoutCharged ? {} : { failureReason: 'stub: declined (answer lost)' }),
+        raw: { stub: true, state: 'answer_lost' },
+      });
+      throw new BillingProviderError('stub: timeout', false);
+    }
     if (this.pendingRemaining > 0) {
       this.pendingRemaining--;
       result = { status: 'pending', chargeId, raw: { stub: true, state: 'pending' } };
@@ -138,15 +168,32 @@ export class StubBillingProvider implements BillingProvider {
     return result;
   }
 
+  async getChargeStatus(req: {
+    idempotencyKey: string;
+    merchantOrderId: string;
+    chargeId: string | null;
+  }): Promise<ChargeResult | null> {
+    return this.charges.get(req.idempotencyKey) ?? null;
+  }
+
   async refund(req: RefundRequest): Promise<RefundResult> {
     const seen = this.refunds.get(req.idempotencyKey);
     if (seen) return seen;
     this.refundCalls.push(req);
-    const result: RefundResult = {
-      status: 'succeeded',
-      refundId: `stub_rf_${short(req.idempotencyKey)}`,
-      raw: { stub: true },
-    };
+    const rejected = this.refundFailRemaining > 0;
+    if (rejected) this.refundFailRemaining--;
+    const result: RefundResult = rejected
+      ? {
+          status: 'failed',
+          refundId: `stub_rf_${short(req.idempotencyKey)}`,
+          failureReason: 'stub: refund rejected',
+          raw: { stub: true, state: 'rejected' },
+        }
+      : {
+          status: 'succeeded',
+          refundId: `stub_rf_${short(req.idempotencyKey)}`,
+          raw: { stub: true },
+        };
     this.refunds.set(req.idempotencyKey, result);
     return result;
   }

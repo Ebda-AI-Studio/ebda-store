@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link from './StoreLink';
 import { useRouter } from 'next/navigation';
 import { useLanguage, translations } from '../contexts/LanguageContext';
 import { useStore, useIsPlatform, useStoreUrl } from '../contexts/StoreContext';

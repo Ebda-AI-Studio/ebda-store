@@ -2,6 +2,7 @@ import { prisma } from '@ebda/database';
 import { countAiUsage } from './definer';
 import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
+import { AI_DISABLED_BY_MERCHANT_CODE, assertStoreAiEnabled } from './store-ai-switch';
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
 export const AI_QUOTA_MONTHLY_CODE = 'AI_QUOTA_MONTHLY_EXCEEDED';
@@ -46,6 +47,8 @@ const AI_QUOTA_STOP_CODES = new Set([
   AI_QUOTA_DAILY_CODE,
   AI_QUOTA_MONTHLY_CODE,
   AI_QUOTA_STORE_DAILY_CODE,
+  // the merchant turned AI off: a sweep must stop, not fail every remaining product
+  AI_DISABLED_BY_MERCHANT_CODE,
   'AI_QUOTA_EXCEEDED',
   'AI_BUDGET_EXCEEDED',
 ]);
@@ -95,6 +98,9 @@ const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
 export async function assertAiQuota(
   opts: { storeId?: string; bulk?: boolean } = {}
 ): Promise<void> {
+  // The merchant's own switch comes first: off means no AI spend at all for this store.
+  if (opts.storeId) await assertStoreAiEnabled(opts.storeId);
+
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const startOfMonth = new Date();

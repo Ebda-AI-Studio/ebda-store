@@ -116,6 +116,8 @@ async function applyCustomerListFilters(
 router.get(
   '/customers/export.xlsx',
   ...adminMiddleware,
+  // SEC-14: a bulk dump of every customer's PII is an owner action, not a staff one.
+  requirePermission('customers:export'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -502,6 +504,21 @@ router.get(
       // middleware/request-transaction.ts (one `res.send`, no `res.write`), so
       // the tx COMMITS BEFORE the bytes go out rather than after.
       const xlsxBuffer = await workbook.xlsx.writeBuffer();
+
+      await auditLog({
+        action: 'customers.exported',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'customer_export',
+        details: {
+          actorRole: req.user!.role,
+          impersonatedBy: req.user!.impersonatedBy ?? null,
+          rows: customers.length,
+          filtered: Boolean(req.query.search || req.query.segment),
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.setHeader(
         'Content-Type',

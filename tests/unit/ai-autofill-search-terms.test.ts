@@ -7,6 +7,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const warn = vi.fn();
+vi.mock('@api/lib/store-ai-switch', () => ({
+  AI_DISABLED_BY_MERCHANT_CODE: 'AI_DISABLED_BY_MERCHANT',
+  isStoreAiEnabled: async () => true,
+  assertStoreAiEnabled: async () => undefined,
+  requireAiEnabled: (_q: unknown, _s: unknown, next: () => void) => next(),
+}));
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: { warn: (...a: unknown[]) => warn(...a), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));

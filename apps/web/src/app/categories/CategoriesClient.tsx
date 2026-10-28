@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { type Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '@/contexts/StoreContext';
 import { pageSurfaceStyle } from '@/lib/page-surface';

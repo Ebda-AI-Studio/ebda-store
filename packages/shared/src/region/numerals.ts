@@ -1,42 +1,28 @@
 /**
- * Digit policy — ONE helper for every number, price and date Ebda renders
- * (Ahmad 2026-10-07, Ruling NUMERALS-1).
+ * Digit policy: ONE helper for every number, price and date Ebda renders.
  *
- *  - Western digits (0-9) are the default everywhere, in Arabic AND English:
- *    storefront, emails, invoices, admin, orders app, help.
- *  - A store may opt into Arabic-Indic digits (٠-٩) for its CUSTOMER-FACING
- *    output only (`StoreTheme.arabicNumerals`, admin: Branding → Theme →
- *    "شكل الأرقام في المتجر"). It applies only while the shopper reads Arabic;
- *    English output and every merchant surface stay Western.
- *  - Identifiers (order numbers, SKUs, phones, tracking numbers) are never
- *    localized.
+ * Ruling DIGITS-1 (Ahmad, 2026-10-26; it supersedes NUMERALS-1's per-store opt-in): Western digits (0-9) in
+ * EVERY Ebda surface, in Arabic AND English: storefront, admin, orders, marketing, help, docs, status, accounts,
+ * emails, notifications, invoices, receipts, packing slips, labels. Arabic-Indic digits are never produced.
+ * A store theme that still carries `arabicNumerals: true` (the retired opt-in) is ignored.
  *
- * Why an explicit numbering system on every Intl call: `ar-EG` (and the
- * browser's own default locale on an Arabic phone) default to Arabic-Indic
- * digits on every CLDR version, so "no option" silently means ٤٥٠ for a lot
- * of Egyptian visitors and merchants.
+ * Why an explicit numbering system on every Intl call: `ar-EG` (and the browser's own default locale on an
+ * Arabic phone) default to Arabic-Indic digits on older CLDR, so "no option" silently means ٤٥٠ for a lot of
+ * Egyptian visitors and merchants. Use `intlLocale()` / `withNumerals()`; tests/unit/digits-1-western-only.test.ts
+ * fails any `ar` locale used without `-u-nu-latn`.
  */
 
 /** A rendering's digit system, as Intl names it. */
-export type Numerals = 'latn' | 'arab';
+export type Numerals = 'latn';
 
-const ARAB_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
-/**
- * The store's customer-facing digit choice. Western unless the merchant
- * explicitly opted in (`theme.arabicNumerals === true`); anything else —
- * unset, null, a malformed theme — is Western.
- */
-export function storeNumerals(theme: { arabicNumerals?: unknown } | null | undefined): Numerals {
-  return theme?.arabicNumerals === true ? 'arab' : 'latn';
+/** The store's digit system: Western, always (DIGITS-1). The retired `arabicNumerals` theme flag is ignored. */
+export function storeNumerals(_theme?: { arabicNumerals?: unknown } | null): Numerals {
+  return 'latn';
 }
 
-/** The digits one render actually uses: Arabic-Indic only for an Arabic reader of an opted-in store. */
-export function effectiveNumerals(
-  language: string | null | undefined,
-  numerals: Numerals = 'latn'
-): Numerals {
-  return numerals === 'arab' && isArabic(language) ? 'arab' : 'latn';
+/** The digits one render uses: Western, always (DIGITS-1). */
+export function effectiveNumerals(_language?: string | null, _numerals?: Numerals): Numerals {
+  return 'latn';
 }
 
 function isArabic(language: string | null | undefined): boolean {
@@ -45,8 +31,7 @@ function isArabic(language: string | null | undefined): boolean {
 
 /**
  * BCP-47 tag for `Intl.*` / `toLocale*String` with the numbering system
- * pinned: `ar-EG-u-nu-latn` (default), `ar-EG-u-nu-arab` (opted-in store,
- * Arabic reader), `en-US-u-nu-latn`.
+ * pinned: `ar-EG-u-nu-latn` or `en-US-u-nu-latn` (Ruling DIGITS-1).
  */
 export function intlLocale(
   language: string | null | undefined,
@@ -64,17 +49,13 @@ export function intlLocale(
 /** Every option `Intl.NumberFormat` / `Intl.DateTimeFormat` accept (and `toLocale*String`). */
 export type IntlFormatOptions = Intl.NumberFormatOptions & Intl.DateTimeFormatOptions;
 
-export function withNumerals(
-  options?: IntlFormatOptions,
-  numerals: Numerals = 'latn'
-): IntlFormatOptions {
-  return { ...options, numberingSystem: numerals };
+export function withNumerals(options?: IntlFormatOptions, _numerals?: Numerals): IntlFormatOptions {
+  return { ...options, numberingSystem: 'latn' };
 }
 
-/** Swap ASCII digits for the chosen system; Western output is the input unchanged. */
-export function localizeDigits(input: string | number, numerals: Numerals = 'latn'): string {
-  const s = String(input);
-  return numerals === 'arab' ? s.replace(/[0-9]/g, d => ARAB_DIGITS[Number(d)]) : s;
+/** Kept for call-site compatibility: digits are never swapped (DIGITS-1), the input is returned as text. */
+export function localizeDigits(input: string | number, _numerals?: Numerals): string {
+  return String(input);
 }
 
 /** A plain count/quantity (`1,234`), grouped, in the chosen digits. */

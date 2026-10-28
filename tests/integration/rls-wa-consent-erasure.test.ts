@@ -23,6 +23,7 @@ import {
   type AppPrismaClient,
 } from '@ebda/database';
 import { buyerKeyFor } from '@ebda/shared';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 import { AuthService } from '../../apps/api/src/services/auth.service';
 import { WhatsAppConsentService, phoneOnOwnOrder } from '../../apps/api/src/lib/wa/consent';
 
@@ -81,7 +82,7 @@ describe.skipIf(!hasDb)('WhatsApp marketing consent under strict RLS (ebda_app)'
   beforeAll(async () => {
     process.env.SUITE_BUYER_KEY_SECRET = SECRET;
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-    await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+    await setAppRoleLogin(owner, APP_PASSWORD);
     await cleanup();
     key = (await buyerKeyFor(SECRET, PHONE))!;
     otherKey = (await buyerKeyFor(SECRET, OTHER_PHONE))!;

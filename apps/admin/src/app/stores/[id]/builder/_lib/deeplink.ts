@@ -1,5 +1,5 @@
 /**
- * The editor's deep link (Task 11): `/stores/:id/builder?select=<sectionId|type|theme|history>
+ * The editor's deep link (Task 11): `/stores/:id/builder?select=<sectionId|type|theme|ai|history>
  * &block=<blockId|type>&field=<id>&page=<kind>`. It is what ⌘K and a pasted URL use to land on a
  * section with one field highlighted. The query string is untrusted input: every value is
  * shape-checked, an unknown id or type is ignored, and nothing here ever throws.
@@ -8,7 +8,7 @@ import type { PageDefinition, SectionNode } from '@ebda/shared';
 import type { Selection } from '../_components/SectionTree';
 
 /** Start-pane tabs a link can open instead of a section. */
-const TAB_TOKENS = { theme: 'theme', history: 'history' } as const;
+const TAB_TOKENS = { theme: 'theme', ai: 'ai', history: 'history' } as const;
 
 /** An id, a section type, a registry id (`builder.header-logo`) or a setting id: short, plain. */
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
@@ -32,7 +32,7 @@ export interface DeepLinkParams {
 
 export interface DeepLinkTarget {
   /** Start-pane tab to open (theme and history exist on their own, not on a section). */
-  tab?: 'theme' | 'history';
+  tab?: 'theme' | 'ai' | 'history';
   selection?: Selection;
   /** The control to scroll to and ring, once the right pane has rendered it. */
   field?: string;

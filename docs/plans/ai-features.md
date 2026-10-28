@@ -1,6 +1,26 @@
 # AI features plan — making "Ebda AI Studio" mean something
 
-**Status:** plan, not yet built
+**Status (checked against the code on 2026-10-27): the three features and the shared infrastructure are BUILT; this file is the original plan.** Where the code differs from the plan, the code wins.
+
+| Feature / piece                                | Status                                                                                                                                                                                                                       | Where it lives                                                                                                                                                           |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Auto-translate EN <-> AR                    | **Built** (per field and bulk)                                                                                                                                                                                               | `AIService.translate`, `POST /stores/:id/ai/translate`, `POST /ai/bulk/translate` + `GET /ai/bulk/:jobId`, `GET /ai/results/translate`; admin `AITranslateMissingButton` |
+| 2. AI-fill SEO meta (store, category, product) | **Built** (all three levels, per entity and bulk)                                                                                                                                                                            | `AIService.suggestSeo`, `POST /ai/seo` (`kind: store / category / product`), `POST /ai/bulk/seo`; admin SEO page, `CategoryForm`, product edit                           |
+| 3. Smart category suggestions                  | **Built**, with two gaps below                                                                                                                                                                                               | `AIService.suggestCategories`, `POST /ai/suggest-categories`, `POST /ai/bulk/categorize`; admin `AICategorySuggestions` (chips hidden once a category is chosen)         |
+| Provider + SDK                                 | **Built differently**: Google Gemini (`GeminiFailoverClient`, default model `gemini-flash-lite-latest`, override `GEMINI_MODEL`), NOT Anthropic Haiku                                                                        | `apps/api/src/services/ai.service.ts`, `lib/ai/gemini-*.ts`                                                                                                              |
+| Kill switch + per-store daily token budget     | **Built**: `AI_FEATURES_ENABLED` (default on) and `AI_DAILY_TOKEN_BUDGET_PER_STORE` (default 200000), checked by `ensureEnabled` / `checkBudget`                                                                             | `apps/api/src/config/index.ts`                                                                                                                                           |
+| Usage log + audit                              | **Built**: `AiUsage` rows, `GET /ai/usage/summary`, `GET /ai/usage/log`                                                                                                                                                      | `schema.prisma` model `AiUsage`                                                                                                                                          |
+| Rate limiting                                  | **Built**: `writeLimiter` on the AI routes                                                                                                                                                                                   | `routes/ai.routes.ts`                                                                                                                                                    |
+| "AI-generated" badge on filled fields          | **Built** for product fields (`AiFieldBadge`, `stampHumanEdits`)                                                                                                                                                             | admin product edit                                                                                                                                                       |
+| Scope added after this plan                    | FAQs, HowTos, image alt, excerpt, tags, product meta AEO, balance-descriptions, llms.txt, brand facts, GEO / citation sweeps, section content, campaign drafts, logo palette (see `docs/plans/2026-07-03-ai-bulk-sweeps.md`) | `routes/ai.routes.ts`                                                                                                                                                    |
+
+**NOT built (the real gaps):**
+
+1. (owner: the builder agent, 2026-10-27) Category suggestions when the store has NO categories yet: the service returns an empty list (`existingCategories.length === 0`); the plan's "suggest the first three to create" path was deferred and never written.
+2. (owner: the builder agent, 2026-10-27) A merchant-facing switch to turn AI off for their own store: the column `stores.ai_features_enabled` exists and the scan crons honour it, but no admin screen sets it.
+3. (DEFERRED by Ruling AI-ADDON-0, Ahmad 2026-10-27: no paid AI add-on for launch; AI stays included in every plan within the daily budget) The paid "AI add-on" tier: no plan flag, price or entitlement exists; AI is included in every plan within the daily budget (decided: deferred, Ruling AI-ADDON-0).
+4. The Phase 0 env names in the plan say Railway and `ANTHROPIC_API_KEY`; production uses Cloudflare Workers secrets and `GOOGLE_GENERATIVE_AI_KEY` / `GEMINI_API_KEY` with key failover (`docs/ENVIRONMENT.md`).
+
 **Product:** Ebda Store (the e-commerce platform)
 **Company:** Ebda AI Studio (the parent brand that owns Ebda Store + Ebda AI Studio WhatsApp Business Platform)
 **Goal:** ship three concrete AI features so the parent name describes real capabilities
@@ -247,7 +267,8 @@ User prompt:
 
 ### UX edge cases
 
-- **No categories exist yet** → suggest the first 3 the merchant should create. Different code path; might defer to phase 2 or skip.
+- **No categories exist yet** → BUILT 2026-10-27 as Ruling STORECAT-1: a proposal grouped from the store's products (`suggest-store-categories`), reviewed and edited on the categories page, created on accept (`apply-store-categories`).
+- **Merchant AI switch** → BUILT 2026-10-27 as Ruling AISWITCH-1 (`stores.ai_features_enabled`, checked in `assertAiQuota` and every AI router).
 - **Empty result** → don't show the chips at all (silently no-op).
 - **User already picked categories manually** → don't show suggestions (respect their choice).
 
@@ -297,7 +318,7 @@ Conclusion: budget is not a constraint. Could even charge merchants $10/month "A
 
 ## Open decisions for the operator
 
-- **AI add-on as a paid tier?** Charge $10-25/month per store, or include free?
+- **AI add-on as a paid tier?** DECIDED (Ruling AI-ADDON-0, Ahmad 2026-10-27): no paid add-on for launch; AI is included in every plan within the daily budget.
 - **Show "AI-generated" badge** next to AI-filled fields, or hide the source?
 - **Allow merchants to disable AI** entirely from store settings?
 - **Default behaviour on new product save:** auto-translate without asking, or always require a button click?

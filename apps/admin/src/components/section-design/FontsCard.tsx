@@ -132,7 +132,7 @@ export function FontsCard({
               className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
             >
               <span
-                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
                   f.type === 'google'
                     ? 'bg-sky-100 text-sky-800'
                     : 'bg-emerald-100 text-emerald-800'
@@ -236,7 +236,7 @@ export function FontsCard({
             )}
           </label>
           {uploadError && (
-            <p className="rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive-ink">
+            <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive-ink">
               {uploadError}
             </p>
           )}

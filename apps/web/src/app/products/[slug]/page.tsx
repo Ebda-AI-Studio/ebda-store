@@ -1,3 +1,4 @@
+import { withLocaleAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
@@ -57,7 +58,11 @@ export async function generateMetadata({
       ?.defaultLanguage as string | undefined;
     const locale = await resolveStorefrontLocale(storeDefaultLanguage);
 
-    return buildProductMetadata(product, store, locale);
+    return withLocaleAlternates(
+      buildProductMetadata(product, store, locale),
+      store,
+      `/products/${product.slug}`
+    );
   } catch {
     // On any fetch error, return minimal metadata
     return { title: 'Product' };

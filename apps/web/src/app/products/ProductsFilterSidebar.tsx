@@ -155,7 +155,7 @@ function FacetGroup({
                   // button is the explicit done action.
                   onOptionToggle?.(facet.name, v.value);
                 }}
-                className="h-4 w-4 shrink-0 accent-primary rounded"
+                className="h-6 w-6 shrink-0 accent-primary rounded"
                 aria-label={valueLabel}
               />
               <span>{valueLabel}</span>

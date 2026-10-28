@@ -10,20 +10,20 @@
  *   - Chrome ("Available on X", "Upgrade to X", etc.): `featureUpgrade` i18n
  *     namespace added to en.json + ar.json.
  *   - Unlocking plan: lowestPlanForFeature() from @ebda/shared.
- *   - Plan display label: PLAN_LABELS from @ebda/shared.
+ *   - Plan display label: publicPlanLabelForFeature() (sold plans only).
  *
  * Contact CTA:
  *   Both the primary upgrade button and the secondary "Talk to us" link point
  *   to UPGRADE_CONTACT_WHATSAPP below. Ahmad can swap the number in one place.
  */
 
+import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@ebda/ui';
 import { AdminLayout } from './AdminLayout';
 import {
   FEATURE_REGISTRY,
   BRAND,
-  PLAN_LABELS,
   lowestPlanForFeature,
   publicPlanLabelForFeature,
   type FeatureKey,
@@ -63,15 +63,11 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
   // Lowest plan that unlocks this feature.
   const unlockingPlan = def ? lowestPlanForFeature(featureKey as FeatureKey) : null;
   const publicLabel = def ? publicPlanLabelForFeature(featureKey as FeatureKey) : null;
-  const planLabel = publicLabel
-    ? isAr
-      ? publicLabel.ar
-      : publicLabel.en
-    : unlockingPlan
-      ? isAr
-        ? PLAN_LABELS[unlockingPlan].ar
-        : PLAN_LABELS[unlockingPlan].en
-      : null;
+  // Only the SOLD plans (Basic / Growth / Business) are ever named to a merchant.
+  const planLabel = publicLabel ? (isAr ? publicLabel.ar : publicLabel.en) : null;
+  const billingLink = `/stores/${encodeURIComponent(storeId)}/billing${
+    publicLabel ? `?plan=${encodeURIComponent(publicLabel.code)}` : ''
+  }#plans`;
 
   const upgradeLink = buildUpgradeMailto(storeId, featureName);
 
@@ -157,15 +153,15 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
 
               {/* CTA buttons */}
               <div className="flex flex-col sm:flex-row gap-3">
-                {/* Primary: upgrade */}
-                <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                {/* Primary: upgrade (the billing page plan picker; card + InstaPay) */}
+                <Link href={billingLink} className="flex-1">
                   <Button
                     type="button"
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold"
                   >
-                    {planLabel ? t('upgradeCta', { plan: planLabel }) : t('contactCta')}
+                    {planLabel ? t('upgradeCta', { plan: planLabel }) : t('seePlansCta')}
                   </Button>
-                </a>
+                </Link>
 
                 {/* Secondary: talk to us */}
                 <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">

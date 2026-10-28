@@ -73,7 +73,15 @@ describe('RootLayout: look hooks', () => {
   it('look store: data-look, fonts link, vars', async () => {
     const out = await html('qamar.atelier');
     expect(out).toContain('data-look="qamar.atelier"');
-    expect(out).toContain('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic');
+    // SEO-5: self-hosted faces, no Google Fonts request, primary files preloaded.
+    expect(out).not.toContain('fonts.googleapis.com');
+    expect(out).not.toContain('fonts.gstatic.com');
+    expect(out).toMatch(
+      /@font-face \{[^}]*font-family: 'Noto Naskh Arabic'[^}]*\/fonts\/look\/[\w.-]+\.woff2/
+    );
+    expect(out).toMatch(
+      /<link rel="preload" as="font" type="font\/woff2" href="\/fonts\/look\/[\w.-]+\.woff2" crossorigin=""/i
+    );
     expect(out).toContain('--font-display:');
     expect(out).toContain(
       '--font-latin: &quot;Cormorant Garamond&quot;'.replace('&quot;', '"').replace('&quot;', '"')
@@ -92,7 +100,8 @@ describe('RootLayout: look hooks', () => {
       }),
     };
     const out = renderToStaticMarkup(await RootLayout({ children: <main>x</main> }));
-    expect(out).toMatch(/fonts\.googleapis\.com\/css2\?[^"]*family=Cairo/);
+    expect(out).not.toContain('fonts.googleapis.com');
+    expect(out).toMatch(/@font-face \{[^}]*font-family: 'Cairo'/);
     expect(out).toContain('--font-display: "Cairo"');
     expect(out).toContain('--font-latin: "Cairo"');
   });

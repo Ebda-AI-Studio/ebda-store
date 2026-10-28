@@ -8,7 +8,7 @@
  */
 import { VariantText } from '@ebda/ui';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalePrice } from '../../hooks/useLocalePrice';

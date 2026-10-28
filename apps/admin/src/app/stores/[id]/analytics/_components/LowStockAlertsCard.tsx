@@ -71,17 +71,17 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                 {/* Backorder enrichment — shown when Batch 2 data is present */}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(product.openBackorderCount ?? 0) > 0 && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                       {t('openBackorders', { count: product.openBackorderCount ?? 0 })}
                     </span>
                   )}
                   {product.acceptsBackorder && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                       {t('acceptsBackorder')}
                     </span>
                   )}
                   {product.reorderRule && (
-                    <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground rounded bg-muted">
+                    <span className="px-1.5 py-0.5 text-xs text-muted-foreground rounded bg-muted">
                       {t('reorderRule', {
                         min: product.reorderRule.minQty,
                         qty: product.reorderRule.reorderQty,

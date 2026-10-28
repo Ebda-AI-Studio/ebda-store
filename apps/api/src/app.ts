@@ -29,7 +29,7 @@ import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import billingWebhookRoutes from './routes/billing-webhook.routes';
-import { assertBillingConfigAtBoot } from './services/billing';
+import { assertBillingConfigAtBoot, billingProviderUnsetWarning } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
 import { prisma, setDbHopObserver } from '@ebda/database';
@@ -62,6 +62,18 @@ import { healthPayload } from './lib/health-payload';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 assertBillingConfigAtBoot();
+{
+  // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
+  const unset = billingProviderUnsetWarning();
+  if (unset) {
+    logger.error(unset);
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: BILLING_PROVIDER is not set',
+      body: unset,
+    }).catch(() => undefined);
+  }
+}
 
 // Every plan / subscription / catalog write anywhere tells Ebda WhatsApp (lib/wa/observers.ts).
 installWaWriteObservers();

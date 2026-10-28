@@ -1,3 +1,4 @@
+import { withLocaleAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { API_URL } from '@/lib/api';
@@ -48,7 +49,11 @@ export async function generateMetadata({
     const product = data?.data?.product;
     if (!product) return { title: 'Product Not Found' };
 
-    return buildProductMetadata(product, store, locale);
+    return withLocaleAlternates(
+      buildProductMetadata(product, store, locale),
+      store,
+      `/products/${product.slug}`
+    );
   } catch {
     return { title: 'Product' };
   }

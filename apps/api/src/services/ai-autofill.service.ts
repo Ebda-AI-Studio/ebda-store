@@ -10,6 +10,7 @@ import { withSavepoint } from '../lib/savepoint';
 import { config } from '../config';
 import { generateProductSearchTerms } from '../lib/ai/product-search-terms-generator';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
+import { isStoreAiEnabled } from '../lib/store-ai-switch';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
@@ -135,6 +136,8 @@ export async function readFillPlan(
     include: { categories: { select: { categoryId: true } } },
   });
   if (!product) return null;
+  // The merchant's AI switch: off means the autopilot and every sweep leave the product alone.
+  if (!(await isStoreAiEnabled(storeId))) return null;
 
   const sources = (product.aiFieldSources as AiFieldSources) ?? {};
   let fillSet = new Set(
@@ -469,7 +472,8 @@ export async function isAutopilotEnabled(storeId: string): Promise<boolean> {
     })
   );
   const theme = (store?.theme as Record<string, unknown>) ?? {};
-  return theme.aiAutopilot !== false; // default ON
+  // ON by default; the master AI switch overrides it.
+  return theme.aiAutopilot !== false && (await isStoreAiEnabled(storeId));
 }
 
 const STALE_TTL_DAYS = parseInt(process.env.AI_AUTOFILL_STALE_TTL_DAYS ?? '30', 10);

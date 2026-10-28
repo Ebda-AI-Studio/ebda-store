@@ -11,7 +11,7 @@ import {
   LOOK_CHIP_STYLE,
   LOOK_NEW_CHIP_STYLE,
 } from '../shared/look-card';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import {

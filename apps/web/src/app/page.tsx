@@ -1,6 +1,6 @@
+import { storefrontAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound, isResolvedStore } from '../lib/store-resolver';
-import { storeAbsoluteUrl } from '../lib/structured-data';
 import { HomePageBody } from './HomePageBody';
 
 // The ROOT layout's `generateMetadata` (see `storefront-metadata.ts`) is the
@@ -20,7 +20,7 @@ export async function generateMetadata({
   const store = await getStore();
   // No canonical for an unresolved store (#1855) — it would name the demo store.
   if (!isResolvedStore(store)) return {};
-  return { alternates: { canonical: storeAbsoluteUrl(store, '') } };
+  return { alternates: await storefrontAlternates(store, '', true) };
 }
 
 export default async function HomePage({

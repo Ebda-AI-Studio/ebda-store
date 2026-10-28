@@ -8,6 +8,7 @@ import { Button, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet, apiFetch } from '../../../../lib/api';
+import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -72,6 +73,8 @@ import { formatDate, formatPrice } from '@/lib/format';
 import { customerListFilterParams, moveSearchToHeader } from '@ebda/shared';
 
 export default function StoreCustomersPage() {
+  const { user } = useAuth();
+  const canExport = !!user && user.role !== 'staff';
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('customers.page');
@@ -301,14 +304,14 @@ export default function StoreCustomersPage() {
                   {name || customer.email || customer.phone}
                 </Link>
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SEGMENT_BADGE_CLASSES[badgeKey]}`}
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${SEGMENT_BADGE_CLASSES[badgeKey]}`}
                 >
                   {t(`badges.${badgeKey}`)}
                 </span>
                 {customer.smsMarketingConsent === 'granted' && (
                   <span
                     data-sms-consent-badge
-                    className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success-ink"
+                    className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success-ink"
                     title={t('smsConsentBadgeTitle')}
                   >
                     {t('smsConsentBadge')}
@@ -417,28 +420,31 @@ export default function StoreCustomersPage() {
       subtitle={t('subtitle')}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleExport}
-            disabled={isLoading || isExporting || customers.length === 0}
-          >
-            <svg
-              className="h-4 w-4 me-2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
+          {/* Owners only (SEC-14): the API answers 403 to staff, so do not offer the button. */}
+          {canExport && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleExport}
+              disabled={isLoading || isExporting || customers.length === 0}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            {isExporting ? t('exporting') : t('exportXlsx')}
-          </Button>
+              <svg
+                className="h-4 w-4 me-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              {isExporting ? t('exporting') : t('exportXlsx')}
+            </Button>
+          )}
           <Link href={`/stores/${storeId}`}>
             <Button type="button" variant="outline">
               {t('backToStore')}

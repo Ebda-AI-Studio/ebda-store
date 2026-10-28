@@ -1,49 +1,48 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Geist, Geist_Mono, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { BRAND } from '@ebda/shared/brand';
 import { type Locale } from '../lib/site';
 import { EbdaTracking } from './EbdaTracking';
 import '@/app/globals.css';
 
-/** BRAND's font URL plus IBM Plex Sans Arabic 700 for the Arabic display headlines. */
-const FONTS_URL = BRAND.fonts.googleFontsUrl.replace(
-  'IBM+Plex+Sans+Arabic:wght@400;500',
-  'IBM+Plex+Sans+Arabic:wght@400;500;700'
-);
-// Fail the build loudly if BRAND's font URL changes shape and the 700 weight would silently vanish.
-if (!FONTS_URL.includes('IBM+Plex+Sans+Arabic:wght@400;500;700')) {
-  throw new Error(
-    'RootShell: could not add IBM Plex Sans Arabic 700 to BRAND.fonts.googleFontsUrl'
-  );
-}
+/**
+ * SEO-5: fonts are self-hosted at build by next/font (no fonts.googleapis.com / gstatic request, no
+ * render-blocking stylesheet, display swap, size-adjusted fallback, hashed files served immutable).
+ * Families and weights mirror BRAND.fonts (Geist, Geist Mono, IBM Plex Sans Arabic 400/500/700).
+ */
+const geist = Geist({ subsets: ['latin'], variable: '--nf-sans', display: 'swap' });
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--nf-mono',
+  display: 'swap',
+  weight: ['400', '500'],
+});
+const plexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ['arabic'],
+  variable: '--nf-ar',
+  display: 'swap',
+  weight: ['400', '500', '700'],
+});
 
 /** Brand tokens come from BRAND (single source of truth); everything else lives in globals.css. */
 const tokens = {
   '--night': BRAND.colors.night,
   '--gold': BRAND.colors.gold,
   '--lift': BRAND.colors.lift,
-  '--font-ar': BRAND.fonts.stacks.arabic,
-  '--font-sans': BRAND.fonts.stacks.sans,
-  '--font-mono': BRAND.fonts.stacks.mono,
+  '--font-ar': 'var(--nf-ar), ui-sans-serif, system-ui, sans-serif',
+  '--font-sans': 'var(--nf-sans), ui-sans-serif, system-ui, sans-serif',
+  '--font-mono': 'var(--nf-mono), ui-monospace, "SFMono-Regular", monospace',
 } as CSSProperties;
 
 /** `<html>` shell per locale (Arabic RTL default, English LTR). */
 export function RootShell({ locale, children }: { locale: Locale; children: ReactNode }) {
   return (
-    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} style={tokens}>
-      {/* eslint-disable-next-line @next/next/no-head-element -- app router: <head> in the root layout is the supported pattern */}
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* Fonts load non-blocking (swap): system fallbacks paint first. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(FONTS_URL)};document.head.appendChild(l);`,
-          }}
-        />
-        <noscript>
-          <link rel="stylesheet" href={FONTS_URL} />
-        </noscript>
-      </head>
+    <html
+      lang={locale}
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+      style={tokens}
+      className={`${geist.variable} ${geistMono.variable} ${plexArabic.variable}`}
+    >
       <body>
         {children}
         <EbdaTracking />

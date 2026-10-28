@@ -101,11 +101,11 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
             <span>
               {t('llmsTxt.label')}{' '}
               {llmsLength > 0 ? (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 ml-1">
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 ms-1">
                   ✓ {llmsLength} {t('llmsTxt.charsSuffix')}
                 </span>
               ) : (
-                <span className="text-xs text-muted-foreground ml-1">{t('empty')}</span>
+                <span className="text-xs text-muted-foreground ms-1">{t('empty')}</span>
               )}
             </span>
             <span className="text-xs text-muted-foreground group-open:hidden">{t('view')}</span>
@@ -137,11 +137,11 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
             <span>
               {t('brandFacts.label')}{' '}
               {factsKeys > 0 ? (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 ml-1">
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 ms-1">
                   ✓ {factsKeys} {t('brandFacts.keysSuffix')}
                 </span>
               ) : (
-                <span className="text-xs text-muted-foreground ml-1">{t('empty')}</span>
+                <span className="text-xs text-muted-foreground ms-1">{t('empty')}</span>
               )}
             </span>
             <span className="text-xs text-muted-foreground group-open:hidden">{t('view')}</span>

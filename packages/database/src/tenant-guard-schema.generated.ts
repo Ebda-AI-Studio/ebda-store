@@ -1460,6 +1460,18 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     },
   },
   {
+    name: 'BillingReferral',
+    table: 'billing_referrals',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'BillingGrant',
+    table: 'billing_grants',
+    storeId: false,
+    relations: {},
+  },
+  {
     name: 'BillingWebhookEvent',
     table: 'billing_webhook_events',
     storeId: false,

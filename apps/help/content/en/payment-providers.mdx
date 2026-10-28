@@ -1,6 +1,6 @@
 ---
 title: Payment providers
-description: How to connect Paymob, Kashier or FawryPay to your store with your own account. Ebda Store checks your keys the moment you save them.
+description: How to connect Paymob, Kashier, FawryPay or Geidea to your store with your own account. Ebda Store checks your keys the moment you save them.
 section: Selling
 order: 5
 keywords: cards wallets provider paymob fawry fawrypay kashier connect api keys webhook sandbox test connection
@@ -70,7 +70,21 @@ only a credentials step in **Settings > Payments**:
   site; FawryPay contacts you to activate it. Using your real account straight away is fine too.
 - **Webhook:** send the webhook URL to the FawryPay team as your notification (callback) URL.
 
+## Geidea
+
+<Callout title="Limited for now: unverified">
+  Geidea is connected from its published documentation only, and it is **not shown to your customers at checkout yet** (you can connect it, it shows "Pending verification", and we switch it on for your store once Geidea confirms how its notifications work). Ebda Store can create a Geidea payment session for a
+  customer, but Geidea has not published how it signs its payment notifications, so Ebda Store does **not** accept
+  Geidea notifications yet and does not confirm a Geidea payment by itself. Confirm those orders by checking your
+  Geidea dashboard until this is finished. Refunds are made from the Geidea dashboard.
+</Callout>
+
+- **Merchant public key** and **API password:** Geidea merchant dashboard > Settings > API credentials (test and
+  live values differ). There is no safe test call, so saving keys shows "unverified" and the first real order
+  is what proves the connection.
+- **Webhook:** nothing to paste yet.
+
 ## Need another provider?
 
-Ebda Store supports Paymob, Kashier and FawryPay, plus cash on delivery and InstaPay. If you need another
+Ebda Store supports Paymob, Kashier, FawryPay and Geidea, plus cash on delivery and InstaPay. If you need another
 payment or shipping company, use the **Tell us** link at the bottom of the Payments page.
