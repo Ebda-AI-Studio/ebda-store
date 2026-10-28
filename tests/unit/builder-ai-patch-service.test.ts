@@ -18,7 +18,7 @@ vi.mock('@api/services/ai.service', () => ({ AIService: { proposeBuilderPatch: m
 import { proposeBuilderPatch } from '@api/services/builder-ai-patch.service';
 
 const doc = (): PageDefinition =>
-  layoutToDefinition(resolveLayoutSettings(loadLayoutFixture('default-flow'), 'modern'));
+  layoutToDefinition(resolveLayoutSettings(loadLayoutFixture('default-flow'), 'qamar'));
 
 beforeEach(() => vi.resetAllMocks());
 
