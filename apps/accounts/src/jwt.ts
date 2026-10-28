@@ -16,6 +16,8 @@ export interface AccessClaims {
   stores: StoreClaim[];
   /** Platform role, only when set. */
   pa?: 'super_admin';
+  /** Seconds since epoch of the interactive login that created the session (additive). A platform admin's `pa` is honoured only within 12 h of it. */
+  auth_time?: number;
   /** Additive v1 claims (proposed to the contract owners): convenience for products that have no user table. */
   email?: string;
   email_verified?: boolean;
@@ -29,6 +31,7 @@ export async function mintAccessToken(
   const now = Math.floor(Date.now() / 1000);
   const payload: Record<string, unknown> = { sid: c.sid, stores: c.stores };
   if (c.pa) payload.pa = c.pa;
+  if (c.auth_time !== undefined) payload.auth_time = c.auth_time;
   if (c.email) payload.email = c.email;
   if (c.email_verified !== undefined) payload.email_verified = c.email_verified;
   const token = await new SignJWT(payload)

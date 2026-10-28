@@ -5409,10 +5409,13 @@
       "serverError": "Server returned an invalid response. Please try again.",
       "accessDenied": "Access denied. Admin or staff privileges required.",
       "mfaVerifyFailed": "Verification failed",
+      "emailNotVerified": "Please verify your email first. We sent you a code.",
+      "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
       "forgotPassword": "Forgot password?",
       "passkeySignIn": "Sign in with a passkey",
       "passkeyOr": "or",
-      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password."
+      "passkeyFailed": "Passkey sign-in did not work. Try again, or use your password.",
+      "adminNeedsSecondFactor": "Platform administrators sign in with a passkey or an authenticator code. Use your passkey to continue."
     },
     "forgot": {
       "title": "Reset your password",
@@ -7425,7 +7428,17 @@
         "removed": "Passkey removed",
         "errorLoad": "Could not load your passkeys",
         "errorGeneric": "Something went wrong. Nothing was changed."
-      }
+      },
+      "passwordLabel": "Confirm your password",
+      "bootstrapIntro": "To add your first sign-in method we e-mail a code to this account, so a stolen password alone cannot add one. Platform administrators also need the one-time enrolment token their operator script printed.",
+      "bootstrapTokenLabel": "Enrolment token",
+      "bootstrapPasswordLabel": "Your password (to send the e-mailed code)",
+      "bootstrapSend": "E-mail me the code",
+      "bootstrapResend": "Send again",
+      "bootstrapCodeLabel": "E-mailed code (6 digits)",
+      "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
+      "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
+      "savedSignInAgainButton": "Saved, sign me out"
     }
   },
   "answerEngine": {
@@ -7569,6 +7582,19 @@
       "cancelButton": "Cancel",
       "removingButton": "Removing…",
       "removeButton": "Remove"
+    },
+    "invites": {
+      "title": "Pending invitations",
+      "description": "These people have an account already and have not accepted yet. Revoking a link makes it stop working at once.",
+      "expires": "Expires {date}",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke this invitation?",
+      "revokeBody": "The link sent to {email} will stop working. You can invite them again later.",
+      "revokedTitle": "Invitation revoked",
+      "revokedDesc": "The link sent to {email} no longer works.",
+      "revokeFailed": "Could not revoke the invitation",
+      "sentTitle": "Invitation sent",
+      "sentDesc": "{email} will get an email to accept. Nothing changes on their account until they do."
     }
   },
   "blog": {
@@ -8434,7 +8460,13 @@
       "resend": "Send a new link",
       "resending": "Sending…",
       "resent": "If the address is eligible, a new link is on its way.",
-      "backToLogin": "Back to sign in"
+      "backToLogin": "Back to sign in",
+      "passwordTitle": "Confirm your password",
+      "passwordBody": "Enter the password you chose when you signed up to finish verifying your email.",
+      "password": "Password",
+      "verifyButton": "Verify my email",
+      "wrongPassword": "That is not the password this verification was created with.",
+      "forgotPassword": "Forgot your password?"
     },
     "flow": {
       "title": "Set up your store",
@@ -8651,6 +8683,23 @@
       "support": "Need help?",
       "footer": "Your store. Your brand.",
       "back": "Back to Ebda Store"
+    },
+    "acceptInvite": {
+      "title": "Staff invitation",
+      "working": "Accepting your invitation…",
+      "successTitle": "You now have access",
+      "successBody": "You were added as staff. Open the dashboard to start.",
+      "signInAgainTitle": "Sign in again to continue",
+      "signInAgainBody": "Your account is now a staff account. Sign in again to open the store.",
+      "continue": "Continue",
+      "signIn": "Sign in",
+      "missing": "This invitation link is incomplete. Open the link from the email again.",
+      "invalid": "This invitation link is invalid or has expired. Ask the store owner to send it again.",
+      "mismatch": "You are signed in with a different email address from the one invited. Sign out and sign in with the invited address.",
+      "notVerified": "Verify your email address first (use the verification email we sent you), then open this invitation link again.",
+      "ownsStore": "This account owns a store, so it cannot become a staff account. Ask the store to invite a different email address.",
+      "limit": "This store has reached its staff limit. Ask the owner to make room or upgrade.",
+      "generic": "We could not accept the invitation. Try again in a moment."
     }
   },
   "legalNotice": {

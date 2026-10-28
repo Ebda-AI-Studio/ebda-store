@@ -74,7 +74,11 @@
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop
   // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
-  "services": [{ "binding": "STOREFRONT", "service": "ebda-web" }],
+  "services": [
+    { "binding": "STOREFRONT", "service": "ebda-web" },
+    // The shared identity service (Rulings ID-1/ID-2): JWKS over fetch, isRevoked/getAccountState/... over RPC.
+    { "binding": "ACCOUNTS", "service": "ebda-accounts", "entrypoint": "Accounts" },
+  ],
 
   // Outbound email (G6, Ruling INFRA-CF-1): Cloudflare Email Service, sender domain ebda.app
   // (onboarded 2026-10-24; DKIM/SPF live on cf-bounce.ebda.app). No API key. services/mail-transport.ts.

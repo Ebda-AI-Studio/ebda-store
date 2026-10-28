@@ -1,0 +1,74 @@
+/**
+ * The Store's client for the shared identity service (Service Binding `ACCOUNTS`, Rulings ID-1/ID-2).
+ * Every call fails CLOSED: a missing binding or a failed call is an AppError 503, never a silent "allowed".
+ */
+import { cfBindings, type AccountsRpc, type AccountState } from '../cf/bindings';
+import { AppError } from '../middleware/error-handler';
+import { getUserState } from './definer';
+
+let override: AccountsRpc | undefined;
+/** Test seam. */
+export function configureIdentityClient(fake?: AccountsRpc): void {
+  override = fake;
+}
+
+function rpc(): AccountsRpc {
+  const b = override ?? cfBindings()?.ACCOUNTS;
+  if (!b) throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service is not configured');
+  return b;
+}
+
+async function call<T>(
+  name: keyof AccountsRpc,
+  fn: (r: AccountsRpc) => Promise<T> | undefined
+): Promise<T> {
+  try {
+    const p = fn(rpc());
+    if (!p) throw new Error(`ACCOUNTS.${String(name)} is not available`);
+    return await p;
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
+  }
+}
+
+export const getAccountState = (userId: string): Promise<AccountState | null> =>
+  call('getAccountState', r => r.getAccountState?.(userId));
+export const setAccountStatus = (
+  userId: string,
+  status: 'active' | 'inactive' | 'suspended',
+  reason: string
+) => call('setStatus', r => r.setStatus?.(userId, status, reason));
+export const revokeIdentitySession = (sid: string, reason: string) =>
+  call('revokeSession', r => r.revokeSession?.(sid, reason));
+export const revokeIdentityUser = (userId: string, reason: string) =>
+  call('revokeUser', r => r.revokeUser?.(userId, reason));
+export const createIdentity = (input: Parameters<NonNullable<AccountsRpc['createUser']>>[0]) =>
+  call('createUser', r => r.createUser?.(input));
+export const resendIdentityVerification = (email: string) =>
+  call('resendVerification', r => r.resendVerification?.(email));
+export const inviteIdentity = (input: Parameters<NonNullable<AccountsRpc['inviteUser']>>[0]) =>
+  call('inviteUser', r => r.inviteUser?.(input));
+export const forgotIdentityPassword = (email: string) =>
+  call('forgotPassword', r => r.forgotPassword?.(email));
+export const setAccountRole = (
+  userId: string,
+  role: 'store_admin' | 'staff',
+  reason: string,
+  ifCurrentRole?: 'store_admin' | 'staff'
+) => call('setRole', r => r.setRole?.(userId, role, reason, ifCurrentRole));
+export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
+
+/**
+ * Merchant, staff and super-admin accounts (users.store_id NULL, role not customer) have their credentials and sessions in the
+ * identity service; customers do not. Reads the user's state through the definer, so it works under any tenant scope.
+ */
+export async function isIdentityManagedUser(userId: string): Promise<boolean> {
+  const st = await getUserState(userId);
+  return !!st && st.storeId === null && st.role !== 'customer';
+}
+
+/** Every Store path that ends a user's sessions must end them at the identity service too, or refresh keeps working. */
+export async function revokeIdentityIfManaged(userId: string, reason: string): Promise<void> {
+  if (await isIdentityManagedUser(userId)) await revokeIdentityUser(userId, reason);
+}

@@ -4,7 +4,20 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { withUser } from '@ebda/database';
 import { config } from '../config';
-import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
+import {
+  authenticate,
+  authenticateAccounts,
+  rejectIdentityManaged,
+  rejectAdminOnMerchantOrigin,
+  rejectImpersonated,
+} from '../middleware/auth';
+import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
+import {
+  isIdentityManagedUser,
+  revokeIdentitySession,
+  setAccountStatus,
+} from '../lib/identity-client';
+import { reconcileShadowUser } from '../services/identity-shadow';
 import {
   AuthService,
   GENERIC_RESEND_VERIFICATION_RESULT,
@@ -445,6 +458,40 @@ function mayIssueCsrfToken(
 // mutation cap, so nothing else supplies one.
 const refreshGuards = [refreshIpLimiter, refreshLimiter];
 
+// POST /auth/session
+// Exchanges an identity-service access token (Authorization: Bearer <ES256>, aud=store) for the Store's HttpOnly `token`
+// cookie, after reconciling the Store's profile row from the identity service. The browser calls it after every
+// sign-in and every silent refresh (the token lives 15 minutes). No token is accepted from the body or the URL.
+router.post(
+  '/session',
+  refreshIpLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const header = req.headers.authorization ?? '';
+      const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+      if (!token || !isAccountsToken(token))
+        throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+      const origin = req.headers.origin as string | undefined;
+      if (
+        origin &&
+        !isPlatformOrigin(origin, {
+          webUrl: config.webUrl,
+          adminUrl: config.adminUrl,
+          nodeEnv: config.nodeEnv,
+        })
+      )
+        throw new AppError(403, 'CORS_ORIGIN_NOT_ALLOWED', 'Origin not allowed');
+      const { claims } = await authenticateAccounts(token, { allowMissingProfile: true });
+      await reconcileShadowUser(claims.sub);
+      setTokenCookie(res, token);
+      const user = await AuthService.getProfile(claims.sub);
+      res.json({ success: true, data: { user, sessionExpiresAt: claims.exp * 1000 } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /auth/refresh
 router.post('/refresh', refreshGuards, async (req: Request, res: Response, next: NextFunction) => {
   // Accept the refresh token from the JSON body (Bearer/localStorage
@@ -710,7 +757,12 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
       const cookieToken = req.cookies?.token as string | undefined;
       const rawToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : cookieToken;
 
-      if (rawToken) {
+      if (rawToken && isAccountsToken(rawToken)) {
+        // Identity-service session: end it at the source so every product loses it. Best effort here (the browser's own
+        // call to accounts.ebda.app/logout is the primary path); the cookie is cleared below regardless.
+        const claims = await verifyAccountsToken(rawToken, { ignoreExpiration: true });
+        await revokeIdentitySession(claims.sid, 'logout');
+      } else if (rawToken) {
         const payload = jwt.verify(rawToken, config.jwtSecret, {
           algorithms: ['HS256'],
           issuer: JWT_ISSUERS_ACCEPTED,
@@ -792,6 +844,11 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
+
+      // An identity-service account is deactivated THERE first (every session and refresh dies, sign-in is refused); if that
+      // fails nothing has changed and the request fails.
+      if (await isIdentityManagedUser(userId))
+        await setAccountStatus(userId, 'inactive', 'self-delete');
 
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
       const before = await withUser(userId, tx =>
@@ -959,6 +1016,7 @@ router.post(
   '/change-password',
   authLimiter,
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {

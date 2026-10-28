@@ -19,5 +19,6 @@
   "relative": {
     "ratio": 0.25,
     "slackMs": 15
-  }
+  },
+  "_ruling": "Ruling ID-17 (docs/rulings/ID-17.md): the identity work adds +83019 B to the api bundle (jose 35.6 KB, invites, identity mail), measured against main. The ceiling itself is set by main (15500000)."
 }
