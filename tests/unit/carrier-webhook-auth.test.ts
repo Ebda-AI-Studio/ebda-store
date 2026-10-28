@@ -123,3 +123,96 @@ describe('Bosta webhook: URL token AND derived header', () => {
     expect(r).toBe('ignored');
   });
 });
+
+describe('graceful rotation keeps in-flight shipments working (SEC-8)', () => {
+  const OLD = 'b'.repeat(48);
+  const NEW = SECRET;
+  const DAY = 24 * 60 * 60 * 1000;
+  const rotatedAt = (daysAgo: number) => new Date(Date.now() - daysAgo * DAY).toISOString();
+  const withPrevious = (daysAgo: number) =>
+    findUnique.mockResolvedValue({
+      credentials: encryptCarrierBlob({
+        live: { apiKey: 'k' },
+        webhookSecret: NEW,
+        previousWebhook: { secret: OLD, rotatedAt: rotatedAt(daysAgo) },
+      }),
+      settings: {},
+    });
+  const oldHeaders = { [BOSTA_WEBHOOK_HEADER]: webhookHeaderValue(OLD) };
+
+  it('accepts the NEW token with the new header, and the OLD token with the old header while a pre-rotation shipment is undelivered', async () => {
+    withPrevious(3);
+    shipmentFindFirst.mockResolvedValueOnce({ id: 'in-flight' }); // grace check
+    await expect(call(OLD, oldHeaders)).resolves.toBe('unknown_shipment');
+    shipmentFindFirst.mockReset();
+    shipmentFindFirst.mockResolvedValue(null);
+    await expect(call(NEW, good)).resolves.toBe('unknown_shipment');
+  });
+
+  it('the old URL token with the NEW header (or the reverse) is still refused', async () => {
+    withPrevious(3);
+    shipmentFindFirst.mockResolvedValue({ id: 'in-flight' });
+    await expect(call(OLD, good)).resolves.toBe('unauthorized');
+    await expect(call(NEW, oldHeaders)).resolves.toBe('unauthorized');
+  });
+
+  it('the old token stops working once every pre-rotation shipment is delivered', async () => {
+    withPrevious(3);
+    shipmentFindFirst.mockResolvedValue(null); // none in flight
+    await expect(call(OLD, oldHeaders)).resolves.toBe('unauthorized');
+  });
+
+  it('the old token stops working after 30 days even with a shipment still in flight', async () => {
+    withPrevious(31);
+    shipmentFindFirst.mockResolvedValue({ id: 'in-flight' });
+    await expect(call(OLD, oldHeaders)).resolves.toBe('unauthorized');
+  });
+
+  it('the in-flight lookup only counts shipments created before the rotation and not yet terminal', async () => {
+    withPrevious(3);
+    shipmentFindFirst.mockResolvedValueOnce({ id: 'x' });
+    await call(OLD, oldHeaders);
+    const where = shipmentFindFirst.mock.calls[0][0].where;
+    expect(where.createdAt.lt).toBeInstanceOf(Date);
+    expect(where.status.notIn).toEqual(expect.arrayContaining(['delivered']));
+    expect(where.carrier).toBe('bosta');
+  });
+
+  it('the OLD token may only touch shipments created before the rotation and not yet terminal; the NEW token has no such limit', async () => {
+    withPrevious(3);
+    shipmentFindFirst.mockResolvedValueOnce({ id: 'in-flight' }).mockResolvedValue(null);
+    await call(OLD, oldHeaders);
+    const apply = shipmentFindFirst.mock.calls[1][0].where;
+    expect(apply.createdAt.lt).toBeInstanceOf(Date);
+    expect(apply.status.notIn).toEqual(expect.arrayContaining(['delivered']));
+    shipmentFindFirst.mockReset();
+    shipmentFindFirst.mockResolvedValue(null);
+    await call(NEW, good);
+    const applyNew = shipmentFindFirst.mock.calls[0][0].where;
+    expect(applyNew.createdAt).toBeUndefined();
+    expect(applyNew.status).toBeUndefined();
+  });
+
+  it('a blob without a previous secret rejects an unknown token as before', async () => {
+    await expect(call(OLD, oldHeaders)).resolves.toBe('unauthorized');
+  });
+});
+
+describe('rotateBlobWebhookSecret', () => {
+  it('immediate by default (drops any previous secret); graceful keeps the old one with a timestamp', async () => {
+    const { rotateBlobWebhookSecret } =
+      await import('@api/services/carriers/carrier-connection.service');
+    const { decryptCarrierBlob } = await import('@api/services/carriers/carrier-credentials');
+    const start = encryptCarrierBlob({ live: { apiKey: 'k' }, webhookSecret: SECRET });
+    const graceful = decryptCarrierBlob(rotateBlobWebhookSecret(start, {}, { grace: true }));
+    expect(graceful.webhookSecret).not.toBe(SECRET);
+    expect(graceful.previousWebhook?.secret).toBe(SECRET);
+    expect(Date.parse(graceful.previousWebhook!.rotatedAt)).toBeGreaterThan(Date.now() - 5000);
+    expect(graceful.live).toEqual({ apiKey: 'k' });
+    const hard = decryptCarrierBlob(
+      rotateBlobWebhookSecret(encryptCarrierBlob({ ...graceful }), {})
+    );
+    expect(hard.previousWebhook).toBeUndefined();
+    expect(hard.webhookSecret).not.toBe(graceful.webhookSecret);
+  });
+});

@@ -253,6 +253,20 @@ describe('scripts/ci-affected.mjs', () => {
     ]);
   });
 
+  it.each([
+    'packages/database/prisma/schema.prisma',
+    'packages/database/prisma/migrations/20261110000000_x/migration.sql',
+  ])(
+    '%s always puts packages/cf-schema in the unit lane (the generated CF schema derives from it)',
+    f => {
+      expect(run(f).unit).toContain('packages/cf-schema');
+    }
+  );
+
+  it('an unrelated app change does not drag the cf-schema tests in', () => {
+    expect(run('apps/marketing/src/page.tsx').unit).not.toContain('packages/cf-schema');
+  });
+
   it('a package change also selects its dependents', () => {
     const r = run('packages/ui/src/button.tsx');
     expect(r.workspaces).toEqual(expect.arrayContaining(['packages/ui', 'apps/admin', 'apps/web']));

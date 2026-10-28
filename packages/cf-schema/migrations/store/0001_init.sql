@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS "abandoned_carts" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "abandoned_carts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "abandoned_carts_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts" ("id") ON DELETE CASCADE,
-  CONSTRAINT "abandoned_carts_coupon_id_fkey" FOREIGN KEY ("coupon_id") REFERENCES "coupons" ("id") ON DELETE SET NULL,
+  CONSTRAINT "abandoned_carts_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "abandoned_carts_coupon_id_fkey" FOREIGN KEY ("coupon_id") REFERENCES "coupons" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "abandoned_carts_cart_items_chk" CHECK (json_valid("cart_items"))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "abandoned_carts_cart_id_key" ON "abandoned_carts" ("cart_id");
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS "accounts" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "accounts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "accounts_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "accounts" ("id") ON DELETE SET NULL,
+  CONSTRAINT "accounts_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "accounts" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "accounts_type_chk" CHECK ("type" IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
   CONSTRAINT "accounts_is_system_chk" CHECK ("is_system" IN (0, 1)),
   CONSTRAINT "accounts_is_active_chk" CHECK ("is_active" IN (0, 1))
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS "affiliate_events" (
   "occurred_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "affiliate_events_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "affiliate_events_affiliate_id_fkey" FOREIGN KEY ("affiliate_id") REFERENCES "affiliates" ("id") ON DELETE CASCADE,
+  CONSTRAINT "affiliate_events_affiliate_id_fkey" FOREIGN KEY ("affiliate_id") REFERENCES "affiliates" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "affiliate_events_details_chk" CHECK (json_valid("details"))
 );
 CREATE INDEX IF NOT EXISTS "affiliate_events_affiliate_id_occurred_at_idx" ON "affiliate_events" ("affiliate_id", "occurred_at");
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS "affiliate_payouts" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "affiliate_payouts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "affiliate_payouts_affiliate_id_fkey" FOREIGN KEY ("affiliate_id") REFERENCES "affiliates" ("id") ON DELETE CASCADE
+  CONSTRAINT "affiliate_payouts_affiliate_id_fkey" FOREIGN KEY ("affiliate_id") REFERENCES "affiliates" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "affiliate_payouts_store_id_idx" ON "affiliate_payouts" ("store_id");
 CREATE INDEX IF NOT EXISTS "affiliate_payouts_affiliate_id_idx" ON "affiliate_payouts" ("affiliate_id");
@@ -187,8 +187,8 @@ CREATE TABLE IF NOT EXISTS "affiliate_referrals" (
   "cookie_expires_at" INTEGER NOT NULL,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "affiliate_referrals_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "affiliate_referrals_affiliate_id_fkey" FOREIGN KEY ("affiliate_id") REFERENCES "affiliates" ("id") ON DELETE CASCADE,
-  CONSTRAINT "affiliate_referrals_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE SET NULL
+  CONSTRAINT "affiliate_referrals_affiliate_id_fkey" FOREIGN KEY ("affiliate_id") REFERENCES "affiliates" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "affiliate_referrals_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "affiliate_referrals_store_id_idx" ON "affiliate_referrals" ("store_id");
 CREATE INDEX IF NOT EXISTS "affiliate_referrals_affiliate_id_idx" ON "affiliate_referrals" ("affiliate_id");
@@ -231,8 +231,8 @@ CREATE TABLE IF NOT EXISTS "ai_recommendation" (
   "reason" TEXT,
   "generated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "ai_recommendation_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "ai_recommendation_source_product_id_fkey" FOREIGN KEY ("source_product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "ai_recommendation_target_product_id_fkey" FOREIGN KEY ("target_product_id") REFERENCES "products" ("id") ON DELETE CASCADE
+  CONSTRAINT "ai_recommendation_source_product_id_fkey" FOREIGN KEY ("source_product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "ai_recommendation_target_product_id_fkey" FOREIGN KEY ("target_product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "ai_recommendation_store_id_source_product_id_target_product_id_key" ON "ai_recommendation" ("store_id", "source_product_id", "target_product_id");
 CREATE INDEX IF NOT EXISTS "ai_recommendation_store_id_generated_at_idx" ON "ai_recommendation" ("store_id", "generated_at");
@@ -295,10 +295,10 @@ CREATE TABLE IF NOT EXISTS "backorder_lines" (
   "cancelled_reason" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "backorder_lines_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "backorder_lines_order_item_id_fkey" FOREIGN KEY ("order_item_id") REFERENCES "order_items" ("id") ON DELETE CASCADE,
-  CONSTRAINT "backorder_lines_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "backorder_lines_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL,
-  CONSTRAINT "backorder_lines_fulfilled_by_po_item_id_fkey" FOREIGN KEY ("fulfilled_by_po_item_id") REFERENCES "purchase_order_items" ("id") ON DELETE SET NULL,
+  CONSTRAINT "backorder_lines_order_item_id_fkey" FOREIGN KEY ("order_item_id") REFERENCES "order_items" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "backorder_lines_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "backorder_lines_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "backorder_lines_fulfilled_by_po_item_id_fkey" FOREIGN KEY ("fulfilled_by_po_item_id") REFERENCES "purchase_order_items" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "backorder_lines_qty_fulfilled_range" CHECK (qty_fulfilled >= 0 AND qty_fulfilled <= qty),
   CONSTRAINT "backorder_lines_qty_positive" CHECK (qty > 0)
 );
@@ -319,7 +319,7 @@ CREATE TABLE IF NOT EXISTS "bank_statements" (
   "status" TEXT NOT NULL DEFAULT 'pending',
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "bank_statements_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "bank_statements_gl_account_id_fkey" FOREIGN KEY ("gl_account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "bank_statements_gl_account_id_fkey" FOREIGN KEY ("gl_account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "bank_statements_status_chk" CHECK ("status" IN ('pending', 'reconciling', 'reconciled'))
 );
 CREATE INDEX IF NOT EXISTS "bank_statements_store_id_status_idx" ON "bank_statements" ("store_id", "status");
@@ -341,8 +341,8 @@ CREATE TABLE IF NOT EXISTS "bank_transactions" (
   "confidence" INTEGER NOT NULL DEFAULT 0,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "bank_transactions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "bank_transactions_statement_id_fkey" FOREIGN KEY ("statement_id") REFERENCES "bank_statements" ("id") ON DELETE CASCADE,
-  CONSTRAINT "bank_transactions_matched_journal_entry_id_fkey" FOREIGN KEY ("matched_journal_entry_id") REFERENCES "journal_entries" ("id") ON DELETE SET NULL,
+  CONSTRAINT "bank_transactions_statement_id_fkey" FOREIGN KEY ("statement_id") REFERENCES "bank_statements" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bank_transactions_matched_journal_entry_id_fkey" FOREIGN KEY ("matched_journal_entry_id") REFERENCES "journal_entries" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "bank_transactions_direction_chk" CHECK ("direction" IN ('debit', 'credit')),
   CONSTRAINT "bank_transactions_match_status_chk" CHECK ("match_status" IN ('unmatched', 'auto_matched', 'manual_matched', 'ignored'))
 );
@@ -437,9 +437,9 @@ CREATE TABLE IF NOT EXISTS "bundle_items" (
   "variant_id" TEXT,
   "quantity" INTEGER NOT NULL,
   CONSTRAINT "bundle_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "bundle_items_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "bundles" ("id") ON DELETE CASCADE,
-  CONSTRAINT "bundle_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "bundle_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "bundle_items_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "bundles" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bundle_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bundle_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "bundle_items_quantity_range" CHECK (quantity >= 1 AND quantity <= 1000)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "bundle_items_bundle_id_product_id_variant_id_key" ON "bundle_items" ("bundle_id", "product_id", "variant_id");
@@ -486,9 +486,9 @@ CREATE TABLE IF NOT EXISTS "campaign_recipients" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "campaign_recipients_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "campaign_recipients_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns" ("id") ON DELETE CASCADE,
-  CONSTRAINT "campaign_recipients_subscriber_id_fkey" FOREIGN KEY ("subscriber_id") REFERENCES "newsletter_subscribers" ("id") ON DELETE SET NULL,
-  CONSTRAINT "campaign_recipients_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE SET NULL,
+  CONSTRAINT "campaign_recipients_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "campaign_recipients_subscriber_id_fkey" FOREIGN KEY ("subscriber_id") REFERENCES "newsletter_subscribers" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "campaign_recipients_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "campaign_recipients_status_chk" CHECK ("status" IN ('queued', 'sent', 'failed', 'bounced', 'unsubscribed'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "campaign_recipients_campaign_id_email_key" ON "campaign_recipients" ("campaign_id", "email");
@@ -530,8 +530,8 @@ CREATE TABLE IF NOT EXISTS "cart_bundles" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "cart_bundles_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "cart_bundles_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts" ("id") ON DELETE CASCADE,
-  CONSTRAINT "cart_bundles_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "bundles" ("id") ON DELETE CASCADE
+  CONSTRAINT "cart_bundles_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "cart_bundles_bundle_id_fkey" FOREIGN KEY ("bundle_id") REFERENCES "bundles" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "cart_bundles_cart_id_bundle_id_key" ON "cart_bundles" ("cart_id", "bundle_id");
 CREATE INDEX IF NOT EXISTS "cart_bundles_bundle_id_idx" ON "cart_bundles" ("bundle_id");
@@ -548,9 +548,9 @@ CREATE TABLE IF NOT EXISTS "cart_items" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "cart_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "cart_items_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts" ("id") ON DELETE CASCADE,
-  CONSTRAINT "cart_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "cart_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL
+  CONSTRAINT "cart_items_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "cart_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "cart_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "cart_items_cart_id_idx" ON "cart_items" ("cart_id");
 CREATE INDEX IF NOT EXISTS "cart_items_product_id_idx" ON "cart_items" ("product_id");
@@ -600,8 +600,8 @@ CREATE TABLE IF NOT EXISTS "categories" (
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "deleted_at" INTEGER,
   CONSTRAINT "categories_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "categories_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "categories" ("id") ON DELETE SET NULL,
-  CONSTRAINT "categories_size_chart_id_fkey" FOREIGN KEY ("size_chart_id") REFERENCES "size_charts" ("id") ON DELETE SET NULL,
+  CONSTRAINT "categories_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "categories" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "categories_size_chart_id_fkey" FOREIGN KEY ("size_chart_id") REFERENCES "size_charts" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "categories_is_active_chk" CHECK ("is_active" IN (0, 1)),
   CONSTRAINT "categories_show_on_home_strip_chk" CHECK ("show_on_home_strip" IN (0, 1))
 );
@@ -626,7 +626,7 @@ CREATE TABLE IF NOT EXISTS "cod_remittances" (
   "source" TEXT NOT NULL DEFAULT 'csv',
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "cod_remittances_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "cod_remittances_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "shipments" ("id") ON DELETE SET NULL,
+  CONSTRAINT "cod_remittances_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "shipments" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "cod_remittances_net_check" CHECK ("net_amount" = "gross_amount" - "fee_amount"),
   CONSTRAINT "cod_remittances_nonneg_check" CHECK ("gross_amount" >= 0 AND "fee_amount" >= 0)
 );
@@ -670,9 +670,9 @@ CREATE TABLE IF NOT EXISTS "count_lines" (
   "variance" INTEGER NOT NULL,
   "scanned_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "count_lines_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "count_lines_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "count_sessions" ("id") ON DELETE CASCADE,
-  CONSTRAINT "count_lines_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "count_lines_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL
+  CONSTRAINT "count_lines_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "count_sessions" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "count_lines_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "count_lines_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "count_lines_session_id_product_id_variant_id_key" ON "count_lines" ("session_id", "product_id", "variant_id");
 CREATE INDEX IF NOT EXISTS "count_lines_session_id_idx" ON "count_lines" ("session_id");
@@ -723,7 +723,7 @@ CREATE TABLE IF NOT EXISTS "coupons" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "coupons_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "coupons_customer_group_id_fkey" FOREIGN KEY ("customer_group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL,
+  CONSTRAINT "coupons_customer_group_id_fkey" FOREIGN KEY ("customer_group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "coupons_type_chk" CHECK ("type" IN ('percentage', 'fixed', 'free_shipping')),
   CONSTRAINT "coupons_first_order_only_chk" CHECK ("first_order_only" IN (0, 1)),
   CONSTRAINT "coupons_scope_product_ids_chk" CHECK (json_valid("scope_product_ids") AND json_type("scope_product_ids") = 'array'),
@@ -750,7 +750,7 @@ CREATE TABLE IF NOT EXISTS "customer_addresses" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "customer_addresses_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "customer_addresses_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE CASCADE,
+  CONSTRAINT "customer_addresses_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "customer_addresses_is_default_chk" CHECK ("is_default" IN (0, 1))
 );
 CREATE INDEX IF NOT EXISTS "customer_addresses_customer_id_idx" ON "customer_addresses" ("customer_id");
@@ -848,7 +848,7 @@ CREATE TABLE IF NOT EXISTS "customers" (
   "user_id" TEXT,
   "buyer_key" TEXT,
   CONSTRAINT "customers_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "customers_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL
+  CONSTRAINT "customers_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "customers_store_id_email_key" ON "customers" ("store_id", "email");
 CREATE UNIQUE INDEX IF NOT EXISTS "customers_store_id_phone_key" ON "customers" ("store_id", "phone");
@@ -891,8 +891,8 @@ CREATE TABLE IF NOT EXISTS "deadstock_flags" (
   "dismissed_at" INTEGER,
   "scanned_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "deadstock_flags_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "deadstock_flags_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "deadstock_flags_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE,
+  CONSTRAINT "deadstock_flags_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "deadstock_flags_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "deadstock_flags_status_chk" CHECK ("status" IN ('open', 'accepted_clearance', 'dismissed', 'expired'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "deadstock_flags_store_id_product_id_variant_id_scanned_at_key" ON "deadstock_flags" ("store_id", "product_id", "variant_id", "scanned_at");
@@ -999,9 +999,9 @@ CREATE TABLE IF NOT EXISTS "expenses" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "expenses_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "expenses_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON DELETE SET NULL,
-  CONSTRAINT "expenses_expense_account_id_fkey" FOREIGN KEY ("expense_account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "expenses_paid_from_account_id_fkey" FOREIGN KEY ("paid_from_account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "expenses_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "expenses_expense_account_id_fkey" FOREIGN KEY ("expense_account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "expenses_paid_from_account_id_fkey" FOREIGN KEY ("paid_from_account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "expenses_status_chk" CHECK ("status" IN ('draft', 'pending', 'approved', 'posted', 'rejected')),
   CONSTRAINT "expenses_ocr_json_chk" CHECK ("ocr_json" IS NULL OR (json_valid("ocr_json"))),
   CONSTRAINT "expenses_total_matches_amount_plus_tax" CHECK (total = amount + tax_amount),
@@ -1073,8 +1073,8 @@ CREATE TABLE IF NOT EXISTS "frequently_bought_together" (
   "co_occurrence_count" INTEGER NOT NULL DEFAULT 0,
   "last_calculated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "frequently_bought_together_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "frequently_bought_together_product_id_1_fkey" FOREIGN KEY ("product_id_1") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "frequently_bought_together_product_id_2_fkey" FOREIGN KEY ("product_id_2") REFERENCES "products" ("id") ON DELETE CASCADE
+  CONSTRAINT "frequently_bought_together_product_id_1_fkey" FOREIGN KEY ("product_id_1") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "frequently_bought_together_product_id_2_fkey" FOREIGN KEY ("product_id_2") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "frequently_bought_together_store_id_product_id_1_product_id_2_key" ON "frequently_bought_together" ("store_id", "product_id_1", "product_id_2");
 CREATE INDEX IF NOT EXISTS "frequently_bought_together_store_id_product_id_1_idx" ON "frequently_bought_together" ("store_id", "product_id_1");
@@ -1162,7 +1162,7 @@ CREATE TABLE IF NOT EXISTS "gold_rates_current" (
   "rate_per_gram" INTEGER NOT NULL,
   "applied_at" INTEGER NOT NULL,
   CONSTRAINT "gold_rates_current_pkey" PRIMARY KEY ("store_id", "karat"),
-  CONSTRAINT "gold_rates_current_rate_id_fkey" FOREIGN KEY ("rate_id") REFERENCES "gold_rates" ("id") ON DELETE CASCADE,
+  CONSTRAINT "gold_rates_current_rate_id_fkey" FOREIGN KEY ("rate_id") REFERENCES "gold_rates" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "gold_rates_current_karat_check" CHECK ("karat" IN (24, 21, 18)),
   CONSTRAINT "gold_rates_current_rate_check" CHECK ("rate_per_gram" BETWEEN 10000 AND 10000000)
 );
@@ -1181,7 +1181,7 @@ CREATE TABLE IF NOT EXISTS "inventory_history" (
   "created_by" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "inventory_history_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "inventory_history_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
+  CONSTRAINT "inventory_history_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "inventory_history_type_chk" CHECK ("type" IN ('manual_add', 'manual_remove', 'sale', 'return_stock', 'adjustment', 'damage', 'transfer_in', 'transfer_out', 'initial'))
 );
 CREATE INDEX IF NOT EXISTS "inventory_history_product_id_idx" ON "inventory_history" ("product_id");
@@ -1202,7 +1202,7 @@ CREATE TABLE IF NOT EXISTS "journal_entries" (
   "posted_by" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "journal_entries_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "journal_entries_reversed_by_id_fkey" FOREIGN KEY ("reversed_by_id") REFERENCES "journal_entries" ("id") ON DELETE SET NULL,
+  CONSTRAINT "journal_entries_reversed_by_id_fkey" FOREIGN KEY ("reversed_by_id") REFERENCES "journal_entries" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "journal_entries_source_chk" CHECK ("source" IN ('order', 'refund', 'purchase_order', 'expense', 'stock_adjustment', 'manual', 'period_close', 'opening_balance')),
   CONSTRAINT "journal_entries_status_chk" CHECK ("status" IN ('posted', 'reversed', 'draft'))
 );
@@ -1228,8 +1228,8 @@ CREATE TABLE IF NOT EXISTS "journal_lines" (
   "ref_id" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "journal_lines_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "journal_lines_entry_id_fkey" FOREIGN KEY ("entry_id") REFERENCES "journal_entries" ("id") ON DELETE CASCADE,
-  CONSTRAINT "journal_lines_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "journal_lines_entry_id_fkey" FOREIGN KEY ("entry_id") REFERENCES "journal_entries" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "journal_lines_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "accounts" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "journal_lines_debit_credit_nonneg" CHECK (debit >= 0 AND credit >= 0),
   CONSTRAINT "journal_lines_debit_xor_credit" CHECK ((debit = 0 AND credit > 0) OR (debit > 0 AND credit = 0))
 );
@@ -1264,7 +1264,7 @@ CREATE TABLE IF NOT EXISTS "loyalty_transactions" (
   "expires_at" INTEGER,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "loyalty_transactions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "loyalty_transactions_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE SET NULL,
+  CONSTRAINT "loyalty_transactions_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "loyalty_transactions_type_chk" CHECK ("type" IN ('earn_purchase', 'earn_signup', 'earn_referral', 'earn_review', 'earn_birthday', 'earn_manual', 'redeem_discount', 'redeem_product', 'expire', 'adjust', 'tier_changed'))
 );
 CREATE INDEX IF NOT EXISTS "loyalty_transactions_store_id_idx" ON "loyalty_transactions" ("store_id");
@@ -1346,7 +1346,7 @@ CREATE TABLE IF NOT EXISTS "order_events" (
   "metadata" TEXT NOT NULL DEFAULT '{}',
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "order_events_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "order_events_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE,
+  CONSTRAINT "order_events_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "order_events_metadata_chk" CHECK (json_valid("metadata"))
 );
 CREATE INDEX IF NOT EXISTS "order_events_order_id_idx" ON "order_events" ("order_id");
@@ -1381,9 +1381,9 @@ CREATE TABLE IF NOT EXISTS "order_items" (
   "bundle_name" TEXT,
   "bundle_name_ar" TEXT,
   CONSTRAINT "order_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE,
-  CONSTRAINT "order_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "order_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL,
+  CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "order_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "order_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "order_items_cost_price_deferred_chk" CHECK ("cost_price_deferred" IN (0, 1)),
   CONSTRAINT "order_items_price_group_applied_chk" CHECK ("price_group_applied" IS NULL OR ("price_group_applied" IN (0, 1))),
   CONSTRAINT "order_items_tier_ladder_chk" CHECK ("tier_ladder" IS NULL OR (json_valid("tier_ladder"))),
@@ -1430,6 +1430,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "customer_notes" TEXT,
   "shipping_address" TEXT NOT NULL,
   "billing_address" TEXT NOT NULL,
+  "area_key" TEXT,
+  "buyer_key" TEXT,
   "shipped_at" INTEGER,
   "delivered_at" INTEGER,
   "review_request_sent_at" INTEGER,
@@ -1453,9 +1455,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "source" TEXT DEFAULT 'web',
   "checkout_ip" TEXT,
   "manual_hold_admitted" INTEGER NOT NULL DEFAULT 0,
-  "buyer_key" TEXT,
   CONSTRAINT "orders_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "orders_applied_promotion_id_fkey" FOREIGN KEY ("applied_promotion_id") REFERENCES "promotions" ("id") ON DELETE SET NULL,
+  CONSTRAINT "orders_applied_promotion_id_fkey" FOREIGN KEY ("applied_promotion_id") REFERENCES "promotions" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "orders_status_chk" CHECK ("status" IN ('pending', 'awaiting_payment_confirmation', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded')),
   CONSTRAINT "orders_payment_status_chk" CHECK ("payment_status" IN ('unpaid', 'paid', 'failed', 'refunded', 'disputed')),
   CONSTRAINT "orders_tax_included_in_price_chk" CHECK ("tax_included_in_price" IN (0, 1)),
@@ -1464,7 +1465,8 @@ CREATE TABLE IF NOT EXISTS "orders" (
   CONSTRAINT "orders_sms_opt_in_chk" CHECK ("sms_opt_in" IN (0, 1)),
   CONSTRAINT "orders_manual_hold_admitted_chk" CHECK ("manual_hold_admitted" IN (0, 1)),
   CONSTRAINT "orders_wallet_amount_non_negative" CHECK ("wallet_amount" >= 0),
-  CONSTRAINT "orders_cod_fee_nonneg" CHECK ("cod_fee" >= 0)
+  CONSTRAINT "orders_cod_fee_nonneg" CHECK ("cod_fee" >= 0),
+  CONSTRAINT "orders_buyer_key_check" CHECK ("buyer_key" IS NULL OR (length("buyer_key") = 64 AND "buyer_key" NOT GLOB '*[^0-9a-f]*'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_order_number_key" ON "orders" ("order_number");
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_idempotency_key_key" ON "orders" ("idempotency_key");
@@ -1478,7 +1480,6 @@ CREATE INDEX IF NOT EXISTS "orders_store_id_created_at_idx" ON "orders" ("store_
 CREATE INDEX IF NOT EXISTS "orders_store_id_payment_gateway_abandoned_at_idx" ON "orders" ("store_id", "payment_gateway_abandoned_at");
 CREATE INDEX IF NOT EXISTS "orders_payment_confirmation_expires_at_idx" ON "orders" ("payment_confirmation_expires_at");
 CREATE INDEX IF NOT EXISTS "orders_applied_promotion_id_idx" ON "orders" ("applied_promotion_id");
-CREATE INDEX IF NOT EXISTS "orders_buyer_key_idx" ON "orders" ("buyer_key");
 CREATE INDEX IF NOT EXISTS "orders_payment_gateway_abandoned_at_idx" ON "orders" ("store_id", "payment_gateway_abandoned_at") WHERE "payment_gateway_abandoned_at" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "orders_refund_reversal_pending_idx" ON "orders" ("updated_at") WHERE "refund_reversed_at" IS NULL AND "status" IN ('cancelled', 'refunded');
 CREATE INDEX IF NOT EXISTS "orders_refund_reversal_requested_idx" ON "orders" ("refund_reversal_requested_at") WHERE "refund_reversed_at" IS NULL AND "refund_reversal_requested_at" IS NOT NULL;
@@ -1486,6 +1487,7 @@ CREATE INDEX IF NOT EXISTS "orders_status_fanout_pending_idx" ON "orders" ("stat
 CREATE INDEX IF NOT EXISTS "orders_open_hold_phone_idx" ON "orders" ("store_id", (json_extract(shipping_address, '$.phone'))) WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_email_idx" ON "orders" ("store_id", (lower(trim(json_extract(shipping_address, '$.email'))))) WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "orders_open_hold_ip_idx" ON "orders" ("store_id", "checkout_ip") WHERE "status" IN ('pending', 'awaiting_payment_confirmation') AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL;
+CREATE INDEX IF NOT EXISTS "orders_store_buyer_key_created_idx" ON "orders" ("store_id", "buyer_key", "created_at") WHERE "buyer_key" IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "payment_configs" (
   "id" TEXT NOT NULL,
@@ -1548,7 +1550,7 @@ CREATE TABLE IF NOT EXISTS "payment_events" (
   "occurred_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "payment_events_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "payment_events_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payments" ("id") ON DELETE CASCADE,
+  CONSTRAINT "payment_events_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payments" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "payment_events_from_status_chk" CHECK ("from_status" IS NULL OR ("from_status" IN ('pending', 'processing', 'completed', 'failed', 'cancelled', 'expired', 'refunded', 'partially_refunded', 'disputed', 'cod_pending'))),
   CONSTRAINT "payment_events_to_status_chk" CHECK ("to_status" IS NULL OR ("to_status" IN ('pending', 'processing', 'completed', 'failed', 'cancelled', 'expired', 'refunded', 'partially_refunded', 'disputed', 'cod_pending'))),
   CONSTRAINT "payment_events_provider_payload_chk" CHECK ("provider_payload" IS NULL OR (json_valid("provider_payload"))),
@@ -1581,7 +1583,7 @@ CREATE TABLE IF NOT EXISTS "payments" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "payments_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "payments_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE,
+  CONSTRAINT "payments_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "payments_status_chk" CHECK ("status" IN ('pending', 'processing', 'completed', 'failed', 'cancelled', 'expired', 'refunded', 'partially_refunded', 'disputed', 'cod_pending')),
   CONSTRAINT "payments_metadata_chk" CHECK ("metadata" IS NULL OR (json_valid("metadata")))
 );
@@ -1596,8 +1598,8 @@ CREATE TABLE IF NOT EXISTS "product_categories" (
   "category_id" TEXT NOT NULL,
   "position" INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT "product_categories_pkey" PRIMARY KEY ("product_id", "category_id"),
-  CONSTRAINT "product_categories_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_categories_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "categories" ("id") ON DELETE CASCADE
+  CONSTRAINT "product_categories_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_categories_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "categories" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "product_categories_category_id_position_idx" ON "product_categories" ("category_id", "position");
 
@@ -1612,7 +1614,7 @@ CREATE TABLE IF NOT EXISTS "product_faqs" (
   "manually_edited" INTEGER NOT NULL DEFAULT 0,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_faqs_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_faqs_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
+  CONSTRAINT "product_faqs_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "product_faqs_ai_drafted_chk" CHECK ("ai_drafted" IN (0, 1)),
   CONSTRAINT "product_faqs_manually_edited_chk" CHECK ("manually_edited" IN (0, 1))
 );
@@ -1626,7 +1628,7 @@ CREATE TABLE IF NOT EXISTS "product_images" (
   "position" INTEGER NOT NULL DEFAULT 0,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_images_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_images_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE
+  CONSTRAINT "product_images_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "product_images_product_id_idx" ON "product_images" ("product_id");
 
@@ -1642,8 +1644,8 @@ CREATE TABLE IF NOT EXISTS "product_model_bindings" (
   "roughness" REAL,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_model_bindings_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_model_bindings_model_id_fkey" FOREIGN KEY ("model_id") REFERENCES "product_models" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_model_bindings_option_value_id_fkey" FOREIGN KEY ("option_value_id") REFERENCES "product_option_values" ("id") ON DELETE CASCADE,
+  CONSTRAINT "product_model_bindings_model_id_fkey" FOREIGN KEY ("model_id") REFERENCES "product_models" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_model_bindings_option_value_id_fkey" FOREIGN KEY ("option_value_id") REFERENCES "product_option_values" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "product_model_bindings_kind_check" CHECK ("kind" IN ('material', 'gltf_variant')),
   CONSTRAINT "product_model_bindings_color_check" CHECK ("color" IS NULL OR (length("color") = 7 AND substr("color", 1, 1) = '#' AND substr("color", 2) NOT GLOB '*[^0-9a-f]*')),
   CONSTRAINT "product_model_bindings_unit_check" CHECK (("metalness" IS NULL OR ("metalness" >= 0 AND "metalness" <= 1)) AND ("roughness" IS NULL OR ("roughness" >= 0 AND "roughness" <= 1))),
@@ -1671,7 +1673,7 @@ CREATE TABLE IF NOT EXISTS "product_models" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_models_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_models_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
+  CONSTRAINT "product_models_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "product_models_ar_enabled_chk" CHECK ("ar_enabled" IN (0, 1)),
   CONSTRAINT "product_models_materials_chk" CHECK (json_valid("materials")),
   CONSTRAINT "product_models_gltf_variants_chk" CHECK (json_valid("gltf_variants")),
@@ -1691,7 +1693,7 @@ CREATE TABLE IF NOT EXISTS "product_option_values" (
   "position" INTEGER NOT NULL DEFAULT 0,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_option_values_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_option_values_option_id_fkey" FOREIGN KEY ("option_id") REFERENCES "product_options" ("id") ON DELETE CASCADE,
+  CONSTRAINT "product_option_values_option_id_fkey" FOREIGN KEY ("option_id") REFERENCES "product_options" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "product_option_values_swatch_hex_format" CHECK ("swatch_hex" IS NULL OR (length("swatch_hex") = 7 AND substr("swatch_hex", 1, 1) = '#' AND substr("swatch_hex", 2) NOT GLOB '*[^0-9A-Fa-f]*'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "product_option_values_option_id_value_key" ON "product_option_values" ("option_id", "value");
@@ -1704,7 +1706,7 @@ CREATE TABLE IF NOT EXISTS "product_options" (
   "position" INTEGER NOT NULL DEFAULT 0,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_options_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_options_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE
+  CONSTRAINT "product_options_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "product_options_product_id_name_key" ON "product_options" ("product_id", "name");
 
@@ -1719,9 +1721,9 @@ CREATE TABLE IF NOT EXISTS "product_price_tiers" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_price_tiers_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_price_tiers_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_price_tiers_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_price_tiers_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "customer_groups" ("id") ON DELETE CASCADE,
+  CONSTRAINT "product_price_tiers_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_price_tiers_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_price_tiers_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "customer_groups" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "product_price_tiers_min_qty_chk" CHECK ("min_qty" >= 2),
   CONSTRAINT "product_price_tiers_price_minor_chk" CHECK ("price_minor" >= 0)
 );
@@ -1741,8 +1743,8 @@ CREATE TABLE IF NOT EXISTS "product_relations" (
   "position" INTEGER NOT NULL DEFAULT 0,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "product_relations_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_relations_source_product_id_fkey" FOREIGN KEY ("source_product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_relations_target_product_id_fkey" FOREIGN KEY ("target_product_id") REFERENCES "products" ("id") ON DELETE CASCADE
+  CONSTRAINT "product_relations_source_product_id_fkey" FOREIGN KEY ("source_product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_relations_target_product_id_fkey" FOREIGN KEY ("target_product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "product_relations_store_id_source_product_id_target_product_id_type_key" ON "product_relations" ("store_id", "source_product_id", "target_product_id", "type");
 CREATE INDEX IF NOT EXISTS "product_relations_store_id_source_product_id_idx" ON "product_relations" ("store_id", "source_product_id");
@@ -1754,8 +1756,8 @@ CREATE TABLE IF NOT EXISTS "product_tags" (
   "product_id" TEXT NOT NULL,
   "tag_id" TEXT NOT NULL,
   CONSTRAINT "product_tags_pkey" PRIMARY KEY ("product_id", "tag_id"),
-  CONSTRAINT "product_tags_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_tags_tag_id_fkey" FOREIGN KEY ("tag_id") REFERENCES "tags" ("id") ON DELETE CASCADE
+  CONSTRAINT "product_tags_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_tags_tag_id_fkey" FOREIGN KEY ("tag_id") REFERENCES "tags" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "product_tags_tag_id_idx" ON "product_tags" ("tag_id");
 
@@ -1763,8 +1765,8 @@ CREATE TABLE IF NOT EXISTS "product_variant_options" (
   "variant_id" TEXT NOT NULL,
   "value_id" TEXT NOT NULL,
   CONSTRAINT "product_variant_options_pkey" PRIMARY KEY ("variant_id", "value_id"),
-  CONSTRAINT "product_variant_options_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE,
-  CONSTRAINT "product_variant_options_value_id_fkey" FOREIGN KEY ("value_id") REFERENCES "product_option_values" ("id") ON DELETE CASCADE
+  CONSTRAINT "product_variant_options_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "product_variant_options_value_id_fkey" FOREIGN KEY ("value_id") REFERENCES "product_option_values" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "product_variant_options_value_id_idx" ON "product_variant_options" ("value_id");
 
@@ -1794,7 +1796,7 @@ CREATE TABLE IF NOT EXISTS "product_variants" (
   "gold_margin_bps" INTEGER,
   "gold_rate_id" TEXT,
   CONSTRAINT "product_variants_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "product_variants_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
+  CONSTRAINT "product_variants_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "product_variants_is_active_chk" CHECK ("is_active" IN (0, 1)),
   CONSTRAINT "product_variants_allow_backorder_chk" CHECK ("allow_backorder" IN (0, 1)),
   CONSTRAINT "product_variants_pricing_mode_check" CHECK ("pricing_mode" IS NULL OR "pricing_mode" IN ('fixed', 'gold_rate')),
@@ -1872,7 +1874,7 @@ CREATE TABLE IF NOT EXISTS "products" (
   "discount_value" INTEGER,
   "has_variants" INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT "products_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "products_size_chart_id_fkey" FOREIGN KEY ("size_chart_id") REFERENCES "size_charts" ("id") ON DELETE SET NULL,
+  CONSTRAINT "products_size_chart_id_fkey" FOREIGN KEY ("size_chart_id") REFERENCES "size_charts" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "products_track_inventory_chk" CHECK ("track_inventory" IN (0, 1)),
   CONSTRAINT "products_dimensions_chk" CHECK ("dimensions" IS NULL OR (json_valid("dimensions"))),
   CONSTRAINT "products_status_chk" CHECK ("status" IN ('draft', 'active', 'archived')),
@@ -1963,7 +1965,7 @@ CREATE TABLE IF NOT EXISTS "promotions" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "promotions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "promotions_customer_group_id_fkey" FOREIGN KEY ("customer_group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL,
+  CONSTRAINT "promotions_customer_group_id_fkey" FOREIGN KEY ("customer_group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "promotions_type_chk" CHECK ("type" IN ('percentage', 'fixed', 'free_shipping')),
   CONSTRAINT "promotions_is_active_chk" CHECK ("is_active" IN (0, 1)),
   CONSTRAINT "promotions_first_order_only_chk" CHECK ("first_order_only" IN (0, 1)),
@@ -1986,9 +1988,9 @@ CREATE TABLE IF NOT EXISTS "purchase_order_items" (
   "notes" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "purchase_order_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "purchase_order_items_po_id_fkey" FOREIGN KEY ("po_id") REFERENCES "purchase_orders" ("id") ON DELETE CASCADE,
-  CONSTRAINT "purchase_order_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "purchase_order_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL,
+  CONSTRAINT "purchase_order_items_po_id_fkey" FOREIGN KEY ("po_id") REFERENCES "purchase_orders" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "purchase_order_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "purchase_order_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "purchase_order_items_qty_received_range" CHECK (qty_received >= 0 AND qty_received <= qty),
   CONSTRAINT "purchase_order_items_qty_positive" CHECK (qty > 0),
   CONSTRAINT "purchase_order_items_unit_cost_nonneg" CHECK (unit_cost >= 0)
@@ -2019,8 +2021,8 @@ CREATE TABLE IF NOT EXISTS "purchase_orders" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "purchase_orders_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "purchase_orders_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "purchase_orders_ap_account_id_fkey" FOREIGN KEY ("ap_account_id") REFERENCES "accounts" ("id") ON DELETE SET NULL,
+  CONSTRAINT "purchase_orders_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "purchase_orders_ap_account_id_fkey" FOREIGN KEY ("ap_account_id") REFERENCES "accounts" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "purchase_orders_status_chk" CHECK ("status" IN ('draft', 'sent', 'partial', 'received', 'cancelled'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "purchase_orders_journal_entry_id_key" ON "purchase_orders" ("journal_entry_id");
@@ -2061,9 +2063,9 @@ CREATE TABLE IF NOT EXISTS "reorder_rules" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "reorder_rules_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "reorder_rules_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "reorder_rules_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE,
-  CONSTRAINT "reorder_rules_preferred_supplier_id_fkey" FOREIGN KEY ("preferred_supplier_id") REFERENCES "suppliers" ("id") ON DELETE SET NULL,
+  CONSTRAINT "reorder_rules_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "reorder_rules_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "reorder_rules_preferred_supplier_id_fkey" FOREIGN KEY ("preferred_supplier_id") REFERENCES "suppliers" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "reorder_rules_is_active_chk" CHECK ("is_active" IN (0, 1))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "reorder_rules_store_id_product_id_variant_id_key" ON "reorder_rules" ("store_id", "product_id", "variant_id");
@@ -2093,9 +2095,9 @@ CREATE TABLE IF NOT EXISTS "reorder_suggestions" (
   "po_id" TEXT,
   "scanned_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "reorder_suggestions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "reorder_suggestions_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "reorder_suggestions_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE,
-  CONSTRAINT "reorder_suggestions_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON DELETE SET NULL,
+  CONSTRAINT "reorder_suggestions_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "reorder_suggestions_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "reorder_suggestions_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "reorder_suggestions_status_chk" CHECK ("status" IN ('open', 'accepted', 'dismissed', 'expired'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "reorder_suggestions_store_id_product_id_variant_id_scanned_at_key" ON "reorder_suggestions" ("store_id", "product_id", "variant_id", "scanned_at");
@@ -2119,9 +2121,9 @@ CREATE TABLE IF NOT EXISTS "return_items" (
   "adjustment_override_by" TEXT,
   "tier_carry" INTEGER NOT NULL DEFAULT 0,
   CONSTRAINT "return_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "return_items_return_id_fkey" FOREIGN KEY ("return_id") REFERENCES "returns" ("id") ON DELETE CASCADE,
-  CONSTRAINT "return_items_order_item_id_fkey" FOREIGN KEY ("order_item_id") REFERENCES "order_items" ("id") ON DELETE CASCADE,
-  CONSTRAINT "return_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "return_items_return_id_fkey" FOREIGN KEY ("return_id") REFERENCES "returns" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "return_items_order_item_id_fkey" FOREIGN KEY ("order_item_id") REFERENCES "order_items" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "return_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "return_items_adjustment_overridden_chk" CHECK ("adjustment_overridden" IN (0, 1))
 );
 CREATE INDEX IF NOT EXISTS "return_items_return_id_idx" ON "return_items" ("return_id");
@@ -2156,7 +2158,7 @@ CREATE TABLE IF NOT EXISTS "returns" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "returns_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "returns_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "returns_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "returns_type_chk" CHECK ("type" IN ('return', 'exchange', 'refund')),
   CONSTRAINT "returns_status_chk" CHECK ("status" IN ('pending', 'approved', 'rejected', 'shipped', 'received', 'inspecting', 'completed', 'cancelled'))
 );
@@ -2191,8 +2193,8 @@ CREATE TABLE IF NOT EXISTS "reviews" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "reviews_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "reviews_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "reviews_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE RESTRICT,
+  CONSTRAINT "reviews_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "reviews_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "reviews_verified_purchase_chk" CHECK ("verified_purchase" IN (0, 1)),
   CONSTRAINT "reviews_spam_reasons_chk" CHECK ("spam_reasons" IS NULL OR (json_valid("spam_reasons")))
 );
@@ -2231,7 +2233,7 @@ CREATE TABLE IF NOT EXISTS "shipment_pickups" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "shipment_pickups_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "shipment_pickups_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "shipments" ("id") ON DELETE CASCADE,
+  CONSTRAINT "shipment_pickups_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "shipments" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "shipment_pickups_address_chk" CHECK (json_valid("address")),
   CONSTRAINT "shipment_pickups_status_check" CHECK ("status" IN ('requesting', 'requested', 'failed', 'cancelled')),
   CONSTRAINT "shipment_pickups_date_check" CHECK ("pickup_date" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
@@ -2265,27 +2267,29 @@ CREATE TABLE IF NOT EXISTS "shipments" (
   "carrier_name" TEXT,
   "create_attempts" INTEGER NOT NULL DEFAULT 0,
   "last_polled_at" INTEGER,
-  "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
-  "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
-  "return_reason_raw" TEXT,
-  "return_reason_code" TEXT,
   "picked_up_at" INTEGER,
   "delivered_at" INTEGER,
-  "attempts" INTEGER NOT NULL DEFAULT 0,
+  "returned_at" INTEGER,
+  "delivery_attempts" INTEGER NOT NULL DEFAULT 0,
+  "return_reason_raw" TEXT,
+  "return_reason_code" TEXT,
   "area_key" TEXT,
+  "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
+  "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "shipments_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "shipments_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE,
+  CONSTRAINT "shipments_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "shipments_pickup_address_chk" CHECK (json_valid("pickup_address")),
   CONSTRAINT "shipments_delivery_address_chk" CHECK (json_valid("delivery_address")),
   CONSTRAINT "shipments_dimensions_chk" CHECK ("dimensions" IS NULL OR (json_valid("dimensions"))),
   CONSTRAINT "shipments_status_history_chk" CHECK (json_valid("status_history")),
-  CONSTRAINT "shipments_return_reason_code_chk" CHECK ("return_reason_code" IS NULL OR ("return_reason_code" IN ('refused', 'not_home', 'wrong_address', 'unreachable', 'rescheduled', 'price_or_changed_mind', 'damaged', 'other', 'unknown')))
+  CONSTRAINT "shipments_return_reason_code_check" CHECK ("return_reason_code" IS NULL OR "return_reason_code" IN ( 'customer_refused', 'customer_unreachable', 'wrong_address', 'address_incomplete', 'customer_postponed', 'price_dispute', 'product_not_as_described', 'damaged_in_transit', 'courier_failed_attempts', 'courier_lost', 'duplicate_order', 'fake_order', 'other' )),
+  CONSTRAINT "shipments_return_reason_raw_len_check" CHECK ("return_reason_raw" IS NULL OR length("return_reason_raw") <= 200),
+  CONSTRAINT "shipments_delivery_attempts_check" CHECK ("delivery_attempts" >= 0)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "shipments_order_id_key" ON "shipments" ("order_id");
 CREATE INDEX IF NOT EXISTS "shipments_store_id_idx" ON "shipments" ("store_id");
 CREATE INDEX IF NOT EXISTS "shipments_tracking_number_idx" ON "shipments" ("tracking_number");
 CREATE INDEX IF NOT EXISTS "shipments_store_id_status_idx" ON "shipments" ("store_id", "status");
-CREATE INDEX IF NOT EXISTS "shipments_store_id_area_key_idx" ON "shipments" ("store_id", "area_key");
 
 CREATE TABLE IF NOT EXISTS "shipping_area_rates" (
   "id" TEXT NOT NULL,
@@ -2409,9 +2413,9 @@ CREATE TABLE IF NOT EXISTS "stock_adjustment_items" (
   "unit_cost" INTEGER NOT NULL,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "stock_adjustment_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "stock_adjustment_items_adjustment_id_fkey" FOREIGN KEY ("adjustment_id") REFERENCES "stock_adjustments" ("id") ON DELETE CASCADE,
-  CONSTRAINT "stock_adjustment_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT,
-  CONSTRAINT "stock_adjustment_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL,
+  CONSTRAINT "stock_adjustment_items_adjustment_id_fkey" FOREIGN KEY ("adjustment_id") REFERENCES "stock_adjustments" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "stock_adjustment_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "stock_adjustment_items_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "stock_adjustment_items_delta_matches_qty" CHECK (delta_qty = new_qty - previous_qty)
 );
 CREATE INDEX IF NOT EXISTS "stock_adjustment_items_adjustment_id_idx" ON "stock_adjustment_items" ("adjustment_id");
@@ -2469,6 +2473,8 @@ CREATE TABLE IF NOT EXISTS "store_config" (
   "ai_bulk_throttle_ms" INTEGER NOT NULL DEFAULT 2500,
   "ai_narration_enabled" INTEGER NOT NULL DEFAULT 1,
   "insights_rollup_cron" TEXT NOT NULL DEFAULT 'daily',
+  "ci_sharing" INTEGER NOT NULL DEFAULT 0,
+  "ci_sharing_changed_at" INTEGER,
   CONSTRAINT "store_config_pkey" PRIMARY KEY ("store_id"),
   CONSTRAINT "store_config_settings_chk" CHECK (json_valid("settings")),
   CONSTRAINT "store_config_tax_enabled_chk" CHECK ("tax_enabled" IN (0, 1)),
@@ -2483,6 +2489,7 @@ CREATE TABLE IF NOT EXISTS "store_config" (
   CONSTRAINT "store_config_expense_two_step_approval_chk" CHECK ("expense_two_step_approval" IN (0, 1)),
   CONSTRAINT "store_config_ai_features_enabled_chk" CHECK ("ai_features_enabled" IN (0, 1)),
   CONSTRAINT "store_config_ai_narration_enabled_chk" CHECK ("ai_narration_enabled" IN (0, 1)),
+  CONSTRAINT "store_config_ci_sharing_chk" CHECK ("ci_sharing" IN (0, 1)),
   CONSTRAINT "stores_fiscal_year_start_month_range" CHECK (fiscal_year_start_month BETWEEN 1 AND 12)
 );
 
@@ -2702,7 +2709,7 @@ CREATE TABLE IF NOT EXISTS "store_tax_documents" (
   "uploaded_by" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "store_tax_documents_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "store_tax_documents_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "store_tax_profiles" ("id") ON DELETE CASCADE,
+  CONSTRAINT "store_tax_documents_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "store_tax_profiles" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "store_tax_documents_kind_chk" CHECK ("kind" IN ('tax_card', 'vat_certificate', 'other'))
 );
 CREATE INDEX IF NOT EXISTS "store_tax_documents_store_id_idx" ON "store_tax_documents" ("store_id");
@@ -2842,9 +2849,9 @@ CREATE TABLE IF NOT EXISTS "wallet_transactions" (
   "note" TEXT,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "wallet_transactions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "wallet_transactions_wallet_id_fkey" FOREIGN KEY ("wallet_id") REFERENCES "customer_wallets" ("id") ON DELETE CASCADE,
-  CONSTRAINT "wallet_transactions_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE SET NULL,
-  CONSTRAINT "wallet_transactions_return_id_fkey" FOREIGN KEY ("return_id") REFERENCES "returns" ("id") ON DELETE SET NULL,
+  CONSTRAINT "wallet_transactions_wallet_id_fkey" FOREIGN KEY ("wallet_id") REFERENCES "customer_wallets" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "wallet_transactions_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "wallet_transactions_return_id_fkey" FOREIGN KEY ("return_id") REFERENCES "returns" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "wallet_transactions_type_chk" CHECK ("type" IN ('credit', 'debit', 'refund_credit', 'order_payment', 'order_payment_reversal', 'admin_adjust', 'expire')),
   CONSTRAINT "wallet_transactions_amount_non_zero" CHECK ("amount" <> 0),
   CONSTRAINT "wallet_transactions_balance_after_non_negative" CHECK ("balance_after" >= 0)
@@ -2866,9 +2873,9 @@ CREATE TABLE IF NOT EXISTS "warehouse_stock" (
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "store_id" TEXT NOT NULL,
   CONSTRAINT "warehouse_stock_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "warehouse_stock_warehouse_id_fkey" FOREIGN KEY ("warehouse_id") REFERENCES "warehouses" ("id") ON DELETE CASCADE,
-  CONSTRAINT "warehouse_stock_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE,
-  CONSTRAINT "warehouse_stock_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE
+  CONSTRAINT "warehouse_stock_warehouse_id_fkey" FOREIGN KEY ("warehouse_id") REFERENCES "warehouses" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "warehouse_stock_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "warehouse_stock_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "warehouse_stock_warehouse_id_product_id_variant_id_key" ON "warehouse_stock" ("warehouse_id", "product_id", "variant_id");
 CREATE INDEX IF NOT EXISTS "warehouse_stock_warehouse_id_idx" ON "warehouse_stock" ("warehouse_id");
@@ -2920,7 +2927,7 @@ CREATE TABLE IF NOT EXISTS "webhook_deliveries" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "webhook_deliveries_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "webhook_deliveries_endpoint_id_store_id_fkey" FOREIGN KEY ("endpoint_id", "store_id") REFERENCES "webhook_endpoints" ("id", "store_id") ON DELETE CASCADE,
+  CONSTRAINT "webhook_deliveries_endpoint_id_store_id_fkey" FOREIGN KEY ("endpoint_id", "store_id") REFERENCES "webhook_endpoints" ("id", "store_id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "webhook_deliveries_payload_chk" CHECK (json_valid("payload")),
   CONSTRAINT "webhook_deliveries_is_test_chk" CHECK ("is_test" IN (0, 1))
 );
@@ -2972,7 +2979,7 @@ CREATE TABLE IF NOT EXISTS "wholesale_applications" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "wholesale_applications_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "wholesale_applications_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL,
+  CONSTRAINT "wholesale_applications_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "customer_groups" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "wholesale_applications_status_chk" CHECK ("status" IN ('pending', 'approved', 'rejected', 'revoked'))
 );
 CREATE INDEX IF NOT EXISTS "wholesale_applications_store_id_status_created_at_idx" ON "wholesale_applications" ("store_id", "status", "created_at");
@@ -2987,8 +2994,8 @@ CREATE TABLE IF NOT EXISTS "wishlist_items" (
   "product_id" TEXT NOT NULL,
   "added_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "wishlist_items_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "wishlist_items_wishlist_id_fkey" FOREIGN KEY ("wishlist_id") REFERENCES "wishlists" ("id") ON DELETE CASCADE,
-  CONSTRAINT "wishlist_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE
+  CONSTRAINT "wishlist_items_wishlist_id_fkey" FOREIGN KEY ("wishlist_id") REFERENCES "wishlists" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "wishlist_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "wishlist_items_wishlist_id_product_id_key" ON "wishlist_items" ("wishlist_id", "product_id");
 CREATE INDEX IF NOT EXISTS "wishlist_items_product_id_idx" ON "wishlist_items" ("product_id");

@@ -963,6 +963,108 @@ export class PaymentService {
   }
 
   /**
+   * Authenticate one gateway delivery and parse it. THROWS (400 MISSING_SIGNATURE /
+   * INVALID_SIGNATURE / WEBHOOK_MALFORMED) when it is not genuine. The webhook route calls this
+   * BEFORE it persists anything (SEC-5: a forged delivery must not write an inbox row or queue
+   * an event); `handleWebhook` calls it again over the stored raw body, so the cryptographic
+   * check is never skipped on the async path or on a replay.
+   */
+  static async verifyWebhookDelivery(
+    provider: PaymentProvider,
+    payload: unknown,
+    signature?: string,
+    storeId?: string,
+    rawBody?: string
+  ): Promise<WebhookPayload> {
+    const p = await factory.getProvider(provider, storeId);
+    // Owner decision 2026-10-01 (issue 2065, ruling RL-2a): a webhook is SAVED
+    // first (the durable inbox row, replayable from /webhook-events) but is
+    // NEVER acted on until its signature verifies. This used to be
+    // `if (signature) { verify }` — fail-OPEN: a call with no signature (an
+    // inbox row stored with an empty one, a replay, any future caller) skipped
+    // verification and went straight on to move money. No signature is now a
+    // rejection, exactly like a wrong one.
+    if (!signature) {
+      throw new AppError(400, 'MISSING_SIGNATURE', 'Webhook signature is required');
+    }
+    let webhookData: WebhookPayload;
+    {
+      // Verify against the raw body string when available (required for a
+      // correct HMAC). Fall back to the payload object for providers that do
+      // not use raw-body HMAC.
+      const verifyTarget: unknown = rawBody !== undefined ? rawBody : payload;
+      let verified: WebhookPayload | null = null;
+      let signatureOk: boolean;
+      if (p.verifyAndParseWebhook) {
+        // v2 adapter (Paymob / Kashier / Fawry): verify and parse in one step, over the raw
+        // body when we have it (the three gateways sign parsed fields, so a re-serialised
+        // payload verifies the same).
+        try {
+          verified = p.verifyAndParseWebhook(
+            typeof verifyTarget === 'string' ? verifyTarget : JSON.stringify(verifyTarget),
+            signature
+          );
+          signatureOk = true;
+        } catch (verifyError) {
+          if (
+            verifyError instanceof PaymentProviderError &&
+            verifyError.code === 'WEBHOOK_MALFORMED'
+          ) {
+            throw new AppError(400, 'WEBHOOK_MALFORMED', 'Webhook body is not a valid delivery');
+          }
+          signatureOk = false;
+        }
+      } else {
+        signatureOk = p.verifyWebhook(verifyTarget, signature);
+      }
+      if (!signatureOk) {
+        // HMAC verification failed — could be a single misconfigured test
+        // webhook (noise) or a real attacker / rotated credential (signal).
+        // Throttle via redis counter: 3+ failures from the same provider
+        // + store in 5 minutes = real, fire a P0 alert. Single fails just
+        // throw without alerting.
+        try {
+          const counterKey = `payment-hmac-fail:${provider}:${storeId ?? 'platform'}`;
+          const count = await redis.incrementRateLimit(counterKey, 300);
+          if (count >= 3) {
+            void sendAlert({
+              level: 'p0',
+              scope: storeId ? 'store' : 'platform',
+              ...(storeId
+                ? {
+                    store: {
+                      id: storeId,
+                      name:
+                        (
+                          await withStore(storeId, tx =>
+                            tx.store.findUnique({
+                              where: { id: storeId },
+                              select: { name: true },
+                            })
+                          )
+                        )?.name ?? storeId,
+                    },
+                  }
+                : {}),
+              source: 'payment.webhook.hmac_fail',
+              title: 'payment.webhook.hmac_fail',
+              body: `Payment webhook signature failures for store ${storeId}: ${provider} failed ${count} times in 5 min. Likely a rotated or wrong webhook secret (genuine deliveries are answered 401 and the gateway retries them) or an attacker.`,
+              context: { provider, storeId, failureCount: count },
+            }).catch(() => undefined);
+          }
+        } catch {
+          // Never let alert bookkeeping break the actual security check —
+          // the throw below is the load-bearing action.
+        }
+        throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature');
+      }
+      // Parse webhook using the structured payload object (v2: parsed with the verification).
+      webhookData = verified ?? p.parseWebhook(payload);
+    }
+    return webhookData;
+  }
+
+  /**
    * Process refund
    *
    * TRANSACTION BOUNDARIES. Every write this method makes about the money —
@@ -1541,90 +1643,13 @@ export class PaymentService {
   ): Promise<{ success: boolean; status?: string; orderId?: string }> {
     const p = await factory.getProvider(provider, storeId);
 
-    // Owner decision 2026-10-01 (issue 2065, ruling RL-2a): a webhook is SAVED
-    // first (the durable inbox row, replayable from /webhook-events) but is
-    // NEVER acted on until its signature verifies. This used to be
-    // `if (signature) { verify }` — fail-OPEN: a call with no signature (an
-    // inbox row stored with an empty one, a replay, any future caller) skipped
-    // verification and went straight on to move money. No signature is now a
-    // rejection, exactly like a wrong one.
-    if (!signature) {
-      throw new AppError(400, 'MISSING_SIGNATURE', 'Webhook signature is required');
-    }
-    let webhookData: WebhookPayload;
-    {
-      // Verify against the raw body string when available (required for a
-      // correct HMAC). Fall back to the payload object for providers that do
-      // not use raw-body HMAC.
-      const verifyTarget: unknown = rawBody !== undefined ? rawBody : payload;
-      let verified: WebhookPayload | null = null;
-      let signatureOk: boolean;
-      if (p.verifyAndParseWebhook) {
-        // v2 adapter (Paymob / Kashier / Fawry): verify and parse in one step, over the raw
-        // body when we have it (the three gateways sign parsed fields, so a re-serialised
-        // payload verifies the same).
-        try {
-          verified = p.verifyAndParseWebhook(
-            typeof verifyTarget === 'string' ? verifyTarget : JSON.stringify(verifyTarget),
-            signature
-          );
-          signatureOk = true;
-        } catch (verifyError) {
-          if (
-            verifyError instanceof PaymentProviderError &&
-            verifyError.code === 'WEBHOOK_MALFORMED'
-          ) {
-            throw new AppError(400, 'WEBHOOK_MALFORMED', 'Webhook body is not a valid delivery');
-          }
-          signatureOk = false;
-        }
-      } else {
-        signatureOk = p.verifyWebhook(verifyTarget, signature);
-      }
-      if (!signatureOk) {
-        // HMAC verification failed — could be a single misconfigured test
-        // webhook (noise) or a real attacker / rotated credential (signal).
-        // Throttle via redis counter: 3+ failures from the same provider
-        // + store in 5 minutes = real, fire a P0 alert. Single fails just
-        // throw without alerting.
-        try {
-          const counterKey = `payment-hmac-fail:${provider}:${storeId ?? 'platform'}`;
-          const count = await redis.incrementRateLimit(counterKey, 300);
-          if (count >= 3) {
-            void sendAlert({
-              level: 'p0',
-              scope: storeId ? 'store' : 'platform',
-              ...(storeId
-                ? {
-                    store: {
-                      id: storeId,
-                      name:
-                        (
-                          await withStore(storeId, tx =>
-                            tx.store.findUnique({
-                              where: { id: storeId },
-                              select: { name: true },
-                            })
-                          )
-                        )?.name ?? storeId,
-                    },
-                  }
-                : {}),
-              source: 'payment.webhook.hmac_fail',
-              title: 'payment.webhook.hmac_fail',
-              body: `${provider} webhook signature failed ${count} times in 5 min — likely a rotated webhook secret on the provider side or an attacker.`,
-              context: { provider, storeId, failureCount: count },
-            }).catch(() => undefined);
-          }
-        } catch {
-          // Never let alert bookkeeping break the actual security check —
-          // the throw below is the load-bearing action.
-        }
-        throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature');
-      }
-      // Parse webhook using the structured payload object (v2: parsed with the verification).
-      webhookData = verified ?? p.parseWebhook(payload);
-    }
+    let webhookData = await PaymentService.verifyWebhookDelivery(
+      provider,
+      payload,
+      signature,
+      storeId,
+      rawBody
+    );
 
     // Find and update payment. Include `order.customer` + `order.store` so we
     // can render the customer's name and store name in the post-status
