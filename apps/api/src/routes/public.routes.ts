@@ -281,7 +281,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const headerTerm = searchQueryFromHeader(req);
     const search = headerTerm ?? req.query.search;
     const storeId = await getStoreIdFromRequest(req);
-    if (backendFor(storeId, req) === 'do') {
+    if ((await backendFor(storeId, req)) === 'do') {
       // Phase 0 spike (Ruling INFRA-CF-1): flagged demo store + opt-in header only. Postgres path below is untouched.
       const lim = Math.min(Math.max(Number(limit) || 24, 1), 100);
       const products = unwrapDo(await storeDo(storeId).listProducts(storeId, lim));
@@ -877,7 +877,7 @@ router.post(
 
       const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      if (backendFor(storeId, req) === 'do') {
+      if ((await backendFor(storeId, req)) === 'do') {
         const { cartId } = unwrapDo(
           await storeDo(storeId).addCartItem(storeId, sessionId, productId, quantity, variantId)
         );
@@ -1330,7 +1330,7 @@ router.post(
 
       const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
-      if (backendFor(storeId, req) === 'do') {
+      if ((await backendFor(storeId, req)) === 'do') {
         // Spike order path: stock + order rows in ONE DO transaction. The demo copy only; no payment, no email.
         const order = unwrapDo(await storeDo(storeId).createOrder(storeId, sessionId));
         // The order just decremented stock in the Durable Object: every cache layer (KV, the Worker edge cache

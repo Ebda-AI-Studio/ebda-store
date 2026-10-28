@@ -8,5 +8,5 @@ Source of the Cloudflare-only migration (Ruling INFRA-CF-1, plan `docs/plans/202
 - **Added on purpose:** `scripts/cf-additions.mjs` (CI-1 capture fields, buyer key, outbox, entity index, `do_flags`).
 - **Hand-written invariants:** `migrations/*/0002_invariants.sql` (row-guard triggers). Everything else that was a Postgres function is a repo method, mapped in `docs/cf/fn-map.json`.
 - **Limits to remember:** 100 columns per table and 100 bound parameters per query (chunk every `IN (...)` and bulk insert), 10 GB per DO.
-- **Nothing reads these tables in production yet.** The StoreDO backend stays behind `STORE_DO_ENABLED_IDS` until the phase 2 and 3 slices land.
+- **Nothing reads these tables in production yet.** The API Worker binds the platform database as `PLATFORM_DB` (task 2.4): it reads `stores.storage_backend` for the backend selector and `/health`, and `cf-api-deploy.yml` applies `migrations/platform` before each deploy. The StoreDO backend is still not routed for real traffic until the phase 2 and 3 slices land.
 - **Tests:** `npx vitest run packages/cf-schema` (needs `node:sqlite`, Node >= 22.13).

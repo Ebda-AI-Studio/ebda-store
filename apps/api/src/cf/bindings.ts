@@ -151,6 +151,8 @@ export interface CfBindings {
   STORE_REALTIME?: DurableObjectNamespaceLike;
   /** One SQLite Durable Object per store (Phase 0 spike, flag-gated: lib/store-backend.ts). */
   STORE_DO?: DurableObjectNamespaceLike;
+  /** D1 `ebda-platform` (task 2.4): `stores.storage_backend`, the per-store backend switch (lib/store-backend.ts). */
+  PLATFORM_DB?: import('../lib/store-backend').PlatformD1Like;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
   /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */

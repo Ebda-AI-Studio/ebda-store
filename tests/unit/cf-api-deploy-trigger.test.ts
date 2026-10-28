@@ -28,4 +28,12 @@ describe('cf-api-deploy.yml auto-deploy', () => {
     expect(wf).not.toMatch(/inngest/i);
     expect(wf).toContain("github.ref == 'refs/heads/main'");
   });
+  it('applies the D1 platform migrations before the Worker deploys, from the schema package (task 2.4)', () => {
+    const apply = wf.indexOf(
+      'wrangler d1 migrations apply ebda-platform --remote --config .wrangler.deploy.jsonc'
+    );
+    expect(apply).toBeGreaterThan(-1);
+    expect(apply).toBeLessThan(wf.indexOf('npx wrangler deploy --config'));
+    expect(wf).toContain('EBDA_PLATFORM_D1_ID: ${{ vars.EBDA_PLATFORM_D1_ID }}');
+  });
 });
