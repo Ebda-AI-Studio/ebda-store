@@ -690,6 +690,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
       - run: npm ci
+      - name: Generate Prisma client
+        # packages/repo/src/rpc/codec.ts reads Prisma.Decimal from @prisma/client; ungenerated, every StoreDO.query returns ok:false.
+        run: npm run db:generate
       - name: StoreDO / D1 / R2 integration tests
         run: npm run cf:test:do -w apps/api
 
