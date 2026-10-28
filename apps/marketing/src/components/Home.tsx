@@ -19,12 +19,17 @@ import { JsonLd } from './JsonLd';
 import { LooksShowcase } from './LooksShowcase';
 import { Reveal, StoryScroll } from './Motion';
 import { Product3D } from './Product3D';
+import { Phone } from './Devices';
+import { STORY_FRAMES } from '../lib/story-frames';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import { FeatureVisuals } from './FeatureVisuals';
 import { HomeCapabilities } from './Capabilities';
 import { AiNative } from './AiNative';
 import { FEATURES_PAGE, THEME_COPY } from '../lib/capabilities';
+
+/** The hero phone shows the last story frame: the finished store. */
+const HERO_FRAME = STORY_FRAMES[STORY_FRAMES.length - 1];
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
@@ -332,6 +337,24 @@ export function Home({ locale }: { locale: Locale }) {
                   {c.hero.cta}
                 </SiteLink>
               </p>
+            </div>
+            {/* Desktop only (CSS): the finished store in the same phone the story below builds, so the first screen shows the product. */}
+            <div className="hero-visual" aria-hidden="true">
+              <Phone className="hero-phone">
+                <div className="story-screen">
+                  <picture className="hero-frame">
+                    <source type="image/avif" srcSet={`/devices/${HERO_FRAME.name}.avif`} />
+                    <img
+                      src={`/devices/${HERO_FRAME.name}.webp`}
+                      width={HERO_FRAME.w}
+                      height={HERO_FRAME.h}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </picture>
+                </div>
+              </Phone>
             </div>
           </div>
         </section>

@@ -17,6 +17,9 @@ import {
 
 type Page = PageSlug;
 
+/** Nav anchors that move into the "More" menu on desktop (the mobile menu lists everything). */
+const MORE_KEYS: readonly string[] = ['resources'];
+
 /** The product icon (shared paths from the brand module, so docs/help/status draw the same one). */
 function ProductIcon({ id }: { id: SiteNavProductId }) {
   return (
@@ -79,6 +82,15 @@ export function Header({
     ) : (
       <a href={anchor(n.target)}>{c.nav[n.key]}</a>
     );
+  /** Secondary destinations live in one "More" menu so the top row stays on one line at every desktop width. */
+  const moreItems = [
+    ...NAV_ANCHORS.filter(n => MORE_KEYS.includes(n.key)).map(n => ({
+      key: n.key,
+      node: navLink(n),
+    })),
+    { key: 'about', node: <Link href={pagePath(locale, 'about')}>{c.nav.about}</Link> },
+    { key: 'contact', node: <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link> },
+  ];
   return (
     <header className="site-header">
       <div className="wrap header-row">
@@ -108,9 +120,19 @@ export function Header({
                 </ul>
               </details>
             </li>
-            {NAV_ANCHORS.map(n => (
+            {NAV_ANCHORS.filter(n => !MORE_KEYS.includes(n.key)).map(n => (
               <li key={n.key}>{navLink(n)}</li>
             ))}
+            <li className="nav-products nav-more">
+              <details>
+                <summary>{c.nav.more}</summary>
+                <ul>
+                  {moreItems.map(m => (
+                    <li key={m.key}>{m.node}</li>
+                  ))}
+                </ul>
+              </details>
+            </li>
           </ul>
           <details className="nav-menu">
             <summary>
@@ -139,6 +161,12 @@ export function Header({
               {NAV_ANCHORS.map(n => (
                 <li key={n.key}>{navLink(n)}</li>
               ))}
+              <li>
+                <Link href={pagePath(locale, 'about')}>{c.nav.about}</Link>
+              </li>
+              <li>
+                <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link>
+              </li>
               <li className="menu-wa">
                 <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
               </li>
