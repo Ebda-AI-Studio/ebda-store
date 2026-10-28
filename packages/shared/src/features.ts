@@ -56,6 +56,9 @@ export const FEATURE_KEYS_ARRAY = [
   // baseline (see plan-baselines.ts). A merchant only gets it via an
   // explicit super-admin StoreFeature override.
   'bundles',
+  // Egypt ETA e-receipt connector (2026-10-26, Ruling ETA-1). Per-store, OFF by default, in NO plan
+  // baseline: a super-admin StoreFeature override turns it on for a VAT-registered merchant.
+  'eta_ereceipt',
   // MCP agent-write ESCAPE HATCH (2026-09-09, Ruling M2). NOT part of any
   // plan baseline, so it is OFF for every store and the default posture is
   // ENFORCEMENT ON: the MCP write tools (add_to_cart, place_order) require
@@ -722,6 +725,21 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'المكوّنة، فلا يُحتسب أي صنف مرتين.',
     category: 'commerce',
     tier: 'addon',
+  },
+  eta_ereceipt: {
+    key: 'eta_ereceipt',
+    name: 'ETA e-receipts (Egypt)',
+    nameAr: 'الإيصال الإلكتروني (مصلحة الضرائب)',
+    description:
+      'For VAT-registered Egyptian merchants: send every paid order to the Egyptian Tax Authority ' +
+      'as an e-receipt using your own ETA credentials.',
+    descriptionAr:
+      'للتجار المسجّلين في ضريبة القيمة المضافة: إرسال كل طلب مدفوع لمصلحة الضرائب المصرية ' +
+      'كإيصال إلكتروني باستخدام بيانات الدخول الخاصة بك.',
+    category: 'operations',
+    tier: 'addon',
+    hidden: true,
+    superAdminToggleable: true,
   },
 };
 

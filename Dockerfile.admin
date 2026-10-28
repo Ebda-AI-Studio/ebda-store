@@ -11,6 +11,7 @@ COPY package.json package-lock.json* ./
 COPY apps/admin/package.json ./apps/admin/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/cf-schema/package.json ./packages/cf-schema/
+COPY packages/repo/package.json ./packages/repo/
 COPY packages/shared/package.json ./packages/shared/
 RUN npm ci --legacy-peer-deps
 

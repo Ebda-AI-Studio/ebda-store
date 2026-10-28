@@ -375,6 +375,11 @@ model Store {
   aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
   insightsRollupCron String  @default("daily") @map("insights_rollup_cron")
 
+  /// Customer Intelligence (CI-1, docs/plans/2026-10-28-customer-intelligence.md rule 3): the merchant's
+  /// opt-in to cross-store signals. Default OFF; only the (later) onboarding/settings write path sets it.
+  ciSharing          Boolean   @default(false) @map("ci_sharing")
+  ciSharingChangedAt DateTime? @map("ci_sharing_changed_at")
+
   // Relations
   owner                      User                        @relation(fields: [ownerId], references: [id])
   /// Encrypted provider credentials, split out of the routing table (R-EBDA-005).
@@ -499,6 +504,8 @@ model Store {
   @@index([createdAt])
   @@index([pendingDomain])
   @@map("stores")
+  etaConnection EtaConnection?
+  etaReceipts   EtaReceipt[]
 }
 
 /// Encrypted per-store provider credentials (R-EBDA-005, closes R-EBDA-002): moved out of
@@ -1764,6 +1771,10 @@ model Order {
   customerNotes               String?            @map("customer_notes")
   shippingAddress             Json               @map("shipping_address")
   billingAddress              Json               @map("billing_address")
+  /// Customer Intelligence (CI-1): normalised destination `EG-<gov>-<district>` (no street/building)
+  /// and the suite buyer key (HMAC of the E.164 phone); null when the order has no usable phone.
+  areaKey                     String?            @map("area_key")
+  buyerKey                    String?            @map("buyer_key")
   shippedAt                   DateTime?          @map("shipped_at")
   deliveredAt                 DateTime?          @map("delivered_at")
   reviewRequestSentAt         DateTime?          @map("review_request_sent_at")
@@ -2836,6 +2847,17 @@ model Shipment {
   // How many times booking with the carrier was tried (the Inngest retry counts here).
   createAttempts       Int       @default(0) @map("create_attempts")
   lastPolledAt         DateTime? @map("last_polled_at")
+  // Customer Intelligence (CI-1, docs/plans/2026-10-28-customer-intelligence.md 1.1). The three
+  // timestamps are the FIRST time the carrier reached that state and are never overwritten (they
+  // guard the first-time-only shipment events); deliveryAttempts counts failed-attempt statuses.
+  pickedUpAt           DateTime? @map("picked_up_at")
+  deliveredAt          DateTime? @map("delivered_at")
+  returnedAt           DateTime? @map("returned_at")
+  deliveryAttempts     Int       @default(0) @map("delivery_attempts")
+  // Why a COD parcel came back: what the carrier wrote (scrubbed, max 200 chars) and the closed code.
+  returnReasonRaw      String?   @map("return_reason_raw")
+  returnReasonCode     String?   @map("return_reason_code")
+  areaKey              String?   @map("area_key")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -5760,4 +5782,86 @@ model GoldRateSettings {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@map("gold_rate_settings")
+}
+
+// ==========================================
+// Egypt ETA e-receipt connector (Ruling ETA-1; docs/plans/2026-10-07-egypt-vat-and-eta.md)
+// ==========================================
+
+/// One row per store: the merchant's OWN ETA credentials (client id/secret, POS pre-shared key and the optional
+/// signing-bridge token) AES-256-GCM encrypted in `credentialsEnc` (encryption.service, JSON blob); never returned
+/// to a browser, masked on read. Behind the per-store `eta_ereceipt` feature (off by default).
+/// Store-scoped: the StoreDO table `eta_connections` (cf-schema), same columns.
+model EtaConnection {
+  id               String    @id @default(uuid())
+  storeId          String    @unique @map("store_id")
+  enabled          Boolean   @default(false)
+  /// 'preprod' | 'prod'
+  environment      String    @default("preprod")
+  credentialsEnc   String    @map("credentials_enc")
+  posSerial        String    @map("pos_serial")
+  branchCode       String    @map("branch_code")
+  activityCode     String    @map("activity_code")
+  /// An EGS item code the merchant registered and ETA approved ("EG-<RIN>-<internal code>").
+  defaultItemCode  String    @map("default_item_code")
+  address          Json
+  signingBridgeUrl String?   @map("signing_bridge_url")
+  /// Result of the last credential check ('ok' | ETA error code); never a message from ETA.
+  lastCheckStatus  String?   @map("last_check_status")
+  lastCheckedAt    DateTime? @map("last_checked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("eta_connections")
+}
+
+/// One e-receipt (sale or whole-order return) and its submission state. `document` is the exact JSON that was hashed
+/// into `uuid` and is re-sent unchanged on every retry (same uuid = ETA can dedupe). No FK to orders on purpose:
+/// a fiscal record must outlive order anonymisation; it cascades only with the store. Store-scoped (StoreDO).
+model EtaReceipt {
+  id             String    @id @default(uuid())
+  storeId        String    @map("store_id")
+  orderId        String    @map("order_id")
+  /// 'sale' | 'return'
+  kind           String
+  seq            Int       @default(1)
+  /// Return receipts: the Return id that caused it (order/refunded `partial.refundKey`), or 'full' for a whole-order
+  /// refund. Identifies one logical return across re-issues (seq grows, refundKey stays). NULL for sales.
+  refundKey      String?   @map("refund_key")
+  /// Sale: [{orderItemId, quantity}] aligned with document.itemData (goods lines first; fee lines have no entry).
+  /// Return: { items: [{orderItemId, quantity}], refundAmount } as carried by order/refunded. Lets a partial return be
+  /// built from the order's own lines.
+  lineMap        Json?     @map("line_map")
+  /// queued | retrying | submitted | accepted | rejected | failed | late | manual (@ebda/shared ETA_RECEIPT_STATUSES)
+  status         String    @default("queued")
+  environment    String
+  receiptNumber  String?   @map("receipt_number")
+  uuid           String?
+  previousUuid   String?   @map("previous_uuid")
+  document       Json?
+  totalPiastres  Int?      @map("total_piastres")
+  issuedAt       DateTime? @map("issued_at")
+  /// issuedAt + 24 h (the SDK submission window).
+  deadlineAt     DateTime? @map("deadline_at")
+  submissionUuid String?   @map("submission_uuid")
+  longId         String?   @map("long_id")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime? @map("next_attempt_at")
+  /// Stable machine code (ETA error code or ours); never a credential or a raw ETA body.
+  errorCode      String?   @map("error_code")
+  errorMessage   String?   @map("error_message")
+  acceptedAt     DateTime? @map("accepted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, orderId, kind, seq])
+  @@index([storeId, status, nextAttemptAt])
+  @@index([storeId, orderId])
+  @@index([storeId, orderId, refundKey])
+  @@index([status, nextAttemptAt])
+  @@map("eta_receipts")
 }

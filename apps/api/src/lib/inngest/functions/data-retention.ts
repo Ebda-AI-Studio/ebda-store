@@ -287,6 +287,8 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
                 shippingAddress: anonymizedJson,
                 billingAddress: anonymizedJson,
                 customerNotes: null,
+                buyerKey: null,
+                areaKey: null,
               },
             })
           )
