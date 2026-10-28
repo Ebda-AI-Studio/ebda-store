@@ -21,7 +21,8 @@
  * the BACKFILL: the first run after the Workers AI binding exists finds every un-embedded store.
  * The per-store daily cap (SEARCH_EMBED_STORE_DAILY_CAP) bounds what any one day embeds.
  */
-import { NonRetriableError, type InngestFunction } from 'inngest';
+import { NonRetriableError } from '../../jobs/errors';
+import type { JobDef } from '../../jobs/types';
 import { acrossStores, runInStoreScope } from '@ebda/database';
 import { inngest } from '../client';
 import {
@@ -249,7 +250,7 @@ async function isolate(
   return { ok: settled.ok, failures: settled.failures };
 }
 
-export const searchProductIndex: InngestFunction.Any = inngest.createFunction(
+export const searchProductIndex: JobDef = inngest.createFunction(
   {
     id: 'search-product-index',
     name: 'Search: embed stale products for a store',
@@ -302,7 +303,7 @@ export async function handleSearchIndexBackstop({
   return { stores: found.stores.length, failed: found.failed };
 }
 
-export const searchIndexBackstop: InngestFunction.Any = inngest.createFunction(
+export const searchIndexBackstop: JobDef = inngest.createFunction(
   {
     id: 'search-index-backstop',
     name: 'Search: find stores with stale embeddings (backstop + backfill)',

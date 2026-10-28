@@ -12,9 +12,9 @@
 //
 // What it does per store:
 //   1. Creates a BulkAiJob row in the DB for each sweep kind (faq_aeo,
-//      howto_aeo, meta_aeo) — required because Inngest handlers guard
+//      howto_aeo, meta_aeo) — required because the job handlers guard
 //      on jobId presence and update the row for progress tracking.
-//   2. Fires the matching Inngest event via the REST API.
+//   2. Starts the matching job as an `ebda-jobs` Workflow instance (wrangler).
 //   3. Throttles 3s between stores to smooth Gemini's RPM cap.
 //
 // Each store generates ~10 Gemini calls (8 FAQs + 3 HowTo + ~product-count
@@ -25,6 +25,7 @@
 // NOT yet run with --apply — left for Ahmad to fire when ready.
 
 import 'dotenv/config';
+import { execFileSync } from 'node:child_process';
 import { prisma } from '@ebda/database';
 
 const apply = process.argv.includes('--apply');
@@ -72,29 +73,24 @@ if (!apply) {
 // -----------------------------------------------------------------------
 // Apply mode — validate env before touching anything
 // -----------------------------------------------------------------------
-const inngestEventKey = process.env.INNGEST_EVENT_KEY;
-if (!inngestEventKey) {
-  console.error('✗ INNGEST_EVENT_KEY not set — cannot fire events without an event key.');
-  console.error('  Make sure you are running from apps/api/ and .env is present.');
-  await prisma.$disconnect();
-  process.exit(1);
-}
+// The sweeps run as Cloudflare Workflow instances of the `ebda-jobs` Workflow (the same params the API's
+// dispatcher uses: { fn, event }). This script starts them with the wrangler CLI, so run it from a
+// shell logged in to the Cloudflare account that owns ebda-api (`npx wrangler whoami`).
+const JOB_FOR_EVENT = {
+  'bulk-ai/faq-aeo-requested': 'bulk-ai-faq-aeo',
+  'bulk-ai/howto-aeo-requested': 'bulk-ai-howto-aeo',
+  'bulk-ai/meta-aeo-requested': 'bulk-ai-meta-aeo',
+};
 
-// Inngest Cloud REST endpoint for sending events.
-// In dev (no event key), the SDK uses the local DevServer — but for a
-// script we send directly via HTTP either way.
-const inngestUrl = `https://inn.gs/e/${inngestEventKey}`;
-
-async function fireInngestEvent(name, data) {
-  const res = await fetch(inngestUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, data, ts: Date.now() }),
+function fireJobEvent(name, data) {
+  const fn = JOB_FOR_EVENT[name];
+  if (!fn) throw new Error(`no job for event ${name}`);
+  const id = `backfill-${fn}-${data.jobId}`.slice(0, 100);
+  const params = JSON.stringify({ fn, event: { name, id, data, ts: Date.now() } });
+  execFileSync('npx', ['wrangler', 'workflows', 'trigger', 'ebda-jobs', params, '--id', id], {
+    cwd: new URL('../apps/api', import.meta.url).pathname,
+    stdio: 'pipe',
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '(no body)');
-    throw new Error(`Inngest HTTP ${res.status}: ${body}`);
-  }
 }
 
 // -----------------------------------------------------------------------
@@ -113,7 +109,7 @@ for (const store of stores) {
       data: { storeId: store.id, kind: 'faq_aeo' },
       select: { id: true },
     });
-    await fireInngestEvent('bulk-ai/faq-aeo-requested', {
+    await fireJobEvent('bulk-ai/faq-aeo-requested', {
       jobId: faqJob.id,
       storeId: store.id,
       count: 8,
@@ -125,7 +121,7 @@ for (const store of stores) {
       data: { storeId: store.id, kind: 'howto_aeo' },
       select: { id: true },
     });
-    await fireInngestEvent('bulk-ai/howto-aeo-requested', {
+    await fireJobEvent('bulk-ai/howto-aeo-requested', {
       jobId: howtoJob.id,
       storeId: store.id,
       count: 3,
@@ -137,7 +133,7 @@ for (const store of stores) {
       data: { storeId: store.id, kind: 'meta_aeo' },
       select: { id: true },
     });
-    await fireInngestEvent('bulk-ai/meta-aeo-requested', {
+    await fireJobEvent('bulk-ai/meta-aeo-requested', {
       jobId: metaJob.id,
       storeId: store.id,
     });
@@ -150,7 +146,7 @@ for (const store of stores) {
     // Continue with remaining stores — one failure should not abort the sweep.
   }
 
-  // Throttle between stores so Inngest's queue + Gemini's RPM cap are not
+  // Throttle between stores so the jobs queue + Gemini's RPM cap are not
   // overwhelmed by a burst. Handlers themselves throttle per-item at
   // AI_BULK_THROTTLE_MS (default 2.5s), so the queue settles naturally.
   if (idx < stores.length) {
@@ -163,7 +159,7 @@ for (const store of stores) {
 // -----------------------------------------------------------------------
 console.log(`\n✓ Done. Queued: ${succeeded} stores, Failed: ${failed} stores.`);
 if (succeeded > 0) {
-  console.log('\nInspect progress in the Inngest dashboard or via:');
+  console.log('\nInspect progress with `npx wrangler workflows instances list ebda-jobs` or via:');
   console.log(
     `  node -e "const {prisma}=await import('@ebda/database'); console.log(JSON.stringify(await prisma.bulkAiJob.findMany({where:{status:'running'},select:{id:true,kind:true,storeId:true,processed:true,total:true},take:20}),null,2)); await prisma.$disconnect()"`
   );

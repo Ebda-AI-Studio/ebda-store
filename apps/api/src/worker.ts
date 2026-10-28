@@ -297,7 +297,7 @@ async function floodGuard(
   env: CfBindings,
   path: string
 ): Promise<Response | null> {
-  if (!env.RATE_LIMITER || path === '/health' || path.startsWith('/api/v1/inngest')) return null;
+  if (!env.RATE_LIMITER || path === '/health') return null;
   const ip = request.headers.get('cf-connecting-ip');
   if (!ip) return null;
   try {
@@ -398,7 +398,7 @@ async function scheduled(
  * runs inside `withWorkerContext`, so it has the bindings and its own leased database client
  * exactly like a request or a queue batch.
  */
-export class JobWorkflow extends WorkflowEntrypoint<CfBindings, JobParams> {
+class JobWorkflowBase extends WorkflowEntrypoint<CfBindings, JobParams> {
   async run(
     event: { payload: Readonly<JobParams>; instanceId: string },
     step: Parameters<typeof runJobWorkflow>[0]['step']
@@ -460,21 +460,30 @@ export class IdentityMailer extends WorkerEntrypoint<CfBindings> {
 
 // Errors, cron and queue failures go to Sentry (`@sentry/cloudflare`); with no SENTRY_DSN the
 // client is disabled and this is a pass-through.
-export default Sentry.withSentry(
-  (env: CfBindings) => ({
-    dsn: typeof env.SENTRY_DSN === 'string' ? env.SENTRY_DSN : undefined,
-    enabled: typeof env.SENTRY_DSN === 'string' && env.SENTRY_DSN.length > 0,
-    environment: typeof env.NODE_ENV === 'string' ? env.NODE_ENV : undefined,
-    release:
-      typeof env.BUILD_COMMIT_SHA === 'string' && env.BUILD_COMMIT_SHA
-        ? env.BUILD_COMMIT_SHA
-        : undefined,
-    tracesSampleRate: 0.1,
-    // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
-    // a transaction or a breadcrumb (search log review, fix-the-class).
-    beforeSend: event => scrubSentryEvent(event),
-    beforeSendTransaction: event => scrubSentryEvent(event),
-    beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
-  }),
-  handler as never
-);
+const sentryOptions = (env: CfBindings): Sentry.CloudflareOptions => ({
+  dsn: typeof env.SENTRY_DSN === 'string' ? env.SENTRY_DSN : undefined,
+  enabled: typeof env.SENTRY_DSN === 'string' && env.SENTRY_DSN.length > 0,
+  environment: typeof env.NODE_ENV === 'string' ? env.NODE_ENV : undefined,
+  release:
+    typeof env.BUILD_COMMIT_SHA === 'string' && env.BUILD_COMMIT_SHA
+      ? env.BUILD_COMMIT_SHA
+      : undefined,
+  tracesSampleRate: 0.1,
+  // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+  // a transaction or a breadcrumb (search log review, fix-the-class).
+  beforeSend: event => scrubSentryEvent(event),
+  beforeSendTransaction: event => scrubSentryEvent(event),
+  beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
+});
+
+/**
+ * The job Workflow, instrumented: a run that fails after its retries (and its steps' spans) reaches
+ * Sentry like a request, queue batch or cron does. Inngest never reported to Sentry; this is the
+ * parity-plus (the failure also fires `inngest/function.failed` -> alerts-failure-watch).
+ */
+export const JobWorkflow = Sentry.instrumentWorkflowWithSentry(
+  sentryOptions,
+  JobWorkflowBase as never
+) as unknown as typeof JobWorkflowBase;
+
+export default Sentry.withSentry(sentryOptions, handler as never);

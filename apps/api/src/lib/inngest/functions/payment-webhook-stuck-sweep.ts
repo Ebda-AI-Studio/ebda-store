@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { webhookInbox } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -46,7 +46,7 @@ interface StuckRow {
 const STUCK_WEBHOOK_MINUTES = Number(process.env.STUCK_WEBHOOK_MINUTES) || 10;
 const SWEEP_TAKE = 200;
 
-export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunction(
+export const paymentWebhookStuckSweep: JobDef = inngest.createFunction(
   {
     id: 'payment-webhook-stuck-sweep',
     name: 'Payment webhook — sweep undelivered / wedged inbox rows',

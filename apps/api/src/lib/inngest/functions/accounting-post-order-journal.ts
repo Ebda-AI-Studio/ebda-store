@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -23,7 +23,7 @@ import { SentryService } from '../../../services/sentry.service';
  * between order-marked-paid and journal post. Mitigated by the daily
  * reconciliation job (Task 14) which catches any missed posts.
  */
-export const accountingPostOrderJournal: InngestFunction.Any = inngest.createFunction(
+export const accountingPostOrderJournal: JobDef = inngest.createFunction(
   {
     id: 'accounting-post-order-journal',
     name: 'Accounting — post journal on order paid',

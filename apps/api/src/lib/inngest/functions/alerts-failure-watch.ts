@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import logger from '../../logger';
@@ -21,7 +21,7 @@ import logger from '../../logger';
  * facing P0. If a P0 surface (payment fan-out, order-created) shows
  * up here we can promote later by inspecting function_id.
  */
-export const alertsFailureWatch: InngestFunction.Any = inngest.createFunction(
+export const alertsFailureWatch: JobDef = inngest.createFunction(
   {
     id: 'alerts-failure-watch',
     name: 'Alert on Inngest function past-final-retry failure',
