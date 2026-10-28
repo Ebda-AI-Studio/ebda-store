@@ -423,10 +423,9 @@ html[lang='en'] .wm-name {
 }
 @media (max-width: 520px) {
   .wm-name {
-    white-space: normal;
+    white-space: nowrap;
     font-size: 0.8rem;
     line-height: 1.25;
-    max-width: 7.5rem;
   }
   .link-login,
   .header-actions .lang-toggle {
@@ -477,13 +476,23 @@ html[lang='en'] .wm-name {
 @media (max-width: 400px) {
   /* 360px: wordmark + menu + WhatsApp + start must fit one row (the start button overflowed the viewport by 21px in Arabic) */
   .wm-name {
-    max-width: 6.5rem;
+    font-size: 0.8125rem;
+  }
+  /* the full studio name stays on one line; the mark gives its room up (it is decorative, the name is the link label) */
+  .wordmark img {
+    display: none;
   }
   .header-actions .btn {
     padding: 0 10px;
   }
   .header-actions .wa-compact {
     display: none;
+  }
+}
+
+@media (max-width: 374px) {
+  .wm-name {
+    font-size: 0.75rem;
   }
 }
 
@@ -603,7 +612,9 @@ html[lang='ar'] .hero h1 {
   }
   .hero-visual {
     display: grid;
-    place-items: center;
+    align-items: center;
+    justify-items: start; /* the phone sits next to the copy, not stranded at the far edge of its column */
+    padding-inline-start: clamp(0px, 3vw, 48px);
   }
   .hero-phone {
     --w: min(300px, calc((100svh - 190px) / 2.07));
