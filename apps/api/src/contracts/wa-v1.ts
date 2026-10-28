@@ -5,7 +5,7 @@
  *
  * Consumers dedupe on `id`. Ordering is not guaranteed: entity events carry `updatedAt`, and an older one is dropped.
  */
-import { z } from 'zod/v3';
+import { z } from 'zod';
 
 /** The minor version of this contract (envelope `v` stays 1: every change so far is additive). v1.5 = `customer.consent_changed.wording`. */
 export const CONTRACT_VERSION = '1.5';
