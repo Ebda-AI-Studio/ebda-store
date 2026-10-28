@@ -1,24 +1,24 @@
 {
   "_doc": "Budget for the API Worker's startup, enforced by scripts/ci/worker-startup-budget.mjs (CI: Worker dry-run (api)). Cloudflare rejects a deploy whose global scope exceeds its startup CPU limit (error 10021, hit once after the B2B merge). Local workerd numbers are not Cloudflare's, so these are REGRESSION gates with headroom over the recorded baseline, not the platform limit. Raise one only with a Ruling that says why. The absolute startupCpuMs ceiling is enforced on main/nightly runs (quiet runner); pull requests compare against main's bundle measured in the same job (relative.ratio + relative.slackMs).",
   "startupCpuMs": 140,
-  "bundleBytes": 15500000,
-  "bundleGzipBytes": 3400000,
+  "bundleBytes": 8300000,
+  "bundleGzipBytes": 2400000,
   "baseline": {
-    "recorded": "2026-10-22",
+    "recorded": "2026-10-28",
     "before": {
-      "startupCpuMs": 164,
-      "bundleBytes": 14722076,
-      "bundleGzipBytes": 3092899
+      "startupCpuMs": 91.6,
+      "bundleBytes": 14288016,
+      "bundleGzipBytes": 3005070
     },
     "after": {
-      "startupCpuMs": 90,
-      "bundleBytes": 14244673,
-      "bundleGzipBytes": 3020756
+      "startupCpuMs": 99.2,
+      "bundleBytes": 7518999,
+      "bundleGzipBytes": 2171018
     }
   },
   "relative": {
     "ratio": 0.25,
     "slackMs": 15
   },
-  "_ruling": "Ruling ID-17 (docs/rulings/ID-17.md): the identity work adds +83019 B to the api bundle (jose 35.6 KB, invites, identity mail), measured against main. The ceiling itself is set by main (15500000)."
+  "_ruling": "Ruling BUNDLE-BUDGET-4 (docs/rulings/BUNDLE-BUDGET-4.md): minify + upload_source_maps in apps/api/wrangler.jsonc cut the bundle 14,288,016 -> 7,518,999 B; the size ceilings are the new size + 10%. Supersedes BUNDLE-BUDGET-3 and the +83019 B note of ID-17 (already included)."
 }
