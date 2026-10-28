@@ -64,6 +64,23 @@ export interface EmailBindingLike {
   }): Promise<{ messageId: string }>;
 }
 
+/** R2 bucket, as the CI sink uses it (conditional put returns null when the precondition fails). */
+export interface R2BucketCasLike {
+  get(
+    key: string
+  ): Promise<{ text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer>; etag: string } | null>;
+  put(
+    key: string,
+    value: string | Uint8Array,
+    opts?: { onlyIf?: { etagMatches?: string; etagDoesNotMatch?: string } }
+  ): Promise<unknown | null>;
+}
+
+/** Analytics Engine dataset binding. */
+export interface AnalyticsEngineLike {
+  writeDataPoint(point: { indexes?: string[]; blobs?: string[]; doubles?: number[] }): void;
+}
+
 export interface CfBindings {
   HYPERDRIVE: { connectionString: string };
   /** Public caches (store/product payloads). Eventual consistency is fine for these. */
@@ -86,6 +103,10 @@ export interface CfBindings {
   JOB_GATE?: DurableObjectNamespaceLike;
   /** One SQLite Durable Object per store: its recurring jobs as an alarm (src/cf/store-schedule.ts). */
   STORE_SCHEDULE?: DurableObjectNamespaceLike;
+  /** Customer Intelligence capture (lib/ci): events in, R2 `ebda-ci` + Analytics Engine out. */
+  CI_EVENTS_QUEUE?: QueueProducerLike;
+  CI_BUCKET?: R2BucketCasLike;
+  CI_OUTCOMES?: AnalyticsEngineLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */

@@ -222,6 +222,18 @@ describe.each(['paymob'] as const)(
       expect(orderUpdate).not.toHaveBeenCalled();
     });
 
+    it('SEC-5: verifyWebhookDelivery (the route pre-check) rejects a forged signature and touches no payment', async () => {
+      providerVerify.mockReturnValue(false);
+      await expect(
+        PaymentService.verifyWebhookDelivery(provider, { fake: true }, 'forged', STORE_ID)
+      ).rejects.toMatchObject({ code: 'INVALID_SIGNATURE' });
+      await expect(
+        PaymentService.verifyWebhookDelivery(provider, { fake: true }, undefined, STORE_ID)
+      ).rejects.toMatchObject({ code: 'MISSING_SIGNATURE' });
+      expect(paymentFindFirst).not.toHaveBeenCalled();
+      expect(paymentUpdate).not.toHaveBeenCalled();
+    });
+
     it('an underpaid "completed" webhook never marks the order paid and raises the p0 alert', async () => {
       providerVerify.mockReturnValue(true);
       mockPayment('pending', 'pending');

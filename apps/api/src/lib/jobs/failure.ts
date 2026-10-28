@@ -94,7 +94,22 @@ export async function reportJobFailure(
         extra: { instanceId: runId, triggeringEvent: event.name },
       }) || null;
     report.sentryFlushed = await Sentry.flush(3000);
-    if (!report.sentryFlushed) report.sentryProbe = await probeSentry(process.env.SENTRY_DSN);
+    if (!report.sentryFlushed) {
+      // The SDK client is not active in this step (measured: flush false while the ingest endpoint
+      // answers 200), so its event never leaves. Send the real failure straight to the ingest endpoint.
+      const direct = await probeSentry(process.env.SENTRY_DSN, fetch, {
+        message: `job failed: ${def.id}`,
+        errorName: error.name,
+        errorMessage: message,
+        tags: { job: def.id, group },
+        extra: { instanceId: runId, triggeringEvent: event.name },
+        environment: process.env.NODE_ENV,
+      });
+      report.sentryProbe = direct;
+      if ('status' in direct && direct.status === 200 && direct.eventId) {
+        report.sentryEventId = direct.eventId;
+      }
+    }
   } catch (err) {
     logger.warn({ err, job: def.id }, '[jobs] failure not sent to sentry');
   }

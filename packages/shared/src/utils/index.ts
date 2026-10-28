@@ -250,6 +250,7 @@ export function truncate(str: string, maxLength: number, suffix = '...'): string
 export { isHostInjectedScriptEvent } from './sentry-host-injected-filter';
 export {
   redactSensitiveQuery,
+  redactPathSecrets,
   urlCarriesSensitiveQuery,
   scrubSentryEvent,
   scrubSentryBreadcrumb,

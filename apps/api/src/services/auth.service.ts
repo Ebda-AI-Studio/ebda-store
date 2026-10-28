@@ -1,4 +1,5 @@
 import { InstapayReceiptService } from './payment-providers/instapay-receipt.service';
+import { scrubProviderVerifier } from './provider-verification.service';
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -43,6 +44,8 @@ import {
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { buyerKeyForErasure } from '../lib/wa/buyer-key';
+import { exportCiOutcomes } from '../lib/ci/export';
+import { ciSinceDay } from '../lib/ci/layout';
 import {
   WhatsAppConsentService,
   lockAccountConsent,
@@ -1470,7 +1473,7 @@ export class AuthService {
           const user = await prisma.user.findUnique({ where: { id: userId } });
           if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
           if (user.phone && toE164(user.phone) !== toE164(data.phone!)) {
-            await revokeForPhoneChangeInTx(storeId, user.phone);
+            await revokeForPhoneChangeInTx(storeId, userId, user.phone);
           }
           return prisma.user.update({
             where: { id: userId },
@@ -1975,6 +1978,18 @@ export class AuthService {
     const buyerKey = await buyerKeyForErasure(user.phone);
     // Set by `anonymize` below: the user's token version after the erase bumps it.
     let erasedTokenVersion: number | undefined;
+    // Customer Intelligence erase scope, collected BEFORE the scrub nulls the keys: the account's OWN orders in
+    // its store (and the keys on them) are always erased; a buyer-key erase happens only for a phone the
+    // account proved it holds (`eraseProvenBuyerKey`, the WA-CONSENT-1 proof) and only in the store that proof was made in. A buyer key is a hash of a phone
+    // someone typed at checkout, so it never widens the scope on its own.
+    let ciScope:
+      | { storeId: string; orderIds: string[]; buyerKeys: string[]; sinceDay?: string }
+      | undefined;
+    let ciProven: { storeId: string; buyerKeys: string[] } | undefined;
+    // The buyer key of the profile phone, ONLY when that phone is proven to be this account's (a delivered
+    // order). Set inside `anonymize`; it is what the `account/erased` event carries, so an attacker who
+    // typed a victim's number cannot make WhatsApp erase the victim's contact (WA-CONSENT-PROOF-1).
+    let eraseProvenBuyerKey: string | undefined;
     // What the merchant-CRM scrub actually did (#1880) — returned to the
     // caller so a partial erasure is recorded and shown, not just logged.
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
@@ -1991,7 +2006,7 @@ export class AuthService {
       const consentStoreId = opts.scopeStoreId ?? eraseStoreId;
       if (!consentStoreId)
         throw new Error('[auth.eraseAccount] no store id for the consent erasure');
-      const eraseProvenBuyerKey =
+      eraseProvenBuyerKey =
         buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
           ? buyerKey
           : undefined;
@@ -2010,6 +2025,20 @@ export class AuthService {
         orderIds: erasedOrderIds,
         email: user.email,
       });
+      const ownOrders = await tx.order.findMany({
+        where: { customerId: userId, storeId: eraseStoreId },
+        select: { id: true, buyerKey: true, createdAt: true },
+      });
+      ciScope = {
+        storeId: eraseStoreId,
+        orderIds: ownOrders.map(o => o.id),
+        buyerKeys: [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+        // The prefix pass starts at the sink's partition day of the first order minus a margin (lib/ci/layout.ts).
+        sinceDay: ciSinceDay(ownOrders.map(o => o.createdAt)),
+      };
+      ciProven = eraseProvenBuyerKey
+        ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
+        : undefined;
       // InstaPay receipts of those orders: the payer's typed / AI-read personal fields and the screenshot go (M-025);
       // the amount, reference and status stay with the order's financial record.
       await InstapayReceiptService.scrubForOrders(tx, eraseStoreId, erasedOrderIds);
@@ -2025,6 +2054,9 @@ export class AuthService {
           shippingAddress: anonymizedAddressJson,
           billingAddress: anonymizedAddressJson,
           customerNotes: null,
+          // CI-1: the pseudonymous buyer key and the coarse area go with the identity.
+          buyerKey: null,
+          areaKey: null,
         },
       });
 
@@ -2049,6 +2081,9 @@ export class AuthService {
       // connection would commit independently — the hazard eraseAccount was
       // moved off).
       await deleteUserAddresses(userId);
+
+      // Platform state that names the user (a super-admin who confirmed a provider): null the id, keep the fact.
+      await scrubProviderVerifier(tx, userId);
 
       await tx.abandonedCart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
       await tx.cart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
@@ -2390,7 +2425,14 @@ export class AuthService {
         name: 'account/erased',
         // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
         // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
-        data: { userId, oneSignalPlayerIds, storeId: user.storeId ?? undefined, buyerKey },
+        data: {
+          userId,
+          oneSignalPlayerIds,
+          storeId: user.storeId ?? undefined,
+          buyerKey: eraseProvenBuyerKey,
+          ciProven,
+          ciScope,
+        },
       })
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
@@ -2586,6 +2628,18 @@ export class AuthService {
       provenKey
     );
 
+    // Customer Intelligence: the commerce outcomes recorded under this person's buyer key(s), pseudonymous.
+    const customerIntelligence = await exportCiOutcomes({
+      storeId,
+      orderIds: orders.map(o => o.id),
+      buyerKeys: [
+        ...new Set([
+          ...orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
+          ...(provenKey ? [provenKey] : []),
+        ]),
+      ],
+    });
+
     return {
       exportedAt: new Date().toISOString(),
       user,
@@ -2605,6 +2659,7 @@ export class AuthService {
       passkeys,
       smsMarketingConsents,
       whatsappMarketingConsent,
+      customerIntelligence,
       wholesaleApplications,
     };
   }

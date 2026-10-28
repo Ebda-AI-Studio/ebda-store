@@ -603,7 +603,10 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 
     res.json({
       success: true,
-      data: result,
+      // A customer's own list never carries the platform's CI columns (buyerKey, areaKey).
+      data: isStoreViewer
+        ? result
+        : { ...result, orders: result.orders.map(redactOrderForCustomer) },
     });
   } catch (error) {
     next(error);

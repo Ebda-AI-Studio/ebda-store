@@ -23,7 +23,10 @@ describe('generated schema is current', () => {
   });
   it('manifest', () => {
     expect(JSON.parse(read('generated/manifest.json'))).toEqual(
-      JSON.parse(JSON.stringify(manifest))
+      JSON.parse(JSON.stringify({ ...manifest, meta: undefined }))
+    );
+    expect(JSON.parse(read('generated/prisma-meta.json'))).toEqual(
+      JSON.parse(JSON.stringify(manifest.meta))
     );
   });
   it('no table passes the Durable Object column limit', () => {

@@ -134,25 +134,30 @@ export async function lockAccountConsent(userId: string): Promise<void> {
 }
 
 /** Revoke the old number's consent on the CURRENT transaction (see `lockAccountConsent`). */
-export async function revokeForPhoneChangeInTx(storeId: string, oldPhone: string): Promise<void> {
+export async function revokeForPhoneChangeInTx(
+  storeId: string,
+  userId: string,
+  oldPhone: string
+): Promise<void> {
   const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), oldPhone);
   if (!buyerKey) return;
+  // WA-CONSENT-PROOF-1: a profile phone is self-declared, so a customer who typed SOMEONE ELSE'S number
+  // and later changes it must not switch that person's consent off. Same rule as `revokeForAccount`:
+  // only rows this account owns, or every row of the number when it is PROVEN theirs.
+  const proven = await phoneOnOwnOrder(storeId, userId, oldPhone);
   await prisma.storeWhatsAppConsent.updateMany({
-    where: { storeId, buyerKey, granted: true },
+    where: { storeId, buyerKey, granted: true, ...(proven ? {} : { userId }) },
     data: { granted: false, revokedAt: new Date(), revokedSource: 'profile' },
   });
 }
 
 /** The customer changed their profile phone: the OLD number's consent ends; the new one needs a fresh tick. */
-export async function revokeForPhoneChange(storeId: string, oldPhone: string): Promise<void> {
-  const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), oldPhone);
-  if (!buyerKey) return;
-  await runInTenantContext(storeId, () =>
-    prisma.storeWhatsAppConsent.updateMany({
-      where: { storeId, buyerKey, granted: true },
-      data: { granted: false, revokedAt: new Date(), revokedSource: 'profile' },
-    })
-  );
+export async function revokeForPhoneChange(
+  storeId: string,
+  userId: string,
+  oldPhone: string
+): Promise<void> {
+  await runInTenantContext(storeId, () => revokeForPhoneChangeInTx(storeId, userId, oldPhone));
 }
 
 export const WhatsAppConsentService = {
@@ -207,13 +212,21 @@ export const WhatsAppConsentService = {
         select: { phone: true },
       });
       if (!user?.phone) return { status: 'no_phone' as const };
-      // A profile phone is self-declared, so GRANTING needs proof the number is theirs: it must be the
-      // number on a delivered order THIS customer placed. Withdrawing needs no proof.
-      if (input.consent && !(await phoneOnOwnOrder(storeId, userId, user.phone))) {
-        return { status: 'phone_unproven' as const };
-      }
+      // A profile phone is self-declared (WA-CONSENT-PROOF-1), so BOTH directions need it: GRANTING needs
+      // proof the number is theirs (a delivered order of THIS customer), and so does WITHDRAWING, unless
+      // the account already OWNS the row (it granted with proof earlier). Otherwise an attacker who typed
+      // a victim's number into their profile could switch the victim's consent off.
+      const proven = await phoneOnOwnOrder(storeId, userId, user.phone);
       const buyerKey = await buyerKeyFor(suiteBuyerKeySecret(), user.phone);
       if (!buyerKey) return { status: 'no_phone' as const };
+      if (!proven) {
+        if (input.consent) return { status: 'phone_unproven' as const };
+        const row = await prisma.storeWhatsAppConsent.findUnique({
+          where: { storeId_buyerKey: { storeId, buyerKey } },
+          select: { userId: true },
+        });
+        if (!row || row.userId !== userId) return { status: 'phone_unproven' as const };
+      }
       await writeConsent(storeId, buyerKey, {
         consent: input.consent,
         source: 'checkout',

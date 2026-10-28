@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 120,
+      "tables": 122,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -33,7 +33,7 @@
         "bundles": 15,
         "bundle_items": 5,
         "cart_bundles": 6,
-        "orders": 59,
+        "orders": 60,
         "order_events": 8,
         "order_items": 26,
         "payments": 17,
@@ -51,7 +51,7 @@
         "frequently_bought_together": 6,
         "ai_recommendation": 7,
         "shipping_carrier_configs": 12,
-        "shipments": 29,
+        "shipments": 30,
         "shipment_pickups": 20,
         "cod_remittances": 13,
         "affiliates": 18,
@@ -120,8 +120,10 @@
         "gold_rate_settings": 10,
         "store_whatsapp_links": 10,
         "store_whatsapp_consents": 12,
+        "eta_connections": 15,
+        "eta_receipts": 25,
         "store_profile": 62,
-        "store_config": 22,
+        "store_config": 24,
         "commerce_outcomes": 14,
         "do_flags": 2,
         "d1_outbox": 7
@@ -385,6 +387,14 @@
       "unique": true,
       "pgCols": "((\"details\" ->> 'claimId'))",
       "pgWhere": "\"event_type\" IN ('refund_webhook_absorbed', 'refund_failed')"
+    },
+    {
+      "name": "orders_store_buyer_key_created_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"buyer_key\", \"created_at\"",
+      "pgWhere": "\"buyer_key\" IS NOT NULL"
     },
     {
       "name": "provider_activation_requests_one_live",
@@ -1075,6 +1085,54 @@
     },
     {
       "kind": "check",
+      "name": "eta_connections_environment_check",
+      "table": "eta_connections",
+      "disposition": "store-do:eta_connections"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_kind_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_status_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_environment_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_return_reason_code_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_return_reason_raw_len_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_delivery_attempts_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "orders_buyer_key_check",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "check",
       "name": "billing_referrals_not_self",
       "table": "billing_referrals",
       "disposition": "d1:billing_referrals"
@@ -1417,6 +1475,12 @@
     },
     {
       "kind": "index",
+      "name": "orders_store_buyer_key_created_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
       "name": "instapay_receipts_retention_idx",
       "table": "instapay_receipts",
       "disposition": "d1:instapay_receipts"
@@ -1589,7 +1653,9 @@
       "aiFeaturesEnabled",
       "aiBulkThrottleMs",
       "aiNarrationEnabled",
-      "insightsRollupCron"
+      "insightsRollupCron",
+      "ciSharing",
+      "ciSharingChangedAt"
     ]
   }
 }

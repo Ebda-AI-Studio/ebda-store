@@ -671,6 +671,17 @@ export const SETTINGS: SettingEntry[] = [
     en: 'time zone timezone cairo clock',
     ar: 'المنطقة الزمنية توقيت القاهرة',
   }),
+  setting(
+    'tax.eta',
+    '/tax',
+    'eta.title',
+    'owner',
+    {
+      en: 'eta e-receipt electronic receipt egyptian tax authority pos serial client id secret',
+      ar: 'الايصال الالكتروني مصلحة الضرائب رقم الجهاز',
+    },
+    { feature: 'eta_ereceipt' }
+  ),
   // ── PWA / language / domain / SEO ──────────────────────────────────────────
   setting(
     'pwa.app-name',
@@ -929,7 +940,7 @@ export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
   '/delivery': 14,
   '/shipping': 20,
   '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
-  '/tax': 13,
+  '/tax': 16,
   '/pwa': 13,
   '/language': 0,
   '/domain': 1,
