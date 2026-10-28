@@ -15,7 +15,7 @@ import {
 import { loadLayoutFixture } from '../fixtures/builder/homepage-data';
 
 const base = (): PageDefinition =>
-  layoutToDefinition(resolveLayoutSettings(loadLayoutFixture('default-flow'), 'modern'));
+  layoutToDefinition(resolveLayoutSettings(loadLayoutFixture('default-flow'), 'qamar'));
 
 describe('aiPatchSchema', () => {
   it('accepts the allowed ops', () => {

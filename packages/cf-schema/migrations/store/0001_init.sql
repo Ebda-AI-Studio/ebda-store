@@ -1813,6 +1813,7 @@ CREATE TABLE IF NOT EXISTS "product_variants" (
 CREATE INDEX IF NOT EXISTS "product_variants_product_id_idx" ON "product_variants" ("product_id");
 CREATE INDEX IF NOT EXISTS "product_variants_sku_idx" ON "product_variants" ("sku");
 CREATE INDEX IF NOT EXISTS "product_variants_product_id_barcode_idx" ON "product_variants" (product_id, barcode) WHERE barcode IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "product_variants_product_id_barcode_uniq" ON "product_variants" ("product_id", "barcode") WHERE "barcode" IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS "products" (
   "id" TEXT NOT NULL,
@@ -1917,6 +1918,7 @@ CREATE INDEX IF NOT EXISTS "products_store_id_is_new_new_arrival_position_idx" O
 CREATE INDEX IF NOT EXISTS "products_store_id_is_best_seller_best_seller_position_idx" ON "products" ("store_id", "is_best_seller", "best_seller_position") WHERE "is_best_seller" = 1;
 CREATE UNIQUE INDEX IF NOT EXISTS "products_store_id_sku_key" ON "products" ("store_id", "sku") WHERE "deleted_at" IS NULL;
 CREATE INDEX IF NOT EXISTS "products_gold_reprice_idx" ON "products" ("store_id", "gold_karat") WHERE "pricing_mode" = 'gold_rate' AND "deleted_at" IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "products_store_id_barcode_uniq" ON "products" ("store_id", "barcode") WHERE "barcode" IS NOT NULL AND "deleted_at" IS NULL;
 
 CREATE TABLE IF NOT EXISTS "profit_anomalies" (
   "id" TEXT NOT NULL,

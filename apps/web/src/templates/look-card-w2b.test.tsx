@@ -81,13 +81,8 @@ vi.mock('next/link', () => ({
 
 const adapters = await import('./adapters');
 const { StorefrontProductCard } = await import('./shared/StorefrontProductCard');
-const { default: MinimalProductCard } = await import('./minimal/ProductCard');
-const SKIN_CARDS = {
-  modern: (await import('./modern/ProductCard')).default,
-  elegant: (await import('./elegant/ProductCard')).default,
-  classic: (await import('./classic/ProductCard')).default,
-  bold: (await import('./bold/ProductCard')).default,
-};
+const { default: BaseProductCard } = await import('./base/ProductCard');
+const SKIN_CARDS = {};
 const { ProductCarousel } = await import('./shared/ProductCarousel');
 const { ProductListItem } = await import('../app/products/ProductListItem');
 const { lookCardCta, lookCtaVisible, overPhotoMaterial, OVER_PHOTO_INK } =
@@ -115,7 +110,7 @@ const product = (k: Kind) =>
 
 function selectLook(look: string | null) {
   state.look = look;
-  state.template = look ? 'qamar' : 'minimal';
+  state.template = 'qamar';
   // The "New" chip is a merchant switch, off by default (Ruling D1016-NEW-1): these cases test the
   // chip's geometry and tone, so the switch is on.
   state.theme = {
@@ -152,10 +147,10 @@ const PATHS: Array<[string, (k: Kind) => React.ReactElement]> = [
       ),
   ],
   [
-    'minimal/ProductCard',
+    'base/ProductCard',
     k =>
       React.createElement(
-        MinimalProductCard as never,
+        BaseProductCard as never,
         {
           product: product(k),
           isRtl: true,
@@ -257,7 +252,7 @@ describe.each(PATHS)('%s', (name, path) => {
       const add = ctas(plain.container);
       expect(add.length, look).toBe(1);
       // The minimal skin's add is already its own quiet underlined text link (no slab).
-      if (name !== 'minimal/ProductCard') expect(add[0].className, look).toContain('border-input');
+      if (name !== 'base/ProductCard') expect(add[0].className, look).toContain('border-input');
       expect(add[0].className, look).not.toContain('bg-primary');
       cleanup();
       const out = render(path('soldOut'));
@@ -401,11 +396,11 @@ describe('StorefrontProductCard NEW chip never shares the heart corner', () => {
   });
 });
 
-describe('minimal/ProductCard chips (the Qamar search grid) follow cardBadge', () => {
+describe('base/ProductCard chips (the Qamar search grid) follow cardBadge', () => {
   const card = () =>
     render(
       React.createElement(
-        MinimalProductCard as never,
+        BaseProductCard as never,
         {
           product: { ...product('plain'), isNew: true },
           isRtl: true,
@@ -500,11 +495,11 @@ describe('StorefrontProductCard fills its column on a look store (IA-05)', () =>
   });
 });
 
-describe('minimal/ProductCard fills its column on a look store too (IA-05, search grid)', () => {
+describe('base/ProductCard fills its column on a look store too (IA-05, search grid)', () => {
   const root = () =>
     render(
       React.createElement(
-        MinimalProductCard as never,
+        BaseProductCard as never,
         { product: product('plain'), isRtl: true } as never
       )
     ).container.firstElementChild as HTMLElement;
@@ -594,7 +589,7 @@ describe('one card anatomy on a look store: grid and carousel', () => {
         {
           products: [product('sale')],
           isRtl: true,
-          pack: 'minimal',
+          pack: 'base',
         } as never
       )
     ).container;
@@ -617,7 +612,7 @@ describe('one radius per look (LB-c)', () => {
     '%s: card image and heart use var(--radius); no pill, no disc',
     look => {
       selectLook(look);
-      for (const C of [StorefrontProductCard, MinimalProductCard]) {
+      for (const C of [StorefrontProductCard, BaseProductCard]) {
         const c = card(C);
         const img = c.querySelector('img')!.closest('div')!;
         expect(img.className).toContain('rounded-[var(--radius)]');
@@ -640,7 +635,7 @@ describe('one radius per look (LB-c)', () => {
 describe('the NEW chip is neutral on a look store (VT-b)', () => {
   it.each(['qamar.atelier', 'qamar.lookbook', 'qamar.vitrine'])('%s', look => {
     selectLook(look);
-    for (const C of [StorefrontProductCard, MinimalProductCard]) {
+    for (const C of [StorefrontProductCard, BaseProductCard]) {
       const c = render(
         React.createElement(
           C as never,

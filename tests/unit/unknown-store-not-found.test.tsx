@@ -17,7 +17,8 @@ vi.mock('@web/contexts/LanguageContext', () => ({
 }));
 
 const { UnknownHostNotFound } = await import('@web/components/UnknownHostNotFound');
-const { notFoundKind, unknownHostLinks } = await import('@web/lib/unknown-store-page');
+const { notFoundKind, unknownHostLinks, signupSlugForHost, signupUrlForSlug } =
+  await import('@web/lib/unknown-store-page');
 
 const render = (lang: 'en' | 'ar', links = unknownHostLinks({})) => {
   languageState.language = lang;
@@ -77,5 +78,54 @@ describe('notFoundKind', () => {
   it('a platform host (no store domain) gets the generic page', () => {
     expect(notFoundKind(null, { id: 'demo' })).toBe('unknown-host');
     expect(notFoundKind('', { id: 'store_1' })).toBe('unknown-host');
+  });
+});
+
+describe('404 on <slug>.ebda.app: offer that name, never another store', () => {
+  it('signupSlugForHost accepts only a valid, unreserved, unprotected store label under .ebda.app', () => {
+    expect(signupSlugForHost('nosuchstore123.ebda.app')).toBe('nosuchstore123');
+    expect(signupSlugForHost('Nosuchstore123.ebda.app:443')).toBe('nosuchstore123');
+    for (const bad of [
+      'crm.ebda.app', // reserved
+      'app.ebda.app', // reserved
+      'storedemo.ebda.app', // demo showroom
+      'paymob.ebda.app', // protected brand
+      'ab.ebda.app', // too short
+      'a--b.ebda.app', // double hyphen
+      'x.y.ebda.app', // multi-label
+      'amelia.example.com', // custom domain
+      'ebda.app',
+      '',
+      null,
+      undefined,
+    ]) {
+      expect(signupSlugForHost(bad as string | null | undefined), String(bad)).toBeNull();
+    }
+  });
+
+  it('shows the no-store line and the prefilled signup CTA (Arabic and English)', () => {
+    languageState.language = 'en';
+    const en = renderToStaticMarkup(
+      <UnknownHostNotFound links={unknownHostLinks({})} startSlug="nosuchstore123" />
+    );
+    expect(en).toContain('There’s no store at this address yet.');
+    expect(en).toContain('Start your store as “nosuchstore123”');
+    expect(en).toContain(`href="${signupUrlForSlug('nosuchstore123').replace(/&/g, '&amp;')}"`);
+    expect(signupUrlForSlug('nosuchstore123')).toBe(
+      'https://store.ebda.app/signup?slug=nosuchstore123'
+    );
+    languageState.language = 'ar';
+    const ar = renderToStaticMarkup(
+      <UnknownHostNotFound links={unknownHostLinks({})} startSlug="nosuchstore123" />
+    );
+    expect(ar).toContain('مفيش متجر على العنوان ده لسه.');
+    expect(ar).toContain('ابدأ متجرك باسم «nosuchstore123»');
+  });
+
+  it('no CTA and the old line when there is no claimable name (platform host, custom domain)', () => {
+    languageState.language = 'en';
+    const html = renderToStaticMarkup(<UnknownHostNotFound links={unknownHostLinks({})} />);
+    expect(html).toContain('This store doesn’t exist or hasn’t opened yet');
+    expect(html).not.toContain('/signup?slug=');
   });
 });

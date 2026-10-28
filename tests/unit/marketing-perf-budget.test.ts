@@ -46,6 +46,6 @@ describe('marketing performance budget', () => {
     expect(b.lcpMs).toBe(2500);
     expect(b.lcpGateMs).toBeGreaterThanOrEqual(b.lcpMs);
     expect(b.default.jsGzipKb).toBeLessThanOrEqual(200);
-    expect(b.pages['/'].jsGzipKb).toBeLessThanOrEqual(205);
+    expect(b.pages['/'].jsGzipKb).toBeLessThanOrEqual(208); // MKT-NAV-BUDGET-1 (was 205)
   });
 });

@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { UnknownHostNotFound } from '../components/UnknownHostNotFound';
 import { StoreNotFound } from '../components/StoreNotFound';
 import { getStore } from '../lib/store-resolver';
-import { notFoundKind, unknownHostLinks } from '../lib/unknown-store-page';
+import { notFoundKind, signupSlugForHost, unknownHostLinks } from '../lib/unknown-store-page';
 
 /**
  * 404 served by Next when a server-component calls `notFound()` or an unknown
@@ -25,5 +25,8 @@ export default async function NotFound() {
     return <StoreNotFound store={store} />;
   }
 
-  return <UnknownHostNotFound links={unknownHostLinks()} />;
+  // `<slug>.ebda.app` with no live store: offer that name (never any other store's).
+  return (
+    <UnknownHostNotFound links={unknownHostLinks()} startSlug={signupSlugForHost(storeDomain)} />
+  );
 }

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
@@ -13,6 +13,7 @@ import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
+import { recordQrScan, resolveQrScan } from '../services/qr.service';
 import { AppError } from '../middleware/error-handler';
 import {
   authenticate,
@@ -73,6 +74,7 @@ import {
   storefrontOrigin,
   CONTACT_HONEYPOT_FIELD,
   normalizeArabicSearch,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import {
   assertScalarQuery,
@@ -789,6 +791,33 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
       return;
     }
     res.json({ toSlug });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /qr/scan?kind=&slug= - resolve a printed QR code and count the scan (QR-1). Called
+// server-to-server by the storefront `/q/*` redirect with the shopper's store host in
+// x-store-domain. Unknown store, unknown/foreign slug, or a WhatsApp code with no number is a
+// 404 and writes nothing. Never cacheable: a cached answer would skip the count.
+const QR_NON_SHOPPER_UA =
+  /bot|crawl|spider|preview|facebookexternalhit|whatsapp|slack|telegram|twitter|embed|curl|wget/i;
+const qrScanQuery = z.object({
+  kind: z.enum(['store', 'product', 'category', 'whatsapp']),
+  slug: z.string().min(1).max(200).optional(),
+});
+router.get('/qr/scan', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { kind, slug } = qrScanQuery.parse(req.query);
+    const storeId = await getStoreIdFromRequest(req);
+    const resolved = await readInStoreContext(storeId, () => resolveQrScan(storeId, kind, slug));
+    // Link-preview fetchers (WhatsApp, Facebook, Slack...), crawlers and HEAD probes are not shoppers.
+    const ua = String(req.headers['user-agent'] ?? '');
+    if (req.method !== 'HEAD' && !QR_NON_SHOPPER_UA.test(ua)) {
+      await recordQrScan(storeId, resolved.kind, resolved.ref);
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data: { target: resolved.target, kind: resolved.kind } });
   } catch (err) {
     next(err);
   }
@@ -2269,6 +2298,9 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // pixel IDs — the tokens must never be exposed to anonymous visitors.
       const publicStore = {
         ...store,
+        // A store still holding a retired Force skin renders as its mapped Ebda template, at
+        // read time, with no database write (Ruling SKIN-DEL-8).
+        template: normalizeLegacyTemplate(store.template),
         marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
         settings: publicStoreSettings(store.settings),
         // The checkout/cart tax line needs the rate, not just the
@@ -2501,6 +2533,7 @@ router.get(
         // public storefront + edge cache (browser pixels use public IDs only).
         const publicStore = {
           ...store,
+          template: normalizeLegacyTemplate(store.template),
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
           settings: publicStoreSettings(store.settings),
           // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).

@@ -107,7 +107,7 @@ describe.skipIf(!hasDb)('invoice + analytics against Postgres', () => {
         data: {
           name: 'b2bia',
           slug: `b2bia-${SUF}`,
-          template: 'modern',
+          template: 'qamar',
           currency: 'EGP',
           ownerId: owner.id,
         },

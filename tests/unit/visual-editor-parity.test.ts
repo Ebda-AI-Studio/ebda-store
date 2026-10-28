@@ -173,7 +173,7 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
                   ? ['#112233']
                   : [];
         for (const value of values) {
-          const layout = resolveLayoutSettings({}, 'modern');
+          const layout = resolveLayoutSettings({}, 'qamar');
           // what the classic form does: layout[key] = { ...layout[key], [field]: value }
           const classic = {
             ...layout,
@@ -209,7 +209,7 @@ if (process.env.EDITOR_MATRIX_WRITE === '1') {
         ['hero', 'hero'],
         ['testimonials', 'testimonials'],
       ] as const) {
-        const layout = resolveLayoutSettings({}, 'modern');
+        const layout = resolveLayoutSettings({}, 'qamar');
         const doc = layoutToDefinition(layout);
         const node = doc.sections.find(n => n.type === type)!;
         let d = reduceDocument(doc, {

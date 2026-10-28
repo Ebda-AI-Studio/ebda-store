@@ -3,7 +3,7 @@
  * One definition for the typography PUT route and for the visual editor's draft patch
  * (`PageDefinition.typography`, see `builder/typography-draft.ts`).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Per-zone styling. Every field is optional so the merchant can leave
 // most zones inheriting from the template and only override the bits

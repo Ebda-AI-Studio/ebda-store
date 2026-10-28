@@ -1401,6 +1401,13 @@
           "optional": false,
           "external": true
         },
+        "qrScanDaily": {
+          "kind": "relation",
+          "type": "QrScanDaily",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
         "paymentEvents": {
           "kind": "relation",
           "type": "PaymentEvent",

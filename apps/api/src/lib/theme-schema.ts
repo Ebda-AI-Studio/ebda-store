@@ -3,7 +3,7 @@
  * `StoreService.updateTheme`). Moved out of `store.routes.ts` so the edge can be
  * tested without the router (Ruling D1016-NEW-2).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   LOOK_DENSITIES,
   LOOK_IMAGE_RATIOS,

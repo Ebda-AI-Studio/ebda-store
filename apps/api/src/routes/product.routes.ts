@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { ProductService } from '../services/product.service';
 import { requirePermission } from '../middleware/rbac';
@@ -83,6 +83,8 @@ const createProductSchema = z.object({
   // fixed      → piastres
   discountValue: z.number().int().min(0).optional().nullable(),
   sku: z.string().optional().nullable(),
+  /** BARCODE-1: EAN-13 / UPC-A (check digit verified) or Code 128 text; '' / null clears. */
+  barcode: z.string().max(100).optional().nullable(),
   inventory: z.number().int().min(0).optional(),
   // Per-product threshold for the LOW STOCK badge / merchant alerts.
   // Default lives on the schema (5). Without this in Zod, the createProductSchema

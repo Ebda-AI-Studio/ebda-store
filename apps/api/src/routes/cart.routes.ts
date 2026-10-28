@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { CartService } from '../services/cart.service';
 import { customerUserId } from '../middleware/auth';
 import { buyerFromRequest } from '../lib/buyer-identity';

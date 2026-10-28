@@ -19,7 +19,7 @@ vi.mock('../../../../../lib/api', () => ({
 
 import { SettingsPanel } from './SettingsPanel';
 
-const doc = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const doc = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 const hero = doc.sections.find(n => n.type === 'hero')!;
 
 function panel(focusField?: string) {
@@ -30,7 +30,7 @@ function panel(focusField?: string) {
       selection={{ sectionId: hero.id }}
       viewport="desktop"
       theme={undefined}
-      template="modern"
+      template="qamar"
       errors={[]}
       dispatch={vi.fn()}
       focusField={focusField}

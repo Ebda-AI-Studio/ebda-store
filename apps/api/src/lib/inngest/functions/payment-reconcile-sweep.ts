@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -137,7 +137,7 @@ export async function handlePaymentReconcileSweep(
   return { scanned: mismatches.length, alerted };
 }
 
-export const paymentReconcileSweep: InngestFunction.Any = inngest.createFunction(
+export const paymentReconcileSweep: JobDef = inngest.createFunction(
   {
     id: 'payment-reconcile-sweep',
     name: 'Payment reconcile — captured payment on cancelled order watch',

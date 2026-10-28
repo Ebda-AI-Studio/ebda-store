@@ -1,6 +1,6 @@
 'use client';
-import { getLook, resolveHeaderChrome } from '@ebda/shared';
-import MinimalHeader from '../minimal/Header';
+import { getLook, lockupFor, resolveHeaderChrome } from '@ebda/shared';
+import MinimalHeader from '../base/Header';
 import type { HeaderProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
 
@@ -16,6 +16,11 @@ export default function QamarHeader(props: HeaderProps) {
   );
   // The composed theme's wordmark size: merchant > look > skin (W2a T-01).
   return (
-    <MinimalHeader {...props} logoPlacement={placement} wordmarkSize={store?.theme?.wordmarkSize} />
+    <MinimalHeader
+      {...props}
+      lockup={lockupFor(store?.look, store?.template)}
+      logoPlacement={placement}
+      wordmarkSize={store?.theme?.wordmarkSize}
+    />
   );
 }

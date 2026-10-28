@@ -19,7 +19,7 @@ import {
   DISABLED_VARIANT_STOCK_VALUE_SQL,
   storeStockValueFils,
 } from '../lib/effective-inventory-sql';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';

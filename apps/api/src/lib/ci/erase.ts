@@ -233,3 +233,8 @@ export async function eraseCiBuyerInStore(
     sinceDay
   );
 }
+
+/** Drops a buyer's index entry once EVERY store it listed has been erased (the whole-index customer erase). */
+export async function dropCiBuyerIndex(ci: CiBucket, buyerKey: string) {
+  await ci.delete(ciBuyerIndexKey(buyerKey));
+}

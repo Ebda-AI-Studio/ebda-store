@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Store-wide delivery estimate (`Store.settings.deliveryDays`), in BUSINESS days.

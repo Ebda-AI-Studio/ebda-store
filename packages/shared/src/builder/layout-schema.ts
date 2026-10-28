@@ -8,7 +8,7 @@
  * (`tests/unit/layout-schema-parity.test.ts`) still guards the silent-strip
  * class against `LAYOUT_TOP_LEVEL_KEYS`.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { isSafeUrl } from '../utils/safe-url';
 import { LEGACY_HOME_SECTION_KEYS } from './section-keys';
 

@@ -100,17 +100,27 @@ describe('middleware — the Host alone picks the store', () => {
     expect(res.headers.get('set-cookie') ?? '').not.toContain('x-store-slug');
   });
 
-  it.each([
-    'admin.ebda.app',
-    'api.ebda.app',
-    'orders.ebda.app',
-    'docs.ebda.app',
-    'whatsapp.ebda.app',
-  ])('platform service host %s is not served by the storefront (404, no store)', host => {
-    const res = middleware(at(host, '/'));
-    expect(res.status).toBe(404);
-    expect(forwarded(res, 'x-store-domain')).toBeNull();
-  });
+  it.each(['admin.ebda.app', 'api.ebda.app', 'orders.ebda.app', 'docs.ebda.app'])(
+    'platform service host %s is not served by the storefront (404, no store)',
+    host => {
+      const res = middleware(at(host, '/'));
+      expect(res.status).toBe(404);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(forwarded(res, 'x-store-domain')).toBeNull();
+    }
+  );
+
+  // Upcoming products: Ebda AI Studio's coming-soon page (200 + noindex), still no store and nothing cacheable.
+  it.each(['whatsapp.ebda.app', 'wa.ebda.app', 'crm.ebda.app'])(
+    'upcoming product host %s is a coming-soon page, never a store',
+    host => {
+      const res = middleware(at(host, '/'));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-robots-tag')).toContain('noindex');
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(forwarded(res, 'x-store-domain')).toBeNull();
+    }
+  );
 
   it.each([
     'store.ebda.app', // there is no store.ebda.app

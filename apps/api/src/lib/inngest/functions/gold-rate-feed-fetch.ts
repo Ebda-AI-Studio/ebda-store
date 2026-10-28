@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInStoreScope, withStore } from '@ebda/database';
 import { GOLD_KARATS } from '@ebda/shared';
 import logger from '../../logger';
@@ -211,7 +211,7 @@ export async function handleGoldRateFeedFetch(
   }
 }
 
-export const goldRateFeedFetchCron: InngestFunction.Any = inngest.createFunction(
+export const goldRateFeedFetchCron: JobDef = inngest.createFunction(
   {
     id: 'gold-rate-feed-fetch',
     name: 'Gold rate — automatic feed (6-hourly)',

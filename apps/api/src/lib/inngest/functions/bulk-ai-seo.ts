@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
@@ -67,7 +67,7 @@ function needsSeo(entity: {
   );
 }
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type when the returned object mixes a plain string[]
 // with a richer array-of-objects sibling (the annotation widens the
@@ -486,4 +486,4 @@ const bulkAiSeoFn = inngest.createFunction(
     }); // end runInStoreScope
   }
 );
-export const bulkAiSeo: InngestFunction.Any = bulkAiSeoFn;
+export const bulkAiSeo: JobDef = bulkAiSeoFn;

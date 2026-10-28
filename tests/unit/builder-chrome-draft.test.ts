@@ -15,7 +15,7 @@ import {
   type PageDefinition,
 } from '@ebda/shared';
 
-const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'), 'home');
+const BASE = layoutToDefinition(resolveLayoutSettings({}, 'qamar'), 'home');
 
 describe('draftChromeSchema', () => {
   it.each(['/products', '#top', 'https://example.com/a', 'mailto:a@b.co', 'tel:+201000000000', ''])(
@@ -165,7 +165,7 @@ describe('rebaseDraftOntoLive (classic save vs pending visual draft)', () => {
       chrome: { navMenu: [{ label: 'a', href: '/' }] },
     };
     const next = layoutToDefinition(
-      resolveLayoutSettings({ header: { sticky: true } }, 'modern'),
+      resolveLayoutSettings({ header: { sticky: true } }, 'qamar'),
       'home'
     );
     const out = rebaseDraftOntoLive(draft, BASE, next);

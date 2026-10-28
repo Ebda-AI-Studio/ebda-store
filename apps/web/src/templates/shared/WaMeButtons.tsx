@@ -7,7 +7,7 @@
  *
  * A button renders only when the store has a valid Egyptian WhatsApp number
  * AND the matching merchant toggle is not off (`resolveWaMeVisibility`). All
- * five themes share the product page and the order pages, so these three
+ * every template shares the product page and the order pages, so these three
  * components are the single storefront implementation.
  */
 

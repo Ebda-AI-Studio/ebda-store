@@ -4,6 +4,7 @@ import { COPY } from '../lib/content';
 import { NavBehavior } from './NavBehavior';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
+import { HeaderSearch } from './HeaderSearch';
 import {
   HOME,
   LOGIN_URL,
@@ -155,6 +156,7 @@ export function Header({
           </details>
         </nav>
         <div className="header-actions">
+          <HeaderSearch locale={locale} />
           <Link
             href={pagePath(other, page)}
             hrefLang={other}

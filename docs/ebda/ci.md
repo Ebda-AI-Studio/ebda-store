@@ -8,6 +8,12 @@ Umbra (Ebda Store's self-hosted runner): every job is `runs-on: ubuntu-latest`, 
 `tests/unit/workflow-hosted-runners-only.test.ts` fails the build if a
 self-hosted label, `vars.USE_SELF_HOSTED` or `SCHEDULED_ON_CLOUD` reappears.
 
+> **Integration on pull requests (2026-10-25, #227).** The integration tier is still a main-lane job, but a PR now runs it
+> when `scripts/ci-affected.mjs` selects it: a changed `tests/integration/*.test.ts` runs that file; a changed file under
+> `apps/api/src` runs the integration tests that import it (the services/routes/middleware they cover); a changed shared
+> fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
+> feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
+
 ## Lanes
 
 | Trigger                     | Runs                                                                                                                                                                                                                                          |

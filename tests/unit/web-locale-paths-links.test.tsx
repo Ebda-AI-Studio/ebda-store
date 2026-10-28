@@ -19,7 +19,7 @@ import {
 import { LocalePathProvider } from '../../apps/web/src/contexts/LocalePathContext';
 
 const ctx = vi.hoisted(() => ({
-  store: { id: 'store-1', name: 'Demo', template: 'modern', look: null } as Record<string, unknown>,
+  store: { id: 'store-1', name: 'Demo', template: 'qamar', look: null } as Record<string, unknown>,
   language: 'ar' as 'en' | 'ar',
 }));
 
@@ -85,18 +85,7 @@ describe('every storefront component uses StoreLink, never next/link directly', 
   });
 });
 
-const PACKS = [
-  'modern',
-  'elegant',
-  'classic',
-  'minimal',
-  'bold',
-  'dahab',
-  'qamar',
-  'souq',
-  'jasmine',
-  'lamma',
-];
+const PACKS = ['dahab', 'qamar', 'souq', 'jasmine', 'lamma'];
 const branding = { name: 'Demo', nameAr: 'ديمو', logo: null };
 const navigation = [
   { href: '/', label: 'Home', labelAr: 'الرئيسية' },

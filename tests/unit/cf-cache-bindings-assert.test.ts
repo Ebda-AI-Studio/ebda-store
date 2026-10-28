@@ -110,7 +110,10 @@ describe('cf-setup-local.sh → assert-cf-cache-bindings.sh', () => {
 
 describe('ci.yml worker-dry-run runs generator → assertion → build → dry-run', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-  const job = ci.slice(ci.indexOf('\n  worker-dry-run:\n'), ci.indexOf('\n  build:\n'));
+  const job = ci.slice(
+    ci.indexOf('\n  worker-dry-run:\n'),
+    ci.indexOf('\n  # OPS-2: the PRODUCTION build')
+  );
 
   it('generates the config before building, then asserts it (issues 2089/2152/2154)', () => {
     const setupAt = job.indexOf('bash scripts/cf-setup-local.sh ${{ matrix.app }}');

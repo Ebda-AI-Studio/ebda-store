@@ -7,6 +7,7 @@ import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } fro
 // global alias would be ambiguous across apps/{web,admin,api,orders}).
 // Zero behavior change — Next.js resolves both forms identically.
 import { devSuffixesAllowed } from './src/lib/platform-host';
+import { studioHostResponse } from './studio-host';
 import { DEMO_LOOK_HEADER, parseDemoLook } from './src/lib/demo-look-param';
 import {
   LOCALE_PATH_HEADER,
@@ -463,6 +464,19 @@ function handlePlatformHost(requestHeaders: Headers): NextResponse {
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
+/**
+ * A host nobody serves. A bare label under `.ebda.app` gets Ebda AI Studio's branded page (a real 404, or
+ * a 200 "coming soon" for the named upcoming products); an IP, junk or another zone stays the plain 404.
+ */
+function unservedHostResponse(request: NextRequest, hostname: string): NextResponse {
+  const studio = studioHostResponse(
+    hostname,
+    request.headers.get('accept-language'),
+    request.nextUrl.searchParams.get('lang')
+  );
+  return studio ? studio.response : notFoundResponse();
+}
+
 function notFoundResponse(): NextResponse {
   return new NextResponse('Not found', {
     status: 404,
@@ -520,7 +534,7 @@ export function middleware(request: NextRequest) {
   // An IP, `localhost`, a reserved label with no surface (`store.ebda.app`), a
   // multi-label name under `.ebda.app` or any malformed Host is never a store
   // and never a page: 404, with no store lookup and nothing cacheable.
-  if (parsedHost.kind === 'invalid') return notFoundResponse();
+  if (parsedHost.kind === 'invalid') return unservedHostResponse(request, hostname);
 
   // www → apex canonical 301: for CUSTOM store domains, and for the platform's
   // own `www.ebda.app`. The www custom hostname is enrolled in
@@ -541,7 +555,7 @@ export function middleware(request: NextRequest) {
   // Platform hosts this Worker does not serve (app., api., orders., docs., …) are
   // misrouted traffic, not pages.
   if (parsedHost.kind === 'platform' && !SERVED_PLATFORM_APPS.has(parsedHost.app)) {
-    return notFoundResponse();
+    return unservedHostResponse(request, hostname);
   }
 
   const draftToken = request.nextUrl.searchParams.get('_layoutDraft');

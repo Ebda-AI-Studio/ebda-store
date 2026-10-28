@@ -48,7 +48,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const { default: QamarHeader } = await import('../../apps/web/src/templates/qamar/Header');
-const { default: MinimalHeader } = await import('../../apps/web/src/templates/minimal/Header');
+const { default: MinimalHeader } = await import('../../apps/web/src/templates/base/Header');
 
 const branding = { name: 'Qamar Demo', nameAr: 'قمر', logo: null };
 const nav = [
@@ -101,7 +101,7 @@ describe('qamar header', () => {
     // A flex item shrinks below its content only with a small min-width: min-w-11 (P2-N2's 44px
     // floor) still lets the name truncate, where min-w-0 used to.
     expect(html).toMatch(/\bmin-w-(0|11)\b/);
-    expect(html).toMatch(/class="[^"]*\btruncate\b[^"]*"[^>]*title="/);
+    expect(html).toMatch(/class="[^"]*\bline-clamp-2\b[^"]*"/);
     expect(html).toContain(`title="${longName}"`);
   });
   it('keeps cart, search and menu accessible in centre mode', () => {
@@ -115,14 +115,14 @@ describe('qamar header', () => {
 
 describe('minimal header is unchanged for every non-Qamar caller (C16)', () => {
   it('has no placement attribute without the prop', () => {
-    ctx.store = { ...ctx.store, template: 'minimal', look: null };
+    ctx.store = { ...ctx.store, template: 'qamar', look: null };
     expect(renderToStaticMarkup(<MinimalHeader branding={branding} />)).not.toContain(
       'data-logo-placement'
     );
   });
   for (const lang of ['ar', 'en'] as const) {
     it(`markup matches the pre-change snapshot (${lang})`, async () => {
-      ctx.store = { ...ctx.store, template: 'minimal', look: null };
+      ctx.store = { ...ctx.store, template: 'qamar', look: null };
       ctx.language = lang;
       const html = renderToStaticMarkup(
         <MinimalHeader branding={branding} navigation={nav} cartItemCount={2} />
@@ -157,9 +157,10 @@ describe('look-sized wordmark (W2a T-01)', () => {
   it('Atelier: 24px display wordmark, never tracked or uppercased; nav 14px untracked', () => {
     withTheme('qamar.atelier');
     const html = renderToStaticMarkup(<QamarHeader branding={branding} navigation={nav} />);
+    // G1 (template-match): with no logo the header paints the look's lockup (Atelier: 36px), never tracked caps.
     const mark = html.match(/<span[^>]*data-zone="storeName"[^>]*>/)![0];
-    expect(mark).toContain(wordmarkClass('lg'));
-    expect(mark).toContain('text-2xl');
+    expect(mark).toContain('data-lockup="stack"');
+    expect(html).toContain('font-size:36px');
     expect(mark).not.toMatch(/tracking-\[|ui-caps-toggle|uppercase/);
     const link = html.match(/<a[^>]*href="\/shop"[^>]*>/)![0];
     expect(link).toContain(WORDMARK_NAV_LINK_CLASS);
@@ -175,17 +176,17 @@ describe('look-sized wordmark (W2a T-01)', () => {
   it('Vitrine keeps its centred 24/30px wordmark through the token', () => {
     withTheme('qamar.vitrine');
     const html = renderToStaticMarkup(<QamarHeader branding={branding} />);
-    expect(html).toContain(wordmarkClass('xl'));
-    expect(html).toContain('text-2xl sm:text-3xl');
+    expect(html).toContain('data-lockup=');
+    expect(html).toMatch(/font-size:(5\d|6\d|7\d)px/); // the Vitrine lockup is the big Ruqaa wordmark
   });
   it('a merchant value beats the look (merchant > look)', () => {
+    // The token still decides the checkout/success wordmark and the composed theme; the header of a store with no
+    // logo now paints the lockup (G1), so precedence is asserted on the composed theme.
     withTheme('qamar.atelier', { wordmarkSize: 'xl' });
-    expect(renderToStaticMarkup(<QamarHeader branding={branding} />)).toContain(
-      wordmarkClass('xl')
-    );
+    expect((ctx.store.theme as { wordmarkSize?: string }).wordmarkSize).toBe('xl');
   });
   it('the plain minimal header (no prop) keeps its tracked wordmark and nav', () => {
-    ctx.store = { ...ctx.store, template: 'minimal', look: null, theme: {} };
+    ctx.store = { ...ctx.store, template: 'qamar', look: null, theme: {} };
     const html = renderToStaticMarkup(<MinimalHeader branding={branding} navigation={nav} />);
     expect(html).toContain('text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground');
     expect(html).toContain('text-xs tracking-[0.18em] ui-caps-toggle');
@@ -195,7 +196,7 @@ describe('look-sized wordmark (W2a T-01)', () => {
     ctx.store = { ...ctx.store, name: 'Qamar Demo', logo: null };
     const look = renderToStaticMarkup(<MinimalChrome>x</MinimalChrome>);
     expect(look).toContain(wordmarkClass('lg'));
-    ctx.store = { ...ctx.store, template: 'minimal', look: null, theme: {} };
+    ctx.store = { ...ctx.store, template: 'qamar', look: null, theme: {} };
     const legacy = renderToStaticMarkup(<MinimalChrome>x</MinimalChrome>);
     expect(legacy).toContain('text-2xl font-bold text-primary sm:text-3xl');
     expect(legacy).not.toContain('data-zone="storeName"');
@@ -256,7 +257,7 @@ describe('checkout header brand link is 44px tall (P2-N2)', () => {
 // neighbours. Search shows from md, and the menu glyph draws at 1.5.
 describe('820 header: search from md, a solid menu glyph (P2-12)', () => {
   it('minimal header', () => {
-    ctx.store = { ...ctx.store, template: 'minimal', look: null };
+    ctx.store = { ...ctx.store, template: 'qamar', look: null };
     ctx.language = 'en';
     const html = renderToStaticMarkup(<MinimalHeader branding={branding} navigation={nav} />);
     expect(html).toMatch(/class="hidden md:inline-flex h-11 w-11[^"]*" aria-label="Search"/);

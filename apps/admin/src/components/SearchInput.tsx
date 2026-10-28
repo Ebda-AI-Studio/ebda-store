@@ -6,7 +6,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 interface SearchInputProps {
   /** The committed (debounced) value owned by the parent. */
   value: string;
-  /** Fires with the debounced text after the user stops typing (300ms). */
+  /** Fires with the debounced text after the user stops typing (150ms). */
   onSearch: (value: string) => void;
   placeholder: string;
   /** Extra classes for the wrapping element. */
@@ -19,7 +19,7 @@ interface SearchInputProps {
  * Debounced search box with a leading magnifier icon.
  *
  * Shared by the Products list filters and the Inventory page so both surfaces
- * get identical behaviour: a 300ms debounce (via `useDebouncedValue`), the same
+ * get identical behaviour: a 150ms debounce (via `useDebouncedValue`), the same
  * icon, and the same styling. The parent owns the committed value while this
  * component holds the live keystrokes locally and only calls `onSearch` once
  * the debounce settles.
@@ -32,7 +32,7 @@ export function SearchInput({
   ariaLabel,
 }: SearchInputProps) {
   const [localValue, setLocalValue] = useState(value);
-  const debounced = useDebouncedValue(localValue, 300);
+  const debounced = useDebouncedValue(localValue, 150);
 
   // Push the debounced value up only when it actually changed, so a re-render
   // driven by the parent doesn't loop back into another onSearch call.
@@ -65,7 +65,8 @@ export function SearchInput({
         />
       </svg>
       <input
-        type="text"
+        type="search"
+        enterKeyHint="search"
         value={localValue}
         onChange={e => setLocalValue(e.target.value)}
         placeholder={placeholder}

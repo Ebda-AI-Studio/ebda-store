@@ -466,9 +466,8 @@ describe('Order Flow', () => {
       // Inventory restoration is NOT synchronous with the request. Since #758
       // ("reversals off the request tx, retriable + idempotent") the cancel
       // path only ENQUEUES `order/refunded`; the restore runs in the Inngest
-      // fanout. In tests `inngest.send` is a no-op — client.ts replaces it
-      // whenever INNGEST_DRY_RUN=true or NODE_ENV=test, and CI sets both —
-      // so nothing consumes the event and the restore would never happen.
+      // fanout. In Node (tests) `inngest.send` starts nothing — there are no Worker
+      // bindings — so nothing consumes the event and the restore would never happen.
       //
       // Asserting inventory straight after the response therefore tested a
       // contract the API stopped honouring on 2026-07-16, and this test had

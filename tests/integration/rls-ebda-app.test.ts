@@ -468,6 +468,8 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
     expect(tables).toContain('size_charts');
     // Storefront search log (search program P0 Task 5, 2026-10-15) — same automatic coverage.
     expect(tables).toContain('search_query_daily');
+    // Merchant QR scan counters (QR-1) — same automatic coverage.
+    expect(tables).toContain('qr_scan_daily');
     // Merchant outgoing webhooks (2026-10-21) — same automatic coverage.
     expect(tables).toEqual(expect.arrayContaining(['webhook_endpoints', 'webhook_deliveries']));
     const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`

@@ -268,6 +268,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-28-customer-intelligence.md](plans/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
 - [plans/2026-10-28-store-on-cloudflare.md](plans/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something
+- [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
+- [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
 
 ## privacy - Privacy
 
@@ -294,6 +296,8 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [runbooks/support-wholesaler-sees-retail.md](runbooks/support-wholesaler-sees-retail.md) - Support: "a wholesaler sees the retail price"
 - [runbooks/tenant-routing-canary.md](runbooks/tenant-routing-canary.md) - Tenant routing canary (demo-boutique first)
 - [runbooks/whatsapp-og-preview.md](runbooks/whatsapp-og-preview.md) - WhatsApp / Social Link Preview Runbook
+- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1)
+- [runbooks/neon-decommission.md](runbooks/neon-decommission.md) - Neon decommission (INFRA-CF-1 phase 7)
 
 ## security - Security
 

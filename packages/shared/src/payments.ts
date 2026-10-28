@@ -4,7 +4,7 @@
  *
  * MONEY: every amount here is integer piastres (EGP minor units).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /** Order status of an InstaPay order until the merchant confirms the transfer arrived. */
 export const AWAITING_PAYMENT_CONFIRMATION = 'awaiting_payment_confirmation' as const;

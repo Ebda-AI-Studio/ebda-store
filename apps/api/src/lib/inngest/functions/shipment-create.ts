@@ -1,4 +1,5 @@
-import { NonRetriableError, type InngestFunction } from 'inngest';
+import { NonRetriableError } from '../../jobs/errors';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -96,7 +97,7 @@ export async function handleShipmentCreateFailure(data: Data, error: Error) {
   await notifyMerchant(data, error?.message ?? 'carrier unavailable');
 }
 
-export const shipmentCreate: InngestFunction.Any = inngest.createFunction(
+export const shipmentCreate: JobDef = inngest.createFunction(
   {
     id: 'shipment-create',
     name: 'Book a shipment with the carrier (retried, outage-isolated)',

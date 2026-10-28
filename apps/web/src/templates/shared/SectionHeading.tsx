@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import Link from '../../components/StoreLink';
-import type { TemplateId, SectionDividers, DividerSettings } from '@ebda/shared';
+import type { SectionDividers, DividerSettings } from '@ebda/shared';
 import {
   DEFAULT_DIVIDER_SETTINGS,
   resolveColor,
@@ -10,7 +10,7 @@ import {
   contrastRatio,
   resolveBackgroundPreset,
 } from '@ebda/shared';
-import { getPackStyles } from './pack-styles';
+import { getPackStyles, type PackId } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';
 import {
@@ -34,7 +34,7 @@ interface SectionHeadingProps {
   isRtl?: boolean;
   /** When provided, renders a "see all" link at the end of the heading row. */
   seeAllHref?: string;
-  pack?: TemplateId;
+  pack?: PackId;
   /**
    * Flanking hairlines around the kicker text. Default true preserves the
    * editorial divider look; set false to keep the kicker text alone.
@@ -169,14 +169,7 @@ export function SectionHeading({
   const resolvedSubtitleColor: string | undefined =
     ensureReadable(subtitleZone?.color) ?? pickReadableForeground(resolvedBg) ?? '#000000';
   const kickerLinesEnabled = dividers?.kicker?.enabled ?? showKickerLines !== false;
-  // Item 2 (2026-07-12) persona-completion: elegant's hairline-flanked
-  // heading (design.md "hairline-flanked (kicker + subtitle both)") is
-  // completed to also flank the TITLE by default when personaChromeV2 is
-  // on — but only when the merchant hasn't made an explicit pick either
-  // way (dividers?.title?.enabled undefined). An explicit merchant choice
-  // (true or false) always wins.
-  const elegantPersonaChrome = pack === 'elegant' && store.theme?.personaChromeV2 === true;
-  const titleLinesEnabled = dividers?.title?.enabled ?? (elegantPersonaChrome ? true : false);
+  const titleLinesEnabled = dividers?.title?.enabled ?? false;
   const subtitleLinesEnabled = dividers?.subtitle?.enabled ?? showSubtitleLines !== false;
 
   // Compute the flanking line style for each slot from the merchant's saved
@@ -254,16 +247,10 @@ export function SectionHeading({
   const seeAllLink = (inline: boolean) => (
     <Link
       href={seeAllHref ?? ''}
-      // Item 2 (2026-07-12) persona-completion: elegant's whisper CTA
-      // idiom (top hairline, matching productCardCta's `border-t
-      // border-foreground/15`) extended to the see-all link when
-      // personaChromeV2 is on. Existing theme token only, no new color.
       className={
         inline
           ? `inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center ${styles.sectionSeeAll}`
-          : `mt-2 block w-full text-end ${
-              elegantPersonaChrome ? 'border-t border-foreground/15 pt-2' : ''
-            } ${styles.sectionSeeAll}`
+          : `mt-2 block w-full text-end ${styles.sectionSeeAll}`
       }
       data-zone="sectionSeeAll"
       // The data-cta="link" hover effect is a from-center underline (a

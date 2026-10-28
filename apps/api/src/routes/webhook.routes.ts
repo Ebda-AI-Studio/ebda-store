@@ -201,6 +201,13 @@ async function gateDelivery(args: {
     // A reference that belongs to ANOTHER store is indistinguishable from an unknown one: same 503,
     // same body. Otherwise a caller holding store A's secret could probe which refs exist in store B.
     if (!owner || owner !== urlStoreId) {
+      // Ruling WEBHOOK-SCOPE-1: refused and logged server-side only; the caller sees the same 503 either way.
+      logger.warn(
+        { provider, urlStoreId, idempotencyKey, crossStore: Boolean(owner) },
+        owner
+          ? '[WEBHOOK] Reference belongs to another store than the signed one; refused'
+          : '[WEBHOOK] Reference not found in the signed store; refused'
+      );
       respondUnresolvedPayment(res, provider, idempotencyKey);
       return undefined;
     }
@@ -214,6 +221,15 @@ async function gateDelivery(args: {
 }
 
 /**
+ * The key a delivery is stored and deduped under: the store id in front of the provider's own key.
+ * `orders.idempotency_key` and the inbox key are globally unique, so two stores that hold the same
+ * provider reference string would otherwise treat each other's deliveries as duplicates (Ruling WEBHOOK-SCOPE-1).
+ */
+export function storeScopedIdempotencyKey(storeId: string, idempotencyKey: string): string {
+  return `${storeId}:${idempotencyKey}`;
+}
+
+/**
  * Check if a webhook has already been processed (idempotency check).
  *
  * Runs through a SECURITY DEFINER lookup because the storeId is not known yet
@@ -221,13 +237,18 @@ async function gateDelivery(args: {
  * query is read-only and cross-tenant by nature — we're matching on an
  * idempotency key that may span any store.
  */
-async function checkIdempotency(idempotencyKey: string): Promise<{
+async function checkIdempotency(
+  idempotencyKey: string,
+  storeId: string
+): Promise<{
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
   // The store is not known yet, so this exact-key lookup is a definer
   // (`ebda_webhook_order_by_idempotency`), not a store-scoped read.
   const order = await findOrderByIdempotencyKey(idempotencyKey);
+  // Ruling WEBHOOK-SCOPE-1: a key another store settled is not a duplicate of THIS store's delivery.
+  if (order && order.storeId !== storeId) return { alreadyProcessed: false };
   if (order && order.webhookProcessedAt) {
     return { alreadyProcessed: true, orderId: order.orderId };
   }
@@ -242,12 +263,19 @@ async function checkIdempotency(idempotencyKey: string): Promise<{
 async function checkWebhookIdempotency(
   provider: string,
   payload: Record<string, unknown>,
-  idempotencyKey: string
+  idempotencyKey: string,
+  storeId: string
 ): Promise<{ alreadyProcessed: boolean; orderId?: string }> {
-  const first = await checkIdempotency(idempotencyKey);
+  const first = await checkIdempotency(storeScopedIdempotencyKey(storeId, idempotencyKey), storeId);
   if (first.alreadyProcessed) return first;
-  for (const legacy of webhookRefs(provider, payload).legacyIdempotencyKeys ?? []) {
-    const hit = await checkIdempotency(legacy);
+  // Keys written before WEBHOOK-SCOPE-1 carry no store prefix: still honoured, but only for this store's orders.
+  const unscoped = [
+    webhookRefs(provider, payload).idempotencyKey,
+    ...(webhookRefs(provider, payload).legacyIdempotencyKeys ?? []),
+  ];
+  for (const legacy of unscoped) {
+    if (!legacy) continue;
+    const hit = await checkIdempotency(legacy, storeId);
     if (hit.alreadyProcessed) return hit;
   }
   return first;
@@ -659,7 +687,8 @@ async function handleGatewayWebhook(
     const { alreadyProcessed, orderId } = await checkWebhookIdempotency(
       provider,
       payload,
-      idempotencyKey
+      idempotencyKey,
+      storeIdForWebhook
     );
 
     if (alreadyProcessed) {
@@ -694,7 +723,7 @@ async function handleGatewayWebhook(
     // before so the webhook is never lost.
     const { enqueued, result } = await enqueueOrProcessWebhook({
       provider,
-      idempotencyKey,
+      idempotencyKey: storeScopedIdempotencyKey(storeIdForWebhook, idempotencyKey),
       storeId: storeIdForWebhook,
       payload,
       rawBody: rawBody.toString(),
@@ -824,7 +853,8 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     const { alreadyProcessed, orderId } = await checkWebhookIdempotency(
       provider,
       payload,
-      idempotencyKey
+      idempotencyKey,
+      storeIdForWebhook
     );
 
     if (alreadyProcessed) {
@@ -855,7 +885,7 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     // failure so no webhook is lost. See enqueueOrProcessWebhook.
     const { enqueued, result } = await enqueueOrProcessWebhook({
       provider,
-      idempotencyKey,
+      idempotencyKey: storeScopedIdempotencyKey(storeIdForWebhook, idempotencyKey),
       storeId: storeIdForWebhook,
       payload,
       rawBody: rawBody.toString(),

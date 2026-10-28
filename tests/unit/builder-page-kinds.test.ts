@@ -152,7 +152,7 @@ describe('reducer: a section only goes where it belongs', () => {
       presetIndex: 0,
     });
     expect(r.rejected).toBe('PAGE_MISMATCH');
-    const home = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const home = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     expect(
       reduceDocument(home, {
         type: 'addSection',
@@ -207,7 +207,7 @@ describe('reducer: a section only goes where it belongs', () => {
     ).toBeUndefined();
   });
   it('an unknown page key behaves like the home page (content pages keep working)', () => {
-    const d = { ...layoutToDefinition(resolveLayoutSettings({}, 'modern')), pageKey: 'about' };
+    const d = { ...layoutToDefinition(resolveLayoutSettings({}, 'qamar')), pageKey: 'about' };
     expect(
       reduceDocument(d, {
         type: 'addSection',
@@ -228,7 +228,7 @@ describe('validator enforces the same on every write', () => {
       sections: [...cart.sections, { id: 'hero', type: 'hero', settings: {} }],
     };
     expect(codes(withHero)).toContain('PAGE_MISMATCH');
-    const home = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const home = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     expect(
       codes({
         ...home,
@@ -262,7 +262,7 @@ describe('validator enforces the same on every write', () => {
       expect(codes({ ...p, ...patch }), JSON.stringify(patch)).toContain('PAGE_MISMATCH');
   });
   it('the home document is unaffected', () => {
-    const home = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const home = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     expect(
       validateDefinitionSync(home).errors.filter(
         e => e.code === 'PAGE_MISMATCH' || e.code === 'PINNED'
@@ -352,7 +352,7 @@ describe('page-type settings (Ruling VE-13)', () => {
       expect(r.doc).toBe(cart);
     }
     // home: its own keys, one nesting level down for the card badges
-    const home = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const home = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     const c = reduceDocument(home, {
       type: 'setSiteSetting',
       key: 'productCardDefaults',
@@ -407,20 +407,20 @@ describe('page-type settings (Ruling VE-13)', () => {
   });
 
   it("the home document does not look drifted when another page's key changes the live layout", () => {
-    const layout = resolveLayoutSettings({ productDetailPage: { density: 'compact' } }, 'modern');
+    const layout = resolveLayoutSettings({ productDetailPage: { density: 'compact' } }, 'qamar');
     const home = layoutToDefinition(layout);
-    expect(publishedDocumentAgrees(home, layout, 'modern')).toBe(true);
+    expect(publishedDocumentAgrees(home, layout, 'qamar')).toBe(true);
     const later = resolveLayoutSettings(
       { productDetailPage: { density: 'spacious' }, cartPage: { textScale: 'lg' } },
-      'modern'
+      'qamar'
     );
-    expect(publishedDocumentAgrees(home, later, 'modern')).toBe(true);
+    expect(publishedDocumentAgrees(home, later, 'qamar')).toBe(true);
     // a home-owned key still counts as drift
     const drifted = resolveLayoutSettings(
       { sizing: { heroAspect: '4:3', productImageAspect: '1:1', categoryImageAspect: '1:1' } },
-      'modern'
+      'qamar'
     );
-    expect(publishedDocumentAgrees(home, drifted, 'modern')).toBe(false);
+    expect(publishedDocumentAgrees(home, drifted, 'qamar')).toBe(false);
     void definitionToLayout;
   });
 });

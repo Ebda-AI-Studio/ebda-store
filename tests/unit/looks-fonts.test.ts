@@ -23,7 +23,7 @@ describe('look fonts', () => {
   });
   it('display/body stacks end in the platform Arabic + sans fallbacks', () => {
     const css = buildThemeStyleTag(
-      composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme: {} }),
+      composeStoreTheme({ template: 'qamar', look: 'qamar.atelier', theme: {} }),
       'qamar.atelier'
     );
     expect(css).toMatch(
@@ -35,7 +35,7 @@ describe('look fonts', () => {
   });
   it('density, ratio and motion become vars', () => {
     const css = buildThemeStyleTag(
-      composeStoreTheme({ template: 'minimal', look: 'lamma.market', theme: {} }),
+      composeStoreTheme({ template: 'qamar', look: 'lamma.market', theme: {} }),
       'lamma.market'
     );
     expect(css).toContain('--space-unit: 0.875');
@@ -45,7 +45,7 @@ describe('look fonts', () => {
   it('a stray density/fonts on a legacy store (no look) emits nothing', () => {
     const css = buildThemeStyleTag(
       composeStoreTheme({
-        template: 'minimal',
+        template: 'qamar',
         theme: { density: 'airy', headingFont: 'Cairo', motion: 'expressive' },
       })
     );
@@ -56,7 +56,7 @@ describe('look fonts', () => {
     expect(css).not.toContain('--font-display');
   });
   it('a look store whose merchant cleared density still gets font vars; --font-latin follows the look', () => {
-    const theme = composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme: {} });
+    const theme = composeStoreTheme({ template: 'qamar', look: 'qamar.atelier', theme: {} });
     delete (theme as { density?: string }).density;
     const css = buildThemeStyleTag(theme, 'qamar.atelier');
     expect(css).toContain('--font-display: "Noto Naskh Arabic"');
@@ -65,13 +65,13 @@ describe('look fonts', () => {
     expect(css).not.toContain('--space-unit');
   });
   it('a legacy theme emits none of the look vars', () => {
-    const css = buildThemeStyleTag(composeStoreTheme({ template: 'minimal', theme: {} }));
+    const css = buildThemeStyleTag(composeStoreTheme({ template: 'qamar', theme: {} }));
     expect(css).not.toMatch(
       /--(font-display|font-body|font-latin|space-unit|image-ratio|motion-duration)/
     );
     // even a stored headingFont does not turn a legacy store into a look store
     const css2 = buildThemeStyleTag(
-      composeStoreTheme({ template: 'minimal', theme: { headingFont: 'Cairo' } })
+      composeStoreTheme({ template: 'qamar', theme: { headingFont: 'Cairo' } })
     );
     expect(css2).not.toContain('--font-display');
   });
@@ -111,13 +111,13 @@ describe('merchant font override on a look store (LOOKS-3: merchant wins)', () =
   const families = (href: string) => new URL(href).searchParams.getAll('family');
   const styleFor = (theme: Partial<StoreTheme>) =>
     buildThemeStyleTag(
-      composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme }),
+      composeStoreTheme({ template: 'qamar', look: 'qamar.atelier', theme }),
       'qamar.atelier'
     );
 
   it('a loadable override joins the Google Fonts link and replaces the look face', () => {
     const theme = composeStoreTheme({
-      template: 'minimal',
+      template: 'qamar',
       look: 'qamar.atelier',
       theme: { headingFont: 'Cairo', bodyFont: 'Tajawal' },
     });
@@ -158,7 +158,7 @@ describe('merchant font override on a look store (LOOKS-3: merchant wins)', () =
     expect(old).not.toContain('Inter"');
     // An old font that happens to be loadable: the merchant's choice wins and is loaded.
     const kept = composeStoreTheme({
-      template: 'minimal',
+      template: 'qamar',
       look: 'qamar.atelier',
       theme: { headingFont: 'Amiri' },
     });

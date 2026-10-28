@@ -9,7 +9,7 @@
  * the lanes are pinned here.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 // @ts-expect-error - plain .mjs script, no type declarations
@@ -18,7 +18,13 @@ import { classify, loadWorkspaces, UNIT_PATHS } from '../../scripts/ci-affected.
 const ROOT = path.resolve(__dirname, '../..');
 const raw = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 
-type Job = { if?: string; needs?: string | string[]; 'runs-on'?: string; steps?: unknown[] };
+type Job = {
+  outputs?: Record<string, string>;
+  if?: string;
+  needs?: string | string[];
+  'runs-on'?: string;
+  steps?: unknown[];
+};
 const ci = yaml.load(raw) as {
   on: Record<string, any>;
   concurrency: { group: string; 'cancel-in-progress': string };
@@ -31,7 +37,6 @@ const MAIN_LANE = [
   'build',
   'test-unit',
   'orphan-tests',
-  'test-integration',
   'test-rls-ebda-app',
   'test-rls-payload-parity',
   'test-e2e',
@@ -48,6 +53,10 @@ const PR_LANE = [
   'worker-dry-run',
   'api-workerd-smoke',
   'workerd-integration',
+  'app-build',
+  'app-builds',
+  // runs on a PR ONLY when scripts/ci-affected.mjs selects integration tests (#227); full tier in the main lane
+  'test-integration',
 ];
 
 /** Does the job (or, through `needs`, a job it waits on) skip on pull_request? */
@@ -116,6 +125,30 @@ describe('ci.yml lanes', () => {
     expect(skipsOnPr(name), `${name} is reachable from a pull_request`).toBe(true);
   });
 
+  it('Integration Tests: the full tier in the main lane, and on a PR only the files the planner selects (#227)', () => {
+    const j = ci.jobs['test-integration'];
+    const cond = j.if ?? '';
+    expect(([] as string[]).concat(j.needs ?? []).sort()).toEqual(['build', 'changes']);
+    // main lane: after a successful build, never on a PR
+    expect(cond).toMatch(
+      /github\.event_name != 'pull_request' && needs\.build\.result == 'success'/
+    );
+    // PR lane: only when the planner says so
+    expect(cond).toMatch(
+      /github\.event_name == 'pull_request' && needs\.changes\.outputs\.integration == 'true'/
+    );
+    expect(ci.jobs.changes.outputs).toMatchObject({
+      integration: expect.any(String),
+      integration_paths: expect.any(String),
+    });
+    // a PR runs just the selected files; the main lane keeps the whole tier
+    expect(raw).toContain('INTEGRATION_PATHS: ${{ needs.changes.outputs.integration_paths }}');
+    expect(raw).toMatch(/targets="tests\/integration apps\/api\/src"/);
+    expect(raw).toMatch(
+      /npx vitest run \$targets --exclude tests\/integration\/rls-ebda-app\.test\.ts/
+    );
+  });
+
   it('mutation tests are weekly or manual only, never on a push or the Mon-Sat nightly', () => {
     const cond = ci.jobs.mutation.if ?? '';
     expect(cond).toMatch(
@@ -131,9 +164,10 @@ describe('ci.yml lanes', () => {
     const runsOnPush = (name: string): boolean => {
       const j = ci.jobs[name];
       const cond = j.if ?? '';
-      if (/always\(\)/.test(cond)) return true;
+      if (/needs\.build\.result == 'success'/.test(cond)) return runsOnPush('build');
       if (/github\.event_name\s*==\s*'(pull_request|schedule|workflow_dispatch)'/.test(cond))
         return false;
+      if (/always\(\)/.test(cond)) return true;
       if (/needs\.changes\./.test(cond)) return false;
       return ([] as string[]).concat(j.needs ?? []).every(runsOnPush);
     };
@@ -170,7 +204,7 @@ describe('ci.yml lanes', () => {
     expect(raw).toMatch(/ALTER ROLE ebda_app WITH PASSWORD/);
     expect(raw).toMatch(/postgresql:\/\/ebda_app:ci-only-app-pw@/);
     expect(raw).toMatch(/image: redis:7-alpine/);
-    for (const n of ['test-integration', 'test-rls-ebda-app']) expect(skipsOnPr(n)).toBe(true);
+    expect(skipsOnPr('test-rls-ebda-app')).toBe(true);
   });
 
   it('the PR unit paths are a subset of the main-lane unit globs', () => {
@@ -190,6 +224,26 @@ describe('scripts/ci-affected.mjs', () => {
     expect(dirs).toEqual(
       expect.arrayContaining(['apps/api', 'apps/web', 'apps/admin', 'packages/shared'])
     );
+  });
+
+  it('OPS-2: apps whose graph includes the changed workspace get a production build', () => {
+    expect(run('apps/web/src/app/page.tsx').buildApps).toEqual(['web']);
+    expect(run('apps/admin/src/x.ts').buildApps).toEqual(['admin']);
+    // a shared package touches every app that has a deploy build
+    expect(run('packages/ui/src/Button.tsx').buildApps).toEqual(
+      expect.arrayContaining(['web', 'admin'])
+    );
+    expect(run('packages/shared/src/x.ts').buildApps).toEqual(
+      expect.arrayContaining(['web', 'admin', 'orders', 'marketing', 'docs', 'help'])
+    );
+    // a root config can change any build
+    expect(run('package-lock.json').buildApps.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('OPS-2: docs, api-only and test-only changes build no app', () => {
+    expect(run('docs/ebda/ci.md').buildApps).toEqual([]);
+    expect(run('apps/api/src/x.ts').buildApps).toEqual([]);
+    expect(run('tests/unit/x.test.ts').buildApps).toEqual([]);
   });
 
   it('docs-only changes select nothing', () => {
@@ -330,4 +384,17 @@ describe('postgres image parity', () => {
       expect(refs.filter(r => r !== PINNED)).toEqual([]);
     });
   }
+});
+
+describe('OPS-5: a failed deploy reaches a human', () => {
+  const dir = path.join(ROOT, '.github/workflows');
+  const deploys = readdirSync(dir).filter(f => /^cf-.*-deploy\.yml$/.test(f));
+  it('finds the deploy workflows', () => expect(deploys.length).toBeGreaterThanOrEqual(9));
+  it.each(deploys)('%s has a notify-failure job wired to the Telegram secrets', f => {
+    const raw = readFileSync(path.join(dir, f), 'utf8');
+    expect(raw).toMatch(/\n {2}notify-failure:/);
+    expect(raw).toContain("needs.deploy.result == 'failure'");
+    expect(raw).toContain('secrets.TELEGRAM_BOT_TOKEN');
+    expect(raw).toContain('secrets.TELEGRAM_ALERT_CHAT_ID');
+  });
 });

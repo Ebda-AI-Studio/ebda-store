@@ -22,7 +22,7 @@
  * persistence + admin-time validation only.
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { searchNameIds } from '../services/product-search.service';
 import logger from '../lib/logger';

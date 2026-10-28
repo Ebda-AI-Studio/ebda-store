@@ -7,7 +7,7 @@ import { AnalyticsService, currentMonthStart } from '../services/analytics.servi
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@ebda/database';
 import logger from '../lib/logger';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { analyticsPeriodSchema, parseReportRange, type ReportRange } from '@ebda/shared';
 
 const router = Router({ mergeParams: true });

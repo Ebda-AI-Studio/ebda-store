@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -13,7 +13,7 @@ import { inngest } from '../client';
  * Free tier permits cron-triggered functions; this is a no-op so
  * it doesn't burn any meaningful quota.
  */
-export const heartbeat: InngestFunction.Any = inngest.createFunction(
+export const heartbeat: JobDef = inngest.createFunction(
   {
     id: 'heartbeat',
     name: 'Hourly heartbeat',

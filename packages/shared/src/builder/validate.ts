@@ -12,7 +12,7 @@
  * WARNING on read: `renderableSections` skips them so a public render never
  * throws on a document written by a newer editor.
  */
-import type { z } from 'zod';
+import type { z } from 'zod/v3';
 import { isSafeUrl } from '../utils/safe-url';
 import { storeLayoutSchema } from './layout-schema';
 import { allSections, sectionToLegacy } from './adapter';

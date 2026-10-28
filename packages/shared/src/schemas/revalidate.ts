@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Body of the storefront's on-demand cache purge (`POST /api/revalidate`,

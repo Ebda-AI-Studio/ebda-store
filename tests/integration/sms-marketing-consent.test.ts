@@ -88,7 +88,7 @@ async function seedStore(opts: { sms: boolean } = { sms: true }) {
       data: {
         name: `smsc-${id}`,
         slug: `smsc-${id}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
         status: 'active',

@@ -63,7 +63,7 @@ const STORE = {
   id: 's',
   name: 'Shop',
   nameAr: 'متجر',
-  template: 'modern',
+  template: 'qamar',
   theme: {},
   currency: 'EGP',
   blogEnabled: false,
@@ -75,11 +75,11 @@ function render(raw: unknown, opts: { editorMode?: boolean; language?: 'en' | 'a
   ctx.store = STORE;
   ctx.language = opts.language ?? 'en';
   // The way production delivers a layout: stored JSON resolved against the template.
-  const layout = resolveLayoutSettings(JSON.parse(JSON.stringify(raw)), 'modern');
+  const layout = resolveLayoutSettings(JSON.parse(JSON.stringify(raw)), 'qamar');
   return renderToStaticMarkup(
     <PageRenderer
       definition={layoutToDefinition(layout)}
-      templateId="modern"
+      templateId="qamar"
       featuredProducts={[]}
       newArrivals={[]}
       bestSellers={[]}
@@ -199,18 +199,18 @@ describe('editor model: items are blocks (add / remove / reorder)', () => {
   });
 
   it('round-trips: absent stays absent, [] stays [], blocks reorder the items', () => {
-    const legacy = definitionToLayout(layoutToDefinition(resolveLayoutSettings({}, 'modern')));
+    const legacy = definitionToLayout(layoutToDefinition(resolveLayoutSettings({}, 'qamar')));
     expect(legacy.trustStrip?.items).toBeUndefined();
 
     const fresh = definitionToLayout(
-      layoutToDefinition(resolveLayoutSettings(NEW_STORE_LAYOUT_SETTINGS, 'modern'))
+      layoutToDefinition(resolveLayoutSettings(NEW_STORE_LAYOUT_SETTINGS, 'qamar'))
     );
     expect(fresh.trustStrip?.items).toEqual([]);
 
     const doc = layoutToDefinition(
       resolveLayoutSettings(
         { trustStrip: { items: [{ title: 'A' }, { title: 'B' }, { title: 'C' }] } },
-        'modern'
+        'qamar'
       )
     );
     const node = doc.sections.find(s => s.type === 'trust-strip')!;

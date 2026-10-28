@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
 
-const state = { template: 'minimal' };
+const state = { template: 'qamar' };
 
 // The Dahab carousel reads prefers-reduced-motion; jsdom has no matchMedia.
 window.matchMedia ??= ((query: string) => ({
@@ -72,11 +72,7 @@ vi.mock('next/link', () => ({
 
 const adapters = await import('./adapters');
 const { StorefrontProductCard } = await import('./shared/StorefrontProductCard');
-const { default: ModernProductCard } = await import('./modern/ProductCard');
-const { default: ElegantProductCard } = await import('./elegant/ProductCard');
-const { default: ClassicProductCard } = await import('./classic/ProductCard');
-const { default: BoldProductCard } = await import('./bold/ProductCard');
-const { default: MinimalProductCard } = await import('./minimal/ProductCard');
+const { default: BaseProductCard } = await import('./base/ProductCard');
 const { ProductCarousel } = await import('./shared/ProductCarousel');
 const { ProductListItem } = await import('../app/products/ProductListItem');
 
@@ -143,7 +139,7 @@ const MAPPERS: Array<[string, (k: Kind) => Tpl]> = [
 ];
 
 // ── Card render paths ────────────────────────────────────────────────────────
-const PACKS = ['modern', 'elegant', 'classic', 'minimal', 'bold', 'dahab'] as const;
+const PACKS = ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] as const;
 type Path = [string, (p: Tpl, onAdd: (id: string) => void) => React.ReactElement];
 function direct(Card: unknown): Path[1] {
   return function renderDirect(product, onAdd) {
@@ -159,11 +155,7 @@ function direct(Card: unknown): Path[1] {
   };
 }
 const PATHS: Path[] = [
-  ['modern/ProductCard', direct(ModernProductCard)],
-  ['elegant/ProductCard', direct(ElegantProductCard)],
-  ['classic/ProductCard', direct(ClassicProductCard)],
-  ['minimal/ProductCard', direct(MinimalProductCard)],
-  ['bold/ProductCard', direct(BoldProductCard)],
+  ['base/ProductCard', direct(BaseProductCard)],
   ...PACKS.map(
     (pack): Path => [
       `StorefrontProductCard, ${pack} pack`,
@@ -221,7 +213,7 @@ async function addsWhenEveryButtonIsClicked(
 
 afterEach(() => {
   cleanup();
-  state.template = 'minimal';
+  state.template = 'qamar';
 });
 
 describe.each(MAPPERS)('%s', (_m, map) => {

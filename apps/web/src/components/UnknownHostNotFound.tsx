@@ -2,7 +2,7 @@
 
 import { BRAND } from '@ebda/shared';
 import { useLanguage } from '../contexts/LanguageContext';
-import type { UnknownHostLinks } from '../lib/unknown-store-page';
+import { signupUrlForSlug, type UnknownHostLinks } from '../lib/unknown-store-page';
 
 /**
  * Generic Ebda 404 for a host that is not a live store (Ruling SUBDOMAIN-404-1):
@@ -20,7 +20,14 @@ const INK = '#121314';
 const MUTED = '#575c5d';
 const LINE = '#868b8c';
 
-export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
+export function UnknownHostNotFound({
+  links,
+  startSlug = null,
+}: {
+  links: UnknownHostLinks;
+  /** A claimable `<slug>` when the host was `<slug>.ebda.app` (see `signupSlugForHost`). */
+  startSlug?: string | null;
+}) {
   const { t, isRtl } = useLanguage();
   const font = isRtl ? BRAND.fonts.stacks.arabic : BRAND.fonts.stacks.sans;
   const button =
@@ -40,7 +47,9 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
       />
 
       <h1 className="mt-8 max-w-md text-balance text-2xl font-bold leading-snug sm:text-3xl">
-        {t('This store doesn’t exist or hasn’t opened yet', 'المتجر ده مش موجود أو لسه مفتحش')}
+        {startSlug
+          ? t('There’s no store at this address yet.', 'مفيش متجر على العنوان ده لسه.')
+          : t('This store doesn’t exist or hasn’t opened yet', 'المتجر ده مش موجود أو لسه مفتحش')}
       </h1>
       <p className="mt-3 max-w-sm text-[15px] leading-relaxed" style={{ color: MUTED }}>
         {t(
@@ -50,10 +59,23 @@ export function UnknownHostNotFound({ links }: { links: UnknownHostLinks }) {
       </p>
 
       <div className="mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:justify-center">
+        {startSlug && (
+          <a
+            href={signupUrlForSlug(startSlug)}
+            className={button}
+            style={{ background: BRAND.colors.gold, color: BRAND.colors.night, outlineColor: INK }}
+          >
+            {t(`Start your store as “${startSlug}”`, `ابدأ متجرك باسم «${startSlug}»`)}
+          </a>
+        )}
         <a
           href={links.createStoreUrl}
-          className={button}
-          style={{ background: BRAND.colors.gold, color: BRAND.colors.night, outlineColor: INK }}
+          className={startSlug ? `${button} border` : button}
+          style={
+            startSlug
+              ? { borderColor: LINE, color: INK, outlineColor: INK }
+              : { background: BRAND.colors.gold, color: BRAND.colors.night, outlineColor: INK }
+          }
         >
           {t('Create your store on Ebda Store', 'أنشئ متجرك على ابدأ ستور')}
         </a>

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { InvoiceService } from '../../../services/invoice.service';
 import { EmailService } from '../../../services/email.service';
@@ -12,7 +12,7 @@ import { inngest } from '../client';
  * can't block the request — the email goes through the queue's retry
  * machinery instead.
  */
-export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
+export const invoiceEmail: JobDef = inngest.createFunction(
   {
     id: 'invoice-email',
     name: 'Email order invoice to customer',

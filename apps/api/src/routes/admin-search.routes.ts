@@ -34,7 +34,11 @@ import { orderSearchWhere } from '../services/order.service';
 const router = Router({ mergeParams: true });
 
 const PER_KIND = 5;
-const MIN_QUERY = 2;
+// Search-as-you-type (Ruling SEARCH-LIVE-1): a product answers from ONE character (one Arabic letter is a
+// word; short terms are word-start matches, index-backed, Ruling SEARCH-T14-3). Customers need two:
+// a one-letter customer match would scan names and phones.
+const MIN_QUERY = 1;
+const MIN_CUSTOMER_QUERY = 2;
 /** Orders also need a trigram-sized term: shorter ones take the unindexed relation filter. */
 const MIN_ORDER_QUERY = 3;
 const USER_CAP = 50;
@@ -73,7 +77,7 @@ router.get(
         can('products:read')
           ? searchProductIds(storeId, q, { scope: 'admin', field: 'name', limit: PER_KIND })
           : Promise.resolve([] as string[]),
-        canOrders
+        canOrders && q.length >= MIN_CUSTOMER_QUERY
           ? matchingCustomers(storeId, q, { userCap: USER_CAP, guestCap: GUEST_ORDER_CAP })
           : Promise.resolve(null),
       ]);

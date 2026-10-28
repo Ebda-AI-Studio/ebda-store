@@ -1,6 +1,6 @@
 # Looks
 
-A **look** is a named design direction: colour roles, fonts, radius, density, image ratio and motion, plus a section mix for the home page. Every store has at most one (`stores.look`, nullable `TEXT`); a store with `look = null` is a legacy store and renders exactly as it did before looks existed (see "Legacy stores"). There are 15 looks, 3 per template (Rulings TPL-1, TPL-2, LOOKS-1..5 in `docs/RULINGS.md`).
+A **look** is a named design direction: colour roles, fonts, radius, density, image ratio and motion, plus a section mix for the home page. Every store has at most one (`stores.look`, nullable `TEXT`); a store with `look = null` is a legacy store and renders exactly as it did before looks existed (see "Legacy stores"). The five inherited Force skins are deleted: a store row that still holds one of those names renders as its mapped Ebda template at read time (`normalizeLegacyTemplate`, Rulings SKIN-DEL-1 and SKIN-DEL-8), never a crash and never a write. There are 15 looks, 3 per template (Rulings TPL-1, TPL-2, LOOKS-1..5 in `docs/RULINGS.md`).
 
 Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/looks/`) over the shared section registry and token set, and never fork commerce components (Ruling LOOKS-1).
 
@@ -97,7 +97,7 @@ Onboarding chooses a look through the same service (`onboarding.service.ts`), wi
 
 ## Known residual (Phase S)
 
-The skin baseline still paints its brand-colour section bands on a look store, so a dark-primary look shows near-black bands and the minimal skin's category caption is faint on them (Ruling LOOKS-16). Each look's skin decides its section colours in Phase B.
+The skin baseline still paints its brand-colour section bands on a look store, so a dark-primary look shows near-black bands and the shared base's category caption is faint on them (Ruling LOOKS-16). Each look's skin decides its section colours in Phase B.
 
 ## Brand surfaces outside the storefront
 

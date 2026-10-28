@@ -21,21 +21,13 @@ import type {
 } from '../looks/types';
 import { getLook } from '../looks/registry';
 import { resolveLookFonts } from '../looks/fonts';
+import { mockCssVars } from '../looks/mock-tokens';
+import { mapRetiredTemplate } from '../templates/legacy-skin-map';
 
 /**
  * Available store templates
  */
-export type TemplateId =
-  | 'modern'
-  | 'classic'
-  | 'minimal'
-  | 'bold'
-  | 'elegant'
-  | 'dahab'
-  | 'qamar'
-  | 'souq'
-  | 'jasmine'
-  | 'lamma';
+export type TemplateId = 'dahab' | 'qamar' | 'souq' | 'jasmine' | 'lamma';
 
 /**
  * Font family options for store themes
@@ -654,31 +646,6 @@ export const DEFAULT_THEME: StoreTheme = {
  * Template presets with default themes
  */
 export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
-  modern: {
-    primaryColor: '36 36% 52%', // Ebda gold (was the inherited orange; D1016-ORANGE-1)
-    fontFamily: 'modern',
-    borderRadius: 'lg',
-  },
-  classic: {
-    primaryColor: '35 35% 35%', // Rich brown
-    fontFamily: 'serif',
-    borderRadius: 'sm',
-  },
-  minimal: {
-    primaryColor: '0 0% 9%', // Near black
-    fontFamily: 'default',
-    borderRadius: 'none',
-  },
-  bold: {
-    primaryColor: '262 83% 58%', // Vibrant purple
-    fontFamily: 'rounded',
-    borderRadius: 'xl',
-  },
-  elegant: {
-    primaryColor: '340 82% 52%', // Rose pink
-    fontFamily: 'serif',
-    borderRadius: 'md',
-  },
   // Qamar (fashion & boutiques, Phase B1): a neutral base. Every Qamar store has a
   // look, and the look's tokens (packages/shared/src/looks/registry.ts) own colour,
   // type, radius, density, image ratio and motion. Dividers off: the looks separate
@@ -777,56 +744,6 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
  */
 export const TEMPLATES: TemplateInfo[] = [
   {
-    id: 'modern',
-    name: 'Modern',
-    nameAr: 'عصري',
-    description: 'Clean lines, bold accents, and contemporary feel',
-    descriptionAr: 'خطوط نظيفة ولمسات جريئة وشعور معاصر',
-    thumbnail: '/templates/modern.png',
-    tags: ['tech', 'lifestyle', 'gadgets'],
-    bestFor: 'Tech, lifestyle, and modern brands',
-  },
-  {
-    id: 'classic',
-    name: 'Classic',
-    nameAr: 'كلاسيكي',
-    description: 'Elegant serif fonts and timeless sophistication',
-    descriptionAr: 'خطوط أنيقة وتطور خالد',
-    thumbnail: '/templates/classic.png',
-    tags: ['luxury', 'heritage', 'traditional'],
-    bestFor: 'Luxury, heritage, and established brands',
-  },
-  {
-    id: 'minimal',
-    name: 'Minimal',
-    nameAr: 'بسيط',
-    description: 'Maximum whitespace, product-focused design',
-    descriptionAr: 'مساحة بيضاء واسعة وتصميم يركز على المنتج',
-    thumbnail: '/templates/minimal.png',
-    tags: ['photography', 'art', 'design'],
-    bestFor: 'Photography, art galleries, and design studios',
-  },
-  {
-    id: 'bold',
-    name: 'Bold',
-    nameAr: 'جريء',
-    description: 'Vibrant colors, dynamic layouts, energetic feel',
-    descriptionAr: 'ألوان نابضة وتخطيطات ديناميكية وشعور بالطاقة',
-    thumbnail: '/templates/bold.png',
-    tags: ['youth', 'sports', 'streetwear'],
-    bestFor: 'Youth brands, sports, and streetwear',
-  },
-  {
-    id: 'elegant',
-    name: 'Elegant',
-    nameAr: 'أنيق',
-    description: 'Fashion-forward design with refined aesthetics',
-    descriptionAr: 'تصميم عصري بجماليات راقية',
-    thumbnail: '/templates/elegant.png',
-    tags: ['fashion', 'jewelry', 'beauty'],
-    bestFor: 'Fashion, jewelry, and beauty brands',
-  },
-  {
     id: 'dahab',
     name: 'Dahab',
     nameAr: 'دهب',
@@ -882,7 +799,7 @@ export const TEMPLATES: TemplateInfo[] = [
  * Get template info by ID
  */
 export function getTemplateInfo(templateId: TemplateId): TemplateInfo | undefined {
-  return TEMPLATES.find(t => t.id === templateId);
+  return TEMPLATES.find(t => t.id === mapRetiredTemplate(templateId));
 }
 
 /**
@@ -891,7 +808,7 @@ export function getTemplateInfo(templateId: TemplateId): TemplateInfo | undefine
 export function getTemplateTheme(templateId: TemplateId): StoreTheme {
   return {
     ...DEFAULT_THEME,
-    ...TEMPLATE_THEMES[templateId],
+    ...TEMPLATE_THEMES[mapRetiredTemplate(templateId) as TemplateId],
   };
 }
 
@@ -1087,6 +1004,7 @@ export function lookCssVars(
   if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
   if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
   if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];
+  Object.assign(v, mockCssVars(lookId));
   return v;
 }
 

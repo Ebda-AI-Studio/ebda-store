@@ -39,7 +39,7 @@ export function useThemeSafe(): ThemeContextValue {
   if (!context) {
     return {
       theme: DEFAULT_THEME,
-      templateId: 'modern',
+      templateId: 'qamar',
       isRtl: false,
       cssVars: themeToCssVars(DEFAULT_THEME),
     };
@@ -65,7 +65,7 @@ export interface ThemeProviderProps {
  * Usage:
  * ```tsx
  * <ThemeProvider
- *   templateId="modern"
+ *   templateId="qamar"
  *   theme={{ primaryColor: '36 36% 52%' }}
  *   isRtl={false}
  * >
@@ -76,7 +76,7 @@ export interface ThemeProviderProps {
 export function ThemeProvider({
   children,
   theme: themeOverrides,
-  templateId = 'modern',
+  templateId = 'qamar',
   isRtl = false,
   applyToDocument = true,
 }: ThemeProviderProps) {

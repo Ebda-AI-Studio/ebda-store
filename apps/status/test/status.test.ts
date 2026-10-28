@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { runProbes, thresholdsFrom } from '../src/index';
+import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS } from '../src/config';
 import { probe, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
@@ -188,15 +189,59 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(snap.active[0].updates[0].body).toContain('timeout after 40ms');
   });
 
-  it('serves the page with no scripts and a restrictive CSP', async () => {
+  it('serves the page with two same-origin scripts (the shared nav and the optional search) and a restrictive CSP', async () => {
     const r = await get('/en');
     const html = await r.text();
-    // no executable script; the only script elements are JSON-LD data blocks (never run, so CSP does not apply)
+    // the JSON-LD blocks are data (never run, so CSP does not apply); strip them before counting scripts
+    const scripts = html.replace(/<script type="application\/ld\+json">.*?<\/script>/gs, '');
+    expect(scripts.match(/<script\b[^>]*>/gi)).toEqual([
+      '<script src="/assets/site-nav.js" defer>',
+      '<script src="/assets/typeahead.js" defer>',
+    ]);
     expect(
-      /<script/i.test(html.replace(/<script type="application\/ld\+json">.*?<\/script>/gs, ''))
+      /<script\b[^>]*>\s*\S/i.test(scripts.replace(/<script src="[^"]*" defer><\/script>/g, ''))
     ).toBe(false);
-    expect(r.headers.get('content-security-policy')).toContain("default-src 'none'");
+    const csp = r.headers.get('content-security-policy') ?? '';
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'self'");
+    expect(has(html, 'role="search"')).toBe(true);
     expect(has(html, 'lang="en"')).toBe(true);
+  });
+
+  it('serves the shared header-nav script as a same-origin file, byte for byte', async () => {
+    const r = await get('/assets/site-nav.js');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('javascript');
+    expect(r.headers.get('cache-control')).toBe('public, max-age=300');
+    expect(r.headers.get('content-security-policy')).toContain("script-src 'self'");
+    expect(await r.text()).toBe(SITE_NAV_JS);
+  });
+});
+
+describe('header search (components, incidents, help)', () => {
+  it('serves the search script itself, and the page data in both languages', async () => {
+    const js = await get('/assets/typeahead.js');
+    expect(js.status).toBe(200);
+    expect(js.headers.get('content-type')).toContain('javascript');
+    expect((await js.text()).length).toBeGreaterThan(5000);
+    for (const [lang, name] of [
+      ['en', 'Merchant dashboard'],
+      ['ar', 'لوحة التحكم'],
+    ] as const) {
+      const r = await get(`/search.json?lang=${lang}`);
+      expect(r.status).toBe(200);
+      const docs = (await r.json()) as { id: string; title: string; section: string }[];
+      const hit = docs.find(d => d.title === name);
+      expect(hit?.id.includes('#c-')).toBe(true);
+      expect(docs.every(d => d.id.startsWith(lang === 'ar' ? '/#' : '/en#'))).toBe(true);
+    }
+  });
+
+  it('the page carries anchors for the results and the form points at the help search', async () => {
+    const html = await (await get('/en')).text();
+    expect(has(html, 'id="c-admin"')).toBe(true);
+    expect(has(html, 'action="https://help.ebda.app/en/search/"')).toBe(true);
+    expect(has(html, '/search.json?lang=en||docs')).toBe(true);
   });
 });
 
@@ -299,6 +344,38 @@ describe('manual incidents (authenticated POST)', () => {
       (await post('/api/incidents/9999/updates', { status: 'resolved', body: 'x' }, 'test-secret'))
         .status
     ).toBe(404);
+  });
+});
+
+describe('404 (the studio page for people, JSON for API clients)', () => {
+  const html = (path: string, headers: Record<string, string> = {}) =>
+    worker.fetch(
+      new Request(`https://status.ebda.app${path}`, {
+        headers: { accept: 'text/html', ...headers },
+      }),
+      env
+    );
+
+  it('a browser on a missing path gets a real 404 studio page: noindex, search box, links', async () => {
+    const r = await html('/no-such-page', { 'accept-language': 'en' });
+    expect(r.status).toBe(404);
+    expect(r.headers.get('content-type')).toContain('text/html');
+    expect(r.headers.get('x-robots-tag')).toContain('noindex');
+    const page = await r.text();
+    expect(page.includes('The page you&#39;re looking for can&#39;t be found.')).toBe(true);
+    expect(page.includes('role="search"')).toBe(true);
+    expect(page.includes('href="https://help.ebda.app/en/"')).toBe(true);
+    expect(page.includes('href="https://status.ebda.app/"')).toBe(true);
+  });
+
+  it('Arabic by default, and an API client or an /api path keeps the JSON 404', async () => {
+    expect((await (await html('/zzz')).text()).includes('dir="rtl"')).toBe(true);
+    const api = await html('/api/nope');
+    expect(api.status).toBe(404);
+    expect(api.headers.get('content-type')).toContain('application/json');
+    const json = await worker.fetch(new Request('https://status.ebda.app/zzz'), env);
+    expect(json.status).toBe(404);
+    expect(json.headers.get('content-type')).toContain('application/json');
   });
 });
 

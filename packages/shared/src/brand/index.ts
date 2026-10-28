@@ -502,6 +502,76 @@ export const SITE_NAV_PANEL_CSS = `
 .menu-group>p{margin:0;padding:6px var(--np-inset,10px);color:var(--muted);font-size:.8125rem;font-weight:600}
 `.replace(/\n/g, '');
 
+/**
+ * The keyboard and close behaviour of the header's two <details> menus (the Products panel and the mobile menu), as one
+ * framework-free script, shared by marketing, docs, help and status. Every site serves it as a same-origin static file
+ * (`/assets/site-nav.js`, marketing `/site-nav.js`); there is no inline code, so a strict CSP (`script-src 'self'`)
+ * stays valid. The markup works without it (plain <details>); the script only adds:
+ *   - Esc closes the open menu and returns focus to its trigger;
+ *   - a pointer or focus outside an open menu closes it;
+ *   - opening one menu closes the other;
+ *   - a plain link click inside closes it (a ctrl/cmd/shift/middle click leaves the page where it is, so it stays);
+ *   - aria-expanded on the trigger, kept in step with the open state.
+ * The source is plain ES5 so no build step touches it. tests/unit/site-nav-behaviour.test.ts runs it in jsdom against
+ * every site's real header and checks each site serves exactly this text.
+ */
+export const SITE_NAV_JS = `(function () {
+  var header = document.querySelector('.site-header');
+  if (!header) return;
+  function menus() {
+    return Array.prototype.slice.call(header.querySelectorAll('details'));
+  }
+  function trigger(d) {
+    for (var i = 0; i < d.children.length; i++)
+      if (d.children[i].tagName === 'SUMMARY') return d.children[i];
+    return null;
+  }
+  function sync(d) {
+    var t = trigger(d);
+    if (t) t.setAttribute('aria-expanded', String(d.open));
+  }
+  function closeAll(except) {
+    menus().forEach(function (d) {
+      if (d !== except && d.open) d.open = false;
+    });
+  }
+  function outside(e) {
+    menus().forEach(function (d) {
+      if (d.open && !d.contains(e.target)) d.open = false;
+    });
+  }
+  menus().forEach(sync);
+  header.addEventListener(
+    'toggle',
+    function (e) {
+      var d = e.target;
+      if (!d || d.tagName !== 'DETAILS') return;
+      sync(d);
+      if (d.open) closeAll(d);
+    },
+    true
+  );
+  header.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    var a = e.target.closest ? e.target.closest('a') : null;
+    var d = a && a.closest('details');
+    if (d && header.contains(d)) d.open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = menus().filter(function (d) {
+      return d.open;
+    })[0];
+    if (!open) return;
+    open.open = false;
+    var t = trigger(open);
+    if (t) t.focus();
+  });
+  document.addEventListener('pointerdown', outside);
+  document.addEventListener('focusin', outside);
+})();
+`;
+
 /** Stylesheet for the wordmark and the nav above. Uses the sites' shared tokens (--fg --muted --line --lift --panel --night). */
 export const SITE_NAV_CSS =
   `

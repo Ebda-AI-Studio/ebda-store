@@ -1157,8 +1157,8 @@ export function looksForTemplate(t: LookTemplate): LookDefinition[] {
 /**
  * What a NEW store may be created on. Driven entirely by `status: 'built'` above: flipping a
  * look to 'built' makes its template appear in signup, onboarding and the admin switcher, and
- * makes its skin acceptable to the API, with no second list to edit. The five legacy Force
- * skins (modern, elegant, classic, minimal, bold) have no look, so they are never offered.
+ * makes its skin acceptable to the API, with no second list to edit. The five retired Force
+ * skins (`RETIRED_TEMPLATES`) have no look, so they are never offered.
  */
 export function builtLooks(): LookDefinition[] {
   return LOOKS.filter(l => l.status === 'built');

@@ -67,7 +67,7 @@ const { ProductSpotlightSection } =
 const { resolveSectionProducts, saleDiscount, onSaleProducts } =
   await import('../../apps/web/src/builder/sections/section-products');
 
-const SKINS = ['minimal', 'dahab', 'qamar', 'souq'] as const;
+const SKINS = ['dahab', 'qamar', 'souq'] as const;
 const useSkin = (skin: (typeof SKINS)[number], lang: 'en' | 'ar' = 'en') => {
   ctx.store = { ...STORES.A, template: skin, look: null, theme: getTemplateTheme(skin) };
   ctx.language = lang;

@@ -36,6 +36,8 @@ import {
   LOOK_OWNED_THEME_KEYS,
   mergeClientSettings,
   stripServerOwnedSettings,
+  isRetiredTemplate,
+  normalizeLegacyTemplate,
 } from '@ebda/shared';
 import { applyFamilyForLook, previewFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -457,17 +459,17 @@ export class StoreService {
             locale: 'ar-EG',
             defaultLanguage: REGION.defaultLocale,
           }) as Prisma.InputJsonValue,
-          // 2026-07-12 design structural batch: new stores get the persona-chrome
-          // completion + card-frame dedup ON by default (Ahmad-approved for NEW
+          // 2026-07-12 design structural batch: new stores get the card-frame dedup
+          // ON by default (Ahmad-approved for NEW
           // stores only — every existing store keeps these flags undefined/false
           // and renders unchanged). Merchant can still toggle either off via
           // Branding → Theme.
           // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
           // OOS ribbon (harmonizes better than the platform's original fixed
           // terracotta). Existing stores keep it undefined and render unchanged.
-          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8).
+          // `rtlPolish` is no longer seeded: no renderer reads it (Ruling EP-8); nor is
+          // `personaChromeV2`: only the deleted Force skins read it (Ruling SKIN-DEL-5).
           theme: {
-            personaChromeV2: true,
             frameChromeDedup: true,
             oosRibbonColor: '#6b7280',
           },
@@ -1022,11 +1024,16 @@ export class StoreService {
   }
 
   static async updateTemplate(storeId: string, template: string) {
+    // The five Force skins are deleted (Ruling SKIN-DEL-8): the strict writer refuses them, even
+    // as a re-save of a store that still holds one. Readers keep mapping them (no write).
+    if (isRetiredTemplate(template)) {
+      throw new AppError(400, 'TEMPLATE_RETIRED', 'That template has been retired; choose a look');
+    }
     const store = await this.getById(storeId);
 
-    // Existing stores keep their current skin (a re-save of it is allowed), but nobody can switch
-    // INTO a bare skin: the five legacy Force skins are closed to new choices and Qamar is only
-    // reachable through a look (Ruling B1-17). Switching is `applyLook`, gated on built looks.
+    // Existing stores keep their current template (a re-save of it is allowed), but nobody can
+    // switch INTO a bare template: Qamar and the rest are only reachable through a look (Ruling
+    // B1-17). Switching is `applyLook`, gated on built looks.
     if (template !== store.template) {
       throw new AppError(
         400,
@@ -1078,7 +1085,10 @@ export class StoreService {
       ...preview,
       look: look.id,
       // the skin (header, cards, buttons) is not drawn in the preview: say when it will change
-      skinChange: store.template !== look.skin ? { from: store.template, to: look.skin } : null,
+      skinChange:
+        normalizeLegacyTemplate(store.template) !== look.skin
+          ? { from: normalizeLegacyTemplate(store.template), to: look.skin }
+          : null,
     };
   }
 
@@ -1327,6 +1337,37 @@ export class StoreService {
   // new sub-key in, write back. Same posture as the announcement-bar
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
+  /**
+   * QR-1: replace `settings.qr` only. One atomic jsonb_set so a concurrent write of another
+   * settings key (floating widget, announcement, ...) is never overwritten by a stale read-merge-write.
+   */
+  static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{qr}', ${JSON.stringify(qr)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
+  /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
+  static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{labels}', ${JSON.stringify(labels)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
   static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
     const store = await this.getById(storeId);
     const existingSettings = (store.settings as Record<string, unknown>) || {};

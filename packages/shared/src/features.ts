@@ -1,5 +1,5 @@
 // Feature Toggle Engine — Feature Registry
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // All toggleable feature keys.
 // 2026-05-21: 22 features (added floating_widget).

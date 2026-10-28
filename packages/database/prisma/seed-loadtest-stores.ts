@@ -297,7 +297,7 @@ async function seedLoadtestStore(ownerId: string, storeIndex: number) {
       description: `Disposable load-test store #${storeIndex}. Safe to delete.`,
       descriptionAr: `متجر اختبار حمل مؤقت رقم ${storeIndex}`,
       currency: REGION.currency,
-      template: 'modern',
+      template: 'qamar',
       theme: {
         primaryColor: '210 9% 4%', // Ebda night (Ruling D1016-ORANGE-1)
         primaryForeground: '0 0% 100%',

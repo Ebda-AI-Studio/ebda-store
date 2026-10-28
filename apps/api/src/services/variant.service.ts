@@ -1,5 +1,6 @@
 import { prisma, Prisma, withMoneyTx } from '@ebda/database';
 import { GoldRateService } from './gold-rate/gold-rate.service';
+import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -492,6 +493,10 @@ export class VariantService {
       );
     }
 
+    // BARCODE-1: a typed/scanned barcode must be valid and unused anywhere in the store.
+    const typedBarcode = input.barcode?.trim() ? parseBarcodeOrThrow(input.barcode) : undefined;
+    if (typedBarcode) await assertBarcodeAvailable(storeId, typedBarcode);
+
     // Create variant
     const createVariantRow = (db: Pick<typeof prisma, 'productVariant'>) =>
       db.productVariant.create({
@@ -500,7 +505,7 @@ export class VariantService {
           title,
           titleAr,
           sku: input.sku,
-          barcode: input.barcode,
+          barcode: typedBarcode,
           price: input.price,
           compareAtPrice: input.compareAtPrice,
           costPrice: input.costPrice,
@@ -528,8 +533,14 @@ export class VariantService {
         )
       : await createVariantRow(prisma);
 
+    // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
+    const autoBarcode = typedBarcode
+      ? null
+      : await ensureBarcode(storeId, { variantId: variant.id });
+
     const result = {
       ...variant,
+      barcode: autoBarcode ?? variant.barcode,
       optionValues: variant.options.map(o => ({
         optionId: o.value.option.id,
         optionName: o.value.option.name,
@@ -570,9 +581,21 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Variant not found');
     }
 
+    // BARCODE-1: validate a changed barcode; '' clears it.
+    let barcodeUpdate: { barcode?: string | null } = {};
+    if (input.barcode !== undefined) {
+      const raw = input.barcode?.trim();
+      if (!raw) barcodeUpdate = { barcode: null };
+      else {
+        const value = parseBarcodeOrThrow(raw);
+        await assertBarcodeAvailable(storeId, value, { variantId });
+        barcodeUpdate = { barcode: value };
+      }
+    }
+
     const updated = await prisma.productVariant.update({
       where: { id: variantId },
-      data: input,
+      data: { ...input, ...barcodeUpdate },
       include: {
         options: {
           include: {
@@ -746,6 +769,7 @@ export class VariantService {
           : await createRow(prisma);
 
       created.push(variant.id);
+      await ensureBarcode(storeId, { variantId: variant.id });
     }
 
     // Variant stock/price is serialised into the storefront product list,

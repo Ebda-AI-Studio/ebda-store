@@ -42,7 +42,7 @@ async function seed() {
       data: {
         name: 'erasecap',
         slug: `${PREFIX}${uniq}`,
-        template: 'modern',
+        template: 'qamar',
         currency: 'EGP',
         ownerId: owner.id,
       },

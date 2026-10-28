@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@ebda/ui';
+import { SearchPicker } from '@/components/SearchPicker';
 import { useLocale } from 'next-intl';
 import {
   EGYPT_GOVERNORATES,
@@ -92,7 +93,6 @@ export default function NewOrderPage() {
   // or guest info typed into the form.
   const [customerMode, setCustomerMode] = useState<'existing' | 'guest'>('guest');
   const [customerSearch, setCustomerSearch] = useState('');
-  const [customerResults, setCustomerResults] = useState<CustomerSearchResult[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -121,8 +121,6 @@ export default function NewOrderPage() {
   const [shippingOverrideMajor, setShippingOverrideMajor] = useState('');
 
   // Product picker state.
-  const [productSearch, setProductSearch] = useState('');
-  const [productResults, setProductResults] = useState<ProductSearchResult[]>([]);
   const [items, setItems] = useState<LineItem[]>([]);
   // Variant picker: when a product with variants is selected from the dropdown,
   // it sits here until the merchant picks a variant (or dismisses).
@@ -133,40 +131,32 @@ export default function NewOrderPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const debouncedProductSearch = useDebounced(productSearch, 250);
-  const debouncedCustomerSearch = useDebounced(customerSearch, 250);
-
-  // Product autocomplete.
-  useEffect(() => {
-    if (!storeId || debouncedProductSearch.trim().length < 2) {
-      setProductResults([]);
-      return;
-    }
-    apiGet<{ products: ProductSearchResult[] }>(
-      `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(
-        debouncedProductSearch
-      )}&limit=10`
-    ).then(({ data }) => {
-      if (data?.products) setProductResults(data.products);
-    });
-  }, [storeId, debouncedProductSearch]);
-
-  // Customer autocomplete — search existing User rows. The store's
-  // customers list endpoint covers this.
-  useEffect(() => {
-    if (!storeId || customerMode !== 'existing' || debouncedCustomerSearch.trim().length < 2) {
-      setCustomerResults([]);
-      return;
-    }
-    apiGet<{ customers: CustomerSearchResult[] }>(
-      `/api/v1/stores/${storeId}/customers/search`,
-      searchQueryHeaders(debouncedCustomerSearch)
-    )
-      .then(({ data }) => {
-        if (data?.customers) setCustomerResults(data.customers);
-      })
-      .catch(() => setCustomerResults([]));
-  }, [storeId, customerMode, debouncedCustomerSearch]);
+  // Product + customer pickers: search-as-you-type (SearchPicker aborts the superseded request).
+  const searchProducts = useCallback(
+    async (q: string, signal: AbortSignal) => {
+      const { data, error } = await apiGet<{ products: ProductSearchResult[] }>(
+        `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`,
+        undefined,
+        signal
+      );
+      if (error) throw new Error(error.message);
+      return data?.products ?? [];
+    },
+    [storeId]
+  );
+  // Customer search — existing User rows. The store's customers list endpoint covers this.
+  const searchCustomers = useCallback(
+    async (q: string, signal: AbortSignal) => {
+      const { data, error } = await apiGet<{ customers: CustomerSearchResult[] }>(
+        `/api/v1/stores/${storeId}/customers/search`,
+        searchQueryHeaders(q),
+        signal
+      );
+      if (error) throw new Error(error.message);
+      return data?.customers ?? [];
+    },
+    [storeId]
+  );
 
   const subtotal = useMemo(
     () => items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0),
@@ -217,9 +207,6 @@ export default function NewOrderPage() {
     isRtl ? nameAr || name : name || nameAr || name;
 
   const addProduct = async (p: ProductSearchResult) => {
-    setProductSearch('');
-    setProductResults([]);
-
     // If the product has variants, fetch them and show the variant picker.
     // The API's rule (any variant row), not the column (W1a re-review minor 4).
     const hasVariants = isVariantProduct(p) || (p.variants?.length ?? 0) > 0;
@@ -321,7 +308,6 @@ export default function NewOrderPage() {
         ? `${c.firstName} ${c.lastName} <${c.email || c.phone}> (guest)`
         : `${c.firstName} ${c.lastName} <${c.email}>`
     );
-    setCustomerResults([]);
   };
 
   // When governorate changes, reset area + shipping preview.
@@ -489,41 +475,32 @@ export default function NewOrderPage() {
           </div>
           {customerMode === 'existing' && (
             <div className="relative mb-4">
-              <input
-                type="text"
-                placeholder={t('customerSection.searchPlaceholder')}
+              <SearchPicker<CustomerSearchResult>
                 value={customerSearch}
-                onChange={e => setCustomerSearch(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                onValueChange={setCustomerSearch}
+                search={searchCustomers}
+                getKey={c => c.id}
+                onPick={selectCustomer}
+                placeholder={t('customerSection.searchPlaceholder')}
+                renderOption={(c, hl) => (
+                  <>
+                    <span className="font-medium">
+                      {hl(`${c.firstName} ${c.lastName || ''}`.trim())}
+                    </span>
+                    {c.email && <span className="ms-2 text-muted-foreground">{hl(c.email)}</span>}
+                    {c.phone && (
+                      <span className="ms-2 text-muted-foreground" dir="ltr">
+                        {hl(c.phone)}
+                      </span>
+                    )}
+                    {c.isGuest && (
+                      <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning-ink">
+                        {t('customerSection.guestBadge')}
+                      </span>
+                    )}
+                  </>
+                )}
               />
-              {customerResults.length > 0 && (
-                <ul className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
-                  {customerResults.map(c => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => selectCustomer(c)}
-                        className="w-full px-3 py-2 text-start text-sm hover:bg-muted"
-                      >
-                        <span className="font-medium">
-                          {c.firstName} {c.lastName || ''}
-                        </span>
-                        {c.email && <span className="ms-2 text-muted-foreground">{c.email}</span>}
-                        {c.phone && (
-                          <span className="ms-2 text-muted-foreground" dir="ltr">
-                            {c.phone}
-                          </span>
-                        )}
-                        {c.isGuest && (
-                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
-                            {t('customerSection.guestBadge')}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
               {selectedCustomerId && (
                 <p className="mt-2 text-xs text-success-ink">
                   ✓{' '}
@@ -692,30 +669,19 @@ export default function NewOrderPage() {
             {t('productsSection.heading')}
           </h2>
           <div className="relative mb-4">
-            <input
-              type="text"
+            <SearchPicker<ProductSearchResult>
+              search={searchProducts}
+              getKey={p => p.id}
+              onPick={addProduct}
               placeholder={t('productsSection.searchPlaceholder')}
-              value={productSearch}
-              onChange={e => setProductSearch(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              renderOption={(p, hl) => (
+                <>
+                  <span className="font-medium">{hl(displayName(p.name, p.nameAr))}</span>
+                  {p.sku && <span className="ms-2 text-xs text-muted-foreground">{hl(p.sku)}</span>}
+                  <span className="ms-2 text-muted-foreground">{formatPrice(p.price)}</span>
+                </>
+              )}
             />
-            {productResults.length > 0 && (
-              <ul className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
-                {productResults.map(p => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => addProduct(p)}
-                      className="w-full px-3 py-2 text-start text-sm hover:bg-muted"
-                    >
-                      <span className="font-medium">{displayName(p.name, p.nameAr)}</span>
-                      {p.sku && <span className="ms-2 text-xs text-muted-foreground">{p.sku}</span>}
-                      <span className="ms-2 text-muted-foreground">{formatPrice(p.price)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
             {loadingVariants && (
               <p className="mt-2 text-xs text-muted-foreground">
                 {t('productsSection.loadingVariants')}

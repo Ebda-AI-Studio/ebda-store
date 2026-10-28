@@ -108,6 +108,10 @@ jobs:
       accounts_tests: ${{ steps.affected.outputs.accounts_tests }}
       workers: ${{ steps.affected.outputs.workers }}
       has_workers: ${{ steps.affected.outputs.has_workers }}
+      build_apps: ${{ steps.affected.outputs.build_apps }}
+      has_build_apps: ${{ steps.affected.outputs.has_build_apps }}
+      integration: ${{ steps.affected.outputs.integration }}
+      integration_paths: ${{ steps.affected.outputs.integration_paths }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -534,6 +538,70 @@ jobs:
           path: ${{ runner.temp }}/worker-startup-budget.json
           if-no-files-found: ignore
 
+  # OPS-2: the PRODUCTION build of every app whose dependency graph includes a changed workspace, with the same commands the
+  # cf-<app>-deploy.yml workflows run. #248 merged green and broke the storefront build because no PR check built the apps.
+  app-build:
+    name: App build (${{ matrix.app }})
+    needs: [changes]
+    if: needs.changes.outputs.has_build_apps == 'true'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.changes.outputs.build_apps) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Private TMPDIR per runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Build database + shared packages
+        run: |
+          npm run build -w packages/database
+          npm run build -w packages/shared
+      - name: Generate the ${{ matrix.app }} worker config (same generator as cf-deploy)
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
+        env:
+          OPENNEXT_CACHE: 'true'
+          CF_SETUP_SKIP_DEPS: '1'
+        run: bash scripts/cf-setup-local.sh ${{ matrix.app }}
+      - name: Build ${{ matrix.app }} for Cloudflare (OpenNext) - the deploy's build command
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
+        env:
+          NEXT_PUBLIC_API_URL: https://api.ebda.app/api/v1
+        run: bash scripts/cf-build.sh ${{ matrix.app }}
+      - name: Build ${{ matrix.app }} (static site) - the deploy's build command
+        if: contains(fromJSON('["marketing","docs","help"]'), matrix.app)
+        run: npm run build -w apps/${{ matrix.app }}
+
+  # The ONE required check for the app builds: runs on every PR, passes when no app needed building, fails when any app
+  # build failed or was cancelled. (A matrix job that is legitimately skipped cannot itself be a required check.)
+  app-builds:
+    name: App builds (affected)
+    needs: [changes, app-build]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 2
+    steps:
+      - name: Require every affected app build to have passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          BUILDS: ${{ needs.app-build.result }}
+        run: |
+          echo "changes=$CHANGES app-build=$BUILDS"
+          [ "$CHANGES" = "success" ] || { echo "::error::could not compute the affected apps ($CHANGES)"; exit 1; }
+          case "$BUILDS" in success|skipped) ;; *) echo "::error::an affected app build did not pass ($BUILDS)"; exit 1 ;; esac
+
   # Boot the API Worker in workerd (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot
   # see code that throws only on Workers (2026-10-08: `Prisma.dmmf` -> error 1101 on every request
   # for ~4 minutes with every Node test green). Fresh Postgres migrated from scratch, the Worker
@@ -749,7 +817,7 @@ jobs:
         # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
         # default, so a future config change can't silently re-mask
         # order-dependent state pollution on this required merge gate.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema packages/repo apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
+        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema packages/cf-migrate packages/repo apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -892,9 +960,16 @@ jobs:
 
   test-integration:
     name: Integration Tests
+    # Two lanes (2026-10-25, #227 merged four edited integration test files that never ran): the FULL/nightly lane runs
+    # the whole tier after `build`; a pull request runs it ONLY when scripts/ci-affected.mjs says an integration test
+    # or a service one imports changed (`changes.outputs.integration`), and then just those files.
+    if: >-
+      always() && !cancelled() && (
+        (github.event_name != 'pull_request' && needs.build.result == 'success') ||
+        (github.event_name == 'pull_request' && needs.changes.outputs.integration == 'true'))
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 25
-    needs: [build]
+    needs: [build, changes]
     services:
       postgres:
         image: pgvector/pgvector:0.8.0-pg17
@@ -974,8 +1049,8 @@ jobs:
         # allowance, no bypass setting). The API server below runs as ebda_app,
         # exactly as production does — for the
         # SYNCHRONOUS HTTP request/response paths only (#1974). The sibling
-        # "Start API server" step below sets INNGEST_DRY_RUN: 'true', which
-        # no-ops every Inngest function, so async/cron writers under
+        # "Start API server" step below runs in Node, where no background job is started (the
+        # Worker bindings are absent), so async/cron writers under
         # ebda_app (order-auto-cancel-unpaid, payment-abandonment-sweep,
         # stock-reorder-scan, analytics-daily-rollup, audit-log-archive, and
         # the rest) remain entirely unexercised here — see
@@ -1013,7 +1088,6 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
-          INNGEST_DRY_RUN: 'true'
           # self-serve-onboarding-live picks InstaPay as the trial's payment method (go-live gate, EBDA-FUNNEL-5).
           EBDA_INSTAPAY_HANDLE: ebda@instapay
 
@@ -1058,10 +1132,22 @@ jobs:
         # to the same big tables in parallel, so they run SERIALLY after the parallel pass, on a quiet database.
         run: |
           set -euo pipefail
+          targets="tests/integration apps/api/src"
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$INTEGRATION_PATHS" ] && [ "$INTEGRATION_PATHS" != "all" ]; then
+            targets="$INTEGRATION_PATHS"   # only the integration tests the planner selected for this PR
+          fi
+          echo "integration targets: $targets"
           PLANNER_EXCLUDES="$(bash scripts/ci/planner-lane.sh excludes)"
-          npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts $PLANNER_EXCLUDES --reporter=verbose --retry=1
-          npx vitest run $(bash scripts/ci/planner-lane.sh list) --no-file-parallelism --reporter=verbose --retry=1
+          npx vitest run $targets --exclude tests/integration/rls-ebda-app.test.ts --exclude tests/integration/rls-pooler-isolation.test.ts $PLANNER_EXCLUDES --reporter=verbose --retry=1
+          # serial planner pass: the whole lane on a full run, only the selected planner files on a narrowed PR run
+          lane="$(bash scripts/ci/planner-lane.sh list)"
+          if [ "$targets" != "tests/integration apps/api/src" ]; then
+            lane="$(for f in $lane; do for t in $targets; do case "$f" in "$t"*) echo "$f";; esac; done; done)"
+          fi
+          if [ -n "$lane" ]; then npx vitest run $lane --no-file-parallelism --reporter=verbose --retry=1; fi
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          INTEGRATION_PATHS: ${{ needs.changes.outputs.integration_paths }}
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
           # (pointed at the ep-spring-dew preview branch) is retired with staging —
@@ -1073,9 +1159,6 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
-          # Suppress inngest.send() network calls — dev server is not running in CI.
-          # The client.ts no-op path activates when this is 'true' OR NODE_ENV=test.
-          INNGEST_DRY_RUN: 'true'
           # Match the value passed to the seed step above so the login test
           # can authenticate with the seeded super admin.
           ADMIN_PASSWORD: test-admin-password-ci
@@ -1372,8 +1455,6 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
-          # Suppress inngest.send() network calls — dev server is not running in CI.
-          INNGEST_DRY_RUN: 'true'
           WEB_URL: http://localhost:3000
           ADMIN_URL: http://localhost:3001
 

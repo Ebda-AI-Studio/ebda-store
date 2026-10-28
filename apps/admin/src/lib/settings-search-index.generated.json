@@ -871,6 +871,16 @@
     "feature": "pwa"
   },
   {
+    "id": "page:/codes",
+    "kind": "page",
+    "route": "/codes",
+    "access": "owner",
+    "en": "QR codes & barcodes",
+    "ar": "أكواد QR والباركود",
+    "synEn": "qr code barcode label sticker print scan poster flyer receipt thermal a4 ean",
+    "synAr": "كود كيو ار باركود ملصق طباعة مسح بوستر فلاير فاتورة حراري"
+  },
+  {
     "id": "page:/language",
     "kind": "page",
     "route": "/language",

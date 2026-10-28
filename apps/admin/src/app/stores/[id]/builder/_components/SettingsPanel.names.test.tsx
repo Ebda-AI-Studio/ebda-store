@@ -39,7 +39,7 @@ function nameOf(el: Element): string {
 }
 
 describe('SettingsPanel: every control is named', () => {
-  for (const template of ['modern', 'dahab'] as const) {
+  for (const template of ['qamar', 'dahab'] as const) {
     const doc = layoutToDefinition(resolveLayoutSettings({}, template));
     const nodes = [...doc.sections, ...doc.sectionGroups.header, ...doc.sectionGroups.footer];
     it(`${template}: ${nodes.length} sections, content + design`, () => {
@@ -71,7 +71,7 @@ describe('SettingsPanel: every control is named', () => {
   }
 
   it('a localized text field is named after the field AND its language', () => {
-    const doc = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+    const doc = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
     const names: string[] = [];
     for (const node of doc.sections) {
       render(

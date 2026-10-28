@@ -15,7 +15,7 @@
  * Shape: `fonts` is the WHOLE library (the editor sends it whole, like the PUT does); `zones` maps a
  * zone name to its override, or `null` to clear that zone. An absent patch changes nothing.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { fontSourceSchema, zoneSchema } from '../schemas/typography';
 
 /** Fonts the storefront loads must be https (the storefront emitter drops anything else). */

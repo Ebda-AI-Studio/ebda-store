@@ -587,8 +587,15 @@ export async function apiRequest<T = unknown>(
  * `headers` carries extra request headers; a typed search term goes in `X-Search-Query`
  * (`searchQueryHeaders` from @ebda/shared), never in the URL (Ruling SEARCH-P2-9).
  */
-export async function apiGet<T = unknown>(endpoint: string, headers?: Record<string, string>) {
-  return apiRequest<T>(endpoint, headers ? { method: 'GET', headers } : { method: 'GET' });
+export async function apiGet<T = unknown>(
+  endpoint: string,
+  headers?: Record<string, string>,
+  signal?: AbortSignal
+) {
+  const init: RequestInit = { method: 'GET' };
+  if (headers) init.headers = headers;
+  if (signal) init.signal = signal;
+  return apiRequest<T>(endpoint, init);
 }
 
 export async function apiPost<T = unknown>(endpoint: string, body?: unknown) {

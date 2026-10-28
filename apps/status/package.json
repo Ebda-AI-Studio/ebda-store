@@ -13,9 +13,11 @@
     "lint": "eslint src test scripts --ext .ts,.mjs",
     "lint:fix": "eslint src test scripts --ext .ts,.mjs --fix",
     "snapshot": "tsx scripts/snapshot.ts",
+    "gen:typeahead": "node scripts/gen-typeahead.mjs",
     "check:a11y": "node scripts/a11y-check.mjs",
+    "check:search": "node scripts/search-check.mjs",
     "check:lighthouse": "node scripts/lighthouse-check.mjs",
-    "check": "npm run typecheck && npm run build && npm test && npm run snapshot && npm run check:a11y",
+    "check": "npm run typecheck && npm run build && npm test && npm run snapshot && npm run check:a11y && npm run check:search",
     "clean": "rm -rf dist .gate node_modules"
   },
   "dependencies": {},

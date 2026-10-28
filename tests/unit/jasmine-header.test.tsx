@@ -108,9 +108,13 @@ describe('jasmine header', () => {
   it('logo-forward: the wordmark is the sized, untracked display one and out-ranks the 14px nav', () => {
     setLook('jasmine.apothecary', 'en');
     const { container } = render(<JasmineHeader branding={branding} navigation={nav} />);
-    const mark = container.querySelector('[data-zone="storeName"]')!.getAttribute('class')!;
-    expect(mark).toContain('text-2xl');
-    expect(mark).not.toMatch(/tracking-\[|ui-caps-toggle|uppercase/);
+    // G1 (template-match): a store with no logo gets the look's lockup; its name is far bigger than the 14px nav.
+    const lockup = container.querySelector('[data-zone="storeName"]')!;
+    expect(lockup.getAttribute('data-lockup')).toBeTruthy();
+    expect(
+      Number.parseInt((lockup.firstElementChild as HTMLElement).style.fontSize, 10)
+    ).toBeGreaterThanOrEqual(28);
+    expect(lockup.outerHTML).not.toMatch(/ui-caps-toggle/);
     expect(container.querySelector('a[href="/products"]')!.getAttribute('class')).toContain(
       'text-sm'
     );
@@ -128,7 +132,7 @@ describe('jasmine header', () => {
     // the logo slot is capped at 65% of the row on a phone, so the actions always keep their room
     expect(logo.getAttribute('class')).toContain('max-w-[65%]');
     const mark = container.querySelector('[data-zone="storeName"]')!;
-    expect(mark.getAttribute('class')).toMatch(/\btruncate\b/);
+    expect(mark.firstElementChild!.getAttribute('class')).toMatch(/\bline-clamp-2\b/);
     expect(mark.getAttribute('title')).toBe(longName);
   });
   it('the look data, not the component, decides the placement (chrome on every Jasmine look)', async () => {

@@ -24,7 +24,7 @@ const languageState = { language: 'en' as 'en' | 'ar' };
 vi.mock('../../contexts/StoreContext', () => ({
   useStore: () => storeState,
   useStoreUrl: () => (path: string) => path,
-  useStoreTemplate: () => 'modern',
+  useStoreTemplate: () => 'qamar',
 }));
 
 vi.mock('../../contexts/LanguageContext', () => ({
@@ -64,11 +64,7 @@ vi.mock('next/link', () => ({
 }));
 
 const { StorefrontProductCard } = await import('./StorefrontProductCard');
-const { default: ModernProductCard } = await import('../modern/ProductCard');
-const { default: ElegantProductCard } = await import('../elegant/ProductCard');
-const { default: ClassicProductCard } = await import('../classic/ProductCard');
-const { default: BoldProductCard } = await import('../bold/ProductCard');
-const { default: MinimalProductCard } = await import('../minimal/ProductCard');
+const { default: BaseProductCard } = await import('../base/ProductCard');
 const { ProductCarousel } = await import('./ProductCarousel');
 const { default: DahabProductCard } = await import('../dahab/ProductCard');
 
@@ -83,11 +79,7 @@ const PRODUCT = {
 };
 const CARDS = [
   ['StorefrontProductCard', StorefrontProductCard],
-  ['modern', ModernProductCard],
-  ['elegant', ElegantProductCard],
-  ['classic', ClassicProductCard],
-  ['bold', BoldProductCard],
-  ['minimal', MinimalProductCard],
+  ['base', BaseProductCard],
   ['dahab', DahabProductCard],
 ] as const;
 

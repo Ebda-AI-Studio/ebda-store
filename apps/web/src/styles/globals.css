@@ -108,7 +108,7 @@
        keywords, so swapping the class for the var changes nothing rendered. */
     --duration-fast: 200ms; /* bold's snappy pace */
     --duration-base: 300ms; /* CTA micro-transitions, colors */
-    --duration-slow: 500ms; /* modern/classic/minimal default hover pace */
+    --duration-slow: 500ms; /* default hover pace */
     --duration-slower: 700ms; /* elegant's glacial pace */
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
@@ -1947,4 +1947,17 @@ html[lang='en'] [data-look] h1,
 html[lang='en'] [data-look] h2,
 html[lang='en'] [data-look] .font-display {
   font-family: var(--font-latin, var(--font-display)), var(--font-display);
+}
+
+/*
+ * Template-match PR2 (docs/plans/2026-10-25-templates-match-mockups.md, G2): a look sets the mobile hero box with
+ * `--look-hero-aspect` / `--look-hero-maxh` (packages/shared/src/looks/mock-tokens.ts). The rule matches the
+ * hero's own utility classes (HeroBanner, HeroSlider) so no markup changes; without the variables it computes
+ * to exactly the utilities' values. Phones only: from 640px the desktop utilities win as before.
+ */
+@media (max-width: 639.98px) {
+  [data-look] .aspect-\[var\(--hero-m-aspect\)\].max-h-\[45vh\] {
+    aspect-ratio: var(--look-hero-aspect, var(--hero-m-aspect));
+    max-height: var(--look-hero-maxh, 45vh);
+  }
 }

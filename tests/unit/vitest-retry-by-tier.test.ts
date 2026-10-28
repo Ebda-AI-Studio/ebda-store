@@ -49,7 +49,13 @@ describe('vitest retry is scoped by tier, not a global default', () => {
 
     const integrationRun = ci
       .split('\n')
-      .find(l => l.includes('vitest run tests/integration apps/api/src'));
+      .find(
+        l =>
+          l.includes('npx vitest run $targets') &&
+          l.includes('--exclude tests/integration/rls-ebda-app')
+      );
+    // $targets is `tests/integration apps/api/src` in the main lane, or the planner-selected files on a PR (ci.yml)
+    expect(ci).toContain('targets="tests/integration apps/api/src"');
     expect(integrationRun, "ci.yml's integration command moved — re-point this test").toBeTruthy();
     expect(
       integrationRun,

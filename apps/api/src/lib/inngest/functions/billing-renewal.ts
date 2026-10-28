@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import {
   expireStaleCheckouts,
@@ -31,7 +31,7 @@ import {
  * no-money transitions (overdue, suspension) are compare-and-set. The provider
  * call happens inside the step but outside any DB transaction.
  */
-export const billingRenewalDaily: InngestFunction.Any = inngest.createFunction(
+export const billingRenewalDaily: JobDef = inngest.createFunction(
   {
     id: 'billing-renewal-daily',
     name: 'Daily subscription reminders, renewals + dunning',

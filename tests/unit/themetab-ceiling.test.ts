@@ -20,14 +20,19 @@ describe('ThemeTab toggle ceiling', () => {
   });
 
   it('every checkbox sits in a counted card or is one of the two footer-logo options', () => {
-    // 6 cards hold 7 checkboxes (the social-icon card has two); the footer logo uploader holds 2 options.
+    // 5 cards hold 6 checkboxes (the social-icon card has two); the footer logo uploader holds 2 options.
     const checkboxes = (src.match(/type="checkbox"/g) ?? []).length;
-    expect(checkboxes).toBe(9);
+    expect(checkboxes).toBe(8);
     expect(src).toContain('footerLogoInvert');
     expect(src).toContain('hideFooterLogoMobile');
   });
 
   it('the control nothing reads is gone (Ruling EP-8), and the key is still a valid stored value', () => {
     expect(src).not.toContain('rtlPolish');
+  });
+
+  it('the control only the deleted skins read is gone (Ruling SKIN-DEL-5)', () => {
+    expect(src).not.toContain('personaChromeV2');
+    expect(src).not.toContain('PERSONA_CHROME_SKINS');
   });
 });

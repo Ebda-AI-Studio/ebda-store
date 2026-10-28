@@ -11,7 +11,7 @@
  * number is the one on their account and must be proven theirs (an order they placed) to GRANT.
  */
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const bodySchema = z
   .object({ consent: z.boolean(), language: z.enum(['en', 'ar']).optional() })

@@ -178,11 +178,7 @@ describe('every corner-chip render path derives the placement from the per-store
   const ROOT = resolve(__dirname, '../..');
   const PATHS = [
     'apps/web/src/templates/shared/StorefrontProductCard.tsx',
-    'apps/web/src/templates/modern/ProductCard.tsx',
-    'apps/web/src/templates/elegant/ProductCard.tsx',
-    'apps/web/src/templates/classic/ProductCard.tsx',
-    'apps/web/src/templates/minimal/ProductCard.tsx',
-    'apps/web/src/templates/bold/ProductCard.tsx',
+    'apps/web/src/templates/base/ProductCard.tsx',
     'apps/web/src/templates/shared/ProductCarousel.tsx',
     'apps/web/src/app/products/ProductListItem.tsx',
   ];

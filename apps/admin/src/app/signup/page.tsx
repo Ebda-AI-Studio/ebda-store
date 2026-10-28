@@ -14,6 +14,7 @@ import { useT } from '@/i18n/useT';
 import { LEGAL_DOC_TITLE, legalPolicyUrl, type LegalDocKey } from '@ebda/shared';
 import { STATIC_PLANS } from '../../components/billing/plans';
 import { isTrialPlanCode, storePlan, type PlanSelection } from '../../components/billing/types';
+import { storeSignupSlug } from '../../components/onboarding/signup-slug';
 
 /** Every document the API records at signup is shown and linked here (LEGAL_DOC_KEYS, reading order). */
 const SIGNUP_LEGAL_DOCS: readonly LegalDocKey[] = [
@@ -58,6 +59,8 @@ export default function SignupPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanSelection | null>(null);
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
+    // A store-host 404 sends ?slug=<name>: keep it (if signup would accept it) for the store step.
+    storeSignupSlug(qs.get('slug'));
     const planCode = qs.get('plan');
     if (!isTrialPlanCode(planCode)) return;
     const selection: PlanSelection = {

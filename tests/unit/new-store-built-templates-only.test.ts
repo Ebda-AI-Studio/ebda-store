@@ -1,6 +1,6 @@
 /**
  * A NEW store may only start on an Ebda template that is BUILT in the looks registry
- * (today: Qamar). The five legacy Force skins (modern, elegant, classic, minimal, bold) are
+ * (today: Qamar). The five retired Force skins (`RETIRED_TEMPLATES`) are
  * closed to new stores; existing stores keep theirs. Everything here is driven by the registry's
  * `status`, so flipping Souq / Jasmine / Lamma / Dahab to 'built' opens them with no code edit.
  * Unit only: no DB container (integration runs in CI).
@@ -64,6 +64,7 @@ import {
   builtSkins,
   defaultNewStoreLook,
   isBuiltSkin,
+  RETIRED_TEMPLATES,
 } from '@ebda/shared';
 import { OnboardingService } from '@api/services/onboarding.service';
 import { createStoreSchema } from '@api/routes/onboarding.schemas';
@@ -85,7 +86,7 @@ async function withDesignedLook<T>(
   }
 }
 
-const LEGACY = ['modern', 'elegant', 'classic', 'minimal', 'bold'] as const;
+const LEGACY = RETIRED_TEMPLATES;
 const body = { name: 'Shop', slug: 'my-shop' };
 
 beforeEach(() => {

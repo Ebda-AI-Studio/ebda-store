@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { eraseCiOutcomes } from './account-erased-propagation';
 
@@ -30,7 +30,7 @@ export async function ciErasureSecondPass(event: { data: Data }, step: Step) {
   return { skipped: false, ...r };
 }
 
-export const ciErasureSecondPassFn: InngestFunction.Any = inngest.createFunction(
+export const ciErasureSecondPassFn: JobDef = inngest.createFunction(
   {
     id: 'ci-erasure-second-pass',
     name: 'Customer Intelligence: erasure second pass (2 h after the first)',

@@ -30,7 +30,7 @@ Inputs read the composed `--input` (never the decorative line), so a field bound
 
 ## Chrome
 
-`apps/web/src/templates/lamma/Header.tsx` wraps the minimal header with the look's logo placement (`start` on Table and Market, `centre` on Notebook; the skin's icon search). `PACK_STYLES.lamma` is a photo-led card in the look's radius, one >= 44 px add control; the `[data-pack='lamma']` CSS sets the type voice only (no colour of its own). Every Lamma look also sets `chrome.cartBar: 'total'` and `chrome.cardStepper: 'inline'` (platform-commerce sections 15 and 16); Market sets `chrome.aisles`.
+`apps/web/src/templates/lamma/Header.tsx` wraps the shared base header (`templates/base/Header.tsx`) with the look's logo placement (`start` on Table and Market, `centre` on Notebook; the skin's icon search). `PACK_STYLES.lamma` is a photo-led card in the look's radius, one >= 44 px add control; the `[data-pack='lamma']` CSS sets the type voice only (no colour of its own). Every Lamma look also sets `chrome.cartBar: 'total'` and `chrome.cardStepper: 'inline'` (platform-commerce sections 15 and 16); Market sets `chrome.aisles`.
 
 ## Section mixes
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
 import { fieldDefId, parseDeepLink, resolveDeepLink } from './deeplink';
 
-const base = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
+const base = layoutToDefinition(resolveLayoutSettings({}, 'qamar'));
 // The default home has no header section or slides: add one of each so every lookup path is real.
 const doc = {
   ...base,

@@ -152,7 +152,7 @@ async function renderPdp(p: Record<string, unknown>) {
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
   const { default: ProductDetailClient } =
     await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
-  ctx.store = { ...STORES.A, template: 'minimal' };
+  ctx.store = { ...STORES.A, template: 'qamar' };
   ctx.all.length = 0;
   render(<ProductDetailClient initialProduct={p as never} />);
   act(() =>
@@ -415,7 +415,7 @@ describe('Dahab PDP: the main and pinned buttons nudge the first unset option (C
 });
 
 describe('WhatsApp order button with the required note missing nudges the field (both PDP paths)', () => {
-  it.each(['minimal', 'dahab'])(
+  it.each(['qamar', 'dahab'])(
     '%s: tap focuses the field, reveals the hint, opens nothing',
     async template => {
       const scrollSpy = mockScrollIntoView();
@@ -525,7 +525,7 @@ const backorderSized = {
 };
 
 describe('X-02: a sold-out size that accepts backorder stays pickable (pre-order)', () => {
-  it.each(['minimal', 'dahab'] as const)('%s PDP', async template => {
+  it.each(['qamar', 'dahab'] as const)('%s PDP', async template => {
     vi.stubGlobal('IntersectionObserver', IO);
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
     const { default: ProductDetailClient } =

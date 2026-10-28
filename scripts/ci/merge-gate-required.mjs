@@ -9,6 +9,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ALWAYS_IF = /^github\.event_name == 'pull_request'$/;
+// An aggregator that runs even when the jobs it needs were (legitimately) skipped: always required on a PR.
+const ALWAYS_RUN_IF = /^always\(\) && github\.event_name == 'pull_request'$/;
 
 export function parseWorkflow(text) {
   const lines = text.split('\n');
@@ -43,6 +45,7 @@ export function requiredChecks(dir) {
     const always = id => {
       const j = jobs[id];
       if (!j) return false;
+      if (j.if !== null && ALWAYS_RUN_IF.test(j.if)) return true;
       if (j.if !== null && !ALWAYS_IF.test(j.if)) return false;
       return j.needs.every(always);
     };
