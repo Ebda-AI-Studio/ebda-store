@@ -19,6 +19,8 @@ import {
   HEADER_WORDMARKS,
   HERO_RATIOS,
   TAB_BARS,
+  HEADING_WEIGHTS,
+  PRICE_COLOURS,
 } from '@ebda/shared';
 
 /**
@@ -82,6 +84,8 @@ export const themeSchema = z
       headerWordmark: HEADER_WORDMARKS,
       heroRatio: HERO_RATIOS,
       tabBar: TAB_BARS,
+      headingWeight: HEADING_WEIGHTS,
+      priceColour: PRICE_COLOURS,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

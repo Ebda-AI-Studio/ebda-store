@@ -6,6 +6,10 @@ import { describe, it, expect } from 'vitest';
 import {
   DRAFT_THEME_KEYS,
   HERO_RATIOS,
+  HEADING_WEIGHTS,
+  PRICE_COLOURS,
+  lookTraitAttrs,
+  traitDefault,
   TAB_BARS,
   resolveTabBar,
   LOOK_OWNED_THEME_KEYS,
@@ -81,5 +85,62 @@ describe('tabBar (P3)', () => {
     expect(tabBarShownOn('/products', 'never')).toBe(false);
     expect(tabBarShownOn('/checkout', 'always')).toBe(false);
     expect(isHomePath('/s/qamar', '/s/qamar')).toBe(true);
+  });
+});
+
+describe('headingWeight + priceColour (P4)', () => {
+  it('are validated, draftable, look-owned, shown on all five skins', () => {
+    validated('headingWeight', HEADING_WEIGHTS);
+    validated('priceColour', PRICE_COLOURS);
+  });
+
+  it('look default: bold where the display face ships a bold weight, regular on single-weight faces', () => {
+    expect(traitDefault('headingWeight', 'qamar.atelier')).toBe('bold'); // Noto Naskh 400;700
+    expect(traitDefault('headingWeight', 'qamar.lookbook')).toBe('regular'); // Lalezar, one weight
+    expect(traitDefault('headingWeight', 'dahab.giftbox')).toBe('regular'); // Kufam, one weight
+    expect(traitDefault('priceColour', 'qamar.atelier')).toBe('accent'); // light page, readable accent
+    expect(traitDefault('priceColour', 'qamar.lookbook')).toBe('text'); // dark page
+    expect(traitDefault('headingWeight', null)).toBeUndefined();
+  });
+
+  it('body attributes: merchant beats look; a store with no look gets none', () => {
+    expect(lookTraitAttrs({}, 'qamar.atelier')).toEqual({
+      'data-heading-weight': 'bold',
+      'data-price-colour': 'accent',
+    });
+    expect(
+      lookTraitAttrs({ headingWeight: 'regular', priceColour: 'text' }, 'qamar.atelier')
+    ).toEqual({
+      'data-heading-weight': 'regular',
+      'data-price-colour': 'text',
+    });
+    expect(lookTraitAttrs({ headingWeight: 'bold' }, null)).toEqual({});
+  });
+
+  it('the accent price colour is emitted only when the accent reads on page and card, else the text colour stays', () => {
+    const ok = lookCssVars(
+      { accentColor: '350 60% 30%', backgroundColor: '0 0% 100%', cardColor: '0 0% 100%' } as never,
+      'qamar.atelier'
+    );
+    expect(ok['--look-price-colour']).toBe('350 60% 30%');
+    const pale = lookCssVars(
+      {
+        accentColor: '230 31% 89%',
+        backgroundColor: '231 36% 18%',
+        cardColor: '0 0% 98%',
+      } as never,
+      'qamar.lookbook'
+    );
+    expect(pale['--look-price-colour']).toBeUndefined();
+    expect(
+      lookTraitAttrs(
+        {
+          accentColor: '230 31% 89%',
+          backgroundColor: '231 36% 18%',
+          cardColor: '0 0% 98%',
+        } as never,
+        'qamar.lookbook'
+      )['data-price-colour']
+    ).toBe('text');
   });
 });

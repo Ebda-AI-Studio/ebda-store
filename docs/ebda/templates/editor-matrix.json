@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1413,
+    "wired": 1423,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3002,6 +3002,19 @@
       "evidence": "static"
     },
     {
+      "id": "dahab|theme|headingWeight",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "dahab|theme|heroRatio",
       "skin": "dahab",
       "looks": [
@@ -3039,6 +3052,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|priceColour",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "dahab|theme|primaryColor",
@@ -6811,6 +6837,19 @@
       "evidence": "static"
     },
     {
+      "id": "jasmine|theme|headingWeight",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "jasmine|theme|heroRatio",
       "skin": "jasmine",
       "looks": [
@@ -6848,6 +6887,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|priceColour",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "jasmine|theme|primaryColor",
@@ -10633,6 +10685,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|headingWeight",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "lamma|theme|heroRatio",
       "skin": "lamma",
       "looks": [
@@ -10670,6 +10735,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "lamma|theme|priceColour",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "lamma|theme|primaryColor",
@@ -14442,6 +14520,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|headingWeight",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "qamar|theme|heroRatio",
       "skin": "qamar",
       "looks": [
@@ -14479,6 +14570,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|priceColour",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "qamar|theme|primaryColor",
@@ -18264,6 +18368,19 @@
       "evidence": "static"
     },
     {
+      "id": "souq|theme|headingWeight",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headingWeight",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "souq|theme|heroRatio",
       "skin": "souq",
       "looks": [
@@ -18301,6 +18418,19 @@
       "control": "normalizeProductImages",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|priceColour",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "priceColour",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "souq|theme|primaryColor",

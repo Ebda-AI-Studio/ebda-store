@@ -150,6 +150,14 @@ export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern:
     file: 'packages/shared/src/looks/compose.ts',
     pattern: /theme\?\.headerWordmark/,
   },
+  'theme/headingWeight': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /headingWeight/,
+  },
+  'theme/priceColour': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /priceColour/,
+  },
   'theme/tabBar': {
     file: 'packages/shared/src/looks/compose.ts',
     pattern: /theme\?\.tabBar/,

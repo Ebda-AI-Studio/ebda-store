@@ -1566,6 +1566,32 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.heading-weight",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Section heading weight",
+    "ar": "سُمك عناوين الأقسام",
+    "synEn": "heading weight bold regular section title typography",
+    "synAr": "سمك عناوين الاقسام عريض عادي خط العنوان",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
+    "id": "builder.price-colour",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Price colour on cards",
+    "ar": "لون السعر على الكروت",
+    "synEn": "price colour accent text card product",
+    "synAr": "لون السعر اللون المميز النص الكارت المنتج",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.tab-bar",
     "kind": "setting",
     "route": "/builder",

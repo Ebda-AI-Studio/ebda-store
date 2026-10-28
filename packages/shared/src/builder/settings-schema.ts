@@ -415,6 +415,34 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
     labelAr: 'الخطوط',
     settings: [
       {
+        id: 'headingWeight',
+        type: 'select',
+        labelEn: 'Section heading weight',
+        labelAr: 'سُمك عناوين الأقسام',
+        hintEn:
+          'Bold or regular section titles. Some display fonts have a single weight, so the look keeps those regular.',
+        hintAr:
+          'عناوين الأقسام بخط عريض أو عادي. بعض خطوط العناوين ليها سُمك واحد، فالشكل بيسيبها عادية.',
+        options: [opt('bold', 'Bold', 'عريض'), opt('regular', 'Regular', 'عادي')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'priceColour',
+        type: 'select',
+        labelEn: 'Price colour on cards',
+        labelAr: 'لون السعر على الكروت',
+        hintEn:
+          'Prices in the look accent colour (made readable on your page) or in the normal text colour.',
+        hintAr: 'الأسعار بلون الشكل المميز (متظبط يبان على صفحتك) أو بلون النص العادي.',
+        options: [
+          opt('accent', 'Accent colour', 'اللون المميز'),
+          opt('text', 'Text colour', 'لون النص'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
         id: 'fontFamily',
         type: 'select',
         labelEn: 'Font style',

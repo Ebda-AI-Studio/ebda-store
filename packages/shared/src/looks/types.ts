@@ -55,6 +55,12 @@ export type HeroRatio = (typeof HERO_RATIOS)[number];
  * page except the home page (the mock: the cart is the header bag), `never` no bar. Unset = `inner` on a look
  * store, `always` on a store with no look (untouched).
  */
+/** The merchant's section-heading weight (TEMPLATES-MOCK-6). Unset = the look's own (bold where its display face ships a bold weight). */
+export const HEADING_WEIGHTS = ['regular', 'bold'] as const;
+export type HeadingWeight = (typeof HEADING_WEIGHTS)[number];
+/** Product price colour on cards (TEMPLATES-MOCK-6): the look's accent (made readable) or the plain text colour. */
+export const PRICE_COLOURS = ['accent', 'text'] as const;
+export type PriceColour = (typeof PRICE_COLOURS)[number];
 export const TAB_BARS = ['always', 'inner', 'never'] as const;
 export type TabBarMode = (typeof TAB_BARS)[number];
 export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
@@ -254,6 +260,8 @@ export const HEADER_CHROME_OVERRIDE_KEYS = [
 export const MOCK_TRAIT_KEYS = [
   'heroRatio',
   'tabBar',
+  'headingWeight',
+  'priceColour',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
 /** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */

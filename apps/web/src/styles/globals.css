@@ -1959,6 +1959,20 @@ html[lang='en'] [data-look] .font-display {
  * hero's own utility classes (HeroBanner, HeroSlider) so no markup changes; without the variables it computes
  * to exactly the utilities' values. Phones only: from 640px the desktop utilities win as before.
  */
+/*
+ * TEMPLATES-MOCK-6 (P4): bold section headings and the card price in the look's accent. Both are scoped to the
+ * `<body>` data attributes `lookTraitAttrs` sets (merchant value, else the look's default; none on a legacy
+ * store), so a store without them is unchanged. A merchant's own heading/price zone is an inline style and
+ * still wins. `--look-price-colour` is the accent already nudged to >= 4.5:1 on the page.
+ */
+[data-heading-weight='bold'] h2[data-zone='sectionTitle'],
+[data-heading-weight='bold'] [data-part='section-title'] {
+  font-weight: 700;
+}
+[data-price-colour='accent'] span[data-zone='productPrice'] {
+  color: hsl(var(--look-price-colour, var(--foreground)));
+}
+
 @media (max-width: 639.98px) {
   [data-look] .aspect-\[var\(--hero-m-aspect\)\].max-h-\[45vh\] {
     aspect-ratio: var(--look-hero-aspect, var(--hero-m-aspect));

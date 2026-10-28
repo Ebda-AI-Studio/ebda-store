@@ -58,6 +58,7 @@ export function SectionHeader({
                 ? `min-w-0 ${getPackStyles(packSkin ?? 'qamar').sectionHeading}`
                 : 'min-w-0 font-display text-balance text-[clamp(1.5rem,1.1rem+1.4vw,2.35rem)] leading-tight text-foreground rtl:leading-[1.45]'
             }
+            data-part="section-title"
             {...editTitle}
           >
             {title}

@@ -102,6 +102,8 @@ The five templates default to the old Python mock-ups (plan `docs/plans/2026-10-
 | `headerWordmark` | `lockup` \| `plain`            | `lockup` for a store with no logo (a logo always wins)       | `resolveLockup` in the five headers                                     | Header → Store name without a logo            |
 | `heroRatio`      | `tall` \| `square` \| `wide`   | the look's `heroAspect` (unset); `wide` = old landscape crop | `mockCssVars(lookId, theme)` → `--look-hero-aspect`                     | Background and rhythm → Hero height on phones |
 | `tabBar`         | `always` \| `inner` \| `never` | `inner` on a look store, `always` with no look               | `resolveTabBar` → `useTabBarShown` (BottomTabBar, base + Dahab headers) | Header → Bottom bar on phones                 |
+| `headingWeight`  | `bold` \| `regular`            | bold unless the look's display face is single-weight         | `lookTraitAttrs` → `<body data-heading-weight>` → globals.css           | Typography → Section heading weight           |
+| `priceColour`    | `accent` \| `text`             | `accent` (readable, `--look-price-colour`)                   | `lookTraitAttrs` + `lookCssVars`                                        | Typography → Price colour on cards            |
 
 ## Product-card CTA + OOS-label + name-case (2026-06-24)
 

@@ -856,6 +856,20 @@ export const SETTINGS: SettingEntry[] = [
         'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
       ],
       [
+        'builder.heading-weight',
+        'builder.theme.headingWeight',
+        'select=theme',
+        'heading weight bold regular section title typography',
+        'سمك عناوين الاقسام عريض عادي خط العنوان',
+      ],
+      [
+        'builder.price-colour',
+        'builder.theme.priceColour',
+        'select=theme',
+        'price colour accent text card product',
+        'لون السعر اللون المميز النص الكارت المنتج',
+      ],
+      [
         'builder.tab-bar',
         'builder.theme.tabBar',
         'select=theme',
