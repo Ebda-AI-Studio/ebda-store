@@ -8,7 +8,7 @@
  * harness: one source, not a copy). Fail closed: no secret on the Worker = 503, never an open door.
  * Every path under /cutover/ is answered here and never reaches Express.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authorizeCutover } from '../../../../packages/cf-migrate/src/store-admin.mjs';
 import logger from '../lib/logger';
 import type { CfBindings } from './bindings';
