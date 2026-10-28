@@ -34,6 +34,10 @@ export const RESERVED_SLUGS = [
   'hub',
   'id',
   'accounts',
+  // The R2 public bucket's custom domain (media.ebda.app): a platform host, never a store.
+  'media',
+  // Ebda WhatsApp (https://wa.ebda.app), a product host and an allow-listed identity origin.
+  'wa',
 ] as const;
 
 export type ReservedSlug = (typeof RESERVED_SLUGS)[number];

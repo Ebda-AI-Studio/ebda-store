@@ -18,6 +18,10 @@ import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
 import { runBackupSweep, flaggedStoreIds, type SweepEnv } from './ops/backup-sweep';
+import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
+import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+
+const isJobCron = (cron: string): boolean => allJobCronStrings().includes(cron);
 
 export interface CronJob {
   name: string;
@@ -25,6 +29,8 @@ export interface CronJob {
 }
 
 export const CRON_SCHEDULE: Record<string, CronJob[]> = {
+  // Per-store job alarms (cf/store-schedule.ts): arm every live store's schedule, hourly.
+  '0 * * * *': [{ name: 'store-schedule-sync', run: () => syncStoreSchedules() }],
   // Abandoned-cart reminder emails (was every 15 min).
   '*/15 * * * *': [{ name: 'abandoned-cart', run: () => abandonedCartService.process() }],
   // Carrier tracking poll (was every 30 min).
@@ -54,13 +60,24 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
 };
 
 /** Run every job for a cron expression; one failing job never stops the others. */
-export async function runScheduled(cron: string): Promise<Array<{ name: string; ok: boolean }>> {
+export async function runScheduled(
+  cron: string,
+  scheduledTime: number = Date.now()
+): Promise<Array<{ name: string; ok: boolean }>> {
+  // Background jobs on Cloudflare (G5): Inngest's crons, started per rollout group.
+  const started = await runScheduledJobs(cron, scheduledTime).catch(err => {
+    logger.error({ err, cron }, '[cron] job scheduling failed');
+    return [];
+  });
+  const startedResults = started.map(s => ({ name: s.job, ok: s.result !== 'failed' }));
   const jobs = CRON_SCHEDULE[cron];
   if (!jobs) {
-    logger.warn({ cron }, '[cron] no jobs registered for this schedule');
-    return [];
+    if (started.length === 0 && !isJobCron(cron)) {
+      logger.warn({ cron }, '[cron] no jobs registered for this schedule');
+    }
+    return startedResults;
   }
-  return Promise.all(
+  const legacy = await Promise.all(
     jobs.map(async job => {
       try {
         await job.run();
@@ -72,4 +89,5 @@ export async function runScheduled(cron: string): Promise<Array<{ name: string; 
       }
     })
   );
+  return [...legacy, ...startedResults];
 }

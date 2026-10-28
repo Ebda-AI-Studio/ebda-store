@@ -5,7 +5,7 @@
  * be used.
  *
  * Delivery policy:
- *  - production + Resend configured  -> real mail via the platform sender.
+ *  - production + a mail transport configured  -> real mail via the platform sender.
  *  - everything else (dev, test, CI) -> NEVER sent. The message is captured in
  *    a bounded in-process outbox (read by tests and the scripted E2E) and the
  *    verification link is logged at info level for local dev.
@@ -17,11 +17,19 @@ import { BRAND, BRAND_EMAIL_LOGO_URL, productName, resolveDefaultLanguage } from
 import { config } from '../config';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { ResendService } from './resend.service';
+import { isMailTransportConfigured } from './mail-transport';
 import { EmailService, renderBrandedShell } from './email.service';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { passwordResetTemplate } from './email-templates/password-reset';
 import { staffInviteTemplate, type StaffInviteData } from './email-templates/staff-invite';
+import {
+  factorAddedNoticeTemplate,
+  type FactorAddedNoticeData,
+} from './email-templates/factor-added-notice';
+import {
+  factorEnrolCodeTemplate,
+  type FactorEnrolCodeData,
+} from './email-templates/factor-enrol-code';
 import { legalNoticeTemplate, type LegalNoticeEmailData } from './email-templates/legal-notice';
 import { passkeyNoticeTemplate, type PasskeyNoticeData } from './email-templates/passkey-notice';
 import { escapeHtml } from './email-templates/_util';
@@ -67,7 +75,7 @@ export function tokenFromCapturedMail(mail: CapturedMail | undefined): string | 
 }
 
 function shouldReallySend(): boolean {
-  return config.nodeEnv === 'production' && ResendService.isConfigured();
+  return config.nodeEnv === 'production' && isMailTransportConfigured();
 }
 
 /**
@@ -88,15 +96,18 @@ function redactTokenParam(link: string | null): string | null {
 }
 
 async function deliver(
-  msg: { to: string; subject: string; html: string; replyTo?: string },
+  msg: { to: string; subject: string; html: string; replyTo?: string; fromName?: string },
   opts: { redactLinkInLog?: boolean } = {}
 ): Promise<void> {
   if (shouldReallySend()) {
     await EmailService.sendPlatformRaw({
+      // Account mail comes from the studio (accounts.ebda.app), not the store product (BRAND-NAME-1).
+      fromName: BRAND.name,
       to: msg.to,
       subject: msg.subject,
       html: msg.html,
       ...(msg.replyTo ? { replyTo: msg.replyTo } : {}),
+      ...(msg.fromName ? { fromName: msg.fromName } : {}),
     });
     return;
   }
@@ -107,7 +118,7 @@ async function deliver(
     // Production without a Resend key must be loud, never silently "sent".
     logger.error(
       { to: maskEmail(msg.to), subject: msg.subject },
-      '[PLATFORM-MAIL] RESEND_API_KEY missing in production - mail NOT delivered'
+      '[PLATFORM-MAIL] no mail transport (EMAIL binding) in production - mail NOT delivered'
     );
   } else {
     logger.info(
@@ -125,24 +136,32 @@ type Lang = 'en' | 'ar';
 
 export async function sendMerchantVerificationEmail(
   data: { email: string; name: string; verificationUrl: string; expiresInHours: number },
-  language?: Lang
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = emailVerificationTemplate[lang](data, productName(lang));
+  const content = emailVerificationTemplate[lang](
+    data,
+    studio ? (lang === 'ar' ? BRAND.nameAr : BRAND.name) : productName(lang)
+  );
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver({
     to: data.email,
     subject: emailVerificationTemplate.subject[lang](data, ''),
     html,
+    ...(studio ? { fromName: BRAND.name } : {}),
   });
 }
 
@@ -163,8 +182,8 @@ export async function sendMerchantDuplicateSignupNotice(
       ? `<h2>لديك حساب مسبقاً</h2><p>مرحباً ${name}،</p><p>حاول شخص ما (ربما أنت) إنشاء متجر جديد بهذا البريد، لكن لديك حساب بالفعل. إذا كنت أنت، سجّل الدخول مباشرة.</p><p style="text-align:center;margin:24px 0;"><a href="${loginUrl}" class="button">تسجيل الدخول</a></p><p style="font-size:14px;color:#666;">إذا لم تكن أنت فتجاهل هذه الرسالة؛ لم يتغير شيء في حسابك.</p>`
       : `<h2>You already have an account</h2><p>Hi ${name},</p><p>Someone (possibly you) just tried to start a new store with this email, but an account already exists. If it was you, just sign in.</p><p style="text-align:center;margin:24px 0;"><a href="${loginUrl}" class="button">Sign in</a></p><p style="font-size:14px;color:#666;">If this wasn't you, ignore this email; nothing changed on your account.</p>`;
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
@@ -188,25 +207,33 @@ export async function sendMerchantDuplicateSignupNotice(
  */
 export async function sendMerchantPasswordResetEmail(
   data: { email: string; name: string; resetUrl: string; expiresInMinutes: number },
-  language?: Lang
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = passwordResetTemplate[lang](data, productName(lang));
+  const content = passwordResetTemplate[lang](
+    data,
+    studio ? (lang === 'ar' ? BRAND.nameAr : BRAND.name) : productName(lang)
+  );
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver(
     {
       to: data.email,
       subject: passwordResetTemplate.subject[lang](data, ''),
       html,
+      ...(studio ? { fromName: BRAND.name } : {}),
       replyTo: BRAND.supportEmail,
     },
     { redactLinkInLog: true }
@@ -222,24 +249,93 @@ export async function sendMerchantPasswordResetEmail(
  * set-password link for a brand-new account, or none when the account already
  * has a password (added to a second store).
  */
-export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lang): Promise<void> {
+export async function sendStaffInviteEmail(
+  data: StaffInviteData,
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
+): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
   const content = staffInviteTemplate[lang](data, '');
   const html = renderBrandedShell(content, {
-    name: BRAND.product.nameEn,
-    nameAr: null,
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
     address: null,
     defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
   });
   await deliver(
     {
       to: data.email,
       subject: staffInviteTemplate.subject[lang](data, ''),
       html,
+      ...(studio ? { fromName: BRAND.name } : {}),
+      replyTo: BRAND.supportEmail,
+    },
+    { redactLinkInLog: true }
+  );
+}
+
+/** A sign-in method was added to the account (Ruling ID-15). */
+export async function sendFactorAddedNoticeEmail(
+  data: FactorAddedNoticeData,
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(factorAddedNoticeTemplate[lang](data), {
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
+  });
+  await deliver({
+    to: data.email,
+    subject: factorAddedNoticeTemplate.subject[lang](data),
+    html,
+    ...(studio ? { fromName: BRAND.name } : {}),
+    replyTo: BRAND.supportEmail,
+  });
+}
+
+/** Platform-administrator first-factor enrolment code (Ruling ID-15). */
+export async function sendFactorEnrolCodeEmail(
+  data: FactorEnrolCodeData,
+  language?: Lang,
+  /** Sent on behalf of the shared identity service: master brand (Ebda AI Studio), never the product name. */
+  studio = false
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(factorEnrolCodeTemplate[lang](data), {
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+    // the sender already is the master brand: no "Powered by <product>" footer
+    hidePoweredBy: studio,
+  });
+  await deliver(
+    {
+      to: data.email,
+      subject: factorEnrolCodeTemplate.subject[lang](data),
+      html,
+      ...(studio ? { fromName: BRAND.name } : {}),
       replyTo: BRAND.supportEmail,
     },
     { redactLinkInLog: true }
@@ -256,8 +352,8 @@ export async function sendPasskeyNoticeEmail(
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
   const html = renderBrandedShell(passkeyNoticeTemplate[lang](data), {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
@@ -274,12 +370,12 @@ export async function sendPasskeyNoticeEmail(
 }
 
 /**
- * False when a legal notice could not really be delivered (production without Resend). The
+ * False when a legal notice could not really be delivered (production without a mail transport). The
  * fan-out checks it ONCE at the start of a run (Ruling LEGAL-5, I2), so an unconfigured mailer
  * fails the run fast instead of burning a pacer slot per recipient.
  */
 export function legalNoticeMailerReady(): boolean {
-  return !(config.nodeEnv === 'production' && !ResendService.isConfigured());
+  return !(config.nodeEnv === 'production' && !isMailTransportConfigured());
 }
 
 /**
@@ -299,10 +395,10 @@ export async function sendLegalNoticeEmail(
   data: LegalNoticeEmailData & { email: string }
 ): Promise<void> {
   // Belt and braces: the job checks legalNoticeMailerReady() ONCE before its first batch.
-  if (!legalNoticeMailerReady()) throw new Error('RESEND_NOT_CONFIGURED');
+  if (!legalNoticeMailerReady()) throw new Error('MAIL_NOT_CONFIGURED');
   const html = renderBrandedShell(legalNoticeTemplate.body(data), {
-    name: BRAND.product.nameEn,
-    nameAr: BRAND.product.nameAr,
+    name: BRAND.name,
+    nameAr: BRAND.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,

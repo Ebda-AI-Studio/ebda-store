@@ -267,3 +267,38 @@ describe('x-hop-timing operator token', () => {
     expect((ev as any).request.headers.accept).toBe('x');
   });
 });
+
+describe('SEC-8: secrets in the path', () => {
+  const STORE = '0f8fad5b-d9cb-469f-a165-70867728950e';
+  const TOKEN = ['not', 'a', 'secret', '0123456789', '0123456789'].join('-');
+  it('masks the Bosta webhook token but keeps the store id', async () => {
+    const { redactPathSecrets } = await import('../utils/sentry-url-scrub');
+    expect(redactPathSecrets(`/api/v1/webhooks/shipping/bosta/${STORE}/${TOKEN}`)).toBe(
+      `/api/v1/webhooks/shipping/bosta/${STORE}/[Filtered]`
+    );
+    // even a short or letters-only token on that route is masked
+    expect(redactPathSecrets(`/webhooks/shipping/bosta/${STORE}/short`)).toBe(
+      `/webhooks/shipping/bosta/${STORE}/[Filtered]`
+    );
+  });
+  it('masks any other 24+ char token-like segment, not UUIDs, slugs or short ids', async () => {
+    const { redactPathSecrets } = await import('../utils/sentry-url-scrub');
+    expect(redactPathSecrets(`/x/${TOKEN}/y`)).toBe('/x/[Filtered]/y');
+    expect(redactPathSecrets(`/stores/${STORE}/orders`)).toBe(`/stores/${STORE}/orders`);
+    expect(redactPathSecrets('/blog/a-very-long-readable-blog-post-slug')).toBe(
+      '/blog/a-very-long-readable-blog-post-slug'
+    );
+    expect(redactPathSecrets('/api/v1/products/123')).toBe('/api/v1/products/123');
+  });
+  it('Sentry/PostHog scrub masks the Bosta token but keeps long product slugs readable', () => {
+    const slug = '/products/samsung-galaxy-s24-ultra-512gb';
+    expect(redactSensitiveQuery(slug)).toBe(slug);
+    expect(redactSensitiveQuery(`/x/${TOKEN}/y`)).toBe(`/x/${TOKEN}/y`);
+  });
+  it('is applied by redactSensitiveQuery and scrubSentryEvent too', () => {
+    const url = `/webhooks/shipping/bosta/${STORE}/${TOKEN}?x=1`;
+    expect(redactSensitiveQuery(url)).not.toContain(TOKEN);
+    const ev = scrubSentryEvent({ request: { url: `https://api.ebda.app${url}` } });
+    expect(JSON.stringify(ev)).not.toContain(TOKEN);
+  });
+});

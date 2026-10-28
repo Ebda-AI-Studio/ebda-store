@@ -1,5 +1,13 @@
 // Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
-import { BRAND, brandMarkSvg, brandAppIconSvg } from '../../../packages/shared/src/brand/index';
+import {
+  BRAND,
+  BRAND_MARKETING_URL,
+  SITE_NAV_CSS,
+  brandMarkSvg,
+  brandAppIconSvg,
+  siteNavHtml,
+  siteWordmarkHtml,
+} from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, HISTORY_DAYS, PRODUCTS } from './config';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
@@ -42,7 +50,8 @@ const T = {
     bars: 'كل شريط يوم واحد (بالتوقيت العالمي)، من الأقدم إلى الأحدث.',
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}`,
+    // a function of the YEAR: a module-level `new Date()` is evaluated while the Worker's clock is frozen at 0 (1970)
+    footer: (year: number) => `© ${year} ${BRAND.company.shortNameAr}`,
   },
   en: {
     title: `${BRAND.company.shortNameEn} Status`,
@@ -80,7 +89,7 @@ const T = {
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}`,
+    footer: (year: number) => `© ${year} ${BRAND.company.shortNameEn}`,
   },
 } as const;
 
@@ -141,7 +150,8 @@ function incident(i: Incident, lang: Lang): string {
 </li>`;
 }
 
-const CSS = `
+const CSS =
+  `
 :root{--night:${BRAND.colors.night};--gold:${BRAND.colors.gold};--lift:${BRAND.colors.lift};--panel:#121415;--raise:#181b1c;--line:#2f3435;--fg:#f3f5f4;--muted:#a9b1af;--ok:#5fd08a;--warn:#e6b450;--bad:#ff8a80}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--night);color:var(--fg);font-family:${BRAND.fonts.stacks.sans};line-height:1.65}
@@ -151,7 +161,8 @@ a{color:var(--lift);text-underline-offset:3px}a:hover{color:var(--fg)}
 .wrap{max-width:860px;margin-inline:auto;padding-inline:16px}
 .skip{position:absolute;inset-inline-start:8px;top:-80px;background:var(--lift);color:var(--night);padding:10px 14px;border-radius:8px;font-weight:600}
 .skip:focus{top:8px;color:var(--night)}
-header{border-bottom:1px solid var(--line)}
+header{border-bottom:1px solid var(--line);overflow-x:clip}
+.header-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding-block:12px}.wm-site{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px}
 .wordmark{display:inline-flex;gap:8px;align-items:center;color:var(--fg);text-decoration:none}
 .wm-l{font-weight:600;letter-spacing:.01em}.wm-mk{flex:none}.wm-a{color:var(--lift)}.wm-s{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
@@ -164,11 +175,11 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .operational .dot{background:var(--ok)}.degraded .dot{background:var(--warn)}.outage .dot{background:var(--bad)}
 .muted{color:var(--muted)}.small{font-size:.875rem}
 .prod h3{font-size:.95rem;margin:1.2em 0 .5em;color:var(--muted)}.comps,.incs,.upd{list-style:none;padding:0;margin:0}
-.comp{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--panel)}
+.comp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--panel)}
 .comp-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:.875rem;font-weight:600}
 .pill.operational{color:var(--ok)}.pill.degraded{color:var(--warn)}.pill.outage{color:var(--bad)}.pill.unknown{color:var(--muted)}
-.bars{display:flex;gap:2px;height:30px;direction:ltr;margin-bottom:6px}
+.bars{display:flex;gap:2px;height:30px;direction:ltr;margin-bottom:6px;min-width:0;overflow:hidden}
 .b{flex:1 1 0;min-width:2px;border-radius:2px;background:var(--line)}
 .b.up{background:var(--ok)}.b.part{background:var(--warn)}.b.down{background:var(--bad)}
 .inc{border:1px solid var(--line);border-inline-start:4px solid var(--warn);border-radius:10px;padding:12px 16px;margin-bottom:12px;background:var(--panel)}
@@ -176,7 +187,46 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .tag{border:1px solid var(--gold);color:var(--lift);border-radius:999px;padding:0 8px;font-size:.78rem}
 .upd{margin-top:8px}.upd li{padding:6px 0;border-top:1px solid var(--line)}
 footer{border-top:1px solid var(--line);margin-top:48px;padding-block:20px}
-`.replace(/\n/g, '');
+`.replace(/\n/g, '') + SITE_NAV_CSS;
+
+/** Social card (og + twitter) and JSON-LD for the status page: the shared 1200x630 card, the studio as publisher. */
+function socialHead(
+  t: { title: string; explain: string; site: string },
+  lang: Lang,
+  origin: string,
+  home: string
+): string {
+  const url = origin + (home === '/' ? '/' : home);
+  const image = `${BRAND_MARKETING_URL}/og.png`;
+  const ld = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${BRAND_MARKETING_URL}/#organization`,
+        name: lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+        url: BRAND_MARKETING_URL,
+        logo: `${BRAND_MARKETING_URL}/icon-512.png`,
+      },
+      {
+        '@type': 'WebSite',
+        url,
+        name: t.site,
+        inLanguage: lang,
+        publisher: { '@id': `${BRAND_MARKETING_URL}/#organization` },
+      },
+    ],
+  }).replace(/</g, '\\u003c');
+  return (
+    `<meta property="og:title" content="${esc(t.title)}"><meta property="og:description" content="${esc(t.explain)}">` +
+    `<meta property="og:url" content="${url}"><meta property="og:type" content="website">` +
+    `<meta property="og:site_name" content="${esc(t.site)}"><meta property="og:locale" content="${lang === 'ar' ? 'ar_EG' : 'en_US'}">` +
+    `<meta property="og:image" content="${image}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` +
+    `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(t.title)}">` +
+    `<meta name="twitter:description" content="${esc(t.explain)}"><meta name="twitter:image" content="${image}">` +
+    `<script type="application/ld+json">${ld}</script>`
+  );
+}
 
 export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): string {
   const t = T[lang];
@@ -201,12 +251,14 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <link rel="alternate" hreflang="ar" href="${origin}/">
 <link rel="alternate" hreflang="en" href="${origin}/en">
 <link rel="icon" href="${icon}">
+${socialHead(t, lang, origin, home)}
 <style>${CSS}</style>
 </head>
 <body>
 <a class="skip" href="#main">${esc(t.skip)}</a>
-<header><div class="wrap row">
-<a class="wordmark" href="${home}">${brandMarkSvg({ size: 24, cls: 'wm-mk' })}<span class="wm-l">${BRAND.name.toLowerCase()}</span><span class="wm-a" lang="ar">${BRAND.nameAr}</span><span class="wm-s">${esc(t.site)}</span></a>
+<header class="site-header"><div class="wrap header-row">
+${siteWordmarkHtml({ lang, href: home, siteLabel: t.site, markHtml: brandMarkSvg({ size: 28, cls: 'wm-mk' }) })}
+${siteNavHtml(lang, 'status')}
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>
 <main id="main" class="wrap">
@@ -225,7 +277,7 @@ ${PRODUCTS.map(prod => {
 ${recent}
 <p class="muted small">${esc(t.generated)}: <time datetime="${new Date(s.generatedAt).toISOString()}">${fmt(s.generatedAt)}</time> · <a href="/api/status.json">/api/status.json</a></p>
 </main>
-<footer><div class="wrap muted small">${esc(t.footer)} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
+<footer><div class="wrap muted small">${esc(t.footer(new Date(s.generatedAt).getUTCFullYear()))} · <a href="https://${BRAND.domains.help}">${lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}</a> · <a href="https://${BRAND.domains.docs}">${lang === 'ar' ? 'الوثائق' : 'Docs'}</a></div></footer>
 </body>
 </html>
 `;

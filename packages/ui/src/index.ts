@@ -28,3 +28,6 @@ export * from './theme';
 // Utilities
 export { cn } from './utils/cn';
 export * from './components/ReceiptPrinterShell';
+
+// Search-as-you-type primitives (shared by storefront + admin)
+export * from './search';

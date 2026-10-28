@@ -31,6 +31,7 @@
     "dev:status": "npm run dev -w apps/status",
     "test:status": "npm run test -w apps/status",
     "test:accounts": "npm run test -w apps/accounts",
+    "test:repo-workers": "npm run cf:test -w packages/repo",
     "test:api-workers": "npm run cf:test -w apps/api",
     "build": "npm run build --workspaces --if-present",
     "build:web": "npm run build -w apps/web",
@@ -69,7 +70,7 @@
     "test:load": "bash loadtests/run.sh lens-n-medium-traffic",
     "ai:eval": "tsx tests/ai-eval/live.eval.ts",
     "search:eval": "tsx tests/search-eval/run.ts",
-    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/database/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/cf-schema/tsconfig.json && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/orders/tsconfig.json && tsc --noEmit -p apps/marketing/tsconfig.json && tsc --noEmit -p apps/status/tsconfig.json && tsc --noEmit -p apps/accounts/tsconfig.json && tsc --noEmit -p tests/search-eval/tsconfig.json",
+    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/database/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/cf-schema/tsconfig.json && tsc --noEmit -p packages/repo/tsconfig.json && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/orders/tsconfig.json && tsc --noEmit -p apps/marketing/tsconfig.json && tsc --noEmit -p apps/status/tsconfig.json && tsc --noEmit -p apps/accounts/tsconfig.json && tsc --noEmit -p tests/search-eval/tsconfig.json",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "db:generate": "npm run generate -w packages/database",
     "db:migrate": "npm run migrate -w packages/database",
@@ -143,18 +144,21 @@
     "tmp": "0.2.7",
     "uuid": "^11.1.1",
     "js-yaml": "4.3.2",
-    "nodemailer": "9.0.1",
-    "dompurify": "3.4.16",
+    "nodemailer": "10.2.1",
+    "dompurify": "3.4.17",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "sharp": "^0.35.3",
-    "fast-uri": "3.1.8",
+    "fast-uri": "3.1.9",
     "miniflare": {
-      "undici": "7.29.1"
+      "undici": "7.30.1"
+    },
+    "chromium-bidi": {
+      "zod": "4.6.7"
     },
     "nanoid": "3.3.18",
-    "hono": "4.13.7",
-    "ip-address": "10.7.3",
+    "hono": "4.13.14",
+    "ip-address": "10.7.5",
     "@opentelemetry/propagator-jaeger": "2.9.0",
     "rimraf": {
       "brace-expansion": "5.0.12"

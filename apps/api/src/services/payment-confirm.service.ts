@@ -42,9 +42,11 @@ import { CardTestingGuard } from './card-testing-guard.service';
 import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
+import { recordPaymentSettled } from './provider-verification.service';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { cfWaitUntil } from '../cf/bindings';
 import { assertValidTransition } from './order-status-machine';
+import { claimOrderFailed, claimOrderPaid, lockPaymentRow } from './payment-state-claims';
 
 /**
  * Which pull-side path asked the provider for this status.
@@ -140,7 +142,7 @@ export async function confirmPaymentFromProviderStatus(
     status === 'completed'
       ? order.paymentStatus !== 'paid'
       : status === 'failed' || status === 'expired' || status === 'cancelled'
-        ? order.paymentStatus !== 'failed'
+        ? order.paymentStatus === 'unpaid' // a paid / refunded / disputed order never becomes failed (M-064)
         : false;
 
   if (status === 'completed') {
@@ -238,27 +240,47 @@ export async function confirmPaymentFromProviderStatus(
       select: { status: true },
     });
     if (!currentOrder) throw new Error(`Order ${order.id} not found during confirmation`);
-    assertValidTransition(currentOrder.status, 'confirmed');
+    // An order already past confirmation (processing / shipped / delivered) is marked PAID without moving its
+    // fulfilment status; only a terminal order (cancelled / refunded) is refused here.
+    if (!['processing', 'shipped', 'delivered'].includes(currentOrder.status)) {
+      assertValidTransition(currentOrder.status, 'confirmed');
+    }
 
-    await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: 'completed',
-          paidAt: providerStatus.paidAt ?? new Date(),
-          metadata: {
-            ...((payment.metadata as object) || {}),
-            confirmedVia: source,
-            ...(triggeredByUserId ? { confirmedBy: triggeredByUserId } : {}),
-            confirmedAt: new Date().toISOString(),
-          },
-        },
-      }),
-      prisma.order.update({
+    // ONE conditional update decides who confirms (M-049): the snapshot above can be stale, a webhook may
+    // have paid the order in between. Only the caller that wins the claim writes the payment row and fans out.
+    await lockPaymentRow(payment.id);
+    const claim = await claimOrderPaid(order.id, order.storeId);
+    if (claim === 'blocked_status') {
+      // The order went terminal (cancelled / refunded) between the status read and the claim. Raise what the
+      // earlier check would have: the auto-cancel sweep turns INVALID_STATUS_TRANSITION into its durable
+      // "captured money on a terminal order" trace and P1. A quiet return here would lose that.
+      const now = await prisma.order.findUnique({
         where: { id: order.id, storeId: order.storeId },
-        data: { status: 'confirmed', paymentStatus: 'paid' },
-      }),
-    ]);
+        select: { status: true },
+      });
+      logger.error(
+        { paymentId: payment.id, orderId: order.id, source, status: now?.status },
+        '[PAYMENT CONFIRM] provider says paid but the order is no longer confirmable — not flipped'
+      );
+      assertValidTransition(now?.status ?? 'cancelled', 'confirmed');
+      return { paymentStatus: 'unpaid', providerStatus: status, statusChanged: false };
+    }
+    if (claim !== 'claimed') {
+      return { paymentStatus: 'paid', providerStatus: status, statusChanged: false };
+    }
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'completed',
+        paidAt: providerStatus.paidAt ?? new Date(),
+        metadata: {
+          ...((payment.metadata as object) || {}),
+          confirmedVia: source,
+          ...(triggeredByUserId ? { confirmedBy: triggeredByUserId } : {}),
+          confirmedAt: new Date().toISOString(),
+        },
+      },
+    });
 
     // Bust the admin aggregated-customers snapshot — this paymentStatus
     // transition changes the paid/total-spent counts it aggregates.
@@ -358,24 +380,43 @@ export async function confirmPaymentFromProviderStatus(
       )
     );
 
+    // PROVIDERS-3: a real payment settled through this provider (evidence for auto-verify).
+    void recordPaymentSettled({
+      storeId: order.storeId,
+      provider: payment.provider,
+      paymentId: payment.id,
+    });
     return { paymentStatus: 'paid', providerStatus: status, statusChanged: true };
   }
 
   if (status === 'failed' || status === 'expired' || status === 'cancelled') {
     if (!statusChanged) {
-      return { paymentStatus: 'failed', providerStatus: status, statusChanged: false };
+      // Report the order's REAL state: a paid (or since-refunded / disputed) order must not read as failed.
+      return {
+        paymentStatus: order.paymentStatus === 'failed' ? 'failed' : 'paid',
+        providerStatus: status,
+        statusChanged: false,
+      };
     }
 
-    await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data: { status },
-      }),
-      prisma.order.update({
-        where: { id: order.id, storeId: order.storeId },
-        data: { paymentStatus: 'failed' },
-      }),
-    ]);
+    // Conditional (M-064): re-decided against the CURRENT order row, so a webhook that paid it after our
+    // snapshot (or an admin Refresh on a paid order) can never turn it into `failed`.
+    await lockPaymentRow(payment.id);
+    const failedClaim = await claimOrderFailed(order.id, order.storeId);
+    if (failedClaim !== 'claimed') {
+      return {
+        paymentStatus: failedClaim === 'already_failed' ? 'failed' : 'paid',
+        providerStatus: status,
+        statusChanged: false,
+      };
+    }
+    await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: { notIn: ['completed', 'refunded', 'partially_refunded', 'disputed'] },
+      },
+      data: { status },
+    });
 
     // Bust the admin aggregated-customers snapshot — this paymentStatus
     // transition changes the paid/failed counts it aggregates.

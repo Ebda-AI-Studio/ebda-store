@@ -6,7 +6,7 @@
  * hairline under both. Uses `font-display`, which is the pack's display face
  * where a pack defines one (Dahab) and the body face everywhere else.
  */
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useStore } from '../../contexts/StoreContext';
 import { getPackStyles } from '../../templates/shared/pack-styles';
 

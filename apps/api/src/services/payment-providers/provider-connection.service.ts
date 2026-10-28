@@ -29,7 +29,6 @@ import {
   type CredentialBlob,
   type CredentialHints,
 } from './credentials';
-import { isProviderUsable } from './provider-gate';
 import { getProviderV2 } from './registry';
 import type { ConnectionTestResult } from './types';
 import { paymentWebhookUrl } from './webhook-url';
@@ -205,22 +204,12 @@ export function connectionTestLooksCurrent(row: ConnectableRow): boolean {
  * The enable gate, for EVERY write path that can leave a non-manual provider enabled (create,
  * update, toggle, mode switch). Manual providers (COD, InstaPay) are not gated here.
  */
-export function assertEnableAllowed(
-  row: ConnectableRow,
-  opts: { storeActivated?: boolean } = {}
-): void {
+export function assertEnableAllowed(row: ConnectableRow): void {
   const entry = getProviderEntry(row.provider);
   if (!entry || entry.kind !== 'payments') {
     throw new AppError(422, 'UNKNOWN_PROVIDER', `Unknown payment provider "${row.provider}"`);
   }
   if (entry.manual) return;
-  if (!isProviderUsable(row.provider) && !opts.storeActivated) {
-    throw new AppError(
-      409,
-      'PROVIDER_NOT_VERIFIED',
-      `${row.provider} is not activated for this store yet: request activation first`
-    );
-  }
   if (!connectionTestIsCurrent(row)) {
     throw new AppError(
       409,
@@ -232,11 +221,13 @@ export function assertEnableAllowed(
 
 /** Run the adapter's harmless call for the row's ACTIVE mode. Never throws for provider errors. */
 export async function runConnectionTest(
-  row: ConnectableRow
+  row: ConnectableRow,
+  /** Check this mode's credentials instead of the active one (the mode just saved: sandbox first). */
+  forMode?: CredentialMode
 ): Promise<{ result: ConnectionTestResult; stored: StoredConnectionTest }> {
   const entry = connectableEntry(row.provider);
-  const mode = modeOf(row);
-  const fields = activeFields(row);
+  const mode = forMode ?? modeOf(row);
+  const fields = decryptCredentialBlob(row.credentials ?? null)[mode] ?? {};
   const at = new Date().toISOString();
   const missing = missingRequiredFields(entry, fields);
   let result: ConnectionTestResult;
@@ -244,8 +235,16 @@ export async function runConnectionTest(
     result = { ok: false, code: 'incomplete', message: `Missing: ${missing.join(', ')}` };
   } else {
     const adapter = getProviderV2(row.provider);
-    if (!adapter?.testConnection) {
-      result = { ok: false, code: 'unknown', message: 'This provider has no connection test' };
+    if (!adapter) {
+      result = { ok: false, code: 'unknown', message: 'This provider has no adapter' };
+    } else if (!adapter.testConnection) {
+      // PROVIDERS-3: no safe read-only call exists. Nothing is sent; the connection is usable but
+      // explicitly UNVERIFIED (the merchant sees a warning, the first real use pages ops).
+      result = {
+        ok: true,
+        code: 'no_check',
+        message: 'This provider has no safe connection test; the connection is unverified',
+      };
     } else {
       const settings =
         row.settings && typeof row.settings === 'object' && !Array.isArray(row.settings)

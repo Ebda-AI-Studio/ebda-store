@@ -61,8 +61,8 @@ vi.mock('../../apps/api/src/services/email.service', () => ({
 vi.mock('../../apps/api/src/services/domain-provider', () => ({
   resolveDomainService: () => ({ providerName: 'x', addDomain: vi.fn(), removeDomain: vi.fn() }),
 }));
-vi.mock('../../apps/api/src/services/resend.service', () => ({
-  ResendService: { provisionStoreDomain: vi.fn() },
+vi.mock('../../apps/api/src/services/store-mailer.service', () => ({
+  StoreMailer: { provisionStoreDomain: vi.fn() },
 }));
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },

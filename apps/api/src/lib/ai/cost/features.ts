@@ -27,7 +27,7 @@ const STORE = { storeId: 'rep-store', storeName: 'Demo Store' };
 /** A typical bilingual Ebda product with a variant option — representative prompt size. */
 const REP_PRODUCT = {
   name: 'Organic Medjool Dates 400g',
-  nameAr: 'تمر مجدول عضوي ٤٠٠ جرام',
+  nameAr: 'تمر مجدول عضوي 400 جرام',
   description:
     'Premium soft Medjool dates, naturally sweet with a caramel-like flavour. Hand-picked, unpitted, and packed fresh. Rich in fibre and potassium — a wholesome snack or gift.',
   descriptionAr:

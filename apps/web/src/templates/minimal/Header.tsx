@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useId } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';

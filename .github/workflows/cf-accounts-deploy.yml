@@ -47,7 +47,7 @@ jobs:
         run: npx wrangler d1 migrations apply ebda-identity --remote
       - name: Deploy ebda-accounts Worker
         working-directory: apps/accounts
-        run: npx wrangler deploy
+        run: npx wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA
       - name: Verify the live Worker, roll back automatically if not
         env:
           PREVIOUS_VERSION: ${{ steps.previous.outputs.previous }}

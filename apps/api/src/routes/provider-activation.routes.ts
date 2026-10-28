@@ -1,3 +1,8 @@
+import { auditLog } from '../middleware/security';
+import {
+  confirmProviderVerification,
+  listProviderVerification,
+} from '../services/provider-verification.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, asPlatformOperator } from '@ebda/database';
@@ -124,6 +129,43 @@ adminProviderActivationRoutes.get(
       const { status } = parseInput(statusSchema, req.query);
       const requests = await asPlatformOperator(req.user!.userId, () => listAllRequests(status));
       res.json({ success: true, data: { requests } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** PROVIDERS-3: per-provider real-traffic evidence and the automatic `verified` flip. */
+adminProviderActivationRoutes.get(
+  '/provider-verification',
+  ...superAdmin,
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: { providers: await listProviderVerification() } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** PROVIDERS-3: a super admin confirms a provider that reached "ready" (silences its alerts). */
+adminProviderActivationRoutes.post(
+  '/provider-verification/:provider/confirm',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const provider = parseInput(providerSchema, req.params.provider);
+      const done = await confirmProviderVerification(provider, req.user!.userId);
+      await auditLog({
+        action: 'provider_verification.confirmed',
+        userId: req.user!.userId,
+        resourceType: 'provider_verification',
+        resourceId: provider,
+        details: { provider },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: done });
     } catch (error) {
       next(error);
     }

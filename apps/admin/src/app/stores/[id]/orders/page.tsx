@@ -42,6 +42,8 @@ export default function StoreOrdersPage() {
   // Staff cannot record a refund (the API needs orders:refund): hide the option, not just fail it.
   const { user } = useAuth();
   const canRefund = !!user && user.role !== 'staff';
+  // The API answers 403 to staff (customers:export is owner-only), so do not offer the button.
+  const canExport = !!user && user.role !== 'staff';
 
   // Per-page preference is persisted per store so the user's choice survives
   // navigation. Falls back to 25 (admin default) when nothing is stored or the
@@ -419,29 +421,31 @@ export default function StoreOrdersPage() {
       subtitle={t('subtitle')}
       actions={
         <div className="flex items-center gap-2">
-          {/* Export orders to Excel */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleExport}
-            disabled={isLoading || isExporting}
-          >
-            <svg
-              className="h-4 w-4 me-2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
+          {/* Export orders to Excel: owners only (SEC-14, the sheet carries every customer's PII) */}
+          {canExport && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleExport}
+              disabled={isLoading || isExporting}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            {isExporting ? t('export.exporting') : t('export.button')}
-          </Button>
+              <svg
+                className="h-4 w-4 me-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              {isExporting ? t('export.exporting') : t('export.button')}
+            </Button>
+          )}
           {/* Admin phone-order entry. Lets merchants take an order over
               the phone, then issue a payment link from the
               order detail page (Ahmad 2026-05-16). */}

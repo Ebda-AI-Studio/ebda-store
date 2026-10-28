@@ -1,7 +1,15 @@
 import type { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { resolveDefaultLanguage } from '@ebda/shared';
 import { API_URL } from '../lib/api';
+import {
+  localePathsOn,
+  localeAlternates,
+  prefixedPath,
+  storeKeyForHost,
+  type PathLocale,
+} from '../lib/locale-paths';
 
 // Static page slugs that exist for every store (per-tenant rewrite).
 const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly' | 'weekly' }> = [
@@ -23,6 +31,8 @@ type StoreListEntry = {
   slug: string;
   /** The demo showroom (Ruling B1-14): listed nowhere. */
   isDemo?: boolean;
+  /** `settings.defaultLanguage`: the x-default of a store that has language-in-URL ON (LOCALE-PATHS-1). */
+  defaultLanguage?: string;
 };
 
 type ProductEntry = {
@@ -67,7 +77,12 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
     const data = await res.json();
     const store = data?.data?.store;
     if (!store?.id || !store?.slug) return null;
-    return { id: store.id, slug: store.slug, isDemo: store.isDemo === true };
+    return {
+      id: store.id,
+      slug: store.slug,
+      isDemo: store.isDemo === true,
+      defaultLanguage: store.settings?.defaultLanguage,
+    };
   } catch (error) {
     if (error instanceof SitemapSourceUnavailableError) throw error;
     throw new SitemapSourceUnavailableError('host resolve → network error');
@@ -171,9 +186,31 @@ async function fetchBundles(storeId: string): Promise<BundleEntry[]> {
 async function buildTenantSitemap(
   requestHost: string,
   storeId: string,
-  now: Date
+  now: Date,
+  /** The store's default language when it has language-in-URL ON (LOCALE-PATHS-1), else undefined. */
+  localeDefault?: PathLocale
 ): Promise<MetadataRoute.Sitemap> {
   const base = `https://${requestHost}`;
+  /** One URL per language, each naming both (and x-default) when the store has locale paths; else the one URL. */
+  const pageEntries = (
+    path: string,
+    lastModified: Date,
+    changeFrequency: 'weekly' | 'monthly',
+    priority: number
+  ): MetadataRoute.Sitemap => {
+    if (!localeDefault)
+      return [{ url: `${base}${path || '/'}`, lastModified, changeFrequency, priority }];
+    return (['ar', 'en'] as const).map(locale => ({
+      url: `${base}${prefixedPath(locale, path || '/')}`,
+      lastModified,
+      changeFrequency,
+      priority,
+      alternates: {
+        languages: localeAlternates({ origin: base, path, locale, defaultLocale: localeDefault })
+          .languages,
+      },
+    }));
+  };
   // Single store, own domain: up to 10 pages x 100 = 1000 product URLs,
   // plus 1 unpaginated bundle-list request (see fetchBundles) — 12
   // subrequests worst case, nowhere near any Worker limit.
@@ -185,24 +222,21 @@ async function buildTenantSitemap(
   ]);
   const entries: MetadataRoute.Sitemap = [];
   for (const page of STORE_STATIC_PAGES) {
-    entries.push({
-      url: `${base}${page.path || '/'}`,
-      lastModified: now,
-      changeFrequency: page.freq,
-      priority: page.priority,
-    });
+    entries.push(...pageEntries(page.path, now, page.freq, page.priority));
   }
   for (const product of products) {
-    entries.push({
-      url: `${base}/products/${product.slug}`,
-      lastModified: product.updatedAt
-        ? new Date(product.updatedAt)
-        : product.createdAt
-          ? new Date(product.createdAt)
-          : now,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    });
+    entries.push(
+      ...pageEntries(
+        `/products/${product.slug}`,
+        product.updatedAt
+          ? new Date(product.updatedAt)
+          : product.createdAt
+            ? new Date(product.createdAt)
+            : now,
+        'weekly',
+        0.7
+      )
+    );
   }
   // No `updatedAt` on the bundle-list response (it's the pre-filtered,
   // customer-facing shape — see PublicBundle) — `now` is an acceptable
@@ -263,5 +297,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!tenant) notFound();
   // The demo showroom is noindex (Ruling B1-14): nothing to submit.
   if (tenant.isDemo) return [];
-  return buildTenantSitemap(storeHost, tenant.id, now);
+  return buildTenantSitemap(
+    storeHost,
+    tenant.id,
+    now,
+    localePathsOn(storeKeyForHost(storeHost))
+      ? resolveDefaultLanguage(tenant.defaultLanguage)
+      : undefined
+  );
 }

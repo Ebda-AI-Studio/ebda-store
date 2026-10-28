@@ -1,19 +1,19 @@
 ---
 title: Shipping carriers
-description: How to connect Bosta, ShipBlu, Mylerz or Aramex to your store to book parcels, print labels and track deliveries. Each carrier opens once it is verified.
+description: How to connect Bosta, ShipBlu, Mylerz or Aramex to your store to book parcels, print labels and track deliveries. Ebda Store checks your keys the moment you save them.
 section: Selling
 order: 7
-status: soon
 appPath: /stores
 keywords: shipping carrier bosta shipblu mylerz aramex connect api key cod cash on delivery label tracking sandbox test connection pickup courier pickup request
 ---
 
-<Callout type="soon" title="Coming soon">
-  Bosta, ShipBlu, Mylerz and Aramex show as "Coming soon" until we finish testing each one against
-  its own test environment. You can read how connecting works below; the steps will not change.
+<Callout title="New connections: we watch the first parcel">
+  Ebda Store builds each carrier from the carrier's official documentation, and your own account is
+  what proves it works. When you save your keys we check them straight away. The first real parcel booked
+  through a carrier is watched by the Ebda Store team, so if anything is off we see it immediately and fix it.
 </Callout>
 
-## What works today
+## What is available
 
 **Manual delivery** is always available: on an order, type the courier's name and the tracking number
 they gave you, then move the order along yourself. See [Shipping](/en/shipping/) and
@@ -30,10 +30,12 @@ delivery are between you and the carrier, not Ebda Store. Connecting is only a c
 2. Paste each value. Every field has a **Where do I find this?** note that names the exact place in the
    carrier's dashboard. Secrets are saved encrypted and are never shown again: the page only shows
    "Saved ••••" and the last 4 characters.
-3. Press **Test connection**. Ebda Store makes one harmless call to the carrier with your keys. Nothing is
-   booked.
-4. Once the test passes, switch the carrier **on** and, if you use several, choose your **default**.
-   Changing a key later turns the carrier off until you test again.
+3. Press **Save**. Ebda Store immediately makes one harmless call to the carrier with your keys (the mode you
+   just saved); nothing is booked. You see **Connected**, **Credentials wrong** (check them and save again)
+   or **Carrier not reachable** (your keys are saved; try **Test connection** again later). **Test
+   connection** re-runs the check any time.
+4. Once the check passes, switch the carrier **on** and, if you use several, choose your **default**.
+   Changing a key later turns the carrier off until it is checked again.
 5. Fill in your **pickup address** and the carrier's settings on the same card.
 
 When an order is ready, **Ship** books the parcel with your default carrier. The cash to collect is the
@@ -88,8 +90,8 @@ Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so 
   merchant portal).
 - **Pickup warehouse name:** Mylerz merchant portal > Warehouses, the "Name" column. It must match
   exactly. Test connection lists the names Mylerz knows for you.
-- **No public sandbox:** Mylerz publishes no test environment, so Mylerz stays "Coming soon" until
-  Mylerz gives us one. Ask your account manager if you have a staging host.
+- **No public sandbox:** Mylerz publishes no test environment, so connect your real account in **Live**
+  mode. The check on save only reads (it lists your warehouses), so nothing is booked.
 - **Tracking:** polled about every 30 minutes. Cancel works before pickup.
 
 ## Aramex
@@ -110,7 +112,9 @@ Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so 
 
 - **"The address could not be mapped":** the customer's governorate or area is not one the carrier
   recognises. Correct the order's address (governorate, then area) and press **Ship** again.
-- **"Coming soon":** the carrier is not open yet. Use manual delivery meanwhile.
+- **"Credentials wrong" or "not reachable" on save:** the first means the carrier refused the keys (check them
+  and save again), the second means the carrier did not answer (your keys are saved; press **Test connection**
+  again later). Use manual delivery meanwhile.
 - **The carrier is not answering:** the order is untouched and booking is retried automatically.
 
 ## Need another carrier?

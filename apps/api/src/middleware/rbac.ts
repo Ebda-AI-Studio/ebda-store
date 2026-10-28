@@ -19,6 +19,8 @@ export type Permission =
   | 'orders:write'
   | 'orders:manage'
   | 'orders:refund'
+  // Bulk export of customers' personal data (SEC-14): owners only, never staff
+  | 'customers:export'
   // Store permissions
   | 'store:read'
   | 'store:write'
@@ -90,6 +92,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'payments:read',
     'payments:refund',
     'audit:read',
+    'customers:export',
     'ai:manage',
     'returns:read',
     'returns:write',
@@ -114,6 +117,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'payments:read',
     'payments:refund',
     'audit:read',
+    'customers:export',
     'ai:use',
     'ai:manage',
     'returns:read',

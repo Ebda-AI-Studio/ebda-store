@@ -39,11 +39,6 @@ const L = {
     sidebarLabel: 'المقالات',
     search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في المساعدة' },
     switch: { label: 'English', lang: 'en' },
-    nav: [
-      { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
-      { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
-      { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
-    ],
     footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}. تحتاج مساعدة إضافية؟ راسلنا.`,
     searchMsgs: {
       loading: 'جارٍ تحميل فهرس البحث…',
@@ -72,11 +67,6 @@ const L = {
     sidebarLabel: 'Articles',
     search: { action: '/en/search/', label: 'Search', placeholder: 'Search help' },
     switch: { label: 'العربية', lang: 'ar' },
-    nav: [
-      { href: BRAND_MARKETING_URL + '/en/', label: BRAND.company.shortNameEn },
-      { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
-      { href: `https://${BRAND.domains.status}/en`, label: 'Status' },
-    ],
     footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. Need more help? Email us.`,
     searchMsgs: {
       loading: 'Loading the search index…',
@@ -137,7 +127,7 @@ const base = lang => {
     lang,
     siteLabel: c.site,
     homeHref: homeUrl(lang),
-    nav: c.nav,
+    active: 'help',
     search: c.search,
     skipLabel: c.skip,
     footer: renderFooter({

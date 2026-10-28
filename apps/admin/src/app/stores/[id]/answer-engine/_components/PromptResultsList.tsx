@@ -50,7 +50,7 @@ export function PromptResultsList({ storeId, prompts }: PromptResultsListProps) 
                     {prompt.competitorUrls.map(url => (
                       <span
                         key={url}
-                        className="inline-block mr-1.5 rtl:mr-0 rtl:ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"
+                        className="inline-block mr-1.5 rtl:mr-0 rtl:ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
                       >
                         {url.replace(/^https?:\/\//, '')}
                       </span>

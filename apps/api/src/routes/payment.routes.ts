@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { requestHoldsOrderViewToken } from '../lib/order-view-token';
+import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@ebda/shared';
 import { z } from 'zod';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
@@ -23,6 +25,7 @@ import {
 } from '../lib/definer';
 import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
+import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
@@ -75,7 +78,7 @@ function platformUrlOrRelative(url: string): boolean {
 
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry']).optional(),
+  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry', 'geidea']).optional(),
   /**
    * Which of the provider's methods the customer picked (Fawry: reference code or card;
    * Paymob: one integration). Absent = the provider's own page offers them all.
@@ -103,6 +106,8 @@ const createPaymentSchema = z.object({
 
 const refundSchema = z.object({
   transactionId: z.string(),
+  /** Narrows the lookup when two providers hold the same reference string (Ruling ITEST-14). */
+  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
   amount: z.number().int().positive().optional(),
   reason: z.string().optional(),
 });
@@ -933,7 +938,15 @@ router.get(
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const view = await InstapayService.getInstructions(storeId, orderId);
-      res.json({ success: true, data: view });
+      // SEC-15: the receipt id (which opens the receipt poll) only with the order's view token.
+      const withToken = requestHoldsOrderViewToken(req, orderId);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.vary('X-Order-View-Token');
+      res.json({
+        success: true,
+        data:
+          withToken || !view.proof ? view : { ...view, proof: { ...view.proof, receiptId: null } },
+      });
     } catch (error) {
       next(error);
     }
@@ -993,7 +1006,15 @@ router.get(
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const receipt = await InstapayService.getReceipt(storeId, orderId, receiptId);
-      res.json({ success: true, data: { receipt } });
+      // SEC-15: the payer's name / address / mobile / bank only with the order's view token.
+      res.json({
+        success: true,
+        data: {
+          receipt: requestHoldsOrderViewToken(req, orderId)
+            ? receipt
+            : maskReceiptPayerPii(receipt),
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -1044,7 +1065,15 @@ router.get(
 
       // Strict RLS: a contextless read sees nothing, so the owning store is resolved from the
       // provider reference through the definer, and every read below runs inside that store.
-      const statusStoreId = await resolveStoreFromWebhookRef({ transactionId });
+      const statusStoreId = await resolveStoreFromWebhookRef({
+        transactionId,
+        // Only the gateways share reference strings across providers; `cod` / `instapay` have no gateway reference,
+        // and a caller's ?provider= for them must not turn a found payment into a 404 (Ruling ITEST-14).
+        provider:
+          provider === 'paymob' || provider === 'kashier' || provider === 'fawry'
+            ? provider
+            : undefined,
+      });
       if (!statusStoreId) {
         notFound();
         return;
@@ -1112,6 +1141,7 @@ router.post(
       // reference to its store and the payment is read inside that store. Ownership follows.
       const resolvedRefundStore = await resolveStoreFromWebhookRef({
         transactionId: data.transactionId,
+        provider: data.provider,
       });
       const paymentRow = resolvedRefundStore
         ? await withStore(resolvedRefundStore, () =>
@@ -1138,52 +1168,72 @@ router.post(
 
       const refundStoreId = paymentRow.order.store.id;
 
-      const refund = await runInTenantContext(refundStoreId, async () => {
-        const r = await PaymentService.refund({
+      // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
+      // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
+      const refund = await runInTenantContext(refundStoreId, () =>
+        PaymentService.refund({
           transactionId: data.transactionId,
           amount: data.amount,
           reason: data.reason,
-        });
+        })
+      );
 
+      // The audit trail, on its OWN transaction after the money moved, best effort + alert: a failing audit write
+      // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
+      // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
+      // a pre-refund snapshot.
+      await runInTenantContext(refundStoreId, async () => {
         await auditLog({
           action: 'payment.refunded',
           userId: user.userId,
           resourceType: 'payment',
-          resourceId: r.transactionId,
+          resourceId: refund.transactionId,
           details: {
-            refundId: r.refundId,
-            amount: r.amount,
+            refundId: refund.refundId,
+            amount: refund.amount,
             reason: data.reason || null,
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
-
-        // Append-only audit row.
+        const after = await prisma.payment.findUnique({
+          where: { id: paymentRow.id },
+          select: { status: true },
+        });
         await recordPaymentEvent({
           paymentId: paymentRow.id,
           storeId: refundStoreId,
           orderId: paymentRow.orderId,
           eventType: 'refund',
           fromStatus: paymentRow.status,
-          // Against the REMAINING balance, as PaymentService.refund decides
-          // it (#1360): the last slice of a piecewise refund settles the
-          // payment even though it is smaller than the original amount.
           toStatus:
-            (paymentRow.refundedAmount ?? 0) + r.amount >= paymentRow.amount
+            after?.status ??
+            ((paymentRow.refundedAmount ?? 0) + refund.amount >= paymentRow.amount
               ? 'refunded'
-              : 'partially_refunded',
+              : 'partially_refunded'),
           provider: paymentRow.provider,
           triggeredByUserId: user.userId,
           details: {
-            refundId: r.refundId,
-            amount: r.amount,
+            refundId: refund.refundId,
+            amount: refund.amount,
             reason: data.reason ?? null,
             initiatedBy: user.role,
           },
         });
-
-        return r;
+      }).catch(err => {
+        logger.error(
+          { err, paymentId: paymentRow.id, refundId: refund.refundId },
+          '[payments] refund committed but its audit rows failed'
+        );
+        void sendAlert({
+          level: 'p1',
+          scope: 'store',
+          store: { id: refundStoreId, name: refundStoreId },
+          source: 'payment.refund.audit_failed',
+          title: 'payment.refund.audit_failed',
+          body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made, but its audit rows could not be written. Add them by hand.`,
+          context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount },
+        }).catch(() => undefined);
       });
 
       res.json({

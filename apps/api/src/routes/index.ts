@@ -34,6 +34,7 @@ import providerActivationRoutes, {
 import couponRoutes from './coupon.routes';
 import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
+import etaRoutes from './eta.routes';
 import { fiscalArchiveRoutes, fiscalDocumentRoutes } from './fiscal-document.routes';
 import customerGroupRoutes from './customer-groups.routes';
 import priceTierRoutes from './price-tier.routes';
@@ -90,9 +91,11 @@ import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import staffRoutes from './staff.routes';
+import staffInviteRoutes from './staff-invite.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import lifecycleEmailsRoutes from './lifecycle-emails.routes';
+import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
@@ -142,6 +145,7 @@ router.use('/mcp', mcpRoutes);
 router.use('/auth/me/sms-consent', smsConsentAccountRoutes);
 router.use('/auth/merchant', merchantSignupRoutes);
 router.use('/auth', authRoutes);
+router.use('/staff-invites', staffInviteRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
 // Must come AFTER auth routes and BEFORE any catch-all.
@@ -239,7 +243,7 @@ router.use('/stores', tenantContext, featureRoutes);
 // (Phase 1a), then REVERTED — the domain-management handlers in
 // store.routes.ts call external APIs in-request (Cloudflare-for-SaaS domain
 // provisioning via `resolveDomainService`, Resend domain verification via
-// `ResendService.provisionStoreDomain` / `removeStoreDomain` /
+// `StoreMailer.provisionStoreDomain` / `removeStoreDomain` /
 // `verifyAndRefreshDomain`). Trapping a slow third-party call inside a 30s
 // RLS interactive transaction risks blowing the timeout. This router is
 // CONTEXT-LESS — Phase 2 candidate; the CRUD-only handlers are fine, only
@@ -339,6 +343,8 @@ router.use('/stores', tenantContext, setupGuideRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
+// Egypt ETA e-receipt connector (Ruling ETA-1); every route behind the per-store `eta_ereceipt` feature.
+router.use('/stores', tenantContext, etaRoutes);
 router.use('/stores', tenantContext, fiscalDocumentRoutes);
 router.use('/stores', tenantContext, customerGroupRoutes);
 router.use('/stores', tenantContext, priceTierRoutes);
@@ -440,7 +446,7 @@ router.use('/public', publicAffiliateRoutes);
 // Newsletter admin routes (list + CSV export). Public signup is in
 // public.routes.ts so visitors don't need a JWT to subscribe.
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the
-// broadcast endpoint loops `ResendService.sendBrandedEmail` in chunks of 50,
+// broadcast endpoint loops `StoreMailer.sendBrandedEmail` in chunks of 50,
 // sequentially awaited in-request — a large subscriber list can run well
 // past 30s, which would blow the RLS transaction's timeout.
 router.use('/stores', tenantContext, newsletterRoutes);
@@ -540,6 +546,8 @@ router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 // Self-serve lifecycle emails: the merchant's log (admin) and the login-free unsubscribe link (store from the signed token).
 router.use('/stores/:storeId/lifecycle-emails', tenantContext, lifecycleEmailsRoutes);
+// Ebda WhatsApp connect / disconnect (the only request path that writes the server-owned link).
+router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not

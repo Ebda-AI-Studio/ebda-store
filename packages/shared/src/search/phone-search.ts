@@ -13,3 +13,16 @@ export function phoneSearchDigits(q: string): string | null {
   const national = digits.replace(/^(?:0020|20|0)/, '');
   return national.length >= 9 ? national : digits;
 }
+
+/** TS twin of SQL `public.ebda_digits(t)`: Arabic-Indic and Persian digits to ASCII, then every non-digit removed. */
+export function digitsOnly(t: string | null | undefined): string {
+  if (!t) return '';
+  const from = '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹';
+  const to = '01234567890123456789';
+  let out = '';
+  for (const ch of t) {
+    const i = from.indexOf(ch);
+    out += i >= 0 ? to[i] : ch;
+  }
+  return out.replace(/[^0-9]/g, '');
+}

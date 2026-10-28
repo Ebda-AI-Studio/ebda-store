@@ -6,6 +6,8 @@ import type { ResolvedStore } from '../lib/store-resolver';
  * B0-46 review I-2: the share row's URL comes from the SERVER (canonical, store-aware via
  * storeAbsoluteUrl), so the server HTML and a tap before hydration carry a real link.
  */
+// The /ar|/en URL header (LOCALE-PATHS-1) is read through next/headers; no request scope exists in a unit test.
+vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('next/navigation', () => ({
   permanentRedirect: vi.fn(),
   notFound: vi.fn(() => {

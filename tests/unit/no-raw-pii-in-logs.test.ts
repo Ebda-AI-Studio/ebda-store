@@ -71,6 +71,8 @@ const SAFE_CALL = /^(mask|redact|hash)/i;
  * adding a line.
  */
 const REVIEWED_SPREADS: Record<string, string> = {
+  'apps/api/src/app.ts|unset':
+    'billingProviderUnsetWarning() → a fixed config warning string; no contact data',
   'apps/api/src/lib/database-role-guard.ts|detail':
     'refuse() detail → { err: message } | { rowCount } | { currentUser: DB role name, rol* flags }',
   'apps/api/src/lib/inngest/functions/accounting-post-refund-journal.ts|partialResult':

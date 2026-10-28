@@ -53,7 +53,7 @@ function PrivacyFallback() {
                 'نجمع المعلومات التي تقدمها لنا مباشرة، بما في ذلك:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'Name, email address, and contact information',
@@ -79,7 +79,7 @@ function PrivacyFallback() {
             <p className="mt-2 text-muted-foreground">
               {t('We use the information we collect to:', 'نستخدم المعلومات التي نجمعها من أجل:')}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>{t('Process and fulfill your orders', 'معالجة وتنفيذ طلباتك')}</li>
               <li>
                 {t(
@@ -108,7 +108,7 @@ function PrivacyFallback() {
                 'لا نبيع معلوماتك الشخصية. قد نشارك معلوماتك مع:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'Service providers who assist in our operations (payment processing, shipping)',
@@ -137,7 +137,7 @@ function PrivacyFallback() {
                 'نطبق إجراءات أمنية مناسبة لحماية معلوماتك الشخصية، بما في ذلك:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'SSL encryption for all data transmission',
@@ -172,7 +172,7 @@ function PrivacyFallback() {
                 'نستخدم ملفات تعريف الارتباط والتقنيات المماثلة من أجل:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>{t('Keep you logged in to your account', 'إبقائك مسجلاً في حسابك')}</li>
               <li>{t('Remember your cart contents', 'تذكر محتويات سلتك')}</li>
               <li>{t('Analyze site traffic and usage', 'تحليل حركة المرور واستخدام الموقع')}</li>
@@ -190,7 +190,7 @@ function PrivacyFallback() {
                 'نعتمد على مزودي خدمات موثوقين من جهات خارجية لتشغيل هذا المتجر. يعالج كل منهم البيانات اللازمة لأداء وظيفته فقط، وفقاً لسياسة الخصوصية الخاصة به:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'Payment gateways (such as Paymob, Kashier, or Fawry) — to process your payments securely. We never store your full card details.',
@@ -217,8 +217,8 @@ function PrivacyFallback() {
               </li>
               <li>
                 {t(
-                  'Resend (email delivery) — to send transactional emails such as order confirmations and password resets.',
-                  'Resend (تسليم البريد الإلكتروني) — لإرسال رسائل البريد الإلكتروني المعاملاتية مثل تأكيدات الطلبات وإعادة تعيين كلمة المرور.'
+                  'Cloudflare Email Service (email delivery) — to send transactional emails such as order confirmations and password resets.',
+                  'Cloudflare Email Service (تسليم البريد الإلكتروني) — لإرسال رسائل البريد الإلكتروني المعاملاتية مثل تأكيدات الطلبات وإعادة تعيين كلمة المرور.'
                 )}
               </li>
               <li>
@@ -249,7 +249,7 @@ function PrivacyFallback() {
             <p className="mt-2 text-muted-foreground">
               {t('You have the right to:', 'لديك الحق في:')}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>{t('Access your personal information', 'الوصول إلى معلوماتك الشخصية')}</li>
               <li>{t('Correct inaccurate information', 'تصحيح المعلومات غير الدقيقة')}</li>
               <li>{t('Request deletion of your data', 'طلب حذف بياناتك')}</li>

@@ -22,6 +22,12 @@ const h = vi.hoisted(() => ({
   withRlsBypass: vi.fn(),
 }));
 
+vi.mock('@api/lib/store-ai-switch', () => ({
+  AI_DISABLED_BY_MERCHANT_CODE: 'AI_DISABLED_BY_MERCHANT',
+  isStoreAiEnabled: async () => true,
+  assertStoreAiEnabled: async () => undefined,
+  requireAiEnabled: (_q: unknown, _s: unknown, next: () => void) => next(),
+}));
 vi.mock('@ebda/database', () => ({
   prisma: { aiUsage: { count: h.ambientCount } },
 }));

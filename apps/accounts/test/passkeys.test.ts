@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { env } from 'cloudflare:test';
-import { call, cookieOf, login, seedUser } from './helpers';
+import { call, emailCodeFor, cookieOf, login, seedUser } from './helpers';
 import { SoftAuthenticator } from './authenticator';
 
 const ADMIN = 'https://store.ebda.app';
@@ -37,7 +37,7 @@ async function enroll(u: { email: string; password: string }, origin = ADMIN) {
     origin
   );
   const done = await call('/passkey/register/verify', {
-    json: { response: reg, name: 'Laptop' },
+    json: { response: reg, name: 'Laptop', emailCode: await emailCodeFor(u, s.body.access_token) },
     bearer: s.body.access_token,
     headers: hdr(origin),
   });
@@ -169,6 +169,38 @@ describe('passkeys', () => {
     const res = await passkeyLogin(auth, u.id, ADMIN);
     expect(res.status).toBe(401);
     expect((await passkeyLogin(auth, u.id, 'https://orders.ebda.app')).status).toBe(200);
+  });
+
+  it('rename touches only your own passkey', async () => {
+    const u = await seedUser();
+    const other = await seedUser();
+    const { s, done } = await enroll(u);
+    expect(done.status).toBe(201);
+    const list = (await (await call('/passkeys', { bearer: s.body.access_token })).json()) as {
+      data: { passkeys: Array<{ id: string }> };
+    };
+    const id = list.data.passkeys[0].id;
+    expect(
+      (
+        await call(`/passkeys/${id}/rename`, {
+          json: { name: '  My   phone ' },
+          bearer: s.body.access_token,
+        })
+      ).status
+    ).toBe(200);
+    const after = (await (await call('/passkeys', { bearer: s.body.access_token })).json()) as {
+      data: { passkeys: Array<{ name: string }> };
+    };
+    expect(after.data.passkeys[0].name).toBe('My phone');
+    const o = await login(other);
+    expect(
+      (
+        await call(`/passkeys/${id}/rename`, {
+          json: { name: 'stolen' },
+          bearer: o.body.access_token,
+        })
+      ).status
+    ).toBe(404);
   });
 
   it('a suspended account cannot sign in with a passkey; list and delete need the bearer and the password', async () => {

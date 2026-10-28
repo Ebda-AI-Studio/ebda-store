@@ -1,6 +1,12 @@
 // Static page shell shared by docs + help: header (wordmark, nav, language switch, search),
 // optional sidebar, footer. Pure string templates; no client framework.
-import { BRAND } from '@ebda/shared/brand';
+import {
+  BRAND,
+  BRAND_MARKETING_URL,
+  SITE_NAV_CSS,
+  siteNavHtml,
+  siteWordmarkHtml,
+} from '@ebda/shared/brand';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +16,80 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const esc = s =>
   String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+/** The shared social card for help and docs (the same image ebda.app shares: 1200x630). */
+export const OG_IMAGE = { url: `${BRAND_MARKETING_URL}/og.png`, width: 1200, height: 630 };
+
+/** JSON-LD graph of one page: the studio, a WebSite on the home, and BreadcrumbList + Article on a content page. */
+export function pageJsonLd(p) {
+  const org = `${BRAND_MARKETING_URL}/#organization`;
+  const origin = new URL(p.canonical).origin;
+  const homeUrl = origin + p.homeHref;
+  const lang = p.lang;
+  const publisher = {
+    '@type': 'Organization',
+    '@id': org,
+    name: lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+    url: BRAND_MARKETING_URL,
+    logo: `${BRAND_MARKETING_URL}/icon-512.png`,
+  };
+  const graph = [publisher];
+  const isHome = p.canonical === homeUrl;
+  if (isHome) {
+    graph.push({
+      '@type': 'WebSite',
+      url: homeUrl,
+      name: p.siteLabel,
+      inLanguage: lang,
+      publisher: { '@id': org },
+    });
+  } else if (!(p.scripts && p.scripts.length)) {
+    // a content page (not the search page, which is noindex): breadcrumb + article
+    graph.push({
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: p.siteLabel, item: homeUrl },
+        { '@type': 'ListItem', position: 2, name: p.title.split(' | ')[0], item: p.canonical },
+      ],
+    });
+    graph.push({
+      '@type': 'Article',
+      headline: p.title.split(' | ')[0],
+      description: p.description,
+      inLanguage: lang,
+      mainEntityOfPage: p.canonical,
+      image: OG_IMAGE.url,
+      author: { '@id': org },
+      publisher: { '@id': org },
+    });
+  }
+  return { '@context': 'https://schema.org', '@graph': graph };
+}
+
+/** The head of one page: social card (og + twitter) and JSON-LD. */
+export function socialHead(p) {
+  const locale = p.lang === 'ar' ? 'ar_EG' : 'en_US';
+  const image = p.ogImage ?? OG_IMAGE.url;
+  const ld = JSON.stringify(pageJsonLd(p)).replace(/</g, '\\u003c');
+  return (
+    `<meta property="og:site_name" content="${esc(p.siteLabel)}">` +
+    `<meta property="og:locale" content="${locale}">` +
+    `<meta property="og:image" content="${esc(image)}">` +
+    `<meta property="og:image:width" content="${OG_IMAGE.width}"><meta property="og:image:height" content="${OG_IMAGE.height}">` +
+    `<meta name="twitter:card" content="summary_large_image">` +
+    `<meta name="twitter:title" content="${esc(p.title)}">` +
+    `<meta name="twitter:description" content="${esc(p.description)}">` +
+    `<meta name="twitter:image" content="${esc(image)}">` +
+    `<script type="application/ld+json">${ld}</script>`
+  );
+}
+
 /** Copy the shared stylesheet into `<outDir>/assets/site.css`. */
 export function writeSiteCss(outDir) {
   mkdirSync(path.join(outDir, 'assets'), { recursive: true });
+  // the shared header nav (packages/shared/src/brand/index.ts) styles itself with the same string status inlines
   writeFileSync(
     path.join(outDir, 'assets', 'site.css'),
-    readFileSync(path.join(here, '..', 'css', 'site.css'))
+    readFileSync(path.join(here, '..', 'css', 'site.css'), 'utf8') + '\n' + SITE_NAV_CSS
   );
 }
 
@@ -32,7 +106,7 @@ const tokensCss = () =>
  * @param {{hreflang:string, href:string}[]} [p.alternates]
  * @param {string} p.siteLabel        e.g. "Docs" / "مركز المساعدة"
  * @param {string} p.homeHref
- * @param {{href:string,label:string}[]} p.nav
+ * @param {'docs'|'help'} p.active    the site this page belongs to (its nav link gets aria-current)
  * @param {{href:string,label:string,lang:string}} [p.langSwitch]
  * @param {{action:string,label:string,placeholder:string}} p.search
  * @param {string} [p.sidebar]        html (a <nav>)
@@ -50,7 +124,6 @@ export function renderPage(p) {
   const sw = p.langSwitch
     ? `<a class="lang-switch" href="${esc(p.langSwitch.href)}" hreflang="${p.langSwitch.lang}" lang="${p.langSwitch.lang}">${esc(p.langSwitch.label)}</a>`
     : '';
-  const nav = p.nav.map(n => `<li><a href="${esc(n.href)}">${esc(n.label)}</a></li>`).join('');
   return `<!doctype html>
 <html lang="${p.lang}" dir="${dir}">
 <head>
@@ -64,6 +137,7 @@ export function renderPage(p) {
 <meta property="og:description" content="${esc(p.description)}">
 <meta property="og:url" content="${esc(p.canonical)}">
 <meta property="og:type" content="website">
+${socialHead(p)}
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -76,8 +150,8 @@ export function renderPage(p) {
 <a class="skip" href="#main">${esc(p.skipLabel)}</a>
 <header class="site-header">
   <div class="wrap header-row">
-    <a class="wordmark" href="${esc(p.homeHref)}"><img src="/icon.svg" alt="" width="28" height="28"><span>${esc(p.lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn)}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>
-    <nav class="top-nav" aria-label="${esc(p.siteLabel)}"><ul>${nav}</ul></nav>
+    ${siteWordmarkHtml({ lang: p.lang, href: p.homeHref, siteLabel: p.siteLabel, markHtml: '<img src="/icon.svg" alt="" width="28" height="28">' })}
+    ${siteNavHtml(p.lang, p.active)}
     <form class="search" role="search" action="${esc(p.search.action)}" method="get">
       <label class="sr-only" for="q">${esc(p.search.label)}</label>
       <input id="q" name="q" type="search" placeholder="${esc(p.search.placeholder)}" autocomplete="off">

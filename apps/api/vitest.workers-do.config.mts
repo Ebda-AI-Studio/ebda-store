@@ -20,6 +20,7 @@ export default defineConfig({
         durableObjects: { STORE_DO: { className: 'StoreDO', useSQLite: true } },
         r2Buckets: ['STORE_BACKUPS', 'MEDIA_BUCKET', 'CI_BUCKET'],
         d1Databases: ['PLATFORM_DB', 'IDENTITY_DB', 'RESTORE_DB'],
+        kvNamespaces: ['KV_CACHE'],
       },
     }),
   ],

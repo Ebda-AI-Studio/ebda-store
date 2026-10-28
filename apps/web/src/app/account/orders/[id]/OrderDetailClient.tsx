@@ -6,7 +6,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import { useNumerals } from '../../../../hooks/useNumerals';
-import Link from 'next/link';
+import Link from '../../../../components/StoreLink';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { api, API_URL } from '@/lib/api';

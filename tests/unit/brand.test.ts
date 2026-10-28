@@ -74,6 +74,15 @@ describe('brand helpers', () => {
   });
 });
 
+describe('sender display name (BRAND-NAME-1)', () => {
+  it('store mail is Ebda Store, account mail is Ebda AI Studio, never the bare "Ebda"', () => {
+    expect(brandFrom()).toBe('Ebda Store <no-reply@ebda.app>');
+    expect(brandFrom(BRAND.name)).toBe('Ebda AI Studio <no-reply@ebda.app>');
+    expect(() => brandFrom('Ebda')).toThrow(/bare/);
+    expect(() => brandFrom(' ebda ')).toThrow(/bare/);
+  });
+});
+
 describe('product name (PRODUCT-NAME-1)', () => {
   it('names the product Ebda Store while the company is Ebda AI Studio', () => {
     expect(BRAND.product).toEqual({ nameEn: 'Ebda Store', nameAr: 'ابدأ ستور' });

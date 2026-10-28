@@ -8,7 +8,7 @@
  * page surface. Newsletter signup is a page section on Dahab (builder
  * `newsletter`), so the footer does not repeat it.
  */
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';

@@ -22,7 +22,8 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
-import { isProviderActivatedForStore } from '../services/payment-providers/provider-gate';
+import { reportConnectionCheck } from '../services/provider-verification.service';
+import { describeConnectionCheck, type ConnectionCheckView } from '@ebda/shared';
 import {
   applyCredentialUpdate,
   assertEnableAllowed,
@@ -370,16 +371,13 @@ router.post(
       refuseLegacyGatewayCredentials(data.provider, req.body ?? {});
       // A gateway created enabled has no tested credentials yet: the gate refuses it.
       if (data.isEnabled) {
-        assertEnableAllowed(
-          {
-            provider: data.provider,
-            testMode: data.testMode,
-            isEnabled: true,
-            credentials: null,
-            connectionTest: null,
-          },
-          { storeActivated: await isProviderActivatedForStore(storeId, data.provider) }
-        );
+        assertEnableAllowed({
+          provider: data.provider,
+          testMode: data.testMode,
+          isEnabled: true,
+          credentials: null,
+          connectionTest: null,
+        });
       }
 
       // Encrypt credentials before storing
@@ -541,16 +539,13 @@ router.put(
       // gateway (the other mode's credentials were never tested), needs a current test.
       const resultingEnabled = data.isEnabled ?? existing.isEnabled;
       if (resultingEnabled) {
-        assertEnableAllowed(
-          {
-            provider,
-            testMode: data.testMode ?? existing.testMode,
-            isEnabled: true,
-            credentials: existing.credentials,
-            connectionTest: existing.connectionTest,
-          },
-          { storeActivated: await isProviderActivatedForStore(storeId, provider) }
-        );
+        assertEnableAllowed({
+          provider,
+          testMode: data.testMode ?? existing.testMode,
+          isEnabled: true,
+          credentials: existing.credentials,
+          connectionTest: existing.connectionTest,
+        });
       }
 
       if (data.settings !== undefined || data.isEnabled !== undefined) {
@@ -734,9 +729,7 @@ router.post(
       // Disabling is always allowed; enabling a gateway needs a verified provider and a
       // successful Test connection of the credentials stored now (PROVIDERS-2 + plan 4.2/5).
       if (enabled === true) {
-        assertEnableAllowed(existing, {
-          storeActivated: await isProviderActivatedForStore(storeId, existing.provider),
-        });
+        assertEnableAllowed(existing);
       } else if (enabled !== false) {
         throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
       }
@@ -870,14 +863,58 @@ router.put(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
+      // PROVIDERS-3: SANDBOX-FIRST automatic check of the credentials just saved (the saved
+      // mode), with the provider's one read-only call. Never a charge. A failed check does not
+      // undo the save: the merchant fixes the field and saves again.
+      let finalConfig = config;
+      let check: ConnectionCheckView | null = null;
+      if (update.changed.length > 0) {
+        const { result, stored } = await runConnectionTest(config, body.mode);
+        // Only the ACTIVE mode's proof is stored (the enable gate reads it); checking the other
+        // mode just reports, so it can neither void a live proof nor mark a live gateway down.
+        if ((body.mode === 'sandbox') === config.testMode) {
+          finalConfig = await prisma.paymentConfig.update({
+            where: { id: config.id, storeId },
+            data: {
+              connectionTest: stored as unknown as Prisma.InputJsonValue,
+              healthStatus: result.ok
+                ? 'healthy'
+                : result.code === 'unreachable'
+                  ? 'degraded'
+                  : 'down',
+              lastHealthCheck: new Date(stored.at),
+            },
+          });
+        }
+        await auditLog({
+          action: 'store_payment_config.connection_tested',
+          storeId,
+          userId: user.userId,
+          resourceType: 'payment_config',
+          resourceId: config.id,
+          details: {
+            storeId,
+            provider,
+            mode: stored.mode,
+            ok: result.ok,
+            code: result.code,
+            auto: true,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        await reportConnectionCheck({ storeId, provider, mode: stored.mode, code: result.code });
+        check = describeConnectionCheck(result);
+      }
       PaymentService.clearCache(storeId);
 
       res.json({
         success: true,
         data: {
-          config: { ...publicPaymentConfig(config, storeId), ...maskCredentials(config) },
+          config: { ...publicPaymentConfig(finalConfig, storeId), ...maskCredentials(finalConfig) },
           changed: update.changed,
           disabledUntilRetested: mustDisable,
+          check,
         },
       });
     } catch (error) {
@@ -910,6 +947,7 @@ router.post(
       const startedAt = Date.now();
       const { result, stored } = await runConnectionTest(existing);
       const latency = Date.now() - startedAt;
+      await reportConnectionCheck({ storeId, provider, mode: stored.mode, code: result.code });
 
       await prisma.paymentConfig.update({
         where: { id: existing.id, storeId },
@@ -943,6 +981,7 @@ router.post(
             details: result.details ?? {},
             latency,
           },
+          check: describeConnectionCheck(result),
         },
       });
     } catch (error) {

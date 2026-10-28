@@ -9,6 +9,7 @@ import rateLimit, {
 import { RedisStore } from 'rate-limit-redis';
 import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
@@ -50,7 +51,7 @@ if (!isWorkers) {
       }
     },
     5 * 60 * 1000
-  ); // Every 5 minutes
+  ).unref(); // Every 5 minutes. unref: merely importing this module (any script that reaches it through a service) must not keep the process alive.
 }
 
 /**
@@ -134,9 +135,18 @@ export async function generateCsrfToken(
  * never reach this code (they return early — a header the browser never
  * attaches by itself cannot be ridden).
  */
-function csrfPrincipal(req: Request): string {
+async function csrfPrincipal(req: Request): Promise<string> {
   const cookieToken = req.cookies?.token as string | undefined;
   if (!cookieToken) return ANONYMOUS_CSRF_PRINCIPAL;
+
+  // Identity-service (ES256) cookie: same rule, signature verified, expiry ignored.
+  if (isAccountsToken(cookieToken)) {
+    try {
+      return (await verifyAccountsToken(cookieToken, { ignoreExpiration: true })).sub;
+    } catch {
+      return ANONYMOUS_CSRF_PRINCIPAL;
+    }
+  }
 
   try {
     const payload = jwt.verify(cookieToken, config.jwtSecret, {
@@ -676,7 +686,8 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // Always verify the CSRF token for state-changing requests (POST/PUT/PATCH/DELETE).
   // Previously this check was only applied when an Authorization header was present,
   // which left unauthenticated state-changing endpoints unprotected.
-  verifyCsrfToken(sessionId, csrfToken, csrfPrincipal(req))
+  csrfPrincipal(req)
+    .then(principal => verifyCsrfToken(sessionId, csrfToken, principal))
     .then(valid => {
       if (!valid) {
         res.status(403).json({
@@ -1684,6 +1695,41 @@ export const newsletterLimiter = rateLimit({
     const sessionId = req.headers['x-session-id'] as string;
     return `${sessionId || 'anon'}:${ipKeyGenerator(req.ip ?? '') || 'noip'}`;
   },
+});
+
+// WhatsApp marketing-consent: per-CALLER ceiling (the signed-in customer), applied to grants AND
+// revocations so one customer cannot spam, but keyed on the user so nobody else's traffic can exhaust it.
+export const whatsappConsentUserLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-user'),
+  windowMs: 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => `u:${req.user?.userId ?? 'anon'}`,
+});
+
+// WhatsApp marketing-consent GRANTS: a per-STORE ceiling, keyed on the RESOLVED store id (set by the
+// opt-in chain before this runs), never on a raw client header.
+export const whatsappConsentStoreLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-store'),
+  windowMs: 60 * 1000,
+  max: Number(process.env.WA_CONSENT_STORE_RATE_LIMIT_PER_MIN) || 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: (req, res) =>
+    `s:${(res.locals.waStoreId as string | undefined) ?? ipKeyGenerator(req.ip ?? '')}`,
 });
 
 // Coupon validate limiter — public brute-force discovery protection.

@@ -43,10 +43,22 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     id: 'storefront',
     product: 'store',
     name: { en: 'Storefronts', ar: 'المتاجر' },
-    // Merchant #1's store host stands in for every `<slug>.ebda.app` storefront.
-    url: `https://amelia${d.storeSuffix}/`,
+    // A demo store we control and seed (apps/marketing DEMO_STORES, scripts/storedemo/seed.mjs) stands in for every
+    // `<slug>.ebda.app` storefront; it exists whatever merchants do. `data-zone=` is rendered by a real storefront
+    // template and is absent from the unknown-store 404 page, so a missing store cannot pass as "up".
+    url: `https://storedemo-souq${d.storeSuffix}/`,
     expectStatus: 200,
-    expectBody: '<html',
+    expectBody: 'data-zone=',
+  },
+  {
+    id: 'storefront-product',
+    product: 'store',
+    name: { en: 'Storefront product pages', ar: 'صفحات المنتجات في المتاجر' },
+    // A product page renders through a different route than the home page (one returned a one-off 500, audit UI-7),
+    // so it is probed on its own: the seeded Lamma demo product. `data-zone=` as above.
+    url: `https://storedemo-lamma${d.storeSuffix}/products/mahshi-koronb`,
+    expectStatus: 200,
+    expectBody: 'data-zone=',
   },
   {
     id: 'docs',

@@ -31,6 +31,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import {
   createPrismaClient,
+  Prisma,
   runInTenantContext,
   runWithRequestDb,
   type AppPrismaClient,
@@ -308,8 +309,11 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         });
       }
       expect(cfg.credentialHints.fingerprints).toBeUndefined();
-      expect(cfg.connectionTest).toBeNull();
-      expect(cfg.connectionTestCurrent).toBe(false);
+      // PROVIDERS-3: saving the ACTIVE mode ran the automatic check and stored its proof; saving the
+      // OTHER (live) mode afterwards reported only and did not replace it. Saving never enables.
+      expect(res.body.data.check).toMatchObject({ status: 'connected', ok: true });
+      expect(cfg.connectionTest).toMatchObject({ ok: true, code: 'ok', mode: 'sandbox' });
+      expect(cfg.connectionTestCurrent).toBe(true);
       expect(cfg.enabled).toBe(false);
 
       // single-carrier GET is the same browser-safe view
@@ -374,6 +378,12 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const s = await mkStore(`${c.code}-gate`);
       await saveSandbox(s, s);
 
+      // PROVIDERS-3: the save already checked these keys, so a passing proof of exactly the stored
+      // credentials exists. Without one (no proof, or a failing one) enabling is still 409.
+      await owner.shippingCarrierConfig.updateMany({
+        where: { storeId: s.id, carrier: c.code },
+        data: { connectionTest: Prisma.DbNull },
+      });
       const early = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(early.status).toBe(409);
       expect(early.body.error.code).toBe('CONNECTION_NOT_TESTED');
@@ -451,14 +461,24 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(edited.body.data.disabledUntilRetested).toBe(true);
       expect(edited.body.data.config.enabled).toBe(false);
       expect((await row(s, c.code)).enabled).toBe(false);
-      expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(false);
+      // PROVIDERS-3: the edit re-ran the check on the NEW credentials (the stub accepts them), so
+      // the proof covers exactly what is stored now; re-enabling is the merchant's explicit act.
+      expect(edited.body.data.check).toMatchObject({ status: 'connected', ok: true });
+      expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(true);
+      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
 
+      // a re-edit to a key the carrier REFUSES fails its check: disabled, and enabling stays 409
+      const refused = await saveSandbox(s, s, { apiKey: 'definitely-not-the-stub-key-0123456789' });
+      expect(refused.body.data.check).toMatchObject({ status: 'credentials_wrong', ok: false });
+      expect(refused.body.data.disabledUntilRetested).toBe(true);
+      expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(false);
       const again = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(again.status).toBe(409);
       expect(again.body.error.code).toBe('CONNECTION_NOT_TESTED');
 
-      // a new Test connection of the NEW credentials opens it again
-      expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
+      // restoring the good credentials passes the check again and opens the gate
+      const restored = await saveSandbox(s, s, c.fields);
+      expect(restored.body.data.check).toMatchObject({ status: 'connected' });
       expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
 
       // editing the OTHER mode's key does not touch the active one
@@ -561,8 +581,8 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
     ).toBe(1);
   });
 
-  describe('PROVIDERS-2 (relaxed by PROVIDERS-ACTIVATION): an unverified carrier', () => {
-    it('store_admin may save and test; nobody (store_admin or super admin) can enable it', async () => {
+  describe('PROVIDERS-3: an unverified carrier connects like any other', () => {
+    it('store_admin saves (the check runs on save), tests and enables it (PROVIDERS-3)', async () => {
       const s = await mkStore('soon');
       const op = await mkSuperAdmin();
       const fields = { apiKey: BOSTA_STUB.apiKey };
@@ -574,6 +594,8 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
           activate: true,
         });
         expect(save.status, JSON.stringify(save.body)).toBe(200);
+        expect(save.body.data.check.status).toBe('connected');
+        expect(save.body.data.check.messageAr).toBeTruthy();
         const test = await post(s, testUrl(s, 'bosta'));
         expect(test.status, JSON.stringify(test.body)).toBe(200);
         expect(test.body.data.test.ok).toBe(true);
@@ -589,23 +611,16 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         expect(opTest.status, JSON.stringify(opTest.body)).toBe(200);
         expect(opTest.body.data.test.ok).toBe(true);
 
-        // ...but nobody enables it, however well it tested
+        // PROVIDERS-3: it enables like any other once the check passed, for the merchant and the operator
         for (const who of [op, s]) {
           const on = await put(who, cfgUrl(s, 'bosta'), { enabled: true });
-          // both stop at the enable gate until the store is activated
-          expect(on.status).toBe(409);
-          expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
+          expect(on.status, JSON.stringify(on.body)).toBe(200);
         }
-        expect((await row(s, 'bosta')).enabled).toBe(false);
-        // and the default (which needs enabled) is out of reach too
-        expect((await post(op, defaultUrl(s, 'bosta'))).status).toBe(409);
+        expect((await row(s, 'bosta')).enabled).toBe(true);
       });
-
-      // the seam back on (the stub suites), the same, already-tested row enables
-      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
     });
 
-    it('a booking is refused for a carrier row that is not enabled, and for an enabled one the catalog does not verify (CARRIER_NOT_ENABLED)', async () => {
+    it('a booking is refused for a carrier that was never connected or is not enabled (CARRIER_NOT_ENABLED)', async () => {
       const s = await mkStore('book');
       const o = await mkOrder(s);
       const ship = () =>
@@ -630,19 +645,14 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(off.status).toBe(409);
       expect(off.body.error.code).toBe('CARRIER_NOT_ENABLED');
 
-      // enabled, then run as production: the row says enabled, the catalog says not verified
-      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
-      const gated = await asProduction(ship);
-      expect(gated.status).toBe(409);
-      expect(gated.body.error.code).toBe('CARRIER_NOT_ENABLED');
-
       // none of the refusals reached the carrier or left a shipment row
       expect(bosta.requests.length).toBe(callsAfterTest);
       expect(callsAfterTest).toBeGreaterThan(calls); // (the Test connection itself did)
       expect(await owner.shipment.count({ where: { orderId: o.id } })).toBe(0);
 
-      // sanity: with the seam on, this very order books. (Through the service: the 201 over HTTP
+      // sanity: once enabled, this very order books. (Through the service: the 201 over HTTP
       // books but its response never completes under ebda_app, see the report.)
+      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
       const ok = await asApp(() =>
         runInTenantContext(s.id, () =>
           shippingCarrierService.createShipmentForOrder(s.id, o.id, 'bosta')

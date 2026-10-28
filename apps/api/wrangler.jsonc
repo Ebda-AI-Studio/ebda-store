@@ -17,6 +17,9 @@
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
   "logpush": true,
+  // Queue-run background jobs (src/lib/jobs) hold one database context for a whole sweep; the default
+  // 30 s of CPU is too tight for the retention/export ones. A cap, billed only on use.
+  "limits": { "cpu_ms": 120000 },
   // NO Smart Placement (tried 2026-10-22, PR #136, reverted): it placed the Worker at EWR
   // (`cf-placement: remote-EWR`) and API KV-hit calls got slower (median 1.2 s -> 2.3 s, n=6).
   // The serial Frankfurt/DO hops are the cost; fix them by removing hops, not by moving the Worker.
@@ -51,16 +54,35 @@
       // One per store: the SQLite store (Ruling INFRA-CF-1, Phase 0 spike). Reachable only for a store in
       // STORE_DO_ENABLED_IDS that also sends `x-ebda-backend: do` (lib/store-backend.ts).
       { "name": "STORE_DO", "class_name": "StoreDO" },
+      // Concurrency leases and debounce for background jobs (G5, src/cf/job-gate.ts): one per function + key.
+      { "name": "JOB_GATE", "class_name": "JobGate" },
+      // One per store: its recurring jobs as an alarm (G5, src/cf/store-schedule.ts).
+      { "name": "STORE_SCHEDULE", "class_name": "StoreSchedule" },
     ],
   },
   // StoreDO nightly backups (Ruling INFRA-CF-1 Phase 0): the EXISTING private bucket, prefix store-do-backups/.
   // No new bucket (Ruling INFRA-PREVIEW-1).
-  "r2_buckets": [{ "binding": "STORE_BACKUPS", "bucket_name": "ebda-private" }],
+  "r2_buckets": [
+    { "binding": "STORE_BACKUPS", "bucket_name": "ebda-private" },
+    // Customer Intelligence (CI-1): the source of truth for commerce outcomes. PRIVATE, 24-month
+    // lifecycle on outcomes/ (scripts/ops/ci-r2-lifecycle.sh). Create it before the first deploy.
+    { "binding": "CI_BUCKET", "bucket_name": "ebda-ci" },
+  ],
+  // Customer Intelligence dashboards: one point per outcome, no buyer key, no order id (lib/ci/sink.ts).
+  "analytics_engine_datasets": [{ "binding": "CI_OUTCOMES", "dataset": "ebda_commerce_outcomes" }],
 
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop
   // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
-  "services": [{ "binding": "STOREFRONT", "service": "ebda-web" }],
+  "services": [
+    { "binding": "STOREFRONT", "service": "ebda-web" },
+    // The shared identity service (Rulings ID-1/ID-2): JWKS over fetch, isRevoked/getAccountState/... over RPC.
+    { "binding": "ACCOUNTS", "service": "ebda-accounts", "entrypoint": "Accounts" },
+  ],
+
+  // Outbound email (G6, Ruling INFRA-CF-1): Cloudflare Email Service, sender domain ebda.app
+  // (onboarded 2026-10-24; DKIM/SPF live on cf-bounce.ebda.app). No API key. services/mail-transport.ts.
+  "send_email": [{ "name": "EMAIL" }],
 
   // Workers AI: search embeddings only (@cf/baai/bge-m3, apps/api/src/lib/search/embedding-provider.ts).
   // No id; billed per input token to the account the Worker deploys to (Whisky, 69188202...). AI
@@ -72,10 +94,21 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] },
     { "tag": "v2", "new_sqlite_classes": ["StoreDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["JobGate"] },
+    { "tag": "v4", "new_sqlite_classes": ["StoreSchedule"] },
   ],
+
+  // Background jobs (G5, src/lib/jobs): one Workflow class runs every multi-step job, one instance
+  // per run. The binding creates instances (src/lib/jobs/start.ts).
+  "workflows": [{ "name": "ebda-jobs", "binding": "JOBS_WORKFLOW", "class_name": "JobWorkflow" }],
 
   "queues": {
     "producers": [
+      // Store -> Ebda WhatsApp events (contract 2026-10-24; lib/wa/events.ts). Ebda WhatsApp consumes it.
+      { "binding": "WA_EVENTS_QUEUE", "queue": "ebda-wa-events" },
+      { "binding": "JOBS_QUEUE", "queue": "ebda-jobs" },
+      // Customer Intelligence capture (lib/ci/port.ts): validated commerce_outcomes envelopes.
+      { "binding": "CI_EVENTS_QUEUE", "queue": "ebda-ci-events" },
       { "binding": "EMAIL_QUEUE", "queue": "ebda-email" },
       { "binding": "SMS_QUEUE", "queue": "ebda-sms" },
     ],
@@ -99,6 +132,38 @@
         "dead_letter_queue": "ebda-sms-dlq",
       },
       { "queue": "ebda-email-dlq", "max_batch_size": 10, "max_retries": 2 },
+      // WhatsApp -> Store events (COD outcomes, erasure races): lib/wa/store-events-consumer.ts.
+      {
+        "queue": "ebda-store-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 2,
+        "max_retries": 5,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-store-events-dlq",
+      },
+      { "queue": "ebda-store-events-dlq", "max_batch_size": 10, "max_retries": 2 },
+      // Background jobs with at most one step. The job's own `retries` (max 6 in the map) decide when
+      // a run fails for good, so the platform limit sits above it and only a crash loop reaches the DLQ.
+      {
+        "queue": "ebda-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 10,
+        "max_concurrency": 10,
+        "dead_letter_queue": "ebda-jobs-dlq",
+      },
+      { "queue": "ebda-jobs-dlq", "max_batch_size": 1, "max_retries": 2 },
+      // Customer Intelligence sink (lib/ci/sink.ts): R2 + Analytics Engine. 25 per batch keeps the
+      // Analytics Engine writes of one invocation small; an unreadable event retries into the DLQ (pages).
+      {
+        "queue": "ebda-ci-events",
+        "max_batch_size": 25,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-ci-events-dlq",
+      },
+      { "queue": "ebda-ci-events-dlq", "max_batch_size": 10, "max_retries": 2 },
       { "queue": "ebda-sms-dlq", "max_batch_size": 10, "max_retries": 2 },
     ],
   },
@@ -124,7 +189,41 @@
 
   // Scheduled work that used to be setInterval loops (index.ts, Node only): see src/cf/cron.ts.
   "triggers": {
-    "crons": ["*/15 * * * *", "*/30 * * * *", "0 */12 * * *", "0 3 * * *"],
+    // The four legacy loops (src/cf/cron.ts CRON_SCHEDULE) plus every Inngest schedule ported to
+    // Cloudflare (G5, src/lib/jobs/schedule.ts: a Cairo-time cron appears twice, winter and summer
+    // UTC, and is guarded by the real local time). tests/unit/jobs-schedule.test.ts pins this list
+    // to the code. Budget rule: nothing under 30 minutes except the pre-existing */15 cart sweep.
+    "crons": [
+      "*/15 * * * *",
+      "*/30 * * * *",
+      "0 * * * *",
+      "0 */12 * * *",
+      "0 */4 * * *",
+      "0 */6 * * *",
+      "0 0 * * *",
+      "0 2 * * MON",
+      "0 2 1 * *",
+      "0 22 * * *",
+      "0 23 * * *",
+      "0 3 * * *",
+      "0 3 * * SUN",
+      "0 3 1 * *",
+      "0 4 * * *",
+      "0 4 * * SUN",
+      "0 7 * * *",
+      "17 * * * *",
+      "17 */6 * * *",
+      "30 22 * * *",
+      "30 23 * * *",
+      "30 3 * * *",
+      "30 3 1 * *",
+      "30 4 * * *",
+      "41 */12 * * *",
+      "45 4 * * *",
+      "5 */6 * * *",
+      "7 * * * *",
+      "7,37 * * * *",
+    ],
   },
 
   // Node-only packages replaced by Workers-native code or stubbed (see src/cf/stubs/*).
@@ -162,6 +261,12 @@
     "TRUST_PROXY_HOPS": "1",
     // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
+    // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
+    // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
+    "JOBS_CF_GROUPS": "1,2,3,4,5,6,7,8",
+    // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
+    // comma list of function ids or "all"; "" = every schedule stays a cron.
+    "JOBS_CF_ALARMS": "",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",

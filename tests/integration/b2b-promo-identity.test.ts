@@ -26,6 +26,7 @@ import { CouponService } from '../../apps/api/src/services/coupon.service';
 import { CustomerGroupService } from '../../apps/api/src/services/customer-group.service';
 import { getCustomerProfile } from '../../apps/api/src/services/customer-aggregate.service';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../../apps/api/src/lib/buyer-identity';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -66,7 +67,7 @@ async function cleanup() {
 
 beforeAll(async () => {
   owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-  await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+  await setAppRoleLogin(owner, APP_PASSWORD);
   await cleanup();
   const user = (tag: string, o: Record<string, unknown> = {}) =>
     owner.user.create({

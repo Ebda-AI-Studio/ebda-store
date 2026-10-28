@@ -3,21 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
-  isActivationRequestable,
   isMaskedSecret,
   validateCredentialValue,
   type CredentialFieldDef,
+  type ConnectionCheckView,
   type CredentialMode,
   type ProviderCatalogEntry,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
-import type { ActivationRequest } from '../../../../../lib/provider-activation';
-import {
-  ActivatedChip,
-  ProviderActivationPanel,
-} from '../../../../../components/ProviderActivationPanel';
+import { UnverifiedProviderNotice } from '../../../../../components/UnverifiedProviderNotice';
 
 /** One saved-credential hint: secrets only say they are set (+ last 4), non-secrets echo the value. */
 type CredentialHint = { set: true; last4?: string; value?: string };
@@ -55,8 +51,6 @@ interface Props {
   entry: ProviderCatalogEntry;
   config: GatewayConfig | undefined;
   storeId: string;
-  /** This provider's activation request for the store (unverified providers only). */
-  activation?: ActivationRequest;
   /** Refetch the store's configs after any write. */
   onChanged: () => Promise<void> | void;
 }
@@ -83,7 +77,7 @@ const asStringList = (v: unknown, fallback: string[]): string[] =>
     ? (v as string[])
     : fallback;
 
-export function GatewayConnectCard({ entry, config, storeId, activation, onChanged }: Props) {
+export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props) {
   const t = useT('paymentSettings.connect');
   const locale: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
   const base = `/api/v1/payment-settings/store/${storeId}/${entry.code}`;
@@ -120,19 +114,16 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
     entry.fields.every(f => !f.required || hintFor(m, f.key) !== null);
   const activeReady = Boolean(config) && requiredSavedFor(activeMode);
 
-  // An unverified provider is usable only once Ebda activated it for this store.
-  const requestable = isActivationRequestable(entry);
-  const activated = requestable && activation?.status === 'activated';
-  const usable = !requestable || activated;
+  // PROVIDERS-3: an unverified provider connects like any other; the automatic check on save
+  // (and Test connection) is the gate, and the first real order confirms it.
+  const unverified = !entry.manual && !entry.verified;
   const connected = Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok);
-  const canEnable = connected && usable;
-  const enableBlockedReason = !usable
-    ? t('enable.notActivated')
-    : !config
-      ? t('enable.saveFirst')
-      : !config.connectionTestCurrent || !config.connectionTest?.ok
-        ? t('enable.testFirst')
-        : null;
+  const canEnable = connected;
+  const enableBlockedReason = !config
+    ? t('enable.saveFirst')
+    : !config.connectionTestCurrent || !config.connectionTest?.ok
+      ? t('enable.testFirst')
+      : null;
 
   const statusKey = config?.isEnabled ? 'enabled' : connected ? 'connected' : 'notConnected';
   const statusTone =
@@ -175,23 +166,28 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
     }
     setBusy(activate ? 'activate' : 'save');
     setNotice(null);
-    const { data, error: apiErr } = await apiPut<{ disabledUntilRetested?: boolean }>(
-      `${base}/credentials`,
-      { mode, fields, ...(activate ? { activate: true } : {}) }
-    );
+    const { data, error: apiErr } = await apiPut<{
+      disabledUntilRetested?: boolean;
+      check?: ConnectionCheckView | null;
+    }>(`${base}/credentials`, { mode, fields, ...(activate ? { activate: true } : {}) });
     setBusy(null);
     if (apiErr) {
       setNotice({ type: 'error', text: apiErr.message || t('messages.failed') });
       return;
     }
     setTest(null);
+    const savedText = data?.disabledUntilRetested
+      ? t('messages.savedDisabled')
+      : activate
+        ? t('messages.modeActivated', { mode: t(`modes.${mode}`) })
+        : t('messages.saved');
+    // PROVIDERS-3: the automatic check ran on save; say connected / wrong credentials / unreachable.
+    const check = data?.check;
     setNotice({
-      type: 'success',
-      text: data?.disabledUntilRetested
-        ? t('messages.savedDisabled')
-        : activate
-          ? t('messages.modeActivated', { mode: t(`modes.${mode}`) })
-          : t('messages.saved'),
+      type: check && !check.ok ? 'error' : 'success',
+      text: check
+        ? `${savedText} ${locale === 'ar' ? check.messageAr : check.messageEn}`
+        : savedText,
     });
     await onChanged();
   }
@@ -219,9 +215,7 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
       const text =
         apiErr.code === 'CONNECTION_NOT_TESTED'
           ? t('enable.testFirst')
-          : apiErr.code === 'PROVIDER_NOT_VERIFIED'
-            ? t('enable.notActivated')
-            : apiErr.message || t('messages.failed');
+          : apiErr.message || t('messages.failed');
       setNotice({ type: 'error', text });
       return;
     }
@@ -263,14 +257,13 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone}`}>
               {t(`status.${statusKey}`)}
             </span>
-            {activated && <ActivatedChip />}
             {config?.isEnabled && <HealthChip config={config} />}
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {entry.capabilities.methods.map(m => (
               <span
                 key={m}
-                className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
               >
                 {t(`methods.${m}`)}
               </span>
@@ -287,14 +280,9 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
         </button>
       </div>
 
-      {requestable && !activated && (
+      {unverified && (
         <div className="border-t px-4 py-3">
-          <ProviderActivationPanel
-            provider={entry.code}
-            storeId={storeId}
-            activation={activation}
-            onChanged={onChanged}
-          />
+          <UnverifiedProviderNotice pending={!entry.capabilities.webhooks} />
         </div>
       )}
 
@@ -321,7 +309,7 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
                 >
                   {t(`modes.${m}`)}
                   {activeMode === m && config && (
-                    <span className="ms-2 rounded-full bg-success/10 px-1.5 py-0.5 text-[11px] text-success-ink">
+                    <span className="ms-2 rounded-full bg-success/10 px-1.5 py-0.5 text-xs text-success-ink">
                       {t('modes.active')}
                     </span>
                   )}
@@ -488,7 +476,7 @@ export function GatewayConnectCard({ entry, config, storeId, activation, onChang
             <div className="rounded-lg border border-border bg-background p-3 text-sm">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <p className="font-medium text-foreground">{t('webhook.label')}</p>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {entry.webhook.delivery === 'per-request'
                     ? t('webhook.automatic')
                     : t('webhook.pasteIt')}

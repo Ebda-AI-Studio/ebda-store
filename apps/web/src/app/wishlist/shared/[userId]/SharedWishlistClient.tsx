@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { isOnSale } from '../../../../lib/product-pricing';
-import Link from 'next/link';
+import Link from '../../../../components/StoreLink';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';

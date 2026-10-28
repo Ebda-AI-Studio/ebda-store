@@ -23,6 +23,16 @@ declare module 'cloudflare:workers' {
     protected ctx: unknown;
     protected env: Env;
   }
+  /** Workflows base class (it lives in `cloudflare:workers`; `NonRetryableError` is in `cloudflare:workflows`). */
+  export abstract class WorkflowEntrypoint<Env = unknown, Params = unknown> {
+    protected ctx: { waitUntil(p: Promise<unknown>): void };
+    protected env: Env;
+    constructor(ctx: { waitUntil(p: Promise<unknown>): void }, env: Env);
+    abstract run(
+      event: { payload: Readonly<Params>; timestamp: Date; instanceId: string },
+      step: unknown
+    ): Promise<unknown>;
+  }
   export const env: Record<string, unknown>;
 }
 
@@ -58,4 +68,10 @@ interface DurableObjectStateLike {
 declare class WebSocketPair {
   0: WebSocket;
   1: WebSocket;
+}
+
+declare module 'cloudflare:workflows' {
+  export class NonRetryableError extends Error {
+    constructor(message: string, name?: string);
+  }
 }

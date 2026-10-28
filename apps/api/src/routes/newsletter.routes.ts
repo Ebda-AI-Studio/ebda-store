@@ -5,7 +5,7 @@ import { csvField } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
-import { ResendService } from '../services/resend.service';
+import { StoreMailer } from '../services/store-mailer.service';
 import { storeHidesPoweredBy } from '../services/email.service';
 import { buildBroadcastMessage } from '../lib/newsletter-broadcast';
 import logger from '../lib/logger';
@@ -17,6 +17,9 @@ import logger from '../lib/logger';
  * file is store-admin only and goes through the same auth chain as every
  * other admin route (authenticate → authorize → requireStoreAccess).
  */
+/** Each recipient is one `send()` in this request; stays well under the 1,000-subrequest cap. */
+const BROADCAST_MAX_RECIPIENTS = 400;
+
 const router = Router();
 
 // GET /stores/:storeId/newsletter/subscribers - List newsletter subscribers
@@ -249,6 +252,19 @@ router.post(
         select: { id: true, email: true, language: true },
       });
 
+      // One provider call per subscriber inside this single request (Worker subrequest budget):
+      // big lists belong to Campaigns (paced, per-recipient, resumable).
+      if (subscribers.length > BROADCAST_MAX_RECIPIENTS) {
+        res.status(413).json({
+          success: false,
+          error: {
+            code: 'BROADCAST_TOO_LARGE',
+            message: `A broadcast reaches at most ${BROADCAST_MAX_RECIPIENTS} subscribers; use a campaign.`,
+          },
+        });
+        return;
+      }
+
       if (subscribers.length === 0) {
         res.json({ success: true, data: { sent: 0, message: 'No active subscribers to send to' } });
         return;
@@ -283,11 +299,19 @@ router.post(
       for (let i = 0; i < messages.length; i += CHUNK) {
         const chunk = messages.slice(i, i + CHUNK);
         try {
-          await ResendService.sendBrandedBatch(storeId, {
+          const r = await StoreMailer.sendBrandedBatch(storeId, {
             subject: chunk[0].subject,
             messages: chunk.map(({ to, html, text, headers }) => ({ to, html, text, headers })),
           });
-          sent += chunk.length;
+          sent += r.ids.length;
+          if (r.error) {
+            logger.error(
+              { storeId, code: r.error, chunk: i / CHUNK },
+              '[Newsletter] Chunk stopped'
+            );
+            errors.push(`send stopped (${r.error}) after ${r.ids.length} of ${chunk.length}`);
+            break; // later chunks would hit the same wall; the merchant sees the partial count
+          }
         } catch (err: any) {
           const msg = err?.message ?? 'send failed';
           logger.error({ err, storeId, chunk: i / CHUNK }, '[Newsletter] Chunk send error');

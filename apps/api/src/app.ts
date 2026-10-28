@@ -3,6 +3,7 @@
 //   - `index.ts`  : the Node server (Railway/Docker/dev): http server, socket.io,
 //                   background loops, graceful shutdown.
 //   - `worker.ts` : the Cloudflare Worker (`httpServerHandler`), R-EBDA-001.
+import { installWaWriteObservers } from './lib/wa/observers';
 import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -29,7 +30,7 @@ import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import billingWebhookRoutes from './routes/billing-webhook.routes';
-import { assertBillingConfigAtBoot } from './services/billing';
+import { assertBillingConfigAtBoot, billingProviderUnsetWarning } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
 import { prisma, setDbHopObserver } from '@ebda/database';
@@ -58,10 +59,25 @@ import {
   decideCorsCache,
   isPlatformOrigin,
 } from './lib/cors-cache';
-import { buildIdentity } from './lib/build-identity';
+import { healthPayload } from './lib/health-payload';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 assertBillingConfigAtBoot();
+{
+  // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
+  const unset = billingProviderUnsetWarning();
+  if (unset) {
+    logger.error(unset);
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: BILLING_PROVIDER is not set',
+      body: unset,
+    }).catch(() => undefined);
+  }
+}
+
+// Every plan / subscription / catalog write anywhere tells Ebda WhatsApp (lib/wa/observers.ts).
+installWaWriteObservers();
 
 const app = express();
 
@@ -448,8 +464,8 @@ app.use(requestLogger);
 // and any manual check had nothing to compare against. Unknown values are
 // reported as null rather than omitted or guessed, so a caller can tell
 // "this build is X" apart from "this build will not say".
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), ...buildIdentity() });
+app.get('/health', async (_req, res) => {
+  res.json(await healthPayload());
 });
 
 // Comprehensive health check with dependency status (requires auth)

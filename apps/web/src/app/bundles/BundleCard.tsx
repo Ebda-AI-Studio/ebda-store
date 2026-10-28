@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import Image from 'next/image';
 import { Button } from '@ebda/ui';
 import type { PublicBundle } from '@/lib/api';

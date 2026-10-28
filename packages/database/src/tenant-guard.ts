@@ -124,9 +124,15 @@ export const USER_KEYED_MODELS: Readonly<Record<string, string>> = {
 export const GLOBAL_MODELS: readonly string[] = [
   'AnswerEngineProviderConfig',
   'BillingWebhookEvent',
+  // Ruling FOUNDING-1: platform billing ledgers keyed by store ids, no store_id column, no tenant data.
+  'BillingReferral',
+  'BillingGrant',
   // Ruling LEGAL-4: one row per announced policy version, read by every merchant.
   'LegalNoticeSend',
   'Plan',
+  // Ruling PROVIDERS-3: platform-wide provider verification evidence (no tenant data).
+  'ProviderVerification',
+  'ProviderVerificationEvent',
   'SystemSetting',
 ];
 
@@ -524,14 +530,68 @@ function observed(label: string, run: () => Promise<unknown>): Promise<unknown> 
   return run().finally(() => obs(label, performance.now() - t));
 }
 
+/**
+ * Write observer: told AFTER a write to a watched model completed (in the caller's async context,
+ * so `afterTenantTxCommit` / the request's deferral scope still apply). It only OBSERVES: it never
+ * changes whether or how a query runs, and a throwing observer is swallowed. Used to emit
+ * `store.plan_changed` from the ONE place every plan / subscription write passes through (any
+ * service, job or route, present or future), instead of a call at each of ~25 write sites.
+ */
+export interface ModelWriteEvent {
+  model: string;
+  operation: string;
+  args: unknown;
+  result: unknown;
+}
+let modelWriteObserver: ((e: ModelWriteEvent) => void) | undefined;
+export function setModelWriteObserver(fn: ((e: ModelWriteEvent) => void) | undefined): void {
+  modelWriteObserver = fn;
+}
+const WRITE_OPERATIONS = new Set([
+  'create',
+  'createMany',
+  'createManyAndReturn',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany',
+]);
+function observeWrite(model: string, operation: string, args: unknown, result: unknown): void {
+  const obs = modelWriteObserver;
+  if (!obs || !WRITE_OPERATIONS.has(operation)) return;
+  try {
+    obs({ model, operation, args, result });
+  } catch {
+    /* an observer must never break a write that already succeeded */
+  }
+}
+
+/**
+ * The per-operation body of the extension: the guard check, the query, then the write observer.
+ * Exported so the wiring is testable without a database.
+ */
+export function guardedOperation(p: {
+  model: string;
+  operation: string;
+  args: unknown;
+  query: QueryFn;
+}): Promise<unknown> {
+  const { model, operation, args, query } = p;
+  assertTenantScoped(model, operation, args, ambientScope());
+  return observed(`db-${model}.${operation}`, () => query(args)).then(result => {
+    observeWrite(model, operation, args, result);
+    return result;
+  });
+}
+
 /** The query extension the client factory installs on every app client. */
 export const tenantGuardExtension = Prisma.defineExtension({
   name: 'ebda-tenant-guard',
   query: {
     $allModels: {
       $allOperations({ model, operation, args, query }) {
-        assertTenantScoped(model, operation, args, ambientScope());
-        return observed(`db-${model}.${operation}`, () => (query as QueryFn)(args));
+        return guardedOperation({ model, operation, args, query: query as QueryFn });
       },
     },
     $queryRaw({ args, query }) {

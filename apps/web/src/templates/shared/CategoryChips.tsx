@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { CategoryStripProps } from '../types';
 
 /**

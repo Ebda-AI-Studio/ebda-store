@@ -387,59 +387,6 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </label>
       </div>
 
-      {/* ── Store numerals (Ruling NUMERALS-1) ─────────────────────────────
-          Western 123 is the default in both languages; ١٢٣ is the store's
-          opt-in for its Arabic customer-facing pages. The admin itself always
-          shows 0-9. */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-        <div>
-          <p
-            data-setting-id="branding.arabic-numerals"
-            id="store-numerals-label"
-            className="text-sm font-semibold text-foreground"
-          >
-            {t('arabicNumerals.title')}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('arabicNumerals.hint')}</p>
-        </div>
-        <div
-          role="radiogroup"
-          aria-labelledby="store-numerals-label"
-          className="inline-flex overflow-hidden rounded-md border border-border"
-        >
-          {(
-            [
-              { arab: false, sample: '123', label: t('arabicNumerals.western') },
-              { arab: true, sample: '١٢٣', label: t('arabicNumerals.arabic') },
-            ] as const
-          ).map(opt => {
-            const selected = (branding.theme.arabicNumerals === true) === opt.arab;
-            return (
-              <button
-                key={opt.sample}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={opt.label}
-                onClick={() =>
-                  onChange({
-                    ...branding,
-                    theme: { ...branding.theme, arabicNumerals: opt.arab },
-                  })
-                }
-                className={`min-w-[4rem] px-4 py-2 text-sm tabular-nums transition-colors ${
-                  selected
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card text-foreground hover:bg-muted'
-                }`}
-              >
-                {opt.sample}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* ── Footer logo ───────────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>

@@ -1,5 +1,7 @@
+import { InstapayReceiptService } from '../../../services/payment-providers/instapay-receipt.service';
 import type { InngestFunction } from 'inngest';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
+import { acrossOpts } from '../../jobs/store-scope';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -55,7 +57,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     retries: 1,
     triggers: [{ cron: '0 4 * * 0' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     const cutoff = new Date(Date.now() - ABANDONED_CART_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
     // FORCE RLS: data-retention is cross-tenant — no storeId available.
@@ -63,10 +65,12 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     // Store-scoped table: counted and purged store by store, each in its own scope.
     const candidateCount = await step.run('count-candidates', async () =>
       (
-        await acrossStores(storeId =>
-          prisma.abandonedCart.count({
-            where: { storeId, createdAt: { lt: cutoff }, customerId: null },
-          })
+        await acrossStores(
+          storeId =>
+            prisma.abandonedCart.count({
+              where: { storeId, createdAt: { lt: cutoff }, customerId: null },
+            }),
+          acrossOpts(event)
         )
       ).reduce((n, r) => n + r.value, 0)
     );
@@ -90,7 +94,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
           where: { id: { in: candidates.map(c => c.id) }, storeId },
         });
         return result.count;
-      })) {
+      }, acrossOpts(event))) {
         removed += value;
       }
       return removed;
@@ -128,6 +132,28 @@ export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
       throw new Error(`search-log-purge: ${failedStores} store(s) failed; see the per-store log`);
     }
     return { purged };
+  }
+);
+
+/**
+ * InstaPay receipt retention (M-025): screenshots deleted (approved: right away, a missed delete is retried here;
+ * rejected / voided: 30 days after the decision; drafts: 30 days after upload) and the personal fields scrubbed 180 days
+ * after a final decision. Daily (a missed delete is retried the next day); per store, in the store's own scope. See docs/RETENTION.md.
+ */
+export const instapayReceiptRetention: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'instapay-receipt-retention-daily',
+    name: 'Delete InstaPay receipt screenshots and scrub receipt personal fields on schedule',
+    retries: 1,
+    triggers: [{ cron: '30 4 * * *' }],
+  },
+  async ({ step }) => {
+    const out = await step.run('sweep', () => InstapayReceiptService.sweepRetention());
+    logger.info(
+      { images: out.images, scrubbed: out.scrubbed },
+      'instapay-receipt-retention: completed'
+    );
+    return out;
   }
 );
 
@@ -284,6 +310,8 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
                 shippingAddress: anonymizedJson,
                 billingAddress: anonymizedJson,
                 customerNotes: null,
+                buyerKey: null,
+                areaKey: null,
               },
             })
           )

@@ -5,7 +5,8 @@ import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
-import { redactOrderForCustomer } from '../services/gold-rate/public';
+import { redactOrderForCustomer, maskGuestOrderView } from '../services/gold-rate/public';
+import { signOrderViewToken, requestHoldsOrderViewToken } from '../lib/order-view-token';
 import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
@@ -30,6 +31,9 @@ import {
   writeLimiter,
   couponAttemptLimiter,
   newsletterLimiter,
+  whatsappConsentStoreLimiter,
+  whatsappConsentUserLimiter,
+  auditLog,
   viewIngestLimiter,
 } from '../middleware/security';
 import {
@@ -52,7 +56,14 @@ import {
   restoreCartIntoSession,
   cartEmailOptInAvailable,
 } from '../services/cart-email-optin.service';
-import { boundedCacheKey, getCached } from '../lib/public-cache';
+import { isWhatsAppLinked } from '../lib/wa/link';
+import { createWhatsAppOptInHandlers, createWhatsAppOptInStateHandlers } from './whatsapp-optin';
+import { WhatsAppConsentService } from '../lib/wa/consent';
+import {
+  boundedCacheKey,
+  getCached,
+  invalidateStoreProductCachesAfterOrder,
+} from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
@@ -91,6 +102,20 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 import { inParallel } from '../lib/run-in-parallel';
 import { publicReadLimit } from '../middleware/public-read-limit';
+/**
+ * The guest view token for a just-created order, or undefined when it cannot be signed. The order
+ * is already committed at this point: a missing signing key must degrade to the masked order view,
+ * never turn a placed order into a 500 (SEC-15).
+ */
+function guestViewTokenFor(orderId: string): string | undefined {
+  try {
+    return signOrderViewToken(orderId);
+  } catch (err) {
+    logger.error({ err, orderId }, '[public.orders] could not sign the guest order view token');
+    return undefined;
+  }
+}
+
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
@@ -457,7 +482,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // never shared-cacheable (Ruling SEARCH-URL-1). `Vary` is set for any cache that honours it.
     if (headerTerm !== undefined) res.vary('X-Search-Query');
     if (ranked || headerTerm !== undefined) res.setHeader('Cache-Control', 'private, no-store');
-    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    else setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300, neverStale: true });
     res.json({
       success: true,
       data: gateBackorderPayload(result, backorderOn),
@@ -519,7 +544,7 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     const backorderOn = await readInStoreContext(storeId, () =>
       featureService.isFeatureEnabled(storeId, 'inventory.backorder')
     );
-    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300, neverStale: true });
     res.json({
       success: true,
       data: { product: gateBackorderPayload(payload, backorderOn) },
@@ -965,6 +990,49 @@ router.post(
   }
 );
 
+// POST /cart/whatsapp-optin - the checkout box "Send me offers and reminders on WhatsApp" (Ruling
+// WA-CONSENT-1). Cart reminders are marketing: the box is UNTICKED by default, nothing is recorded
+// until the shopper ticks it, and unticking withdraws it. SECURITY: the body carries NO phone. The
+// caller must be a logged-in customer with a cart in THIS session; consent is recorded against the
+// number on their own account (the number the reminder goes to), source 'checkout', audited with the
+// cart id. A guest, another session or a body-supplied phone cannot opt anyone in or out. Rate-limited
+// per IP+session and per store. Only offered on a store that has Ebda WhatsApp linked.
+/** Show the WhatsApp marketing box only where Ebda WhatsApp is linked; a lookup failure fails CLOSED (hidden). */
+async function whatsappOptInAvailable(storeId: string): Promise<boolean> {
+  try {
+    return await isWhatsAppLinked(storeId);
+  } catch (err) {
+    logger.warn({ err, storeId }, '[public] whatsapp link lookup failed, opt-in box hidden');
+    return false;
+  }
+}
+router.post(
+  '/cart/whatsapp-optin',
+  ...createWhatsAppOptInHandlers({
+    authenticate: (req, res, next) => optionalAuthenticate(req, res, next),
+    userLimiter: (req, res, next) => whatsappConsentUserLimiter(req, res, next),
+    storeLimiter: (req, res, next) => whatsappConsentStoreLimiter(req, res, next),
+    storeIdFor: getStoreIdFromRequest,
+    isLinked: isWhatsAppLinked,
+    record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    state: (s, u) => WhatsAppConsentService.stateForUser(s, u),
+    audit: e => auditLog(e as Parameters<typeof auditLog>[0]),
+  })
+);
+router.get(
+  '/cart/whatsapp-optin',
+  ...createWhatsAppOptInStateHandlers({
+    authenticate: (req, res, next) => optionalAuthenticate(req, res, next),
+    userLimiter: (req, res, next) => whatsappConsentUserLimiter(req, res, next),
+    storeLimiter: (req, res, next) => whatsappConsentStoreLimiter(req, res, next),
+    storeIdFor: getStoreIdFromRequest,
+    isLinked: isWhatsAppLinked,
+    record: (...a) => WhatsAppConsentService.recordForCart(...a),
+    state: (s, u) => WhatsAppConsentService.stateForUser(s, u),
+    audit: e => auditLog(e as Parameters<typeof auditLog>[0]),
+  })
+);
+
 // POST /cart/restore - the recovery email's button: copy the emailed cart's lines into THIS
 // session's cart. The signed, expiring, store-scoped token is the only capability; the source
 // cart's session id is never returned.
@@ -1236,6 +1304,9 @@ router.post(
       if (backendFor(storeId, req) === 'do') {
         // Spike order path: stock + order rows in ONE DO transaction. The demo copy only; no payment, no email.
         const order = unwrapDo(await storeDo(storeId).createOrder(storeId, sessionId));
+        // The order just decremented stock in the Durable Object: every cache layer (KV, the Worker edge cache
+        // through the same generations, the storefront tag) must see it, exactly as the Postgres path does.
+        await invalidateStoreProductCachesAfterOrder(storeId);
         res.setHeader('x-store-backend', 'do');
         res.status(201).json({ success: true, data: { order } });
         return;
@@ -1257,13 +1328,22 @@ router.post(
         sessionId,
         orderData,
         undefined,
-        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null, buyer: buyerFromRequest(req) }
+        {
+          checkoutIp: ipKeyGenerator(req.ip ?? '') || null,
+          buyer: buyerFromRequest(req),
+          idempotencyKey: req.header('idempotency-key') ?? null,
+        }
       );
 
       res.status(201).json({
         success: true,
         // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-36).
-        data: { order: redactOrderForCustomer(order) },
+        // A guest also gets the signed view token for it (SEC-15): the only credential, beside the
+        // order id, that `GET /orders/:id` accepts for the unmasked address and phone.
+        data: {
+          order: redactOrderForCustomer(order),
+          ...(order.customerId ? {} : { viewToken: guestViewTokenFor(order.id) }),
+        },
       });
     } catch (error) {
       next(error);
@@ -1439,10 +1519,30 @@ router.get(
         return;
       }
 
+      // A guest (customerId null) sees the unmasked address and phone only with the signed view
+      // token issued when the order was created (SEC-15 / M-137). The order UUID alone is not
+      // enough: it leaks through history, screenshots and shared links.
+      const guestMayViewPii = isCustomer || requestHoldsOrderViewToken(req, order.id);
+      // Never shown to a shopper, token or not: the checkout IP, the merchant's internal note and the
+      // idempotency key (the schema marks checkoutIp as shown to no one).
+      const {
+        checkoutIp: _ip,
+        notes: _notes,
+        idempotencyKey: _idem,
+        ...shopperOrder
+      } = redactOrderForCustomer(order) as Record<string, unknown>;
+      void _ip;
+      void _notes;
+      void _idem;
+      const visible = shopperOrder;
+      // The answer differs by token: never cache it shared.
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.vary('X-Order-View-Token');
+
       res.json({
         success: true,
         // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-23).
-        data: { order: redactOrderForCustomer(order) },
+        data: { order: guestMayViewPii ? visible : maskGuestOrderView(visible) },
       });
     } catch (error) {
       next(error);
@@ -2188,6 +2288,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         // It is display-only — the send gate re-checks everything live.
         smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
         cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+        whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -2409,6 +2510,7 @@ router.get(
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
           cartEmailOptIn: await cartEmailOptInAvailable(store.id),
+          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
         };
 
         const locations = await fetchFooterLocations(store);

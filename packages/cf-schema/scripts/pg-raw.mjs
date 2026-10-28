@@ -153,13 +153,15 @@ export function readRawInvariants(migrationsDir) {
   return { checks: [...checks.values()], indexes: [...indexes.values()] };
 }
 
-// GLOB templates for the handful of regexes the migrations use.
+// GLOB templates for the handful of regexes the migrations use. workerd caps LIKE/GLOB patterns at 50 bytes
+// (a 67-byte hex pattern failed every swatch insert on a real DO), so keep them short; generate.mjs asserts it.
 const REGEX_TO_SQLITE = {
   '^[0-9]{4}$': c => `(length(${c}) = 4 AND ${c} NOT GLOB '*[^0-9]*')`,
+  '^[0-9a-f]{64}$': c => `(length(${c}) = 64 AND ${c} NOT GLOB '*[^0-9a-f]*')`,
   '^#[0-9a-f]{6}$': c =>
-    `(length(${c}) = 7 AND ${c} GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]')`,
+    `(length(${c}) = 7 AND substr(${c}, 1, 1) = '#' AND substr(${c}, 2) NOT GLOB '*[^0-9a-f]*')`,
   '^#[0-9A-Fa-f]{6}$': c =>
-    `(length(${c}) = 7 AND ${c} GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')`,
+    `(length(${c}) = 7 AND substr(${c}, 1, 1) = '#' AND substr(${c}, 2) NOT GLOB '*[^0-9A-Fa-f]*')`,
   '^\\d{4}-\\d{2}-\\d{2}$': c => `${c} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
   '^\\d{2}:\\d{2}$': c => `${c} GLOB '[0-9][0-9]:[0-9][0-9]'`,
   '^[a-z0-9][a-z0-9-]{0,63}$': c =>

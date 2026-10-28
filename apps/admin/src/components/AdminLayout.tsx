@@ -401,7 +401,7 @@ export function AdminLayout({
           />
         </svg>
         <span className="flex-1 text-start">{tcp('trigger')}</span>
-        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] lg:inline-block">
+        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-xs lg:inline-block">
           ⌘K
         </kbd>
       </button>

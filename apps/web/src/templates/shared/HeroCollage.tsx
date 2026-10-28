@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { sanitizeUrl, type HeroSlide } from '@ebda/shared';
 import { HeroBannerLink } from './HeroBannerLink';
 import { translations } from '../../contexts/LanguageContext';

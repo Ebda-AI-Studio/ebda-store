@@ -3,7 +3,7 @@
 import { storeNumerals } from '@ebda/shared';
 import { pickLocalizedName } from '../templates/shared/display-helpers';
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import Link from './StoreLink';
 import { usePathname } from 'next/navigation';
 import { Button } from '@ebda/ui';
 import { api } from '../lib/api';

@@ -2,7 +2,7 @@
  * Where each gateway puts its webhook signature, and how its webhook names the payment
  * (SP6b). The webhook route needs both BEFORE the adapter runs: the signature to refuse an
  * unsigned call, the references to find the owning store (through the
- * `ebda_webhook_resolve_store` definer) and the inbox idempotency key.
+ * `ebda_webhook_resolve_store_scoped` definer) and the inbox idempotency key.
  *
  *   Paymob   `?hmac=` query parameter       (HMAC-SHA512 over 20 callback fields)
  *   Kashier  `x-kashier-signature` header   (HMAC-SHA256 over the signed keys)
@@ -37,7 +37,9 @@ const obj = (v: unknown): Record<string, unknown> =>
  * extractors below; tests/unit/provider-catalog.test.ts asserts the list equals the catalog's
  * non-manual payment providers, so a catalog entry cannot ship without its webhook wiring.
  */
-export const GATEWAY_WEBHOOK_PROVIDERS = ['paymob', 'kashier', 'fawry'] as const;
+// geidea: listed so its route exists, but its callback signature is undocumented: it carries NO
+// extractable signature (-> 401 MISSING_SIGNATURE) and its adapter refuses every delivery.
+export const GATEWAY_WEBHOOK_PROVIDERS = ['paymob', 'kashier', 'fawry', 'geidea'] as const;
 export type GatewayWebhookProvider = (typeof GATEWAY_WEBHOOK_PROVIDERS)[number];
 
 export function isGatewayWebhookProvider(p: string): p is GatewayWebhookProvider {

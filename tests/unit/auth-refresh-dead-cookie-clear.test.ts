@@ -41,6 +41,8 @@ vi.mock('@api/middleware/security', () => ({
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: unknown, _res: unknown, next: () => void) => next(),
   rejectImpersonated: (_req: unknown, _res: unknown, next: () => void) => next(),
+  rejectIdentityManaged: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authenticateAccounts: vi.fn(),
   rejectAdminOnMerchantOrigin: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 vi.mock('@api/services/redis.service', () => ({

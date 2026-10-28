@@ -1,5 +1,7 @@
 'use client';
 
+import { useLocalePath } from '../../contexts/LocalePathContext';
+import { localizeHref } from '../../lib/locale-paths';
 import type React from 'react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -244,6 +246,7 @@ export function ProductCardCta({
   lookCta,
 }: ProductCardCtaProps) {
   const router = useRouter();
+  const localePath = useLocalePath();
   const { ref: ctaRef, compact: compactRaw } = useCompactCta();
   const stepper = useCardStepperLine(productId, { hasVariants: hasVariants || viewOnly });
   const instance = useId();
@@ -296,7 +299,7 @@ export function ProductCardCta({
         onClick={e => {
           e.preventDefault();
           e.stopPropagation();
-          router.push(viewHref);
+          router.push(localizeHref(viewHref, localePath));
         }}
         ref={ctaRef}
         aria-label={viewLabel}

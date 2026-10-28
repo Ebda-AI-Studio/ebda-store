@@ -41,11 +41,11 @@ export function formatFiscalDate(iso: string, locale: string, timeZone?: string 
     timeZone: timeZone || undefined,
   });
   try {
-    return new Date(iso).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB', opts);
+    return new Date(iso).toLocaleString(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', opts);
   } catch {
     // An unknown timezone string must not blank the row.
     return new Date(iso).toLocaleString(
-      locale === 'ar' ? 'ar-EG' : 'en-GB',
+      locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB',
       withNumerals({ dateStyle: 'medium', timeStyle: 'short' })
     );
   }

@@ -1,5 +1,6 @@
 import { Inngest, type EventPayload } from 'inngest';
 import { config } from '../../config';
+import { attachJobs } from '../jobs/with-jobs';
 
 /**
  * Event registry — every event the API can fan out lives here so
@@ -261,6 +262,13 @@ type AccountErasedEvent = EventPayload & {
      *  always empty for customer erasures — see the caveat in
      *  privacy-propagation.service.ts. */
     oneSignalPlayerIds: string[];
+    /** The erased customer's store and hashed phone, for Ebda WhatsApp's `customer.erased`. */
+    storeId?: string;
+    buyerKey?: string;
+    /** Buyer keys of a phone the account PROVED it holds, and the store that proof was made in: erased in THAT store only. */
+    ciProven?: { storeId: string; buyerKeys: string[] };
+    /** The account's own orders in its store (and the keys on them): the default CI erase scope. */
+    ciScope?: { storeId: string; orderIds: string[]; buyerKeys: string[]; sinceDay?: string };
   };
 };
 
@@ -327,6 +335,19 @@ type EbdaAdsConversionRequestedEvent = EventPayload & {
     storeId?: string;
     billingEventId?: string;
   };
+};
+
+// Egypt ETA e-receipt submit (Ruling ETA-1): one event per eta_receipts row; the job also re-sends
+// itself for the verdict poll, so the same row id may arrive many times (idempotent by row state).
+type EtaReceiptSubmitEvent = EventPayload & {
+  name: 'eta/receipt.submit';
+  data: { storeId: string; receiptId: string };
+};
+
+// Durable timer for the next ETA attempt/poll of a row (sleeps until `at`, then re-sends eta/receipt.submit).
+type EtaReceiptScheduledEvent = EventPayload & {
+  name: 'eta/receipt.scheduled';
+  data: { storeId: string; receiptId: string; at: string };
 };
 
 // Material legal-policy change (Ruling LEGAL-4): emitted ONLY by the super-admin
@@ -405,6 +426,8 @@ export type AppEvent =
   | CampaignSendRequestedEvent
   | CartRecoveryEmailRequestedEvent
   | EbdaAdsConversionRequestedEvent
+  | EtaReceiptSubmitEvent
+  | EtaReceiptScheduledEvent
   | LegalNoticeSendRequestedEvent
   | SearchStoreReindexRequestedEvent
   | WebhookDeliveryRequestedEvent
@@ -467,3 +490,8 @@ if (isDryRun) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (inngest as any).send = async () => ({ ids: [] });
 }
+
+// G5: the job layer (lib/jobs). Registers every function for the Cloudflare runners, routes
+// `send` per rollout group (JOBS_CF_GROUPS) and makes a function that already moved a no-op
+// here. Applied AFTER the dry-run override so CI's no-op send stays the Inngest fallback.
+attachJobs(inngest);

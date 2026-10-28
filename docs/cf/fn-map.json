@@ -14,6 +14,21 @@
     "replacement": "D1 trigger (migrations/platform/0002_invariants.sql)",
     "test": "packages/cf-schema/test/platform.test.ts"
   },
+  "billing_grants_guard": {
+    "target": "d1",
+    "replacement": "NOT YET PORTED: FOUNDING-1 (billing_grants) landed after cf-schema phase 1. Until billing moves to the D1 platform database the guard runs on Postgres only; port it to migrations/platform/0002_invariants.sql (as SQLite triggers, like billing_events_guard_*) before that cutover. Ruling CF-SCHEMA-GRANTS-1.",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "billing_grants_guard_delete": {
+    "target": "d1",
+    "replacement": "NOT YET PORTED: FOUNDING-1 (billing_grants) landed after cf-schema phase 1. Until billing moves to the D1 platform database the guard runs on Postgres only; port it to migrations/platform/0002_invariants.sql (as SQLite triggers, like billing_events_guard_*) before that cutover. Ruling CF-SCHEMA-GRANTS-1.",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "billing_grants_guard_update": {
+    "target": "d1",
+    "replacement": "NOT YET PORTED: FOUNDING-1 (billing_grants) landed after cf-schema phase 1. Until billing moves to the D1 platform database the guard runs on Postgres only; port it to migrations/platform/0002_invariants.sql (as SQLite triggers, like billing_events_guard_*) before that cutover. Ruling CF-SCHEMA-GRANTS-1.",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
   "current_store_id": {
     "target": "deleted-by-construction",
     "replacement": "none: the StoreDO id is the store id; getStore(env, storeId) is the only entry"
@@ -339,6 +354,11 @@
     "replacement": "platform.webhookInbox.resolveStore(provider, ref)",
     "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
   },
+  "ebda_webhook_resolve_store_scoped": {
+    "target": "d1",
+    "replacement": "platform.webhookInbox.resolveStoreScoped({transactionId, invoiceId, provider, preferStore}): entity-index lookup by provider reference, filtered by provider when given, preferred store first, newest payment, deterministic order (Ruling ITEST-14)",
+    "test": "packages/repo/test/contract/webhook-inbox.contract.ts"
+  },
   "ebda_withdraw_legal_notice_send": {
     "target": "d1",
     "replacement": "platform.withdrawLegalNotice(id)",
@@ -382,6 +402,16 @@
   "store_credentials_mirror": {
     "target": "deleted-by-construction",
     "replacement": "dropped: credentials live in the StoreDO; D1 holds only the directory fields"
+  },
+  "store_subscriptions_past_due_since": {
+    "target": "d1",
+    "replacement": "the Postgres trigger on store_subscriptions becomes the two D1 triggers store_subscriptions_past_due_since_insert/_update (same file as store_subscriptions_track_past_due)",
+    "test": "packages/cf-schema/test/platform.test.ts"
+  },
+  "store_subscriptions_track_past_due": {
+    "target": "d1",
+    "replacement": "D1 triggers store_subscriptions_past_due_since_insert/_update in migrations/platform/0002_invariants.sql (WA-GRACE-1: set once on the transition into past_due, kept on a retry, cleared otherwise)",
+    "test": "packages/cf-schema/test/platform.test.ts"
   },
   "store_tax_profiles_review_guard": {
     "target": "store-do",

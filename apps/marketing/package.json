@@ -21,10 +21,11 @@
     "clean": "rm -rf .next out node_modules",
     "qr": "tsx scripts/3d/make-qr.ts",
     "llms-full": "tsx scripts/make-llms-full.ts",
-    "stills": "node scripts/3d/make-stills.mjs"
+    "stills": "node scripts/3d/make-stills.mjs",
+    "check:perf": "node ../../scripts/ci/marketing-perf-budget.mjs --out out"
   },
   "dependencies": {
-    "next": "^16.3.8",
+    "next": "^16.4.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

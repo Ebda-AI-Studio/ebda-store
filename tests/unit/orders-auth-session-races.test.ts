@@ -101,8 +101,12 @@ describe.each([
     it('a 404 on the post-refresh /auth/me retry is "signed-out" too', async () => {
       let meCalls = 0;
       globalThis.fetch = vi.fn(async (url: unknown) => {
-        if (urlOf(url).includes('/auth/refresh')) {
-          return res(200, { success: true, data: { refreshed: true } });
+        // The session is refreshed through the identity service (Rulings ID-1/ID-2): a token request, then /auth/session.
+        if (urlOf(url).includes('/auth/session')) {
+          return res(200, { success: true, data: { user: { id: 'u1' } } });
+        }
+        if (urlOf(url).includes('/token?aud=')) {
+          return res(200, { success: true, data: { access_token: 't', expires_at: 1 } });
         }
         meCalls += 1;
         return meCalls === 1 ? res(401) : res(404, GONE);
@@ -135,7 +139,7 @@ describe.each([
     it('does not clear tokens a login wrote while the refresh was in flight', async () => {
       let releaseRefresh!: (r: Response) => void;
       globalThis.fetch = vi.fn((url: unknown) => {
-        if (urlOf(url).includes('/auth/refresh')) {
+        if (urlOf(url).includes('/token?aud=')) {
           return new Promise<Response>(r => (releaseRefresh = r));
         }
         return Promise.resolve(res(401));
@@ -164,7 +168,7 @@ describe.each([
 
     it('stops at its next sleep once a newer check has started', async () => {
       globalThis.fetch = vi.fn(async (url: unknown) =>
-        urlOf(url).includes('/auth/refresh') ? res(429) : res(401)
+        urlOf(url).includes('/token?aud=') ? res(429) : res(401)
       ) as never;
       const { checkSessionWithMountRetries } = await load();
 

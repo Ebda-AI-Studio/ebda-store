@@ -17,6 +17,7 @@ import { reviewModeration } from './review-moderation';
 import {
   abandonedCartPurge,
   searchLogPurge,
+  instapayReceiptRetention,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
 } from './data-retention';
@@ -49,6 +50,7 @@ import { aiAutofillSweep } from './ai-autofill-sweep';
 import { searchProductIndex, searchIndexBackstop } from './search-product-index';
 import { orderCapiConversion } from './order-capi-conversion';
 import { ebdaAdsConversion } from './ebda-ads-conversion';
+import { etaReceiptEnqueue, etaReceiptRedrive, etaReceiptSubmit } from './eta-receipt';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { instapayExpiry } from './instapay-expiry';
 import { shipmentCreate } from './shipment-create';
@@ -85,6 +87,9 @@ import { campaignSend } from './campaign-send';
 import { webhookFanout, webhookDeliver, webhookDeliveryPurge } from './webhook-delivery';
 import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
+import { waStoreEvents, waPlanSync } from './wa-store-events';
+import { ciOutcomes } from './ci-outcomes';
+import { ciErasureSecondPassFn } from './ci-erasure-second-pass';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -114,6 +119,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   reviewModeration,
   abandonedCartPurge,
   searchLogPurge,
+  instapayReceiptRetention,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
@@ -155,6 +161,10 @@ const allInngestFunctions: InngestFunction.Any[] = [
   orderCapiConversion,
   // Ebda's OWN acquisition funnel: Meta CAPI for registration / store created / first paid sub.
   ebdaAdsConversion,
+  // Egypt ETA e-receipts (Ruling ETA-1): enqueue on order created/refunded, submit + verdict poll, durable timer.
+  etaReceiptEnqueue,
+  etaReceiptSubmit,
+  etaReceiptRedrive,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
   instapayExpiry,
@@ -238,6 +248,10 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // Material legal-policy change: one email per store owner (Ruling LEGAL-4). Event-triggered
   // only (a super admin pressing Send notice).
   legalNoticeSend,
+  waStoreEvents,
+  ciOutcomes,
+  ciErasureSecondPassFn,
+  waPlanSync,
   // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate
   // alerts (hourly). Both exit un-stepped on an empty tick (one execution).
   goldRateFeedFetchCron,

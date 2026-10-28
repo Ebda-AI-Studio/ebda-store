@@ -162,8 +162,8 @@ describe('formatMoney', () => {
     expect(formatMoney(129_950)).toBe('1,299.50 ج.م'); // locale defaults to ar
   });
 
-  it('ar + easternArabicDigits: ٠-٩ digits, ٬ grouping, ٫ decimal', () => {
-    expect(formatMoney(129_950, 'ar', { easternArabicDigits: true })).toBe('١٬٢٩٩٫٥٠ ج.م');
+  it('ar + easternArabicDigits is ignored: Western digits only (Ruling DIGITS-1)', () => {
+    expect(formatMoney(129_950, 'ar', { easternArabicDigits: true })).toBe('1,299.50 ج.م');
   });
 
   it('easternArabicDigits is ignored for English (identifiers/SKUs must stay Latin)', () => {
@@ -185,18 +185,18 @@ describe('formatMoney', () => {
     expect(formatMoney(-0.4, 'ar')).toBe('0 ج.م');
   });
 
-  it("numerals: 'arab' is the only way to Arabic-Indic digits, and only in Arabic", () => {
-    expect(formatMoney(45_000, 'ar', { numerals: 'arab' })).toBe('٤٥٠ ج.م');
-    expect(formatMoney(129_950, 'ar', { numerals: 'arab' })).toBe('١٬٢٩٩٫٥٠ ج.م');
-    expect(formatMoney(45_000, 'en', { numerals: 'arab' })).toBe('EGP 450');
+  it("numerals: 'arab' (retired opt-in) is ignored: Western digits in both locales (Ruling DIGITS-1)", () => {
+    expect(formatMoney(45_000, 'ar', { numerals: 'arab' as never })).toBe('450 ج.م');
+    expect(formatMoney(129_950, 'ar', { numerals: 'arab' as never })).toBe('1,299.50 ج.م');
+    expect(formatMoney(45_000, 'en', { numerals: 'arab' as never })).toBe('EGP 450');
     expect(formatMoney(45_000, 'ar', { numerals: 'latn' })).toBe('450 ج.م');
   });
 
-  it('formatPrice defaults to WESTERN digits in Arabic (Ruling NUMERALS-1)', () => {
+  it('formatPrice is WESTERN digits in Arabic (Ruling DIGITS-1)', () => {
     expect(formatPrice(129_950)).toBe('EGP 1,299.50');
     expect(formatPrice(45_000, { locale: 'ar' })).toBe('450 ج.م');
     expect(formatPrice(129_950, { locale: 'ar' })).toBe('1,299.50 ج.م');
-    expect(formatPrice(129_950, { locale: 'ar', numerals: 'arab' })).toBe('١٬٢٩٩٫٥٠ ج.م');
+    expect(formatPrice(129_950, { locale: 'ar', numerals: 'arab' as never })).toBe('1,299.50 ج.م');
     expect(formatPrice(1299.5, { unit: 'major' })).toBe('EGP 1,299.50');
     expect(formatPrice(450, { unit: 'major', locale: 'ar' })).toBe('450 ج.م');
   });

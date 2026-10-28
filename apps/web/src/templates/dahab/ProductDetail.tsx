@@ -17,7 +17,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { ProductOption, ProductVariant } from '@/lib/api';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';

@@ -1,4 +1,13 @@
-// Idempotent: create-or-promote a super_admin user.
+// Idempotent: create-or-promote a super_admin user IN THE STORE'S POSTGRES.
+//
+// SUPERSEDED after the identity cutover (Rulings ID-1/ID-2/ID-15): platform administrators then live in the shared identity
+// service (D1 ebda-identity), and this script writes to a table that no longer authenticates anyone. Use instead, in your own
+// terminal (the password is typed at a hidden prompt, never passed as an argument):
+//   cd apps/accounts && node scripts/upsert-super-admin.mjs --email=you@example.com --remote          # dry run
+//   cd apps/accounts && node scripts/upsert-super-admin.mjs --email=you@example.com --remote --apply  # writes
+// A super_admin also needs a second factor (TOTP or passkey) before the token carries any admin power.
+// This file stays only for a Postgres-only environment before the cutover.
+//
 //
 // Usage (run from apps/api/ so @ebda/database resolves):
 //   node ../../scripts/admin-upsert-super-admin.mjs --email=foo@bar.com --password=secret

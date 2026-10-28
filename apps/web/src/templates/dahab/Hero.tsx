@@ -13,7 +13,7 @@
  * first slide is the LCP element: eager, high priority.
  */
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { heroObjectPosition } from '@ebda/shared';
 import type { HeroBannerProps, HeroProps, HeroSliderProps } from '../types';
 import { resolveBannerLink } from '../shared/hero-banner-link-utils';

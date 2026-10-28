@@ -67,6 +67,8 @@ export function build() {
   const d1Names = new Set([...storeBuckets.d1Only, ...storeBuckets.mirror]);
   d1Store.fields = d1Store.fields.filter(x => x.kind !== 'relation' && d1Names.has(x.name));
   d1Store.indexes = d1Store.indexes.filter(ix => ix.fields.every(x => d1Names.has(x.field)));
+  // CF-only D1 columns (storage_backend): the router reads them from the directory row, never from the DO.
+  for (const col of extraColumns.Store ?? []) d1Store.fields.push(clone(col));
   dbs.d1.push(d1Store);
   // Store -> DO `store_profile` (mirror + profile) and `store_config` (config)
   const mkPart = (name, dbName, names, idNote) => {
@@ -256,9 +258,118 @@ export function build() {
   manifest.rawInvariants = accounted;
   delete manifest.placed;
   manifest.supersededUniques ??= [];
+  manifest.meta = buildMeta(schema, split);
   manifest.decimals = decimals;
   manifest.storeSplit = storeBuckets;
   return { out, manifest, schema, split };
+}
+
+// Runtime metadata for the Prisma-compatible query layer (packages/repo): per model, its table, columns,
+// scalar types, enum values, uniques and RESOLVED relations. Relations to models in another database
+// (every `store` relation: Store lives in D1) are marked external and are not traversable in the DO.
+function buildMeta(schema, split) {
+  const byName = new Map(schema.models.map(m => [m.name, m]));
+  const enums = Object.fromEntries(schema.enums.map(e => [e.name, e.values]));
+  const out = {};
+  for (const m of schema.models) {
+    const target = split[m.name].target;
+    if (target !== 'store-do' && target !== 'd1') continue;
+    const fields = {};
+    for (const f of m.fields) {
+      if (f.kind === 'unsupported') continue;
+      if (f.kind !== 'relation') {
+        const dec = (f.attrs.db ?? '').match(/Decimal\((\d+),\s*(\d+)\)/);
+        fields[f.name] = {
+          kind: f.kind,
+          type: f.type,
+          column: f.column,
+          list: f.list,
+          optional: f.optional,
+          ...(dec ? { scale: Number(dec[2]) } : {}),
+          ...(f.kind === 'enum' ? { enum: f.type } : {}),
+          ...(f.attrs.default !== undefined ? { default: f.attrs.default } : {}),
+          ...(f.attrs.updatedAt ? { updatedAt: true } : {}),
+          ...(f.attrs.id ? { id: true } : {}),
+        };
+        continue;
+      }
+      const tm = byName.get(f.type);
+      const external = split[f.type].target !== target;
+      let rel = { kind: 'relation', type: f.type, list: f.list, optional: f.optional, external };
+      const r = f.attrs.relation;
+      if (r && r.fields.length) {
+        rel = {
+          ...rel,
+          owner: true,
+          from: r.fields.map(n => m.fields.find(x => x.name === n).column),
+          fromProps: r.fields,
+          to: r.references.map(n => tm.fields.find(x => x.name === n).column),
+          toProps: r.references,
+          onDelete: r.onDelete,
+        };
+      } else if (!external) {
+        const back = tm.fields.filter(
+          g =>
+            g.kind === 'relation' &&
+            g.type === m.name &&
+            g.attrs.relation?.fields.length &&
+            (!r?.name || g.attrs.relation.name === r.name)
+        );
+        if (back.length !== 1)
+          throw new Error(
+            `cannot resolve inverse of ${m.name}.${f.name} (${back.length} candidates)`
+          );
+        const g = back[0].attrs.relation;
+        rel = {
+          ...rel,
+          owner: false,
+          from: g.references.map(n => m.fields.find(x => x.name === n).column),
+          fromProps: g.references,
+          to: g.fields.map(n => tm.fields.find(x => x.name === n).column),
+          toProps: g.fields,
+        };
+      }
+      fields[f.name] = rel;
+    }
+    out[m.name] = {
+      table: m.dbName,
+      db: target,
+      pk: m.id ?? m.fields.filter(f => f.attrs.id).map(f => f.name),
+      uniques: [
+        ...m.fields.filter(f => f.attrs.unique && f.kind !== 'relation').map(f => [f.name]),
+        ...m.uniques.map(u => u.fields.map(x => x.field)),
+      ],
+      fields,
+    };
+  }
+  return { models: out, enums, omit: globalOmit(out) };
+}
+
+// The real client's global `omit` (secrets that a full-row read must never return). Parsed from the one place it is
+// declared so prisma-lite cannot drift from it; keyed by Prisma model name and limited to models in this database.
+function globalOmit(models) {
+  const src = fs.readFileSync(path.join(repo, 'packages/database/src/client.ts'), 'utf8');
+  const m0 = /^ {2}omit: \{/m.exec(src);
+  const at = m0 ? m0.index : -1;
+  if (at < 0) throw new Error('packages/database/src/client.ts no longer declares a global omit');
+  let depth = 0;
+  let end = -1;
+  for (let i = src.indexOf('{', at); i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    if (src[i] === '}' && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  const body = src.slice(src.indexOf('{', at), end + 1).replace(/\/\/.*$/gm, '');
+  const literal = new Function(`return (${body})`)();
+  const out = {};
+  for (const [delegate, fields] of Object.entries(literal)) {
+    const model = delegate[0].toUpperCase() + delegate.slice(1);
+    if (!models[model]) continue; // e.g. user: identity, not in this database
+    out[model] = Object.keys(fields).filter(k => fields[k] === true);
+  }
+  return out;
 }
 
 function reasonFor(skippedAll, kind, name) {
@@ -437,6 +548,14 @@ function buildTable(m, ctx) {
       refTable: target.dbName,
       refCols: rel.references.map(tField),
       action,
+      // Prisma's default referential action on update is Cascade (a primary-key change reaches the children)
+      onUpdate: {
+        Cascade: 'CASCADE',
+        SetNull: 'SET NULL',
+        Restrict: 'RESTRICT',
+        NoAction: 'NO ACTION',
+        SetDefault: 'SET DEFAULT',
+      }[rel.onUpdate ?? 'Cascade'],
     });
   }
 
@@ -513,7 +632,7 @@ export function emitSql(db, title) {
       body.push(`  CONSTRAINT ${qid(`${t.name}_pkey`)} PRIMARY KEY (${t.pk.map(qid).join(', ')})`);
     t.fks.forEach((fk, i) => {
       body.push(
-        `  CONSTRAINT ${qid(uniq(`${t.name}_${fk.cols.join('_')}_fkey`))} FOREIGN KEY (${fk.cols.map(qid).join(', ')}) REFERENCES ${qid(fk.refTable)} (${fk.refCols.map(qid).join(', ')}) ON DELETE ${fk.action}`
+        `  CONSTRAINT ${qid(uniq(`${t.name}_${fk.cols.join('_')}_fkey`))} FOREIGN KEY (${fk.cols.map(qid).join(', ')}) REFERENCES ${qid(fk.refTable)} (${fk.refCols.map(qid).join(', ')}) ON DELETE ${fk.action} ON UPDATE ${fk.onUpdate}`
       );
     });
     for (const c of t.columns)
@@ -605,13 +724,32 @@ function main() {
     ),
     'src/store/schema.generated.ts': emitTs(out['store-do'], 'store'),
     'src/platform/schema.generated.ts': emitTs(out.d1, 'platform'),
-    'generated/manifest.json': JSON.stringify(manifest, null, 2) + '\n',
+    'generated/manifest.json': JSON.stringify({ ...manifest, meta: undefined }, null, 2) + '\n',
+    'generated/prisma-meta.json': JSON.stringify(manifest.meta, null, 1) + '\n',
   };
+  // workerd refuses a LIKE/GLOB pattern longer than 50 bytes at EXECUTION time ("LIKE or GLOB pattern too
+  // complex"), so an oversize CHECK only fails on a real Durable Object, never in node:sqlite. Fail here.
+  const longPatterns = [];
+  const scanPatterns = (label, text) => {
+    for (const m of text.matchAll(/\b(?:NOT\s+)?(?:GLOB|LIKE)\s+'((?:[^']|'')*)'/gi))
+      if (Buffer.byteLength(m[1].replace(/''/g, "'")) > 50)
+        longPatterns.push(`${label}: ${Buffer.byteLength(m[1])} bytes in ${m[0].slice(0, 90)}`);
+  };
+  for (const [rel, content] of Object.entries(files))
+    if (rel.endsWith('.sql')) scanPatterns(rel, content);
+  for (const dir of ['migrations/store', 'migrations/platform'])
+    for (const f of fs.readdirSync(path.join(pkg, dir)))
+      if (f.endsWith('.sql') && !(`${dir}/${f}` in files))
+        scanPatterns(`${dir}/${f}`, fs.readFileSync(path.join(pkg, dir, f), 'utf8'));
+  if (longPatterns.length)
+    throw new Error(
+      `LIKE/GLOB patterns over workerd's 50-byte limit:\n- ${longPatterns.join('\n- ')}`
+    );
   for (const [rel, content] of Object.entries(files)) {
     const p = path.join(pkg, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, content);
-    if (rel.endsWith('.ts'))
+    if (rel.endsWith('.ts') || rel.endsWith('.json'))
       execFileSync('npx', ['prettier', '--write', p], { cwd: repo, stdio: 'ignore' });
   }
   if (check) {

@@ -7,6 +7,7 @@ import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete, unwrapList, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { ImageUpload } from '../../../../components/ImageUpload';
 
 interface SeoSettings {
   metaTitle: string;
@@ -136,8 +137,12 @@ const DEFAULT_SETTINGS: SeoSettings = {
   ogImage: '',
   twitterHandle: '',
   googleSiteVerification: '',
-  emailSenderLocalPart: 'noreply',
+  emailSenderLocalPart: 'orders',
 };
+
+// Approved sender prefixes (mirrors MERCHANT_SENDER_PREFIXES in apps/api/src/services/email-sender.ts;
+// the API rejects anything else). The address is <prefix>.<your-store-slug>@ebda.app.
+const SENDER_PREFIXES: string[] = ['orders', 'receipts', 'hello', 'info', 'support'];
 
 // Character limits for SEO best practices
 const TITLE_MAX = 60;
@@ -226,7 +231,9 @@ export default function StoreSeoPage() {
           ogImage: seo.ogImage || '',
           twitterHandle: seo.twitterHandle || '',
           googleSiteVerification: seo.googleSiteVerification || '',
-          emailSenderLocalPart: seo.emailSenderLocalPart || 'noreply',
+          emailSenderLocalPart: SENDER_PREFIXES.includes(seo.emailSenderLocalPart ?? '')
+            ? (seo.emailSenderLocalPart as string)
+            : 'orders',
         });
       }
 
@@ -735,13 +742,14 @@ export default function StoreSeoPage() {
           <h2 className="font-semibold text-foreground">{t('advanced')}</h2>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">{t('ogImage')}</label>
-            <input
-              type="url"
+            {/* SEC-6: the API only accepts an image from our media library, so upload it here. */}
+            <ImageUpload
               value={settings.ogImage}
-              onChange={e => setSettings(prev => ({ ...prev, ogImage: e.target.value }))}
-              placeholder={t('ogImagePlaceholder')}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onUpload={url => setSettings(prev => ({ ...prev, ogImage: url }))}
+              onRemove={() => setSettings(prev => ({ ...prev, ogImage: '' }))}
+              folder="branding"
+              storeId={storeId}
+              label={t('ogImage')}
             />
             <p className="mt-1 text-xs text-muted-foreground">{t('ogImageHint')}</p>
           </div>
@@ -790,7 +798,7 @@ export default function StoreSeoPage() {
                 {t('googleSiteVerificationHint')}
               </p>
               {settings.googleSiteVerification && (
-                <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 text-[11px] text-muted-foreground">
+                <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                   {`<meta name="google-site-verification" content="${settings.googleSiteVerification}" />`}
                 </pre>
               )}
@@ -801,21 +809,22 @@ export default function StoreSeoPage() {
                 {t('senderPrefix')}
               </label>
               <div className="flex items-center rounded-lg border border-border overflow-hidden">
-                <input
-                  type="text"
+                <select
                   value={settings.emailSenderLocalPart}
                   onChange={e =>
-                    setSettings(prev => ({
-                      ...prev,
-                      emailSenderLocalPart: e.target.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9._-]/g, ''),
-                    }))
+                    setSettings(prev => ({ ...prev, emailSenderLocalPart: e.target.value }))
                   }
-                  placeholder={t('senderPrefixPlaceholder')}
-                  className="flex-1 px-3 py-2 text-sm focus:outline-none"
-                />
-                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground">@ebda.app</span>
+                  className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none"
+                >
+                  {SENDER_PREFIXES.map(p => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground" dir="ltr">
+                  .{'{store}'}@ebda.app
+                </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{t('senderPrefixHint')}</p>
             </div>
@@ -964,7 +973,7 @@ export default function StoreSeoPage() {
                     <button
                       type="button"
                       onClick={() => handleToggleFaqActive(faq)}
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${faq.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${faq.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                     >
                       {faq.isActive ? t('faqActive') : t('faqInactive')}
                     </button>
@@ -1134,7 +1143,7 @@ export default function StoreSeoPage() {
                     <button
                       type="button"
                       onClick={() => handleToggleHowtoActive(howto)}
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${howto.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${howto.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                     >
                       {howto.isActive ? t('howtoActive') : t('howtoInactive')}
                     </button>

@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 118,
+      "tables": 122,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -33,7 +33,7 @@
         "bundles": 15,
         "bundle_items": 5,
         "cart_bundles": 6,
-        "orders": 57,
+        "orders": 60,
         "order_events": 8,
         "order_items": 26,
         "payments": 17,
@@ -51,7 +51,7 @@
         "frequently_bought_together": 6,
         "ai_recommendation": 7,
         "shipping_carrier_configs": 12,
-        "shipments": 29,
+        "shipments": 30,
         "shipment_pickups": 20,
         "cod_remittances": 13,
         "affiliates": 18,
@@ -108,7 +108,7 @@
         "warehouses": 13,
         "warehouse_stock": 8,
         "answer_engine_checks": 12,
-        "store_page_revisions": 14,
+        "store_page_revisions": 15,
         "store_tax_profiles": 15,
         "store_tax_documents": 11,
         "fiscal_documents": 26,
@@ -118,18 +118,23 @@
         "gold_rates": 12,
         "gold_rates_current": 5,
         "gold_rate_settings": 10,
+        "store_whatsapp_links": 10,
+        "store_whatsapp_consents": 12,
+        "eta_connections": 15,
+        "eta_receipts": 25,
         "store_profile": 62,
-        "store_config": 22,
+        "store_config": 24,
         "commerce_outcomes": 14,
         "do_flags": 2,
         "d1_outbox": 7
       }
     },
     "d1": {
-      "tables": 23,
-      "maxColumns": 36,
+      "tables": 28,
+      "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
+        "staff_invites": 10,
         "SlugRedirect": 7,
         "webhook_events": 16,
         "system_settings": 7,
@@ -141,15 +146,19 @@
         "answer_engine_provider_configs": 5,
         "merchant_api_keys": 12,
         "plans": 12,
-        "store_subscriptions": 25,
+        "store_subscriptions": 27,
         "billing_events": 21,
-        "instapay_receipts": 36,
+        "instapay_receipts": 38,
         "manual_payment_claims": 17,
         "billing_reminders": 6,
         "store_lifecycle_emails": 6,
         "billing_webhook_events": 7,
         "provider_activation_requests": 11,
-        "stores": 30,
+        "provider_verifications": 9,
+        "provider_verification_events": 10,
+        "billing_referrals": 3,
+        "billing_grants": 17,
+        "stores": 31,
         "entity_index": 4,
         "platform_audit_log": 8
       }
@@ -373,12 +382,36 @@
       "pgWhere": "\"pricing_mode\" = 'gold_rate' AND \"deleted_at\" IS NULL"
     },
     {
+      "name": "payment_events_claim_single_outcome_key",
+      "table": "payment_events",
+      "db": "store-do",
+      "unique": true,
+      "pgCols": "((\"details\" ->> 'claimId'))",
+      "pgWhere": "\"event_type\" IN ('refund_webhook_absorbed', 'refund_failed')"
+    },
+    {
+      "name": "orders_store_buyer_key_created_idx",
+      "table": "orders",
+      "db": "store-do",
+      "unique": false,
+      "pgCols": "\"store_id\", \"buyer_key\", \"created_at\"",
+      "pgWhere": "\"buyer_key\" IS NOT NULL"
+    },
+    {
       "name": "provider_activation_requests_one_live",
       "table": "provider_activation_requests",
       "db": "d1",
       "unique": true,
       "pgCols": "\"store_id\", \"provider\"",
       "pgWhere": "\"status\" IN ('requested', 'activated')"
+    },
+    {
+      "name": "instapay_receipts_retention_idx",
+      "table": "instapay_receipts",
+      "db": "d1",
+      "unique": false,
+      "pgCols": "\"status\", \"reviewed_at\"",
+      "pgWhere": "\"image_deleted_at\" IS NULL OR \"personal_scrubbed_at\" IS NULL"
     }
   ],
   "supersededUniques": [
@@ -1028,6 +1061,126 @@
       "disposition": "store-do:order_items"
     },
     {
+      "kind": "check",
+      "name": "store_whatsapp_links_entitlement_status_check",
+      "table": "store_whatsapp_links",
+      "disposition": "store-do:store_whatsapp_links"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_consents_buyer_key_check",
+      "table": "store_whatsapp_consents",
+      "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_consents_granted_source_check",
+      "table": "store_whatsapp_consents",
+      "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "store_whatsapp_consents_revoked_source_check",
+      "table": "store_whatsapp_consents",
+      "disposition": "store-do:store_whatsapp_consents"
+    },
+    {
+      "kind": "check",
+      "name": "eta_connections_environment_check",
+      "table": "eta_connections",
+      "disposition": "store-do:eta_connections"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_kind_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_status_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "eta_receipts_environment_check",
+      "table": "eta_receipts",
+      "disposition": "store-do:eta_receipts"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_return_reason_code_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_return_reason_raw_len_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "shipments_delivery_attempts_check",
+      "table": "shipments",
+      "disposition": "store-do:shipments"
+    },
+    {
+      "kind": "check",
+      "name": "orders_buyer_key_check",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_role_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_status_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
+    },
+    {
+      "kind": "check",
+      "name": "billing_referrals_not_self",
+      "table": "billing_referrals",
+      "disposition": "d1:billing_referrals"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_kind_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_status_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_months_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_value_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "store_subscriptions_billing_anchor_day_check",
+      "table": "store_subscriptions",
+      "disposition": "d1:store_subscriptions"
+    },
+    {
       "kind": "index",
       "name": "users_admin_email_key",
       "table": "users",
@@ -1326,6 +1479,24 @@
       "name": "products_gold_reprice_idx",
       "table": "products",
       "disposition": "store-do:products"
+    },
+    {
+      "kind": "index",
+      "name": "payment_events_claim_single_outcome_key",
+      "table": "payment_events",
+      "disposition": "store-do:payment_events"
+    },
+    {
+      "kind": "index",
+      "name": "orders_store_buyer_key_created_idx",
+      "table": "orders",
+      "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "instapay_receipts_retention_idx",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
     }
   ],
   "decimals": [
@@ -1495,7 +1666,9 @@
       "aiFeaturesEnabled",
       "aiBulkThrottleMs",
       "aiNarrationEnabled",
-      "insightsRollupCron"
+      "insightsRollupCron",
+      "ciSharing",
+      "ciSharingChangedAt"
     ]
   }
 }

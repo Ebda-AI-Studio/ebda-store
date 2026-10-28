@@ -72,6 +72,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       owner: 'User',
       credentials: 'StoreCredential',
+      whatsappLink: 'StoreWhatsAppLink',
+      whatsappConsents: 'StoreWhatsAppConsent',
       customerUsers: 'User',
       products: 'Product',
       categories: 'Category',
@@ -181,6 +183,25 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       instapayReceipts: 'InstapayReceipt',
       billingReminders: 'BillingReminder',
       lifecycleEmails: 'StoreLifecycleEmail',
+      staffInvites: 'StaffInvite',
+      etaConnection: 'EtaConnection',
+      etaReceipts: 'EtaReceipt',
+    },
+  },
+  {
+    name: 'StoreWhatsAppLink',
+    table: 'store_whatsapp_links',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'StoreWhatsAppConsent',
+    table: 'store_whatsapp_consents',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {
@@ -198,6 +219,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
       user: 'User',
+    },
+  },
+  {
+    name: 'StaffInvite',
+    table: 'staff_invites',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {
@@ -1431,6 +1460,18 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     },
   },
   {
+    name: 'BillingReferral',
+    table: 'billing_referrals',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'BillingGrant',
+    table: 'billing_grants',
+    storeId: false,
+    relations: {},
+  },
+  {
     name: 'BillingWebhookEvent',
     table: 'billing_webhook_events',
     storeId: false,
@@ -1469,6 +1510,18 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
     },
+  },
+  {
+    name: 'ProviderVerification',
+    table: 'provider_verifications',
+    storeId: false,
+    relations: {},
+  },
+  {
+    name: 'ProviderVerificationEvent',
+    table: 'provider_verification_events',
+    storeId: false,
+    relations: {},
   },
   {
     name: 'FiscalDocument',
@@ -1521,6 +1574,22 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
   {
     name: 'GoldRateSettings',
     table: 'gold_rate_settings',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'EtaConnection',
+    table: 'eta_connections',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'EtaReceipt',
+    table: 'eta_receipts',
     storeId: true,
     relations: {
       store: 'Store',

@@ -942,6 +942,66 @@ export const doFlags = sqliteTable('do_flags', {
   value: integer('value').notNull().default(0),
 });
 
+export const etaConnections = sqliteTable('eta_connections', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  environment: text('environment').notNull().default('preprod'),
+  credentialsEnc: text('credentials_enc').notNull(),
+  posSerial: text('pos_serial').notNull(),
+  branchCode: text('branch_code').notNull(),
+  activityCode: text('activity_code').notNull(),
+  defaultItemCode: text('default_item_code').notNull(),
+  address: text('address', { mode: 'json' }).$type<unknown>().notNull(),
+  signingBridgeUrl: text('signing_bridge_url'),
+  lastCheckStatus: text('last_check_status'),
+  lastCheckedAt: integer('last_checked_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const etaReceipts = sqliteTable('eta_receipts', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  orderId: text('order_id').notNull(),
+  kind: text('kind').notNull(),
+  seq: integer('seq').notNull().default(1),
+  refundKey: text('refund_key'),
+  lineMap: text('line_map', { mode: 'json' }).$type<unknown>(),
+  status: text('status').notNull().default('queued'),
+  environment: text('environment').notNull(),
+  receiptNumber: text('receipt_number'),
+  uuid: text('uuid'),
+  previousUuid: text('previous_uuid'),
+  document: text('document', { mode: 'json' }).$type<unknown>(),
+  totalPiastres: integer('total_piastres'),
+  issuedAt: integer('issued_at', { mode: 'timestamp_ms' }),
+  deadlineAt: integer('deadline_at', { mode: 'timestamp_ms' }),
+  submissionUuid: text('submission_uuid'),
+  longId: text('long_id'),
+  attempts: integer('attempts').notNull().default(0),
+  nextAttemptAt: integer('next_attempt_at', { mode: 'timestamp_ms' }),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const expenses = sqliteTable('expenses', {
   id: text('id')
     .primaryKey()
@@ -1449,6 +1509,8 @@ export const orders = sqliteTable('orders', {
   customerNotes: text('customer_notes'),
   shippingAddress: text('shipping_address', { mode: 'json' }).$type<unknown>().notNull(),
   billingAddress: text('billing_address', { mode: 'json' }).$type<unknown>().notNull(),
+  areaKey: text('area_key'),
+  buyerKey: text('buyer_key'),
   shippedAt: integer('shipped_at', { mode: 'timestamp_ms' }),
   deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
   reviewRequestSentAt: integer('review_request_sent_at', { mode: 'timestamp_ms' }),
@@ -1466,6 +1528,8 @@ export const orders = sqliteTable('orders', {
   }),
   idempotencyKey: text('idempotency_key'),
   webhookProcessedAt: integer('webhook_processed_at', { mode: 'timestamp_ms' }),
+  checkoutIdempotencyKey: text('checkout_idempotency_key'),
+  checkoutRequestHash: text('checkout_request_hash'),
   stuckPaymentAlertedAt: integer('stuck_payment_alerted_at', { mode: 'timestamp_ms' }),
   orderCreatedNotifiedAt: integer('order_created_notified_at', { mode: 'timestamp_ms' }),
   refundReversedAt: integer('refund_reversed_at', { mode: 'timestamp_ms' }),
@@ -1478,7 +1542,6 @@ export const orders = sqliteTable('orders', {
   source: text('source').default('web'),
   checkoutIp: text('checkout_ip'),
   manualHoldAdmitted: integer('manual_hold_admitted', { mode: 'boolean' }).notNull().default(false),
-  buyerKey: text('buyer_key'),
 });
 
 export const paymentConfigs = sqliteTable('payment_configs', {
@@ -2241,30 +2304,19 @@ export const shipments = sqliteTable('shipments', {
   carrierName: text('carrier_name'),
   createAttempts: integer('create_attempts').notNull().default(0),
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp_ms' }),
+  pickedUpAt: integer('picked_up_at', { mode: 'timestamp_ms' }),
+  deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
+  returnedAt: integer('returned_at', { mode: 'timestamp_ms' }),
+  deliveryAttempts: integer('delivery_attempts').notNull().default(0),
+  returnReasonRaw: text('return_reason_raw'),
+  returnReasonCode: text('return_reason_code'),
+  areaKey: text('area_key'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
-  returnReasonRaw: text('return_reason_raw'),
-  returnReasonCode: text('return_reason_code', {
-    enum: [
-      'refused',
-      'not_home',
-      'wrong_address',
-      'unreachable',
-      'rescheduled',
-      'price_or_changed_mind',
-      'damaged',
-      'other',
-      'unknown',
-    ],
-  }),
-  pickedUpAt: integer('picked_up_at', { mode: 'timestamp_ms' }),
-  deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
-  attempts: integer('attempts').notNull().default(0),
-  areaKey: text('area_key'),
 });
 
 export const shippingAreaRates = sqliteTable('shipping_area_rates', {
@@ -2462,6 +2514,8 @@ export const storeConfig = sqliteTable('store_config', {
   aiBulkThrottleMs: integer('ai_bulk_throttle_ms').notNull().default(2500),
   aiNarrationEnabled: integer('ai_narration_enabled', { mode: 'boolean' }).notNull().default(true),
   insightsRollupCron: text('insights_rollup_cron').notNull().default('daily'),
+  ciSharing: integer('ci_sharing', { mode: 'boolean' }).notNull().default(false),
+  ciSharingChangedAt: integer('ci_sharing_changed_at', { mode: 'timestamp_ms' }),
 });
 
 export const storeCredentials = sqliteTable('store_credentials', {
@@ -2564,6 +2618,7 @@ export const storePageRevisions = sqliteTable('store_page_revisions', {
   baseRev: integer('base_rev'),
   note: text('note'),
   createdBy: text('created_by'),
+  publishedBy: text('published_by'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
@@ -2727,6 +2782,46 @@ export const storeTaxProfiles = sqliteTable('store_tax_profiles', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const storeWhatsappConsents = sqliteTable(
+  'store_whatsapp_consents',
+  {
+    storeId: text('store_id').notNull(),
+    buyerKey: text('buyer_key').notNull(),
+    granted: integer('granted', { mode: 'boolean' }).notNull().default(false),
+    grantedAt: integer('granted_at', { mode: 'timestamp_ms' }),
+    grantedSource: text('granted_source'),
+    locale: text('locale'),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    revokedSource: text('revoked_source'),
+    userId: text('user_id'),
+    optOutVersion: integer('opt_out_version').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  },
+  t => [primaryKey({ columns: [t.storeId, t.buyerKey] })]
+);
+
+export const storeWhatsappLinks = sqliteTable('store_whatsapp_links', {
+  storeId: text('store_id').primaryKey().notNull(),
+  linked: integer('linked', { mode: 'boolean' }).notNull().default(false),
+  ownerUserId: text('owner_user_id'),
+  linkedAt: integer('linked_at', { mode: 'timestamp_ms' }),
+  entitlementVersion: integer('entitlement_version').notNull().default(0),
+  entitlementPackageId: text('entitlement_package_id'),
+  entitlementAutomation: integer('entitlement_automation', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  entitlementStatus: text('entitlement_status'),
+  entitlementValidUntil: integer('entitlement_valid_until', { mode: 'timestamp_ms' }),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

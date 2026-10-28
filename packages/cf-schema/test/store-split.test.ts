@@ -23,7 +23,7 @@ describe('Store split', () => {
     const all = [...b.d1Only, ...b.mirror, ...b.profile, ...b.config];
     expect(all.sort()).toEqual([...scalars].sort());
     expect(new Set(all).size).toBe(scalars.length);
-    expect(scalars.length).toBe(95); // pinned: a new Store column must be placed consciously
+    expect(scalars.length).toBe(97); // pinned: a new Store column must be placed consciously (97 = 95 + ci_sharing + ci_sharing_changed_at, CI-1)
     for (const n of [...STORE_D1_ONLY, ...STORE_MIRROR, ...STORE_PROFILE])
       expect(scalars, n).toContain(n);
   });
@@ -44,7 +44,7 @@ describe('Store split', () => {
       databases: Record<string, { columnCounts: Record<string, number>; maxColumns: number }>;
     }>('generated/manifest.json');
     const b = classifyStoreColumns(scalars) as Record<string, string[]>;
-    expect(manifest.databases.d1.columnCounts.stores).toBe(b.d1Only.length + b.mirror.length);
+    expect(manifest.databases.d1.columnCounts.stores).toBe(b.d1Only.length + b.mirror.length + 1); // + storage_backend (CF-only)
     expect(manifest.databases['store-do'].columnCounts.store_profile).toBe(
       1 + b.mirror.length - 1 + b.profile.length
     ); // id becomes store_id

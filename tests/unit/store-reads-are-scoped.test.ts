@@ -26,6 +26,8 @@ const SCOPES =
 
 /** `file::function` that run only under a caller's scope, with the reason. */
 const ALLOWED: Record<string, string> = {
+  'apps/api/src/services/page-builder.service.ts::publisherNames':
+    'only reached from listRevisions, behind the page-builder routes (requireStoreAccess opens the request scope)',
   'apps/api/src/services/store.service.ts::list':
     'GET /stores runs it under withUser (owner) or asPlatformOperator (super_admin)',
   'apps/api/src/services/provisioning.service.ts::listStores':

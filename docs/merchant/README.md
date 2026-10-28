@@ -8,7 +8,7 @@ Welcome. This guide covers everything you need to set up and run your store on E
 
 1. [Quickstart — البدء السريع](./quickstart.md) — get your store live in under an hour
 2. [Custom Domain Setup — ربط النطاق المخصص](./custom-domain.md) — point yourstore.com at Ebda Store
-   - [Activating a payment or shipping service — تفعيل خدمة دفع أو شحن](./provider-activation.md) — about 5 hours per service
+   - [Connecting a payment or shipping service — ربط خدمة دفع أو شحن](./provider-activation.md) — connect with your own account, checked on save
 3. [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md) — set per-area delivery fees with governorate → area cascade + bulk import/export
 4. [Orders (and the Orders app) — الطلبات](./orders.md) — manage orders, payment links, refunds, invoices, and payment alerts
 5. [Inventory: variant stock, adjustments & scanning — المخزون](./inventory.md) — variant stock totals, stock adjustments, and barcode Receive/Pick/Count

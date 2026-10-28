@@ -66,6 +66,7 @@ import {
   planSubscriberCounts,
   storeIdsOnPlan,
 } from '../../apps/api/src/lib/definer';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'; // same as the CI role step: roles are cluster-wide, so tests must not rotate it
@@ -83,6 +84,8 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
   _prisma_migrations: 'migration bookkeeping; not granted to ebda_app',
   plans: 'platform-global plan catalog (config; no tenant data, no store_id)',
   billing_webhook_events: 'provider-event dedupe ledger (no store_id, no tenant data)',
+  billing_referrals: 'referral link between two stores (no store_id column; platform billing data)',
+  billing_grants: 'append-only free-month grant ledger (no store_id column; platform billing data)',
 };
 
 let owner: AppPrismaClient;
@@ -204,7 +207,7 @@ async function cleanup(): Promise<void> {
 beforeAll(async () => {
   owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
   // ops gives ebda_app its LOGIN + password per environment; the migration creates it NOLOGIN.
-  await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+  await setAppRoleLogin(owner, APP_PASSWORD);
   await cleanup();
 
   const mkUser = (tag: string, role: string, storeId: string | null) =>
@@ -365,6 +368,12 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 // The role itself
 // ---------------------------------------------------------------------------
+const PLATFORM_GLOBAL_TRUE = new Set([
+  'system_settings',
+  'provider_verifications',
+  'provider_verification_events',
+]);
+
 describe('ebda_app: the runtime role', () => {
   it('is a plain login: no superuser, no BYPASSRLS, no createdb/createrole', async () => {
     const [r] = await asApp(
@@ -507,7 +516,11 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
         ['USING', p.qual],
         ['WITH CHECK', p.with_check],
       ] as const) {
-        if (p.tablename === 'system_settings') continue; // platform-global, documented
+        // Platform-global, documented: `system_settings`, and the PROVIDERS-3 evidence tables (Ruling
+        // PROVIDERS-3, migration 20261103000200). They carry NO tenant data and are listed in
+        // GLOBAL_MODELS; the ONLY accepted shape is the literal `true` policy, so any other predicate
+        // that skips the GUC still fails.
+        if (PLATFORM_GLOBAL_TRUE.has(p.tablename) && text?.trim() === 'true') continue;
         if (!text) {
           offenders.push(`${p.tablename}.${p.policyname} ${label} missing`);
           continue;
