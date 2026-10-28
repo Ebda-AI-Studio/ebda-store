@@ -548,6 +548,10 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # One Next/OpenNext production build at a time: each is ~2 GB resident and ~13 MB/s of I/O, and two at once on the 5 GiB
+      # guest repeated the 2026-10-26 swap storm. app-build is HEAVY-lane by design: its job id is not in the guest's
+      # light-jobs.conf, so it takes one of the 2 heavy slots (tests/unit/ci-lean-structure.test.ts pins both).
+      max-parallel: 1
       matrix:
         app: ${{ fromJSON(needs.changes.outputs.build_apps) }}
     steps:
@@ -622,6 +626,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d ebda_smoke"
           --health-interval 10s
           --health-timeout 5s
@@ -980,6 +985,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -991,6 +997,7 @@ jobs:
           # Dynamic host port: same reasoning as postgres above.
           - 6379
         options: >-
+          --tmpfs /data:rw,size=256m
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
@@ -1204,6 +1211,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -1316,6 +1324,7 @@ jobs:
           # Dynamic host port, same reasoning as the jobs above.
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -1393,6 +1402,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d force_test"
           --health-interval 10s
           --health-timeout 5s
@@ -1404,6 +1414,7 @@ jobs:
           # Dynamic host port: same reasoning as postgres above.
           - 6379
         options: >-
+          --tmpfs /data:rw,size=256m
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
