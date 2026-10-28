@@ -42,8 +42,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'cf/store-do/repo.ts': {
     category: 'unrelated',
     reason:
-      'INFRA-CF-1 Phase 0 spike: the StoreDO copy of the demo store prices RETAIL only (no wholesale, no groups); reachable only for a flagged store plus x-ebda-backend: do. The PriceResolver port is Phase 3 (money correctness)',
-    reads: { addCartItem: 3, createOrder: 2 },
+      'INFRA-CF-1 Phase 0 demo operations of the StoreDO: seed writes the demo catalogue and listProducts shows RETAIL prices; both reachable only for a flagged store plus x-ebda-backend: do. The order path no longer prices anything here: createOrder hands the cart to the DO money core (packages/repo placeOrder), which resolves every price',
+    reads: { seed: 2, listProducts: 1 },
   },
   'services/gold-rate/gate.ts': {
     category: 'catalog-read',

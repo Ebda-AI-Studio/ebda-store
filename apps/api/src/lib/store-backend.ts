@@ -41,7 +41,7 @@ interface StoreDoStub {
   createOrder(
     storeId: string,
     sessionId: string
-  ): Promise<DoResult<{ orderId: string; orderNumber: number; total: number }>>;
+  ): Promise<DoResult<{ orderId: string; orderNumber: string; total: number }>>;
   seed(rows: unknown): Promise<DoResult<{ products: number; variants: number }>>;
   rowCounts(): Promise<Record<string, number>>;
   ensureBackupAlarm(): Promise<number>;

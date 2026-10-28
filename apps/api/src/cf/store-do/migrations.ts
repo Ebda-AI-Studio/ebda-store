@@ -1,4 +1,8 @@
-// Generated from spikes/store-do/migrations/0001_core.sql (kept as TS so the Worker needs no .sql module rule).
+import { STORE_MIGRATIONS } from '@ebda-src/cf-schema';
+import { splitSql } from '@ebda-src/repo';
+
+// LEGACY (INFRA-CF-1 Phase 0 spike). New StoreDOs never run this: they start on the full generated cf-schema
+// (STORE_MIGRATIONS). It stays so a test can rebuild a spike-era DO and prove the upgrade path (runMigrations).
 export const CORE_0001 = `
 -- Core 5 tables (+ their two item child tables) for the StoreDO spike. Money = integer piastres,
 -- enums = CHECK, JSON = TEXT, time = INTEGER epoch ms. Columns mirror schema.prisma models
@@ -84,3 +88,76 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 CREATE INDEX IF NOT EXISTS order_items_order ON order_items (order_id);
 `;
+
+// ---- versioned, idempotent migration runner ----------------------------------------------------------------------
+/** The id Phase 0 recorded for CORE_0001. Present in `_migrations` = a spike-era DO whose thin tables must go first. */
+export const SPIKE_CORE_ID = '0001_core';
+/** Child tables first (FKs). The thin spike tables; the full schema re-creates `products` & co. with real columns. */
+const SPIKE_TABLES = [
+  'order_items',
+  'orders',
+  'cart_items',
+  'carts',
+  'product_variants',
+  'products',
+  'stores',
+] as const;
+
+/** The slice of `ctx.storage` the runner uses (structural: this package does not load workers-types globals). */
+export interface MigrationStorage {
+  sql: {
+    exec(q: string, ...b: unknown[]): { toArray(): Array<Record<string, unknown>> };
+  };
+  transactionSync<T>(fn: () => T): T;
+}
+
+interface Migration {
+  id: string;
+  /** Statements to run, given the ids already applied (so a step can be conditional on history). */
+  statements(applied: ReadonlySet<string>): string[];
+}
+
+/**
+ * Applied in order, each once, each in ONE transaction together with its `_migrations` row (a crash between the DDL
+ * and the row cannot leave a half-applied step). Every statement is also idempotent (IF NOT EXISTS), so re-running the
+ * list is safe.
+ *
+ * `cf-0000_drop_spike_core`: a DO that ran Phase 0 has thin `products`/`orders`/... tables (and the spike demo rows,
+ * which are disposable test seeds, never merchant data: the spike was reachable only for a flagged demo store). They are
+ * dropped so the full table definitions can be created. On a fresh DO it is a recorded no-op.
+ */
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    id: 'cf-0000_drop_spike_core',
+    statements: applied =>
+      applied.has(SPIKE_CORE_ID) ? SPIKE_TABLES.map(t => `DROP TABLE IF EXISTS "${t}"`) : [],
+  },
+  ...STORE_MIGRATIONS.map(m => ({ id: m.id, statements: () => splitSql(m.sql) })),
+];
+
+/** Latest schema version: the id of the last migration. A DO reports it so a deploy can be checked against it. */
+export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].id;
+
+export function runMigrations(storage: MigrationStorage, now: number = Date.now()): string[] {
+  const sqlx = storage.sql;
+  sqlx.exec(
+    'CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)'
+  );
+  const done = new Set(
+    sqlx
+      .exec('SELECT id FROM _migrations')
+      .toArray()
+      .map(r => r.id as string)
+  );
+  const ran: string[] = [];
+  for (const m of MIGRATIONS) {
+    if (done.has(m.id)) continue;
+    storage.transactionSync(() => {
+      for (const stmt of m.statements(done)) sqlx.exec(stmt);
+      sqlx.exec('INSERT INTO _migrations (id, applied_at) VALUES (?, ?)', m.id, now);
+    });
+    done.add(m.id);
+    ran.push(m.id);
+  }
+  return ran;
+}

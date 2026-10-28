@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { StoreDO } from '../src/cf/store-do/store-do';
-import { STORE_TABLES } from '../src/cf/store-do/tables';
 import {
   STORE_DO_REGISTRY,
   unclassifiedTables,
-  classifiedTables,
   mediaSurface,
   ciSurface,
   identitySurface,
@@ -79,9 +77,32 @@ const merchant = (over: Partial<MerchantSubject> = {}): MerchantSubject => ({
 });
 
 describe('registry contract with the phase-1 schema', () => {
-  it('every StoreDO table is classified, and nothing classified is stale', () => {
-    expect(unclassifiedTables()).toEqual([]);
-    expect(classifiedTables().sort()).toEqual([...STORE_TABLES].sort());
+  // The StoreDO carries the full cf-schema (122 tables); the registry that turns erasure-classification.json into
+  // match/scrub entries is the G10 follow-up. Until it covers the schema a CUSTOMER subject fails CLOSED: it must
+  // never answer "nothing found" for tables it does not know about.
+  it('unclassifiedTables names every live table the registry does not cover', () => {
+    expect(unclassifiedTables(['products', 'customers'], { products: { kind: 'no-pii' } })).toEqual(
+      ['customers']
+    );
+  });
+  it('a customer export/erase on a DO whose schema the registry does not cover is refused, a merchant export is not', async () => {
+    await seed('er-closed');
+    const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-closed'));
+    // Caught inside the DO: an exception that crosses the RPC edge is also reported by the pool as unhandled.
+    const refusal = (call: (d: StoreDO) => unknown) =>
+      runInDurableObject(stub, async d => {
+        try {
+          await call(d);
+          return 'allowed';
+        } catch (err) {
+          return (err as Error).message;
+        }
+      });
+    expect(await refusal(d => d.exportSubject(customer()))).toMatch(/ERASURE_REGISTRY_INCOMPLETE/);
+    expect(await refusal(d => d.eraseSubject(customer()))).toMatch(/ERASURE_REGISTRY_INCOMPLETE/);
+    const all = await stub.exportSubject(merchant({ storeId: 'er-closed' }));
+    expect(Object.keys(all.tables).length).toBeGreaterThan(100);
+    expect(all.tables.products).toHaveLength(1);
   });
   it('a scrub entry overwrites every column it matches on (else the row would still identify the buyer)', () => {
     for (const c of Object.values(STORE_DO_REGISTRY)) {
@@ -93,12 +114,12 @@ describe('registry contract with the phase-1 schema', () => {
 
 describe('surface: store-do (customer rows, registry driven)', () => {
   const REG: Record<string, TableClass> = {
-    customers: {
+    er_customers: {
       kind: 'customer-pii',
       match: { buyerKey: 'buyer_key', email: 'email', userId: 'user_id' },
       action: 'delete',
     },
-    ship_addr: {
+    er_ship_addr: {
       kind: 'customer-pii',
       match: { buyerKey: 'buyer_key' },
       action: 'scrub',
@@ -110,32 +131,32 @@ describe('surface: store-do (customer rows, registry driven)', () => {
     await runInDurableObject(stub, async (_i, state) => {
       const sql = state.storage.sql;
       sql.exec(
-        'CREATE TABLE customers (id INTEGER PRIMARY KEY, buyer_key TEXT, email TEXT, user_id TEXT)'
+        'CREATE TABLE er_customers (id INTEGER PRIMARY KEY, buyer_key TEXT, email TEXT, user_id TEXT)'
       );
-      sql.exec('CREATE TABLE ship_addr (id INTEGER PRIMARY KEY, buyer_key TEXT, line1 TEXT)');
+      sql.exec('CREATE TABLE er_ship_addr (id INTEGER PRIMARY KEY, buyer_key TEXT, line1 TEXT)');
       sql.exec(
-        "INSERT INTO customers (buyer_key,email,user_id) VALUES (?, 'buyer@example.com', NULL), (?, 'o@x.eg', NULL), (NULL, NULL, 'u-buyer')",
+        "INSERT INTO er_customers (buyer_key,email,user_id) VALUES (?, 'buyer@example.com', NULL), (?, 'o@x.eg', NULL), (NULL, NULL, 'u-buyer')",
         BK,
         OTHER
       );
       sql.exec(
-        "INSERT INTO ship_addr (buyer_key,line1) VALUES (?, '1 Nile St'), (?, '2 Nile St')",
+        "INSERT INTO er_ship_addr (buyer_key,line1) VALUES (?, '1 Nile St'), (?, '2 Nile St')",
         BK,
         OTHER
       );
       const s = customer();
-      expect(exportCustomerRows(sql, s, REG).customers).toHaveLength(2); // by key OR email OR user id
+      expect(exportCustomerRows(sql, s, REG).er_customers).toHaveLength(2); // by key OR email OR user id
       expect(countCustomerRows(sql, s, REG)).toBe(3);
       const erased = state.storage.transactionSync(() => eraseCustomerRows(sql, s, REG));
-      expect(erased).toEqual({ customers: 2, ship_addr: 1 });
+      expect(erased).toEqual({ er_customers: 2, er_ship_addr: 1 });
       expect(countCustomerRows(sql, s, REG)).toBe(0);
-      expect(sql.exec('SELECT count(*) AS n FROM customers').one().n).toBe(1); // the other buyer
-      expect(sql.exec("SELECT line1 FROM ship_addr WHERE buyer_key = '[erased]'").one().line1).toBe(
-        '[erased]'
-      );
-      expect(sql.exec('SELECT line1 FROM ship_addr WHERE buyer_key = ?', OTHER).one().line1).toBe(
-        '2 Nile St'
-      );
+      expect(sql.exec('SELECT count(*) AS n FROM er_customers').one().n).toBe(1); // the other buyer
+      expect(
+        sql.exec("SELECT line1 FROM er_ship_addr WHERE buyer_key = '[erased]'").one().line1
+      ).toBe('[erased]');
+      expect(
+        sql.exec('SELECT line1 FROM er_ship_addr WHERE buyer_key = ?', OTHER).one().line1
+      ).toBe('2 Nile St');
     });
   });
   it('merchant erase wipes the whole DO: rows, tables and alarm', async () => {

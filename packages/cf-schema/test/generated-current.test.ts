@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { build, emitSql, MAX_COLUMNS } from '../scripts/generate.mjs';
+import { build, emitSql, emitStoreMigrationsTs, MAX_COLUMNS } from '../scripts/generate.mjs';
 import { PKG } from './helpers';
 
 const { out, manifest } = build();
@@ -15,6 +15,13 @@ describe('generated schema is current', () => {
     expect(read('migrations/store/0001_init.sql')).toBe(
       emitSql(out['store-do'], 'StoreDO schema (one SQLite Durable Object per store)')
     );
+  });
+  it('store migrations module carries both SQL files verbatim, in order', async () => {
+    const { STORE_MIGRATIONS } = await import('../src/store/migrations.generated');
+    expect(STORE_MIGRATIONS.map(m => m.id)).toEqual(['cf-0001_init', 'cf-0002_invariants']);
+    expect(STORE_MIGRATIONS[0].sql).toBe(read('migrations/store/0001_init.sql'));
+    expect(STORE_MIGRATIONS[1].sql).toBe(read('migrations/store/0002_invariants.sql'));
+    expect(typeof emitStoreMigrationsTs).toBe('function');
   });
   it('platform migration', () => {
     expect(read('migrations/platform/0001_init.sql')).toBe(

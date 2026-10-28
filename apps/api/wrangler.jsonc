@@ -250,6 +250,10 @@
     // package, and nothing tree-shakes. Measured 2026-10-22: startup CPU 164 -> 90 ms (scripts/ci/worker-startup-budget.mjs).
     "@ebda/shared": "../../packages/shared/src/index.ts",
     "@ebda/database": "../../packages/database/src/index.ts",
+    // StoreDO sources (apps/api/src/cf/repo-modules.d.ts explains why these names are not the package names).
+    "@ebda-src/repo": "../../packages/repo/src/index.ts",
+    "@ebda-src/cf-schema": "../../packages/cf-schema/src/store/migrations.generated.ts",
+    "@ebda-src/prisma-meta": "../../packages/cf-schema/generated/prisma-meta.json",
   },
 
   // Non-secret configuration. BUILD_COMMIT_SHA is overridden per deploy
