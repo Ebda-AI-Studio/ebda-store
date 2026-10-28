@@ -321,6 +321,21 @@ export default function StoreSettingsPage() {
       ),
     },
     {
+      key: 'qrCodes',
+      href: `/stores/${storeId}/qr`,
+      color: 'bg-muted text-foreground',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2z"
+          />
+        </svg>
+      ),
+    },
+    {
       key: 'template',
       href: `/stores/${storeId}/template`,
       color: 'bg-primary/10 text-primary-ink',

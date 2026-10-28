@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { pollGmailAlerts } from '../../../services/gmail-alert-poller.service';
@@ -17,7 +17,7 @@ import { pollGmailAlerts } from '../../../services/gmail-alert-poller.service';
  * retries=1 because IMAP can flake under transient network. quota:
  * one Inngest invocation per hour = 24/day.
  */
-export const gmailAlertPoller: InngestFunction.Any = inngest.createFunction(
+export const gmailAlertPoller: JobDef = inngest.createFunction(
   {
     id: 'gmail-alert-poller',
     name: 'Poll Gmail for external-service alerts → forward to Telegram',

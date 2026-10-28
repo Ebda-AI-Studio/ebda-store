@@ -8,6 +8,7 @@
  * section renders nothing on the public storefront (the editor shows the hint). Bilingual with the
  * active language winning and a non-blank fallback to the other.
  */
+import { StoreAnchor } from '../../components/StoreLink';
 import React from 'react';
 import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import { sanitizeUrl } from '@ebda/shared';
@@ -174,12 +175,12 @@ export function MakerProfileSection({
             )}
             <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
               {link && story && (
-                <a
+                <StoreAnchor
                   href={link}
                   className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-foreground underline decoration-primary underline-offset-4"
                 >
                   {t('Read the story', 'اقرأ الحكاية')}
-                </a>
+                </StoreAnchor>
               )}
               {/* the cook leads, but the dishes are one tap away (taste P2: no product above the fold) */}
               <a

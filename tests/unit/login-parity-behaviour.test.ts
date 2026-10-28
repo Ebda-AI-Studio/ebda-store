@@ -191,7 +191,9 @@ describe.each(SURFACES)('login gates behave the same on both paths: %s', (_n, us
 
   it('a good credential is admitted by both, and clears a partial failure count on both', async () => {
     h.fails.set(world.key, 3);
-    expect(await viaPassword(SECRET)).toBe('admitted');
+    // Merchants, staff and super admins sign in at the identity service (Rulings ID-1/ID-2): the legacy password path
+    // verifies the credential (and clears the counter) but issues nothing for them. A store shopper is admitted.
+    expect(await viaPassword(SECRET)).toBe(userOver.role === 'customer' ? 'admitted' : 'refused');
     expect(h.fails.get(world.key)).toBeUndefined();
     h.fails.set(world.key, 3);
     expect(await viaPasskey(true)).toBe('admitted');

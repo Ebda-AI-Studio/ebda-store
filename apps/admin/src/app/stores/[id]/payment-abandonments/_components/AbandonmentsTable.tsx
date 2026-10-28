@@ -28,6 +28,7 @@ function gatewayLabel(provider: string | null): string {
     paymob: 'Paymob',
     kashier: 'Kashier',
     fawry: 'Fawry',
+    geidea: 'Geidea',
   };
   return map[provider.toLowerCase()] ?? provider;
 }

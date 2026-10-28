@@ -5,7 +5,7 @@
  * session; this form sends no user id). Arabic first copy via `t(en, ar)`, Latin digits.
  */
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import { Button } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { useLanguage } from '../../../contexts/LanguageContext';

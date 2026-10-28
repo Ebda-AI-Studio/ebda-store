@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { orderCreated } from './order-created';
 import { orderRefunded } from './order-refunded';
 import { bulkImportProducts } from './bulk-import';
@@ -17,6 +17,7 @@ import { reviewModeration } from './review-moderation';
 import {
   abandonedCartPurge,
   searchLogPurge,
+  instapayReceiptRetention,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
 } from './data-retention';
@@ -49,6 +50,7 @@ import { aiAutofillSweep } from './ai-autofill-sweep';
 import { searchProductIndex, searchIndexBackstop } from './search-product-index';
 import { orderCapiConversion } from './order-capi-conversion';
 import { ebdaAdsConversion } from './ebda-ads-conversion';
+import { etaReceiptEnqueue, etaReceiptRedrive, etaReceiptSubmit } from './eta-receipt';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { instapayExpiry } from './instapay-expiry';
 import { shipmentCreate } from './shipment-create';
@@ -85,14 +87,17 @@ import { campaignSend } from './campaign-send';
 import { webhookFanout, webhookDeliver, webhookDeliveryPurge } from './webhook-delivery';
 import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
+import { waStoreEvents, waPlanSync } from './wa-store-events';
+import { ciOutcomes } from './ci-outcomes';
+import { ciErasureSecondPassFn } from './ci-erasure-second-pass';
 
 /**
- * Registry of every Inngest function the API exposes. The serve
- * handler in `apps/api/src/index.ts` mounts this list at
- * `/api/v1/inngest`. Functions added here are picked up by the
- * Inngest platform on the next deploy / dev sync.
+ * Registry of every background function the API runs. Importing a
+ * function file registers it (`createFunction`); the Worker's Workflow, Queue and
+ * Cron runners (lib/jobs) execute them. A new function also needs its entry in
+ * `lib/jobs/jobs-map.ts` (pinned by tests/unit/jobs-map.test.ts).
  */
-const allInngestFunctions: InngestFunction.Any[] = [
+const allInngestFunctions: JobDef[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
@@ -114,6 +119,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   reviewModeration,
   abandonedCartPurge,
   searchLogPurge,
+  instapayReceiptRetention,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
@@ -155,6 +161,10 @@ const allInngestFunctions: InngestFunction.Any[] = [
   orderCapiConversion,
   // Ebda's OWN acquisition funnel: Meta CAPI for registration / store created / first paid sub.
   ebdaAdsConversion,
+  // Egypt ETA e-receipts (Ruling ETA-1): enqueue on order created/refunded, submit + verdict poll, durable timer.
+  etaReceiptEnqueue,
+  etaReceiptSubmit,
+  etaReceiptRedrive,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
   instapayExpiry,
@@ -208,9 +218,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // WarehouseStock to the authoritative Product/ProductVariant.inventory
   // aggregate for every store with a warehouse, regardless of which writer
   // last drifted it (the class-fix, not a per-writer hook) + its on-demand
-  // twin for the admin "Reconcile now" button. NOTE: like every new
-  // cron/event here, this is invisible to Inngest until a real deploy bumps
-  // INNGEST_DEPLOY_ID (see client.ts) — a hot-reload alone won't register it.
+  // twin for the admin "Reconcile now" button.
   warehouseReconcileSweepCron,
   warehouseReconcileOnDemand,
   // Answer-Engine Insights (Task 6): weekly citation scan across every
@@ -238,6 +246,10 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // Material legal-policy change: one email per store owner (Ruling LEGAL-4). Event-triggered
   // only (a super admin pressing Send notice).
   legalNoticeSend,
+  waStoreEvents,
+  ciOutcomes,
+  ciErasureSecondPassFn,
+  waPlanSync,
   // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate
   // alerts (hourly). Both exit un-stepped on an empty tick (one execution).
   goldRateFeedFetchCron,
@@ -249,6 +261,6 @@ const allInngestFunctions: InngestFunction.Any[] = [
  * (TCP + TLS to Gmail), dropped from the Ebda API (R-EBDA-001 section 5); Ebda alerts come from
  * Sentry and the status page.
  */
-export const inngestFunctions: InngestFunction.Any[] = isWorkers
+export const inngestFunctions: JobDef[] = isWorkers
   ? allInngestFunctions.filter(f => f !== gmailAlertPoller)
   : allInngestFunctions;

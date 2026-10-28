@@ -7,7 +7,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPONENTS, HISTORY_DAYS } from '../src/config';
-import { renderStatusPage } from '../src/render';
+import { renderStatusPage, statusSearchDocs } from '../src/render';
+import { TYPEAHEAD_JS } from '../src/typeahead-bundle';
 import type { ComponentSnapshot, Incident, Snapshot } from '../src/types';
 
 const out = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.gate');
@@ -134,4 +135,8 @@ writeFileSync(
     'https://status.ebda.app'
   )
 );
+// What the Worker serves for the live search (the gate serves the files): the script and the English page data.
+mkdirSync(path.join(out, 'assets'), { recursive: true });
+writeFileSync(path.join(out, 'assets', 'typeahead.js'), TYPEAHEAD_JS);
+writeFileSync(path.join(out, 'search.json'), JSON.stringify(statusSearchDocs(snap, 'en')));
 console.log(`status snapshot written to ${out} (/, /en/, /ok/)`);

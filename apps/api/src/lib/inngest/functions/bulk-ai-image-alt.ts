@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -65,7 +65,7 @@ interface BatchResult {
   cancelled: boolean;
 }
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type when the returned object mixes a plain string[]
 // with a richer array-of-objects sibling (the annotation widens the
@@ -298,11 +298,6 @@ const bulkAiImageAltFn = inngest.createFunction(
         }
       }
 
-      const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
-
       // A bulk AI sweep rewrites product-facing content (titles, descriptions,
       // SEO, translations, tags, categories, image alt, FAQs) with raw Prisma
       // writes that carry no cache awareness, so the storefront kept serving
@@ -311,17 +306,24 @@ const bulkAiImageAltFn = inngest.createFunction(
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const finalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed,
+            filled,
+            skipped,
+            failed,
+            errors: errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
@@ -331,4 +333,4 @@ const bulkAiImageAltFn = inngest.createFunction(
     }); // end runInStoreScope
   }
 );
-export const bulkAiImageAlt: InngestFunction.Any = bulkAiImageAltFn;
+export const bulkAiImageAlt: JobDef = bulkAiImageAltFn;

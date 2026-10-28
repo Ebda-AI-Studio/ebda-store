@@ -43,6 +43,13 @@ import * as Sentry from '@sentry/cloudflare';
 import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 import { companyHostRoute } from './company-host-route';
 import { DEMO_EDGE_API_URL, isDemoStoreHost, serveDemoEdge } from './demo-edge-cache';
+import {
+  bumpEpochs,
+  parseAllowlist,
+  serveStoreEdge,
+  storeVerdict,
+  type R2Like,
+} from './store-edge-cache';
 
 interface WorkerEnv {
   /** Server-side Sentry DSN for this Worker. Set via `wrangler deploy --var
@@ -52,6 +59,10 @@ interface WorkerEnv {
    * browser bundle). Absent entirely on unconfigured/preview deploys. */
   SENTRY_DSN?: string;
   CF_ENV_NAME?: string;
+  /** Ruling STORE-EDGE-1: exact store hosts whose HTML may be served from the edge cache. Empty/unset = nobody. */
+  STOREFRONT_HTML_EDGE_HOSTS?: string;
+  /** The OpenNext incremental-cache bucket; the purge epochs live under `html-epoch/`. */
+  NEXT_INC_CACHE_R2_BUCKET?: R2Like;
   [key: string]: unknown;
 }
 
@@ -89,10 +100,49 @@ const baseHandler = {
     // route.kind === 'next' — all merchant domains + platform subdomains,
     // routed to the Next storefront exactly as before this carve-out.
     // Demo showroom hosts only (Ruling DEMO-EDGE-1): served from the edge cache when eligible.
+    const waitCtx = ctx as { waitUntil(p: Promise<unknown>): void };
+    const origin = (r: Request) => nextHandler.fetch(r, env, ctx);
+    const allow = parseAllowlist(env.STOREFRONT_HTML_EDGE_HOSTS);
+    // A storefront purge from the API: after Next accepts it, record the per-store epoch (Ruling STORE-EDGE-1)
+    // so every data centre stops serving pages rendered before it. Only when the layer is on.
+    if (
+      allow.size > 0 &&
+      env.NEXT_INC_CACHE_R2_BUCKET &&
+      request.method === 'POST' &&
+      pathname === '/api/revalidate'
+    ) {
+      let tags: string[] = [];
+      try {
+        const body = (await request.clone().json()) as { tags?: unknown };
+        if (Array.isArray(body.tags))
+          tags = body.tags.filter((t): t is string => typeof t === 'string');
+      } catch {
+        // not a purge we understand: Next answers it (400); nothing to record
+      }
+      const res = await origin(request);
+      if (res.ok && tags.length > 0)
+        await bumpEpochs(env.NEXT_INC_CACHE_R2_BUCKET, tags, Date.now());
+      return res;
+    }
+    const edgeCache = (
+      globalThis as unknown as {
+        caches?: { default?: Parameters<typeof serveStoreEdge>[3]['cache'] };
+      }
+    ).caches?.default;
     return serveDemoEdge(
       request,
-      ctx as { waitUntil(p: Promise<unknown>): void },
-      r => nextHandler.fetch(r, env, ctx),
+      waitCtx,
+      r => {
+        // Not a demo request: real stores that the operator listed may use the store edge cache.
+        if (allow.size === 0 || !edgeCache) return origin(r);
+        return serveStoreEdge(r, waitCtx, origin, {
+          allow,
+          r2: env.NEXT_INC_CACHE_R2_BUCKET,
+          cache: edgeCache,
+          verdict: host => storeVerdict(host, DEMO_EDGE_API_URL),
+          now: Date.now,
+        });
+      },
       host => isDemoStoreHost(host, DEMO_EDGE_API_URL)
     );
   },

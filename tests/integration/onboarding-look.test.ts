@@ -174,13 +174,30 @@ describe.skipIf(!hasDb)('POST /onboarding/store with a look (ebda_app + tenant g
   });
 
   it('an unbuilt (designed) look is refused with a 400 and creates no store (#111)', async () => {
-    const designed = LOOKS.find(l => l.status !== 'built')!;
-    expect(designed, 'fixture: the registry still has a designed look').toBeTruthy();
-    const m = await merchant('unbuilt');
-    const slug = mkSlug('unbuilt');
-    const res = await create(m.token, { name: 'Unbuilt', slug, lookId: designed.id });
-    expect(res.status).toBe(400);
-    expect(await prisma.store.count({ where: { slug } })).toBe(0);
+    // Every registry look is built today (Dahab/B5, #151 flipped the last one), so the refusal would
+    // go untested. Use a real designed look when one exists, else register a synthetic one for this
+    // test only (same module instance the API reads) and remove it again.
+    const registry = LOOKS as unknown as Array<(typeof LOOKS)[number]>;
+    let designed = registry.find(l => l.status !== 'built');
+    const synthetic = designed
+      ? null
+      : { ...registry[0], id: 'test.designed-only', status: 'designed' as const };
+    if (synthetic) {
+      registry.push(synthetic);
+      designed = synthetic;
+    }
+    try {
+      expect(designed!.status).not.toBe('built');
+      const m = await merchant('unbuilt');
+      const slug = mkSlug('unbuilt');
+      const res = await create(m.token, { name: 'Unbuilt', slug, lookId: designed!.id });
+      expect(res.status).toBe(400);
+      // The request schema refuses it first (VALIDATION_ERROR); the service re-checks (LOOK_NOT_AVAILABLE).
+      expect(JSON.stringify(res.body)).toContain('not available for new stores');
+      expect(await prisma.store.count({ where: { slug } })).toBe(0);
+    } finally {
+      if (synthetic) registry.splice(registry.indexOf(synthetic), 1);
+    }
   });
 
   it('no lookId starts the store on the registry default look, never the DB default (#111)', async () => {

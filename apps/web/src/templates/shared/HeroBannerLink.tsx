@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { resolveBannerLink } from './hero-banner-link-utils';
 
 export interface HeroBannerLinkProps {

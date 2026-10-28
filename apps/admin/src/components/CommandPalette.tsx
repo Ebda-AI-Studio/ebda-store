@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { PaletteItem } from './admin-layout/buildPaletteItems';
 import {
+  intlLocale,
   normalizeArabicSearch as normalize,
   searchQueryHeaders,
   type AdminSearchResponse,
@@ -30,8 +31,8 @@ import { apiGet } from '../lib/api';
  */
 
 /** Debounce before a record lookup (products / orders / customers) is sent. */
-const RECORD_DEBOUNCE_MS = 200;
-const RECORD_MIN_CHARS = 2;
+const RECORD_DEBOUNCE_MS = 150;
+const RECORD_MIN_CHARS = 1;
 /** Cap on page + setting rows so a one-letter query does not render the whole registry. */
 const MAX_PAGE_RESULTS = 40;
 
@@ -134,7 +135,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   useEffect(() => setActive(0), [query]);
 
   // Record lookup: products, orders and customers of THIS store, debounced. A reply for an older
-  // query is dropped (the counter), since apiGet takes no abort signal.
+  // query is dropped (the counter) and its request aborted.
   useEffect(() => {
     const q = query.trim();
     setRecords(null);
@@ -145,9 +146,14 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
     }
     setSearching(true);
     const seq = ++requestSeq.current;
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       // The term rides in a header, never the URL (Ruling SEARCH-P2-9): it is often a phone or email.
-      apiGet<AdminSearchResponse>(`/api/v1/stores/${storeId}/search`, searchQueryHeaders(q))
+      apiGet<AdminSearchResponse>(
+        `/api/v1/stores/${storeId}/search`,
+        searchQueryHeaders(q),
+        controller.signal
+      )
         .then(({ data, error }) => {
           if (seq !== requestSeq.current) return;
           setRecords(data ?? null);
@@ -170,7 +176,10 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
           if (seq === requestSeq.current) setSearching(false);
         });
     }, RECORD_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query, open, storeId]);
 
   const failureText = failure ? t(failure === 'rate' ? 'rateLimited' : 'searchFailed') : null;
@@ -184,7 +193,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       icon: i.icon,
     }));
     if (!records || !storeId) return pages;
-    const money = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EGP' });
+    const money = new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency: 'EGP' });
     const out: Row[] = [...pages];
     const push = (section: NonNullable<Row['section']>, list: Row[]) =>
       list.forEach((r, i) =>
@@ -291,7 +300,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             className="h-12 w-full bg-transparent text-sm text-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
             aria-label={t('placeholder')}
           />
-          <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
             ESC
           </kbd>
         </div>

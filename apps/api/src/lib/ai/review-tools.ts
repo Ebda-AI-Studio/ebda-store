@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { GeminiFailoverClient } from './gemini-keys';
 import { prisma, currentStoreId } from '@ebda/database';
 import { config } from '../../config';
@@ -5,6 +6,13 @@ import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
 import { rethrowAsAppError } from './gemini-errors';
 import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
+import {
+  applyPrefilter,
+  buildSpamPrompt,
+  prefilterReview,
+  sanitizeReasons,
+  scoreToStatus,
+} from './review-moderation-policy';
 
 async function throttle() {
   const ms = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
@@ -95,7 +103,8 @@ ${review.body}`;
 //    Score 0-1: >0.7 = spam, 0.3-0.7 = pending, <0.3 = auto-publish.
 // ─────────────────────────────────────────────────────────────────────────────
 export interface SpamCheckResult {
-  spamScore: number;
+  /** null when the model gave no usable score (fail-closed to pending). */
+  spamScore: number | null;
   reasons: string[];
   recommendedStatus: 'published' | 'pending' | 'spam';
 }
@@ -110,23 +119,9 @@ export async function detectSpamReview(reviewId: string): Promise<SpamCheckResul
     return { spamScore: 0, reasons: [], recommendedStatus: 'pending' };
   }
 
-  const prompt = `You are a fraud detector for product reviews on an Egypt e-commerce platform. Analyze this review for spam, fakeness, profanity, or off-topic content.
-
-Score 0.0-1.0:
-- 0.0-0.2: clearly genuine
-- 0.2-0.5: likely genuine, minor concerns
-- 0.5-0.8: suspicious (very short, generic, mismatched language, marketing speak)
-- 0.8-1.0: clearly spam/fake/abusive
-
-Reasons to flag: profanity, hate speech, off-topic content (not about the product), competitor mentions, marketing/promotional spam, copy-paste from other sites, single-word reviews, all-caps abuse, rating-comment mismatch (e.g. 5 stars with negative text).
-
-Return JSON: { "spamScore": number, "reasons": string[] }
-
-Review:
-title: ${review.title ?? '(none)'}
-rating: ${review.rating}/5
-language: ${review.language}
-body: ${review.body}`;
+  const pre = prefilterReview(review);
+  const boundary = `REVIEW_${randomUUID().replace(/-/g, '')}`;
+  const prompt = buildSpamPrompt(review, boundary);
 
   await assertAiQuota({ storeId: review.storeId });
   await throttle();
@@ -137,17 +132,23 @@ body: ${review.body}`;
   } catch (err) {
     rethrowAsAppError(err, 'AI review spam detection failed');
   }
-  const parsed = JSON.parse(stripFences(result.response.text())) as {
-    spamScore: number;
-    reasons: string[];
-  };
+  // Fail closed (SEC-2): an unparseable or non-numeric reply is `pending`, never `published`.
+  let parsed: { spamScore?: unknown; reasons?: unknown } = {};
+  try {
+    parsed = JSON.parse(stripFences(result.response.text())) as typeof parsed;
+  } catch {
+    logger.warn({ reviewId }, '[REVIEW-TOOLS] detectSpamReview: unparseable reply -> pending');
+  }
 
-  const score = Math.max(0, Math.min(1, parsed.spamScore || 0));
-  const recommendedStatus: SpamCheckResult['recommendedStatus'] =
-    score >= 0.7 ? 'spam' : score >= 0.3 ? 'pending' : 'published';
+  const { score, status } = scoreToStatus(parsed?.spamScore);
+  const recommendedStatus = applyPrefilter(status, pre);
+  const reasons = [...sanitizeReasons(parsed?.reasons), ...pre.reasons];
 
-  logger.info({ reviewId, score, recommendedStatus }, '[REVIEW-TOOLS] detectSpamReview: done');
-  return { spamScore: score, reasons: parsed.reasons || [], recommendedStatus };
+  logger.info(
+    { reviewId, score, recommendedStatus, prefiltered: pre.holdForHuman },
+    '[REVIEW-TOOLS] detectSpamReview: done'
+  );
+  return { spamScore: score, reasons, recommendedStatus };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

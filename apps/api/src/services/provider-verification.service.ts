@@ -379,3 +379,20 @@ export async function listProviderVerification(): Promise<ProviderVerificationRo
     };
   });
 }
+
+/**
+ * User erasure: the confirming super-admin's id is personal data (classified `merchant-pii`, scrub,
+ * subject key userId in packages/cf-schema/erasure-classification.json, like platform_audit_log.actor_id).
+ * Null it; the verification itself (verifiedAt) stays, it is platform state. Runs inside the caller's
+ * erasure transaction. The Cloudflare twin is `scrubUserFromPlatform` in packages/repo.
+ */
+export async function scrubProviderVerifier(
+  tx: { providerVerification: Pick<typeof prisma.providerVerification, 'updateMany'> },
+  userId: string
+): Promise<number> {
+  const res = await tx.providerVerification.updateMany({
+    where: { verifiedById: userId },
+    data: { verifiedById: null },
+  });
+  return res.count;
+}

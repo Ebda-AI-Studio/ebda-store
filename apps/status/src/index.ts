@@ -1,24 +1,31 @@
-import { BRAND, BRAND_MARKETING_URL } from '../../../packages/shared/src/brand/index';
+import { BRAND, BRAND_MARKETING_URL, SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
+import {
+  pickStudioLang,
+  renderStudioPage,
+  STUDIO_PAGE_HEADERS,
+} from '../../../packages/shared/src/studio-pages/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
 import { probeAll, type Fetcher } from './probe';
-import { renderStatusPage } from './render';
+import { renderStatusPage, statusSearchDocs } from './render';
+import { TYPEAHEAD_JS } from './typeahead-bundle';
 import type { Impact, IncidentStatus, Thresholds } from './types';
 
 export { StatusStore } from './store';
 
 const SECURITY_HEADERS = {
   'content-security-policy':
-    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    // script: only this Worker's own typeahead (/assets/typeahead.js); connect: its own search.json plus the help indexes
+    `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'self' https://${BRAND.domains.help}; base-uri 'none'; form-action https://${BRAND.domains.help}; frame-ancestors 'none'`,
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
 };
 
-const text = (body: string, type = 'text/plain'): Response =>
+const text = (body: string, type = 'text/plain', maxAge = 3600): Response =>
   new Response(body, {
     headers: {
       'content-type': `${type}; charset=utf-8`,
-      'cache-control': 'public, max-age=3600',
+      'cache-control': `public, max-age=${maxAge}`,
       ...SECURITY_HEADERS,
     },
   });
@@ -163,6 +170,11 @@ export default {
     // Discovery files (site trust standard): this host's own robots, sitemap and security.txt
     if (path === '/robots.txt')
       return text(`User-agent: *\nAllow: /\nSitemap: ${url.origin}/sitemap.xml\n`);
+    // For AI assistants (help and docs have one): what this host is, and the machine-readable feed
+    if (path === '/llms.txt')
+      return text(
+        `# ${BRAND.company.shortNameEn} Status\n\n> Live status of the ${BRAND.company.shortNameEn} products (${BRAND.product.nameEn} and the services around it), with recent incidents. Arabic at ${url.origin}/, English at ${url.origin}/en.\n\n- [Status page (English)](${url.origin}/en)\n- [Status page (Arabic)](${url.origin}/)\n- [JSON status feed](${url.origin}/api/status.json)\n`
+      );
     if (path === '/sitemap.xml')
       return text(
         `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${[
@@ -178,8 +190,27 @@ export default {
       );
     if (path === '/.well-known/security.txt') return text(securityTxt(url.origin));
 
+    // the shared header-nav behaviour (Esc, click-outside, one menu open, aria-expanded): a same-origin file, no inline script
+    if (path === '/assets/site-nav.js')
+      // an unhashed file: a short cache so a changed script reaches visitors within minutes, not an hour
+      return text(SITE_NAV_JS, 'text/javascript', 300);
+
     if (path === '/healthz')
       return new Response('ok', { headers: { 'content-type': 'text/plain', ...SECURITY_HEADERS } });
+
+    if (path === '/assets/typeahead.js')
+      return new Response(TYPEAHEAD_JS, {
+        headers: {
+          'content-type': 'text/javascript; charset=utf-8',
+          'cache-control': 'public, max-age=3600',
+          ...SECURITY_HEADERS,
+        },
+      });
+    if (path === '/search.json') {
+      const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'ar';
+      const snap = await store(env).snapshot(Date.now());
+      return json(statusSearchDocs(snap, lang), 200, { 'cache-control': 'public, max-age=30' });
+    }
 
     if (path === '/api/status.json') {
       const snap = await store(env).snapshot(Date.now());
@@ -193,10 +224,22 @@ export default {
       return new Response(renderStatusPage(snap, path === '/' ? 'ar' : 'en', url.origin), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'public, max-age=30',
+          // no-transform: Cloudflare then does not inject its Web Analytics beacon, which this page's CSP (rightly) blocks
+          'cache-control': 'public, max-age=30, no-transform',
           ...SECURITY_HEADERS,
         },
       });
+    }
+    // A person who mistyped a status URL gets the studio's calm 404 (search + a map); API clients keep the JSON.
+    if (!path.startsWith('/api/') && (req.headers.get('accept') ?? '').includes('text/html')) {
+      const lang = pickStudioLang(req.headers.get('accept-language'), url.searchParams.get('lang'));
+      return new Response(
+        req.method === 'HEAD' ? null : renderStudioPage({ lang, kind: 'not-found' }),
+        {
+          status: 404,
+          headers: STUDIO_PAGE_HEADERS,
+        }
+      );
     }
     return json({ success: false, error: { code: 'NOT_FOUND' } }, 404);
   },

@@ -2,7 +2,7 @@ import { prisma, runInTenantContext } from '@ebda/database';
 import { EmailService } from '../../../services/email.service';
 import { signReviewToken } from '../../review-token';
 import logger from '../../logger';
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { storeOrigin } from '@ebda/shared';
@@ -22,7 +22,7 @@ import { storeOrigin } from '@ebda/shared';
  *   - Order has no items
  *   - Store not found (deleted between fire and execution)
  */
-export const reviewRequest: InngestFunction.Any = inngest.createFunction(
+export const reviewRequest: JobDef = inngest.createFunction(
   {
     id: 'review-request',
     name: 'Post-purchase review request — 7-day delay',
@@ -39,7 +39,10 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
     }
 
     // Feature gate — skip review requests when reviews feature is disabled.
-    const reviewsEnabled = await featureService.isFeatureEnabled(storeId, 'reviews');
+    // In a step: on a Workflow only step bodies hold a database connection.
+    const reviewsEnabled = await step.run('check-feature', () =>
+      featureService.isFeatureEnabled(storeId, 'reviews')
+    );
     if (!reviewsEnabled) {
       logger.info({ storeId, orderId }, '[REVIEW-REQUEST] reviews feature disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'reviews' };

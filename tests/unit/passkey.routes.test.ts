@@ -74,6 +74,9 @@ vi.mock('@api/middleware/auth', async importOriginal => {
   const actual = await importOriginal<typeof import('@api/middleware/auth')>();
   return {
     ...actual,
+    // Credential management of identity-managed accounts is closed by design (tests/unit/identity-managed-guard.test.ts);
+    // this file exercises the legacy passkey routes themselves.
+    rejectIdentityManaged: (_req: any, _res: any, next: any) => next(),
     authenticate: (req: any, _res: any, next: any) => {
       req.tokenJti = h.caller.jti;
       req.user = {

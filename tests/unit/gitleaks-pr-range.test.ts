@@ -11,12 +11,14 @@ const wf = readFileSync(join(ROOT, '.github/workflows/gitleaks.yml'), 'utf8');
 const hasGitleaks = spawnSync('gitleaks', ['version']).status === 0;
 
 describe('gitleaks workflow scope', () => {
-  it('a pull_request scans base..head only; main pushes, nightly and dispatch scan the full history', () => {
-    expect(wf).toContain('--log-opts="${BASE_SHA}..${HEAD_SHA}"');
+  it('GITLEAKS-SCOPE-1: PR = base..head, push to main = before..after, nightly/dispatch = HEAD; never --all', () => {
+    expect(wf).toContain('RANGE="${BASE_SHA}..${HEAD_SHA}"');
     expect(wf).toMatch(/if \[ "\$EVENT_NAME" = "pull_request" \]/);
-    expect(wf).toMatch(
-      /else[\s\S]*gitleaks detect --source \. --config \.gitleaks\.toml --redact --verbose --exit-code 1/
-    );
+    expect(wf).toContain('RANGE="${PUSH_BEFORE}..${PUSH_AFTER}"');
+    expect(wf).toMatch(/else\s*\n\s*RANGE="HEAD"/);
+    // the one scan command always carries an explicit range, so it can never fall back to `git log --all`
+    expect(wf).toContain('--log-opts="${RANGE}"');
+    expect(wf).not.toMatch(/gitleaks detect --source \. --config \.gitleaks\.toml --redact/);
     expect(wf).toMatch(/schedule:\s*\n\s*#[^\n]*\n\s*- cron:/);
     expect(wf).toMatch(/push:\s*\n\s*branches: \[main\]/);
   });

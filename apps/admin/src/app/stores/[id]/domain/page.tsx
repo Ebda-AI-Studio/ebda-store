@@ -245,9 +245,11 @@ export default function StoreDomainPage() {
   const senderPreview = (() => {
     const name = store?.name ?? '';
     // Read the SEO-configured sender prefix so the DNS-setup preview matches
-    // the address real mail is sent from (resend.service uses the same field).
-    // Falls back to 'noreply' — the same column default — when unset.
-    const localPart = store?.emailSenderLocalPart || 'noreply';
+    // the address real mail is sent from (store-mailer uses the same field).
+    // Falls back to 'orders'; the address is <prefix>.<slug>@ebda.app (email-sender.ts).
+    const prefixes = ['orders', 'receipts', 'hello', 'info', 'support'];
+    const chosen = store?.emailSenderLocalPart ?? '';
+    const localPart = `${prefixes.includes(chosen) ? chosen : 'orders'}.${store?.slug ?? 'store'}`;
     const verifiedCustom = domainStatus?.emailSender?.status === 'verified' && !!store?.domain;
     // Must match PLATFORM_EMAIL_DOMAIN in apps/api/src/services/email-sender.ts
     const host = verifiedCustom ? store!.domain : BRAND.domains.marketing;
@@ -403,7 +405,7 @@ export default function StoreDomainPage() {
                           onClick={() => {
                             void navigator.clipboard.writeText(record.value);
                           }}
-                          className="max-md:min-h-11 max-md:min-w-11 shrink-0 rounded border border-border bg-background px-2 py-0.5 max-md:px-3 text-[10px] font-medium text-foreground hover:bg-muted transition-colors"
+                          className="max-md:min-h-11 max-md:min-w-11 shrink-0 rounded border border-border bg-background px-2 py-0.5 max-md:px-3 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                           aria-label={t('copyValueAriaLabel', { type: record.type })}
                           title={t('copy')}
                         >

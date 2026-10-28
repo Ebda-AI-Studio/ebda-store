@@ -54,8 +54,16 @@ describe('issueSessionFor refuses a non-active account', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('control: an active account still gets a session', async () => {
-    const s = await AuthService.issueSessionFor(base);
+  it('refuses an identity-managed account (merchant/staff/super admin): their sessions come from the identity service', async () => {
+    await expect(AuthService.issueSessionFor(base)).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'USE_IDENTITY_SERVICE',
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('control: an active store customer still gets a session', async () => {
+    const s = await AuthService.issueSessionFor({ ...base, storeId: 'store-1', role: 'customer' });
     expect(typeof s.accessToken).toBe('string');
     expect(typeof s.refreshToken).toBe('string');
     expect(mockCreate).toHaveBeenCalledTimes(1);

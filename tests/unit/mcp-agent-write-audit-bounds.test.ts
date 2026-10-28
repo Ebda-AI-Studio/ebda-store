@@ -19,7 +19,7 @@
  *      carries an unbounded payload.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { anonymousAgentExtra } from '../helpers/mcp-agent-auth';
 

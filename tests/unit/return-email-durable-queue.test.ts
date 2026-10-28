@@ -27,8 +27,8 @@ vi.mock('@ebda/database', () => ({
 vi.mock('@api/services/email-queue.service', () => ({
   emailQueue: { enqueue: enqueueMock },
 }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendBrandedEmail: sendBrandedEmailMock },
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendBrandedEmail: sendBrandedEmailMock },
 }));
 
 import { EmailService } from '@api/services/email.service';

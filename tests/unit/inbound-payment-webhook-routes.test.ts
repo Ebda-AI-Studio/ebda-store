@@ -17,13 +17,17 @@ const m = vi.hoisted(() => ({
   inboxUpdate: vi.fn(),
   inngestSend: vi.fn(),
   handleWebhook: vi.fn(),
+  verify: vi.fn(),
+  incr: vi.fn(),
+  getStatus: vi.fn(),
+  storeFind: vi.fn(),
   audit: vi.fn(),
 }));
 
 vi.mock('@ebda/database', () => ({
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
   withStore: async (_s: string, fn: () => unknown) => fn(),
-  prisma: {},
+  prisma: { store: { findUnique: m.storeFind } },
   Prisma: {},
 }));
 vi.mock('@api/lib/definer', () => ({
@@ -34,9 +38,17 @@ vi.mock('@api/lib/definer', () => ({
   webhookInbox: { record: m.inboxRecord, update: m.inboxUpdate },
 }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { handleWebhook: m.handleWebhook },
+  PaymentService: {
+    handleWebhook: m.handleWebhook,
+    getPaymentStatus: m.getStatus,
+    verifyWebhookDelivery: m.verify,
+  },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@api/services/redis.service', () => ({ redis: { incrementRateLimit: m.incr } }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: m.inngestSend } }));
 vi.mock('@api/services/shipping-carrier.service', () => ({ shippingCarrierService: {} }));
 vi.mock('@api/lib/logger', () => ({
@@ -93,6 +105,8 @@ beforeEach(() => {
   m.inboxRecord.mockResolvedValue('evt-row-1');
   m.inngestSend.mockResolvedValue({ ids: ['x'] });
   m.audit.mockResolvedValue(undefined);
+  m.verify.mockResolvedValue({});
+  m.incr.mockResolvedValue(1);
 });
 
 const post = (c: (typeof cases)[number], path: string, signed: boolean) => {
@@ -107,8 +121,10 @@ describe.each(cases)('inbound $provider webhook route', c => {
   it('refuses an unsigned delivery with 401 and touches nothing', async () => {
     const res = await post(c, path, false);
     expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe('MISSING_SIGNATURE');
+    expect(res.body.error.code).toBe('INVALID_SIGNATURE'); // the one constant body (WEBHOOK-ORDER-1)
     expect(m.findOrder).not.toHaveBeenCalled();
+    expect(m.resolveStore).not.toHaveBeenCalled(); // before ANY lookup
+    expect(m.audit).not.toHaveBeenCalled();
     expect(m.inboxRecord).not.toHaveBeenCalled();
     expect(m.inngestSend).not.toHaveBeenCalled();
     expect(m.handleWebhook).not.toHaveBeenCalled();
@@ -124,7 +140,11 @@ describe.each(cases)('inbound $provider webhook route', c => {
   });
 
   it('replay: an already-processed delivery is acknowledged and NOT processed again', async () => {
-    m.findOrder.mockResolvedValue({ orderId: 'o1', webhookProcessedAt: new Date() });
+    m.findOrder.mockResolvedValue({
+      orderId: 'o1',
+      storeId: STORE,
+      webhookProcessedAt: new Date(),
+    });
     const res = await post(c, path, true);
     expect(res.status).toBe(200);
     expect(res.body.data.message).toBe('Webhook already processed');
@@ -134,19 +154,202 @@ describe.each(cases)('inbound $provider webhook route', c => {
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'WEBHOOK_DUPLICATE' }));
   });
 
-  it('a payment no store owns is ignored (200) without persisting or processing', async () => {
+  const badSig = () =>
+    m.verify.mockRejectedValue(
+      Object.assign(new Error('Invalid webhook signature'), {
+        statusCode: 400,
+        code: 'INVALID_SIGNATURE',
+      })
+    );
+
+  it('WEBHOOK-ORDER-1: a bad signature on a KNOWN payment and on an UNKNOWN payment are byte-identical 401s, on both URL shapes', async () => {
+    badSig();
+    for (const p of [path, `${path}/s/${STORE}`]) {
+      m.resolveStore.mockResolvedValue(STORE);
+      const known = await post(c, p, true);
+      m.resolveStore.mockResolvedValue(null);
+      const unknown = await post(c, p, true);
+      m.resolveStore.mockResolvedValue(OTHER);
+      const otherStore = await post(c, p, true);
+      const unsigned = await post(c, p, false);
+      for (const r of [known, unknown, otherStore, unsigned]) {
+        expect(r.status).toBe(401);
+        expect(r.text).toBe(known.text);
+      }
+    }
+    expect(m.inboxRecord).not.toHaveBeenCalled();
+    expect(m.inngestSend).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
+  });
+
+  it('WEBHOOK-ORDER-1: on the per-store URL the signature is checked BEFORE any payment lookup', async () => {
+    badSig();
+    await post(c, `${path}/s/${STORE}`, true);
+    expect(m.verify).toHaveBeenCalledWith(
+      c.provider,
+      expect.anything(),
+      expect.any(String),
+      STORE,
+      expect.any(String)
+    );
+    expect(m.resolveStore).not.toHaveBeenCalled();
+    expect(m.findOrder).not.toHaveBeenCalled();
+  });
+
+  it('WEBHOOK-ORDER-1 / M-050: a VALID signature on an unknown payment answers 503 + Retry-After and stores nothing', async () => {
     m.resolveStore.mockResolvedValue(null);
-    const res = await post(c, path, true);
-    expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('ignored');
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(503);
+    expect(res.headers['retry-after']).toBe('60');
+    expect(res.body.error.code).toBe('PAYMENT_NOT_YET_VISIBLE');
     expect(m.inboxRecord).not.toHaveBeenCalled();
     expect(m.inngestSend).not.toHaveBeenCalled();
   });
 
-  it('per-store URL: a payment that belongs to ANOTHER store is ignored', async () => {
+  it('WEBHOOK-ORDER-1: a valid store-A signature with a store-B ref is byte-identical to an unknown ref (no cross-store oracle)', async () => {
+    m.resolveStore.mockResolvedValue(null);
+    const unknown = await post(c, `${path}/s/${STORE}`, true);
+    m.resolveStore.mockResolvedValue(OTHER);
+    const otherStore = await post(c, `${path}/s/${STORE}`, true);
+    expect(unknown.status).toBe(503);
+    expect(otherStore.status).toBe(503);
+    expect(otherStore.text).toBe(unknown.text);
+    expect(otherStore.headers['retry-after']).toBe(unknown.headers['retry-after']);
+    expect(m.inboxRecord).not.toHaveBeenCalled();
+    expect(m.inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('WEBHOOK-SCOPE-1: the same ref in two stores resolves only inside the signed store', async () => {
+    // Both stores hold this ref; the resolver is asked for the URL store and must be told to prefer it.
+    m.resolveStore.mockImplementation(
+      async (a: { preferStoreId?: string | null }) => a.preferStoreId ?? OTHER
+    );
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(200);
+    expect(m.resolveStore).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: c.provider, preferStoreId: STORE })
+    );
+    expect(m.inboxRecord).toHaveBeenCalledWith(expect.objectContaining({ storeId: STORE }));
+  });
+
+  it('WEBHOOK-SCOPE-1: a cross-store ref is refused (503, nothing stored, nothing enqueued)', async () => {
     m.resolveStore.mockResolvedValue(OTHER);
     const res = await post(c, `${path}/s/${STORE}`, true);
-    expect(res.body.data.status).toBe('ignored');
+    expect(res.status).toBe(503);
+    expect(m.inboxRecord).not.toHaveBeenCalled();
+    expect(m.inngestSend).not.toHaveBeenCalled();
+    expect(m.handleWebhook).not.toHaveBeenCalled();
+  });
+
+  it('WEBHOOK-SCOPE-1: an order another store already settled under the same key is NOT a duplicate here', async () => {
+    m.findOrder.mockResolvedValue({
+      orderId: 'oB',
+      storeId: OTHER,
+      webhookProcessedAt: new Date(),
+    });
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).not.toBe('Webhook already processed');
+    expect(m.inboxRecord).toHaveBeenCalledWith(expect.objectContaining({ storeId: STORE }));
+  });
+
+  it('WEBHOOK-SCOPE-1: the delivery is stored and deduped under a store-prefixed key', async () => {
+    await post(c, `${path}/s/${STORE}`, true);
+    expect(m.findOrder.mock.calls[0][0]).toMatch(new RegExp(`^${STORE}:`));
+    expect(m.inboxRecord.mock.calls[0][0].idempotencyKey).toMatch(new RegExp(`^${STORE}:`));
+  });
+
+  it('WEBHOOK-ORDER-1: a VALID signature on a known payment answers 200', async () => {
+    const res = await post(c, `${path}/s/${STORE}`, true);
+    expect(res.status).toBe(200);
+    expect(m.inboxRecord).toHaveBeenCalled();
+  });
+
+  it('SEC-5 timing: bad signature, unknown payment and wrong store each take at least the floor', async () => {
+    const { REJECT_FLOOR_MS } = await import('@api/routes/webhook.routes');
+    m.verify.mockRejectedValue(
+      Object.assign(new Error('Invalid webhook signature'), {
+        statusCode: 400,
+        code: 'INVALID_SIGNATURE',
+      })
+    );
+    const timed = async (go: () => Promise<{ status: number }>) => {
+      const t0 = Date.now();
+      const r = await go();
+      expect(r.status).toBe(401);
+      return Date.now() - t0;
+    };
+    const slack = 15; // timer granularity
+    const bad = await timed(() => post(c, path, true));
+    m.resolveStore.mockResolvedValue(null);
+    const unknown = await timed(() => post(c, path, true));
+    m.resolveStore.mockResolvedValue(OTHER);
+    const wrong = await timed(() => post(c, `${path}/s/${STORE}`, true));
+    for (const ms of [bad, unknown, wrong])
+      expect(ms).toBeGreaterThanOrEqual(REJECT_FLOOR_MS - slack);
+  });
+
+  it('SEC-5 oracle: an unknown payment still costs one HMAC (constant-cost dummy verify)', async () => {
+    const spy = vi.spyOn((await import('node:crypto')).default, 'createHmac');
+    m.resolveStore.mockResolvedValue(null);
+    await post(c, path, true);
+    expect(spy).toHaveBeenCalledWith('sha256', 'ebda-webhook-dummy-key');
+    // and the same Redis counter write the real failure path makes, on a dummy key
+    expect(m.incr).toHaveBeenCalledWith('payment-hmac-fail:dummy', 300);
+    spy.mockRestore();
+  });
+
+  it('SEC-5: a delivery whose signature does not verify gets 401 (so a genuine gateway retries) and stores/queues nothing', async () => {
+    m.verify.mockRejectedValue(
+      Object.assign(new Error('Invalid webhook signature'), {
+        statusCode: 400,
+        code: 'INVALID_SIGNATURE',
+      })
+    );
+    const res = await post(c, path, true);
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('INVALID_SIGNATURE');
+    expect(m.verify).toHaveBeenCalledWith(
+      c.provider,
+      expect.anything(),
+      expect.any(String),
+      STORE,
+      JSON.stringify(c.sendBody)
+    );
+    expect(m.inboxRecord).not.toHaveBeenCalled();
+    expect(m.inngestSend).not.toHaveBeenCalled();
+    expect(m.handleWebhook).not.toHaveBeenCalled();
+    // failures are counted per store and source
+    expect(m.incr).toHaveBeenCalledWith(expect.stringMatching(/^webhook-sigfail:/), 300);
+    // a forged body learns nothing about processed payments and writes no audit row
+    m.findOrder.mockResolvedValue({
+      orderId: 'o1',
+      storeId: STORE,
+      webhookProcessedAt: new Date(),
+    });
+    const again = await post(c, path, true);
+    expect(again.status).toBe(401);
+    expect(m.audit).not.toHaveBeenCalled();
+  });
+
+  it('SEC-5: past the per-source budget the answer is 429, still a retry signal, still nothing stored', async () => {
+    m.verify.mockRejectedValue(
+      Object.assign(new Error('Invalid webhook signature'), {
+        statusCode: 400,
+        code: 'INVALID_SIGNATURE',
+      })
+    );
+    m.incr.mockResolvedValue(21);
+    const res = await post(c, path, true);
+    expect(res.status).toBe(429);
+    expect(m.inboxRecord).not.toHaveBeenCalled();
+    expect(m.inngestSend).not.toHaveBeenCalled();
+  });
+
+  it('SEC-5: a transient verification failure (not a client error) is a 5xx so the gateway retries', async () => {
+    m.verify.mockRejectedValue(Object.assign(new Error('db down'), { statusCode: 503 }));
+    const res = await post(c, path, true);
+    expect(res.status).toBe(503);
     expect(m.inboxRecord).not.toHaveBeenCalled();
     expect(m.inngestSend).not.toHaveBeenCalled();
   });
@@ -183,7 +386,7 @@ describe('legacy-keyed Paymob replay is a no-op on EVERY entry path', () => {
     'POST %s dedupes on the stored legacy key',
     async path => {
       m.findOrder.mockImplementation(async (k: string) =>
-        k === legacyKey ? { orderId: 'o1', webhookProcessedAt: new Date() } : null
+        k === legacyKey ? { orderId: 'o1', storeId: STORE, webhookProcessedAt: new Date() } : null
       );
       const res = await request(app)
         .post(`/api/v1/webhooks${path}`)
@@ -196,4 +399,59 @@ describe('legacy-keyed Paymob replay is a no-op on EVERY entry path', () => {
       expect(m.handleWebhook).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('store resolution stays inside the delivering provider (Ruling ITEST-14)', () => {
+  it.each(cases)(
+    '$provider: the resolver is asked for that provider, with no URL store on the bare route',
+    async c => {
+      await post(c, `/payment/${c.provider}`, true);
+      expect(m.resolveStore).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: c.provider, preferStoreId: null })
+      );
+    }
+  );
+
+  it.each(cases)('$provider: the per-store URL names its store as the preferred owner', async c => {
+    await post(c, `/payment/${c.provider}/s/${STORE}`, true);
+    expect(m.resolveStore).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: c.provider, preferStoreId: STORE })
+    );
+  });
+});
+
+describe('payment callback redirect (GET /payment/callback)', () => {
+  const SLUG = { slug: 'shop-a', domain: null };
+  beforeEach(() => {
+    m.getStatus.mockResolvedValue({ status: 'completed' });
+    m.storeFind.mockResolvedValue(SLUG);
+  });
+
+  it.each([
+    ['order', 'paymob'],
+    ['merchantOrderId', 'kashier'],
+    ['merchantRefNumber', 'fawry'],
+  ] as const)(
+    '?%s= resolves the owning store within %s, once, for status AND storefront',
+    async (param, provider) => {
+      const res = await request(app).get(`/api/v1/webhooks/payment/callback?${param}=ref-1`);
+      expect(res.status).toBe(302);
+      expect(m.resolveStore).toHaveBeenCalledTimes(1);
+      expect(m.resolveStore).toHaveBeenCalledWith({ transactionId: 'ref-1', provider });
+      // the status read and the storefront come from the SAME store
+      expect(m.getStatus).toHaveBeenCalledWith('ref-1', undefined, STORE);
+      expect(m.storeFind).toHaveBeenCalledWith(expect.objectContaining({ where: { id: STORE } }));
+      expect(res.headers.location).toContain('/checkout/success');
+      expect(res.headers.location).toContain('shop-a');
+    }
+  );
+
+  it('an unknown reference falls back to the platform web URL', async () => {
+    m.resolveStore.mockResolvedValue(null);
+    m.getStatus.mockResolvedValue({ status: 'pending' });
+    const res = await request(app).get('/api/v1/webhooks/payment/callback?order=ref-2');
+    expect(res.status).toBe(302);
+    expect(m.storeFind).not.toHaveBeenCalled();
+    expect(res.headers.location).toContain('/checkout/pending');
+  });
 });

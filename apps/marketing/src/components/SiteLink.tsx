@@ -23,6 +23,19 @@ export function isExternalHref(href: string): boolean {
   }
 }
 
+/**
+ * The merchant app's sign-up and log-in pages: a visitor on a conversion path continues in the SAME tab (audit UI-15:
+ * opening the signup flow in a new tab strands the page they came from). Everything else external still opens a new tab.
+ */
+export function isAppFlowHref(href: string): boolean {
+  try {
+    const u = new URL(href);
+    return u.hostname === BRAND.domains.storeApp && /^\/(signup|login)(\/|$)/.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 type Props = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'target' | 'rel'> & {
   href: string;
   locale: Locale;
@@ -35,7 +48,7 @@ type Props = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'target' | '
  * link renders as a plain same-tab anchor.
  */
 export function SiteLink({ href, locale, children, 'aria-label': ariaLabel, ...rest }: Props) {
-  if (!isExternalHref(href)) {
+  if (!isExternalHref(href) || isAppFlowHref(href)) {
     return (
       <a href={href} aria-label={ariaLabel} {...rest}>
         {children}

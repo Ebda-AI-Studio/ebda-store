@@ -9,7 +9,11 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },
-  "routes": [{ "pattern": "ebda.app", "custom_domain": true }],
+  "routes": [
+    { "pattern": "ebda.app", "custom_domain": true },
+    // M-072: the storefront owns a `*/*` zone route for merchant custom domains; this explicit apex route out-ranks it.
+    { "pattern": "ebda.app/*", "zone_name": "ebda.app" },
+  ],
   // Assets-only: static hits run no script and are not logged; this keeps config parity with the others (G7).
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "logpush": true,

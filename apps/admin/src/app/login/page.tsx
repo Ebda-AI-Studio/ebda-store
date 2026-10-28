@@ -153,7 +153,11 @@ export default function LoginPage() {
   // ── MFA step ───────────────────────────────────────────────────────────────
   if (mfaChallenge) {
     return (
-      <div className="flex min-h-screen flex-col lg:flex-row">
+      <main
+        id="admin-main-content"
+        tabIndex={-1}
+        className="flex min-h-screen flex-col outline-none lg:flex-row"
+      >
         {/* Mobile: short Nile band above the form (decorative) */}
         <div className="relative h-24 shrink-0 overflow-hidden bg-[#0A0B0C] lg:hidden">
           <NileNight />
@@ -177,7 +181,7 @@ export default function LoginPage() {
                   </svg>
                 </div>
               </div>
-              <h2 className="mt-6 text-3xl font-bold text-foreground">{t('mfaRequired')}</h2>
+              <h1 className="mt-6 text-3xl font-bold text-foreground">{t('mfaRequired')}</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 {useBackupCode ? t('mfaBackupSubtitle') : t('mfaSubtitle')}
               </p>
@@ -260,20 +264,24 @@ export default function LoginPage() {
             <NileNight />
             <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
             <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-              <h1 className="text-4xl font-bold">{t('brandTitle')}</h1>
+              <p className="text-4xl font-bold">{t('brandTitle')}</p>
               <p className="mt-4 text-lg text-white/85 text-center max-w-md">
                 {t('brandSubtitle')}
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   // ── Normal login step ──────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <main
+      id="admin-main-content"
+      tabIndex={-1}
+      className="flex min-h-screen flex-col outline-none lg:flex-row"
+    >
       {/* Mobile band, then login form */}
       {/* Mobile: short Nile band above the form (decorative) */}
       <div className="relative h-24 shrink-0 overflow-hidden bg-[#0A0B0C] lg:hidden">
@@ -305,7 +313,7 @@ export default function LoginPage() {
               />
               <span className="text-xl font-semibold">{tb('brandAlt')}</span>
             </div>
-            <h2 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h2>
+            <h1 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h1>
             <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
 
@@ -420,7 +428,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             {tSignup('noAccount')}{' '}
-            <Link href="/signup" className="text-primary-ink hover:underline">
+            <Link href="/signup" className="text-primary-ink underline underline-offset-4">
               {tSignup('createStore')}
             </Link>
           </p>
@@ -435,11 +443,11 @@ export default function LoginPage() {
           <NileNight />
           <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
           <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-            <h1 className="text-4xl font-bold">{t('brandTitle')}</h1>
+            <p className="text-4xl font-bold">{t('brandTitle')}</p>
             <p className="mt-4 text-lg text-white/85 text-center max-w-md">{t('brandSubtitle')}</p>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

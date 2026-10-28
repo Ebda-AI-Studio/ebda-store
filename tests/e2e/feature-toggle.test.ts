@@ -152,10 +152,23 @@ describe('Feature Toggle Engine', () => {
       // returns false. The test store uses the Prisma schema default
       // `plan = 'starter'` (NOT free — see Store model in schema.prisma),
       // so the resolved map should match PLAN_BASELINE.starter.
+      //
+      // Since the plans engine (2026-10-03, FeatureService layer 1.5) six keys are decided by the store's
+      // effective plan limits, not by PLAN_BASELINE. This fixture store has no subscription, so it resolves
+      // to the `free` fallback limits: every one of them is OFF, even `abandoned_cart` which
+      // PLAN_BASELINE.starter lists (Ruling ITEST-7).
+      const PLAN_ENGINE_OWNED = new Set<string>([
+        'abandoned_cart',
+        'whatsapp',
+        'remove_branding',
+        'b2b.wholesale',
+        'merchant_mcp',
+        'merchant_mcp_write',
+      ]);
       const baseline = new Set(PLAN_BASELINE.starter);
       for (const key of FEATURE_KEYS_ARRAY) {
-        const expected = baseline.has(key);
-        expect(features[key]).toBe(expected);
+        const expected = PLAN_ENGINE_OWNED.has(key) ? false : baseline.has(key);
+        expect(features[key], key).toBe(expected);
       }
     });
   });

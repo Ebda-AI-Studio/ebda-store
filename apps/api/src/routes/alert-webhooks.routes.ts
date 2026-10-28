@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'crypto';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 

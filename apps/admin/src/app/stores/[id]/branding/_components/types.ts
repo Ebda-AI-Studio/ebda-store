@@ -127,10 +127,7 @@ export interface StoreTheme {
    * uppercase via [data-ui-uppercase='true'] .ui-caps-toggle in globals.css.
    */
   uppercaseStyle?: boolean;
-  /**
-   * Opt-in Eastern Arabic-Indic digits (٠١٢٣) on the Arabic storefront.
-   * Default false = Western digits (0-9) everywhere in both languages.
-   */
+  /** RETIRED (Ruling DIGITS-1): Western digits everywhere; ignored. Kept so stored themes still parse. */
   arabicNumerals?: boolean;
   /**
    * Show a "Branches"/"فروعنا" column in the storefront footer listing

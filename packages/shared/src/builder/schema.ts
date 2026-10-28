@@ -38,7 +38,7 @@
  *   (`start` / `center` / `end` — `left`/`right` are rejected), and the
  *   document never stores a direction: the visitor's locale picks it.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { draftThemeSchema } from './theme-draft';
 import { draftChromeSchema } from './chrome-draft';
 import { draftTypographySchema } from './typography-draft';

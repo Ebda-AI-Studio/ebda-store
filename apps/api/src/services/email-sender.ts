@@ -3,13 +3,18 @@
 //
 // Why a standalone module: this is a pure function (no I/O, no DB) so it
 // gets the cheapest possible unit tests — feed it a plain object, assert
-// the from-line. The full ResendService composes this helper.
+// the from-line. The full StoreMailer composes this helper.
+import { z } from 'zod/v3';
 import { BRAND } from '@ebda/shared';
+import logger from '../lib/logger';
 
 const PLATFORM_EMAIL_DOMAIN: string = BRAND.domains.marketing;
+const PLATFORM_FALLBACK_LOCAL = 'no-reply';
 
 export interface StoreSenderShape {
   name: string;
+  /** Required on the platform domain (the mandatory suffix of the sender address). */
+  slug?: string | null;
   domain?: string | null;
   email?: string | null;
   emailSenderLocalPart?: string | null;
@@ -28,26 +33,73 @@ export interface ResolvedSender {
 // the SDK; we only sanitize control-chars + trim.
 function sanitizeDisplayName(name: string): string {
   // eslint-disable-next-line no-control-regex
-  return name.replace(/[\r\n\x00-\x1f\x7f]/g, ' ').trim();
+  // Also drop `"`, `<`, `>` and `\`: they break the `Name <addr>` form, and a rejected From is a
+  // permanent failure for every message of the store (Cloudflare E_VALIDATION_ERROR).
+  return name
+    .replace(/[\r\n\x00-\x1f\x7f"<>\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Merchant mail on the platform domain comes from `<prefix>.<storeSlug>@ebda.app`. The prefix is
+ * one of these (an ALLOWLIST: a denylist loses to `no.reply`, `ebda-support`, `billing2`), and the
+ * store-unique slug suffix is mandatory, so a merchant address can never equal a platform
+ * mailbox. Only the platform itself sends from the bare `no-reply@` / `ahlan@` (brandFrom()).
+ */
+export const MERCHANT_SENDER_PREFIXES = ['orders', 'receipts', 'hello', 'info', 'support'] as const;
+export type MerchantSenderPrefix = (typeof MERCHANT_SENDER_PREFIXES)[number];
+const DEFAULT_MERCHANT_PREFIX: MerchantSenderPrefix = 'orders';
+
+export function isMerchantSenderPrefix(v: unknown): v is MerchantSenderPrefix {
+  return typeof v === 'string' && (MERCHANT_SENDER_PREFIXES as readonly string[]).includes(v);
+}
+
+/**
+ * Save-time validation of a store's sender prefix (store.routes.ts). Allowlist only; the legacy
+ * default `noreply` the admin used to save (and empty/null) is accepted as "unset".
+ */
+export const merchantSenderPrefixInput = z.preprocess(
+  v => (v === '' || v === null || v === 'noreply' || v === 'no-reply' ? undefined : v),
+  z.enum(MERCHANT_SENDER_PREFIXES).optional()
+);
+
+/** `<prefix>.<slug>`; a prefix outside the allowlist (legacy `noreply`, anything typed) becomes `orders`. */
+export function merchantSenderLocalPart(
+  chosen: string | null | undefined,
+  slug: string | null | undefined
+): string {
+  const prefix = isMerchantSenderPrefix(chosen?.trim()) ? chosen!.trim() : DEFAULT_MERCHANT_PREFIX;
+  const slugPart = (slug ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  // Fail fast: a caller that forgot to select `slug` must not silently send from a bare mailbox.
+  if (!slugPart) throw new Error('store slug is required to build the sender address');
+  return `${prefix}.${slugPart}`;
 }
 
 export function resolveSender(store: StoreSenderShape): ResolvedSender {
   const displayName = sanitizeDisplayName(store.name);
-  const useCustomDomain =
-    store.emailDomainStatus === 'verified' && !!store.domain && store.domain.length > 0;
-
-  // Merchant domains keep the conventional `noreply`; the platform domain
-  // uses the brand's own no-reply mailbox (no-reply@ebda.app).
-  const defaultLocalPart = useCustomDomain ? 'noreply' : BRAND.noReplyEmail.split('@')[0];
-  const localPart =
-    store.emailSenderLocalPart && store.emailSenderLocalPart.trim().length > 0
-      ? store.emailSenderLocalPart.trim()
-      : defaultLocalPart;
-
-  const host = useCustomDomain ? (store.domain as string) : PLATFORM_EMAIL_DOMAIN;
+  // Always the platform domain: a merchant's own domain is not a zone in our Cloudflare account, so
+  // there are no per-store sender domains (G6). Replies reach the merchant via Reply-To.
+  let localPart: string;
+  try {
+    localPart = merchantSenderLocalPart(store.emailSenderLocalPart, store.slug);
+  } catch {
+    // A caller whose store query did not select `slug` must not crash the send (a job would fail
+    // and retry forever). Fall back to the PLATFORM sender with the store named in the display
+    // name, never a bare or invented merchant mailbox: replies still reach the merchant.
+    logger.warn({ storeName: store.name }, '[email] store slug missing, platform sender fallback');
+    return {
+      from: `${displayName} via ${BRAND.product.nameEn} <${PLATFORM_FALLBACK_LOCAL}@${PLATFORM_EMAIL_DOMAIN}>`,
+      replyTo: store.email ? store.email : undefined,
+    };
+  }
 
   return {
-    from: `${displayName} <${localPart}@${host}>`,
+    from: `${displayName} <${localPart}@${PLATFORM_EMAIL_DOMAIN}>`,
     replyTo: store.email ? store.email : undefined,
   };
 }

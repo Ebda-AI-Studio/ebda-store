@@ -22,6 +22,7 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
+import { rememberOrderViewToken, readOrderViewToken } from './order-view-token';
 import {
   isIosWebkit,
   moveSearchToHeader,
@@ -864,6 +865,14 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const headers = this.buildHeaders(options);
+    // SEC-15: a guest order's calls (`/public/orders/:id`, `/payments/instapay/:id/...`) carry the
+    // signed view token this tab got when the order was created. Without it the API answers with
+    // the masked view.
+    const orderId = /\/(?:public\/orders|payments\/instapay)\/([0-9a-f-]{36})(?:[/?]|$)/i.exec(
+      endpoint
+    )?.[1];
+    const viewToken = orderId ? readOrderViewToken(orderId) : null;
+    if (viewToken) headers['X-Order-View-Token'] = viewToken;
 
     // 45s request timeout — long enough for cold-start + complex order
     // creation, short enough to surface a real error before the user
@@ -1433,11 +1442,21 @@ class ApiClient {
   }
 
   // Orders (public endpoints)
-  async createOrder(data: CreateOrderData) {
-    return this.request<{ order: Order }>('/public/orders', {
+  /**
+   * `idempotencyKey` (audit M-012): one key per checkout attempt. A double tap or a timeout retry carries the same key and the
+   * server returns the order the first request created instead of creating a second.
+   */
+  async createOrder(data: CreateOrderData, opts: { idempotencyKey?: string } = {}) {
+    const res = await this.request<{ order: Order; viewToken?: string }>('/public/orders', {
       method: 'POST',
       body: JSON.stringify(data),
+      ...(opts.idempotencyKey ? { headers: { 'Idempotency-Key': opts.idempotencyKey } } : {}),
     });
+    // SEC-15: a guest order comes with the signed token that unlocks its address on the success page.
+    if (res.success && res.data?.order?.id) {
+      rememberOrderViewToken(res.data.order.id, res.data.viewToken);
+    }
+    return res;
   }
 
   /**
@@ -1582,7 +1601,7 @@ class ApiClient {
    * (StoreContext does this on mount). Returns an error response if no
    * store is bound, mirroring how getCart() fails without a session.
    */
-  async searchSuggest(q: string) {
+  async searchSuggest(q: string, signal?: AbortSignal) {
     const trimmed = (q ?? '').trim();
     if (!this.storeId) {
       return {
@@ -1598,7 +1617,7 @@ class ApiClient {
     }
     return this.request<{ suggestions: SearchSuggestion[] }>(
       `/public/${this.storeId}/search/suggest`,
-      { headers: searchQueryHeaders(trimmed) }
+      { headers: searchQueryHeaders(trimmed), signal }
     );
   }
 

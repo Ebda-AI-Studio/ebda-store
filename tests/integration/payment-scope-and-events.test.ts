@@ -20,6 +20,7 @@ import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebd
 import { PaymobStub, PAYMOB_STUB } from '../stubs/paymob-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
+import { config } from '@api/config';
 import { encryption } from '@api/services/encryption.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
 import { resetProviderHealthForTests } from '@api/services/payment-providers/provider-health';

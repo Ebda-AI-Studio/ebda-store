@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStore } from '../middleware/store';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -11,6 +11,7 @@ import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { prisma } from '@ebda/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
+import { requireAiEnabled } from '../lib/store-ai-switch';
 import { assertScalarQuery } from '../lib/query-params';
 
 // `mergeParams: true` so the child router's handlers see `:storeId` from
@@ -395,6 +396,7 @@ router.post(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  requireAiEnabled,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -416,6 +418,7 @@ router.post(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  requireAiEnabled,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;

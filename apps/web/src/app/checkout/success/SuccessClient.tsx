@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import { Button } from '@ebda/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';

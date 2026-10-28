@@ -1,20 +1,10 @@
 /**
  * Ruling WA-LEGACY-1: the email layer refuses to send to a reserved-TLD address (a placeholder can
- * never deliver). Covers the helper and the real ResendService send path with the SDK mocked.
+ * never deliver). Covers the helper and the real StoreMailer send path with the Cloudflare EMAIL binding mocked.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const send = vi.hoisted(() => vi.fn(async () => ({ data: { id: 'sent-1' }, error: null })));
-const batch = vi.hoisted(() =>
-  vi.fn(async () => ({ data: { data: [{ id: 'b1' }] }, error: null }))
-);
-vi.mock('resend', () => ({
-  Resend: class {
-    emails = { send };
-    batch = { send: batch };
-  },
-}));
-vi.mock('@api/config', () => ({ config: { resendApiKey: 're_test' } }));
+const send = vi.hoisted(() => vi.fn(async (..._a: unknown[]) => ({ messageId: 'sent-1' })));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -26,6 +16,7 @@ vi.mock('@ebda/database', () => ({
         findUnique: async () => ({
           id: 's1',
           name: 'S',
+          slug: 'souq',
           domain: null,
           email: null,
           emailSenderLocalPart: null,
@@ -36,11 +27,11 @@ vi.mock('@ebda/database', () => ({
 }));
 
 import { isUndeliverableAddress, deliverableOnly } from '@api/lib/undeliverable-email';
-import { ResendService } from '@api/services/resend.service';
+import { StoreMailer } from '@api/services/store-mailer.service';
+import { setCfBindings, clearCfBindings } from '@api/cf/bindings';
 
 beforeEach(() => {
   send.mockClear();
-  batch.mockClear();
 });
 
 describe('undeliverable addresses', () => {
@@ -57,9 +48,14 @@ describe('undeliverable addresses', () => {
   });
 });
 
-describe('ResendService refuses *.invalid recipients', () => {
-  it('sendBrandedEmail to a placeholder never reaches Resend', async () => {
-    const r = await ResendService.sendBrandedEmail('s1', {
+describe('StoreMailer refuses *.invalid recipients', () => {
+  beforeEach(() => {
+    clearCfBindings();
+    setCfBindings({ HYPERDRIVE: { connectionString: 'x' }, EMAIL: { send } });
+  });
+
+  it('sendBrandedEmail to a placeholder never reaches the provider', async () => {
+    const r = await StoreMailer.sendBrandedEmail('s1', {
       to: 'wa-1@placeholder.invalid',
       subject: 's',
       html: '<p>order</p>',
@@ -69,7 +65,7 @@ describe('ResendService refuses *.invalid recipients', () => {
   });
 
   it('a mixed list is sent to the real address only', async () => {
-    await ResendService.sendBrandedEmail('s1', {
+    await StoreMailer.sendBrandedEmail('s1', {
       to: ['a@ebda.app', 'wa-1@placeholder.invalid'],
       subject: 's',
       html: '<p>x</p>',
@@ -79,17 +75,18 @@ describe('ResendService refuses *.invalid recipients', () => {
   });
 
   it('batch and marketing sends drop placeholders too', async () => {
-    await ResendService.sendBrandedBatch('s1', {
+    const r = await StoreMailer.sendBrandedBatch('s1', {
       subject: 's',
       messages: [
         { to: 'wa-1@placeholder.invalid', html: 'x' },
         { to: 'a@ebda.app', html: 'x' },
       ],
     });
-    expect(batch).toHaveBeenCalledTimes(1);
-    const sent = (batch.mock.calls[0] as unknown as [Array<{ to: string[] }>])[0];
-    expect(sent.map(m => m.to)).toEqual([['a@ebda.app']]);
-    const m = await ResendService.sendMarketingEmail({ id: 's1', name: 'S' } as never, {
+    // one message per address (Cloudflare has no batch endpoint); the placeholder is not counted as sent
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(r.ids).toHaveLength(1);
+    expect((send.mock.calls[0] as unknown as [{ to: string }])[0].to).toBe('a@ebda.app');
+    const m = await StoreMailer.sendMarketingEmail({ id: 's1', name: 'S', slug: 'souq' } as never, {
       to: 'x@placeholder.invalid',
       subject: 's',
       html: 'x',

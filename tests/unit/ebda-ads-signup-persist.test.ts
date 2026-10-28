@@ -16,8 +16,9 @@ vi.mock('@ebda/database', () => ({
     fn({
       user: {
         findUnique: async () => null,
-        update: async (a: { where: unknown; data: Record<string, unknown> }) => {
-          updates.push(a);
+        // The profile row is CREATED by the Store now (the credential lives in the identity service).
+        create: async (a: { data: Record<string, unknown> }) => {
+          updates.push({ where: undefined, data: a.data });
           return {};
         },
       },
@@ -33,6 +34,9 @@ vi.mock('@api/lib/definer', () => ({
     firstName: 'A',
     lastName: 'B',
   }),
+}));
+vi.mock('@api/lib/identity-client', () => ({
+  createIdentity: async (input: { id: string }) => ({ id: input.id }),
 }));
 vi.mock('@api/services/auth.service', () => ({
   AuthService: { sendVerificationEmail: async () => undefined },

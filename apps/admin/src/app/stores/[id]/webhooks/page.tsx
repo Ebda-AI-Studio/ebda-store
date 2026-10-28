@@ -233,7 +233,7 @@ export default function WebhooksPage() {
 
   const fmt = (v: string | null) =>
     v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
-  const badge = 'rounded px-1.5 py-0.5 text-[10px] font-medium';
+  const badge = 'rounded px-1.5 py-0.5 text-xs font-medium';
 
   return (
     <AdminLayout

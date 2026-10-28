@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Geist, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
@@ -90,6 +91,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const messages = await getMessages();
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   const t = await getTranslations('common');
+  // The per-request CSP nonce set by middleware.ts: script-src accepts only nonced scripts (SEC-4).
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning>
@@ -97,6 +100,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Inline script to prevent flash of wrong theme on page load.
             Only reads from localStorage — no user input, safe static content. */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `try{var s=localStorage.getItem('admin-theme');if(s!=='light'){document.documentElement.classList.add('dark')}}catch(e){}`,
           }}

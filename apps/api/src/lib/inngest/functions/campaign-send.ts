@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { config } from '../../../config';
 import logger from '../../logger';
@@ -6,7 +6,8 @@ import { inngest } from '../client';
 import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
-import { ResendService, ResendSendError } from '../../../services/resend.service';
+import { StoreMailer } from '../../../services/store-mailer.service';
+import { EmailSendError } from '../../../services/mail-transport';
 import { storeHidesPoweredBy } from '../../../services/email.service';
 import { sendAlert } from '../../../services/alerts.service';
 import {
@@ -235,9 +236,9 @@ const campaignSendFn = inngest.createFunction(
     }
 
     // 2. Wait for a future schedule (durable — survives deploys).
-    if (nonce.getTime() > Date.now()) {
-      await step.sleepUntil('wait-for-schedule', nonce);
-    }
+    // Unconditional: a past time resumes at once, and a clock check here would make a replay skip the
+    // sleep the first run took (the job's concurrency lease is released/re-taken around it).
+    await step.sleepUntil('wait-for-schedule', nonce);
 
     // 3. Claim scheduled → sending, atomically and only for this request.
     //    A cancel during the wait leaves it `cancelled` and nothing is sent.
@@ -404,7 +405,7 @@ const campaignSendFn = inngest.createFunction(
         }
         let messageId: string;
         try {
-          ({ id: messageId } = await ResendService.sendMarketingEmail(store, {
+          ({ id: messageId } = await StoreMailer.sendMarketingEmail(store, {
             to: r.email,
             subject,
             html,
@@ -415,7 +416,7 @@ const campaignSendFn = inngest.createFunction(
           // A throttle is transient: rethrow so the step retries with
           // backoff. Everything already sent in this batch is `sent` and is
           // skipped on the retry.
-          if (err instanceof ResendSendError && err.code === 'rate_limit_exceeded') throw err;
+          if (err instanceof EmailSendError && err.isRateLimit) throw err;
           const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
           await runInTenantContext(storeId, () =>
             prisma.campaignRecipient.updateMany({
@@ -429,7 +430,7 @@ const campaignSendFn = inngest.createFunction(
               campaignId,
               storeId,
               recipientId: r.id,
-              code: err instanceof ResendSendError ? err.code : 'unknown',
+              code: err instanceof EmailSendError ? err.code : 'unknown',
             },
             '[CAMPAIGN] recipient send failed'
           );
@@ -578,4 +579,4 @@ const campaignSendFn = inngest.createFunction(
   }
 );
 
-export const campaignSend: InngestFunction.Any = campaignSendFn;
+export const campaignSend: JobDef = campaignSendFn;

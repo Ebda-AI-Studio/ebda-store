@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import logger from '../../logger';
 import { sendAlert } from '../../../services/alerts.service';
@@ -21,7 +21,7 @@ import { legalNoticeMailerReady } from '../../../services/platform-mailer';
  *  - a run is pinned to ONE send row (`sendId`, M1); recipients are materialised only once
  *    (recipient_count), so Resume / Retry failed re-use the same rows (I5);
  *  - the mailer is checked ONCE before the first batch: unconfigured -> every queued row is
- *    failed (RESEND_NOT_CONFIGURED) and a P1 raised, no pacer slot burnt (I2);
+ *    failed (MAIL_NOT_CONFIGURED) and a P1 raised, no pacer slot burnt (I2);
  *  - throttled by the platform send pacer (shared Resend budget). A step waits for a slot
  *    only within its wall-clock budget; otherwise it ends and the next step continues;
  *  - no orphan `queued` rows: the step cap fails the rest (SEND_WINDOW_EXHAUSTED, P1 alert)
@@ -54,15 +54,15 @@ export async function runLegalNoticeSend({
 
   const preflight = await step.run('preflight', async () => {
     if (legalNoticeMailerReady()) return { ready: true, failed: 0 };
-    const n = await failQueuedDeliveries(sentBy, docKey, version, 'RESEND_NOT_CONFIGURED');
+    const n = await failQueuedDeliveries(sentBy, docKey, version, 'MAIL_NOT_CONFIGURED');
     logger.error({ docKey, version, failed: n }, '[LEGAL-NOTICE] mailer not configured');
     await sendAlert({
       level: 'p1',
       source: 'legal.notice.mailer_not_configured',
       title: `Legal notice ${docKey}@${version}: email is not configured, nobody was mailed`,
       body:
-        `RESEND_API_KEY is missing in production. ${n} recipient(s) of the ${docKey}@${version} ` +
-        `policy notice were marked failed (RESEND_NOT_CONFIGURED) and NOT emailed. Fix the key, ` +
+        `The EMAIL send binding is missing in production. ${n} recipient(s) of the ${docKey}@${version} ` +
+        `policy notice were marked failed (MAIL_NOT_CONFIGURED) and NOT emailed. Fix the binding, ` +
         `then press "Retry failed" on Policy updates (${RECOVER}).`,
       context: { docKey, version, failed: n },
     }).catch(() => undefined);
@@ -74,7 +74,7 @@ export async function runLegalNoticeSend({
       sent: 0,
       failed: preflight.failed,
       stranded: 0,
-      skipped: 'RESEND_NOT_CONFIGURED',
+      skipped: 'MAIL_NOT_CONFIGURED',
     };
   }
 
@@ -186,4 +186,4 @@ const legalNoticeSendFn = inngest.createFunction(
     runLegalNoticeSend({ event: event as { data?: SendData }, step: step as unknown as StepLike })
 );
 
-export const legalNoticeSend: InngestFunction.Any = legalNoticeSendFn;
+export const legalNoticeSend: JobDef = legalNoticeSendFn;

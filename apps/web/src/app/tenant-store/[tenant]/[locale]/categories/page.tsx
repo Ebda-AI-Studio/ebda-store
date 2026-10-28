@@ -1,6 +1,6 @@
+import { storefrontAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStoreByTenantParam, isResolvedStore } from '@/lib/store-resolver';
-import { storeAbsoluteUrl } from '@/lib/structured-data';
 import { CategoriesPageBody } from '@/app/categories/CategoriesPageBody';
 
 // Same document metadata as the legacy `app/categories/page.tsx`, including its
@@ -18,7 +18,7 @@ export async function generateMetadata({
     title: 'Categories',
     description: 'Explore product categories and find exactly what you are looking for.',
     ...(isResolvedStore(store)
-      ? { alternates: { canonical: storeAbsoluteUrl(store, '/categories') } }
+      ? { alternates: await storefrontAlternates(store, '/categories', true) }
       : {}),
   };
 }

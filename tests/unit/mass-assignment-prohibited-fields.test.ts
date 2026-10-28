@@ -162,8 +162,8 @@ vi.mock('@api/services/store-creation-limit', () => ({
 vi.mock('@api/services/domain-provider', () => ({
   resolveDomainService: vi.fn(() => ({ isConfigured: () => false })),
 }));
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: {
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: {
     provisionStoreDomain: vi.fn(),
     verifyAndRefreshDomain: vi.fn(),
     refreshDomainStatus: vi.fn(),
@@ -559,6 +559,10 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
   },
   "order.routes.ts POST '/:orderId/refresh-refund-status'": {
     exempt: 'reads no request body — re-checks the existing refund against the provider',
+  },
+  "order.routes.ts POST '/:orderId/refund-match-claim'": {
+    exempt:
+      'strict zod body `{ claimId, providerRefundId }` only; storeId/orderId from the URL; needs orders:refund',
   },
   "order.routes.ts POST '/:orderId/refund-via-provider'": {
     exempt: 'body schema is `{ amount?, reason? }` only — no entity identity fields',

@@ -12,7 +12,7 @@
  * bundle price edit changes the line on the next view.
  */
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '../StoreLink';
 import { api, type BundleSavingInfo } from '../../lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';

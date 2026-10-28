@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -349,4 +349,4 @@ const agentWriteDeniedWatchFn = inngest.createFunction(
   handleAgentWriteDeniedWatch
 );
 
-export const agentWriteDeniedWatch: InngestFunction.Any = agentWriteDeniedWatchFn;
+export const agentWriteDeniedWatch: JobDef = agentWriteDeniedWatchFn;

@@ -4,7 +4,7 @@ import {
   listProviderVerification,
 } from '../services/provider-verification.service';
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma, asPlatformOperator } from '@ebda/database';
 import { PAYMENT_PROVIDER_CODES, SHIPPING_PROVIDER_CODES } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';

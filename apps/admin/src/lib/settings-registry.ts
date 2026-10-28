@@ -87,6 +87,7 @@ export const REDIRECT_ROUTES: Record<string, string> = {
   '/navigation': '/builder',
   '/page-builder': '/builder',
   '/pages': '/builder',
+  '/qr': '/codes',
 };
 
 export const PAGES: PageEntry[] = [
@@ -421,6 +422,12 @@ export const PAGES: PageEntry[] = [
     feature: 'pwa',
     syn: { en: 'app install home screen mobile icon', ar: 'تطبيق تثبيت شاشة رئيسية جوال ايقونة' },
   }),
+  page('/codes', 'codes.page.title', 'owner', {
+    syn: {
+      en: 'qr code barcode label sticker print scan poster flyer receipt thermal a4 ean',
+      ar: 'كود كيو ار باركود ملصق طباعة مسح بوستر فلاير فاتورة حراري',
+    },
+  }),
   page('/language', 'language.page.title', 'owner', {
     syn: {
       en: 'arabic english default language rtl translation',
@@ -457,6 +464,18 @@ export const PAGES: PageEntry[] = [
 ];
 
 export const SETTINGS: SettingEntry[] = [
+  // ── AI ────────────────────────────────────────────────────────────────────
+  setting(
+    'ai.switch',
+    '/ai-usage',
+    'aiSwitch.title',
+    'owner',
+    {
+      en: 'ai on off disable enable turn off assistant gemini switch',
+      ar: 'ذكاء اصطناعي تشغيل ايقاف قفل تفعيل مساعد',
+    },
+    {}
+  ),
   // ── Branding (tabs: branding · theme · contact · locations) ───────────────
   setting(
     'branding.logo',
@@ -510,17 +529,6 @@ export const SETTINGS: SettingEntry[] = [
     {
       en: 'footer logo white logo invert',
       ar: 'شعار التذييل الفوتر شعار ابيض',
-    },
-    { query: 'tab=theme' }
-  ),
-  setting(
-    'branding.arabic-numerals',
-    '/branding',
-    'branding.theme.arabicNumerals.title',
-    'owner',
-    {
-      en: 'arabic numbers eastern digits indian numerals',
-      ar: 'الارقام العربية ارقام هندية شكل الارقام',
     },
     { query: 'tab=theme' }
   ),
@@ -670,6 +678,17 @@ export const SETTINGS: SettingEntry[] = [
     en: 'time zone timezone cairo clock',
     ar: 'المنطقة الزمنية توقيت القاهرة',
   }),
+  setting(
+    'tax.eta',
+    '/tax',
+    'eta.title',
+    'owner',
+    {
+      en: 'eta e-receipt electronic receipt egyptian tax authority pos serial client id secret',
+      ar: 'الايصال الالكتروني مصلحة الضرائب رقم الجهاز',
+    },
+    { feature: 'eta_ereceipt' }
+  ),
   // ── PWA / language / domain / SEO ──────────────────────────────────────────
   setting(
     'pwa.app-name',
@@ -886,6 +905,13 @@ export const SETTINGS: SettingEntry[] = [
         'غيّر الشكل الستايل القالب معاينة تطبيق',
       ],
       [
+        'builder.ai-patch',
+        'builder.tabs.ai',
+        'select=ai',
+        'ask ai edit page change describe assistant patch',
+        'اسأل الذكاء الاصطناعي تعديل الصفحة تغيير وصف مساعد',
+      ],
+      [
         'builder.history',
         'builder.tabs.history',
         'select=history',
@@ -915,12 +941,13 @@ export const REGISTRY: RegistryEntry[] = [...PAGES, ...SETTINGS];
  * always allowed. Keys are paths under `apps/admin/src/app/stores/[id]`.
  */
 export const SETTINGS_LABEL_BASELINE: Record<string, number> = {
+  '/ai-usage': 0, // the switch is a component (components/ai/AiSwitchCard), anchored ai.switch
   '/branding': 43,
-  '/builder': 27, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
+  '/builder': 28, // the visual editor: panels are generated from the registry; the header chrome controls are anchored builder.header-*
   '/delivery': 14,
   '/shipping': 20,
   '/payment-settings': 23, // +6: the instalments card (enable, months, markup, provider ar/en, min price), anchored payment.instalments
-  '/tax': 13,
+  '/tax': 16,
   '/pwa': 13,
   '/language': 0,
   '/domain': 1,

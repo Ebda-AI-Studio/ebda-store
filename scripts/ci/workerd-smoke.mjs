@@ -126,11 +126,11 @@ async function main() {
       `API_URL=${base}`,
       'BUILD_COMMIT_SHA=smoke',
       'JWT_SECRET=smoke-only-jwt-secret-0123456789abcdef',
+      'SUITE_BUYER_KEY_SECRET=smoke-only-suite-buyer-key-secret-0123456789',
       `ENCRYPTION_KEY=${'0'.repeat(64)}`,
       'TAP_API_KEY=k',
       'TAP_SECRET_KEY=s',
       'TAP_WEBHOOK_SECRET=smoke-only-tap-webhook-secret',
-      'INNGEST_EVENT_KEY=smoke',
       // No AI binding in the smoke (stripAiBinding): say so explicitly, so a `true` set in the
       // config's vars cannot fail the boot check here for a reason production does not have.
       'SEARCH_SEMANTIC_ENABLED=false',
@@ -156,6 +156,11 @@ async function main() {
       },
     }
   );
+  // A chunk that was already in flight when the process group is killed must never crash the run: ending `log` while
+  // the child's pipes are still attached made Node throw ERR_STREAM_WRITE_AFTER_END as an unhandled 'error', and the
+  // script exited 1 AFTER printing "workerd smoke OK" (observed 2026-10-25, #207; load-dependent, so it looked like
+  // infra flakiness). Detach the pipes before ending the file and swallow late stream errors.
+  log.on('error', () => {});
   child.stdout.pipe(log);
   child.stderr.pipe(log);
   let exited = null;
@@ -197,7 +202,7 @@ async function main() {
     failure = err;
   } finally {
     stop();
-    log.end();
+    closeLog(child, log);
   }
   if (failure) {
     console.log(`::error::workerd smoke FAILED:\n${failure.message}`);
@@ -209,6 +214,13 @@ async function main() {
     } catch {}
     process.exit(1);
   }
+}
+
+/** Detach the child's pipes from the log file and end it, so a late chunk can never write after end. */
+export function closeLog(child, log) {
+  child.stdout?.unpipe(log);
+  child.stderr?.unpipe(log);
+  log.end();
 }
 
 import { pathToFileURL } from 'node:url';

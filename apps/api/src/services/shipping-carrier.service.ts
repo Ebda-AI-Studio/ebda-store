@@ -3,6 +3,10 @@
 // Orchestrates carrier integrations: shipment creation, tracking, webhooks
 // ==========================================
 
+import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
+import { CI_SHIPMENT_BOOKED_EVENT, CI_SHIPMENT_TRACKED_EVENT } from '../lib/ci/events';
+import { shipmentStamps } from '../lib/ci/shipment-stamps';
+import { areaKeyFor } from '../lib/ci/area-key';
 import crypto from 'node:crypto';
 import {
   currentStoreId,
@@ -31,6 +35,7 @@ import { withAramexEmails } from './carriers/aramex.carrier';
 import {
   activeCredentials,
   decryptCarrierBlob,
+  previousSecretGraceOpen,
   encryptCarrierBlob,
 } from './carriers/carrier-credentials';
 import {
@@ -294,7 +299,7 @@ class ShippingCarrierService {
    * path and, for carriers that echo a header, in that header). Kept inside the encrypted
    * credentials, generated once, replaced only on `rotate`.
    */
-  async rotateWebhookSecret(storeId: string, carrier: CarrierCode) {
+  async rotateWebhookSecret(storeId: string, carrier: CarrierCode, opts: { grace?: boolean } = {}) {
     await prisma.$transaction(async tx => {
       // same lock as upsertCarrierConfig: a rotation must not be reverted by a concurrent save
       await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
@@ -305,7 +310,9 @@ class ShippingCarrierService {
       if (!current) throw new AppError(404, 'NOT_FOUND', 'Carrier is not configured');
       await tx.shippingCarrierConfig.update({
         where: { storeId_carrier: { storeId, carrier } },
-        data: { credentials: rotateBlobWebhookSecret(current.credentials, current.settings) },
+        data: {
+          credentials: rotateBlobWebhookSecret(current.credentials, current.settings, opts),
+        },
       });
     });
     await this.invalidateCarrierConfigCache(storeId);
@@ -627,6 +634,7 @@ class ShippingCarrierService {
 
     // ---- record it (own short transaction) and move the order along
     const shipment = await runInTenantContext(storeId, () =>
+      // ci: emits ci/shipment-booked (below, after the booking is recorded)
       prisma.shipment.update({
         where: { id: claimedId, storeId },
         data: {
@@ -638,6 +646,13 @@ class ShippingCarrierService {
           carrierShipmentId: response.carrierShipmentId,
           carrierTransactionId: response.carrierTransactionId,
           estimatedDeliveryAt: response.estimatedDelivery,
+          // CI-1: the normalised destination only (never the street or building).
+          areaKey: areaKeyFor({
+            country: deliveryAddress.country,
+            state: deliveryAddress.state,
+            city: deliveryAddress.city,
+            area: deliveryAddress.area,
+          }).areaKey,
           statusHistory: [
             ...history0,
             {
@@ -648,6 +663,13 @@ class ShippingCarrierService {
           ],
         },
       })
+    );
+
+    // CI-1: the booking is an outcome (`shipment.created`). Never blocks or fails the booking.
+    await sendEventAfterCommit(
+      'ci-shipment-booked',
+      { name: CI_SHIPMENT_BOOKED_EVENT, data: { storeId, orderId, shipmentId: shipment.id } },
+      { ifUnhookable: 'send' }
     );
 
     try {
@@ -714,12 +736,14 @@ class ShippingCarrierService {
     try {
       return await runInTenantContext(storeId, async () => {
         if (!input.existingId) {
+          // ci: not-an-outcome (the booking claim; `shipment.created` is emitted once the carrier accepted it)
           const row = await prisma.shipment.create({
             data: { storeId, orderId: input.orderId, ...fields, createAttempts: 1 },
           });
           return row.id;
         }
         const staleBefore = new Date(Date.now() - CLAIM_STALE_MS);
+        // ci: not-an-outcome (re-claiming a failed or stale booking row)
         const r = await prisma.shipment.updateMany({
           where: {
             id: input.existingId,
@@ -744,6 +768,7 @@ class ShippingCarrierService {
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
     try {
       await runInTenantContext(storeId, () =>
+        // ci: not-an-outcome (a failed booking is counted in `attemptsToBook` of the eventual shipment.created)
         prisma.shipment.update({
           where: { id: shipmentId, storeId },
           data: { status: CREATION_FAILED, error: message },
@@ -831,6 +856,7 @@ class ShippingCarrierService {
     }
 
     const history = Array.isArray(shipment.statusHistory) ? (shipment.statusHistory as any[]) : [];
+    // ci: not-an-outcome (a merchant-cancelled shipment is not a delivery outcome; the order cancel is emitted from order/status-changed)
     const updatedShipment = await prisma.shipment.update({
       where: { id: shipmentId, storeId: currentStoreId() },
       data: {
@@ -1033,11 +1059,16 @@ class ShippingCarrierService {
     const nextStatus = merged.status;
 
     const prevStatus = shipment.status;
+    // Customer Intelligence (CI-1): first-time pick-up / attempt / delivery / return facts, stamped in
+    // the SAME update as the status so the columns and the events they guard cannot disagree.
+    const ci = shipmentStamps(merged.history, shipment, source);
+    // ci: emits ci/shipment-tracked (first-time pick-up / attempt / delivery / return, via shipmentStamps)
     const updated = await prisma.shipment.update({
       where: { id: shipmentId, storeId: currentStoreId() },
       data: {
         status: nextStatus,
         statusHistory: merged.history as unknown as Prisma.InputJsonValue,
+        ...ci.data,
         ...(extra.estimatedDelivery ? { estimatedDeliveryAt: extra.estimatedDelivery } : {}),
         ...(source === 'carrier_poll' ? { lastPolledAt: new Date() } : {}),
       },
@@ -1057,6 +1088,45 @@ class ShippingCarrierService {
           source,
         },
       });
+    }
+
+    // Ebda WhatsApp (contract 2026-10-24 section 4): every carrier status change is a
+    // `shipment.updated`; the job drops it unless the store linked WhatsApp. Enqueue failures are
+    // logged, never block tracking (the next poll re-sends a changed status).
+    if (prevStatus !== nextStatus) {
+      await sendEventAfterCommit(
+        'shipment-status-updated',
+        {
+          name: 'shipment/status-updated',
+          data: {
+            storeId: shipment.storeId,
+            orderId: shipment.orderId,
+            shipmentId,
+            status: nextStatus,
+            trackingUrl: updated.trackingUrl ?? null,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        { ifUnhookable: 'send' }
+      );
+    }
+
+    // CI-1: one event per call that brought a NEW first-time fact (not per status change: two failed
+    // attempts keep the status `failed`). Enqueue failures are logged, never block tracking.
+    if (ci.marks.length > 0) {
+      await sendEventAfterCommit(
+        'ci-shipment-tracked',
+        {
+          name: CI_SHIPMENT_TRACKED_EVENT,
+          data: {
+            storeId: shipment.storeId,
+            orderId: shipment.orderId,
+            shipmentId,
+            ci: ci.marks,
+          },
+        },
+        { ifUnhookable: 'send' }
+      );
     }
 
     if (nextStatus === 'delivered' && prevStatus !== 'delivered') {
@@ -1150,8 +1220,30 @@ class ShippingCarrierService {
         where: { storeId_carrier: { storeId, carrier } },
         select: { credentials: true, settings: true },
       });
-      const secret = this.readWebhookSecret(row);
-      if (!verifyWebhookToken(secret, token)) return 'unauthorized' as const;
+      const { current, previous } = this.readWebhookSecrets(row);
+      let secret = '';
+      let createdBefore: Date | undefined;
+      if (verifyWebhookToken(current, token)) {
+        secret = current;
+      } else if (previous && verifyWebhookToken(previous.secret, token)) {
+        // Graceful rotation (SEC-8): callbacks registered before it keep working while a shipment
+        // created before the rotation is still undelivered, for at most 30 days.
+        const inFlight = await prisma.shipment.findFirst({
+          where: {
+            storeId,
+            carrier,
+            createdAt: { lt: new Date(previous.rotatedAt) },
+            status: { notIn: [...TERMINAL_SHIPMENT_STATUSES, CREATION_FAILED, 'creating'] },
+          },
+          select: { id: true },
+        });
+        if (previousSecretGraceOpen(previous, Date.now(), !!inFlight)) {
+          secret = previous.secret;
+          // The old URL may only touch what was registered before the rotation and is not done.
+          createdBefore = new Date(previous.rotatedAt);
+        }
+      }
+      if (!secret) return 'unauthorized' as const;
       // Carriers that echo a header we set (Bosta) must present it too: a leaked URL alone is
       // not enough. Missing, wrong or empty are the same `unauthorized` (no oracle).
       if (impl.webhookHeader) {
@@ -1163,16 +1255,28 @@ class ShippingCarrierService {
 
       const result = impl.processWebhook(body, headers);
       if (!result) return 'ignored' as const;
-      return this.applyWebhookResult(carrier, result);
+      return this.applyWebhookResult(carrier, result, createdBefore);
     });
   }
 
   private async applyWebhookResult(
     carrier: string,
-    result: CarrierWebhookResult
+    result: CarrierWebhookResult,
+    /** Set when the PREVIOUS secret authenticated: only older, still-open shipments may change. */
+    createdBefore?: Date
   ): Promise<'unknown_shipment' | 'duplicate' | 'applied'> {
     const shipment = await prisma.shipment.findFirst({
-      where: { storeId: currentStoreId(), trackingNumber: result.trackingNumber, carrier },
+      where: {
+        storeId: currentStoreId(),
+        trackingNumber: result.trackingNumber,
+        carrier,
+        ...(createdBefore
+          ? {
+              createdAt: { lt: createdBefore },
+              status: { notIn: [...TERMINAL_SHIPMENT_STATUSES, CREATION_FAILED, 'creating'] },
+            }
+          : {}),
+      },
       select: { id: true },
     });
     if (!shipment) {
@@ -1400,14 +1504,15 @@ class ShippingCarrierService {
     }
   }
 
-  private readWebhookSecret(
+  private readWebhookSecrets(
     row: { credentials?: string | null; settings?: unknown } | null | undefined
-  ): string {
-    if (!row?.credentials) return '';
+  ): { current: string; previous?: { secret: string; rotatedAt: string } } {
+    if (!row?.credentials) return { current: '' };
     try {
-      return decryptCarrierBlob(row.credentials, row.settings).webhookSecret ?? '';
+      const blob = decryptCarrierBlob(row.credentials, row.settings);
+      return { current: blob.webhookSecret ?? '', previous: blob.previousWebhook };
     } catch {
-      return '';
+      return { current: '' };
     }
   }
 

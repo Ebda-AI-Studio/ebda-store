@@ -55,6 +55,20 @@ export const WORKER_APPS = [
   'apps/accounts',
 ];
 
+/**
+ * Apps whose PRODUCTION BUILD is a deploy step (cf-<app>-deploy.yml). OPS-2: #248 merged green and broke the storefront
+ * build because PR checks never built the apps. The PR lane builds every one of these whose dependency graph includes a
+ * changed workspace (packages/ui or packages/shared touch all of them).
+ */
+export const BUILD_APPS = [
+  'apps/web',
+  'apps/admin',
+  'apps/orders',
+  'apps/marketing',
+  'apps/docs',
+  'apps/help',
+];
+
 /** Changing these affects every workspace. */
 export const GLOBAL_WORKSPACES = ['packages/shared', 'packages/database'];
 
@@ -62,6 +76,9 @@ export const GLOBAL_WORKSPACES = ['packages/shared', 'packages/database'];
 export const UNIT_PATHS = {
   'packages/shared': ['packages/shared/src'],
   'packages/database': ['packages/database/src'],
+  'packages/cf-schema': ['packages/cf-schema'],
+  'packages/cf-migrate': ['packages/cf-migrate'],
+  'packages/repo': ['packages/repo'],
   'apps/web': ['apps/web'],
   'apps/admin': ['apps/admin/src'],
   'apps/orders': ['apps/orders'],
@@ -71,6 +88,9 @@ export const UNIT_PATHS = {
  * it or the API changes (a signature change must fail CI, not the next manual eval run).
  */
 export const SEARCH_EVAL_TSCONFIG = 'tests/search-eval/tsconfig.json';
+
+/** Files the generated CF schema is derived from (prisma schema + raw SQL migrations). */
+const PRISMA_INPUT = /^packages\/database\/prisma\/(schema\.prisma|migrations\/)/;
 
 /** Always part of the unit lane when any code changed: cross-app source pins. */
 export const BASE_UNIT_PATHS = ['tests/unit'];
@@ -256,6 +276,10 @@ export function classify(files, workspaces) {
   const unit = new Set();
   if (code) BASE_UNIT_PATHS.forEach(p => unit.add(p));
   for (const w of ws) (UNIT_PATHS[w.dir] ?? []).forEach(p => unit.add(p));
+  // The generated Cloudflare schema is a function of schema.prisma + the SQL migrations. It must be re-checked
+  // whenever either moves, even if someone later takes packages/database out of GLOBAL_WORKSPACES (2026-10-27:
+  // #218 added models, cf-schema went red on main and nothing noticed).
+  if (codeFiles.some(f => PRISMA_INPUT.test(f))) unit.add('packages/cf-schema');
   if (runAllUnit)
     Object.values(UNIT_PATHS)
       .flat()
@@ -275,6 +299,7 @@ export function classify(files, workspaces) {
     statusTests: all || direct.has('apps/status'),
     accountsTests: all || direct.has('apps/accounts'),
     workers: ws.filter(w => workerTouched.has(w.dir) && w.hasWrangler).map(w => w.dir.slice(5)),
+    buildApps: ws.filter(w => BUILD_APPS.includes(w.dir)).map(w => w.dir.slice(5)),
     changedFiles: codeFiles,
   };
 }
@@ -294,6 +319,8 @@ function formatOutputs(r, integration = { integration: false, paths: [] }) {
     accounts_tests: String(r.accountsTests),
     workers: JSON.stringify(r.workers),
     has_workers: String(r.workers.length > 0),
+    build_apps: JSON.stringify(r.buildApps),
+    has_build_apps: String(r.buildApps.length > 0),
     affected: r.workspaces.join(' '),
     integration: String(integration.integration),
     integration_paths: integration.paths === 'all' ? 'all' : integration.paths.join(' '),

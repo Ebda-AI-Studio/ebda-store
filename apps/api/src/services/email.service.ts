@@ -7,7 +7,8 @@ import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { storeBrandTheme } from '../lib/store-brand-theme';
-import { ResendService } from './resend.service';
+import { StoreMailer } from './store-mailer.service';
+import { sendMail } from './mail-transport';
 // Static import is safe despite the email-queue↔email-service cycle: both sides
 // use the other only at call-time (sendForStore / the queue's drain), never at
 // module load, so ES live-bindings resolve it. `queue: true` routes order emails
@@ -72,7 +73,6 @@ import {
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
-import { deliverableOnly } from '../lib/undeliverable-email';
 // ==========================================
 // Email Service
 // Transactional email handling
@@ -110,6 +110,8 @@ export interface EmailOptions {
   replyTo?: string;
   /** Extra message headers (RFC 8058 List-Unsubscribe / List-Unsubscribe-Post). Marketing and lifecycle mail only. */
   headers?: Record<string, string>;
+  /** Platform sends only: the From display name. Default = the product (`Ebda Store`); account mail passes `Ebda AI Studio`. */
+  fromName?: string;
 }
 
 export interface EmailStoreContext {
@@ -341,17 +343,6 @@ export interface OrderRefundEmailData {
   currency?: string;
 }
 
-// Lazy platform-sender Resend client. Shared between sendPlatform +
-// sendPlatformRaw so we don't instantiate the SDK on every admin email.
-let _platformResend: import('resend').Resend | null = null;
-async function getPlatformResend(): Promise<import('resend').Resend> {
-  if (!_platformResend) {
-    const { Resend } = await import('resend');
-    _platformResend = new Resend(config.resendApiKey);
-  }
-  return _platformResend;
-}
-
 /** A header value on one line: a shopper-typed subject must not carry CR/LF into the email. */
 function oneLine(value: string): string {
   return value.replace(/[\r\n]+/g, ' ').trim();
@@ -363,7 +354,7 @@ export class EmailService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Load store, wrap content in renderBrandedShell, ship via ResendService.
+   * Load store, wrap content in renderBrandedShell, ship via StoreMailer.
    * Used by all customer-facing send* methods.
    */
   private static async sendForStore(
@@ -430,7 +421,7 @@ export class EmailService {
       });
       return;
     }
-    await ResendService.sendBrandedEmail(storeId, {
+    await StoreMailer.sendBrandedEmail(storeId, {
       to: args.to,
       subject: args.subject,
       html,
@@ -477,22 +468,15 @@ export class EmailService {
       });
       return;
     }
-    const recipients = deliverableOnly(args.to);
-    if (recipients.length === 0) return;
-    const r = await getPlatformResend();
-    const payload: Record<string, unknown> = {
+    await sendMail({
       from: brandFrom(),
-      to: recipients,
+      to: args.to,
       subject: args.subject,
       html,
-    };
-    if (args.text) payload.text = args.text;
-    if (args.replyTo) payload.replyTo = args.replyTo;
-    if (args.headers) payload.headers = args.headers;
-    const { error } = await r.emails.send(
-      payload as unknown as Parameters<typeof r.emails.send>[0]
-    );
-    if (error) throw new Error(`Resend send failed: ${error.message}`);
+      ...(args.text ? { text: args.text } : {}),
+      ...(args.replyTo ? { replyTo: args.replyTo } : {}),
+      ...(args.headers ? { headers: args.headers } : {}),
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -501,10 +485,10 @@ export class EmailService {
 
   /**
    * Replay a queued email that already has a storeId — ships via
-   * ResendService so the store's verified sender is used.
+   * StoreMailer so the store's verified sender is used.
    */
   static async sendRaw(storeId: string, options: EmailOptions): Promise<void> {
-    await ResendService.sendBrandedEmail(storeId, {
+    await StoreMailer.sendBrandedEmail(storeId, {
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -516,22 +500,15 @@ export class EmailService {
    * Replay a queued email with no store context — platform sender.
    */
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
-    const recipients = deliverableOnly(options.to);
-    if (recipients.length === 0) return;
-    const r = await getPlatformResend();
-    const payload: Record<string, unknown> = {
-      from: brandFrom(),
-      to: recipients,
+    await sendMail({
+      from: brandFrom(options.fromName),
+      to: options.to,
       subject: options.subject,
       html: options.html,
-    };
-    if (options.text) payload.text = options.text;
-    if (options.replyTo) payload.replyTo = options.replyTo;
-    if (options.headers) payload.headers = options.headers;
-    const { error } = await r.emails.send(
-      payload as unknown as Parameters<typeof r.emails.send>[0]
-    );
-    if (error) throw new Error(`Resend send failed: ${error.message}`);
+      ...(options.text ? { text: options.text } : {}),
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.headers ? { headers: options.headers } : {}),
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -1021,7 +998,7 @@ export class EmailService {
     // the queue drainer, where a transient failure retries 3x instead of
     // vanishing. Before this, the whole chain was fired-and-forgotten past
     // the response and died on a committed transaction (P2028) at
-    // `resend.service.ts` — every return confirmation silently unsent.
+    // `store-mailer.service.ts` — every return confirmation silently unsent.
     await this.sendForStore(
       storeId,
       { to: data.email, subject, content, language: lang },

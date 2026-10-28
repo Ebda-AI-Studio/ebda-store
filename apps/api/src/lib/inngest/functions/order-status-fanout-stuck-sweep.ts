@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -184,6 +184,9 @@ export async function handleOrderStatusFanoutStuckSweep(
             // The REQUESTED transition (issue 2070); equal to the current
             // status here by construction (superseded rows were split out).
             status: o.statusFanoutRequestedStatus ?? o.status,
+            ...(o.statusFanoutRequestedAt
+              ? { requestedAt: new Date(o.statusFanoutRequestedAt).toISOString() }
+              : {}),
             // Only gates the admin refund bookkeeping email. updateStatus reads
             // it off the pre-transition order; from the persisted row, money
             // was captured when the payment status says paid or refunded.
@@ -316,7 +319,7 @@ async function reportFailedAfterClaim(
   });
 }
 
-export const orderStatusFanoutStuckSweep: InngestFunction.Any = inngest.createFunction(
+export const orderStatusFanoutStuckSweep: JobDef = inngest.createFunction(
   {
     id: 'order-status-fanout-stuck-sweep',
     name: 'Order status fanout — sweep transitions whose order/status-changed never ran',

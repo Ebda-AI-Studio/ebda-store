@@ -3,13 +3,14 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { BRAND, BRAND_MARKETING_URL, siteNavItems } from '@ebda/shared/brand';
 import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
   renderFooter,
   renderPage,
   renderSearchMain,
+  render404Main,
   renderSidebar,
   renderToc,
   writeSeoFiles,
@@ -30,12 +31,6 @@ const PRODUCT = BRAND.product.nameEn;
 const EN = {
   site: `${BRAND.company.shortNameEn} Docs`,
   skip: 'Skip to content',
-  nav: [
-    { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameEn },
-    { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
-    { href: `https://${BRAND.domains.help}`, label: 'Help centre' },
-    { href: `https://${BRAND.domains.status}`, label: 'Status' },
-  ],
   search: { action: '/search/', label: 'Search', placeholder: 'Search the docs' },
   footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. ${BRAND.product.nameEn} developer documentation.`,
   sidebarLabel: 'Documentation',
@@ -123,7 +118,7 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
     ],
     siteLabel: EN.site,
     homeHref: '/',
-    nav: EN.nav,
+    active: 'docs',
     langSwitch: { href: '/ar/', label: 'العربية', lang: 'ar' },
     search: EN.search,
     sidebar: sidebarFor(slug),
@@ -204,15 +199,15 @@ for (const p of pages) {
       { hreflang: 'ar', href: ORIGIN + '/ar/' },
     ],
     siteLabel: 'وثائق المطوّرين',
+    active: 'docs',
     homeHref: '/ar/',
-    nav: [
-      { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
-      { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
-      { href: `https://${BRAND.domains.help}`, label: 'مركز المساعدة' },
-      { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
-    ],
     langSwitch: { href: '/', label: 'English', lang: 'en' },
-    search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
+    search: {
+      action: '/search/',
+      label: 'بحث',
+      placeholder: 'ابحث في الوثائق (بالإنجليزية)',
+      index: '/search-index.en.json',
+    },
     main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${cards}</article>`,
     footer: renderFooter({
       copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
@@ -234,7 +229,7 @@ writePage(
     canonical: ORIGIN + '/search/',
     siteLabel: EN.site,
     homeHref: '/',
-    nav: EN.nav,
+    active: 'docs',
     langSwitch: { href: '/ar/', label: 'العربية', lang: 'ar' },
     search: EN.search,
     sidebar: sidebarFor(''),
@@ -242,7 +237,7 @@ writePage(
       lang: 'en',
       title: 'Search',
       intro: 'Type to search every page of the docs.',
-      indexUrl: '/search-index.json',
+      indexUrl: '/search-index.en.json',
       messages: {
         loading: 'Loading the search index…',
         none: 'No results.',
@@ -259,22 +254,94 @@ writePage(
 await writeSearchAssets(out, searchDocs);
 
 writeSeoFiles(out, ORIGIN, urls);
-writeFileSync(
-  path.join(out, '404.html'),
-  renderPage({
-    lang: 'en',
-    title: `Not found | ${BRAND.company.shortNameEn} Docs`,
-    description: 'Page not found.',
-    canonical: ORIGIN + '/',
-    siteLabel: EN.site,
-    homeHref: '/',
-    nav: EN.nav,
-    search: EN.search,
-    main: `<h1>Page not found</h1><p>That page does not exist. Start from the <a href="/">docs home</a>.</p>`,
-    footer,
-    skipLabel: EN.skip,
-  })
-);
+// 404 pages: Workers Static Assets serves the NEAREST 404.html (/ar/* gets the Arabic one). Apple-style: one calm
+// sentence, live search, a compact map. The docs are English-only, so the Arabic page searches the English index.
+const NF = {
+  en: {
+    line: "The page you're looking for can't be found.",
+    hint: 'Search for what you meant, or pick a section below.',
+    mapLabel: 'Documentation sections',
+    docs: 'Documentation',
+    ebda: BRAND.company.shortNameEn,
+    home: 'Docs home',
+    contact: 'Contact',
+  },
+  ar: {
+    line: 'الصفحة اللي بتدوّر عليها مش موجودة.',
+    hint: 'دوّر على اللي كنت تقصده (الوثائق بالإنجليزية)، أو اختار قسم من تحت.',
+    mapLabel: 'أقسام الوثائق',
+    docs: 'الوثائق',
+    ebda: BRAND.company.shortNameAr,
+    home: 'الصفحة الرئيسية للوثائق',
+    contact: 'تواصل معانا',
+  },
+};
+const firstOfSection = SECTIONS.flatMap(section => {
+  const first = allNav
+    .filter(p => p.section === section)
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))[0];
+  return first ? [{ label: section, href: url(first.slug) }] : [];
+});
+for (const lang of ['en', 'ar']) {
+  const c = NF[lang];
+  const ar = lang === 'ar';
+  writeFileSync(
+    path.join(out, ar ? 'ar/404.html' : '404.html'),
+    renderPage({
+      lang,
+      title: ar
+        ? `الصفحة مش موجودة | وثائق المطوّرين`
+        : `Not found | ${BRAND.company.shortNameEn} Docs`,
+      description: ar ? 'الصفحة مش موجودة.' : 'Page not found.',
+      canonical: ORIGIN + (ar ? '/ar/' : '/'),
+      siteLabel: ar ? 'وثائق المطوّرين' : EN.site,
+      homeHref: ar ? '/ar/' : '/',
+      active: 'docs',
+      search: ar
+        ? {
+            action: '/search/',
+            label: 'بحث',
+            placeholder: 'ابحث في الوثائق (بالإنجليزية)',
+            index: '/search-index.en.json',
+          }
+        : EN.search,
+      noHeaderSearch: true,
+      main: render404Main({
+        lang,
+        search: ar
+          ? {
+              action: '/search/',
+              label: 'بحث',
+              placeholder: 'ابحث في الوثائق (بالإنجليزية)',
+              index: '/search-index.en.json',
+            }
+          : EN.search,
+        line: c.line,
+        hint: c.hint,
+        mapLabel: c.mapLabel,
+        groups: [
+          {
+            title: c.docs,
+            links: [
+              { href: ar ? '/ar/' : '/', label: c.home },
+              ...firstOfSection,
+              { href: '/openapi.json', label: 'OpenAPI' },
+            ],
+          },
+          {
+            title: c.ebda,
+            links: [
+              ...siteNavItems(lang).map(i => ({ href: i.href, label: i.label })),
+              { href: `mailto:${BRAND.supportEmail}`, label: c.contact },
+            ],
+          },
+        ],
+      }),
+      footer,
+      skipLabel: ar ? 'تخطَّ إلى المحتوى' : EN.skip,
+    }).replace('<head>', '<head>\n<meta name="robots" content="noindex">')
+  );
+}
 writeFileSync(
   path.join(out, 'llms.txt'),
   `# ${BRAND.company.shortNameEn} Docs\n\n> Developer documentation for ${BRAND.product.nameEn}, from ${BRAND.company.shortNameEn}. Products are added here as they ship.\n\n${pages

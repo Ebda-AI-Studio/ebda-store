@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInStoreScope } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -18,7 +18,7 @@ import { featureService } from '../../../services/feature.service';
  * (malformed image, unsupported format) are caught inside the service and
  * create a draft with a note instead of throwing.
  */
-export const accountingExpenseOcrProcess: InngestFunction.Any = inngest.createFunction(
+export const accountingExpenseOcrProcess: JobDef = inngest.createFunction(
   {
     id: 'accounting-expense-ocr-process',
     name: 'Accounting — OCR-process uploaded expense receipt',

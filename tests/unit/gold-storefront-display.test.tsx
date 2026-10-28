@@ -70,10 +70,10 @@ describe('goldRateIsStale (mirrors the server rule: whole minutes >= the limit)'
 });
 
 describe('goldRateTime', () => {
-  it('prints Western digits in Arabic unless the merchant opted into Arabic-Indic (NUMERALS-1)', () => {
+  it('prints Western digits in Arabic, whatever is asked (DIGITS-1)', () => {
     expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar')).toMatch(/9:00/);
     expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar')).not.toMatch(/[٠-٩]/);
-    expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar', 'arab')).toMatch(/[٠-٩]/);
+    expect(goldRateTime('2026-10-22T06:00:00.000Z', 'ar', 'arab' as never)).not.toMatch(/[٠-٩]/);
   });
   it('prints the Cairo clock whatever the server timezone is', () => {
     // 06:00Z is 09:00 in Cairo in October 2026 (EEST, UTC+3)

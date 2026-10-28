@@ -1,5 +1,6 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInTenantContext, storeDirectory } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runProfitAnomalyScan } from '../../../services/accounting/profit-anomaly.service';
@@ -20,7 +21,7 @@ import { REGION } from '@ebda/shared';
  * Each per-store scan is wrapped in step.run() so Inngest retries only
  * the failing store without re-running healthy ones.
  */
-export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFunction(
+export const accountingProfitAnomalyCron: JobDef = inngest.createFunction(
   {
     id: 'accounting-profit-anomaly-cron',
     name: 'Profit anomaly scan — daily cron (AI)',
@@ -28,13 +29,13 @@ export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFu
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 30 6 * * *` }], // 06:30 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set).
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory(s => s.accountingEnabled && s.aiFeaturesEnabled).then(list =>
-        list.map(s => ({ id: s.id }))
+      storeDirectory(storeFilter(event, s => s.accountingEnabled && s.aiFeaturesEnabled)).then(
+        list => list.map(s => ({ id: s.id }))
       )
     );
 

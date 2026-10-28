@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma } from '@ebda/database';
 import { AWAITING_PAYMENT_CONFIRMATION } from '@ebda/shared';
 import logger from '../../logger';
@@ -24,7 +24,7 @@ import { InstapayService } from '../../../services/payment-providers/instapay.se
  */
 const RUN_CAP = 500;
 
-export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
+export const instapayExpiry: JobDef = inngest.createFunction(
   {
     id: 'instapay-expiry',
     name: 'Expire unconfirmed InstaPay orders (hourly)',
@@ -35,9 +35,10 @@ export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
     triggers: [{ cron: '7 * * * *' }],
   },
   async ({ step }) => {
-    const now = new Date();
-    const due = await stepRunUnlessEmpty(step, 'find-due', () =>
-      sweepAcrossStores({
+    const due = await stepRunUnlessEmpty(step, 'find-due', () => {
+      // Read inside the step: the cutoff is part of the memoised read, not re-derived on replay.
+      const now = new Date();
+      return sweepAcrossStores({
         fetch: storeId =>
           prisma.order.findMany({
             where: {
@@ -52,8 +53,8 @@ export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
           }),
         orderKey: r => r.paymentConfirmationExpiresAt ?? 0,
         take: RUN_CAP,
-      })
-    );
+      });
+    });
 
     let expired = 0;
     let skipped = 0;
@@ -61,7 +62,7 @@ export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
     for (const o of due) {
       const outcome = await step.run(`expire-${o.id}`, async () => {
         try {
-          return await InstapayService.expireOne(o.storeId, o.id, now);
+          return await InstapayService.expireOne(o.storeId, o.id, new Date());
         } catch (err) {
           logger.error({ err, orderId: o.id, storeId: o.storeId }, 'instapay-expiry: failed');
           return 'failed' as const;

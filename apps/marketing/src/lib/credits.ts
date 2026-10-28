@@ -76,4 +76,40 @@ export const MODEL_CREDITS: readonly ModelCredit[] = [
     },
     triangles: 3540,
   },
+  {
+    file: 'jasmine-serum.glb',
+    title: 'Jasmine serum bottle',
+    author: 'Ebda AI Studio',
+    sourceUrl: 'https://ebda.app',
+    sourceName: 'Ebda AI Studio (modelled in code with three.js)',
+    license: 'CC0 1.0',
+    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+    changes: {
+      ar: 'موديل من تصميمنا بالكود، مش مأخوذ من حد. محسّن للويب (meshopt). CC0 مش بتطلب نسب.',
+      en: 'Modelled by us in code, not taken from anyone. Optimised for the web (meshopt). CC0 needs no attribution.',
+    },
+    use: {
+      ar: 'زجاجة سيروم ياسمين في قسم صفحة المنتج 3D',
+      en: 'The Jasmine serum bottle in the 3D product page',
+    },
+    triangles: 3936,
+  },
+  {
+    file: 'dahab-solitaire.glb',
+    title: 'Dahab solitaire ring',
+    author: 'Ebda AI Studio',
+    sourceUrl: 'https://ebda.app',
+    sourceName: 'Ebda AI Studio (modelled in code with three.js)',
+    license: 'CC0 1.0',
+    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+    changes: {
+      ar: 'موديل من تصميمنا بالكود، مش مأخوذ من حد. محسّن للويب (meshopt). CC0 مش بتطلب نسب.',
+      en: 'Modelled by us in code, not taken from anyone. Optimised for the web (meshopt). CC0 needs no attribution.',
+    },
+    use: {
+      ar: 'خاتم سوليتير دهب في قسم صفحة المنتج 3D',
+      en: 'The Dahab solitaire ring in the 3D product page',
+    },
+    triangles: 6616,
+  },
 ];

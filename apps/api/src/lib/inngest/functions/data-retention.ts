@@ -1,5 +1,7 @@
-import type { InngestFunction } from 'inngest';
+import { InstapayReceiptService } from '../../../services/payment-providers/instapay-receipt.service';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
+import { acrossOpts } from '../../jobs/store-scope';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -48,14 +50,14 @@ const ABANDONED_CART_BATCH_CAP = 10_000;
 const USER_ANONYMIZE_BATCH_CAP = 200;
 const ORDER_ANONYMIZE_BATCH_CAP = 500;
 
-export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
+export const abandonedCartPurge: JobDef = inngest.createFunction(
   {
     id: 'abandoned-cart-purge-weekly',
     name: 'Purge anonymous abandoned carts older than 30 days',
     retries: 1,
     triggers: [{ cron: '0 4 * * 0' }],
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     const cutoff = new Date(Date.now() - ABANDONED_CART_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
     // FORCE RLS: data-retention is cross-tenant — no storeId available.
@@ -63,10 +65,12 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     // Store-scoped table: counted and purged store by store, each in its own scope.
     const candidateCount = await step.run('count-candidates', async () =>
       (
-        await acrossStores(storeId =>
-          prisma.abandonedCart.count({
-            where: { storeId, createdAt: { lt: cutoff }, customerId: null },
-          })
+        await acrossStores(
+          storeId =>
+            prisma.abandonedCart.count({
+              where: { storeId, createdAt: { lt: cutoff }, customerId: null },
+            }),
+          acrossOpts(event)
         )
       ).reduce((n, r) => n + r.value, 0)
     );
@@ -90,7 +94,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
           where: { id: { in: candidates.map(c => c.id) }, storeId },
         });
         return result.count;
-      })) {
+      }, acrossOpts(event))) {
         removed += value;
       }
       return removed;
@@ -109,7 +113,7 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
  * included. Daily, so the table never holds more than ~91 days per store; one small DELETE
  * per store per run.
  */
-export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
+export const searchLogPurge: JobDef = inngest.createFunction(
   {
     id: 'search-log-purge-daily',
     name: `Purge storefront search log rows older than ${SEARCH_LOG_RETENTION_DAYS} days`,
@@ -131,7 +135,29 @@ export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
   }
 );
 
-export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunction(
+/**
+ * InstaPay receipt retention (M-025): screenshots deleted (approved: right away, a missed delete is retried here;
+ * rejected / voided: 30 days after the decision; drafts: 30 days after upload) and the personal fields scrubbed 180 days
+ * after a final decision. Daily (a missed delete is retried the next day); per store, in the store's own scope. See docs/RETENTION.md.
+ */
+export const instapayReceiptRetention: JobDef = inngest.createFunction(
+  {
+    id: 'instapay-receipt-retention-daily',
+    name: 'Delete InstaPay receipt screenshots and scrub receipt personal fields on schedule',
+    retries: 1,
+    triggers: [{ cron: '30 4 * * *' }],
+  },
+  async ({ step }) => {
+    const out = await step.run('sweep', () => InstapayReceiptService.sweepRetention());
+    logger.info(
+      { images: out.images, scrubbed: out.scrubbed },
+      'instapay-receipt-retention: completed'
+    );
+    return out;
+  }
+);
+
+export const softDeletedUserAnonymize: JobDef = inngest.createFunction(
   {
     id: 'soft-deleted-user-anonymize-monthly',
     name: 'Anonymize customer users soft-deleted > 12 months ago',
@@ -228,7 +254,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
  * Schedule: monthly, 1st of month 03:30 UTC (offset from the user
  * anonymization at 02:00 + audit-log archive at 03:00 to spread Neon I/O).
  */
-export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunction(
+export const orderAnonymizeAtFiveYears: JobDef = inngest.createFunction(
   {
     id: 'order-anonymize-5y-monthly',
     name: 'Anonymize orders older than 5 years (Egypt MOF retention window)',
@@ -284,6 +310,8 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
                 shippingAddress: anonymizedJson,
                 billingAddress: anonymizedJson,
                 customerNotes: null,
+                buyerKey: null,
+                areaKey: null,
               },
             })
           )

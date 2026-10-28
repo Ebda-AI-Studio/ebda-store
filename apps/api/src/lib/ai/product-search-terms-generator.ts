@@ -14,7 +14,7 @@
  */
 import { SEARCH_TERM_MAX_LENGTH, cleanSearchTerms, isPersonalDataTerm } from '@ebda/shared';
 import { GeminiFailoverClient } from './gemini-keys';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';

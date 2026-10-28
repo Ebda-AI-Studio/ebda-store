@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
@@ -59,7 +59,7 @@ interface BatchResult {
 
 type WorkItem = { kind: 'store' | 'category' | 'product'; id: string };
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type when the returned object mixes a plain string[]
 // with a richer array-of-objects sibling (the annotation widens the
@@ -531,17 +531,19 @@ const bulkAiTranslateFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
 
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: 'completed',
-          processed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: 'completed',
+            processed,
+            filled,
+            skipped,
+            failed,
+            errors: errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
@@ -551,4 +553,4 @@ const bulkAiTranslateFn = inngest.createFunction(
     }); // end runInStoreScope
   }
 );
-export const bulkAiTranslate: InngestFunction.Any = bulkAiTranslateFn;
+export const bulkAiTranslate: JobDef = bulkAiTranslateFn;

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { webhookInbox } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -46,7 +46,7 @@ interface StuckRow {
 const STUCK_WEBHOOK_MINUTES = Number(process.env.STUCK_WEBHOOK_MINUTES) || 10;
 const SWEEP_TAKE = 200;
 
-export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunction(
+export const paymentWebhookStuckSweep: JobDef = inngest.createFunction(
   {
     id: 'payment-webhook-stuck-sweep',
     name: 'Payment webhook — sweep undelivered / wedged inbox rows',
@@ -72,13 +72,12 @@ export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunct
     triggers: [{ cron: '7,37 * * * *' }],
   },
   async ({ step }) => {
-    const cutoff = new Date(Date.now() - STUCK_WEBHOOK_MINUTES * 60_000);
-
     // Cross-tenant read of the inbox (storeId may be null) — withRlsBypass.
     // Cross-store by nature (the inbox spans every store, including rows with a
     // NULL store): one definer call, `ebda_webhook_inbox_stuck`.
     const stuck: StuckRow[] = await stepRunUnlessEmpty(step, 'find-stuck', async () =>
-      webhookInbox.stuck(cutoff, SWEEP_TAKE)
+      // The cutoff is read inside the step: part of the memoised read, not re-derived on replay.
+      webhookInbox.stuck(new Date(Date.now() - STUCK_WEBHOOK_MINUTES * 60_000), SWEEP_TAKE)
     );
 
     if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };

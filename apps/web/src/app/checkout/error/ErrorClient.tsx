@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import { useRouter } from 'next/navigation';
 import { Button } from '@ebda/ui';
 import { api } from '@/lib/api';

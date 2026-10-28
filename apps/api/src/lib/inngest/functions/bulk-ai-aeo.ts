@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -235,7 +235,7 @@ interface AeoErr {
 // bulk-ai-faq-aeo — draft store-level FAQ items
 // -----------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -357,6 +357,7 @@ const bulkAiFaqAeoFn = inngest.createFunction(
           paymob: ['Visa', 'Mastercard', 'Meeza', 'Mobile wallets', 'valU installments'],
           kashier: ['Visa', 'Mastercard', 'Mobile wallets'],
           fawry: ['Pay at Fawry', 'Visa', 'Mastercard'],
+          geidea: ['Visa', 'Mastercard'],
           instapay: ['InstaPay'],
           cod: ['Cash on Delivery'],
         };
@@ -496,19 +497,16 @@ No other text, no markdown code fences — pure JSON only.`;
       }
 
       if (result.notFound) {
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        await step.run('mark-failed', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+          });
         });
         return;
       }
 
       const quotaReached = 'quotaReached' in result && result.quotaReached === true;
-
-      const faqFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
 
       // Bust ONCE per sweep, never per item. This file defines THREE separate
       // Inngest functions; an earlier pass inserted the bust before only the LAST
@@ -521,21 +519,30 @@ No other text, no markdown code fences — pure JSON only.`;
       // `public:store:resolve:<domain>` payloads), never off `public:products:*`
       // (#1333).
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: faqFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed: result.filled + result.skipped + result.failed,
-          filled: result.filled,
-          skipped: result.skipped,
-          failed: result.failed,
-          errors: result.errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const faqFinalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: faqFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed: result.filled + result.skipped + result.failed,
+            filled: result.filled,
+            skipped: result.skipped,
+            failed: result.failed,
+            errors: result.errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       if (result.filled > 0) {
-        await ensureFooterSupportLinkEnabled(storeId, '/faq', 'FAQ', 'الأسئلة الشائعة');
+        await step.run('ensure-footer-link', async () => {
+          await ensureFooterSupportLinkEnabled(storeId, '/faq', 'FAQ', 'الأسئلة الشائعة');
+        });
       }
 
       logger.info(
@@ -552,13 +559,13 @@ No other text, no markdown code fences — pure JSON only.`;
     }); // end runInStoreScope
   }
 );
-export const bulkAiFaqAeo: InngestFunction.Any = bulkAiFaqAeoFn;
+export const bulkAiFaqAeo: JobDef = bulkAiFaqAeoFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-howto-aeo — draft HowTo guides
 // -----------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -813,44 +820,50 @@ No markdown, no code fences — pure JSON only.`;
       }
 
       if (result.notFound) {
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        await step.run('mark-failed', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+          });
         });
         return;
       }
 
       const quotaReached = 'quotaReached' in result && result.quotaReached === true;
 
-      const howtoFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
-
       // Bust ONCE per sweep, never per item — see the identical note on the
       // FAQ sweep above (#1333): StoreHowto rows are served off the STORE
       // record's own `public:store:*` cache keys, not `public:products:*`.
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: howtoFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed: result.filled + result.skipped + result.failed,
-          filled: result.filled,
-          skipped: result.skipped,
-          failed: result.failed,
-          errors: result.errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const howtoFinalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: howtoFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed: result.filled + result.skipped + result.failed,
+            filled: result.filled,
+            skipped: result.skipped,
+            failed: result.failed,
+            errors: result.errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       if (result.filled > 0) {
-        await ensureFooterSupportLinkEnabled(
-          storeId,
-          '/how-to-guides',
-          'How-To Guides',
-          'أدلة الاستخدام'
-        );
+        await step.run('ensure-footer-link', async () => {
+          await ensureFooterSupportLinkEnabled(
+            storeId,
+            '/how-to-guides',
+            'How-To Guides',
+            'أدلة الاستخدام'
+          );
+        });
       }
 
       logger.info(
@@ -867,7 +880,7 @@ No markdown, no code fences — pure JSON only.`;
     }); // end runInStoreScope
   }
 );
-export const bulkAiHowtoAeo: InngestFunction.Any = bulkAiHowtoAeoFn;
+export const bulkAiHowtoAeo: JobDef = bulkAiHowtoAeoFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-meta-aeo — rewrite meta descriptions in conversational style
@@ -894,7 +907,7 @@ interface MetaBatchResult {
  * never stomp on a merchant who has written a custom one. `force` bypasses
  * the skip.
  */
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -963,17 +976,21 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       });
 
       if (items.length === 0) {
-        await prisma.bulkAiJob.update({
-          where: { id: jobId, storeId },
-          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        await step.run('mark-failed', async () => {
+          await prisma.bulkAiJob.update({
+            where: { id: jobId, storeId },
+            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+          });
         });
         return;
       }
 
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { name: true },
-      });
+      const store = await step.run('load-store', () =>
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { name: true },
+        })
+      );
       const storeName = store?.name ?? storeId;
 
       const batches = chunk(items, BULK_AI_BATCH_SIZE);
@@ -1285,11 +1302,6 @@ const bulkAiMetaAeoFn = inngest.createFunction(
         }
       }
 
-      const metaFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId, storeId },
-        select: { status: true },
-      });
-
       // A bulk AI sweep rewrites product-facing content (titles, descriptions,
       // SEO, translations, tags, categories, image alt, FAQs) with raw Prisma
       // writes that carry no cache awareness, so the storefront kept serving
@@ -1306,17 +1318,24 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       // the same run makes. Bust both.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
-      await prisma.bulkAiJob.update({
-        where: { id: jobId, storeId },
-        data: {
-          status: metaFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
-          completedAt: new Date(),
-        },
+      await step.run('finalize', async () => {
+        const metaFinalRow = await prisma.bulkAiJob.findUnique({
+          where: { id: jobId, storeId },
+          select: { status: true },
+        });
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: {
+            status: metaFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+            processed,
+            filled,
+            skipped,
+            failed,
+            errors: errors as object,
+            completedAt: new Date(),
+          },
+        });
       });
 
       logger.info(
@@ -1326,7 +1345,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
     }); // end runInStoreScope
   }
 );
-export const bulkAiMetaAeo: InngestFunction.Any = bulkAiMetaAeoFn;
+export const bulkAiMetaAeo: JobDef = bulkAiMetaAeoFn;
 
 // Prompt builder for conversational meta descriptions (store/product/category)
 // now lives in lib/ai/product-meta-aeo-generator.ts as `buildMetaAeoPrompt` —

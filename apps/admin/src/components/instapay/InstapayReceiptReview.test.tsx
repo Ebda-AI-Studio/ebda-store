@@ -80,6 +80,12 @@ describe('InstapayReceiptReview', () => {
     expect(apiFetch).toHaveBeenCalledWith('/img/1');
   });
 
+  it('SEC-11: always shows the AI-is-advisory note, even with no flags', async () => {
+    render(<InstapayReceiptReview receipt={receipt({ flags: [] })} imageEndpoint="/img/1" />);
+    expect(screen.getByTestId('instapay-ai-advisory').textContent).toBe('aiAdvisory');
+    await waitFor(() => expect(screen.getByRole('img')).toBeTruthy());
+  });
+
   it('shows flags as warnings, the mismatch prominently, and submitted vs read values (Cairo time)', async () => {
     render(<InstapayReceiptReview receipt={receipt()} imageEndpoint="/img/1" />);
     expect(screen.getByText('AMOUNT_MISMATCH')).toBeTruthy();

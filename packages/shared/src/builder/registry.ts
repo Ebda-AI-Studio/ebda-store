@@ -17,7 +17,7 @@
  * renderers), so every entry maps onto a legacy layout key (`legacyKey`).
  * Adding a section type is a registry entry, not three hand-kept key lists.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { storeLayoutSchema } from './layout-schema';
 import {
   imageTextSchema,

@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import { EDGE_CLASS_HEADER, EDGE_FILL_HEADER, edgeSnapshotOf } from './edge-gens';
 
 /**
  * Apply CDN-friendly Cache-Control + Vary headers so whatever edge/CDN sits
@@ -24,6 +25,12 @@ import type { Response } from 'express';
  * `server: cloudflare` + `cf-ray`), but `cf-cache-status: DYNAMIC` — CF does
  * not cache these JSON responses without an explicit cache rule, so today
  * these headers are honored-but-inert.
+ *
+ * UPDATE (SEO-3, Ruling EDGE-API-1): the API Worker now honours them itself. `cf/public-edge-cache.ts` stores the
+ * anonymous catalogue reads that call this helper in the Workers Cache API (keyed on store host, CORS origin, path
+ * and sorted query, so Vary is not needed for correctness there) and serves a copy only while the cache generations
+ * it was filled under (`lib/edge-gens.ts`) are unchanged. A price/stock write therefore invalidates it in every
+ * data centre; `neverStale` marks those routes so the stale-while-revalidate tail is never served for them.
  *
  * The Vary set below is NOT load-bearing on Cloudflare even once a cache
  * rule IS added: Cloudflare's cache key ignores the `Vary` header (other
@@ -55,6 +62,11 @@ export function setEdgeCache(
     /** Vary tokens beyond the defaults (`x-store-id`, `x-store-domain`).
      *  Add `'Accept-Language'` for locale-split payloads. */
     varyOn?: string[];
+    /**
+     * NEVER-stale payload (price, stock, availability): the Worker edge layer serves it only inside the fresh
+     * window and only while its cache generations are unchanged, never from the stale-while-revalidate tail.
+     */
+    neverStale?: boolean;
   }
 ): void {
   // Design review I3 (B2B): a response that was computed for a SIGNED-IN caller may differ per buyer (group prices,
@@ -76,6 +88,14 @@ export function setEdgeCache(
   res.vary('x-store-domain');
   for (const token of opts.varyOn ?? []) {
     res.vary(token);
+  }
+  // SEO-3: hand the Worker's edge layer (cf/public-edge-cache.ts) what it needs to store this response and
+  // to know when it stops being valid. Both headers are internal and stripped before the client sees them;
+  // they exist only when the layer asked for a fill.
+  const snap = edgeSnapshotOf(res.req);
+  if (snap) {
+    res.setHeader(EDGE_FILL_HEADER, JSON.stringify(snap));
+    res.setHeader(EDGE_CLASS_HEADER, opts.neverStale ? 'never' : 'bounded');
   }
 }
 

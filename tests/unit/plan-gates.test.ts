@@ -72,7 +72,10 @@ beforeEach(() => {
 });
 
 describe('maxStores 1 / 1 / 3 — assertOwnerMayCreateStore', () => {
-  const owns = (...ids: string[]) => m.storeFindMany.mockResolvedValue(ids.map(id => ({ id })));
+  const owns = (...ids: string[]) =>
+    m.storeFindMany.mockResolvedValue(
+      ids.map((id, i) => ({ id, createdAt: new Date(1000 * (i + 1)) }))
+    );
 
   it('the first store is always allowed', async () => {
     owns();

@@ -61,9 +61,17 @@ import {
   renewalKey,
   upgradeKey,
   type BillingInterval,
+  addIntervalAnchored,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
-import { suspendForBilling } from './account.service';
+import {
+  grantedCarryMs,
+  restoreRevokedGrants,
+  revokeGrantsForEvent,
+  shiftedByGrants,
+  sweepFreeMonthGrants,
+} from './grants.service';
+import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -226,6 +234,7 @@ async function downgradeToFree(
       pendingPlanCode: null,
       dunningAttempts: 0,
       nextRetryAt: null,
+      billingAnchorDay: null,
       provider: null,
       providerCustomerId: null,
       providerSubscriptionId: null,
@@ -268,7 +277,11 @@ async function applySuccess(
       status: 'active' as const,
       billingInterval: interval,
       currentPeriodStart: now,
-      currentPeriodEnd: addInterval(now, interval),
+      // a fresh paid period PLUS the free months still unconsumed (additive: a max() would swallow the free month)
+      currentPeriodEnd: new Date(
+        addInterval(now, interval).getTime() + (await grantedCarryMs(tx, row.storeId, now))
+      ),
+      billingAnchorDay: now.getUTCDate(), // the cycle restarts today (M-125)
       cancelAtPeriodEnd: false,
       pendingPlanCode: null,
       dunningAttempts: 0,
@@ -295,7 +308,9 @@ async function applySuccess(
       sub &&
       row.forPeriodEnd &&
       periodEndOf(sub) &&
-      periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() &&
+      (periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() ||
+        // a free-month grant moved the end after this charge was claimed: same period, shifted (FOUNDING-1)
+        (await shiftedByGrants(tx, row.storeId, row.forPeriodEnd, periodEndOf(sub)!))) &&
       ['active', 'trialing', 'past_due'].includes(sub.status);
     if (!sub || !renewable) {
       // Money was taken but the subscription is not in a renewable state for
@@ -313,10 +328,18 @@ async function applySuccess(
     }
     const interval = isInterval(row.billingInterval) ? row.billingInterval : 'monthly';
     const planCode = row.planCode ?? sub.planCode;
-    let start = row.forPeriodEnd!;
+    let start = periodEndOf(sub)!; // = forPeriodEnd, or that end shifted by free-month grants
+    // The day the cycle started on (M-125): clamped from the ANCHOR each cycle, so a short month never moves it.
+    // (a trialing subscription's first paid period anchors on its own start: an old anchor from an earlier life of
+    // this row must not be inherited)
+    let anchor =
+      sub.status === 'trialing' ? start.getUTCDate() : (sub.billingAnchorDay ?? start.getUTCDate());
     // A long-lapsed period must not leave the new one already expired
     // (that would charge again on the very next cron run).
-    if (addInterval(start, interval).getTime() <= now.getTime()) start = now;
+    if (addIntervalAnchored(start, interval, anchor).getTime() <= now.getTime()) {
+      start = now;
+      anchor = now.getUTCDate();
+    }
     await tx.storeSubscription.update({
       where: { storeId: row.storeId },
       data: {
@@ -324,7 +347,8 @@ async function applySuccess(
         billingInterval: interval,
         status: 'active',
         currentPeriodStart: start,
-        currentPeriodEnd: addInterval(start, interval),
+        currentPeriodEnd: addIntervalAnchored(start, interval, anchor),
+        billingAnchorDay: anchor,
         trialEndsAt: null,
         pendingPlanCode: null,
         dunningAttempts: 0,
@@ -551,8 +575,14 @@ async function chargeAndSettle(args: {
       );
       return { settled: 'failed' };
     }
-    // Unknown outcome (timeout / 5xx): leave `pending`; never re-send blindly.
+    // Unknown outcome (timeout / 5xx): leave `pending`; never re-send blindly. Loud (M-023): nothing else is
+    // going to look at it - the daily sweep asks the gateway, then hands it to dunning after the give-up window.
     logger.error({ err, eventId: args.eventId }, '[billing] charge outcome unknown — left pending');
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: charge outcome unknown',
+      body: `billing_events ${args.eventId}: the gateway call did not answer (${(err as Error).message}). Left pending and NOT retried; the daily sweep asks the gateway where it can and names what it cannot resolve.`,
+    }).catch(() => undefined);
     return { settled: 'pending', reason: (err as Error).message };
   }
   if (res.status === 'pending') {
@@ -615,6 +645,7 @@ export async function startCheckout(args: {
   returnUrl?: string;
 }): Promise<{ redirectUrl: string; billingEventId: string }> {
   const interval = args.interval ?? 'monthly';
+  await assertPayableStore(args.storeId);
   // Hosted card checkout exists only in card mode (Ruling EBDA-FUNNEL-17).
   if (resolveTrialCardMode(args.provider) !== 'card_on_file') {
     throw new AppError(
@@ -707,6 +738,7 @@ export async function selectTrialPlan(args: {
   planCode: string;
   interval: BillingInterval;
 }): Promise<{ planCode: string; interval: BillingInterval; amountMinor: number }> {
+  await assertPayableStore(args.storeId);
   const { plan, price } = await loadPayablePlan(args.planCode, args.interval);
   if (!plan.isPublic)
     throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
@@ -737,6 +769,7 @@ export async function startCardSetup(args: {
   provider?: BillingProvider;
   returnUrl?: string;
 }): Promise<{ redirectUrl: string; billingEventId: string }> {
+  await assertPayableStore(args.storeId);
   const provider = args.provider ?? getBillingProvider();
   if (resolveTrialCardMode(provider) !== 'card_on_file') {
     throw new AppError(
@@ -827,6 +860,9 @@ export async function renewSubscription(
   if (sub.status === 'comped' || isGrantedPlan(sub.planCode)) {
     return { action: 'skipped', reason: 'comped' };
   }
+  // A child store is included in its parent's plan and is NEVER charged on its own
+  // (Ruling EBDA-FUNNEL-18). Fail closed: a store the owner list cannot place is skipped too.
+  if (!(await isBillableStoreId(sub.storeId))) return { action: 'skipped', reason: 'child_store' };
   const billable = ['active', 'trialing', 'past_due'].includes(sub.status);
   const periodEnd = periodEndOf(sub);
   if (!billable || !periodEnd) return { action: 'skipped', reason: 'not_billable' };
@@ -1026,6 +1062,113 @@ export async function findDueSubscriptionIds(
   return rows.map(r => r.id);
 }
 
+/** A renewal / upgrade charge is "stuck" when its outcome has not arrived this long after it was claimed. */
+export const STUCK_CHARGE_AFTER_MS = 3_600_000;
+
+/**
+ * Charges whose gateway answer was lost (M-023). For each renewal/upgrade row pending > 1 h the gateway is ASKED
+ * (`getChargeStatus`):
+ *  - a definitive answer is settled through the guarded pending -> succeeded|failed transition;
+ *  - `null` (the provider says it has no record of that charge: it was never taken) is settled `failed`, which
+ *    sends the renewal into dunning;
+ *  - anything else - no lookup on this provider, no transaction id to look up, the gateway unreachable, a settle
+ *    error - leaves the row PENDING and is named in one P1. It is NEVER given up on blindly: a claim that was
+ *    never sent and an answer that was lost look the same from here, and failing the second kind would send a
+ *    dunning retry (a new key) that charges the customer twice.
+ * Idempotent; one bad row never stops the rest.
+ */
+export async function sweepStuckCharges(
+  now: Date,
+  provider?: BillingProvider
+): Promise<{ polled: number; settled: number; notFound: number; stillStuck: number }> {
+  const cutoff = new Date(now.getTime() - STUCK_CHARGE_AFTER_MS);
+  const parts = await acrossStores(
+    storeId =>
+      prisma.billingEvent.findMany({
+        where: {
+          storeId,
+          type: { in: ['renewal', 'upgrade'] },
+          status: 'pending',
+          createdAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          storeId: true,
+          idempotencyKey: true,
+          providerRef: true,
+          createdAt: true,
+        },
+      }),
+    {
+      onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
+    }
+  );
+  const rows = parts.flatMap(p => p.value);
+  let active: BillingProvider | null = provider ?? null;
+  if (!active && rows.length > 0) {
+    try {
+      active = getBillingProvider();
+    } catch {
+      active = null; // card billing is off (InstaPay only): nothing to ask
+    }
+  }
+  const out = { polled: 0, settled: 0, notFound: 0, stillStuck: 0 };
+  const stuck: string[] = [];
+  for (const r of rows) {
+    try {
+      if (!active?.getChargeStatus) {
+        stuck.push(r.id);
+        continue;
+      }
+      out.polled++;
+      const res = await active.getChargeStatus({
+        idempotencyKey: r.idempotencyKey,
+        merchantOrderId: r.id,
+        chargeId: r.providerRef,
+      });
+      if (res === null) {
+        const t = await settleCharge(
+          r.id,
+          { status: 'failed', failureReason: 'not_found_at_gateway' },
+          now
+        );
+        if (t.transitioned) out.notFound++;
+        continue;
+      }
+      if (res.status === 'pending') {
+        stuck.push(r.id);
+        continue;
+      }
+      const t = await settleCharge(
+        r.id,
+        {
+          status: res.status,
+          providerRef: res.chargeId,
+          failureReason: res.failureReason,
+          raw: res.raw,
+        },
+        now
+      );
+      if (t.transitioned) out.settled++;
+    } catch (err) {
+      logger.warn(
+        { err, eventId: r.id },
+        '[billing] stuck charge lookup / settle failed; left pending'
+      );
+      stuck.push(r.id);
+    }
+  }
+  out.stillStuck = stuck.length;
+  if (stuck.length > 0) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: charges with an unknown outcome',
+      body: `${stuck.length} renewal/upgrade charge(s) pending for over an hour with no gateway answer: ${stuck.slice(0, 10).join(', ')}. Not retried (a retry could charge the customer twice). Check the gateway dashboard and /billing-events.`,
+    }).catch(() => undefined);
+  }
+  return out;
+}
+
 export async function expireStaleCheckouts(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_CHECKOUT_MS);
   const parts = await acrossStores(
@@ -1071,6 +1214,18 @@ export async function runBillingCycle(
       }
     }
   }
+  if (!only) {
+    // FOUNDING-1: apply pending free months / re-create lost ones before the due list is read (a granted month
+    // moves a store's due date). Never blocks the renewals below.
+    await sweepFreeMonthGrants(now).catch(err =>
+      logger.error({ err }, '[billing] free-month grant sweep failed')
+    );
+    // M-023: settle / hand on charges whose outcome never arrived, BEFORE the due list is read (a given-up
+    // renewal enters dunning and may be due again today).
+    await sweepStuckCharges(now, provider).catch(err =>
+      logger.error({ err }, '[billing] stuck-charge sweep failed')
+    );
+  }
   const ids = await findDueSubscriptionIds(now, only);
   for (const id of ids) {
     summary.examined++;
@@ -1100,6 +1255,7 @@ export async function changePlan(args: {
   now?: Date;
   provider?: BillingProvider;
 }): Promise<ChangePlanResult> {
+  await assertPayableStore(args.storeId);
   const now = args.now ?? new Date();
   const provider = args.provider ?? getBillingProvider();
   const sub = await loadSub(args.storeId);
@@ -1481,10 +1637,15 @@ async function settleRefundInTx(
     _sum: { amountMinor: true },
   });
   if ((agg._sum.amountMinor ?? 0) >= charge.amountMinor) {
-    await tx.billingEvent.updateMany({
+    const flipped = await tx.billingEvent.updateMany({
       where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
+    // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
+    // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
+    if (flipped.count === 1) {
+      await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
+    }
   }
 }
 
@@ -1513,21 +1674,21 @@ export async function refundCharge(args: {
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
   }
-  const prior = await withStore(charge.storeId, tx =>
+  // EVERY attempt, whatever its outcome: the key below is numbered by attempts, so a failed / rejected refund
+  // must still count or its retry regenerates the same key and is blocked for good (M-062). Only pending
+  // and succeeded rows hold money, so only they count toward `remaining`.
+  const attempts = await withStore(charge.storeId, tx =>
     tx.billingEvent.findMany({
-      where: {
-        storeId: charge.storeId,
-        relatedEventId: charge.id,
-        type: 'refund',
-        status: { in: ['pending', 'succeeded'] },
-      },
+      where: { storeId: charge.storeId, relatedEventId: charge.id, type: 'refund' },
       select: { amountMinor: true, status: true },
     })
   );
-  if (prior.some(p => p.status === 'pending')) {
+  if (attempts.some(p => p.status === 'pending')) {
     throw new AppError(409, 'REFUND_IN_PROGRESS', 'A refund is already pending for this charge');
   }
-  const remaining = charge.amountMinor - prior.reduce((s, p) => s + p.amountMinor, 0);
+  const remaining =
+    charge.amountMinor -
+    attempts.filter(p => p.status === 'succeeded').reduce((s, p) => s + p.amountMinor, 0);
   const amount = args.amountMinor ?? remaining;
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remaining) {
     throw new AppError(
@@ -1536,7 +1697,7 @@ export async function refundCharge(args: {
       `Refund must be between 1 and ${remaining} piastres`
     );
   }
-  const key = `refund:${charge.id}:${prior.length + 1}`;
+  const key = `refund:${charge.id}:${attempts.length + 1}`;
   const refundId = await claimEvent({
     storeId: charge.storeId,
     subscriptionId: charge.subscriptionId,
@@ -1569,6 +1730,8 @@ export async function refundCharge(args: {
         );
       }
     });
+    // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
+    await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };
   } catch (err) {
     if (err instanceof BillingProviderError && err.notCharged) {

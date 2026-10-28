@@ -2,7 +2,14 @@
  * apps/marketing SEO surface: sitemap (both locales, hreflang, ebda.app only), robots,
  * JSON-LD (parses, offers come from PLANS) and per-page metadata with a canonical.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// RootShell loads its fonts through next/font, which only exists inside the Next compiler.
+vi.mock('next/font/google', () => {
+  const font = () => ({ className: '', variable: '', style: {} });
+  return { Geist: font, Geist_Mono: font, IBM_Plex_Sans_Arabic: font };
+});
+
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sitemap from '../../apps/marketing/src/app/sitemap';
@@ -118,29 +125,67 @@ describe('every page exports metadata with a canonical', () => {
     it(`${rel}`, async () => {
       const dir = path.dirname(file);
       const isEn = rel.startsWith(path.join('(en)', 'en'));
-      const page = SITE_PAGES.find(p => p && dir.endsWith(p)) ?? '';
+      // longest match first: 'legal/whatsapp-privacy' must not resolve to 'privacy'
+      const page =
+        [...SITE_PAGES].sort((a, b) => b.length - a.length).find(p => p && dir.endsWith(p)) ?? '';
       const mod = await import(file);
       // The home pages inherit metadata from their locale layout.
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
       expect(meta, `${rel} must export metadata`).toBeTruthy();
-      // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher
-      expect(meta.title).toContain(isEn ? 'Ebda Store' : 'ابدأ ستور');
+      // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher. The /whatsapp page is
+      // the second product (Ebda WhatsApp): its own name, brand line and OG image, never the Store's.
+      const wa = page === 'whatsapp';
+      const product = wa
+        ? isEn
+          ? 'Ebda WhatsApp'
+          : 'ابدأ واتساب'
+        : isEn
+          ? 'Ebda Store'
+          : 'ابدأ ستور';
+      expect(meta.title).toContain(product);
       expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
       // brand disambiguation (not ebda3i.com or any other "Ebda"): the one brand line is in the OG
       // description; inner titles end in the short tail and stay SERP-length
       expect(meta.openGraph.description).toContain(
-        'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
+        wa
+          ? 'Ebda WhatsApp — ابدأ واتساب, by Ebda AI Studio (ebda.app)'
+          : 'Ebda Store — ابدأ ستور, by Ebda AI Studio (ebda.app)'
       );
-      if (page)
-        expect(meta.title.endsWith(`| ${isEn ? 'Ebda Store' : 'ابدأ ستور'} (ebda.app)`)).toBe(true);
+      if (page) expect(meta.title.endsWith(`| ${product} (ebda.app)`)).toBe(true);
       expect(meta.title.length).toBeLessThanOrEqual(page ? 90 : 60);
       expect(meta.twitter.title).toBe(meta.title);
-      expect(meta.openGraph.siteName).toBe(isEn ? 'Ebda Store' : 'ابدأ ستور');
+      expect(meta.openGraph.siteName).toBe(product);
       expect(meta.description).toBeTruthy();
       expect(meta.alternates.canonical).toBe(pagePath(isEn ? 'en' : 'ar', page));
       expect(Object.keys(meta.alternates.languages).sort()).toEqual(['ar', 'en', 'x-default']);
-      expect(meta.openGraph.images[0].url).toBe('/og.png');
+      // the five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs): 1200x630 PNG under 300 KB
+      const vertical = page?.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
+      const card = vertical ? `/og/${vertical}.png` : wa ? '/og-whatsapp.png' : '/og.png';
+      // electronics leads with the lantern ad poster and carries the video; the vertical card follows
+      if (vertical === 'electronics') {
+        expect(meta.openGraph.images.map((i: { url: string }) => i.url)).toEqual([
+          '/ads/lantern-poster.png',
+          card,
+        ]);
+        expect(meta.openGraph.videos[0].url).toBe('/ads/lantern-1080x1350.mp4');
+        expect(
+          statSync(path.resolve(__dirname, '../../apps/marketing/public/ads/lantern-poster.png'))
+            .size
+        ).toBeLessThan(300 * 1024);
+        expect(
+          statSync(path.resolve(__dirname, '../../apps/marketing/public/ads/lantern-1080x1350.mp4'))
+            .size
+        ).toBeLessThan(4 * 1024 * 1024);
+      } else {
+        expect(meta.openGraph.images[0].url).toBe(card);
+        expect(meta.openGraph.videos).toBeUndefined();
+      }
+      expect(meta.twitter.images[0]).toBe(meta.openGraph.images[0].url);
+      if (vertical) {
+        const file = path.resolve(__dirname, `../../apps/marketing/public/og/${vertical}.png`);
+        expect(statSync(file).size).toBeLessThan(300 * 1024);
+      }
       expect(meta.twitter.card).toBe('summary_large_image');
     });
   }

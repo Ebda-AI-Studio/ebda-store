@@ -9,7 +9,7 @@
  * never cached (no Redis/KV/bounded-map, `Cache-Control: no-store` on the route), so ack
  * and send need no invalidation.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { asPlatformOperator, prisma, withUser } from '@ebda/database';
 import {
   LEGAL_DOC_KEYS,

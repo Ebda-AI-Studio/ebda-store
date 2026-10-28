@@ -3,7 +3,7 @@
 import { storeNumerals } from '@ebda/shared';
 import { useState, useEffect } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';

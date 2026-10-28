@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';

@@ -11,13 +11,16 @@
  * scrolled, a translucent backdrop.
  */
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import type { HeaderProps } from '../types';
 import { useTabBarShown, HEADER_MENU_WITH_TAB_BAR } from '../shared/tab-bar-visibility';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
+import { lockupFor } from '@ebda/shared';
 import { StoreLogo } from '../shared/StoreLogo';
+import { StoreLockup } from '../shared/StoreLockup';
+import { useStore } from '../../contexts/StoreContext';
 import { DahabDrawer } from './Drawer';
 import { DahabCartDrawer } from './CartDrawer';
 import { BagIcon, DAHAB_CONTAINER, MenuIcon, SearchIcon, UserIcon, ChevronIcon, cx } from './ui';
@@ -37,6 +40,8 @@ export default function DahabHeader({
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, language, setLanguage, t } = useLanguage();
   const tabBarShown = useTabBarShown();
+  const { store } = useStore();
+  const lockup = lockupFor(store?.look, store?.template);
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -73,6 +78,8 @@ export default function DahabHeader({
     >
       {logo ? (
         <StoreLogo src={logo} alt={name} priority />
+      ) : lockup ? (
+        <StoreLockup lockup={lockup} name={branding.name} nameAr={branding.nameAr} isRtl={isRtl} />
       ) : (
         <span
           translate="no"

@@ -36,6 +36,13 @@ function getInitialLanguage(storeDefault?: Language): Language {
   return resolveDefaultLanguage(undefined);
 }
 
+/** `/ar/products` -> `/en/products`; null when the path carries no language prefix (or already has `lang`). */
+export function swapLocalePrefix(pathname: string, lang: Language): string | null {
+  const m = /^\/(ar|en)(\/.*)?$/.exec(pathname);
+  if (!m || m[1] === lang) return null;
+  return `/${lang}${m[2] ?? ''}`;
+}
+
 // Cookie helpers — used so the user's locale choice survives full page
 // reloads + propagates to server-rendered chrome (titles, breadcrumbs,
 // schema.org). The cookie is read in `apps/web/src/app/layout.tsx`.
@@ -83,9 +90,18 @@ export function LanguageProvider({ children, defaultLanguage }: LanguageProvider
     // have until they navigate away.
     if (typeof window !== 'undefined') {
       writeCookie('force-language', lang);
-      // Defer the reload so the cookie write commits before the navigation
+      // Language in the URL (LOCALE-PATHS-1): on a `/ar|/en` page the other language is another URL, so go there
+      // instead of reloading the same one (the middleware would keep the URL's language and ignore the cookie).
+      const target = swapLocalePrefix(window.location.pathname, lang);
+      // Defer the navigation so the cookie write commits first
       // (some browsers flush cookies on next event loop tick).
-      setTimeout(() => window.location.reload(), 0);
+      setTimeout(
+        () =>
+          target
+            ? window.location.assign(target + window.location.search + window.location.hash)
+            : window.location.reload(),
+        0
+      );
     }
   };
 

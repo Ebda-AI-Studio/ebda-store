@@ -1,5 +1,6 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope, acrossStores } from '@ebda/database';
+import { acrossOpts } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
@@ -73,21 +74,18 @@ export interface WarehouseSweepResult {
  *
  * Failures are alerted, not only logged: a store that throws is a P1, and a
  * night with failed SKUs sends an info alert with the counts.
- *
- * INNGEST_DEPLOY_ID note: like every other cron in this registry, this new
- * function is invisible to the Inngest platform until a deploy bumps
- * `INNGEST_DEPLOY_ID` (see the trap explained in `client.ts` and
- * `queue-depth-watch.ts`) — the first deploy that ships this file needs a
- * real deploy (not just a hot-reload) for Inngest to pick up the new
- * cron/on-demand pair.
  */
-export async function sweepAllWarehouseStores(step: FanoutStep): Promise<WarehouseSweepResult> {
+export async function sweepAllWarehouseStores(
+  step: FanoutStep,
+  event?: { data?: unknown }
+): Promise<WarehouseSweepResult> {
   // FORCE RLS: cron has no storeId — visit every store and keep the ones that
   // have at least one warehouse row.
   const stores = await step.run('list-stores-with-warehouses', async () =>
     (
-      await acrossStores(storeId =>
-        prisma.warehouse.findFirst({ where: { storeId }, select: { storeId: true } })
+      await acrossStores(
+        storeId => prisma.warehouse.findFirst({ where: { storeId }, select: { storeId: true } }),
+        acrossOpts(event)
       )
     )
       .filter(r => r.value !== null)
@@ -143,7 +141,7 @@ export async function sweepAllWarehouseStores(step: FanoutStep): Promise<Warehou
   return result;
 }
 
-export const warehouseReconcileSweepCron: InngestFunction.Any = inngest.createFunction(
+export const warehouseReconcileSweepCron: JobDef = inngest.createFunction(
   {
     id: 'warehouse-reconcile-sweep-cron',
     name: 'Warehouse stock reconcile — daily completeness sweep',
@@ -151,7 +149,7 @@ export const warehouseReconcileSweepCron: InngestFunction.Any = inngest.createFu
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * *` }], // 06:00 Cairo (DST-aware via TZ=)
   },
-  async ({ step }) => sweepAllWarehouseStores(step)
+  async ({ event, step }) => sweepAllWarehouseStores(step, event)
 );
 
 /**
@@ -177,7 +175,7 @@ export async function reconcileOneStoreOnDemand(
   return result;
 }
 
-export const warehouseReconcileOnDemand: InngestFunction.Any = inngest.createFunction(
+export const warehouseReconcileOnDemand: JobDef = inngest.createFunction(
   {
     id: 'warehouse-reconcile-on-demand',
     name: 'Warehouse stock reconcile — on-demand',

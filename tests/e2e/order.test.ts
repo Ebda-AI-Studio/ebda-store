@@ -344,7 +344,10 @@ describe('Order Flow', () => {
   });
 
   describe('Payment Webhook Idempotency', () => {
-    it('should handle duplicate webhook calls', async () => {
+    // Duplicate-delivery idempotency ("already processed") is pinned per live gateway in
+    // tests/integration/egypt-gateway-webhooks.test.ts. Tap was removed when the Egypt gateways replaced it
+    // (5ae935d3f, 2026-10-04), so its endpoint now refuses instead of replaying (Ruling ITEST-9).
+    it('refuses a webhook for a removed provider (tap) and leaves the order untouched', async () => {
       if (!createdOrderId) {
         throw new Error('No order available');
       }
@@ -354,28 +357,27 @@ describe('Order Flow', () => {
         where: { id: createdOrderId },
         data: { idempotencyKey: syntheticKey, webhookProcessedAt: new Date() },
       });
+      const before = await prisma.order.findUnique({ where: { id: createdOrderId } });
 
-      const tapChargeId = syntheticKey.replace(/^tap_/, '');
       const webhookPayload = {
-        id: tapChargeId,
+        id: syntheticKey.replace(/^tap_/, ''),
         object: 'charge',
         status: 'CAPTURED',
       };
 
-      // Content-Type octet-stream so express.raw({ type: '*/*' }) cleanly
-      // captures the body as a Buffer in CI. With Content-Type:
-      // application/json, supertest/express may parse the body upstream and
-      // rawBody arrives as a JS object → JSON.parse(rawBody.toString()) gets
-      // "[object Object]" and throws before the webhook handler can reach
-      // its INVALID_PROVIDER check.
+      // Content-Type octet-stream so express.raw({ type: '*/*' }) captures the body as a Buffer.
       const res = await request(app)
         .post('/webhooks/payment/tap')
         .set('x-tap-signature', 'test-signature')
         .set('Content-Type', 'application/octet-stream')
         .send(Buffer.from(JSON.stringify(webhookPayload)));
 
-      expect(res.status).toBe(200);
-      expect(res.body.data.message).toContain('already processed');
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INVALID_PROVIDER');
+      const after = await prisma.order.findUnique({ where: { id: createdOrderId } });
+      expect(after?.status).toBe(before?.status);
+      expect(after?.paymentStatus).toBe(before?.paymentStatus);
+      expect(after?.idempotencyKey).toBe(syntheticKey);
     });
 
     it('should reject invalid payment provider', async () => {
@@ -464,9 +466,8 @@ describe('Order Flow', () => {
       // Inventory restoration is NOT synchronous with the request. Since #758
       // ("reversals off the request tx, retriable + idempotent") the cancel
       // path only ENQUEUES `order/refunded`; the restore runs in the Inngest
-      // fanout. In tests `inngest.send` is a no-op — client.ts replaces it
-      // whenever INNGEST_DRY_RUN=true or NODE_ENV=test, and CI sets both —
-      // so nothing consumes the event and the restore would never happen.
+      // fanout. In Node (tests) `inngest.send` starts nothing — there are no Worker
+      // bindings — so nothing consumes the event and the restore would never happen.
       //
       // Asserting inventory straight after the response therefore tested a
       // contract the API stopped honouring on 2026-07-16, and this test had

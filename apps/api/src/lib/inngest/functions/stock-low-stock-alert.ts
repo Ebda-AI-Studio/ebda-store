@@ -1,5 +1,6 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
+import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
@@ -34,7 +35,7 @@ import type { LowStockAlertItem } from '../../../services/email-templates/low-st
  * work in withRlsBypass (same pattern as stock-reorder-scan and
  * stock-deadstock-scan).
  */
-export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunction(
+export const stockLowStockAlertCron: JobDef = inngest.createFunction(
   {
     id: 'stock-low-stock-alert-cron',
     name: 'Low-stock alert — 6-hourly cron',
@@ -42,11 +43,11 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 */6 * * *' }], // every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
   },
-  async ({ step }) => {
+  async ({ event, step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.
-      storeDirectory().then(list => list.map(s => ({ id: s.id })))
+      storeDirectory(storeFilter(event)).then(list => list.map(s => ({ id: s.id })))
     );
 
     // One UTC day for the whole run (memoized), so webhook inventory.low dedupes per product per day.
@@ -179,7 +180,7 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
  * short SET NX before it enters a digest.
  * Event: `stock/low-stock-scan-requested` with data: { storeId, requestedBy? }
  */
-export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFunction(
+export const stockLowStockAlertOnDemand: JobDef = inngest.createFunction(
   {
     id: 'stock-low-stock-alert-on-demand',
     name: 'Low-stock alert — on-demand',
@@ -192,7 +193,9 @@ export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFun
     logger.info({ storeId, requestedBy }, 'stock-low-stock-alert-on-demand: starting');
 
     // Feature gate — skip when inventory.stock_alerts is disabled.
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.stock_alerts');
+    const enabled = await step.run('check-feature', () =>
+      featureService.isFeatureEnabled(storeId, 'inventory.stock_alerts')
+    );
     if (!enabled) {
       logger.info(
         { storeId },

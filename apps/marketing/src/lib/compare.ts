@@ -126,8 +126,8 @@ const ROWS: readonly RowDef[] = [
     group: 'strength',
     label: { ar: 'سلات متروكة ونقاط ولاء', en: 'Cart recovery and loyalty' },
     ebda: {
-      ar: 'استرجاع السلات المتروكة بإشعار أو SMS، ونقاط الولاء، من باقة النمو.',
-      en: 'Abandoned-cart recovery by notification or SMS, and loyalty points, from the Growth plan.',
+      ar: 'استرجاع السلات المتروكة بإشعار من باقة النمو (والـSMS في باقة الأعمال بحساب SMS خاص بيك)، ونقاط الولاء.',
+      en: 'Abandoned-cart recovery by notification from the Growth plan (SMS is on the Business plan, with your own SMS account), and loyalty points.',
     },
     plus: {
       needs: 'cart',
@@ -394,7 +394,7 @@ const gulfCopy = (nameEn: string, nameAr: string): Record<Locale, CompareCopy> =
   en: {
     name: nameEn,
     title: `Ebda Store vs ${nameEn}`,
-    desc: `An honest comparison of Ebda Store and ${nameEn} for a seller in Egypt: where Ebda Store is stronger, where ${nameEn} is stronger, and what is not there yet. As of October 2026.`,
+    desc: `Ebda Store vs ${nameEn} for a seller in Egypt: where each is stronger and what Ebda Store does not have yet. As of October 2026.`,
     h1: `Ebda Store vs ${nameEn}`,
     intro: `Both Ebda Store and ${nameEn} let you open an online store in Arabic. The difference is that Ebda Store is built for Egypt, while ${nameEn} started in Saudi Arabia. This page says where each is stronger, including what Ebda Store does not have yet.`,
     chooseThemH: `Choose ${nameEn} if`,
@@ -431,7 +431,7 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
     en: {
       name: 'Shopify',
       title: 'Ebda Store vs Shopify',
-      desc: 'An honest comparison of Ebda Store and Shopify for a seller in Egypt: where Ebda Store is stronger, where Shopify is stronger, and what is not there yet. As of October 2026.',
+      desc: 'Ebda Store vs Shopify for a seller in Egypt: where each is stronger and what Ebda Store does not have yet. As of October 2026.',
       h1: 'Ebda Store vs Shopify',
       intro:
         'Shopify is a large global platform serving merchants in many countries, while Ebda Store is built for Egypt only. This page says where each is stronger, including what Ebda Store does not have yet.',
@@ -536,7 +536,7 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
     en: {
       name: 'Wuilt',
       title: 'Ebda Store vs Wuilt',
-      desc: 'An honest comparison of Ebda Store and Wuilt for a seller in Egypt: Wuilt is cheaper when you are starting out, Ebda Store adds payments, shipping and AI. Checked 22 October 2026.',
+      desc: 'Ebda Store vs Wuilt for a seller in Egypt: Wuilt is cheaper when starting out; Ebda Store adds payments, shipping and AI. Checked 22 Oct 2026.',
       h1: 'Ebda Store vs Wuilt',
       intro:
         'Wuilt is an Egypt-focused platform with a free store, which is a real advantage when you are starting out. This page says where Wuilt is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 22 October 2026.',
@@ -612,7 +612,7 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
     en: {
       name: 'YouCan',
       title: 'Ebda Store vs YouCan',
-      desc: 'An honest comparison of Ebda Store and YouCan for a seller in Egypt: dollar plans plus transaction fees at YouCan, 0% commission at Ebda Store. Checked 22 October 2026.',
+      desc: 'Ebda Store vs YouCan for a seller in Egypt: dollar plans plus transaction fees at YouCan, 0% commission at Ebda Store. Checked 22 Oct 2026.',
       h1: 'Ebda Store vs YouCan',
       intro:
         'YouCan serves merchants in many countries and charges a transaction fee on orders depending on how the customer pays. Ebda Store bills in pounds with 0% commission. Figures come from their public pages, checked 22 October 2026.',
@@ -673,7 +673,7 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
     en: {
       name: 'EasyOrders',
       title: 'Ebda Store vs EasyOrders',
-      desc: 'An honest comparison of Ebda Store and EasyOrders for a seller in Egypt: EasyOrders is cheaper when orders are few, Ebda Store is a full store in pounds with 0% commission. Checked 22 October 2026.',
+      desc: 'Ebda Store vs EasyOrders for a seller in Egypt: EasyOrders is cheaper with few orders; Ebda Store is a full store in pounds, 0% commission.',
       h1: 'Ebda Store vs EasyOrders',
       intro:
         'EasyOrders starts free and charges $0.04 per order, which is much cheaper when you take few orders. This page says where it is cheaper and where Ebda Store is stronger. Figures come from their public pages, checked 22 October 2026.',
@@ -739,7 +739,7 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
     en: {
       name: 'ExpandCart',
       title: 'Ebda Store vs ExpandCart',
-      desc: 'An honest comparison of Ebda Store and ExpandCart for a seller in Egypt: dollar plans with multiple currencies at ExpandCart, pounds and Egypt-first at Ebda Store. Checked 22 October 2026.',
+      desc: 'Ebda Store vs ExpandCart for a seller in Egypt: dollar plans and many currencies at ExpandCart; pounds and Egypt-first at Ebda Store.',
       h1: 'Ebda Store vs ExpandCart',
       intro:
         'ExpandCart says it takes no commission on sales, and it offers multiple currencies and many integrations. Ebda Store bills in pounds and is built for Egypt. Figures come from their public pages, checked 22 October 2026.',

@@ -180,16 +180,13 @@ describe('signup gate (route)', () => {
     }
   });
 
-  it('a genuine pre-FU46-11 token (<ms>.<hmac(ms)>) still verifies until it ages out', () => {
+  it('the legacy pre-FU46-11 2-part token (<ms>.<hmac(ms)>) is refused (removed 2026-10-27, M-155)', () => {
     const ts = String(Date.now() - 10_000);
     const legacySig = crypto
       .createHmac('sha256', `${process.env.JWT_SECRET}:merchant-signup-form`)
       .update(ts)
       .digest('base64url');
-    expect(verifySignupFormToken(`${ts}.${legacySig}`).verdict).toBe('ok');
-    expect(verifySignupFormToken(`${ts}.${legacySig}`, Date.now() + 48 * 3600_000).verdict).toBe(
-      'expired'
-    );
+    expect(verifySignupFormToken(`${ts}.${legacySig}`).verdict).toBe('invalid');
   });
 
   it('the fill-time floor is configurable', async () => {

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { parseInput } from '../lib/parse-input';

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1403,
+    "wired": 1398,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -2842,19 +2842,6 @@
       ],
       "surface": "theme",
       "control": "accentColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "dahab|theme|arabicNumerals",
-      "skin": "dahab",
-      "looks": [
-        "dahab.worn",
-        "dahab.workshop",
-        "dahab.giftbox"
-      ],
-      "surface": "theme",
-      "control": "arabicNumerals",
       "status": "wired",
       "evidence": "static"
     },
@@ -6612,19 +6599,6 @@
       ],
       "surface": "theme",
       "control": "accentColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "jasmine|theme|arabicNumerals",
-      "skin": "jasmine",
-      "looks": [
-        "jasmine.apothecary",
-        "jasmine.bloom",
-        "jasmine.clinic"
-      ],
-      "surface": "theme",
-      "control": "arabicNumerals",
       "status": "wired",
       "evidence": "static"
     },
@@ -10412,19 +10386,6 @@
       "evidence": "static"
     },
     {
-      "id": "lamma|theme|arabicNumerals",
-      "skin": "lamma",
-      "looks": [
-        "lamma.table",
-        "lamma.notebook",
-        "lamma.market"
-      ],
-      "surface": "theme",
-      "control": "arabicNumerals",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
       "id": "lamma|theme|backgroundColor",
       "skin": "lamma",
       "looks": [
@@ -14195,19 +14156,6 @@
       "evidence": "static"
     },
     {
-      "id": "qamar|theme|arabicNumerals",
-      "skin": "qamar",
-      "looks": [
-        "qamar.atelier",
-        "qamar.lookbook",
-        "qamar.vitrine"
-      ],
-      "surface": "theme",
-      "control": "arabicNumerals",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
       "id": "qamar|theme|backgroundColor",
       "skin": "qamar",
       "looks": [
@@ -17974,19 +17922,6 @@
       ],
       "surface": "theme",
       "control": "accentColor",
-      "status": "wired",
-      "evidence": "static"
-    },
-    {
-      "id": "souq|theme|arabicNumerals",
-      "skin": "souq",
-      "looks": [
-        "souq.catalogue",
-        "souq.night",
-        "souq.showroom"
-      ],
-      "surface": "theme",
-      "control": "arabicNumerals",
       "status": "wired",
       "evidence": "static"
     },

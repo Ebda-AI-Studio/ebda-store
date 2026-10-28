@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { inngest } from '../client';
 import { DomainClaimService } from '../../../services/domain-claim.service';
 import { resolveDomainService } from '../../../services/domain-provider';
@@ -17,7 +17,7 @@ import { resolveDomainService } from '../../../services/domain-provider';
  * `updateMany` keyed on the exact pending value, and the provider calls are
  * read-only except the release, which is a no-op for an already-gone hostname.
  */
-export const domainClaimSweep: InngestFunction.Any = inngest.createFunction(
+export const domainClaimSweep: JobDef = inngest.createFunction(
   {
     id: 'domain-claim-sweep',
     name: 'Verify and release pending custom-domain claims',

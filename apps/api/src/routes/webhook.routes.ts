@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@ebda/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { runInTenantContext, withStore } from '@ebda/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import {
   findOrderByIdempotencyKey,
   getOrderStoreId,
@@ -23,8 +23,211 @@ import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { inngest } from '../lib/inngest/client';
+import { sendAlert } from '../services/alerts.service';
+import { redis } from '../services/redis.service';
+import { isTerminalWebhookClientError } from '../lib/inngest/webhook-offload.guard';
 
 const router = Router();
+
+// Timing floor for every refusal (see rejectUnverifiedDelivery). Stamped on entry to this router.
+router.use((_req: Request, res: Response, next: NextFunction) => {
+  res.locals.webhookStartedAt = Date.now();
+  next();
+});
+
+/**
+ * SEC-5: authenticate a delivery BEFORE anything is persisted or queued. The store is already
+ * resolved, so its own secret is available now; a forged body therefore never writes an inbox
+ * row, never emits an Inngest event and never reaches the super-admin viewer. A terminal client
+ * error (bad / missing signature, malformed body) makes this return false and the caller answers
+ * 401 (`rejectUnverifiedDelivery`): NOT a 200, because a genuine delivery that fails (rotated secret,
+ * clock skew) must be retried by the gateway, not dropped as accepted. Anything else (DB, network)
+ * rethrows: a 5xx makes the gateway retry too.
+ * `handleWebhook` verifies again over the stored raw body, so the async path stays cryptographic.
+ */
+async function deliveryIsAuthentic(args: {
+  provider: PaymentProvider;
+  payload: Record<string, unknown>;
+  signature: string;
+  storeId: string;
+  rawBody: Buffer;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  try {
+    await PaymentService.verifyWebhookDelivery(
+      args.provider,
+      args.payload,
+      args.signature,
+      args.storeId,
+      args.rawBody.toString()
+    );
+    return true;
+  } catch (err) {
+    if (isTerminalWebhookClientError(err)) {
+      logger.warn(
+        { provider: args.provider, storeId: args.storeId, idempotencyKey: args.idempotencyKey },
+        '[WEBHOOK] Signature not verified; not persisted, not queued'
+      );
+      return false;
+    }
+    throw err;
+  }
+}
+
+/** Failures per source IP and store before the answer becomes 429 (per 5 minutes). */
+const SIGNATURE_FAILURES_PER_SOURCE = 20;
+
+/**
+ * Every refusal takes at least this long from the start of the request (padded with a sleep), so the
+ * fast no-store branch is not distinguishable from the slower real signature check by timing. A real
+ * check that is already slower than the floor is not padded; the floor only removes the fast side.
+ */
+export const REJECT_FLOOR_MS = 150;
+
+/**
+ * A fixed-cost HMAC over the raw body, burned when there is no store (or the wrong store) to verify
+ * against, so the unknown-payment answer costs about what a real signature check costs and timing
+ * does not tell the two apart. The result is discarded.
+ */
+async function burnDummyWork(rawBody: Buffer): Promise<void> {
+  const mac = crypto.createHmac('sha256', 'ebda-webhook-dummy-key').update(rawBody).digest();
+  crypto.timingSafeEqual(mac, Buffer.alloc(mac.length));
+  try {
+    // The same Redis round trip the real failure path makes (hmac-fail counter), on a dummy key.
+    await redis.incrementRateLimit('payment-hmac-fail:dummy', 300);
+  } catch {
+    // best effort
+  }
+}
+
+/**
+ * The ONE answer for every delivery we will not act on because it cannot be authenticated: a bad
+ * signature, a payment no store owns, and a payment that belongs to another store than the URL
+ * names. Same status and same generic body for all three, so the response is no oracle for which
+ * payment references exist. 401, not 200: a genuine delivery that fails (rotated secret, clock
+ * skew) must be RETRIED by the gateway, never accepted and dropped. Nothing is stored. Failures are
+ * counted per source IP (one bucket, so the count cannot tell the cases apart either); past the
+ * budget the answer is 429, still a retry signal. The P0 alert "payment webhook signature failures
+ * for store X" fires from `PaymentService.verifyWebhookDelivery` after 3 failures in 5 minutes.
+ * A gateway retries a 401 a bounded number of times, then gives up.
+ */
+async function rejectUnverifiedDelivery(req: Request, res: Response): Promise<void> {
+  const startedAt = (res.locals.webhookStartedAt as number | undefined) ?? Date.now();
+  let failures = 0;
+  try {
+    failures = await redis.incrementRateLimit(`webhook-sigfail:${req.ip ?? 'unknown'}`, 300);
+  } catch {
+    // Counting is best effort; the refusal below is the control.
+  }
+  // Pad to the floor so every refusal takes the same minimum time.
+  const wait = REJECT_FLOOR_MS - (Date.now() - startedAt);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  if (failures > SIGNATURE_FAILURES_PER_SOURCE) {
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many invalid webhook signatures' },
+    });
+    return;
+  }
+  res.status(401).json({
+    success: false,
+    error: { code: 'INVALID_SIGNATURE', message: 'Webhook signature could not be verified' },
+  });
+}
+
+/**
+ * A VALIDLY SIGNED delivery whose payment no store can resolve yet (audit M-050 / DB-2). The Payment row
+ * is committed only after the gateway accepts the invoice, and on Cloudflare the entity index lags the
+ * checkout by an outbox drain, so a fast callback can arrive first. 200 made the gateway drop it for
+ * good and the order stayed unpaid; answer 503 + Retry-After so the gateway redelivers, and tell an
+ * operator. Only reachable after the signature verified (Ruling WEBHOOK-ORDER-1), so it reveals
+ * nothing to an unauthenticated caller.
+ */
+function respondUnresolvedPayment(res: Response, provider: string, idempotencyKey: string): void {
+  logger.warn(
+    { provider, idempotencyKey },
+    '[WEBHOOK] Verified delivery, no store owns this payment yet; asking for a retry'
+  );
+  void sendAlert({
+    level: 'info',
+    scope: 'platform',
+    source: 'payment.webhook.unresolved',
+    title: `payment webhook for an unknown payment (${provider})`,
+    body: `A signed ${provider} webhook named a payment no store owns. It was answered 503 so the gateway retries. If it keeps arriving, find the payment at the provider.`,
+    context: { provider, idempotencyKey },
+  }).catch(() => undefined);
+  res
+    .status(503)
+    .set('Retry-After', '60')
+    .json({
+      success: false,
+      error: { code: 'PAYMENT_NOT_YET_VISIBLE', message: 'Payment not found yet, please retry' },
+    });
+}
+
+/**
+ * Ruling WEBHOOK-ORDER-1: authenticate FIRST. Returns the owning store id, or undefined after having
+ * answered:
+ *  - a bad or missing signature, a payment no store can be found for (generic URL), or a payment of
+ *    another store than the URL names: the ONE constant 401 (`rejectUnverifiedDelivery`), identical
+ *    bytes for all, padded to the timing floor;
+ *  - a VALID signature (per-store URL, checked with that store's secret before any payment lookup) for a
+ *    payment not resolvable yet: 503 + Retry-After (M-050).
+ * The generic URL carries no store, so the payment lookup has to come first there; an unresolvable
+ * reference cannot be verified and gets the same constant 401.
+ */
+async function gateDelivery(args: {
+  req: Request;
+  res: Response;
+  provider: PaymentProvider;
+  payload: Record<string, unknown>;
+  rawBody: Buffer;
+  signature: string;
+  idempotencyKey: string;
+  urlStoreId: string | undefined;
+}): Promise<string | undefined> {
+  const { req, res, provider, payload, rawBody, signature, idempotencyKey, urlStoreId } = args;
+  const authentic = (storeId: string) =>
+    deliveryIsAuthentic({ provider, payload, signature, storeId, rawBody, idempotencyKey });
+  const refuse = async (burn: boolean) => {
+    if (burn) await burnDummyWork(rawBody);
+    await rejectUnverifiedDelivery(req, res);
+    return undefined;
+  };
+
+  if (urlStoreId) {
+    if (!(await authentic(urlStoreId))) return refuse(false);
+    const owner = await resolveStoreIdFromWebhookPayload(provider, payload, urlStoreId);
+    // A reference that belongs to ANOTHER store is indistinguishable from an unknown one: same 503,
+    // same body. Otherwise a caller holding store A's secret could probe which refs exist in store B.
+    if (!owner || owner !== urlStoreId) {
+      // Ruling WEBHOOK-SCOPE-1: refused and logged server-side only; the caller sees the same 503 either way.
+      logger.warn(
+        { provider, urlStoreId, idempotencyKey, crossStore: Boolean(owner) },
+        owner
+          ? '[WEBHOOK] Reference belongs to another store than the signed one; refused'
+          : '[WEBHOOK] Reference not found in the signed store; refused'
+      );
+      respondUnresolvedPayment(res, provider, idempotencyKey);
+      return undefined;
+    }
+    return owner;
+  }
+
+  const owner = await resolveStoreIdFromWebhookPayload(provider, payload);
+  if (!owner) return refuse(true);
+  if (!(await authentic(owner))) return refuse(false);
+  return owner;
+}
+
+/**
+ * The key a delivery is stored and deduped under: the store id in front of the provider's own key.
+ * `orders.idempotency_key` and the inbox key are globally unique, so two stores that hold the same
+ * provider reference string would otherwise treat each other's deliveries as duplicates (Ruling WEBHOOK-SCOPE-1).
+ */
+export function storeScopedIdempotencyKey(storeId: string, idempotencyKey: string): string {
+  return `${storeId}:${idempotencyKey}`;
+}
 
 /**
  * Check if a webhook has already been processed (idempotency check).
@@ -34,13 +237,18 @@ const router = Router();
  * query is read-only and cross-tenant by nature — we're matching on an
  * idempotency key that may span any store.
  */
-async function checkIdempotency(idempotencyKey: string): Promise<{
+async function checkIdempotency(
+  idempotencyKey: string,
+  storeId: string
+): Promise<{
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
   // The store is not known yet, so this exact-key lookup is a definer
   // (`ebda_webhook_order_by_idempotency`), not a store-scoped read.
   const order = await findOrderByIdempotencyKey(idempotencyKey);
+  // Ruling WEBHOOK-SCOPE-1: a key another store settled is not a duplicate of THIS store's delivery.
+  if (order && order.storeId !== storeId) return { alreadyProcessed: false };
   if (order && order.webhookProcessedAt) {
     return { alreadyProcessed: true, orderId: order.orderId };
   }
@@ -55,12 +263,19 @@ async function checkIdempotency(idempotencyKey: string): Promise<{
 async function checkWebhookIdempotency(
   provider: string,
   payload: Record<string, unknown>,
-  idempotencyKey: string
+  idempotencyKey: string,
+  storeId: string
 ): Promise<{ alreadyProcessed: boolean; orderId?: string }> {
-  const first = await checkIdempotency(idempotencyKey);
+  const first = await checkIdempotency(storeScopedIdempotencyKey(storeId, idempotencyKey), storeId);
   if (first.alreadyProcessed) return first;
-  for (const legacy of webhookRefs(provider, payload).legacyIdempotencyKeys ?? []) {
-    const hit = await checkIdempotency(legacy);
+  // Keys written before WEBHOOK-SCOPE-1 carry no store prefix: still honoured, but only for this store's orders.
+  const unscoped = [
+    webhookRefs(provider, payload).idempotencyKey,
+    ...(webhookRefs(provider, payload).legacyIdempotencyKeys ?? []),
+  ];
+  for (const legacy of unscoped) {
+    if (!legacy) continue;
+    const hit = await checkIdempotency(legacy, storeId);
     if (hit.alreadyProcessed) return hit;
   }
   return first;
@@ -299,18 +514,28 @@ function generateIdempotencyKey(
  * Returns undefined when we can't match the payload to a Payment row;
  * handleWebhook then finds no payment and acknowledges.
  *
- * Runs through a SECURITY DEFINER lookup (`ebda_webhook_resolve_store`, exact
+ * Runs through a SECURITY DEFINER lookup (`ebda_webhook_resolve_store_scoped`: within the provider, the URL store first; exact
  * match on the provider reference, store id only) because the storeId is unknown
  * at this point. Once it is known the caller switches to runInTenantContext for
  * all subsequent writes.
  */
 async function resolveStoreIdFromWebhookPayload(
   provider: PaymentProvider,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  urlStoreId?: string
 ): Promise<string | undefined> {
   const { transactionId, invoiceId } = webhookRefs(provider, payload);
   if (!transactionId && !invoiceId) return undefined;
-  return (await resolveStoreFromWebhookRef({ transactionId, invoiceId })) ?? undefined;
+  // Within the delivering provider, and the URL's store first: a reference shared with another provider's or
+  // another store's payment must not decide which store owns THIS delivery (Ruling ITEST-14).
+  return (
+    (await resolveStoreFromWebhookRef({
+      transactionId,
+      invoiceId,
+      provider,
+      preferStoreId: urlStoreId ?? null,
+    })) ?? undefined
+  );
 }
 
 // ==========================================
@@ -380,18 +605,8 @@ async function handleGatewayWebhook(
     // the signature is VALID is decided later, over the raw body, with the merchant's secret.
     const signature = extractWebhookSignature(provider, req, payload);
     if (!signature) {
-      logger.warn({ provider }, '[WEBHOOK] Missing signature for webhook');
-      auditLog({
-        action: 'WEBHOOK_NO_SIGNATURE',
-        resourceType: 'payment',
-        details: { provider, headers: Object.keys(req.headers).join(', ') },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-      res.status(401).json({
-        success: false,
-        error: { code: 'MISSING_SIGNATURE', message: 'Webhook signature is required' },
-      });
+      // One constant answer, no lookup, no audit row for an unauthenticated caller (WEBHOOK-ORDER-1).
+      await rejectUnverifiedDelivery(req, res);
       return;
     }
 
@@ -416,11 +631,64 @@ async function handleGatewayWebhook(
       return;
     }
 
+    // Pass the parsed payload for business logic and the raw body string for
+    // HMAC signature verification so providers compute the correct digest.
+    // storeId is resolved upfront so handleWebhook can load the right
+    // per-store webhook secret for signature verification — without this,
+    // signature checks against platform-level env vars (always empty in
+    // Ebda prod) would reject every per-tenant webhook.
+    //
+    // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
+    // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
+    // run in runInTenantContext(storeId) so all their payment/order writes are
+    // correctly scoped. When storeId is undefined (platform-level path)
+    // handleWebhook is called directly with no wrapper — see
+    // processWebhookInline's no-storeId branch for why.
+    const storeIdForWebhook = await gateDelivery({
+      req,
+      res,
+      provider,
+      payload,
+      rawBody,
+      signature,
+      idempotencyKey,
+      urlStoreId: urlStoreId,
+    });
+    if (!storeIdForWebhook) return;
+
+    // Per-store URL: the payment must belong to the store the URL names. Same 401 as an unknown payment.
+    if (urlStoreId && urlStoreId !== storeIdForWebhook) {
+      logger.warn(
+        { provider, idempotencyKey, urlStoreId },
+        '[WEBHOOK] Payment belongs to another store than the webhook URL; refused'
+      );
+      await burnDummyWork(rawBody);
+      await rejectUnverifiedDelivery(req, res);
+      return;
+    }
+
+    if (
+      !(await deliveryIsAuthentic({
+        provider,
+        payload,
+        signature,
+        storeId: storeIdForWebhook,
+        rawBody,
+        idempotencyKey,
+      }))
+    ) {
+      await rejectUnverifiedDelivery(req, res);
+      return;
+    }
+
+    // Duplicate check AFTER authentication: a forged body must learn nothing about which payments
+    // exist and must not write an audit row (SEC-5).
     // Check for duplicate webhook
     const { alreadyProcessed, orderId } = await checkWebhookIdempotency(
       provider,
       payload,
-      idempotencyKey
+      idempotencyKey,
+      storeIdForWebhook
     );
 
     if (alreadyProcessed) {
@@ -446,42 +714,6 @@ async function handleGatewayWebhook(
       return;
     }
 
-    // Pass the parsed payload for business logic and the raw body string for
-    // HMAC signature verification so providers compute the correct digest.
-    // storeId is resolved upfront so handleWebhook can load the right
-    // per-store webhook secret for signature verification — without this,
-    // signature checks against platform-level env vars (always empty in
-    // Ebda prod) would reject every per-tenant webhook.
-    //
-    // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
-    // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
-    // run in runInTenantContext(storeId) so all their payment/order writes are
-    // correctly scoped. When storeId is undefined (platform-level path)
-    // handleWebhook is called directly with no wrapper — see
-    // processWebhookInline's no-storeId branch for why.
-    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
-
-    // The Egyptian gateways have per-merchant credentials only (no platform-level secret), so a
-    // delivery that names no payment of ours cannot be verified or attributed to anyone. Answer
-    // 200 and do nothing: a 5xx would make the gateway retry it forever, and a different status
-    // for "unknown" vs "known" would be a payment-existence oracle for an unauthenticated caller.
-    if (!storeIdForWebhook) {
-      logger.warn({ provider, idempotencyKey }, '[WEBHOOK] No store owns this payment; ignored');
-      res.json({ success: true, data: { message: 'Webhook accepted', status: 'ignored' } });
-      return;
-    }
-
-    // Per-store URL: the payment must belong to the store the URL names. Same 200 "ignored" as
-    // an unknown payment, so the answer is no oracle for which store owns a reference.
-    if (urlStoreId && urlStoreId !== storeIdForWebhook) {
-      logger.warn(
-        { provider, idempotencyKey, urlStoreId },
-        '[WEBHOOK] Payment belongs to another store than the webhook URL; ignored'
-      );
-      res.json({ success: true, data: { message: 'Webhook accepted', status: 'ignored' } });
-      return;
-    }
-
     // Offload the heavy PaymentService.handleWebhook mutation off this request:
     // persist the raw event to the durable WebhookEvent inbox, enqueue an
     // Inngest event, and ACK 200 immediately. The payment-webhook-process
@@ -491,7 +723,7 @@ async function handleGatewayWebhook(
     // before so the webhook is never lost.
     const { enqueued, result } = await enqueueOrProcessWebhook({
       provider,
-      idempotencyKey,
+      idempotencyKey: storeScopedIdempotencyKey(storeIdForWebhook, idempotencyKey),
       storeId: storeIdForWebhook,
       payload,
       rawBody: rawBody.toString(),
@@ -556,11 +788,8 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     const signature = extractWebhookSignature(provider, req, payload);
 
     if (!signature) {
-      logger.warn({ provider }, '[WEBHOOK] Missing signature for auto-detected webhook');
-      res.status(401).json({
-        success: false,
-        error: { code: 'MISSING_SIGNATURE', message: 'Webhook signature is required' },
-      });
+      // One constant answer, no lookup (WEBHOOK-ORDER-1).
+      await rejectUnverifiedDelivery(req, res);
       return;
     }
 
@@ -582,10 +811,50 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       });
       return;
     }
+    // Pass the parsed payload for business logic and the raw body string for
+    // HMAC signature verification so providers compute the correct digest.
+    // Resolve storeId from the payment row matching this payload so the per-
+    // store webhook secret is used for signature verification (see handler
+    // above for the same rationale).
+    //
+    // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
+    // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
+    // run in runInTenantContext(storeId) so all their payment/order writes are
+    // correctly scoped. When storeId is undefined handleWebhook is called
+    // directly with no wrapper — see processWebhookInline's no-storeId branch.
+    const storeIdForWebhook = await gateDelivery({
+      req,
+      res,
+      provider,
+      payload,
+      rawBody,
+      signature,
+      idempotencyKey,
+      urlStoreId: undefined,
+    });
+    if (!storeIdForWebhook) return;
+
+    if (
+      !(await deliveryIsAuthentic({
+        provider,
+        payload,
+        signature,
+        storeId: storeIdForWebhook,
+        rawBody,
+        idempotencyKey,
+      }))
+    ) {
+      await rejectUnverifiedDelivery(req, res);
+      return;
+    }
+
+    // Duplicate check AFTER authentication: a forged body must learn nothing about which payments
+    // exist and must not write an audit row (SEC-5).
     const { alreadyProcessed, orderId } = await checkWebhookIdempotency(
       provider,
       payload,
-      idempotencyKey
+      idempotencyKey,
+      storeIdForWebhook
     );
 
     if (alreadyProcessed) {
@@ -611,31 +880,12 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    // Pass the parsed payload for business logic and the raw body string for
-    // HMAC signature verification so providers compute the correct digest.
-    // Resolve storeId from the payment row matching this payload so the per-
-    // store webhook secret is used for signature verification (see handler
-    // above for the same rationale).
-    //
-    // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
-    // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
-    // run in runInTenantContext(storeId) so all their payment/order writes are
-    // correctly scoped. When storeId is undefined handleWebhook is called
-    // directly with no wrapper — see processWebhookInline's no-storeId branch.
-    const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
-    if (!storeIdForWebhook) {
-      // Per-merchant credentials only: nothing to verify against (see the explicit handler).
-      logger.warn({ provider, idempotencyKey }, '[WEBHOOK] No store owns this payment; ignored');
-      res.json({ success: true, data: { message: 'Webhook accepted', status: 'ignored' } });
-      return;
-    }
-
     // Same offload path as the explicit /payment/:provider handler: persist to
     // the durable inbox, enqueue to Inngest, ACK 200. Inline fallback on send
     // failure so no webhook is lost. See enqueueOrProcessWebhook.
     const { enqueued, result } = await enqueueOrProcessWebhook({
       provider,
-      idempotencyKey,
+      idempotencyKey: storeScopedIdempotencyKey(storeIdForWebhook, idempotencyKey),
       storeId: storeIdForWebhook,
       payload,
       rawBody: rawBody.toString(),
@@ -687,14 +937,25 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   const { order, merchantOrderId, merchantRefNumber } = req.query;
   const transactionId = (order || merchantOrderId || merchantRefNumber) as string;
 
+  // Which gateway sent the shopper back, from the parameter it uses: the lookup stays inside that provider.
+  const callbackProvider = order ? 'paymob' : merchantOrderId ? 'kashier' : 'fawry';
+
+  // ONE store resolution for the whole callback (provider-scoped, Ruling ITEST-14): the status read and the
+  // storefront the shopper is sent back to must come from the same store, which two separate definer lookups on
+  // a shared reference could not promise.
+  const resolveCallbackStore = async (): Promise<string | null> =>
+    transactionId
+      ? resolveStoreFromWebhookRef({ transactionId, provider: callbackProvider })
+      : null;
+
   // Resolve the correct storefront URL — custom domain if the store has one,
   // otherwise fall back to the platform's web URL.
-  async function getStorefrontUrl(): Promise<string> {
+  async function getStorefrontUrl(storeId: string | null): Promise<string> {
     try {
-      if (!transactionId) return config.webUrl;
-      // The store is not known yet: a definer maps the provider's transaction id
-      // to the owning store's slug/domain (`ebda_storefront_for_payment_ref`).
-      const store = await getStorefrontForPaymentRef(transactionId);
+      if (!storeId) return config.webUrl;
+      const store = await withStore(storeId, () =>
+        prisma.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
+      );
       if (store) return storefrontOrigin(store);
       return config.webUrl;
     } catch {
@@ -710,14 +971,14 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   try {
     // Under strict RLS the payment is found inside its store's scope (the store comes from
     // the same definer the webhooks use).
-    const callbackStoreId = await resolveStoreFromWebhookRef({ transactionId });
+    const callbackStoreId = await resolveCallbackStore();
     const [status, baseUrl] = await Promise.all([
       callbackStoreId
         ? withStore(callbackStoreId, () =>
             PaymentService.getPaymentStatus(transactionId, undefined, callbackStoreId)
           )
         : PaymentService.getPaymentStatus(transactionId),
-      getStorefrontUrl(),
+      getStorefrontUrl(callbackStoreId),
     ]);
 
     if (status.status === 'completed') {

@@ -1,8 +1,13 @@
 import { JWT_ISSUERS_ACCEPTED, JWT_AUDIENCES_ACCEPTED } from '@ebda/shared';
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import jwt from 'jsonwebtoken';
-import { authenticate, rejectAdminOnMerchantOrigin, rejectImpersonated } from '../middleware/auth';
+import {
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  rejectIdentityManaged,
+  rejectImpersonated,
+} from '../middleware/auth';
 import {
   auditLog,
   generateCsrfToken,
@@ -180,6 +185,7 @@ router.post(
 router.get(
   '/',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   passkeyOriginGuard,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -197,6 +203,7 @@ router.get(
 router.post(
   '/step-up',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   passkeyOriginGuard,
   rejectImpersonated,
@@ -241,6 +248,7 @@ router.post(
 router.post(
   '/register/begin',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   passkeyOriginGuard,
   rejectImpersonated,
@@ -258,6 +266,7 @@ router.post(
 router.post(
   '/register/finish',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   passkeyOriginGuard,
   rejectImpersonated,
@@ -293,6 +302,7 @@ router.post(
 router.patch(
   '/:id',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   passkeyOriginGuard,
   rejectImpersonated,
@@ -322,6 +332,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticate,
+  rejectIdentityManaged,
   rejectAdminOnMerchantOrigin,
   passkeyOriginGuard,
   rejectImpersonated,

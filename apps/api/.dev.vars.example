@@ -7,19 +7,15 @@ API_URL=http://localhost:8787
 BUILD_COMMIT_SHA=dev
 JWT_SECRET=dev-only-jwt-secret-change-me-0123456789abcdef
 ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
-# Real Inngest / Resend / Sentry / Gemini / payment-provider keys are secrets: wrangler secret put
-# INNGEST_SIGNING_KEY=
-# INNGEST_EVENT_KEY=
-# RESEND_API_KEY=
+# Keys every buyerKey in the Ebda suite (Store <-> WhatsApp contract); >= 32 chars; the SAME value in every suite Worker.
+SUITE_BUYER_KEY_SECRET=dev-only-suite-buyer-key-secret-0123456789
+# Real Sentry / Gemini / payment-provider keys are secrets: wrangler secret put
 # SENTRY_DSN=
 # GEMINI_API_KEY=
 # Fake Tap credentials: the payment-webhook replay in the exit test signs with TAP_WEBHOOK_SECRET
 TAP_API_KEY=dev-only-tap-api-key
 TAP_SECRET_KEY=dev-only-tap-secret-key
 TAP_WEBHOOK_SECRET=dev-only-tap-webhook-secret
-# Dev mode (NODE_ENV != production) sends events to http://localhost:8288; scripts/stage1-exit-test.mjs
-# starts a stand-in for it there (a failing outbound fetch from `wrangler dev` is noisy and slow).
-INNGEST_EVENT_KEY=local-dev-event-key
 # Dev-only diagnostics routes GET /__dev/stats and /__dev/probe (src/cf/dev-stats.ts): isolate pool counters for the
 # Stage 2 burst / soak runs and the workerd db-scope tests. Never set in wrangler.jsonc or a deployed Worker.
 DEV_STATS=1

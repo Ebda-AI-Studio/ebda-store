@@ -82,6 +82,18 @@ const CONFIGS = [
 ];
 
 /**
+ * Where each app's Content-Security-Policy is DEFINED. The storefront's is static (next.config.js,
+ * Ahmad 2026-09-02: no nonce there, docs/architecture/storefront-csp.md). Admin and Orders build
+ * theirs per request in middleware from src/lib/csp.ts, because it carries a nonce (SEC-4 / M-067):
+ * `headers()` runs once at build time and cannot mint one.
+ */
+const CSP_SOURCES = [
+  'apps/web/next.config.js',
+  'apps/admin/src/lib/csp.ts',
+  'apps/orders/src/lib/csp.ts',
+];
+
+/**
  * The three directives the 2026-07-15 fix added. Each closes a distinct hole
  * that `default-src` does NOT cover, which is why ZAP flagged their absence:
  *  - base-uri    — a `<base>` injection re-points every relative URL
@@ -108,10 +120,13 @@ const REQUIRED: { directive: string; pattern: RegExp }[] = [
  * Storefront and Orders PWA only; no inline `on*=` attribute exists in either.
  */
 describe("script-src-attr 'none' on the storefront and the Orders PWA (S10)", () => {
-  it.each(['apps/web/next.config.js', 'apps/orders/next.config.js'])('%s', config => {
-    const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
-    expect(src).toMatch(/script-src-attr\s+'none'/);
-  });
+  it.each(['apps/web/next.config.js', 'apps/admin/src/lib/csp.ts', 'apps/orders/src/lib/csp.ts'])(
+    '%s',
+    config => {
+      const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
+      expect(src).toMatch(/script-src-attr\s+'none'/);
+    }
+  );
 });
 
 /**
@@ -121,7 +136,7 @@ describe("script-src-attr 'none' on the storefront and the Orders PWA (S10)", ()
  * previews it. Same media hosts as the storefront's connect-src.
  */
 describe('media-src admits R2 video on the storefront and the admin (B0 Task 7)', () => {
-  it.each(['apps/web/next.config.js', 'apps/admin/next.config.js'])('%s', config => {
+  it.each(['apps/web/next.config.js', 'apps/admin/src/lib/csp.ts'])('%s', config => {
     const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
     const m = src.match(/media-src ([^;"`]*)/);
     expect(m, `${config} has no media-src`).not.toBeNull();
@@ -142,7 +157,7 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
     expect(present).toContain('apps/web/next.config.js');
   });
 
-  it.each(CONFIGS.filter(c => existsSync(join(ROOT, c))))('%s', config => {
+  it.each(CSP_SOURCES.filter(c => existsSync(join(ROOT, c))))('%s', config => {
     const raw = readFileSync(join(ROOT, config), 'utf8');
     // Assertions run against the comment-stripped source: a comment can name
     // a directive, or (as this repo's own next.config.js comments do) even
@@ -156,7 +171,7 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
     // would be invisible to the nightly scan too — this is the only gate
     // left standing for that regression.
     expect(
-      src.includes('Content-Security-Policy'),
+      src.includes('Content-Security-Policy') || /script-src/.test(src),
       `${config} no longer declares a Content-Security-Policy header at all. ` +
         `ZAP rule 10038 is globally IGNOREd in .zap/rules.tsv, so the nightly ` +
         `scan will NOT report this either.`
@@ -171,6 +186,33 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
           `lives here. Restore the directive, or remove the 10055 suppression ` +
           `so the scan covers it again.`
       ).toBe(true);
+    }
+  });
+
+  it('admin and orders: script-src is nonce + strict-dynamic, with no unsafe-inline and no ad hosts (SEC-4)', async () => {
+    const { buildAdminCsp } = await import('../../apps/admin/src/lib/csp');
+    const { buildOrdersCsp } = await import('../../apps/orders/src/lib/csp');
+    const nonce = 'AAAAAAAAAAAAAAAAAAAAAA==';
+    const policies = {
+      admin: buildAdminCsp({ nonce, pathname: '/', apiOrigin: 'https://api.ebda.app' }),
+      orders: buildOrdersCsp(nonce),
+    };
+    for (const [app, csp] of Object.entries(policies)) {
+      const scriptSrc = csp.split('; ').find(d => d.startsWith('script-src '))!;
+      expect(scriptSrc, app).toContain(`'nonce-${nonce}'`);
+      expect(scriptSrc, app).toContain("'strict-dynamic'");
+      expect(scriptSrc, `${app} must not allow unsafe-inline scripts`).not.toContain(
+        "'unsafe-inline'"
+      );
+      for (const host of [
+        'facebook',
+        'googletagmanager',
+        'tiktok',
+        'doubleclick',
+        'googleadservices',
+      ]) {
+        expect(csp, `${app} must not name the ${host} ad/pixel host`).not.toContain(host);
+      }
     }
   });
 

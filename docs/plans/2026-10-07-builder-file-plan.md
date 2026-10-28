@@ -211,6 +211,8 @@ Tests: per-block render fixtures (loading/empty/error), two-store collection own
 
 ## Phase 5 — AI editing (reviewable patches only)
 
+> **Status 2026-10-26: BUILT** as Ruling AIPATCH-1 (`docs/RULINGS.md`, `docs/architecture/visual-editor.md` § Ask AI). Deviation from the table below: the patch is a closed set of 7 ops applied through the editor reducer (`ai-patch.ts`), not a JSON-Patch subset (`patch.ts`); propose lives in `ai.routes.ts` (`POST /stores/:id/ai/builder-patch`), apply in `page-builder.routes.ts`; the panel is `AiPatchPane.tsx`. Phase 3 versioned publish already existed; its gap (who published) is PUBLISH-WHO-1.
+
 | File                                                                 | Purpose                                                                                                                                                                                                                                                                |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/shared/src/builder/patch.ts`                               | Patch format = restricted JSON-Patch subset (`add`/`replace`/`remove`/`move`) over `sections[*]` only; `applyPatch` is pure and re-runs `validateDefinition`.                                                                                                          |

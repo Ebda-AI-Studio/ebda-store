@@ -8,6 +8,7 @@ import {
 import { LEGAL_AR } from './legal-ar';
 import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
+import { heroSavingAr, heroSavingEn } from './positioning';
 import type { Locale } from './site';
 
 const CO = BRAND.company;
@@ -41,7 +42,7 @@ export interface Model3dVertical {
   product: { name: string; price: number; desc: string };
   /** Accessible name of the 3D canvas and alt of its still image. */
   alt: string;
-  /** Colour names for the model's glTF variants (qamar only), by variant id. */
+  /** Colour names for the model's glTF variants (qamar, jasmine, dahab), by variant id. */
   variants?: Record<string, string>;
 }
 
@@ -66,7 +67,7 @@ export interface Model3dCopy {
   load: string;
   qr: { title: string; hint: string; alt: string };
   footnote: string;
-  verticals: Record<'qamar' | 'souq' | 'lamma', Model3dVertical>;
+  verticals: Record<'qamar' | 'souq' | 'lamma' | 'jasmine' | 'dahab', Model3dVertical>;
 }
 
 /** The three hero features of the features section, each with a visual. */
@@ -140,12 +141,16 @@ export interface Copy {
     /** The Products menu (BRAND-ARCH-1): one entry per LIVE product; the others are added when they ship. */
     products: string;
     storeBlurb: string;
+    /** The Ebda WhatsApp entry of the same menu (LAUNCH-SUITE-1). */
+    whatsappBlurb: string;
     contact: string;
   };
   hero: {
     h1: string;
     /** Names the product (BRAND.product), then what it gives you. */
     sub: string;
+    /** Ruling POSITION-1: the eliminated monthly cost, from lib/positioning.ts. */
+    saving: string;
     cta: string;
   };
   /** The /credits page (Ruling MKT-12): attribution for the third-party 3D models and the illustrative photos. */
@@ -301,11 +306,13 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
       products: 'المنتجات',
       storeBlurb: 'متجرك أونلاين في دقايق',
+      whatsappBlurb: 'كلّم عملاءك على واتساب من مكان واحد',
       contact: 'تواصل معنا',
     },
     hero: {
       h1: 'ابدأ متجرك أونلاين في دقايق.',
       sub: `${PN.nameAr} بيديك لينك باسمك، ومنتجاتك، وطلباتك. كله من موبايلك.`,
+      saving: heroSavingAr(PN.nameAr),
       cta: 'ابدأ دلوقتي',
     },
     model3d: {
@@ -359,6 +366,28 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'فخار مزجّج بيسوّي الأكل على نار هادية، وبيحافظ على سخونته على السفرة.',
           },
           alt: 'موديل 3D لحلة فخار بغطاها، اسحب عشان تلفّها',
+        },
+        jasmine: {
+          name: 'ياسمين',
+          kind: 'جمال وعناية بالبشرة',
+          product: {
+            name: 'سيروم ياسمين 30 مل',
+            price: 420,
+            desc: 'سيروم خفيف بقطّارة، ومتاح بـ3 ألوان.',
+          },
+          alt: 'موديل 3D لزجاجة سيروم بقطّارة، اسحب عشان تلفّها',
+          variants: { rose: 'وردي', amber: 'عنبري', sage: 'أخضر مريمية' },
+        },
+        dahab: {
+          name: 'دهب',
+          kind: 'مجوهرات وهدايا',
+          product: {
+            name: 'خاتم سوليتير',
+            price: 14500,
+            desc: 'خاتم رفيع بحجر واحد، ومتاح بـ3 درجات دهب.',
+          },
+          alt: 'موديل 3D لخاتم سوليتير، اسحب عشان تلفّه',
+          variants: { 'yellow-gold': 'دهب أصفر', 'rose-gold': 'دهب روز', 'white-gold': 'دهب أبيض' },
         },
       },
     },
@@ -589,7 +618,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     creditsPage: {
       title: 'حقوق الصور والموديلات',
-      desc: 'الموديلات ثلاثية الأبعاد والصور اللي في ابدأ ستور، ومين عملها وتحت أي رخصة.',
+      desc: 'الموديلات ثلاثية الأبعاد والصور اللي في ابدأ ستور، ومين عملها وتحت أي رخصة استخدام، عشان حق كل صاحب شغل يتحفظ.',
       intro:
         'المتاجر اللي بتشوفها على الموقع أمثلة توضيحية. الموديلات ثلاثية الأبعاد اللي في صفحة المنتج مأخوذة من مصادر مفتوحة، وده نسبها كاملة.',
       modelsH: 'موديلات 3D',
@@ -607,7 +636,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'عن ابدأ استوديو للذكاء الاصطناعي',
-      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي.',
+      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي، بالعربي أولًا وبواجهة بسيطة.',
       brandLine: 'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
       company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
       storyH: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
@@ -677,7 +706,7 @@ export const COPY: Record<Locale, Copy> = {
     meta: {
       title: `${PN.nameEn} — Open your store online in minutes`,
       description:
-        'Ebda Store, from Ebda AI Studio — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
+        'Ebda Store, from Ebda AI Studio: open your online store in minutes with your own link, online payments, cash and InstaPay, and shipping with Bosta and Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -694,11 +723,13 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
       products: 'Products',
       storeBlurb: 'Your online store in minutes',
+      whatsappBlurb: 'Talk to your customers on WhatsApp, from one inbox',
       contact: 'Contact',
     },
     hero: {
       h1: 'Open your online store in minutes.',
       sub: `${PN.nameEn} gives you your own link, products and orders. All from your phone.`,
+      saving: heroSavingEn(),
       cta: 'Start now',
     },
     model3d: {
@@ -752,6 +783,32 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'Glazed earthenware that cooks slowly and keeps the food hot at the table.',
           },
           alt: '3D model of a lidded clay cooking pot; drag to turn it',
+        },
+        jasmine: {
+          name: 'Jasmine',
+          kind: 'Beauty and skincare',
+          product: {
+            name: 'Jasmine serum 30 ml',
+            price: 420,
+            desc: 'A light serum with a dropper, in 3 colours.',
+          },
+          alt: '3D model of a dropper serum bottle; drag to turn it',
+          variants: { rose: 'Rose', amber: 'Amber', sage: 'Sage' },
+        },
+        dahab: {
+          name: 'Dahab',
+          kind: 'Jewellery and gifts',
+          product: {
+            name: 'Solitaire ring',
+            price: 14500,
+            desc: 'A slim ring with a single stone, in 3 shades of gold.',
+          },
+          alt: '3D model of a solitaire ring; drag to turn it',
+          variants: {
+            'yellow-gold': 'Yellow gold',
+            'rose-gold': 'Rose gold',
+            'white-gold': 'White gold',
+          },
         },
       },
     },
@@ -986,7 +1043,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     creditsPage: {
       title: 'Credits',
-      desc: 'The 3D models and images on Ebda Store: who made them and under which licence.',
+      desc: 'The 3D models and images on Ebda Store: who made them and under which licence, so every creator gets the credit they are due.',
       intro:
         'The stores you see on this site are illustrations. The 3D models on the product page come from openly licensed sources; here is the full attribution.',
       modelsH: '3D models',
@@ -1005,7 +1062,7 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'About Ebda AI Studio',
-      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
+      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio: Arabic first, simple, and built for the local market.',
       brandLine: 'Ebda AI Studio — Your doorway to business.',
       company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
       storyH: 'The Ebda AI Studio story',

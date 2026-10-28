@@ -19,7 +19,7 @@ Use **Bulk import** to upload a CSV or XLSX file.
 2. Fill it in, one product per row. Variants are linked to their parent product by `parentSku`.
 3. Upload the file and click **Preview Import**. Check the table, then confirm. Nothing is saved until you confirm.
 
-Prices (`price`, `compareAtPrice`, `costPrice`) are in **Egyptian pounds, written as you would type them**: `250`, `250.5`, `250.50` or `1,250.50` (Arabic digits like `٢٥٠٫٥٠` work too). Use **two decimals at most**. A price with three decimals, such as `12.500`, is rejected as ambiguous because it could mean 12.5 or 12,500. Negative or non-numeric prices are rejected too, and a product row with no price is an error.
+Prices (`price`, `compareAtPrice`, `costPrice`) are in **Egyptian pounds, written as you would type them**: `250`, `250.5`, `250.50` or `1,250.50` (a price typed with Arabic-Indic digits is read correctly too). Use **two decimals at most**. A price with three decimals, such as `12.500`, is rejected as ambiguous because it could mean 12.5 or 12,500. Negative or non-numeric prices are rejected too, and a product row with no price is an error.
 
 The same rules apply to XLSX files, and the file you export from Ebda Store can be edited and uploaded again with the same prices.
 

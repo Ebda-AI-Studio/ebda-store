@@ -871,6 +871,16 @@
     "feature": "pwa"
   },
   {
+    "id": "page:/codes",
+    "kind": "page",
+    "route": "/codes",
+    "access": "owner",
+    "en": "QR codes & barcodes",
+    "ar": "أكواد QR والباركود",
+    "synEn": "qr code barcode label sticker print scan poster flyer receipt thermal a4 ean",
+    "synAr": "كود كيو ار باركود ملصق طباعة مسح بوستر فلاير فاتورة حراري"
+  },
+  {
     "id": "page:/language",
     "kind": "page",
     "route": "/language",
@@ -944,6 +954,18 @@
     "synAr": "مزايا اضافات تفعيل"
   },
   {
+    "id": "ai.switch",
+    "kind": "setting",
+    "route": "/ai-usage",
+    "access": "owner",
+    "en": "Use AI features",
+    "ar": "استخدام ميزات الذكاء الاصطناعي",
+    "synEn": "ai on off disable enable turn off assistant gemini switch",
+    "synAr": "ذكاء اصطناعي تشغيل ايقاف قفل تفعيل مساعد",
+    "pageEn": "Usage",
+    "pageAr": "الاستخدام"
+  },
+  {
     "id": "branding.logo",
     "kind": "setting",
     "route": "/branding",
@@ -1004,19 +1026,6 @@
     "ar": "شعار التذييل (اختياري)",
     "synEn": "footer logo white logo invert",
     "synAr": "شعار التذييل الفوتر شعار ابيض",
-    "query": "tab=theme",
-    "pageEn": "Store Branding",
-    "pageAr": "هوية المتجر"
-  },
-  {
-    "id": "branding.arabic-numerals",
-    "kind": "setting",
-    "route": "/branding",
-    "access": "owner",
-    "en": "Store numerals: 123 / ١٢٣",
-    "ar": "شكل الأرقام في المتجر: 123 / ١٢٣",
-    "synEn": "arabic numbers eastern digits indian numerals",
-    "synAr": "الارقام العربية ارقام هندية شكل الارقام",
     "query": "tab=theme",
     "pageEn": "Store Branding",
     "pageAr": "هوية المتجر"
@@ -1274,6 +1283,19 @@
     "ar": "المنطقة الزمنية للمتجر",
     "synEn": "time zone timezone cairo clock",
     "synAr": "المنطقة الزمنية توقيت القاهرة",
+    "pageEn": "Tax & VAT",
+    "pageAr": "الضرائب وضريبة القيمة المضافة"
+  },
+  {
+    "id": "tax.eta",
+    "kind": "setting",
+    "route": "/tax",
+    "access": "owner",
+    "en": "ETA e-receipts (Egypt)",
+    "ar": "الإيصال الإلكتروني (مصلحة الضرائب)",
+    "synEn": "eta e-receipt electronic receipt egyptian tax authority pos serial client id secret",
+    "synAr": "الايصال الالكتروني مصلحة الضرائب رقم الجهاز",
+    "feature": "eta_ereceipt",
     "pageEn": "Tax & VAT",
     "pageAr": "الضرائب وضريبة القيمة المضافة"
   },
@@ -1629,6 +1651,19 @@
     "ar": "غيّر الستايل",
     "synEn": "change look style template preview apply",
     "synAr": "غيّر الشكل الستايل القالب معاينة تطبيق",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
+    "id": "builder.ai-patch",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Ask AI",
+    "ar": "اسأل الذكاء",
+    "synEn": "ask ai edit page change describe assistant patch",
+    "synAr": "اسأل الذكاء الاصطناعي تعديل الصفحة تغيير وصف مساعد",
+    "query": "select=ai",
     "pageEn": "Editor",
     "pageAr": "المحرر"
   },

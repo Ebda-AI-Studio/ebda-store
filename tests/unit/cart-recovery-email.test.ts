@@ -94,17 +94,9 @@ vi.mock('@ebda/database', () => {
   };
 });
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: h.send, createFunction: vi.fn() } }));
-vi.mock('@api/services/resend.service', () => {
-  class ResendSendError extends Error {
-    constructor(
-      readonly code: string,
-      message: string
-    ) {
-      super(message);
-    }
-  }
-  return { ResendService: { sendMarketingEmail: h.sendMarketingEmail }, ResendSendError };
-});
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendMarketingEmail: h.sendMarketingEmail },
+}));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: h.isFeatureEnabled },
 }));
@@ -113,7 +105,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { ResendSendError } from '@api/services/resend.service';
+import { EmailSendError } from '@api/services/mail-transport';
 import {
   cartEmailDueAt,
   sweepCartRecoveryEmails,
@@ -468,7 +460,7 @@ describe('deliverCartRecoveryEmail', () => {
   it('a rate limit rethrows (the step retries) and leaves the row queued', async () => {
     const c = queued();
     db.subs.push(sub('sara@example.com'));
-    h.sendMarketingEmail.mockRejectedValueOnce(new ResendSendError('rate_limit_exceeded', 'slow'));
+    h.sendMarketingEmail.mockRejectedValueOnce(new EmailSendError('E_RATE_LIMIT_EXCEEDED', 'slow'));
     await expect(deliverCartRecoveryEmail(STORE_A, c.id)).rejects.toThrow('slow');
     expect(c.emailStatus).toBe('queued');
     // the retry sends (and Resend dedupes by the idempotency key)
@@ -478,15 +470,15 @@ describe('deliverCartRecoveryEmail', () => {
   it('a permanent provider error marks the row failed with the code', async () => {
     const c = queued();
     db.subs.push(sub('sara@example.com'));
-    h.sendMarketingEmail.mockRejectedValueOnce(new ResendSendError('validation_error', 'bad to'));
+    h.sendMarketingEmail.mockRejectedValueOnce(new EmailSendError('E_VALIDATION_ERROR', 'bad to'));
     const r = await deliverCartRecoveryEmail(STORE_A, c.id);
     expect(r.outcome).toBe('failed');
     expect(c.emailStatus).toBe('failed');
   });
 
   it.each([
-    ['a Resend 5xx', () => new ResendSendError('application_error', 'resend is down')],
-    ['an unknown Resend code', () => new ResendSendError('something_new', 'huh')],
+    ['a provider 5xx', () => new EmailSendError('E_INTERNAL_SERVER_ERROR', 'provider is down')],
+    ['an unknown provider code', () => new EmailSendError('something_new', 'huh')],
     ['a network error', () => new TypeError('fetch failed')],
   ])('%s is transient: rethrown so Inngest retries, the row stays queued', async (_n, mk) => {
     const c = queued();
@@ -500,12 +492,12 @@ describe('deliverCartRecoveryEmail', () => {
     expect(new Set(keys).size).toBe(1);
   });
 
-  it.each(['validation_error', 'missing_required_field', 'invalid_from_address'])(
+  it.each(['E_VALIDATION_ERROR', 'E_FIELD_MISSING', 'E_SENDER_NOT_VERIFIED'])(
     'a permanent 4xx (%s) marks the cart failed without a retry',
     async code => {
       const c = queued();
       db.subs.push(sub('sara@example.com'));
-      h.sendMarketingEmail.mockRejectedValueOnce(new ResendSendError(code, 'nope'));
+      h.sendMarketingEmail.mockRejectedValueOnce(new EmailSendError(code, 'nope'));
       expect((await deliverCartRecoveryEmail(STORE_A, c.id)).outcome).toBe('failed');
       expect(c.emailStatus).toBe('failed');
     }

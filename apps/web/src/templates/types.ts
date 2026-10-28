@@ -203,6 +203,11 @@ export interface HeaderProps {
    */
   wordmarkSize?: import('@ebda/shared').WordmarkSize;
   /**
+   * The built-in typographic lockup (looks/lockup.ts), set by the pack skins from the store's look. Shown
+   * only when the store has no uploaded logo; a merchant logo always wins. Undefined = the skin's own wordmark.
+   */
+  lockup?: import('@ebda/shared').Lockup | null;
+  /**
    * Search placement, set only by the Souq skin from the look's chrome data (Ruling B2-1).
    * `prominent` renders one full-width labelled search field (under the logo row on a phone, in
    * the centre column from md); undefined or `icon` = the theme's own icon search, unchanged.

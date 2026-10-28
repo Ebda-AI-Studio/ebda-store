@@ -1,0 +1,303 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Ebda Store 3D render harness</title>
+<style>
+  html,
+  body {
+    margin: 0;
+    background: #0a0b0c;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+  import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+  // Deterministic offscreen renderer: the driver calls window.setup(...) once, then window.draw(...) per frame.
+  let renderer,
+    scene,
+    camera,
+    pivot,
+    model,
+    composer,
+    glowLight,
+    flames = [],
+    variantsExt = [];
+
+  // A small photo studio instead of a flat room: a big warm softbox, a cool strip and a top light on a dark
+  // set. Glass, gold and the gem get long clean highlights to reflect, which is what makes them read as real.
+  function studio(pm) {
+    const s = new THREE.Scene();
+    s.add(
+      new THREE.Mesh(
+        new THREE.BoxGeometry(20, 20, 20),
+        new THREE.MeshBasicMaterial({ color: 0x5a4c3a, side: THREE.BackSide })
+      )
+    );
+    const panel = (w, h, c, k, pos, look) => {
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color(c).multiplyScalar(k),
+          side: THREE.DoubleSide,
+        })
+      );
+      m.position.set(...pos);
+      m.lookAt(...look);
+      s.add(m);
+    };
+    panel(7, 9, 0xfff0dc, 9, [-7, 3, 5], [0, 0, 0]); // warm key softbox, front left
+    panel(1.4, 11, 0xdce8ff, 14, [8, 2, 2], [0, 0, 0]); // cool vertical strip, right
+    panel(8, 8, 0xffffff, 6, [0, 9, 0], [0, 0, 0]); // top
+    panel(1.2, 9, 0xffe2b8, 10, [3, 1, -8], [0, 0, 0]); // warm rim from behind
+    return pm.fromScene(s, 0.02).texture;
+  }
+  function gradientTexture(w, h, cx, cy) {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    const r = g.createRadialGradient(cx * w, cy * h, 0, cx * w, cy * h, Math.max(w, h) * 0.62);
+    r.addColorStop(0, '#231a0e');
+    r.addColorStop(0.45, '#110e0a');
+    r.addColorStop(0.85, '#0A0B0C');
+    g.fillStyle = r;
+    g.fillRect(0, 0, w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+
+  window.setup = async ({
+    url,
+    w,
+    h,
+    exposure = 1.0,
+    key = 2.2,
+    warmGlow = 0,
+    litGlass = false,
+    gradient = false,
+    gradCx = 0.5,
+    gradCy = 0.46,
+    bloom = 0,
+    fakeGlass = false,
+    envI = 1,
+  }) => {
+    renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: true,
+    });
+    renderer.setPixelRatio(1);
+    renderer.setSize(w, h);
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = exposure;
+    document.body.appendChild(renderer.domElement);
+    scene = new THREE.Scene();
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = studio(pm);
+    scene.environmentIntensity = envI;
+    if (gradient) scene.background = gradientTexture(w, h, gradCx, gradCy);
+    const k = new THREE.DirectionalLight(0xfff1dc, key);
+    k.position.set(2, 3, 2.5);
+    scene.add(k);
+    camera = new THREE.PerspectiveCamera(28, w / h, 0.001, 50);
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
+    model = gltf.scene;
+    variantsExt =
+      gltf.parser.json.extensions?.KHR_materials_variants?.variants?.map(v => v.name) ?? [];
+    model.traverse(o => {
+      if (!o.isMesh) return;
+      const n = o.material?.name || '';
+      if (litGlass && /glass/i.test(n)) {
+        // lantern ad: the shipped panes are near-black; here they glow like glass around a flame
+        const m = o.material.clone();
+        m.map = null;
+        m.color.set('#d49a4a');
+        m.emissive.set('#8a5a1e');
+        m.emissiveIntensity = 0.22;
+        m.transparent = true;
+        m.opacity = 0.25;
+        m.depthWrite = false;
+        m.roughness = 0.45;
+        m.metalness = 0;
+        m.envMapIntensity = 0.9;
+        o.material = m;
+      } else if (litGlass && /flame/i.test(n)) {
+        // a glow texture on black: only reads as light when added
+        const m = o.material.clone();
+        m.blending = THREE.AdditiveBlending;
+        m.depthWrite = false;
+        m.transparent = true;
+        o.material = m;
+        o.renderOrder = 2;
+        o.scale.multiplyScalar(1.5);
+        flames.push(m);
+      } else if (litGlass && /brass_diya_lantern$/.test(n)) {
+        o.material = o.material.clone();
+        o.material.metalness = 1;
+        o.material.roughness = Math.max(o.material.roughness, 0.7);
+        o.material.envMapIntensity = 0.45;
+      }
+    });
+    // Posters are transparent PNGs, and transmission needs a backdrop to refract, so the GLB's transmissive glass is
+    // swapped for alpha-blended glass with strong reflections (the live viewer keeps the real transmission).
+    if (fakeGlass)
+      model.traverse(o => {
+        const m0 = o.isMesh && o.material;
+        if (m0 && m0.metalness > 0.9) m0.envMapIntensity = 2.0;
+        if (!m0 || !(m0.transmission > 0)) return;
+        const gem = /stone|gem/i.test(m0.name);
+        const mats = [m0, ...Object.values(o.userData.__vmats || {})];
+        for (const m of mats) {
+          m.transmission = 0;
+          m.transparent = true;
+          m.depthWrite = !gem && m.name !== 'glass' ? true : false;
+          if (gem) {
+            m.metalness = 0.72;
+            m.roughness = 0.02;
+            m.color.set('#ffffff');
+            m.emissive.set('#8896bb');
+            m.emissiveIntensity = 0.3;
+            m.opacity = 1;
+            m.transparent = false;
+            m.depthWrite = true;
+            m.envMapIntensity = 3.4;
+          } else if (m.name === 'glass') {
+            m.opacity = 0.2;
+            m.roughness = 0.03;
+            m.envMapIntensity = 2.8;
+            m.clearcoat = 1;
+            m.sheen = 1;
+            m.sheenColor.set('#ffffff');
+            m.sheenRoughness = 0.25;
+          } else {
+            m.opacity = 0.97;
+            m.transparent = false;
+            m.depthWrite = true;
+            m.roughness = 0.1;
+            m.clearcoat = 1;
+          } // serum
+        }
+        if (m0.name === 'glass') o.renderOrder = 3;
+      });
+    const jobs = [];
+    model.traverse(o => {
+      const maps = o.isMesh && o.userData.gltfExtensions?.KHR_materials_variants?.mappings;
+      if (!maps) return;
+      o.userData.__v = {};
+      for (const m of maps)
+        for (const vi of m.variants)
+          jobs.push(
+            gltf.parser.getDependency('material', m.material).then(mat => {
+              o.userData.__v[vi] = mat;
+              if (fakeGlass && mat.metalness > 0.9) mat.envMapIntensity = 2.0;
+              if (fakeGlass && mat.transmission > 0) {
+                mat.transmission = 0;
+                mat.transparent = false;
+                mat.opacity = 0.97;
+                mat.roughness = 0.1;
+                mat.clearcoat = 1;
+                mat.depthWrite = true;
+              }
+            })
+          );
+    });
+    await Promise.all(jobs);
+    const box = new THREE.Box3().setFromObject(model);
+    const c = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    model.position.sub(c);
+    if (fakeGlass) {
+      // soft contact shadow so the object sits on the page instead of floating
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const g = c.getContext('2d'),
+        rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      rg.addColorStop(0, 'rgba(0,0,0,0.75)');
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = rg;
+      g.fillRect(0, 0, 128, 128);
+      const sh = new THREE.Mesh(
+        new THREE.PlaneGeometry(Math.max(size.x, size.z) * 1.5, Math.max(size.x, size.z) * 1.5),
+        new THREE.MeshBasicMaterial({
+          map: new THREE.CanvasTexture(c),
+          transparent: true,
+          depthWrite: false,
+        })
+      );
+      sh.rotation.x = -Math.PI / 2;
+      sh.position.y = -size.y / 2 - 0.0005;
+      sh.renderOrder = -1;
+      window.__shadow = sh;
+    }
+    pivot = new THREE.Group();
+    pivot.add(model);
+    scene.add(pivot);
+    if (window.__shadow) scene.add(window.__shadow);
+    if (warmGlow) {
+      glowLight = new THREE.PointLight(0xffb45a, warmGlow, 0.6, 1.5);
+      glowLight.userData.base = warmGlow;
+      pivot.add(glowLight);
+    }
+    if (bloom) {
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), bloom, 0.22, 1.5)); // strength, radius, threshold: only the flame and hottest highlights bloom
+      composer.addPass(new OutputPass());
+    }
+    window.__size = size.toArray();
+    return { size: size.toArray(), variants: variantsExt };
+  };
+  window.setBg = hex => {
+    scene.background = null;
+    renderer.setClearColor(hex || 0x000000, hex ? 1 : 0);
+  };
+  // az/el in radians, fit = fraction of frame height the model's largest dimension fills, flame = flicker scalar (1 = rest).
+  window.draw = ({
+    az = 0.6,
+    el = 0.18,
+    fit = 0.8,
+    variant = null,
+    bob = 0,
+    shiftX = 0,
+    flame = 1,
+  }) => {
+    if (variant) {
+      const idx = variantsExt.indexOf(variant);
+      model.traverse(o => {
+        if (o.isMesh && o.userData.__v?.[idx]) o.material = o.userData.__v[idx];
+      });
+    }
+    for (const m of flames) m.color.setScalar(flame * 2.4);
+    if (glowLight) glowLight.intensity = glowLight.userData.base * flame;
+    pivot.rotation.y = az;
+    const d = Math.max(...window.__size);
+    const dist = d / fit / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    camera.position.set(0, Math.sin(el) * dist + bob * d, Math.cos(el) * dist);
+    camera.lookAt(0, 0, 0);
+    const W = renderer.domElement.width,
+      H = renderer.domElement.height;
+    if (shiftX) camera.setViewOffset(W, H, -shiftX * W, 0, W, H);
+    else camera.clearViewOffset();
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
+  };
+  window.ready = true;
+</script>

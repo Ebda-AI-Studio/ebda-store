@@ -20,7 +20,7 @@
  *
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInStoreScope, storeDirectory, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -56,7 +56,11 @@ export interface ScanStoreResult {
  * database make the filter miss rows an earlier attempt wrote.
  */
 async function dbNowIso(): Promise<string> {
-  const rows = await prisma.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`;
+  // `AT TIME ZONE 'UTC'`: the driver reads a bare `timestamptz` as if its wall-clock text were UTC and drops the
+  // offset, so a plain `now()` was hours off on any session whose zone is not UTC (Ruling ITEST-12).
+  const rows = await prisma.$queryRaw<
+    Array<{ now: Date }>
+  >`SELECT (now() AT TIME ZONE 'UTC') AS now`;
   return new Date(rows[0]?.now ?? Date.now()).toISOString();
 }
 
@@ -127,7 +131,7 @@ export async function scanStoreCitations(
 // Weekly cron — Monday 02:00 UTC
 // ---------------------------------------------------------------------------
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating directly here breaks TS's inference of `step.run`'s
 // return type once its result is threaded through `chunk()` (a generic
 // helper). Same trap documented in bulk-ai-translate.ts; the fix is
@@ -141,17 +145,6 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     triggers: [{ cron: '0 2 * * 1' }], // Monday 02:00 UTC
   },
   async ({ step }) => {
-    // INNGEST_DEPLOY_ID re-sync trap: this is a BRAND-NEW cron. Inngest only
-    // re-syncs the function manifest (which crons/events it knows about)
-    // when it detects a deploy-version change — see client.ts's
-    // INNGEST_DEPLOY_ID mapping comment. Until the next Railway deploy bumps
-    // that id, this cron trigger is invisible to Inngest's scheduler even
-    // though it's registered in code (the event-triggered
-    // `answerEngineScanOnDemand` twin works immediately since events don't
-    // depend on the cron manifest sync). No action needed beyond a normal
-    // deploy — called out here so a future "why isn't the weekly scan
-    // running" investigation finds this fast.
-
     // Cross-tenant cron — the store list comes from the directory definer;
     // each store is then scanned in its own scope.
     const stores = await step.run('list-stores', () =>
@@ -250,13 +243,13 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
   }
 );
 
-export const answerEngineCitationScanCron: InngestFunction.Any = answerEngineCitationScanCronFn;
+export const answerEngineCitationScanCron: JobDef = answerEngineCitationScanCronFn;
 
 // ---------------------------------------------------------------------------
 // On-demand — triggered by `answer-engine/scan-requested` event
 // ---------------------------------------------------------------------------
 
-export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunction(
+export const answerEngineScanOnDemand: JobDef = inngest.createFunction(
   {
     id: 'answer-engine-scan-on-demand',
     name: 'Answer-engine citation scan — on-demand (AI)',
@@ -266,7 +259,13 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
   async ({ event, step }) => {
     const { storeId } = event.data;
 
-    const enabled = await featureService.isFeatureEnabled(storeId, 'answer_engine_insights');
+    // One step for both gates: on a Workflow only step bodies hold a database connection.
+    const { enabled, store } = await step.run('gates', async () => ({
+      enabled: await featureService.isFeatureEnabled(storeId, 'answer_engine_insights'),
+      store: await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
+    }));
     if (!enabled) {
       logger.info(
         { storeId },
@@ -280,9 +279,6 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
     // excludes those via `isAiEligiblePlan` when enumerating stores, so
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts`'s on-demand plan gate).
-    const store = await withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

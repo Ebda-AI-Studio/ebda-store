@@ -184,28 +184,6 @@ export const config = {
   smtpFromName: process.env.SMTP_FROM_NAME || BRAND.product.nameEn,
   smtpFromEmail: process.env.SMTP_FROM_EMAIL || BRAND.noReplyEmail,
 
-  // Resend SDK key (single platform-wide account; all merchant domains live
-  // under it). Falls back to SMTP_PASSWORD because the pre-existing setup
-  // (nodemailer-via-Resend-SMTP) stored the same `re_xxx` key there —
-  // Resend keys are valid as both SMTP password AND SDK auth, so the
-  // fallback bridges the migration without forcing an env-var rename
-  // on Railway. When neither is set, ResendService gracefully degrades to
-  // no-op + logs a warning so dev environments don't crash on every send.
-  resendApiKey: process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || '',
-
-  // Public origin Inngest Cloud must call to reach our serve endpoint
-  // (scheme+host only, e.g. https://api.ebda.app — servePath
-  // is added separately). CRITICAL: without this the SDK infers its public
-  // URL from the Host header of whatever request triggers registration. Our
-  // post-boot self-register PUT hits 127.0.0.1, so the SDK registered
-  // `https://localhost:4000/api/v1/inngest` — unreachable from Inngest Cloud,
-  // leaving every enqueued job queued forever (verified 2026-06-27: the
-  // ebda-api app was stuck on localhost; description_balance jobs never ran).
-  // Setting serveHost makes registration advertise the real domain no matter
-  // who triggers it. Unset → fall back to the old (broken-on-Railway)
-  // host-introspection behaviour, so prod MUST set this.
-  inngestServeHost: process.env.INNGEST_SERVE_HOST || '',
-
   // Logging & Monitoring
   logLevel: process.env.LOG_LEVEL || 'debug',
   sentryDsn: process.env.SENTRY_DSN || '',
@@ -240,17 +218,6 @@ export const config = {
   googleAiKey: process.env.GOOGLE_GENERATIVE_AI_KEY ?? process.env.GEMINI_API_KEY ?? '',
   aiFeaturesEnabled: process.env.AI_FEATURES_ENABLED !== 'false',
   aiDailyTokenBudgetPerStore: parseInt(process.env.AI_DAILY_TOKEN_BUDGET_PER_STORE || '200000', 10),
-
-  // Inngest — durable async job queue for fan-out work that doesn't
-  // need to block the request (post-order push/email, bulk imports,
-  // PDF generation). When `INNGEST_EVENT_KEY` is unset the client
-  // runs in dev mode and routes events to the local Inngest dev
-  // server (npx inngest-cli dev). `INNGEST_SIGNING_KEY` is required
-  // for the production /api/v1/inngest endpoint to verify Inngest
-  // platform request signatures — without it the endpoint fail-
-  // closes and Inngest can't invoke our functions.
-  inngestEventKey: process.env.INNGEST_EVENT_KEY || '',
-  inngestSigningKey: process.env.INNGEST_SIGNING_KEY || '',
 } as const;
 
 // Additional production validations (core secrets already validated above)

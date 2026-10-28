@@ -9,7 +9,11 @@ import { FeaturesPage } from '../../apps/marketing/src/components/FeaturesPage';
 import { ComparePage } from '../../apps/marketing/src/components/ComparePage';
 import { CAPABILITIES, CAPABILITY_IDS } from '../../apps/marketing/src/lib/capabilities';
 import { COMPARE_SLUGS, LOCALES } from '../../apps/marketing/src/lib/site';
-import { isExternalHref, NEW_TAB_NOTE } from '../../apps/marketing/src/components/SiteLink';
+import {
+  isAppFlowHref,
+  isExternalHref,
+  NEW_TAB_NOTE,
+} from '../../apps/marketing/src/components/SiteLink';
 
 const sectionsOf = (html: string) =>
   [...html.matchAll(/<section id="([a-z0-9]+)"[^>]*>(.*?)<\/section>/gs)].map(m => ({
@@ -60,6 +64,14 @@ describe('home: one flow, no repeats', () => {
 });
 
 describe('links that leave ebda.app open in a new tab', () => {
+  it('sign-up and log-in stay in the same tab; the rest of the app and other hosts do not (UI-15)', () => {
+    expect(isAppFlowHref('https://store.ebda.app/signup?plan=growth&interval=month')).toBe(true);
+    expect(isAppFlowHref('https://store.ebda.app/login')).toBe(true);
+    expect(isAppFlowHref('https://store.ebda.app/dashboard')).toBe(false);
+    expect(isAppFlowHref('https://example.com/signup')).toBe(false);
+    expect(isAppFlowHref('/signup')).toBe(false);
+  });
+
   it('isExternalHref decides by host', () => {
     expect(isExternalHref('https://store.ebda.app/signup')).toBe(true);
     expect(isExternalHref('https://storedemo-souq.ebda.app/?look=souq.night')).toBe(true);
@@ -90,7 +102,7 @@ describe('links that leave ebda.app open in a new tab', () => {
         const attrs = m[1];
         const href = /href="([^"]*)"/.exec(attrs)?.[1]?.replace(/&amp;/g, '&');
         if (!href) continue;
-        if (isExternalHref(href)) {
+        if (isExternalHref(href) && !isAppFlowHref(href)) {
           external++;
           expect(attrs, href).toContain('target="_blank"');
           expect(attrs, href).toMatch(/rel="noopener noreferrer"/);

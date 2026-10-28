@@ -1,7 +1,7 @@
 /** Second batch of review findings: parallel brute force, audience confusion, step-up throttles, flooding, session age. */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
-import { call, fakes, login, seedUser, testEnv } from './helpers';
+import { call, emailCodeFor, fakes, login, seedUser, testEnv } from './helpers';
 import { totpAt } from '../src/totp';
 import { issueOtp } from '../src/otp';
 import { SESSION_MAX_MS } from '../src/data';
@@ -20,7 +20,7 @@ async function withMfa(u: { email: string; password: string }) {
   ).data.secret;
   const done = (await (
     await call('/mfa/enroll/verify', {
-      json: { code: await totpAt(secret) },
+      json: { code: await totpAt(secret), emailCode: await emailCodeFor(u, s.body.access_token) },
       bearer: s.body.access_token,
     })
   ).json()) as { data: { backupCodes: string[] } };

@@ -9,12 +9,11 @@ vi.mock('@ebda/database', () => {
   const prisma = { store: { findUnique: prismaStoreFindUnique } };
   return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
 });
-vi.mock('@api/services/resend.service', () => ({
-  ResendService: { sendBrandedEmail: vi.fn().mockResolvedValue({ id: 'em_test' }) },
+vi.mock('@api/services/store-mailer.service', () => ({
+  StoreMailer: { sendBrandedEmail: vi.fn().mockResolvedValue({ id: 'em_test' }) },
 }));
 vi.mock('@api/config', () => ({
   config: {
-    resendApiKey: 're_test',
     webUrl: 'https://store.test',
     adminUrl: 'https://admin.test',
     smtpFromEmail: 'noreply@test.com',
@@ -24,7 +23,7 @@ vi.mock('@api/config', () => ({
 import { EmailService, type OrderEmailData } from '@api/services/email.service';
 import { orderConfirmationTemplate } from '@api/services/email-templates/order-confirmation';
 import { buildOrderEmailWaMe } from '@api/services/email-templates/_wa-me';
-import { ResendService } from '@api/services/resend.service';
+import { StoreMailer } from '@api/services/store-mailer.service';
 
 const data = (over: Partial<OrderEmailData> = {}): OrderEmailData => ({
   orderNumber: 'EB-1042',
@@ -63,8 +62,7 @@ const storeRow = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const sentHtml = () =>
-  vi.mocked(ResendService.sendBrandedEmail).mock.calls.at(-1)![1].html as string;
+const sentHtml = () => vi.mocked(StoreMailer.sendBrandedEmail).mock.calls.at(-1)![1].html as string;
 const waHrefs = (html: string) =>
   [...html.matchAll(/href="(https:\/\/wa\.me\/[^"]+)"/g)].map(m => m[1]);
 

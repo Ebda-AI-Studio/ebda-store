@@ -1,9 +1,10 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInStoreScope, withStore } from '@ebda/database';
 import { GOLD_KARATS } from '@ebda/shared';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
+import { stepRunUnlessEmpty, type StepLike } from '../empty-exit';
 import { goldFeedStores } from '../../definer';
 import { sendAlert } from '../../../services/alerts.service';
 import { EmailService } from '../../../services/email.service';
@@ -34,12 +35,13 @@ import { config } from '../../../config';
  * over a store's jump gate is stored pending too (`GoldRateService.applyRates`, actor `feed`).
  */
 export async function handleGoldRateFeedFetch(
-  { step }: { step: { run: <T>(id: string, fn: () => Promise<T>) => Promise<T> } },
+  { step }: { step: StepLike },
   adapter: { fetch(signal: AbortSignal): Promise<GoldFeedResult> } = goldFeed()
 ) {
   {
-    // Un-stepped: the empty tick (no store opted in) must cost ONE execution.
-    const stores = await goldFeedStores();
+    // Read inside a step on a Workflow (no database between steps); on Inngest the empty tick (no
+    // store opted in) still costs ONE execution.
+    const stores = await stepRunUnlessEmpty(step, 'stores', goldFeedStores);
     if (stores.length === 0) return { stores: 0 };
 
     const result = await step.run('fetch', async (): Promise<GoldFeedResult> => {
@@ -209,7 +211,7 @@ export async function handleGoldRateFeedFetch(
   }
 }
 
-export const goldRateFeedFetchCron: InngestFunction.Any = inngest.createFunction(
+export const goldRateFeedFetchCron: JobDef = inngest.createFunction(
   {
     id: 'gold-rate-feed-fetch',
     name: 'Gold rate — automatic feed (6-hourly)',

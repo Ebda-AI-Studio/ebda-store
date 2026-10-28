@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { txLog, state } = vi.hoisted(() => ({
   txLog: [] as Array<{ tx: number; op: string; args: any }>,
-  state: { existing: null as null | Record<string, unknown> },
+  state: { existing: null as null | Record<string, unknown>, profileForReturnedId: false },
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -20,8 +20,11 @@ vi.mock('@ebda/database', () => {
       const tx = ++n;
       return fn({
         user: {
-          findUnique: async () => state.existing,
-          update: async (args: unknown) => (txLog.push({ tx, op: 'user.update', args }), {}),
+          findUnique: async (args?: { where?: { id?: string } }) =>
+            args?.where?.id === '00000000-0000-4000-8000-0000000000a1' && state.profileForReturnedId
+              ? { id: args.where.id }
+              : state.existing,
+          create: async (args: unknown) => (txLog.push({ tx, op: 'user.create', args }), {}),
         },
         verificationToken: { findFirst: async () => null },
         legalAcceptance: {
@@ -44,6 +47,20 @@ vi.mock('@api/lib/definer', () => ({
     lastName: 'B',
   }),
 }));
+const identity = vi.hoisted(() => ({
+  calls: [] as Array<Record<string, unknown>>,
+  /** When set, the identity service answers with THIS id instead of the one it was asked to use. */
+  forceId: null as string | null,
+  /** What the identity service reports for the id it returned (getAccountState). */
+  account: null as null | { email: string; emailVerified: boolean },
+}));
+vi.mock('@api/lib/identity-client', () => ({
+  getAccountState: async () => identity.account,
+  createIdentity: async (input: Record<string, unknown>) => {
+    identity.calls.push(input);
+    return { id: identity.forceId ?? (input.id as string) };
+  },
+}));
 vi.mock('@api/services/auth.service', () => ({
   AuthService: { sendVerificationEmail: async () => undefined },
 }));
@@ -64,8 +81,64 @@ const base = {
 };
 
 beforeEach(() => {
+  identity.calls.length = 0;
+  identity.forceId = null;
+  identity.account = null;
   txLog.length = 0;
   state.existing = null;
+  state.profileForReturnedId = false;
+});
+
+describe('identity binding (Ruling SIGNUP-TAKEOVER-1)', () => {
+  const input = () => merchantSignupSchema.parse({ ...base, acceptedLegal: true });
+
+  it('asks the identity service for an id it generated and writes the profile under exactly that id', async () => {
+    await MerchantSignupService.signup(input(), { ip: '203.0.113.9', userAgent: 'UA/1' });
+    const asked = identity.calls[0].id as string;
+    expect(asked).toMatch(/^[0-9a-f-]{36}$/);
+    const create = txLog.find(l => l.op === 'user.create')!;
+    expect(create.args.data.id).toBe(asked);
+  });
+
+  it('creates NO profile row and NO legal acceptance when the identity answers with a different id it cannot vouch for', async () => {
+    identity.forceId = '00000000-0000-4000-8000-000000000bad';
+    for (const account of [
+      null, // unknown to the identity service
+      { email: 'someone-else@b.co', emailVerified: false }, // another address
+      { email: 'a@b.co', emailVerified: true }, // already verified: not an orphan
+    ]) {
+      txLog.length = 0;
+      identity.account = account;
+      const result = await MerchantSignupService.signup(input(), { ip: '203.0.113.9' });
+      expect(txLog).toEqual([]);
+      // the caller cannot tell: the body is the same generic result as a normal signup
+      expect(result).toEqual({ emailVerificationSent: true });
+    }
+  });
+
+  it('adopts the id of an ORPHAN identity (same address, unverified, no profile) so the merchant is not stuck', async () => {
+    identity.forceId = '00000000-0000-4000-8000-0000000000a1';
+    identity.account = { email: 'A@B.co', emailVerified: false };
+    const result = await MerchantSignupService.signup(input(), { ip: '203.0.113.9' });
+    expect(result).toEqual({ emailVerificationSent: true });
+    const create = txLog.find(l => l.op === 'user.create')!;
+    expect(create.args.data.id).toBe('00000000-0000-4000-8000-0000000000a1');
+    const acc = txLog.find(l => l.op === 'legalAcceptance.createMany')!;
+    expect(acc.tx).toBe(create.tx);
+    expect(
+      (acc.args.data as Array<{ userId: string }>).every(
+        r => r.userId === '00000000-0000-4000-8000-0000000000a1'
+      )
+    ).toBe(true);
+  });
+
+  it('never adopts when a profile already exists for the returned id', async () => {
+    identity.forceId = '00000000-0000-4000-8000-0000000000a1';
+    identity.account = { email: 'a@b.co', emailVerified: false };
+    state.profileForReturnedId = true;
+    await MerchantSignupService.signup(input(), { ip: '203.0.113.9' });
+    expect(txLog.some(l => l.op === 'user.create')).toBe(false);
+  });
 });
 
 describe('signup click-wrap', () => {
@@ -81,7 +154,7 @@ describe('signup click-wrap', () => {
       merchantSignupSchema.parse({ ...base, acceptedLegal: true }),
       { ip: '203.0.113.9', userAgent: 'UA/1' }
     );
-    const update = txLog.find(l => l.op === 'user.update')!;
+    const update = txLog.find(l => l.op === 'user.create')!;
     const create = txLog.find(l => l.op === 'legalAcceptance.createMany')!;
     expect(create.tx).toBe(update.tx);
     expect(create.args.skipDuplicates).toBe(true);
@@ -89,7 +162,7 @@ describe('signup click-wrap', () => {
     expect(rows.map(r => r.docKey).sort()).toEqual([...LEGAL_DOC_KEYS].sort());
     for (const r of rows) {
       expect(r).toMatchObject({
-        userId: 'u1',
+        userId: identity.calls[0].id,
         version: currentLegalVersion(LEGAL_POLICIES, r.docKey as never).version,
         ip: '203.0.113.9',
         userAgent: 'UA/1',
@@ -115,7 +188,9 @@ describe('signup click-wrap', () => {
     // Neither the new-account profile write nor ANY legal_acceptances operation ran, so the
     // owner's original rows are untouched.
     expect(txLog.filter(l => l.op.startsWith('legalAcceptance'))).toEqual([]);
-    expect(txLog.some(l => l.op === 'user.update')).toBe(false);
+    expect(txLog.some(l => l.op === 'user.create')).toBe(false);
+    // ...but the identity service WAS asked to re-register the address, with the id of the existing row
+    expect(identity.calls.at(-1)).toMatchObject({ id: 'u-existing', password: 'Str0ng!Passw0rd' });
   });
 
   it('never splits a surrogate pair when truncating the user-agent', () => {

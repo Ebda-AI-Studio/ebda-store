@@ -114,7 +114,7 @@ describe('lamma header', () => {
     );
     expect(container.querySelector('a[href="/"]')!.getAttribute('class')).toContain('max-w-[65%]');
     const mark = container.querySelector('[data-zone="storeName"]')!;
-    expect(mark.getAttribute('class')).toMatch(/\btruncate\b/);
+    expect(mark.firstElementChild!.getAttribute('class')).toMatch(/\bline-clamp-2\b/);
     expect(mark.getAttribute('title')).toBe(longName);
   });
   it('the cart bar, stepper and aisles chrome keys exist on the Lamma looks and nowhere else', async () => {

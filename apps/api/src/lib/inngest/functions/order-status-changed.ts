@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext, type OrderStatus } from '@ebda/database';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { EmailService } from '../../../services/email.service';
@@ -316,7 +316,7 @@ export async function handleOrderStatusChanged(
   return { ran };
 }
 
-export const orderStatusChanged: InngestFunction.Any = inngest.createFunction(
+export const orderStatusChanged: JobDef = inngest.createFunction(
   {
     id: 'order-status-changed-fanout',
     name: 'Order status changed — email + push + dispatcher fan-out',

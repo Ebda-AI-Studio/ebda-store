@@ -69,28 +69,8 @@ const nextConfig = {
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           // Internal tool — never index.
           { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet, noimageindex' },
-          {
-            // OneSignal needs:
-            //   script-src + 'unsafe-eval' → SDK runtime checks
-            //   connect-src https://*.onesignal.com → REST + websocket
-            //   worker-src 'self' blob: → /OneSignalSDKWorker.js importScripts the OneSignal CDN
-            //   frame-src https://*.onesignal.com → SDK's permission-prompt iframe
-            //   manifest-src 'self' → PWA install
-            key: 'Content-Security-Policy',
-            value:
-              "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://eu-assets.i.posthog.com https://eu.i.posthog.com https://static.cloudflareinsights.com; " +
-              // S10: inline event-handler attributes never run (React binds handlers in JS).
-              "script-src-attr 'none'; " +
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://*.onesignal.com; " +
-              "font-src 'self' data: https://fonts.gstatic.com; " +
-              "img-src 'self' data: https: blob:; " +
-              "connect-src 'self' https://api.ebda.app wss://api.ebda.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; " +
-              'frame-src https://onesignal.com https://*.onesignal.com; ' +
-              "worker-src 'self' blob:; " +
-              "manifest-src 'self'; " +
-              "frame-ancestors 'none'",
-          },
+          // The Content-Security-Policy is set per request in src/middleware.ts (it carries a nonce;
+          // `headers()` is evaluated once at build time) -- SEC-4 / M-067.
         ],
       },
     ];

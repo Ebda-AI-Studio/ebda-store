@@ -73,6 +73,11 @@ const CLASSIFIED: Record<
     kind: 'admin',
     reason: 'warehouse stock sync / search (merchant)',
   },
+  'services/accounting/purchase-order.service.ts': {
+    statements: 1,
+    kind: 'system',
+    reason: 'row lock by id (SELECT id ... FOR UPDATE) for a purchase-order receipt, store-scoped',
+  },
   'services/product-index.service.ts': {
     statements: 7,
     kind: 'system',
@@ -97,6 +102,12 @@ const CLASSIFIED: Record<
     statements: 1,
     kind: 'system',
     reason: 'stock restore on refund',
+  },
+  'services/barcode.service.ts': {
+    statements: 1,
+    kind: 'admin',
+    reason:
+      'merchant-side barcode allocator: highest in-store serial across ALL the store products',
   },
   'lib/inngest/functions/store-usage-snapshot.ts': {
     statements: 1,

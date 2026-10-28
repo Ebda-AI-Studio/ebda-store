@@ -58,6 +58,7 @@ export interface Messages {
   search: {
     placeholder: string;
     clear: string;
+    count: string;
   };
   bulk: {
     selected: string;
@@ -240,6 +241,14 @@ export interface Messages {
     serverError: string;
     iosHint: string;
   };
+  notFound: {
+    line: string;
+    hint: string;
+    searchOrders: string;
+    orders: string;
+    home: string;
+    backToSite: string;
+  };
 }
 
 export const MESSAGES: Record<Locale, Messages> = {
@@ -292,6 +301,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     search: {
       placeholder: 'Search by order # or customer…',
       clear: 'Clear search',
+      count: 'Orders: {count}',
     },
     bulk: {
       selected: '{count} selected',
@@ -506,6 +516,14 @@ export const MESSAGES: Record<Locale, Messages> = {
       serverError: 'The server rejected the subscription. Please try again, or contact support.',
       iosHint: 'Install the app first (Share → Add to Home Screen), then open it to enable alerts.',
     },
+    notFound: {
+      line: "The page you're looking for can't be found.",
+      hint: 'Search your orders, or go to a section.',
+      searchOrders: 'Search orders',
+      orders: 'Orders',
+      home: 'Home',
+      backToSite: 'Back to the Ebda AI Studio site',
+    },
   },
   ar: {
     appName: `طلبات متجر ${BRAND.product.nameAr}`,
@@ -556,6 +574,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     search: {
       placeholder: 'بحث برقم الطلب أو اسم العميل…',
       clear: 'مسح البحث',
+      count: 'عدد الطلبات: {count}',
     },
     bulk: {
       selected: '{count} محدّد',
@@ -768,6 +787,14 @@ export const MESSAGES: Record<Locale, Messages> = {
         'تعذّر تشغيل خدمة التطبيق في الخلفية. أغلق التطبيق تمامًا ثم أعد فتحه وحاول مجددًا.',
       serverError: 'رفض الخادم الاشتراك. حاول مرة أخرى أو تواصل مع الدعم.',
       iosHint: 'ثبّت التطبيق أولًا (مشاركة ← إضافة إلى الشاشة الرئيسية) ثم افتحه لتفعيل التنبيهات.',
+    },
+    notFound: {
+      line: 'الصفحة اللي بتدوّر عليها مش موجودة.',
+      hint: 'دوّر في طلباتك، أو روح لأي قسم.',
+      searchOrders: 'دوّر في الطلبات',
+      orders: 'الطلبات',
+      home: 'الرئيسية',
+      backToSite: 'ارجع لموقع ابدأ استوديو للذكاء الاصطناعي',
     },
   },
 };

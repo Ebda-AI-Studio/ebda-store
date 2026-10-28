@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Input, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
-import { apiPost, apiGet } from '../../../lib/api';
+import { apiGet } from '../../../lib/api';
+import {
+  AccountsError,
+  accountsFetch,
+  accountsToken,
+  establishApiSession,
+} from '../../../lib/accounts';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
@@ -28,12 +34,38 @@ interface EnrollBeginData {
   qr: string;
 }
 
+// ── Identity-service calls ────────────────────────────────────────────────────
+
+/**
+ * MFA lives in the shared identity service (Rulings ID-1/ID-2). Each call gets a fresh 15 minute token, sends it as a Bearer
+ * header, and returns the page's existing `{ data, error }` shape. After a change, the Store's own profile row is
+ * reconciled at once (`/auth/session`), so the super-admin MFA gate sees it without waiting for the next refresh.
+ */
+async function acct<T>(
+  path: string,
+  json: unknown,
+  syncStore = false
+): Promise<{ data?: T; error?: { message: string; code: string } }> {
+  try {
+    const grant = await accountsToken();
+    const data = await accountsFetch<T>(path, { json, bearer: grant.access_token });
+    if (syncStore)
+      await establishApiSession((await accountsToken()).access_token).catch(() => undefined);
+    return { data };
+  } catch (e) {
+    if (e instanceof AccountsError) return { error: { message: e.message, code: e.code } };
+    return { error: { message: String(e), code: 'REQUEST_FAILED' } };
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function SecurityPage() {
   const t = useT('account.security');
   const tc = useT('common');
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  // A platform admin's FIRST factor ends every session (the password-only one included): sign in again with it.
+  const [signInAgain, setSignInAgain] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
   // Status
@@ -44,7 +76,15 @@ export default function SecurityPage() {
   const [step, setStep] = useState<Step>('idle');
   const [enrollData, setEnrollData] = useState<EnrollBeginData | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
-  const [currentCode, setCurrentCode] = useState(''); // required when re-enrolling (already enabled)
+  // Platform administrators: the first factor needs the operator's one-time token plus a code e-mailed to the account.
+  const [passkeyCount, setPasskeyCount] = useState<number | null>(null);
+  // The server is the authority: when it asks for the e-mailed code the step is shown whatever the client guessed.
+  const [serverWantsCode, setServerWantsCode] = useState(false);
+  const [bootToken, setBootToken] = useState('');
+  const [bootCode, setBootCode] = useState('');
+  const [bootPassword, setBootPassword] = useState('');
+  const [bootSent, setBootSent] = useState(false);
+  const [password, setPassword] = useState(''); // step-up: the identity service asks for the password again
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enrollError, setEnrollError] = useState('');
 
@@ -82,19 +122,35 @@ export default function SecurityPage() {
     setEnrollError('');
     setIsSubmitting(true);
     try {
-      // If already enabled, we need the current TOTP code (re-enroll)
-      const body = status?.mfaEnabled ? { code: currentCode } : undefined;
-      const { data, error } = await apiPost<EnrollBeginData>('/api/v1/auth/mfa/enroll/begin', body);
+      const { data, error } = await acct<{ secret: string; otpauthUrl: string }>('/mfa/enroll', {
+        password,
+      });
       if (error) {
         setEnrollError(error.message || t('errorBegin'));
         return;
       }
       if (data) {
-        setEnrollData(data);
+        const QRCode = (await import('qrcode')).default;
+        setEnrollData({ secret: data.secret, qr: await QRCode.toDataURL(data.otpauthUrl) });
         setStep('enrolling');
         setVerifyCode('');
-        setCurrentCode('');
+        setPassword('');
       }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSendBootstrapCode() {
+    setEnrollError('');
+    setIsSubmitting(true);
+    try {
+      const { error } = await acct('/mfa/bootstrap/code', { password: bootPassword });
+      if (error) {
+        setEnrollError(error.message || t('errorVerify'));
+        return;
+      }
+      setBootSent(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -106,16 +162,25 @@ export default function SecurityPage() {
     setEnrollError('');
     setIsSubmitting(true);
     try {
-      const { data, error } = await apiPost<{ backupCodes: string[] }>(
-        '/api/v1/auth/mfa/enroll/verify',
-        { code: verifyCode.trim() }
+      const { data, error } = await acct<{ backupCodes: string[]; requiresSignIn?: boolean }>(
+        '/mfa/enroll/verify',
+        {
+          code: verifyCode.trim(),
+          // First factor of ANY account: a code e-mailed to it; a platform admin also needs the operator's token.
+          ...(isFirstFactor ? { emailCode: bootCode.trim() } : {}),
+          ...(isFirstAdminFactor ? { enrolmentToken: bootToken.trim() } : {}),
+        },
+        true
       );
       if (error) {
+        if (error.code === 'EMAIL_CODE_REQUIRED' || error.code === 'EMAIL_CODE_INVALID')
+          setServerWantsCode(true);
         setEnrollError(error.message || t('errorVerify'));
         setVerifyCode('');
         return;
       }
       setBackupCodes(data?.backupCodes ?? []);
+      setSignInAgain(data?.requiresSignIn === true);
       setStep('backup');
       setStatus(prev =>
         prev ? { ...prev, mfaEnabled: true, mfaEnrolledAt: new Date().toISOString() } : prev
@@ -140,7 +205,7 @@ export default function SecurityPage() {
     setDisableError('');
     setIsSubmitting(true);
     try {
-      const { error } = await apiPost('/api/v1/auth/mfa/disable', { code: disableCode.trim() });
+      const { error } = await acct('/mfa/disable', { password, code: disableCode.trim() }, true);
       if (error) {
         setDisableError(error.message || t('errorDisable'));
         setDisableCode('');
@@ -149,49 +214,59 @@ export default function SecurityPage() {
       setStatus(prev => (prev ? { ...prev, mfaEnabled: false, mfaEnrolledAt: null } : prev));
       setStep('idle');
       setDisableCode('');
+      setPassword('');
       toastSuccess(t('successDisabled'), undefined);
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  // A TOTP is a FIRST factor only when the account has neither a TOTP nor a passkey. A passkey alone is a complete
+  // second-factor state for everyone, platform administrators included (it satisfies the second-factor requirement).
+  const isFirstFactor = !status?.mfaEnabled && (serverWantsCode || passkeyCount === 0);
+  const isFirstAdminFactor = user?.role === 'super_admin' && isFirstFactor;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 space-y-6">
         {/* Super-admin required banner */}
-        {user?.role === 'super_admin' && status && !status.mfaEnabled && step === 'idle' && (
-          <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-            <svg
-              className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-              />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {t('mfaBanner')}
-              </p>
-              <Button
-                type="button"
-                className="mt-3"
-                size="sm"
-                onClick={handleBeginEnroll}
-                disabled={isSubmitting}
+        {user?.role === 'super_admin' &&
+          status &&
+          !status.mfaEnabled &&
+          passkeyCount === 0 &&
+          step === 'idle' && (
+            <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+              <svg
+                className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
               >
-                {t('mfaBannerCta')}
-              </Button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {t('mfaBanner')}
+                </p>
+                <Button
+                  type="button"
+                  className="mt-3"
+                  size="sm"
+                  onClick={handleBeginEnroll}
+                  disabled={isSubmitting}
+                >
+                  {t('mfaBannerCta')}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Status card */}
         {isLoadingStatus ? (
@@ -228,6 +303,9 @@ export default function SecurityPage() {
                   ))}
                 </div>
 
+                {signInAgain && (
+                  <p className="text-sm text-muted-foreground">{t('signInAgainAfterEnrol')}</p>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     type="button"
@@ -243,9 +321,10 @@ export default function SecurityPage() {
                     onClick={() => {
                       setStep('idle');
                       setBackupCodes([]);
+                      if (signInAgain) void logout();
                     }}
                   >
-                    {t('savedButton')}
+                    {signInAgain ? t('savedSignInAgainButton') : t('savedButton')}
                   </Button>
                 </div>
               </div>
@@ -275,6 +354,77 @@ export default function SecurityPage() {
                     {enrollData.secret}
                   </code>
                 </div>
+
+                {/* First factor: a code e-mailed to the account (a platform admin also needs the operator's token) */}
+                {isFirstFactor && (
+                  <div className="space-y-3 rounded-xl border border-border p-4">
+                    <p className="text-sm text-muted-foreground">{t('bootstrapIntro')}</p>
+                    {isFirstAdminFactor && (
+                      <div>
+                        <label
+                          htmlFor="boot-token"
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {t('bootstrapTokenLabel')}
+                        </label>
+                        <Input
+                          id="boot-token"
+                          type="text"
+                          dir="ltr"
+                          autoComplete="off"
+                          value={bootToken}
+                          onChange={e => setBootToken(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label
+                          htmlFor="boot-password"
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {t('bootstrapPasswordLabel')}
+                        </label>
+                        <Input
+                          id="boot-password"
+                          type="password"
+                          autoComplete="current-password"
+                          value={bootPassword}
+                          onChange={e => setBootPassword(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isSubmitting || !bootPassword}
+                        onClick={handleSendBootstrapCode}
+                      >
+                        {bootSent ? t('bootstrapResend') : t('bootstrapSend')}
+                      </Button>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="boot-code"
+                        className="block text-sm font-medium text-foreground"
+                      >
+                        {t('bootstrapCodeLabel')}
+                      </label>
+                      <Input
+                        id="boot-code"
+                        type="text"
+                        inputMode="numeric"
+                        dir="ltr"
+                        autoComplete="off"
+                        maxLength={6}
+                        value={bootCode}
+                        onChange={e => setBootCode(e.target.value)}
+                        className="mt-1 text-center tracking-widest"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Verify form */}
                 <form onSubmit={handleVerifyEnroll} className="space-y-4">
@@ -320,7 +470,12 @@ export default function SecurityPage() {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={isSubmitting || verifyCode.length !== 6}
+                      disabled={
+                        isSubmitting ||
+                        verifyCode.length !== 6 ||
+                        (isFirstFactor && bootCode.trim().length !== 6) ||
+                        (isFirstAdminFactor && !bootToken.trim())
+                      }
                     >
                       {isSubmitting ? t('verifying') : t('verifyButton')}
                     </Button>
@@ -344,6 +499,23 @@ export default function SecurityPage() {
                       {disableError}
                     </div>
                   )}
+                  <div>
+                    <label
+                      htmlFor="disable-password"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      {t('passwordLabel')}
+                    </label>
+                    <Input
+                      id="disable-password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
                   <div>
                     <label
                       htmlFor="disable-code"
@@ -382,7 +554,7 @@ export default function SecurityPage() {
                       type="submit"
                       variant="destructive"
                       className="flex-1"
-                      disabled={isSubmitting || disableCode.length !== 6}
+                      disabled={isSubmitting || disableCode.length !== 6 || !password}
                     >
                       {isSubmitting ? t('disabling') : t('disableButton')}
                     </Button>
@@ -454,52 +626,28 @@ export default function SecurityPage() {
                         {t('enableDescription')}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={handleBeginEnroll}
-                      disabled={isSubmitting}
-                      className="shrink-0"
-                    >
-                      {t('beginButton')}
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Input
+                        id="enroll-password"
+                        type="password"
+                        autoComplete="current-password"
+                        aria-label={t('passwordLabel')}
+                        placeholder={t('passwordLabel')}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleBeginEnroll}
+                        disabled={isSubmitting || !password}
+                        className="shrink-0"
+                      >
+                        {t('beginButton')}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
-                    {/* Re-enroll while enabled: need current TOTP code first */}
-                    <div className="p-5 space-y-3">
-                      <div>
-                        <p className="font-medium text-foreground">{t('reEnrollButton')}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                          {t('currentCodeLabel')}
-                        </p>
-                      </div>
-                      {enrollError && step === 'idle' && (
-                        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
-                          {enrollError}
-                        </div>
-                      )}
-                      <div className="flex gap-3">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          value={currentCode}
-                          onChange={e => setCurrentCode(e.target.value)}
-                          className="text-center tracking-widest"
-                          placeholder={t('codePlaceholder')}
-                          maxLength={6}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleBeginEnroll}
-                          disabled={isSubmitting || currentCode.length !== 6}
-                        >
-                          {isSubmitting ? '…' : t('continueButton')}
-                        </Button>
-                      </div>
-                    </div>
-
                     {/* Disable row */}
                     <div className="flex items-center justify-between gap-4 p-5">
                       <div className="min-w-0">
@@ -527,7 +675,14 @@ export default function SecurityPage() {
             )}
           </>
         )}
-        {status && user?.role !== 'super_admin' && <PasskeysPanel mfaEnabled={status.mfaEnabled} />}
+        {status && (
+          <PasskeysPanel
+            mfaEnabled={status.mfaEnabled}
+            isAdmin={user?.role === 'super_admin'}
+            onCount={setPasskeyCount}
+            onSignInAgain={() => void logout()}
+          />
+        )}
         <LegalAcceptancesPanel />
       </div>
     </AdminLayout>

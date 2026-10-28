@@ -68,7 +68,7 @@ function TermsFallback() {
                 'توافق على استخدام خدمتنا فقط للأغراض المشروعة ووفقاً لهذه الشروط. توافق على عدم:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'Violate any applicable laws or regulations',
@@ -101,7 +101,7 @@ function TermsFallback() {
             <p className="mt-2 text-muted-foreground">
               {t('When you create an account, you agree to:', 'عند إنشاء حساب، فإنك توافق على:')}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t('Provide accurate and complete information', 'تقديم معلومات دقيقة وكاملة')}
               </li>
@@ -136,7 +136,7 @@ function TermsFallback() {
                 'نسعى لتقديم معلومات دقيقة عن المنتجات والأسعار، ولكن قد تحدث أخطاء. نحتفظ بالحق في:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'Correct pricing errors and update information',
@@ -163,7 +163,7 @@ function TermsFallback() {
             <p className="mt-2 text-muted-foreground">
               {t('By placing an order, you agree that:', 'بتقديم طلب، فإنك توافق على أن:')}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>
                 {t(
                   'You are authorized to use the payment method provided',
@@ -198,7 +198,7 @@ function TermsFallback() {
                 'أوقات الشحن تقديرية وغير مضمونة. لسنا مسؤولين عن التأخير الناتج عن:'
               )}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-muted-foreground">
               <li>{t('Shipping carrier delays', 'تأخيرات شركة الشحن')}</li>
               <li>
                 {t(
