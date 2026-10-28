@@ -1,0 +1,3 @@
+# TEMPLATES-MOCK-2
+
+Ruling TEMPLATES-MOCK-2 - every mock trait is also an editor control (Ahmad 2026-10-28). Marketing keeps the mock-up phones; the five real templates are rebuilt to match them BY DEFAULT, and each trait is reachable (or leavable) from the visual editor's Theme pane: wordmark lockup, hero ratio, bottom tab bar, heading weight and card text size, card chrome (heart / swatches / tags), grid gutter and section spacing. Evidence: before this the hero was capped at `max-h-[45vh]` in code, the tab bar was always on and there was no lockup, so the mock look was not reachable. Cost if wrong: extra settings surface in the editor (more QA per template).

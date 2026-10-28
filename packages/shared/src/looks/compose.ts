@@ -2,6 +2,7 @@ import type { StoreTheme, TemplateId } from '../types/store-theme';
 import { getTemplateTheme } from '../types/store-theme';
 import { boundaryColorFloor, hexToHsl as h } from '../utils/color';
 import { getLook } from './registry';
+import { lockupFor, type Lockup } from './lockup';
 import {
   LOOK_OWNED_THEME_KEYS,
   type HeaderLogoPlacement,
@@ -108,4 +109,18 @@ export function resolveHeaderChrome(
       theme?.headerLogoPlacement ?? lookHeader?.logoPlacement ?? fallback.logoPlacement,
     search: theme?.headerSearch ?? lookHeader?.search ?? fallback.search,
   };
+}
+
+/**
+ * The designed wordmark lockup a header draws for a store WITHOUT an uploaded logo (the header itself checks the
+ * logo): the look's lockup unless the merchant chose the plain name (`theme.headerWordmark === 'plain'`).
+ * Unset = lockup (TEMPLATES-MOCK-1/-3). Pure; clearing the override falls back to the lockup.
+ */
+export function resolveLockup(
+  theme: Pick<StoreTheme, 'headerWordmark'> | null | undefined,
+  look?: string | null,
+  template?: string | null
+): Lockup | null {
+  if (theme?.headerWordmark === 'plain') return null;
+  return lockupFor(look, template);
 }

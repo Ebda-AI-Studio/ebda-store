@@ -1553,6 +1553,19 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.header-wordmark",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Store name without a logo",
+    "ar": "اسم المتجر لما مفيش شعار",
+    "synEn": "wordmark lockup store name logo designed plain header brand",
+    "synAr": "كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.fonts",
     "kind": "setting",
     "route": "/builder",

@@ -307,6 +307,11 @@ export const SETTING_OPTIONS = { SIZES, ASPECTS, SHAPES, GAPS, PADDING, opt };
  */
 export interface ThemeSettingDefinition extends Omit<SettingDefinition, 'id' | 'group'> {
   id: keyof StoreTheme;
+  /**
+   * A merchant override of a look-owned trait (TEMPLATES-MOCK-2): unset means "the look decides". The panel
+   * shows the look's own value (`traitDefault`) until the merchant picks one, and a pick can be reset.
+   */
+  trait?: boolean;
 }
 export interface ThemeSettingsGroup {
   id: 'header' | 'colors' | 'typography' | 'buttons' | 'cards' | 'spacing';
@@ -353,6 +358,22 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
         ],
         // only the Souq header turns the search into a field
         shownFor: { templates: ['souq'] },
+      },
+      {
+        id: 'headerWordmark',
+        type: 'select',
+        labelEn: 'Store name without a logo',
+        labelAr: 'اسم المتجر لما مفيش شعار',
+        hintEn:
+          'Designed wordmark (large name with a spaced Latin line) or the plain name. An uploaded logo always wins.',
+        hintAr:
+          'كلمة متصمّمة (الاسم كبير وتحته سطر لاتيني متباعد) أو الاسم عادي. الشعار المرفوع بيطلع دايمًا لو موجود.',
+        options: [
+          opt('lockup', 'Designed wordmark', 'كلمة متصمّمة'),
+          opt('plain', 'Plain name', 'الاسم عادي'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
       },
     ],
   },

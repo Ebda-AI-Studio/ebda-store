@@ -9490,6 +9490,7 @@
       "resetError": "Could not reset. Try again.",
       "headerLogo": "Logo position",
       "headerSearch": "Header search",
+      "headerWordmark": "Store name without a logo",
       "cardBrandBadge": "Store name on cards",
       "cardNewBadge": "\"New\" badge on cards",
       "cardQuickAdd": "Quick add (+) on carousel cards",

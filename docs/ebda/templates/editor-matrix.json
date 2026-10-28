@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1398,
+    "wired": 1403,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -2974,6 +2974,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|headerWordmark",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "dahab|theme|headingFont",
@@ -6742,6 +6755,19 @@
       ],
       "surface": "theme",
       "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "jasmine|theme|headerWordmark",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
       "status": "wired",
       "evidence": "static (compose.ts)"
     },
@@ -10529,6 +10555,19 @@
       "evidence": "static (compose.ts)"
     },
     {
+      "id": "lamma|theme|headerWordmark",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "lamma|theme|headingFont",
       "skin": "lamma",
       "looks": [
@@ -14295,6 +14334,19 @@
       ],
       "surface": "theme",
       "control": "headerLogoPlacement",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "qamar|theme|headerWordmark",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
       "status": "wired",
       "evidence": "static (compose.ts)"
     },
@@ -18078,6 +18130,19 @@
       ],
       "surface": "theme",
       "control": "headerSearch",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
+      "id": "souq|theme|headerWordmark",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "headerWordmark",
       "status": "wired",
       "evidence": "static (compose.ts)"
     },

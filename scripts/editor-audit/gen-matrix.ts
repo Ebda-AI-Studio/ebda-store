@@ -146,6 +146,10 @@ export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern:
     file: 'packages/shared/src/looks/compose.ts',
     pattern: /theme\?\.headerSearch/,
   },
+  'theme/headerWordmark': {
+    file: 'packages/shared/src/looks/compose.ts',
+    pattern: /theme\?\.headerWordmark/,
+  },
   'testimonials/verifiedOnly': {
     file: 'apps/web/src/app/HomePageBody.tsx',
     pattern: /layout\.testimonials\.verifiedOnly/,

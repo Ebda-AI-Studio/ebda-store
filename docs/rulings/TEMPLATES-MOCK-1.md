@@ -1,0 +1,3 @@
+# TEMPLATES-MOCK-1
+
+Ruling TEMPLATES-MOCK-1 - the real templates move to the old Python mock-ups (Ahmad 2026-10-28, "I like old mockups, keep"; plan `docs/plans/2026-10-25-templates-match-mockups.md` P1-P8). The four open questions of that plan take the mock-faithful default: (1) the lockup wordmark is a built-in for every store without a logo; (2) no bottom tab bar on the store home, the cart is the header bag icon as in the mock; (3) the "illustrative photos" notice becomes a footer line; (4) the accent hex is the mock's own. Evidence: the 15-image comparison pack `business/ebda/template-compare-2026-10-28/` (old mock left, live right). Cost if wrong: one revert PR per item.

@@ -849,6 +849,13 @@ export const SETTINGS: SettingEntry[] = [
         'البحث خانة بحث ايقونة الهيدر',
       ],
       [
+        'builder.header-wordmark',
+        'builder.theme.headerWordmark',
+        'select=theme',
+        'wordmark lockup store name logo designed plain header brand',
+        'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
+      ],
+      [
         'builder.fonts',
         'builder.search.fonts',
         'select=theme',

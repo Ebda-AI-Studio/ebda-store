@@ -37,6 +37,13 @@ export const LOOK_CARD_BADGES = ['accent'] as const;
 export const HEADER_LOGO_PLACEMENTS = ['start', 'centre'] as const;
 export const HEADER_SEARCH_PLACEMENTS = ['prominent', 'icon'] as const;
 export type HeaderLogoPlacement = (typeof HEADER_LOGO_PLACEMENTS)[number];
+/**
+ * The merchant's pick for a store with NO uploaded logo (TEMPLATES-MOCK-1/-3): `lockup` = the look's
+ * designed wordmark (display name + letter-spaced Latin line), `plain` = the skin's own plain name.
+ * Unset = `lockup`. A merchant logo always wins whatever this says.
+ */
+export const HEADER_WORDMARKS = ['lockup', 'plain'] as const;
+export type HeaderWordmark = (typeof HEADER_WORDMARKS)[number];
 export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
 export type WordmarkSize = (typeof LOOK_WORDMARK_SIZES)[number];
 export type OverPhotoChrome = (typeof LOOK_OVER_PHOTO_CHROMES)[number];
@@ -227,6 +234,7 @@ export const LOOK_UI_TOKEN_KEYS = [
 export const HEADER_CHROME_OVERRIDE_KEYS = [
   'headerLogoPlacement',
   'headerSearch',
+  'headerWordmark',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
 /** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */

@@ -15,6 +15,7 @@ import type {
   WordmarkSize,
   HeaderLogoPlacement,
   HeaderSearchPlacement,
+  HeaderWordmark,
   CardCta,
   CardHover,
   CardBadge,
@@ -167,6 +168,8 @@ export interface StoreTheme {
   // Never set by a look: merchant > look chrome > skin default. Absent = the look's own value.
   headerLogoPlacement?: HeaderLogoPlacement;
   headerSearch?: HeaderSearchPlacement;
+  // TEMPLATES-MOCK-3: the designed wordmark lockup for a store without a logo; unset = lockup, `plain` opts out.
+  headerWordmark?: HeaderWordmark;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
