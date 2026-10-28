@@ -707,6 +707,21 @@
           "optional": false,
           "default": "\"daily\""
         },
+        "ciSharing": {
+          "kind": "scalar",
+          "type": "Boolean",
+          "column": "ci_sharing",
+          "list": false,
+          "optional": false,
+          "default": "false"
+        },
+        "ciSharingChangedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "ci_sharing_changed_at",
+          "list": false,
+          "optional": true
+        },
         "owner": {
           "kind": "relation",
           "type": "User",
@@ -1569,6 +1584,18 @@
           "to": ["store_id"],
           "toProps": ["storeId"]
         },
+        "staffInvites": {
+          "kind": "relation",
+          "type": "StaffInvite",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["store_id"],
+          "toProps": ["storeId"]
+        },
         "etaConnection": {
           "kind": "relation",
           "type": "EtaConnection",
@@ -1901,6 +1928,102 @@
           "owner": true,
           "from": ["user_id"],
           "fromProps": ["userId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "StaffInvite": {
+      "table": "staff_invites",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "email": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "email",
+          "list": false,
+          "optional": false
+        },
+        "role": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "role",
+          "list": false,
+          "optional": false,
+          "default": "\"staff\""
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"pending\""
+        },
+        "invitedBy": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "invited_by",
+          "list": false,
+          "optional": true
+        },
+        "acceptedBy": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "accepted_by",
+          "list": false,
+          "optional": true
+        },
+        "expiresAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "expires_at",
+          "list": false,
+          "optional": false
+        },
+        "decidedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "decided_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "Cascade"
@@ -6380,6 +6503,20 @@
           "list": false,
           "optional": false
         },
+        "areaKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "area_key",
+          "list": false,
+          "optional": true
+        },
+        "buyerKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "buyer_key",
+          "list": false,
+          "optional": true
+        },
         "shippedAt": {
           "kind": "scalar",
           "type": "DateTime",
@@ -9765,6 +9902,56 @@
           "kind": "scalar",
           "type": "DateTime",
           "column": "last_polled_at",
+          "list": false,
+          "optional": true
+        },
+        "pickedUpAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "picked_up_at",
+          "list": false,
+          "optional": true
+        },
+        "deliveredAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "delivered_at",
+          "list": false,
+          "optional": true
+        },
+        "returnedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "returned_at",
+          "list": false,
+          "optional": true
+        },
+        "deliveryAttempts": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "delivery_attempts",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "returnReasonRaw": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "return_reason_raw",
+          "list": false,
+          "optional": true
+        },
+        "returnReasonCode": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "return_reason_code",
+          "list": false,
+          "optional": true
+        },
+        "areaKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "area_key",
           "list": false,
           "optional": true
         },

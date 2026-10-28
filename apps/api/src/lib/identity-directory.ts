@@ -8,6 +8,9 @@ import { config } from '../config';
 import { ownedStoreIds } from './definer';
 import {
   sendMerchantPasswordResetEmail,
+  sendStaffInviteEmail,
+  sendFactorEnrolCodeEmail,
+  sendFactorAddedNoticeEmail,
   sendMerchantVerificationEmail,
 } from '../services/platform-mailer';
 
@@ -40,11 +43,12 @@ export async function storesForUser(userId: string): Promise<StoreClaim[]> {
 
 export interface CodeMail {
   to: string;
-  kind: 'email_verify' | 'password_reset';
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol';
   code: string;
   language: 'en' | 'ar';
   firstName: string;
   ttlMinutes: number;
+  storeName?: string;
 }
 
 /** The code travels in the link the existing branded templates already render, so no new template is needed. */
@@ -60,7 +64,27 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
         verificationUrl: `${config.adminUrl}/verify-email?${q}`,
         expiresInHours: Math.max(1, Math.round(m.ttlMinutes / 60)),
       },
-      m.language
+      m.language,
+      true
+    );
+  } else if (m.kind === 'factor_enrol') {
+    await sendFactorEnrolCodeEmail(
+      { email: m.to, name: m.firstName, code: m.code, expiresInMinutes: m.ttlMinutes },
+      m.language,
+      true
+    );
+  } else if (m.kind === 'staff_invite') {
+    await sendStaffInviteEmail(
+      {
+        email: m.to,
+        name: m.firstName,
+        storeName: m.storeName ?? 'your store',
+        loginUrl: `${config.adminUrl}/login`,
+        setPasswordUrl: `${config.adminUrl}/reset-password?${q}`,
+        expiresInMinutes: m.ttlMinutes,
+      },
+      m.language,
+      true
     );
   } else {
     await sendMerchantPasswordResetEmail(
@@ -70,7 +94,26 @@ export async function sendCodeMail(m: CodeMail): Promise<void> {
         resetUrl: `${config.adminUrl}/reset-password?${q}`,
         expiresInMinutes: m.ttlMinutes,
       },
-      m.language
+      m.language,
+      true
     );
   }
+}
+
+export interface NoticeMail {
+  to: string;
+  kind: 'factor_added';
+  factor: 'totp' | 'passkey';
+  language: 'en' | 'ar';
+  firstName: string;
+}
+
+/** Security notices from the identity service that carry no code. */
+export async function sendNoticeMail(m: NoticeMail): Promise<void> {
+  if (m.kind !== 'factor_added') throw new Error('sendNoticeMail: unknown kind');
+  await sendFactorAddedNoticeEmail(
+    { email: m.to, name: m.firstName, factor: m.factor },
+    m.language,
+    true
+  );
 }

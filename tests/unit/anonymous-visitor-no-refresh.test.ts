@@ -74,7 +74,10 @@ afterEach(() => {
 });
 
 function refreshCalls(fetchMock: ReturnType<typeof vi.fn>): string[] {
-  return fetchMock.mock.calls.map(c => String(c[0])).filter(u => u.includes('/auth/refresh'));
+  // The storefront refreshes at /auth/refresh; admin and orders ask the identity service for a token at /token (Rulings ID-1/ID-2).
+  return fetchMock.mock.calls
+    .map(c => String(c[0]))
+    .filter(u => u.includes('/auth/refresh') || u.includes('/token?aud='));
 }
 
 describe('guest mount — /auth/me 401 with no session evidence', () => {
@@ -209,8 +212,11 @@ describe.each(['@admin/lib/api', '@orders/lib/api'])('%s — the mount check', m
   it('a browser that held a session still refreshes and recovers', async () => {
     let me = 0;
     const fetchMock = vi.fn(async (url: unknown) => {
-      if (String(url).includes('/auth/refresh')) {
-        return res(200, { success: true, data: { refreshed: true } });
+      if (String(url).includes('/token?aud=')) {
+        return res(200, { success: true, data: { access_token: 't', expires_at: 1 } });
+      }
+      if (String(url).includes('/auth/session')) {
+        return res(200, { success: true, data: { user: { id: 'u1' } } });
       }
       me += 1;
       return me === 1

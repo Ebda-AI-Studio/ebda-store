@@ -69,6 +69,9 @@ vi.mock('@api/lib/definer', () => ({
   revokeUserSessionsRow: (userId: string) => mockPrisma.user.update({ where: { id: userId } }),
 }));
 
+// Merchant/staff sessions are also ended at the identity service (tests/unit/identity-shadow.test.ts covers that call).
+vi.mock('@api/lib/identity-client', () => ({ revokeIdentityIfManaged: async () => undefined }));
+
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: sendAlertMock }));
 
 vi.mock('@api/services/redis.service', () => ({ redis: redisMock }));

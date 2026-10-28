@@ -2,8 +2,12 @@
 import type { UserRow } from './data';
 import { iso, nowMs, randomCode, safeEqual, sha256Hex } from './util';
 
-export type OtpType = 'email' | 'password_reset';
-export const OTP_TTL_MINUTES: Record<OtpType, number> = { email: 30, password_reset: 15 };
+export type OtpType = 'email' | 'password_reset' | 'two_factor';
+export const OTP_TTL_MINUTES: Record<OtpType, number> = {
+  email: 30,
+  password_reset: 15,
+  two_factor: 10,
+};
 const MAX_ATTEMPTS = 5;
 export const MAX_SENDS_PER_15_MIN = 3;
 
@@ -31,7 +35,9 @@ export async function issueOtp(
   db: D1Database,
   user: Pick<UserRow, 'id'>,
   type: OtpType,
-  pending?: PendingSignup
+  pending?: PendingSignup,
+  /** Override the code lifetime (an invitation outlives a password-reset code). */
+  ttlMinutes: number = OTP_TTL_MINUTES[type]
 ): Promise<string | null> {
   const code = randomCode();
   const now = nowMs();
@@ -47,7 +53,7 @@ export async function issueOtp(
         await hashCode(user.id, type, code),
         user.id,
         type,
-        iso(now + OTP_TTL_MINUTES[type] * 60_000),
+        iso(now + ttlMinutes * 60_000),
         iso(now),
         pending ? JSON.stringify(pending) : null
       ),

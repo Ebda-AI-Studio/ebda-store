@@ -68,7 +68,8 @@ describe('sendCodeMail', () => {
         verificationUrl:
           'https://store.ebda.app/verify-email?email=a%2Bb%40example.com#code=123456',
       }),
-      'ar'
+      'ar',
+      true
     );
   });
 
@@ -79,7 +80,8 @@ describe('sendCodeMail', () => {
         resetUrl: 'https://store.ebda.app/reset-password?email=a%2Bb%40example.com#code=123456',
         expiresInMinutes: 15,
       }),
-      'ar'
+      'ar',
+      true
     );
   });
 

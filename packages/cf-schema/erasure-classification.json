@@ -1120,6 +1120,16 @@
     "subjectKeys": [],
     "note": ""
   },
+  "d1:staff_invites": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["email", "invited_by", "accepted_by"],
+    "subjectKeys": ["email"],
+    "note": "invitee address; pending invites expire, rows leave with the store",
+    "userIdColumns": ["invited_by", "accepted_by"],
+    "actorScrub": { "invited_by": null, "accepted_by": null }
+  },
   "d1:store_staff": {
     "db": "d1",
     "class": "merchant-pii",

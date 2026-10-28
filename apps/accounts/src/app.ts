@@ -21,7 +21,7 @@ import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './pass
 import { CODE_GUESS, hit, LOGIN, PER_EMAIL, PER_IP_ONLY, SECOND_FACTOR } from './throttle';
 import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType, type PendingSignup } from './otp';
 import * as passkeys from './passkeys';
-import { newSecret, seal, totpUri, unseal, verifyTotp } from './totp';
+import { newSecret, sealCurrent, totpUri, unsealAny, verifyTotp } from './totp';
 import { csv, iso, nowMs, randomCode, sha256Hex } from './util';
 
 export const COOKIE = '__Host-ebda_rt';
@@ -54,6 +54,19 @@ function audOf(env: Env, raw: string | undefined | null): string {
   const aud = raw ?? 'store';
   if (!csv(env.PRODUCTS).includes(aud)) throw err(400, 'INVALID_AUDIENCE');
   return aud;
+}
+
+/**
+ * A browser origin may only request tokens for the product it belongs to (ORIGIN_PRODUCTS). Requests with no Origin header
+ * (server-side) are not browser-bound and keep the cookie/CSRF rules unchanged.
+ */
+function originAudience(c: C, aud: string): void {
+  const origin = c.req.header('origin');
+  if (!origin) return;
+  const mapped = csv(c.env.ORIGIN_PRODUCTS)
+    .map(p => p.split('='))
+    .find(([o]) => o === origin)?.[1];
+  if (!mapped || mapped !== aud) throw err(403, 'ORIGIN_AUDIENCE_MISMATCH');
 }
 
 const cookieValue = (c: C): string => {
@@ -96,13 +109,34 @@ async function storesFor(env: Env, userId: string): Promise<StoreClaim[]> {
   }
 }
 
-async function mintFor(env: Env, user: UserRow, sid: string, aud: string) {
+/** A platform admin must have logged in within this window for `pa` to be minted or honoured (Ruling ID-15). */
+export const SUPER_ADMIN_MAX_AUTH_AGE_MS = 12 * 3600_000;
+
+/** A second factor was used to create the session: TOTP (`otp`) or a passkey (`hwk`). */
+const hasSecondFactor = (amr: string) => /(^|,)(otp|hwk)(,|$)/.test(amr);
+
+/**
+ * `pa: super_admin` is minted only for a session that (a) was created by a login that used a SECOND FACTOR (TOTP or passkey),
+ * and (b) is at most 12 h old. A platform admin whose session is older must sign in again (401 REAUTH_REQUIRED); one that has
+ * no second factor yet gets an ordinary token without `pa` and is told to enrol (see /login).
+ */
+async function mintFor(
+  env: Env,
+  user: UserRow,
+  sid: string,
+  aud: string,
+  session: { created_at: number; amr: string }
+) {
+  const admin = user.role === 'super_admin';
+  if (admin && nowMs() - session.created_at > SUPER_ADMIN_MAX_AUTH_AGE_MS)
+    throw err(401, 'REAUTH_REQUIRED', 'Sign in again to continue as a platform administrator');
   const { token, expiresAt } = await mintAccessToken(env, {
     sub: user.id,
     sid,
     aud,
     stores: await storesFor(env, user.id),
-    ...(user.role === 'super_admin' ? { pa: 'super_admin' as const } : {}),
+    ...(admin && hasSecondFactor(session.amr) ? { pa: 'super_admin' as const } : {}),
+    auth_time: Math.floor(session.created_at / 1000),
     email: user.email,
     email_verified: !!user.email_verified,
   });
@@ -125,10 +159,207 @@ const publicUser = (u: UserRow) => ({
   mfaEnabled: !!u.mfa_enabled,
 });
 
+async function hasAnyFactor(db: D1Database, user: UserRow): Promise<boolean> {
+  if (user.mfa_enabled && user.mfa_secret) return true;
+  const p = await db
+    .prepare(`SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`)
+    .bind(user.id)
+    .first<{ n: number }>();
+  return (p?.n ?? 0) > 0;
+}
+
+/**
+ * First-factor bootstrap for a platform administrator (Ruling ID-15). A password-only session must not be able to bind the
+ * FIRST factor to a super_admin (a phished or leaked password would hand over the account). So, in addition to the password
+ * and the session, it needs (1) the one-time enrolment token the operator's script printed to their terminal, and (2) a
+ * one-time code mailed to the account's mailbox. Both are single use; the token is hashed at rest and expires.
+ */
+type EnrolMode = 'bootstrap' | 'step-up' | 'password';
+type EnrolTicket = { mode: EnrolMode; sid: string; via?: 'session' | 'totp' };
+const FRESH_FACTOR_MS = 10 * 60_000;
+
+/** The CURRENT session was created by a login that used a second factor, at most 10 minutes ago. */
+async function sessionFactorFresh(c: C, sid: string): Promise<boolean> {
+  const s = await c.env.DB.prepare(
+    `SELECT created_at, amr FROM sessions WHERE sid = ?1 AND revoked_at IS NULL`
+  )
+    .bind(sid)
+    .first<{ created_at: number; amr: string }>();
+  return !!s && hasSecondFactor(s.amr) && nowMs() - s.created_at <= FRESH_FACTOR_MS;
+}
+
+/**
+ * Policy for adding ANY sign-in factor (TOTP or passkey), decided when the enrolment BEGINS and stored on a ticket that the
+ * completion step must find (Ruling ID-15):
+ *  - a platform admin with no factor yet: `bootstrap` - the operator's token + an e-mailed code at completion;
+ *  - an account that already has a factor: `step-up` - a password plus a stolen token is not enough; the session must come
+ *    from a login that used a second factor in the last 10 minutes, or (TOTP holders) a valid TOTP code sent now;
+ *  - anyone else (first factor of a merchant): the password step-up that was always required.
+ * Completion re-checks the CURRENT state, so a factor enrolled between begin and finish only ever makes it stricter.
+ */
+async function startEnrolment(
+  c: C,
+  user: UserRow,
+  sid: string,
+  totpCode?: string
+): Promise<EnrolMode> {
+  const factor = await hasAnyFactor(c.env.DB, user);
+  let ticket: EnrolTicket;
+  if (user.role === 'super_admin' && !factor) ticket = { mode: 'bootstrap', sid };
+  else if (factor) {
+    if (await sessionFactorFresh(c, sid)) ticket = { mode: 'step-up', sid, via: 'session' };
+    else if (user.mfa_enabled && totpCode && (await checkTotp(c, user, totpCode)))
+      ticket = { mode: 'step-up', sid, via: 'totp' };
+    else throw err(403, user.mfa_enabled ? 'MFA_REQUIRED' : 'STEP_UP_REQUIRED');
+  } else ticket = { mode: 'password', sid };
+  await c.env.DB.batch([
+    c.env.DB.prepare(`DELETE FROM challenges WHERE user_id = ?1 AND kind = 'factor-enrol'`).bind(
+      user.id
+    ),
+    c.env.DB.prepare(
+      `INSERT INTO challenges (id, kind, user_id, data, expires_at) VALUES (?1,'factor-enrol',?2,?3,?4)`
+    ).bind(crypto.randomUUID(), user.id, JSON.stringify(ticket), nowMs() + 10 * 60_000),
+  ]);
+  return ticket.mode;
+}
+
+/** Completion gate: the ticket must exist (bound to this session) and its policy - or a stricter current one - must hold. */
+async function authorizeEnrolment(
+  c: C,
+  user: UserRow,
+  sid: string,
+  proof: { enrolmentToken?: string; emailCode?: string }
+): Promise<EnrolMode> {
+  const row = await c.env.DB.prepare(
+    `SELECT data FROM challenges WHERE user_id = ?1 AND kind = 'factor-enrol' AND expires_at > ?2`
+  )
+    .bind(user.id, nowMs())
+    .first<{ data: string }>();
+  const t = row ? (JSON.parse(row.data) as EnrolTicket) : null;
+  if (!t || t.sid !== sid) throw err(409, 'ENROL_NOT_STARTED');
+  if (t.mode === 'bootstrap') {
+    await requireBootstrapProof(c, user, proof); // required whatever the account looks like NOW
+    return 'bootstrap';
+  }
+  const factorNow = await hasAnyFactor(c.env.DB, user);
+  if (!factorNow && user.role !== 'super_admin') {
+    await requireEmailCode(c, user, proof.emailCode);
+    return 'password';
+  }
+  if (factorNow) {
+    if (t.via !== 'totp' && !(await sessionFactorFresh(c, sid))) throw err(403, 'STEP_UP_REQUIRED');
+    return 'step-up';
+  }
+  if (user.role === 'super_admin') {
+    await requireBootstrapProof(c, user, proof);
+    return 'bootstrap';
+  }
+  return t.mode;
+}
+
+/** After a factor is bound: drop every pending enrolment of the account; after a bootstrap also end EVERY session. */
+async function finishEnrolment(
+  c: C,
+  user: UserRow,
+  mode: EnrolMode,
+  factor: 'totp' | 'passkey'
+): Promise<boolean> {
+  const db = c.env.DB;
+  const stmts = [
+    db
+      .prepare(
+        `DELETE FROM challenges WHERE user_id = ?1 AND kind IN ('factor-enrol','passkey-register')`
+      )
+      .bind(user.id),
+  ];
+  if (mode === 'bootstrap') {
+    const now = nowMs();
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE sessions SET revoked_at = ?2, revoked_reason = 'first-factor-enrolled' WHERE user_id = ?1 AND revoked_at IS NULL`
+        )
+        .bind(user.id, now),
+      db
+        .prepare(
+          `UPDATE refresh_tokens SET revoked_at = ?2, revoked_reason = COALESCE(revoked_reason, 'first-factor-enrolled') WHERE user_id = ?1 AND revoked_at IS NULL`
+        )
+        .bind(user.id, iso()),
+      // an unfinished TOTP secret must not outlive the factor that won
+      db
+        .prepare(`UPDATE users SET mfa_secret = NULL WHERE id = ?1 AND mfa_enabled = 0`)
+        .bind(user.id)
+    );
+  }
+  await db.batch(stmts);
+  // A sign-in method was added: tell the mailbox owner (best effort; the change already happened).
+  queueMail(
+    c,
+    c.env.MAILER?.sendNotice({
+      to: user.email,
+      kind: 'factor_added',
+      factor,
+      language: user.language === 'ar' ? 'ar' : 'en',
+      firstName: user.first_name,
+    }) ?? Promise.resolve()
+  );
+  // A platform admin's FIRST factor ends EVERY session, the enrolling one included: it was a password-only session, and the
+  // person signs in again with the new factor (which is what carries admin power).
+  return mode === 'bootstrap';
+}
+
+async function requireBootstrapProof(
+  c: C,
+  user: UserRow,
+  proof: { enrolmentToken?: string; emailCode?: string }
+): Promise<void> {
+  const a = await hit(c.env.DB, user.id, clientIp(c), SECOND_FACTOR);
+  if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
+  if (!proof.enrolmentToken || !proof.emailCode) throw err(403, 'ENROLMENT_PROOF_REQUIRED');
+  const hash = await sha256Hex(proof.enrolmentToken);
+  const row = await c.env.DB.prepare(
+    `SELECT id FROM enrolment_tokens WHERE user_id = ?1 AND token_hash = ?2 AND used_at IS NULL AND expires_at > ?3`
+  )
+    .bind(user.id, hash, nowMs())
+    .first<{ id: string }>();
+  if (!row) throw err(403, 'ENROLMENT_PROOF_INVALID');
+  if (!(await verifyOtp(c.env.DB, user, 'two_factor', proof.emailCode)).ok)
+    throw err(403, 'ENROLMENT_PROOF_INVALID');
+  const used = await c.env.DB.prepare(
+    `UPDATE enrolment_tokens SET used_at = ?2 WHERE id = ?1 AND used_at IS NULL AND expires_at > ?2`
+  )
+    .bind(row.id, nowMs())
+    .run();
+  if ((used.meta.changes ?? 0) !== 1) throw err(403, 'ENROLMENT_PROOF_INVALID');
+  await a.succeeded();
+}
+
+/**
+ * A merchant's (or staff member's) FIRST factor: the password step-up is not enough, because a phished password would let an
+ * attacker bind their own factor, and a password reset (which keeps a verified account's factors, Ruling ID-8) would never
+ * remove it. So it needs the same proof a reset needs: a one-time code mailed to the account's address.
+ */
+async function requireEmailCode(c: C, user: UserRow, emailCode?: string): Promise<void> {
+  const a = await hit(c.env.DB, user.id, clientIp(c), SECOND_FACTOR);
+  if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
+  if (!emailCode) throw err(403, 'EMAIL_CODE_REQUIRED');
+  if (!(await verifyOtp(c.env.DB, user, 'two_factor', emailCode)).ok)
+    throw err(403, 'EMAIL_CODE_INVALID');
+  await a.succeeded();
+}
+
 async function sessionResponse(c: C, user: UserRow, amr: string, aud: string) {
   const s = await createSession(c.env.DB, user, amr, sessionCtx(c));
   setRefreshCookie(c, s.refreshToken);
-  return { user: publicUser(user), ...(await mintFor(c.env, user, s.sid, aud)) };
+  return {
+    user: publicUser(user),
+    ...(await mintFor(c.env, user, s.sid, aud, { created_at: nowMs(), amr })),
+    // A platform admin without a second factor gets no admin power: the client must send them to enrol one.
+    // (A super admin WITH a factor never reaches this point on a password: /login answers secondFactorRequired and creates NO session.)
+    ...(user.role === 'super_admin' && !hasSecondFactor(amr)
+      ? { mfaEnrollmentRequired: true }
+      : {}),
+  };
 }
 
 /**
@@ -165,6 +396,15 @@ async function requirePassword(c: C, user: UserRow, password: unknown): Promise<
   await a.succeeded();
 }
 
+/** Open a sealed TOTP secret with the keyring; a key that is not in it is an operator problem (503), never a 500 or a pass. */
+async function openTotpSecret(c: C, sealed: string, userId: string): Promise<string> {
+  try {
+    return await unsealAny(c.env, sealed, userId);
+  } catch {
+    throw err(503, 'MFA_UNAVAILABLE');
+  }
+}
+
 /**
  * EVERY endpoint that checks a TOTP code goes through here (or /login/mfa, which does the same): counted first against a
  * per-user budget, the matched time step is claimed single-use, a success clears the counter.
@@ -174,7 +414,7 @@ async function checkTotp(c: C, user: UserRow, code: unknown): Promise<boolean> {
   if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
   if (typeof code !== 'string' || !user.mfa_secret || !c.env.MFA_KEY) return false;
   const step = await verifyTotp(
-    await unseal(c.env.MFA_KEY, user.mfa_secret),
+    await openTotpSecret(c, user.mfa_secret, user.id),
     code,
     Date.now(),
     user.mfa_last_step
@@ -196,11 +436,12 @@ async function requireSecondFactor(c: C, user: UserRow, code: unknown): Promise<
 export async function issueAndMail(
   env: Env,
   user: UserRow,
-  kind: 'email_verify' | 'password_reset',
+  kind: 'email_verify' | 'password_reset' | 'staff_invite' | 'factor_enrol',
   type: OtpType,
-  pending?: PendingSignup
+  pending?: PendingSignup,
+  opts: { ttlMinutes?: number; storeName?: string } = {}
 ): Promise<void> {
-  const code = await issueOtp(env.DB, user, type, pending);
+  const code = await issueOtp(env.DB, user, type, pending, opts.ttlMinutes);
   if (!code || !env.MAILER) return;
   try {
     await env.MAILER.sendCode({
@@ -209,7 +450,8 @@ export async function issueAndMail(
       code,
       language: (pending?.language ?? user.language) === 'ar' ? 'ar' : 'en',
       firstName: pending?.first_name ?? user.first_name,
-      ttlMinutes: OTP_TTL_MINUTES[type],
+      ttlMinutes: opts.ttlMinutes ?? OTP_TTL_MINUTES[type],
+      ...(opts.storeName ? { storeName: opts.storeName } : {}),
     });
   } catch (e) {
     console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
@@ -222,6 +464,97 @@ function queueMail(c: C, job: Promise<unknown>): void {
     job.catch(e =>
       console.error(JSON.stringify({ msg: 'background job failed', error: (e as Error).message }))
     )
+  );
+}
+
+/** Mail a password-reset code to an existing active account (generic: silent for an unknown address). */
+export async function forgotPasswordFor(env: Env, email: string): Promise<void> {
+  const user = await findUserByEmail(env.DB, email);
+  if (user && user.status === 'active')
+    await issueAndMail(env, user, 'password_reset', 'password_reset');
+}
+
+export type InviteResult =
+  | { id: string; created: true }
+  | { id: string; created: false; emailVerified: boolean; role: UserRow['role'] };
+
+/**
+ * Invite a merchant or staff member: creates an UNVERIFIED identity with no credential and mails a one-time code that
+ * lets the invitee set their own password (the reset flow; it also verifies the address).
+ *
+ * An invitation may only ever bind to a row IT created. If ANY identity already exists for the address it is reported back
+ * (`created: false`, with its real id, role and verified flag) and nothing is mailed or changed: the caller must use the
+ * explicit accept flow. The one exception is a retry of the same invitation (same id, same role, still unverified), which
+ * re-mails the code. This closes the cross-tenant takeover where an invite attached a store to someone else's row.
+ */
+export async function inviteFor(
+  env: Env,
+  input: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'store_admin' | 'staff';
+    language: 'en' | 'ar';
+    storeName?: string;
+  }
+): Promise<InviteResult> {
+  let user = await findUserByEmail(env.DB, input.email);
+  if (!user) {
+    try {
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, email_verified, language, created_at, updated_at)
+         VALUES (?1,?2,'!pending',?3,?4,?5,'active',0,?6,?7,?7)`
+      )
+        .bind(
+          input.id,
+          input.email,
+          input.firstName,
+          input.lastName,
+          input.role,
+          input.language,
+          iso()
+        )
+        .run();
+    } catch (e) {
+      if (!/UNIQUE.*users\.email|users_email_lower/i.test((e as Error).message)) throw e;
+    }
+    user = await findUserByEmail(env.DB, input.email);
+  }
+  if (!user) throw new Error('invite: identity row missing after insert');
+  const retry = user.id === input.id && user.role === input.role && !user.email_verified;
+  if (!retry) {
+    return { id: user.id, created: false, emailVerified: !!user.email_verified, role: user.role };
+  }
+  await issueAndMail(
+    env,
+    user,
+    input.storeName ? 'staff_invite' : 'password_reset',
+    'password_reset',
+    undefined,
+    {
+      ttlMinutes: 24 * 60,
+      storeName: input.storeName,
+    }
+  );
+  return { id: user.id, created: true };
+}
+
+/** Mail a fresh code to an existing UNVERIFIED account; carries the credential of the latest signup (see verify). */
+export async function resendVerificationFor(env: Env, email: string): Promise<void> {
+  const user = await findUserByEmail(env.DB, email);
+  if (!user || user.status !== 'active' || user.email_verified) return;
+  const last = await env.DB.prepare(
+    `SELECT pending FROM verification_tokens WHERE user_id = ?1 AND type = 'email' AND pending IS NOT NULL ORDER BY created_at DESC LIMIT 1`
+  )
+    .bind(user.id)
+    .first<{ pending: string }>();
+  await issueAndMail(
+    env,
+    user,
+    'email_verify',
+    'email',
+    last ? (JSON.parse(last.pending) as PendingSignup) : undefined
   );
 }
 
@@ -345,7 +678,14 @@ export function createApp() {
   };
 
   // ---- discovery ----
-  app.get('/health', c => c.json({ status: 'ok', service: 'accounts' }));
+  app.get('/health', c =>
+    c.json({
+      status: 'ok',
+      service: 'accounts',
+      commit: c.env.BUILD_COMMIT_SHA || null,
+      deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
+    })
+  );
   app.get('/.well-known/jwks.json', async c => {
     c.header('Cache-Control', 'public, max-age=300');
     return c.json(await jwks(c.env));
@@ -365,6 +705,7 @@ export function createApp() {
   app.post('/login', async c => {
     const body = await json(c, loginBody);
     const aud = audOf(c.env, body.aud);
+    originAudience(c, aud);
     const ip = clientIp(c);
     // Counted BEFORE the password is checked (see throttle.ts): a parallel burst cannot out-run the budget.
     const attempt = await hit(c.env.DB, body.email, ip, LOGIN);
@@ -397,6 +738,10 @@ export function createApp() {
       ]);
       return c.json({ success: true, data: { mfaRequired: true, challenge } });
     }
+    // A platform admin who has a passkey but no TOTP cannot be signed in by the password alone: no session, no cookie, no token
+    // (a half-signed-in session could otherwise be used to remove the passkey, i.e. to lock the only admin out).
+    if (user.role === 'super_admin' && (await hasAnyFactor(c.env.DB, user)))
+      return c.json({ success: true, data: { secondFactorRequired: true } });
     return c.json({ success: true, data: await sessionResponse(c, user, 'pwd', aud) });
   });
 
@@ -420,6 +765,7 @@ export function createApp() {
       .first<{ user_id: string; data: string }>();
     if (!row) throw err(401, 'INVALID_CHALLENGE');
     const data = JSON.parse(row.data) as { aud: string };
+    originAudience(c, data.aud);
     const user = await findUserById(c.env.DB, row.user_id);
     if (
       !user ||
@@ -436,7 +782,7 @@ export function createApp() {
     let spentBackup: { old: string; next: string } | null = null;
     if (body.code) {
       const step = await verifyTotp(
-        await unseal(c.env.MFA_KEY, user.mfa_secret),
+        await openTotpSecret(c, user.mfa_secret, user.id),
         body.code,
         Date.now(),
         user.mfa_last_step
@@ -485,14 +831,22 @@ export function createApp() {
 
   app.get('/token', async c => {
     const aud = audOf(c.env, c.req.query('aud'));
+    originAudience(c, aud);
     const r = await cookieSession(c);
-    return c.json({ success: true, data: await mintFor(c.env, r.user, r.session.sid, aud) });
+    return c.json({
+      success: true,
+      data: await mintFor(c.env, r.user, r.session.sid, aud, r.session),
+    });
   });
 
   app.post('/refresh', async c => {
     const aud = audOf(c.env, c.req.query('aud'));
+    originAudience(c, aud);
     const r = await cookieSession(c, true);
-    return c.json({ success: true, data: await mintFor(c.env, r.user, r.session.sid, aud) });
+    return c.json({
+      success: true,
+      data: await mintFor(c.env, r.user, r.session.sid, aud, r.session),
+    });
   });
 
   app.post('/logout', async c => {
@@ -629,26 +983,7 @@ export function createApp() {
       throw err(429, 'TOO_MANY_ATTEMPTS');
     if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('resend-email', 3))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    queueMail(
-      c,
-      (async () => {
-        const user = await findUserByEmail(c.env.DB, body.email);
-        if (!user || user.status !== 'active' || user.email_verified) return;
-        // Re-send carries the credential of the LATEST signup, so the new code activates the same password as before.
-        const last = await c.env.DB.prepare(
-          `SELECT pending FROM verification_tokens WHERE user_id = ?1 AND type = 'email' AND pending IS NOT NULL ORDER BY created_at DESC LIMIT 1`
-        )
-          .bind(user.id)
-          .first<{ pending: string }>();
-        await issueAndMail(
-          c.env,
-          user,
-          'email_verify',
-          'email',
-          last ? (JSON.parse(last.pending) as PendingSignup) : undefined
-        );
-      })()
-    );
+    queueMail(c, resendVerificationFor(c.env, body.email));
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 
@@ -658,14 +993,7 @@ export function createApp() {
       throw err(429, 'TOO_MANY_ATTEMPTS');
     if (!(await hit(c.env.DB, body.email, 'n/a', PER_EMAIL('forgot-email', 3))).ok)
       throw err(429, 'TOO_MANY_ATTEMPTS');
-    queueMail(
-      c,
-      (async () => {
-        const user = await findUserByEmail(c.env.DB, body.email);
-        if (user && user.status === 'active')
-          await issueAndMail(c.env, user, 'password_reset', 'password_reset');
-      })()
-    );
+    queueMail(c, forgotPasswordFor(c.env, body.email));
     return c.json({ success: true, data: { status: 'sent_if_registered' } }, 202);
   });
 
@@ -701,15 +1029,16 @@ export function createApp() {
 
   // ---- MFA (TOTP) management ----
   app.post('/mfa/enroll', async c => {
-    const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ password: z.string() }));
+    const { user, sid } = await bearerAuth(c);
+    const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));
     await requirePassword(c, user, body.password);
     if (!user.email_verified) throw err(403, 'EMAIL_NOT_VERIFIED');
     if (user.mfa_enabled) throw err(409, 'MFA_ALREADY_ENABLED');
     if (!c.env.MFA_KEY) throw err(503, 'MFA_UNAVAILABLE');
+    await startEnrolment(c, user, sid, body.code);
     const secret = newSecret();
     await c.env.DB.prepare(`UPDATE users SET mfa_secret = ?2 WHERE id = ?1`)
-      .bind(user.id, await seal(c.env.MFA_KEY, secret))
+      .bind(user.id, await sealCurrent(c.env, secret, user.id))
       .run();
     return c.json({
       success: true,
@@ -717,11 +1046,31 @@ export function createApp() {
     });
   });
 
-  app.post('/mfa/enroll/verify', async c => {
+  // Mails the one-time code every account needs to enrol its FIRST factor (a platform admin also needs the operator's token).
+  app.post('/mfa/bootstrap/code', async c => {
     const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ code: z.string() }));
+    const body = await json(c, z.object({ password: z.string() }));
+    await requirePassword(c, user, body.password);
+    if (await hasAnyFactor(c.env.DB, user)) throw err(409, 'NOT_REQUIRED');
+    if (!(await hit(c.env.DB, user.id, 'n/a', PER_EMAIL('bootstrap-code', 3))).ok)
+      throw err(429, 'TOO_MANY_ATTEMPTS');
+    await issueAndMail(c.env, user, 'factor_enrol', 'two_factor');
+    return c.json({ success: true, data: { sent: true } }, 202);
+  });
+
+  app.post('/mfa/enroll/verify', async c => {
+    const { user, sid } = await bearerAuth(c);
+    const body = await json(
+      c,
+      z.object({
+        code: z.string(),
+        enrolmentToken: z.string().max(200).optional(),
+        emailCode: z.string().max(10).optional(),
+      })
+    );
     if (!user.mfa_secret || !c.env.MFA_KEY || user.mfa_enabled) throw err(409, 'MFA_NOT_PENDING');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    const mode = await authorizeEnrolment(c, user, sid, body);
     const plain = Array.from({ length: 10 }, () =>
       [...crypto.getRandomValues(new Uint8Array(5))]
         .map(b => b.toString(16).padStart(2, '0'))
@@ -733,7 +1082,8 @@ export function createApp() {
     )
       .bind(user.id, iso(), JSON.stringify(hashed))
       .run();
-    return c.json({ success: true, data: { enabled: true, backupCodes: plain } });
+    const requiresSignIn = await finishEnrolment(c, user, mode, 'totp');
+    return c.json({ success: true, data: { enabled: true, backupCodes: plain, requiresSignIn } });
   });
 
   app.post('/mfa/disable', async c => {
@@ -742,6 +1092,14 @@ export function createApp() {
     await requirePassword(c, user, body.password);
     if (!user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
+    if (user.role === 'super_admin') {
+      const n = await c.env.DB.prepare(
+        `SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`
+      )
+        .bind(user.id)
+        .first<{ n: number }>();
+      if ((n?.n ?? 0) === 0) throw err(409, 'LAST_FACTOR'); // the TOTP is their only factor
+    }
     await c.env.DB.prepare(
       `UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_backup_codes = '[]', mfa_enrolled_at = NULL WHERE id = ?1`
     )
@@ -765,6 +1123,7 @@ export function createApp() {
   app.post('/passkey/login/verify', async c => {
     const body = await json(c, z.object({ response: z.any(), aud: z.string().optional() }));
     const aud = audOf(c.env, body.aud);
+    originAudience(c, aud);
     const ip = clientIp(c);
     // per client: a global key would let anyone lock every passkey sign-in
     const attempt = await hit(c.env.DB, ip, ip, { ...LOGIN, name: 'passkey' });
@@ -785,11 +1144,12 @@ export function createApp() {
   });
 
   app.post('/passkey/register/options', async c => {
-    const { user } = await bearerAuth(c);
+    const { user, sid } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));
     await requirePassword(c, user, body.password);
-    // With MFA on, registering a passkey (which later signs in WITHOUT MFA) needs a fresh code: token + password is not enough.
-    await requireSecondFactor(c, user, body.code);
+    // Registering a passkey (which later signs in WITHOUT a second factor) never rests on a token + password alone:
+    // see startEnrolment for the policy this call records on the enrolment ticket.
+    await startEnrolment(c, user, sid, body.code);
     return c.json({
       success: true,
       data: await passkeys.beginRegistration(c.env.DB, c.env, user, originHeader(c)),
@@ -797,15 +1157,20 @@ export function createApp() {
   });
 
   app.post('/passkey/register/verify', async c => {
-    const { user } = await bearerAuth(c);
-    const body = await json(c, z.object({ response: z.any(), name: z.string().optional() }));
-    return c.json(
-      {
-        success: true,
-        data: await passkeys.finishRegistration(c.env.DB, user, originHeader(c), body as never),
-      },
-      201
+    const { user, sid } = await bearerAuth(c);
+    const body = await json(
+      c,
+      z.object({
+        response: z.any(),
+        name: z.string().optional(),
+        enrolmentToken: z.string().max(200).optional(),
+        emailCode: z.string().max(10).optional(),
+      })
     );
+    const mode = await authorizeEnrolment(c, user, sid, body);
+    const data = await passkeys.finishRegistration(c.env.DB, user, originHeader(c), body as never);
+    const requiresSignIn = await finishEnrolment(c, user, mode, 'passkey');
+    return c.json({ success: true, data: { ...data, requiresSignIn } }, 201);
   });
 
   app.get('/passkeys', async c => {
@@ -816,11 +1181,31 @@ export function createApp() {
     });
   });
 
-  app.post('/passkeys/:id/delete', async c => {
+  app.post('/passkeys/:id/rename', async c => {
     const { user } = await bearerAuth(c);
+    const body = await json(c, z.object({ name: z.string().min(1).max(100) }));
+    if (!(await passkeys.renamePasskey(c.env.DB, user.id, c.req.param('id'), body.name)))
+      throw err(404, 'NOT_FOUND');
+    return c.json({ success: true, data: { renamed: true } });
+  });
+
+  app.post('/passkeys/:id/delete', async c => {
+    const { user, sid } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string().optional() }));
     await requirePassword(c, user, body.password);
     await requireSecondFactor(c, user, body.code);
+    // Removing a platform admin's factor needs the same fresh second-factor session as adding one (a phished password must not
+    // be able to strip the only admin's passkey).
+    if (user.role === 'super_admin') {
+      if (!(await sessionFactorFresh(c, sid))) throw err(403, 'STEP_UP_REQUIRED');
+      // never let the only platform admin strip their LAST factor (recovery would need the operator script)
+      const n = await c.env.DB.prepare(
+        `SELECT count(*) AS n FROM passkey_credentials WHERE user_id = ?1`
+      )
+        .bind(user.id)
+        .first<{ n: number }>();
+      if ((n?.n ?? 0) <= 1 && !user.mfa_enabled) throw err(409, 'LAST_FACTOR');
+    }
     if (!(await passkeys.removePasskey(c.env.DB, user.id, c.req.param('id'))))
       throw err(404, 'NOT_FOUND');
     return c.json({ success: true, data: { deleted: true } });
