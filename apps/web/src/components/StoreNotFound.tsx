@@ -1,4 +1,5 @@
 import Link from './StoreLink';
+import { StoreNotFoundBody } from './StoreNotFoundBody';
 import type { ResolvedStore } from '../lib/store-resolver';
 
 /**
@@ -32,25 +33,7 @@ export function StoreNotFound({ store }: { store: ResolvedStore }) {
         )}
       </Link>
 
-      <div className="space-y-3">
-        <p className="text-6xl font-bold text-primary">404</p>
-        <h1 className="text-xl font-semibold" dir="rtl">
-          الصفحة مش موجودة
-        </h1>
-        <p className="text-base font-medium text-foreground/70">This page isn’t available</p>
-        <p className="mx-auto max-w-md text-sm text-foreground/70" dir="rtl">
-          معلش، الصفحة اللي بتدوّر عليها مش موجودة أو اتنقلت.
-        </p>
-      </div>
-
-      <Link
-        href={homeHref}
-        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-8 text-base font-semibold text-primary-foreground transition active:opacity-90"
-      >
-        <span dir="rtl">ارجع للمتجر</span>
-        <span aria-hidden>·</span>
-        <span>Back to store</span>
-      </Link>
+      <StoreNotFoundBody />
     </main>
   );
 }

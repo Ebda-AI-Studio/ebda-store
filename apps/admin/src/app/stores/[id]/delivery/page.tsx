@@ -15,7 +15,6 @@ import {
   hasInvalidOffDays,
 } from '../../../../lib/checkout-delivery-payload';
 import { DeliveryOffDaysField } from '../../../../components/DeliveryOffDaysField';
-import { ReceiptBarcodePicker } from '../../../../components/ReceiptBarcodePicker';
 import { PackingSlipNoteField } from '../../../../components/orders/PackingSlipNoteField';
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
@@ -528,11 +527,18 @@ export default function CheckoutDeliveryPage() {
         </section>
 
         {!isLoading && (
-          <ReceiptBarcodePicker
-            storeId={storeId}
-            value={existingSettings.receiptBarcodeShape as string | undefined}
-            onSaved={shape => setExistingSettings(s => ({ ...s, receiptBarcodeShape: shape }))}
-          />
+          <section className="space-y-1 rounded-xl border bg-card p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-foreground">
+              {t('orderBarcodeMoved.title')}
+            </h2>
+            <p className="text-xs text-muted-foreground">{t('orderBarcodeMoved.body')}</p>
+            <Link
+              href={`/stores/${storeId}/codes?tab=receipt`}
+              className="inline-block text-sm font-medium text-primary-ink underline underline-offset-2"
+            >
+              {t('orderBarcodeMoved.link')}
+            </Link>
+          </section>
         )}
 
         {!isLoading && (

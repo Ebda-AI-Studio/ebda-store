@@ -10,6 +10,28 @@ beforeEach(() => {
   fakes.directoryDown = false;
 });
 
+describe('404', () => {
+  it('a browser on a wrong URL gets the studio 404 page: real 404, noindex, search box, links', async () => {
+    const r = await call('/no-such-page', {
+      headers: { accept: 'text/html', 'accept-language': 'en' },
+    });
+    expect(r.status).toBe(404);
+    expect(r.headers.get('content-type')).toContain('text/html');
+    expect(r.headers.get('x-robots-tag')).toContain('noindex');
+    const page = await r.text();
+    expect(page.includes('The page you&#39;re looking for can&#39;t be found.')).toBe(true);
+    expect(page.includes('role="search"')).toBe(true);
+    expect(page.includes('href="https://ebda.app/"')).toBe(true);
+  });
+
+  it('an API caller keeps the JSON 404', async () => {
+    const r = await call('/no-such-page');
+    expect(r.status).toBe(404);
+    expect(r.headers.get('content-type')).toContain('application/json');
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
+  });
+});
+
 describe('discovery', () => {
   it('publishes ES256 public keys only, and the openid configuration points at them', async () => {
     const jwks = (await (await call('/.well-known/jwks.json')).json()) as {

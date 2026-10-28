@@ -47,6 +47,18 @@
     "./tracking-browser": {
       "types": "./src/tracking/browser.ts",
       "default": "./src/tracking/browser.ts"
+    },
+    "./qr": {
+      "types": "./src/qr/index.ts",
+      "default": "./src/qr/index.ts"
+    },
+    "./qr/schema": {
+      "types": "./src/qr/schema.ts",
+      "default": "./src/qr/schema.ts"
+    },
+    "./qr/links": {
+      "types": "./src/qr/links.ts",
+      "default": "./src/qr/links.ts"
     }
   },
   "files": [
@@ -61,6 +73,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
+    "qr": "0.7.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {

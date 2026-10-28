@@ -39,6 +39,11 @@ const GRANDFATHERED = new Set([
   // the old quoted-only regex, so never grandfathered; applied in production
   // on 2026-08-30 (#963/#1012/#1808 provenance: historical, checksum-locked).
   '20260830090000_zero_variant_parent_inventory',
+  // Ruling BARCODE-1b: clears the barcode of NEWER DUPLICATE rows only (a ROW_NUMBER() join on id, a
+  // handful of rows at most) so the unique index below it can be built; without it a store that
+  // already holds a duplicate would fail `prisma migrate deploy` and block the release. Not a
+  // backfill of the table and no SET NOT NULL. Not historical: this is the one deliberate new entry.
+  '20261107000270_barcode_unique',
 ]);
 
 /** Large/hot tables where an unbounded UPDATE risks a boot-time lock stall. */

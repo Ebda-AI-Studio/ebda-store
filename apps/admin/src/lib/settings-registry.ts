@@ -87,6 +87,7 @@ export const REDIRECT_ROUTES: Record<string, string> = {
   '/navigation': '/builder',
   '/page-builder': '/builder',
   '/pages': '/builder',
+  '/qr': '/codes',
 };
 
 export const PAGES: PageEntry[] = [
@@ -420,6 +421,12 @@ export const PAGES: PageEntry[] = [
   page('/pwa', 'pwa.page.title', 'owner', {
     feature: 'pwa',
     syn: { en: 'app install home screen mobile icon', ar: 'تطبيق تثبيت شاشة رئيسية جوال ايقونة' },
+  }),
+  page('/codes', 'codes.page.title', 'owner', {
+    syn: {
+      en: 'qr code barcode label sticker print scan poster flyer receipt thermal a4 ean',
+      ar: 'كود كيو ار باركود ملصق طباعة مسح بوستر فلاير فاتورة حراري',
+    },
   }),
   page('/language', 'language.page.title', 'owner', {
     syn: {

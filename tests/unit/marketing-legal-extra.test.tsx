@@ -102,6 +102,9 @@ describe('LEGAL-1 extra legal pages', () => {
     const md = readFileSync(path.resolve(__dirname, '../../docs/legal/VAT-0-clause.md'), 'utf8');
     const en = /## English\n\n(.+)\n/.exec(md)![1];
     const ar = /## العربية\n\n(.+)\n/.exec(md)![1];
+    // the Ebda WhatsApp terms (clause 6.6, WA PR #25) carry the same clause verbatim
+    expect(COPY.en.legalPages.waTerms.sections.flatMap(s => s.p).join('\n')).toContain(en);
+    expect(COPY.ar.legalPages.waTerms.sections.flatMap(s => s.p).join('\n')).toContain(ar);
     for (const k of ['terms', 'merchant'] as const) {
       expect(COPY.en.legalPages[k].sections.flatMap(s => s.p).join('\n'), `en ${k}`).toContain(en);
       expect(COPY.ar.legalPages[k].sections.flatMap(s => s.p).join('\n'), `ar ${k}`).toContain(ar);

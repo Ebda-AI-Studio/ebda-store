@@ -54,6 +54,11 @@ import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType, type PendingSignup 
 import * as passkeys from './passkeys';
 import { newSecret, sealCurrent, totpUri, unsealAny, verifyTotp } from './totp';
 import { csv, iso, nowMs, randomCode, sha256Hex } from './util';
+import {
+  pickStudioLang,
+  renderStudioPage,
+  STUDIO_PAGE_HEADERS,
+} from '../../../packages/shared/src/studio-pages/index';
 
 export const COOKIE = '__Host-ebda_rt';
 type Env = Cloudflare.Env;
@@ -688,6 +693,25 @@ export function createApp() {
     c.header('Referrer-Policy', 'no-referrer');
     if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
     return undefined;
+  });
+
+  // A person who opened a wrong accounts URL gets the studio's calm 404 (search + a map); API callers keep JSON.
+  app.notFound(c => {
+    const wantsHtml = (c.req.header('accept') ?? '').includes('text/html');
+    if (wantsHtml && (c.req.method === 'GET' || c.req.method === 'HEAD')) {
+      const lang = pickStudioLang(
+        c.req.header('accept-language'),
+        new URL(c.req.url).searchParams.get('lang')
+      );
+      return new Response(
+        c.req.method === 'HEAD' ? null : renderStudioPage({ lang, kind: 'not-found' }),
+        {
+          status: 404,
+          headers: STUDIO_PAGE_HEADERS,
+        }
+      );
+    }
+    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
   });
 
   app.onError((e, c) => {

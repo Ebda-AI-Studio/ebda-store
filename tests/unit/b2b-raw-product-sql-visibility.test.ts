@@ -103,6 +103,12 @@ const CLASSIFIED: Record<
     kind: 'system',
     reason: 'stock restore on refund',
   },
+  'services/barcode.service.ts': {
+    statements: 1,
+    kind: 'admin',
+    reason:
+      'merchant-side barcode allocator: highest in-store serial across ALL the store products',
+  },
   'lib/inngest/functions/store-usage-snapshot.ts': {
     statements: 1,
     kind: 'system',

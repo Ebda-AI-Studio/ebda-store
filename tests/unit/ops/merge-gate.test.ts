@@ -10,6 +10,7 @@ const GATE = join(ROOT, 'scripts/ci/merge-gate.sh');
 const WF = join(ROOT, '.github/workflows');
 const REQ = [
   'API Worker boots on workerd',
+  'App builds (affected)',
   'Detect affected workspaces',
   'Repo guards',
   'Scan for leaked secrets',

@@ -171,8 +171,13 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search (admin palette)', () => {
     ]);
   });
 
-  it('under two characters, or only metacharacters: three empty lists', async () => {
-    for (const q of ['', 'ا', '%']) {
+  it('one character answers products only (word-start); empty or metacharacters: three empty lists', async () => {
+    const one = await search('ا');
+    expect(one.status).toBe(200);
+    expect(one.body.data.products.map((p: { id: string }) => p.id)).toContain(`${tag}-pa`);
+    expect(one.body.data.customers).toEqual([]);
+    expect(one.body.data.orders).toEqual([]);
+    for (const q of ['', '%']) {
       const res = await search(q);
       expect(res.status).toBe(200);
       expect(res.body.data).toEqual({ products: [], orders: [], customers: [] });

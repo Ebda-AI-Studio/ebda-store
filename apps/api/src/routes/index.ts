@@ -44,6 +44,8 @@ import bundleRoutes from './bundle.routes';
 import loyaltyRoutes, { publicLoyaltyRoutes } from './loyalty.routes';
 import walletRoutes from './wallet.routes';
 import pwaRoutes from './pwa.routes';
+import qrRoutes from './qr.routes';
+import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import variantRoutes from './variant.routes';
@@ -354,6 +356,8 @@ router.use('/stores', tenantContext, bundleRoutes);
 // Customer wallet (store credit) — every route behind requireFeature('customer_wallet').
 router.use('/stores', tenantContext, walletRoutes);
 router.use('/stores', tenantContext, pwaRoutes);
+router.use('/stores', tenantContext, qrRoutes);
+router.use('/stores', tenantContext, barcodeLabelRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
 router.use('/stores', tenantContext, variantRoutes);

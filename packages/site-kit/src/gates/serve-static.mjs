@@ -40,7 +40,16 @@ export function startServer(root, port = 0) {
       });
       res.end(body);
     } catch {
-      const body = await readFile(path.join(base, '404.html')).catch(() => 'not found');
+      // Workers Static Assets (not_found_handling "404-page") serve the NEAREST 404.html up the path.
+      let body = 'not found';
+      for (let dir = path.dirname(file); dir.startsWith(base); dir = path.dirname(dir)) {
+        const found = await readFile(path.join(dir, '404.html')).catch(() => null);
+        if (found) {
+          body = found;
+          break;
+        }
+        if (dir === base) break;
+      }
       res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(body);
     }
   });

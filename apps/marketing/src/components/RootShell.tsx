@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import Script from 'next/script';
 import { Geist, Geist_Mono, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { BRAND } from '@ebda/shared/brand';
 import { type Locale } from '../lib/site';
@@ -46,6 +47,10 @@ export function RootShell({ locale, children }: { locale: Locale; children: Reac
       <body>
         {children}
         <EbdaTracking />
+        {/* the shared header-nav behaviour (Esc, click-outside, one menu open, aria-expanded): a static same-origin file */}
+        <script src="/site-nav.js" defer />
+        {/* The live search box (header + 404): one script for the whole site, after hydration. */}
+        <Script src="/assets/typeahead.js" strategy="afterInteractive" />
       </body>
     </html>
   );

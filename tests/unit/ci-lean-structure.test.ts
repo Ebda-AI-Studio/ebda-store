@@ -9,7 +9,7 @@
  * the lanes are pinned here.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 // @ts-expect-error - plain .mjs script, no type declarations
@@ -48,6 +48,8 @@ const PR_LANE = [
   'worker-dry-run',
   'api-workerd-smoke',
   'workerd-integration',
+  'app-build',
+  'app-builds',
 ];
 
 /** Does the job (or, through `needs`, a job it waits on) skip on pull_request? */
@@ -131,9 +133,9 @@ describe('ci.yml lanes', () => {
     const runsOnPush = (name: string): boolean => {
       const j = ci.jobs[name];
       const cond = j.if ?? '';
-      if (/always\(\)/.test(cond)) return true;
       if (/github\.event_name\s*==\s*'(pull_request|schedule|workflow_dispatch)'/.test(cond))
         return false;
+      if (/always\(\)/.test(cond)) return true;
       if (/needs\.changes\./.test(cond)) return false;
       return ([] as string[]).concat(j.needs ?? []).every(runsOnPush);
     };
@@ -190,6 +192,26 @@ describe('scripts/ci-affected.mjs', () => {
     expect(dirs).toEqual(
       expect.arrayContaining(['apps/api', 'apps/web', 'apps/admin', 'packages/shared'])
     );
+  });
+
+  it('OPS-2: apps whose graph includes the changed workspace get a production build', () => {
+    expect(run('apps/web/src/app/page.tsx').buildApps).toEqual(['web']);
+    expect(run('apps/admin/src/x.ts').buildApps).toEqual(['admin']);
+    // a shared package touches every app that has a deploy build
+    expect(run('packages/ui/src/Button.tsx').buildApps).toEqual(
+      expect.arrayContaining(['web', 'admin'])
+    );
+    expect(run('packages/shared/src/x.ts').buildApps).toEqual(
+      expect.arrayContaining(['web', 'admin', 'orders', 'marketing', 'docs', 'help'])
+    );
+    // a root config can change any build
+    expect(run('package-lock.json').buildApps.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('OPS-2: docs, api-only and test-only changes build no app', () => {
+    expect(run('docs/ebda/ci.md').buildApps).toEqual([]);
+    expect(run('apps/api/src/x.ts').buildApps).toEqual([]);
+    expect(run('tests/unit/x.test.ts').buildApps).toEqual([]);
   });
 
   it('docs-only changes select nothing', () => {
@@ -330,4 +352,17 @@ describe('postgres image parity', () => {
       expect(refs.filter(r => r !== PINNED)).toEqual([]);
     });
   }
+});
+
+describe('OPS-5: a failed deploy reaches a human', () => {
+  const dir = path.join(ROOT, '.github/workflows');
+  const deploys = readdirSync(dir).filter(f => /^cf-.*-deploy\.yml$/.test(f));
+  it('finds the deploy workflows', () => expect(deploys.length).toBeGreaterThanOrEqual(9));
+  it.each(deploys)('%s has a notify-failure job wired to the Telegram secrets', f => {
+    const raw = readFileSync(path.join(dir, f), 'utf8');
+    expect(raw).toMatch(/\n {2}notify-failure:/);
+    expect(raw).toContain("needs.deploy.result == 'failure'");
+    expect(raw).toContain('secrets.TELEGRAM_BOT_TOKEN');
+    expect(raw).toContain('secrets.TELEGRAM_ALERT_CHAT_ID');
+  });
 });

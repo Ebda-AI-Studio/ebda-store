@@ -1,0 +1,3 @@
+# MKT-NAV-BUDGET-1
+
+Ruling MKT-NAV-BUDGET-1 - raise the marketing perf budget to the measured post-#283 numbers (default 192 KB JS / 11 scripts, home 207.5 KB / 13 scripts, a few HTML pages +1-5 KB). The shared header search (`typeahead.js`, afterInteractive) and `site-nav.js` ship on every page; CI run 40689278175 measured 191.2 KB / 11 scripts per page and 206.6 KB / 13 scripts on the home. Follow-up: lazy-load typeahead on first search open to ratchet the budget back down. Cost if wrong: every marketing page carries ~14 KB more JS up front until the lazy-load lands, a small LCP cost on slow mobile.

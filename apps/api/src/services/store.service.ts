@@ -1327,6 +1327,37 @@ export class StoreService {
   // new sub-key in, write back. Same posture as the announcement-bar
   // writer above, but folded into the `settings` JSON column instead
   // of a dedicated column.
+  /**
+   * QR-1: replace `settings.qr` only. One atomic jsonb_set so a concurrent write of another
+   * settings key (floating widget, announcement, ...) is never overwritten by a stale read-merge-write.
+   */
+  static async updateQrSettings(storeId: string, qr: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{qr}', ${JSON.stringify(qr)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
+  /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
+  static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    await withStore(
+      storeId,
+      tx => tx.$executeRaw`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{labels}', ${JSON.stringify(labels)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}`
+    );
+    await StoreService.invalidateCache(store);
+  }
+
   static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
     const store = await this.getById(storeId);
     const existingSettings = (store.settings as Record<string, unknown>) || {};

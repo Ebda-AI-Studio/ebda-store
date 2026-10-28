@@ -39,6 +39,7 @@ const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const NORMALISERS = [
   /packages\/shared\/src\/search\//, // search folding + its vectors
   /packages\/shared\/src\/region\/index\.ts$/, // normaliseDigits / phone parsing
+  /packages\/shared\/src\/barcode\/ean\.ts$/, // scanner/typed barcode input normaliser
   /packages\/shared\/src\/tax-profile\.ts$/,
   /packages\/shared\/src\/instapay-receipt\.ts$/,
   /apps\/api\/src\/services\/price-cell\.ts$/,

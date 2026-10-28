@@ -5,6 +5,7 @@ import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../../lib
 import { textFieldValue, numericFieldValue, dateFieldValue } from '../../../../../lib/form-text';
 import type { Coupon, CouponFormData, CouponStatusFilter } from '../_components/types';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 import { roundToMinor } from '@ebda/shared';
 interface UseCouponsResult {
@@ -72,6 +73,8 @@ export function useCoupons(storeId: string): UseCouponsResult {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<CouponStatusFilter>('all');
+  // Search-as-you-type: the list refetches 150 ms after the last keystroke; Enter still fetches at once.
+  const debouncedSearch = useDebouncedValue(searchTerm, 150);
 
   // Bumped after a save/delete/toggle: the fetch effect owns EVERY request, so the refetch reads
   // the CURRENT filter, not the one captured when the mutation started (issue 2443).
@@ -104,11 +107,11 @@ export function useCoupons(storeId: string): UseCouponsResult {
   // used to refetch from the page via `setTimeout(fetchCoupons)` — a closure
   // from the render BEFORE the change, so every request carried the PREVIOUS
   // status and the list lagged one selection behind. Search stays
-  // submit-on-Enter (`fetchCoupons` from the current render).
+  // live (debounced) and also on Enter (`fetchCoupons` from the current render); the latest request wins.
   useEffect(() => {
     void fetchCoupons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, filterActive, refreshKey]);
+  }, [storeId, filterActive, refreshKey, debouncedSearch]);
 
   const saveCoupon = useCallback(
     async (formData: CouponFormData, editingId: string | null): Promise<boolean> => {
