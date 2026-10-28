@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, storeDirectory, withStore } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -22,7 +22,7 @@ import { REGION } from '@ebda/shared';
  * Each per-store scan is wrapped in step.run() so Inngest retries only the
  * failing store without re-running healthy ones.
  */
-export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
+export const stockReorderScanCron: JobDef = inngest.createFunction(
   {
     id: 'stock-reorder-scan-cron',
     name: 'Reorder scan — daily cron (AI)',
@@ -84,7 +84,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
  * Fired by the admin "Re-scan now" button (super_admin only).
  * Event: `stock/reorder-scan-requested` with data: { storeId, requestedBy? }
  */
-export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunction(
+export const stockReorderScanOnDemand: JobDef = inngest.createFunction(
   {
     id: 'stock-reorder-scan-on-demand',
     name: 'Reorder scan — on-demand (AI)',

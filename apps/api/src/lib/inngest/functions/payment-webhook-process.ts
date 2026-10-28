@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { webhookInbox } from '../../definer';
 import { PaymentService } from '../../../services/payment-providers/payment.factory';
@@ -44,7 +44,7 @@ import { AppError } from '../../../middleware/error-handler';
  * the OLD-idiom null-context escape on orders/payments RLS policies already
  * covers this branch).
  */
-export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction(
+export const paymentWebhookProcess: JobDef = inngest.createFunction(
   {
     id: 'payment-webhook-process',
     name: 'Payment webhook — process inbox event off the request path',

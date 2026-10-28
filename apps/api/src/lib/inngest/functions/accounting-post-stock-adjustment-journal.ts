@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postStockAdjustmentJournal } from '../../../services/accounting/posting/stock-adjustment-posting';
@@ -13,7 +13,7 @@ import { featureService } from '../../../services/feature.service';
  * Idempotent via journal.service's (source, sourceId) lookup.
  * Concurrency keyed per-store (limit 5) to prevent sequence races.
  */
-export const accountingPostStockAdjustmentJournal: InngestFunction.Any = inngest.createFunction(
+export const accountingPostStockAdjustmentJournal: JobDef = inngest.createFunction(
   {
     id: 'accounting-post-stock-adjustment-journal',
     name: 'Accounting — post journal on stock adjustment',

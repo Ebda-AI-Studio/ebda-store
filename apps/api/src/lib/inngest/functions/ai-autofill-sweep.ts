@@ -23,7 +23,7 @@
  * per already-swept store.
  */
 
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInStoreScope, storeDirectory } from '@ebda/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
@@ -47,7 +47,7 @@ export function sweepAutofillStore(storeId: string) {
   });
 }
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -105,4 +105,4 @@ const aiAutofillSweepFn = inngest.createFunction(
     }).catch(err => logger.error({ err }, '[ai-autofill-sweep] leader lock error'));
   }
 );
-export const aiAutofillSweep: InngestFunction.Any = aiAutofillSweepFn;
+export const aiAutofillSweep: JobDef = aiAutofillSweepFn;

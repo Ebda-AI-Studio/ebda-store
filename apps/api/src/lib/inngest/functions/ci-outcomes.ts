@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { cfBindings } from '../../../cf/bindings';
 import { inngest } from '../client';
 import { suiteBuyerKeySecret } from '../../wa/config';
@@ -46,7 +46,7 @@ export async function emitCiOutcomesFor(
   return planned.length;
 }
 
-export const ciOutcomes: InngestFunction.Any = inngest.createFunction(
+export const ciOutcomes: JobDef = inngest.createFunction(
   {
     id: 'ci-outcomes',
     name: 'Customer Intelligence: commerce outcomes capture',

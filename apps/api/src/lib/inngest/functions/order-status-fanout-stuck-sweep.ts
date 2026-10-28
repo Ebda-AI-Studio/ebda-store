@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -319,7 +319,7 @@ async function reportFailedAfterClaim(
   });
 }
 
-export const orderStatusFanoutStuckSweep: InngestFunction.Any = inngest.createFunction(
+export const orderStatusFanoutStuckSweep: JobDef = inngest.createFunction(
   {
     id: 'order-status-fanout-stuck-sweep',
     name: 'Order status fanout — sweep transitions whose order/status-changed never ran',

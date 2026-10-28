@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -11,9 +11,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
  * status; this catches the failure modes that Inngest itself can't:
  *
  *   1. A BulkAiJob row stuck in `queued` for >30 min — typical cause:
- *      Inngest function wasn't registered after a deploy (the
- *      INNGEST_DEPLOY_ID trap documented in
- *      `feedback-inngest-deploy-sync-trap.md`).
+ *      the job's start failed or its Workflow instance errored.
  *
  *   2. A BulkAiJob row stuck in `running` for >60 min — typical cause:
  *      the worker crashed mid-run without writing status=failed.
@@ -68,7 +66,7 @@ const RESUME_EVENT_BY_KIND: Record<string, string> = {
   description_revert: 'bulk-ai/revert-balance.requested',
 };
 
-// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// NOTE: inferred WITHOUT the `JobDef` contextual type on this
 // `const` — annotating that directly here breaks TS's inference of
 // `step.run`'s return type for object literals mixing a plain string[] with
 // a richer array-of-objects sibling (the annotation widens the contextual
@@ -297,4 +295,4 @@ const queueDepthWatchFn = inngest.createFunction(
     };
   }
 );
-export const queueDepthWatch: InngestFunction.Any = queueDepthWatchFn;
+export const queueDepthWatch: JobDef = queueDepthWatchFn;

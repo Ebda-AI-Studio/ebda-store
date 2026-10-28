@@ -1,6 +1,6 @@
 # Background jobs on Cloudflare (G5)
 
-Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 100 functions). Rollout is `JOBS_CF_GROUPS` in `apps/api/wrangler.jsonc` (comma list of group numbers, or `all`).
+Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of truth; `tests/unit/jobs-map.test.ts` pins it to the registry, 100 functions). Every job runs on Cloudflare (Ruling G5-3: Inngest is removed; the group numbers are only the order jobs were ported in).
 
 ## Primitives
 

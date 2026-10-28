@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { runInTenantContext, storeDirectory } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -21,7 +21,7 @@ import { REGION } from '@ebda/shared';
  * Each per-store scan is wrapped in step.run() so Inngest retries only
  * the failing store without re-running healthy ones.
  */
-export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFunction(
+export const accountingProfitAnomalyCron: JobDef = inngest.createFunction(
   {
     id: 'accounting-profit-anomaly-cron',
     name: 'Profit anomaly scan — daily cron (AI)',

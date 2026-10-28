@@ -22,8 +22,8 @@ import {
   restrictPlatformOnlyOrigins,
   makeRateLimitStore,
   rateLimitRedisClient,
-  inngestLimiter,
 } from './middleware/security';
+import { writeFreeze } from './middleware/write-freeze';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
 import routes from './routes';
@@ -39,9 +39,8 @@ import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
 import { SentryService } from './services/sentry.service';
 import { sendAlert } from './services/alerts.service';
-import { inngest } from './lib/inngest/client';
-import { inngestFunctions } from './lib/inngest/functions';
-import { serve as inngestServe } from 'inngest/express';
+// Side effect: registers every background job (lib/inngest/functions) for the Worker's runners.
+import './lib/inngest/functions';
 import { installClosedTenantTxAlerting } from './lib/after-tenant-commit';
 import logger from './lib/logger';
 
@@ -134,6 +133,8 @@ setDbHopObserver(recordHop);
 
 // Request ID for tracing
 app.use(requestId);
+// Cutover read-only window (WRITES_FROZEN=1, docs/runbooks/cutover-cf.md): 503 to every write, reads stay open.
+app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
@@ -389,12 +390,6 @@ app.use(
   })
 );
 
-// issue 2063: the Inngest serve path's own bucket — counts only caller-fault
-// answers (4xx except 429: forged/unsigned/malformed calls; never a failing
-// step's 5xx, issue 2314), and sits BEFORE the body parser so a
-// capped caller is refused before its body is read. See inngestLimiter.
-app.use('/api/v1/inngest', inngestLimiter);
-
 // Subscription-billing webhooks (SP5 task 3): raw body for HMAC, mounted BEFORE
 // the generic payment webhooks and the JSON parser.
 app.use(
@@ -415,27 +410,6 @@ app.use(express.urlencoded({ extended: true }));
 // out to the same Telegram chat via the internal alerts.service.
 // Protected by ALERTS_WEBHOOK_TOKEN env var (querystring or header).
 app.use('/api/v1/alerts/webhooks', alertWebhookRoutes);
-
-// Inngest serve handler. Mounted before auth/CSRF because Inngest's
-// platform calls this endpoint with its own request signature
-// (verified inside the SDK using INNGEST_SIGNING_KEY) — it must not
-// be subject to our cookie-based CSRF gate. The handler responds to
-// PUT (function registration) and POST (function invocation).
-app.use(
-  '/api/v1/inngest',
-  inngestServe({
-    client: inngest,
-    functions: inngestFunctions,
-    // Advertise the real public origin to Inngest Cloud. Without this the SDK
-    // guesses from the Host header of the registering request — and our
-    // post-boot self-PUT hits 127.0.0.1, registering an unreachable
-    // localhost URL (see config.inngestServeHost). Only pass it when set so
-    // local dev keeps the SDK's default host-introspection.
-    ...(config.inngestServeHost
-      ? { serveHost: config.inngestServeHost, servePath: '/api/v1/inngest' }
-      : {}),
-  })
-);
 
 // Cookie parsing (for HTTP-only auth cookie support)
 app.use(cookieParser());

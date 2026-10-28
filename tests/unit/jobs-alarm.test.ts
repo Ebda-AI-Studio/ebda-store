@@ -77,11 +77,9 @@ describe('alarm flag', () => {
       JOBS_QUEUE: { send: async () => undefined },
       STORE_SCHEDULE: { idFromName: (n: string) => n, get: () => ({}) as never },
     });
-    process.env.JOBS_CF_GROUPS = 'all';
   });
   afterEach(() => {
     clearCfBindings();
-    delete process.env.JOBS_CF_GROUPS;
     delete process.env.JOBS_CF_ALARMS;
   });
 
@@ -101,11 +99,8 @@ describe('alarm flag', () => {
     expect(jobRunsOnAlarm('heartbeat')).toBe(false);
   });
 
-  it('needs the job group on Cloudflare and the DO binding', () => {
+  it('needs the Worker and DO bindings', () => {
     process.env.JOBS_CF_ALARMS = 'all';
-    process.env.JOBS_CF_GROUPS = '1';
-    expect(jobRunsOnAlarm('accounting-daily-close')).toBe(false);
-    process.env.JOBS_CF_GROUPS = 'all';
     clearCfBindings();
     expect(jobRunsOnAlarm('accounting-daily-close')).toBe(false);
   });

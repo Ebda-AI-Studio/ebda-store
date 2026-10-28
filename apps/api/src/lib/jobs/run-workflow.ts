@@ -11,7 +11,7 @@
  * released while the run sleeps and re-taken after, released on success and on failure.
  */
 import logger from '../logger';
-import { dispatchEventsToAll } from './dispatch-all';
+import { dispatchEventsToAll } from './dispatch';
 import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,

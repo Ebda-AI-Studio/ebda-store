@@ -9,6 +9,7 @@ import type {
   SuppressionPort,
   SurfaceResult,
 } from './types';
+import { dropCiBuyerIndex, eraseCiBuyerInStore } from '../../lib/ci/erase';
 
 const ndjson = (rows: unknown[]) =>
   rows.map(r => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : '');
@@ -99,31 +100,27 @@ export function ciSurface(ci: R2BucketLike): ErasureSurface {
           remaining: (await listAll(ci, ciStorePrefix(s.storeId))).length,
         };
       }
+      // Store-scoped (Ruling CI-8): a buyer key is a hash of a typed phone, so it never erases across
+      // stores on its own. Each store is erased through lib/ci/erase (tombstone first, index pass then
+      // prefix pass); the stores come from the request, else from the buyer index's partitions.
+      const stores = s.storeIds ?? [
+        ...new Set(
+          (await partitionsOf(s.buyerKey))
+            .map(p => /store=([^/]+)\//.exec(p)?.[1])
+            .filter((x): x is string => !!x)
+        ),
+      ];
       let erased = 0;
-      const parts = await partitionsOf(s.buyerKey);
-      for (const p of parts) {
-        const o = await ci.get(p);
-        if (!o) continue;
-        const lines = (await gunzipText(await o.arrayBuffer())).split('\n').filter(Boolean);
-        const keep = lines.filter(
-          l => (JSON.parse(l) as { buyerKey?: string }).buyerKey !== s.buyerKey
-        );
-        erased += lines.length - keep.length;
-        if (keep.length === 0) await ci.delete(p);
-        else if (keep.length !== lines.length)
-          await ci.put(p, await gzipText(keep.join('\n') + '\n'));
-      }
-      await ci.delete(ciBuyerIndexKey(s.buyerKey));
-      // Verify by re-reading every partition that was indexed, not by trusting the loop above.
       let remaining = 0;
-      for (const p of parts) {
-        const o = await ci.get(p);
-        if (!o) continue;
-        remaining += (await gunzipText(await o.arrayBuffer()))
-          .split('\n')
-          .filter(Boolean)
-          .filter(l => (JSON.parse(l) as { buyerKey?: string }).buyerKey === s.buyerKey).length;
+      for (const storeId of stores) {
+        for (const mode of ['index', 'prefix'] as const) {
+          const r = await eraseCiBuyerInStore(ci, { storeId, buyerKeys: [s.buyerKey] }, mode);
+          erased += r.erased;
+          if (mode === 'prefix') remaining += r.remaining;
+        }
       }
+      // Every store the index knew was just erased; an explicit store list leaves the rest of the index.
+      if (!s.storeIds) await dropCiBuyerIndex(ci, s.buyerKey);
       return { surface: 'customer-intelligence', erased, remaining };
     },
   };

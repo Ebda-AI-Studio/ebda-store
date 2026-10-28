@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -320,7 +320,7 @@ export async function handlePartialReturnReversalSweep(
   return { swept: stuck.length, resent, alerted: veryStale.length };
 }
 
-export const refundReversalStuckSweep: InngestFunction.Any = inngest.createFunction(
+export const refundReversalStuckSweep: JobDef = inngest.createFunction(
   {
     id: 'refund-reversal-stuck-sweep',
     name: 'Refund reversal — sweep cancelled/refunded orders whose reversal never ran',
