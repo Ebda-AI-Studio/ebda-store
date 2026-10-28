@@ -15,7 +15,7 @@ import {
   revokeSession,
   type UserRow,
 } from './data';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { reencryptMfaSecrets } from './mfa-keys';
 import {
   deleteStoreClients,

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { queryWithSearchHeader } from '../lib/search-term';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';

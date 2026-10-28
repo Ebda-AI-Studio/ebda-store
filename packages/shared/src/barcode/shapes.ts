@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { BARKOD_SHAPE_DATA } from './shapes.generated';
 
 /** The 24 BARKOD studio shapes Ahmad approved (docs/third-party/barkod-studio.md). */

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v3';
 import { sizeChartSchema, type SizeChart } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';

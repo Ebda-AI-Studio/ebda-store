@@ -6,7 +6,7 @@
  * The applicant is ALWAYS the signed-in customer (customerUserId); a body can never name another user. Zod `.strict()`.
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   authenticate,
   authorize,

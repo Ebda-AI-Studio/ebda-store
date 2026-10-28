@@ -9,7 +9,7 @@
  *   - the store's plan seat limit applies; accepting twice is harmless.
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { withStore } from '@ebda/database';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { AppError } from '../middleware/error-handler';

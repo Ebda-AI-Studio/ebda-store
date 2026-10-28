@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v3';
 import { optionalBooleanQuery, parseOptionalBooleanQuery } from '../query-params';
 
 describe('optionalBooleanQuery', () => {

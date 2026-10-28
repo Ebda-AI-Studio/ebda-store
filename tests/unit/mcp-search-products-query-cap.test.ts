@@ -4,7 +4,7 @@
  * was a ~20 MB in-isolate cache key and an unbounded keyword pattern).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 vi.mock('../../apps/api/src/services/product.service', () => ({
   ProductService: { getPublicById: vi.fn(), listPublic: vi.fn() },

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import multer from 'multer';
 import { pngDimensions } from '../lib/upload-sniff';
 import { authenticate, authorize } from '../middleware/auth';

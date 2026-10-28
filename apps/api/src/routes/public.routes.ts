@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { ProductService } from '../services/product.service';
 import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';

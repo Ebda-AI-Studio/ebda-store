@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { withUser } from '@ebda/database';
 import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';

@@ -1,6 +1,6 @@
 import { JWT_ISSUERS_ACCEPTED, JWT_AUDIENCES_ACCEPTED } from '@ebda/shared';
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import jwt from 'jsonwebtoken';
 import {
   authenticate,
