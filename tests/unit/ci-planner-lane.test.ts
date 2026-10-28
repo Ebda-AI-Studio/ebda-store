@@ -38,9 +38,8 @@ describe('planner lane', () => {
   it('ci.yml runs the parallel pass without them and the lane serially afterwards', () => {
     const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
     expect(ci).toContain('$PLANNER_EXCLUDES');
-    expect(ci).toMatch(
-      /npx vitest run \$\(bash scripts\/ci\/planner-lane\.sh list\) --no-file-parallelism/
-    );
+    expect(ci).toContain('lane="$(bash scripts/ci/planner-lane.sh list)"');
+    expect(ci).toMatch(/npx vitest run \$lane --no-file-parallelism/);
     const parallel = ci.indexOf('npx vitest run tests/integration apps/api/src');
     const serial = ci.indexOf('--no-file-parallelism');
     expect(parallel).toBeGreaterThan(-1);
