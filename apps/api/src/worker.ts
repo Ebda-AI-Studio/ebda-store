@@ -49,6 +49,7 @@ import {
   sendNoticeMail,
   type StoreClaim,
 } from './lib/identity-directory';
+import { listStoreMembers, memberRole } from './lib/store-members';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import { assertEmbeddingConfig } from './lib/search/embedding-provider';
@@ -432,6 +433,20 @@ export class StoreDirectory extends WorkerEntrypoint<CfBindings> {
   /** Identity v1.3: may this store's integrator clients act now (not deleted, not suspended)? */
   async storeActive(storeId: string): Promise<boolean> {
     return withWorkerContext(this.env, this.ctx as Ctx, () => storeActive(storeId));
+  }
+}
+/**
+ * Service Binding RPC for Ebda WhatsApp (identity contract v1.4). Wired ONLY in ebda-whatsapp's wrangler config. Each method is
+ * authorised by the calling USER against live membership (never token claims) and fails closed.
+ */
+export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
+  /** The owner and active staff of a store, for seat assignment. Only the store's owner may ask. */
+  async listStoreMembers(storeId: string, asUserId: string) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => listStoreMembers(storeId, asUserId));
+  }
+  /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
+  async memberRole(storeId: string, userId: string) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => memberRole(storeId, userId));
   }
 }
 export class IdentityMailer extends WorkerEntrypoint<CfBindings> {
