@@ -37,7 +37,8 @@ vi.mock('@ebda/database', () => {
     Prisma: {},
     StoreStatus: {},
     withStore: vi.fn(),
-    withUser: vi.fn(),
+    // the billing-parent guard's sibling-store lookup: the owner has no other stores
+    withUser: async () => [],
     acrossStores: vi.fn(),
     withMoneyTx: async (_p: unknown, fn: (t: unknown) => unknown) => fn(tx),
     scopeTransaction: async (_t: unknown, _c: unknown, fn: () => unknown) => fn(),
