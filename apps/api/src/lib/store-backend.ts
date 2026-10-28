@@ -19,6 +19,7 @@
 import type { Request } from 'express';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
+import logger from './logger';
 
 export type StoreBackend = 'do' | 'pg';
 
@@ -41,8 +42,14 @@ export function enabledStoreIds(
   );
 }
 
-const unavailable = (why: string) =>
-  new AppError(503, 'STORE_BACKEND_UNAVAILABLE', `Store backend flag unreadable: ${why}`);
+/** Generic to the client; the cause is logged server-side only (structured field, control characters stripped). */
+const unavailable = (why: string) => {
+  logger.error(
+    { cause: why.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300) },
+    'store backend flag unreadable'
+  );
+  return new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend temporarily unavailable');
+};
 
 export async function backendFor(
   storeId: string,

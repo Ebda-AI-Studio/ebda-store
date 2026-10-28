@@ -176,15 +176,31 @@ describe('wrangler config', () => {
 });
 
 describe('/health payload', () => {
-  it('carries storage_backend counts when D1 is bound, null when unreadable, omitted when unbound', async () => {
+  it('public health carries platform_db only, never the counts', async () => {
     const { healthPayload } = await import('../../apps/api/src/lib/health-payload');
     bind(fakeD1({ a: 'pg', b: 'do', c: 'do' }));
-    expect((await healthPayload({} as never)).storage_backend).toEqual({ pg: 1, do: 2 });
+    const ok = await healthPayload({} as never);
+    expect(ok.platform_db).toBe('ok');
+    expect('storage_backend' in ok).toBe(false);
     const bad = fakeD1({ a: 'pg' });
     bad.fail = true;
     bind(bad);
-    expect((await healthPayload({} as never)).storage_backend).toBeNull();
+    expect((await healthPayload({} as never)).platform_db).toBe('unavailable');
     bind(undefined);
-    expect('storage_backend' in (await healthPayload({} as never))).toBe(false);
+    expect('platform_db' in (await healthPayload({} as never))).toBe(false);
+  });
+});
+
+describe('503 body', () => {
+  it('is generic: no D1 error text reaches the client', async () => {
+    const db = fakeD1({ s1: 'do' });
+    db.fail = true;
+    bind(db);
+    const err = await backendFor('s1', req()).catch(e => e);
+    expect(err.statusCode).toBe(503);
+    expect(err.message).toBe('Store backend temporarily unavailable');
+    expect(
+      JSON.stringify({ message: err.message, code: err.code, details: err.details })
+    ).not.toMatch(/D1_ERROR|boom/);
   });
 });

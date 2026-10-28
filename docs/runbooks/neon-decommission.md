@@ -10,7 +10,7 @@ Owner: the cutover agent (phases 5 and 7). Approver for step 7: Ahmad.
 node scripts/cf/decommission-neon.mjs preflight --flipped-at <ISO time of the flip> --api https://api.ebda.app --attest-sentry-clean
 ```
 
-All must hold: at least 7 days since the flip; `/health` `storage_backend` is 100% `do` and its commit is the tip of `main`; Sentry clean for the whole period (checked by hand, attested with the flag); the Worker config no longer has a `hyperdrive` binding (step 1 merged); DO nightly exports present in R2 for every store for the last 7 days (`npx wrangler r2 object list ebda-backups --prefix backups/` shows stores x 7); the CF bill is within the projection. A failing check prints the reason and exits 1: fix it, do not skip it.
+All must hold: at least 7 days since the flip; `/api/v1/health` `data.storage_backend` (super_admin, `OPS_HEALTH_TOKEN`) is 100% `do` and its commit is the tip of `main`; Sentry clean for the whole period (checked by hand, attested with the flag); the Worker config no longer has a `hyperdrive` binding (step 1 merged); DO nightly exports present in R2 for every store for the last 7 days (`npx wrangler r2 object list ebda-backups --prefix backups/` shows stores x 7); the CF bill is within the projection. A failing check prints the reason and exits 1: fix it, do not skip it.
 
 ## 1. Code cleanup of the Postgres paths (PRs, in this order; gate: `residue --strict`)
 

@@ -87,7 +87,15 @@ async function preflight() {
     .catch(() => null);
   if (!h) problems.push('/health did not answer');
   else {
-    const sb = h.storage_backend ?? h.data?.storage_backend ?? {};
+    // Counts are super_admin only (public /health would disclose the store count): GET /api/v1/health with OPS_HEALTH_TOKEN.
+    const deep = await fetch(`${v.api}/api/v1/health`, {
+      headers: { authorization: `Bearer ${process.env.OPS_HEALTH_TOKEN ?? ''}` },
+    })
+      .then(r => r.json())
+      .catch(() => null);
+    const sb = deep?.data?.storage_backend ?? {};
+    if (!deep?.data?.storage_backend)
+      problems.push('storage_backend unreadable: set OPS_HEALTH_TOKEN to a super_admin token');
     say(
       `/health storage_backend: ${JSON.stringify(sb)}, commit ${h.commit ?? h.data?.commit ?? '?'}`
     );

@@ -14,12 +14,10 @@ const e = env as unknown as {
   TEST_PLATFORM_MIGRATIONS: unknown[];
 };
 
+// Public /health: reachability only. Per-backend counts disclose the store count and live on the super_admin
+// /api/v1/health (counts logic proven in tests/unit/store-backend-flag.test.ts).
 const health = async () =>
-  (
-    (await (await e.API.fetch('https://api.ebda.app/health')).json()) as {
-      storage_backend?: Record<string, number> | null;
-    }
-  ).storage_backend;
+  (await (await e.API.fetch('https://api.ebda.app/health')).json()) as Record<string, unknown>;
 
 const insert = (id: string, backend: string) =>
   e.PLATFORM_DB.prepare(
@@ -33,15 +31,13 @@ describe('platform D1 in the built Worker', () => {
     await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
   });
 
-  it('/health reports storage_backend counts straight from D1, and a flag write shows immediately', async () => {
-    expect(await health()).toEqual({});
+  it('public /health reports platform_db ok and never the per-backend counts', async () => {
     await insert('s1', 'pg');
-    await insert('s2', 'pg');
-    expect(await health()).toEqual({ pg: 2 });
-    await e.PLATFORM_DB.prepare("UPDATE stores SET storage_backend = 'do' WHERE id = ?1")
-      .bind('s2')
-      .run();
-    expect(await health()).toEqual({ pg: 1, do: 1 });
+    await insert('s2', 'do');
+    const body = await health();
+    expect(body.platform_db).toBe('ok');
+    expect('storage_backend' in body).toBe(false);
+    expect(JSON.stringify(body)).not.toMatch(/"(pg|do)":/);
   });
 
   it('the schema CHECK refuses a backend other than pg/do', async () => {
