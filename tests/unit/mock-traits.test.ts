@@ -6,6 +6,8 @@ import { describe, it, expect } from 'vitest';
 import {
   DRAFT_THEME_KEYS,
   HERO_RATIOS,
+  TAB_BARS,
+  resolveTabBar,
   LOOK_OWNED_THEME_KEYS,
   THEME_SETTINGS_SCHEMA,
   draftThemeSchema,
@@ -13,6 +15,7 @@ import {
   lookCssVars,
   mockCssVars,
 } from '@ebda/shared';
+import { tabBarShownOn, isHomePath } from '../../apps/web/src/templates/shared/tab-bar-visibility';
 import { themeSchema } from '../../apps/api/src/lib/theme-schema';
 
 const control = (id: string) =>
@@ -53,5 +56,30 @@ describe('heroRatio (P2)', () => {
 
   it('a store with no look emits nothing, whatever the key says', () => {
     expect(lookCssVars({ heroRatio: 'tall' } as never, null)).toEqual({});
+  });
+});
+
+describe('tabBar (P3)', () => {
+  it('is validated, draftable, look-owned, shown on all five skins', () =>
+    validated('tabBar', TAB_BARS));
+
+  it('resolves merchant > look (inner) > legacy no-look (always)', () => {
+    expect(resolveTabBar({}, 'qamar.atelier')).toBe('inner');
+    expect(resolveTabBar({ tabBar: 'always' }, 'qamar.atelier')).toBe('always');
+    expect(resolveTabBar({ tabBar: 'never' }, null)).toBe('never');
+    expect(resolveTabBar({}, null)).toBe('always');
+    expect(resolveTabBar(undefined, undefined)).toBe('always');
+  });
+
+  it('inner hides the bar on the home page only; never hides it everywhere; checkout stays hidden', () => {
+    expect(tabBarShownOn('/', 'inner')).toBe(false);
+    expect(tabBarShownOn('/ar', 'inner')).toBe(false);
+    expect(tabBarShownOn('/s/qamar/', 'inner', '/s/qamar')).toBe(false);
+    expect(tabBarShownOn('/products', 'inner')).toBe(true);
+    expect(tabBarShownOn('/s/qamar/products/x', 'inner', '/s/qamar')).toBe(true);
+    expect(tabBarShownOn('/', 'always')).toBe(true);
+    expect(tabBarShownOn('/products', 'never')).toBe(false);
+    expect(tabBarShownOn('/checkout', 'always')).toBe(false);
+    expect(isHomePath('/s/qamar', '/s/qamar')).toBe(true);
   });
 });

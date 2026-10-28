@@ -201,6 +201,7 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
     'builder.header-search',
     'builder.header-wordmark',
     'builder.hero-ratio',
+    'builder.tab-bar',
     'builder.card-brand-badge',
     'builder.card-new-badge',
     'builder.card-quick-add',
@@ -234,6 +235,7 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
       'builder.header-search',
       'builder.header-wordmark',
       'builder.hero-ratio',
+      'builder.tab-bar',
     ])
       expect(builder.find(s => s.id === id)?.query).toBe('select=theme');
   });

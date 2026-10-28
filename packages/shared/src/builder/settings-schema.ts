@@ -375,6 +375,23 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
         trait: true,
         shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
       },
+      {
+        id: 'tabBar',
+        type: 'select',
+        labelEn: 'Bottom bar on phones',
+        labelAr: 'الشريط السفلي على الموبايل',
+        hintEn:
+          'The home / search / cart bar. "Not on the home page" keeps the screen clean and shows the cart bag in the header.',
+        hintAr:
+          'شريط الرئيسية والبحث والسلة. «مش في الرئيسية» بيسيب الشاشة نضيفة وبيطلّع شنطة السلة في الهيدر.',
+        options: [
+          opt('always', 'On every page', 'في كل الصفحات'),
+          opt('inner', 'Not on the home page', 'مش في الرئيسية'),
+          opt('never', 'Never', 'أبدًا'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
     ],
   },
   {

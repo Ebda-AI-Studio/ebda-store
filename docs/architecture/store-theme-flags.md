@@ -97,10 +97,11 @@ The theme PUT refuses any other value for these keys (`null` deletes). Any store
 
 The five templates default to the old Python mock-ups (plan `docs/plans/2026-10-25-templates-match-mockups.md`), and each trait of that look is a control in **Visual editor → Theme pane**. Every trait is an OPTIONAL `StoreTheme` key that is **absent until the merchant picks a value**; the look supplies the default (`traitDefault(key, lookId)` in `packages/shared/src/looks/traits.ts`, mock numbers in `looks/mock-tokens.ts`). Precedence merchant > look > skin; a saved value is never rewritten, a store with no look is untouched (Ruling TEMPLATES-MOCK-3). Each key is in `LOOK_OWNED_THEME_KEYS` (so `design: 'reset'` clears it and the panel shows "edited" + Reset), validated by the theme PUT (`apps/api/src/lib/theme-schema.ts`) and the draft schema (`THEME_SETTINGS_SCHEMA`, `trait: true`). Merchant help: `apps/help/content/{en,ar}/store-look-controls.mdx`.
 
-| Key              | Values                       | Default (look)                                               | Reader                                              | Control                                       |
-| ---------------- | ---------------------------- | ------------------------------------------------------------ | --------------------------------------------------- | --------------------------------------------- |
-| `headerWordmark` | `lockup` \| `plain`          | `lockup` for a store with no logo (a logo always wins)       | `resolveLockup` in the five headers                 | Header → Store name without a logo            |
-| `heroRatio`      | `tall` \| `square` \| `wide` | the look's `heroAspect` (unset); `wide` = old landscape crop | `mockCssVars(lookId, theme)` → `--look-hero-aspect` | Background and rhythm → Hero height on phones |
+| Key              | Values                         | Default (look)                                               | Reader                                                                  | Control                                       |
+| ---------------- | ------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------- |
+| `headerWordmark` | `lockup` \| `plain`            | `lockup` for a store with no logo (a logo always wins)       | `resolveLockup` in the five headers                                     | Header → Store name without a logo            |
+| `heroRatio`      | `tall` \| `square` \| `wide`   | the look's `heroAspect` (unset); `wide` = old landscape crop | `mockCssVars(lookId, theme)` → `--look-hero-aspect`                     | Background and rhythm → Hero height on phones |
+| `tabBar`         | `always` \| `inner` \| `never` | `inner` on a look store, `always` with no look               | `resolveTabBar` → `useTabBarShown` (BottomTabBar, base + Dahab headers) | Header → Bottom bar on phones                 |
 
 ## Product-card CTA + OOS-label + name-case (2026-06-24)
 

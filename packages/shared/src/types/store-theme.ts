@@ -17,6 +17,7 @@ import type {
   HeaderSearchPlacement,
   HeaderWordmark,
   HeroRatio,
+  TabBarMode,
   CardCta,
   CardHover,
   CardBadge,
@@ -173,6 +174,8 @@ export interface StoreTheme {
   headerWordmark?: HeaderWordmark;
   // TEMPLATES-MOCK-4: mobile hero ratio; unset = the look's mock ratio.
   heroRatio?: HeroRatio;
+  // TEMPLATES-MOCK-5: phone tab bar; unset = `inner` on a look store, `always` otherwise.
+  tabBar?: TabBarMode;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no

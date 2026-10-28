@@ -1566,6 +1566,19 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.tab-bar",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Bottom bar on phones",
+    "ar": "الشريط السفلي على الموبايل",
+    "synEn": "bottom tab bar navigation phone home cart bag hide show",
+    "synAr": "الشريط السفلي التبويبات الموبايل الرئيسية السلة شنطة اخفاء اظهار",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.hero-ratio",
     "kind": "setting",
     "route": "/builder",

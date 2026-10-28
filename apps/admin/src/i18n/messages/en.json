@@ -9490,6 +9490,7 @@
       "resetError": "Could not reset. Try again.",
       "headerLogo": "Logo position",
       "headerSearch": "Header search",
+      "tabBar": "Bottom bar on phones",
       "heroRatio": "Hero height on phones",
       "headerWordmark": "Store name without a logo",
       "cardBrandBadge": "Store name on cards",

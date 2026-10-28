@@ -856,6 +856,13 @@ export const SETTINGS: SettingEntry[] = [
         'كلمة اسم المتجر شعار لوجو متصمم عادي الهيدر',
       ],
       [
+        'builder.tab-bar',
+        'builder.theme.tabBar',
+        'select=theme',
+        'bottom tab bar navigation phone home cart bag hide show',
+        'الشريط السفلي التبويبات الموبايل الرئيسية السلة شنطة اخفاء اظهار',
+      ],
+      [
         'builder.hero-ratio',
         'builder.theme.heroRatio',
         'select=theme',

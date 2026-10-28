@@ -261,6 +261,12 @@ export function ThemeSettingsPanel({
                     {field}
                   </div>
                 );
+              if (s.id === 'tabBar')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.tab-bar">
+                    {field}
+                  </div>
+                );
               if (s.id === 'heroRatio')
                 return (
                   <div key={s.id} className="space-y-1" data-setting-id="builder.hero-ratio">

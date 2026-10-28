@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1408,
+    "wired": 1413,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3117,6 +3117,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|tabBar",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "dahab|theme|uppercaseStyle",
@@ -6913,6 +6926,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|tabBar",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "jasmine|theme|uppercaseStyle",
@@ -10724,6 +10750,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|tabBar",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
+    },
+    {
       "id": "lamma|theme|uppercaseStyle",
       "skin": "lamma",
       "looks": [
@@ -14518,6 +14557,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "qamar|theme|tabBar",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "qamar|theme|uppercaseStyle",
@@ -18327,6 +18379,19 @@
       "control": "showQuickAdd",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|tabBar",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "tabBar",
+      "status": "wired",
+      "evidence": "static (compose.ts)"
     },
     {
       "id": "souq|theme|uppercaseStyle",

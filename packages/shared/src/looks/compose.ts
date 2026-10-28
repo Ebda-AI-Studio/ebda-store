@@ -3,6 +3,7 @@ import { getTemplateTheme } from '../types/store-theme';
 import { boundaryColorFloor, hexToHsl as h } from '../utils/color';
 import { getLook } from './registry';
 import { lockupFor, type Lockup } from './lockup';
+import type { TabBarMode } from './types';
 import {
   LOOK_OWNED_THEME_KEYS,
   type HeaderLogoPlacement,
@@ -123,4 +124,16 @@ export function resolveLockup(
 ): Lockup | null {
   if (theme?.headerWordmark === 'plain') return null;
   return lockupFor(look, template);
+}
+
+/**
+ * The phone tab bar mode for a store (TEMPLATES-MOCK-5): merchant > look default (`inner`: no bar on the home
+ * page, the header bag is the cart) > legacy store with no look (`always`, unchanged). Pure.
+ */
+export function resolveTabBar(
+  theme: Pick<StoreTheme, 'tabBar'> | null | undefined,
+  look?: string | null
+): TabBarMode {
+  if (theme?.tabBar) return theme.tabBar;
+  return getLook(look) ? 'inner' : 'always';
 }

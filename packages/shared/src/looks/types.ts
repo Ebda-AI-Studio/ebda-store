@@ -50,6 +50,13 @@ export type HeaderWordmark = (typeof HEADER_WORDMARKS)[number];
  */
 export const HERO_RATIOS = ['tall', 'square', 'wide'] as const;
 export type HeroRatio = (typeof HERO_RATIOS)[number];
+/**
+ * The merchant's phone tab bar (TEMPLATES-MOCK-5): `always` the old bar on every shopping page, `inner` every
+ * page except the home page (the mock: the cart is the header bag), `never` no bar. Unset = `inner` on a look
+ * store, `always` on a store with no look (untouched).
+ */
+export const TAB_BARS = ['always', 'inner', 'never'] as const;
+export type TabBarMode = (typeof TAB_BARS)[number];
 export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
 export type WordmarkSize = (typeof LOOK_WORDMARK_SIZES)[number];
 export type OverPhotoChrome = (typeof LOOK_OVER_PHOTO_CHROMES)[number];
@@ -244,7 +251,10 @@ export const HEADER_CHROME_OVERRIDE_KEYS = [
 ] as const satisfies readonly (keyof StoreTheme)[];
 
 /** The merchant's mock-trait overrides (TEMPLATES-MOCK-2/-3): absent until picked, cleared by a design reset. */
-export const MOCK_TRAIT_KEYS = ['heroRatio'] as const satisfies readonly (keyof StoreTheme)[];
+export const MOCK_TRAIT_KEYS = [
+  'heroRatio',
+  'tabBar',
+] as const satisfies readonly (keyof StoreTheme)[];
 
 /** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */
 export const LOOK_OWNED_THEME_KEYS = [
