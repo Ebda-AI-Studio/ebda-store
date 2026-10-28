@@ -58,6 +58,9 @@ export const setAccountRole = (
   ifCurrentRole?: 'store_admin' | 'staff'
 ) => call('setRole', r => r.setRole?.(userId, role, reason, ifCurrentRole));
 export const eraseIdentityUser = (userId: string) => call('eraseUser', r => r.eraseUser?.(userId));
+/** Integrator clients (identity v1.3) die with their store. Idempotent, so a retry is safe. */
+export const deleteStoreClients = (storeId: string) =>
+  call('deleteStoreClients', r => r.deleteStoreClients?.(storeId));
 
 /**
  * Merchant, staff and super-admin accounts (users.store_id NULL, role not customer) have their credentials and sessions in the

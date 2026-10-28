@@ -338,3 +338,44 @@ describe('role mapping and optionalAuthenticate', () => {
     expect(config.jwtSecret).not.toContain('BEGIN');
   });
 });
+
+describe('integrator client tokens are never accepted by the Store (identity v1.3 mirror)', () => {
+  const clientClaims = {
+    sid: 'cli_abc',
+    client: true,
+    scope: 'messages:send',
+    stores: [{ id: 'store-1', role: 'integration' }],
+  };
+
+  it('a real client token (aud=whatsapp) is refused: wrong audience', async () => {
+    const t = await mint({ aud: 'whatsapp', sub: 'cli_abc', claims: clientClaims });
+    const { req, err } = await run(authenticate, t);
+    expect(err).toMatchObject({ statusCode: 401 });
+    expect(req.user).toBeUndefined();
+  });
+
+  it('even if signed for aud=store (a mis-issued token), client:true is refused', async () => {
+    const t = await mint({ sub: 'cli_abc', claims: clientClaims });
+    const { req, err } = await run(authenticate, t);
+    expect(err).toMatchObject({ statusCode: 401 });
+    expect(req.user).toBeUndefined();
+  });
+
+  it('a person token that carries role "integration" or client:true is refused, never mapped to a Store role', async () => {
+    for (const claims of [
+      { stores: [{ id: 'store-1', role: 'integration' }] },
+      { client: true },
+      { client: false },
+    ]) {
+      const { req, err } = await run(authenticate, await mint({ claims }));
+      expect(err).toMatchObject({ statusCode: 401 });
+      expect(req.user).toBeUndefined();
+    }
+  });
+
+  it('optionalAuthenticate also refuses it (no silent anonymous downgrade that keeps the principal)', async () => {
+    const t = await mint({ sub: 'cli_abc', claims: clientClaims });
+    const { req } = await run(optionalAuthenticate, t);
+    expect(req.user).toBeUndefined();
+  });
+});

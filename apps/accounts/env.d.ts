@@ -4,6 +4,10 @@ import type { D1Migration } from 'cloudflare:test';
 export interface StoreDirectoryRpc {
   /** The stores a user may act on: owner = Store.ownerId, staff = a StoreStaff row. */
   storesForUser(userId: string): Promise<Array<{ id: string; role: 'owner' | 'staff' }>>;
+  /** Is the store still in the directory (not deleted)? Integrator clients of a deleted store are refused. */
+  storeExists(storeId: string): Promise<boolean>;
+  /** Not deleted AND not suspended: integrator clients may act only while this is true. */
+  storeActive(storeId: string): Promise<boolean>;
 }
 export interface MailerRpc {
   /** Send a one-time code mail (verification or password reset) through the Store mail pipeline. */
@@ -52,6 +56,8 @@ declare global {
       MFA_KEY_PREV?: string;
       /** 'true' after the re-encrypt job reports 0 remaining: refuse legacy v1/v2 sealed secrets. */
       MFA_REJECT_LEGACY?: string;
+      /** HMAC key (base64, >= 32 bytes) for integrator client secrets at rest (wrangler secret). Missing = the client endpoints answer 503 and log loudly. */
+      CLIENT_SECRET_PEPPER?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
       TEST_MIGRATIONS?: D1Migration[];

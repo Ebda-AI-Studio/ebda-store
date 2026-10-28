@@ -11,6 +11,8 @@ const h = vi.hoisted(() => ({
   accountStatus: 'active' as 'active' | 'suspended',
   failTx: false,
   ownerStores: 0,
+  clients: [] as string[],
+  clientFailures: 0,
 }));
 
 vi.mock('@ebda/database', () => {
@@ -57,6 +59,14 @@ vi.mock('@api/lib/identity-client', () => ({
   getAccountState: async () => ({ status: h.accountStatus }),
   setAccountStatus: async (_id: string, status: string) => void h.order.push(`identity-${status}`),
   eraseIdentityUser: async () => void h.order.push('identity-erase'),
+  deleteStoreClients: async (id: string) => {
+    if (h.clientFailures > 0) {
+      h.clientFailures--;
+      throw new Error('identity down');
+    }
+    h.clients.push(id);
+    return { clients: 1 };
+  },
 }));
 vi.mock('@api/services/store-closure.service', () => ({
   assertNoMoneyInFlight: async () => {},
@@ -85,6 +95,8 @@ beforeEach(() => {
   h.accountStatus = 'active';
   h.failTx = false;
   h.ownerStores = 0;
+  h.clients = [];
+  h.clientFailures = 0;
   vi.spyOn(StoreService, 'getById').mockResolvedValue({
     id: 's1',
     ownerId: 'owner-1',
@@ -122,5 +134,27 @@ describe('StoreService.delete and the owner identity', () => {
     h.ownerStores = 1;
     await StoreService.delete('s1', 'admin-1');
     expect(h.order).toEqual([]);
+  });
+
+  it('removes the store integrator clients after the commit (v1.3), even when the owner keeps another store', async () => {
+    h.ownerStores = 1;
+    await StoreService.delete('s1', 'admin-1');
+    expect(h.clients).toEqual(['s1']);
+  });
+
+  it('never removes integrator clients when the deletion rolled back', async () => {
+    h.failTx = true;
+    await expect(StoreService.delete('s1', 'admin-1')).rejects.toThrow('commit failed');
+    expect(h.clients).toEqual([]);
+  });
+
+  it('retries a failed client removal and still completes the store deletion', async () => {
+    h.clientFailures = 2;
+    await StoreService.delete('s1', 'admin-1');
+    expect(h.clients).toEqual(['s1']);
+    h.clientFailures = 5;
+    h.clients = [];
+    await expect(StoreService.delete('s1', 'admin-1')).resolves.toBeDefined();
+    expect(h.clients).toEqual([]);
   });
 });

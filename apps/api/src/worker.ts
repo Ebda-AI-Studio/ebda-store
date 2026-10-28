@@ -40,6 +40,8 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   sendCodeMail,
   storesForUser,
+  storeLive,
+  storeActive,
   type CodeMail,
   type NoticeMail,
   sendNoticeMail,
@@ -403,6 +405,14 @@ const handler = { fetch: handle, queue, scheduled };
 export class StoreDirectory extends WorkerEntrypoint<CfBindings> {
   async storesForUser(userId: string): Promise<StoreClaim[]> {
     return withWorkerContext(this.env, this.ctx as Ctx, () => storesForUser(userId));
+  }
+  /** Identity v1.3: does this store still exist? (integrator clients of a deleted store are refused at once). */
+  async storeExists(storeId: string): Promise<boolean> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => storeLive(storeId));
+  }
+  /** Identity v1.3: may this store's integrator clients act now (not deleted, not suspended)? */
+  async storeActive(storeId: string): Promise<boolean> {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => storeActive(storeId));
   }
 }
 export class IdentityMailer extends WorkerEntrypoint<CfBindings> {

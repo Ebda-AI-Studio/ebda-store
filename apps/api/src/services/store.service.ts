@@ -41,6 +41,7 @@ import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import {
+  deleteStoreClients,
   eraseIdentityUser,
   getAccountState,
   isIdentityManagedUser,
@@ -812,6 +813,21 @@ export class StoreService {
         );
       }
       throw err;
+    }
+    // Integrator clients (identity v1.3) are bound to the store and die with it. Post-commit (a rolled-back deletion never gets
+    // here, so no client is lost with a store that still exists) and idempotent, so it is retried; a final failure is logged loudly:
+    // the store is gone, so its clients' tokens reach nothing, but the rows stay until the next attempt.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await deleteStoreClients(store.id);
+        break;
+      } catch (e) {
+        if (attempt === 3)
+          logger.error(
+            { err: e, storeId: store.id },
+            '[STORE_DELETE] integrator clients not removed (retry deleteStoreClients)'
+          );
+      }
     }
     if (erasedOwnerId) {
       await eraseIdentityUser(erasedOwnerId).catch(e =>

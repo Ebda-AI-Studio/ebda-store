@@ -107,6 +107,9 @@ export async function verifyAccountsToken(
     if (opts.ignoreExpiration && e instanceof joseErrors.JWTExpired) payload = e.payload;
     else throw e;
   }
+  // Identity v1.3: an integrator CLIENT token is a machine principal for another product. The Store has no client audience, so
+  // none may ever pass here, whatever it was signed for: refuse any trace of one rather than filter it into an empty profile.
+  if ('client' in payload) throw new Error('client tokens are not accepted by the Store');
   const { sub, sid, jti, stores, pa, auth_time, email, email_verified, exp } = payload as Record<
     string,
     unknown
@@ -114,6 +117,8 @@ export async function verifyAccountsToken(
   if (typeof sub !== 'string' || typeof sid !== 'string' || typeof jti !== 'string')
     throw new Error('token has no sub/sid/jti');
   if (!Array.isArray(stores)) throw new Error('token has no stores claim');
+  if (stores.some(s => (s as { role?: unknown } | null)?.role === 'integration'))
+    throw new Error('integration role is not accepted by the Store');
   return {
     sub,
     sid,
