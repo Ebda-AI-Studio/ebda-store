@@ -140,6 +140,82 @@ describe('checkout core: stock', () => {
   });
 });
 
+describe('checkout core: cart claim (P07 / M-012)', () => {
+  function withCart() {
+    const f = fixture();
+    f.raw.exec(
+      `INSERT INTO carts (id, store_id, session_id) VALUES ('cart1', 's1', 'sess1'), ('cart2', 's2', 'sess2')`
+    );
+    f.raw.exec(
+      `INSERT INTO cart_items (id, cart_id, product_id, quantity) VALUES ('ci1', 'cart1', 'sku', 1)`
+    );
+    return f;
+  }
+  it('a second checkout of the same cart (different key or none) fails; one order, stock moved once', () => {
+    const { db, base, stock, count } = withCart();
+    const cart = { id: 'cart1' };
+    const a = placeOrder(db, base({ cart, idempotencyKey: 'k-a' }));
+    expect(a.replayed).toBe(false);
+    expect(err(() => placeOrder(db, base({ cart, idempotencyKey: 'k-b' }))).code).toBe(
+      'CART_CHANGED'
+    );
+    expect(err(() => placeOrder(db, base({ cart }))).code).toBe('CART_CHANGED');
+    expect(count('SELECT count(*) AS n FROM orders')).toBe(1);
+    expect(count('SELECT count(*) AS n FROM cart_items')).toBe(0);
+    expect(stock('products', 'sku')).toBe(9);
+  });
+  it('the same key after the claim returns the first order, not CART_CHANGED', () => {
+    const { db, base, stock } = withCart();
+    const cart = { id: 'cart1' };
+    const a = placeOrder(db, base({ cart, idempotencyKey: 'k-a' }));
+    const b = placeOrder(db, base({ cart, idempotencyKey: 'k-a' }));
+    expect(b).toMatchObject({ orderId: a.orderId, replayed: true });
+    expect(stock('products', 'sku')).toBe(9);
+  });
+  it('a cart whose LINES differ from the ones ordered (same count) is CART_CHANGED and keeps its rows', () => {
+    const { raw, db, base, count } = withCart();
+    // the cart holds sku x1; the shopper priced sku x5 (another tab changed the quantity)
+    expect(
+      err(() =>
+        placeOrder(db, base({ cart: { id: 'cart1' }, lines: [{ productId: 'sku', quantity: 5 }] }))
+      ).code
+    ).toBe('CART_CHANGED');
+    expect(count('SELECT count(*) AS n FROM cart_items')).toBe(1);
+    expect(count('SELECT count(*) AS n FROM orders')).toBe(0);
+    expect(raw).toBeTruthy();
+  });
+  it('an idempotency key is scoped to its cart: another cart with the same key gets its OWN order, never the first one', () => {
+    const { raw, db, base } = withCart();
+    raw.exec(`INSERT INTO carts (id, store_id, session_id) VALUES ('cart3', 's1', 'sess3')`);
+    raw.exec(
+      `INSERT INTO cart_items (id, cart_id, product_id, quantity) VALUES ('ci3', 'cart3', 'sku', 1)`
+    );
+    const a = placeOrder(db, base({ cart: { id: 'cart1' }, idempotencyKey: 'shared-key' }));
+    const b = placeOrder(db, base({ cart: { id: 'cart3' }, idempotencyKey: 'shared-key' }));
+    expect(b.orderId).not.toBe(a.orderId);
+    expect(b.replayed).toBe(false);
+  });
+  it('a changed cart, another store cart, or a failed order leaves the cart claimable', () => {
+    const { raw, db, base, count } = withCart();
+    // another tab added a second line after the shopper priced one
+    raw.exec(
+      `INSERT INTO cart_items (id, cart_id, product_id, quantity) VALUES ('ci9', 'cart1', 'vprod', 1)`
+    );
+    expect(err(() => placeOrder(db, base({ cart: { id: 'cart1' } }))).code).toBe('CART_CHANGED');
+    raw.exec(`DELETE FROM cart_items WHERE id = 'ci9'`);
+    expect(err(() => placeOrder(db, base({ cart: { id: 'cart2' } }))).code).toBe('CART_CHANGED');
+    // an order that fails AFTER the claim (more than the shelf holds) rolls the claim back with it
+    raw.exec(`UPDATE cart_items SET quantity = 99 WHERE id = 'ci1'`);
+    const failed = err(() =>
+      placeOrder(db, base({ cart: { id: 'cart1' }, lines: [{ productId: 'sku', quantity: 99 }] }))
+    );
+    expect(failed.code).not.toBe('CART_CHANGED');
+    expect(count('SELECT count(*) AS n FROM cart_items')).toBe(1); // rolled back with the failed order
+    expect(count('SELECT count(*) AS n FROM orders')).toBe(0);
+    expect(raw).toBeTruthy();
+  });
+});
+
 describe('checkout core: coupon', () => {
   it('percentage, fixed, cap, minimum, dates, inactive; the total never goes negative', () => {
     const { raw, db, base } = fixture();

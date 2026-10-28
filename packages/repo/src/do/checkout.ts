@@ -15,6 +15,7 @@ import { computeOrderTaxFields } from './tax';
 import { codFeeForCheckout } from './cod-fee';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { quoteRedemption, redeemPoints } from './loyalty';
+import { indexEntity } from './payments';
 
 export interface CheckoutLine {
   productId: string;
@@ -52,6 +53,13 @@ export interface CheckoutInput {
   paymentMethod?: string;
   currency?: string;
   idempotencyKey?: string;
+  /**
+   * The cart this checkout consumes (audit M-012 / P07). It is claimed in the SAME section as the order: the rows still in
+   * it must be exactly the lines and boxes being ordered (compared by content, not count), and they are deleted here, so a
+   * second concurrent checkout of the same cart (no key, or a different key) finds it empty and fails with CART_CHANGED
+   * instead of creating a second order. Also scopes `idempotencyKey` to this cart.
+   */
+  cart?: { id: string };
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
@@ -173,6 +181,22 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       ? { kind: 'merchant-selected', customerId: input.customerId }
       : { kind: 'anonymous' });
 
+  const bundleTotals = new Map<string, number>();
+  for (const b of input.bundles ?? [])
+    bundleTotals.set(b.bundleId, (bundleTotals.get(b.bundleId) ?? 0) + b.quantity);
+  const bundleKey = [...bundleTotals]
+    .map(([k, n]) => `${k}x${n}`)
+    .sort()
+    .join(',');
+
+  // A key from a cart-claimed checkout is scoped to ITS cart (one cart per shopper session): another shopper who guesses a key
+  // can no longer read this order back. Without a cart (admin / import callers) the key stays per store.
+  const idemKey = input.idempotencyKey
+    ? input.cart
+      ? `${input.cart.id}:${input.idempotencyKey}`
+      : input.idempotencyKey
+    : undefined;
+
   return db.transactionSync(() => {
     const sameLines = (orderId: string): boolean => {
       const rows = db.all(
@@ -188,12 +212,21 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         .map(l => key(l.productId, l.variantId, l.quantity))
         .sort()
         .join(',');
-      return a === b;
+      if (a !== b) return false;
+      const boxes = db
+        .all(
+          'SELECT bundle_id, count(DISTINCT bundle_group_id) AS n FROM order_items WHERE order_id = ? AND bundle_id IS NOT NULL GROUP BY bundle_id',
+          [orderId]
+        )
+        .map(r => `${r.bundle_id}x${r.n}`)
+        .sort()
+        .join(',');
+      return boxes === bundleKey;
     };
-    if (input.idempotencyKey) {
+    if (idemKey) {
       const prev = db.all(
         'SELECT id, customer_id, order_number, subtotal, discount, coupon_discount, promotion_discount, bundle_discount, loyalty_discount, shipping, cod_fee, tax, wallet_amount, total, payment_status FROM orders WHERE idempotency_key = ? AND store_id = ?',
-        [input.idempotencyKey, input.storeId]
+        [idemKey, input.storeId]
       )[0];
       if (prev) {
         if (
@@ -224,6 +257,57 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           replayed: true,
         };
       }
+    }
+
+    if (input.cart) {
+      const owned = db.all('SELECT id FROM carts WHERE id = ? AND store_id = ?', [
+        input.cart.id,
+        input.storeId,
+      ])[0];
+      // What the cart holds NOW must be exactly what is being ordered (the lines and boxes, not their number): the rows
+      // are deleted below, so a quantity change or a swapped line in another tab must not be silently eaten.
+      const sig = (rows: Array<Record<string, unknown>>, ...cols: string[]) =>
+        rows
+          .map(r => cols.map(c => String(r[c] ?? '')).join('|'))
+          .sort()
+          .join(',');
+      const liveItems = sig(
+        db.all('SELECT product_id, variant_id, quantity FROM cart_items WHERE cart_id = ?', [
+          input.cart.id,
+        ]),
+        'product_id',
+        'variant_id',
+        'quantity'
+      );
+      const orderedItems = sig(
+        input.lines.map(l => ({
+          product_id: l.productId,
+          variant_id: l.variantId,
+          quantity: l.quantity,
+        })),
+        'product_id',
+        'variant_id',
+        'quantity'
+      );
+      const liveBoxes = sig(
+        db.all('SELECT bundle_id, quantity FROM cart_bundles WHERE cart_id = ?', [input.cart.id]),
+        'bundle_id',
+        'quantity'
+      );
+      const orderedBoxes = sig(
+        (input.bundles ?? []).map(b => ({ bundle_id: b.bundleId, quantity: b.quantity })),
+        'bundle_id',
+        'quantity'
+      );
+      if (!owned || liveItems !== orderedItems || liveBoxes !== orderedBoxes)
+        throw new MoneyError(
+          'CART_CHANGED',
+          'The cart changed or was already checked out. Review it and try again.',
+          409
+        );
+      // counted above, deleted here: the section is single-writer, so nothing slips between the two
+      db.run('DELETE FROM cart_items WHERE cart_id = ?', [input.cart.id]);
+      db.run('DELETE FROM cart_bundles WHERE cart_id = ?', [input.cart.id]);
     }
 
     if (input.customerId) {
@@ -364,12 +448,38 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           available: r.newStock,
         });
       }
-      const r = decrementProduct(db, productId, qty);
-      if (!r.ok)
-        throw new MoneyError('OUT_OF_STOCK', 'not enough stock', 409, {
+      let r = decrementProduct(db, productId, qty);
+      if (!r.ok) {
+        // backorder on a product WITHOUT variants: both the store feature and the product flag; the stock goes negative
+        // (a real backorder debt, unlike a variant row which floors at 0) and the whole quantity counts as taken
+        if (input.backorderEnabled !== true || !p.allow_backorder)
+          throw new MoneyError('OUT_OF_STOCK', 'not enough stock', 409, {
+            productId,
+            available: r.newStock,
+          });
+        const cur = db.all('SELECT inventory FROM products WHERE id = ? AND store_id = ?', [
           productId,
-          available: r.newStock,
+          input.storeId,
+        ])[0].inventory as number;
+        db.run('UPDATE products SET inventory = ?1 WHERE id = ?2 AND store_id = ?3', [
+          cur - qty,
+          productId,
+          input.storeId,
+        ]);
+        r = { ok: true, previousStock: cur, newStock: cur - qty };
+        backorders.push({ lineIndex, productId, variantId: null, qty, stockTaken: qty });
+        recordMovement(db, {
+          storeId: input.storeId,
+          productId,
+          type: 'sale',
+          quantity: qty,
+          previousStock: r.previousStock,
+          newStock: r.newStock,
+          reference: orderId,
+          reason: 'backorder',
         });
+        return;
+      }
       recordMovement(db, {
         storeId: input.storeId,
         productId,
@@ -402,7 +512,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       const v = l.variantId
         ? db.all('SELECT title, title_ar, sku FROM product_variants WHERE id = ?', [l.variantId])[0]
         : undefined;
-      const unit = gold?.unitPrices.get(l.key) ?? l.resolved.unitMinor;
+      // the gate VALIDATES (stale rate, drift, quote) and supplies the snapshot; the charged price is the resolver's, so a
+      // group percent_off applies to gold exactly as in Postgres (order.service.ts:987-1016)
+      const unit = l.resolved.unitMinor;
       take(l.productId, l.variantId, l.qty, lines.length);
       lines.push({
         productId: l.productId,
@@ -442,18 +554,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
     }
 
-    const looseSubtotal =
-      priced.looseSubtotal -
-      (gold
-        ? priced.lines.reduce(
-            (s, l) =>
-              s +
-              (gold.unitPrices.has(l.key)
-                ? (l.resolved.unitMinor - (gold.unitPrices.get(l.key) as number)) * l.qty
-                : 0),
-            0
-          )
-        : 0);
+    const looseSubtotal = priced.looseSubtotal;
     const subtotal = looseSubtotal + bundles.bundlesSubtotal;
     if (subtotal > MAX_TOTAL) throw new MoneyError('TOTAL_TOO_LARGE', 'order total too large', 400);
 
@@ -524,7 +625,10 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           scopeProductIds: jsonList(c.scope_product_ids),
           scopeCategoryIds: jsonList(c.scope_category_ids),
         },
-        { ...ids, cartItems: freeShip ? cartItems : cartItems }
+        {
+          ...ids,
+          cartItems: freeShip ? cartItemsForTargeting(db, input.storeId, priced, true) : cartItems,
+        }
       );
       if (!t.eligible)
         throw new MoneyError(
@@ -730,7 +834,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         JSON.stringify(shippingAddress),
         JSON.stringify(input.billingAddress ?? shippingAddress),
         input.checkoutIp ?? null,
-        input.idempotencyKey ?? null,
+        idemKey ?? null,
         !fullyWalletPaid && MANUAL.has(input.paymentMethod ?? '') ? 1 : 0,
         now,
         now,
@@ -768,7 +872,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         ]
       );
     }
-    for (const b of backorders)
+    for (const b of backorders) {
+      db.run('UPDATE order_items SET cost_price_deferred = 1 WHERE id = ?', [itemIds[b.lineIndex]]);
       db.run(
         'INSERT INTO backorder_lines (id, store_id, order_item_id, product_id, variant_id, qty, stock_taken) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
@@ -781,6 +886,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           b.stockTaken,
         ]
       );
+    }
     if (walletTx)
       db.run(
         'INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -805,6 +911,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         featureEnabled: input.loyaltyFeatureEnabled === true,
         now,
       });
+    // entity index (audit DB-2): queued in the SAME section as the order; the Worker awaits it (awaitEntityIndexed) before
+    // it hands the order reference to a provider or a shopper
+    indexEntity(db, input.storeId, 'order', orderId, now);
     return {
       orderId,
       orderNumber: num,
