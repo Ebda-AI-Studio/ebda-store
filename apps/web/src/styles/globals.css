@@ -1979,6 +1979,18 @@ html[lang='en'] [data-look] .font-display {
 [data-card-tags='off'] [data-section] [data-card-chrome='tags'] {
   display: none;
 }
+/*
+ * TEMPLATES-MOCK-8 (P6): the home product grids' gutter. `regular` (and a store with no look) emits no rule, so the
+ * pre-mock Tailwind gaps stand. Home sections only: the product list keeps its own cardGap setting.
+ */
+[data-grid-gutter='tight'] [data-section] [data-part='product-grid'] {
+  column-gap: 3px;
+  row-gap: 22px;
+}
+[data-grid-gutter='airy'] [data-section] [data-part='product-grid'] {
+  column-gap: 24px;
+  row-gap: 32px;
+}
 [data-price-colour='accent'] span[data-zone='productPrice'] {
   color: hsl(var(--look-price-colour, var(--foreground)));
 }

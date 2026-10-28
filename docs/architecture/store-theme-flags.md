@@ -105,6 +105,7 @@ The five templates default to the old Python mock-ups (plan `docs/plans/2026-10-
 | `headingWeight`                           | `bold` \| `regular`            | bold unless the look's display face is single-weight         | `lookTraitAttrs` → `<body data-heading-weight>` → globals.css           | Typography → Section heading weight               |
 | `priceColour`                             | `accent` \| `text`             | `accent` (readable, `--look-price-colour`)                   | `lookTraitAttrs` + `lookCssVars`                                        | Typography → Price colour on cards                |
 | `cardHeart` / `cardSwatches` / `cardTags` | `on` \| `off`                  | `off` on a look store (home sections only)                   | `lookTraitAttrs` → `<body data-card-*>` → globals.css                   | Product cards → heart / dots / tags on home cards |
+| `gridGutter`                              | `tight` \| `regular` \| `airy` | `tight` on qamar.atelier, else `regular` (old gaps)          | `lookTraitAttrs` → `<body data-grid-gutter>` → globals.css (home grids) | Product cards → Space between home cards          |
 
 ## Product-card CTA + OOS-label + name-case (2026-06-24)
 

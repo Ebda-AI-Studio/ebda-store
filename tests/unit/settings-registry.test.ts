@@ -205,6 +205,7 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
     'builder.card-heart',
     'builder.card-swatches',
     'builder.card-tags',
+    'builder.grid-gutter',
     'builder.heading-weight',
     'builder.price-colour',
     'builder.card-brand-badge',
@@ -244,6 +245,7 @@ describe('admin search registry: every visual-editor control (Task 11)', () => {
       'builder.card-heart',
       'builder.card-swatches',
       'builder.card-tags',
+      'builder.grid-gutter',
       'builder.heading-weight',
       'builder.price-colour',
     ])

@@ -279,6 +279,12 @@ export function ThemeSettingsPanel({
                     {field}
                   </div>
                 );
+              if (s.id === 'gridGutter')
+                return (
+                  <div key={s.id} className="space-y-1" data-setting-id="builder.grid-gutter">
+                    {field}
+                  </div>
+                );
               if (s.id === 'headingWeight')
                 return (
                   <div key={s.id} className="space-y-1" data-setting-id="builder.heading-weight">

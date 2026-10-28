@@ -1605,6 +1605,19 @@
     "pageAr": "المحرر"
   },
   {
+    "id": "builder.grid-gutter",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Space between home cards",
+    "ar": "المسافة بين كروت الرئيسية",
+    "synEn": "grid gutter gap spacing space between cards home tight airy",
+    "synAr": "مسافة فاصل بين الكروت الرئيسية ضيقة واسعة الشبكة",
+    "query": "select=theme",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
     "id": "builder.heading-weight",
     "kind": "setting",
     "route": "/builder",

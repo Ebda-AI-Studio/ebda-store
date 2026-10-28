@@ -22,6 +22,7 @@ import {
   HEADING_WEIGHTS,
   PRICE_COLOURS,
   CARD_CHROME,
+  GRID_GUTTERS,
 } from '@ebda/shared';
 
 /**
@@ -90,6 +91,7 @@ export const themeSchema = z
       cardHeart: CARD_CHROME,
       cardSwatches: CARD_CHROME,
       cardTags: CARD_CHROME,
+      gridGutter: GRID_GUTTERS,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

@@ -529,6 +529,23 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
         shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
       },
       {
+        id: 'gridGutter',
+        type: 'select',
+        labelEn: 'Space between home cards',
+        labelAr: 'المسافة بين كروت الرئيسية',
+        hintEn:
+          'Tight (a hairline between photos, like a lookbook), regular, or airy. Home page sections only.',
+        hintAr:
+          'ضيقة (فاصل رفيع بين الصور زي اللوك بوك) أو عادية أو واسعة. أقسام الصفحة الرئيسية بس.',
+        options: [
+          opt('tight', 'Tight', 'ضيقة'),
+          opt('regular', 'Regular', 'عادية'),
+          opt('airy', 'Airy', 'واسعة'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
         id: 'showBrandBadge',
         type: 'checkbox',
         labelEn: 'Store name on cards',

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "summary": {
-    "wired": 1438,
+    "wired": 1443,
     "no-op": 0,
     "missing": 0,
     "pending-template": 0,
@@ -3013,6 +3013,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "dahab|theme|gridGutter",
+      "skin": "dahab",
+      "looks": [
+        "dahab.worn",
+        "dahab.workshop",
+        "dahab.giftbox"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "dahab|theme|headerWordmark",
@@ -6874,6 +6887,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "jasmine|theme|gridGutter",
+      "skin": "jasmine",
+      "looks": [
+        "jasmine.apothecary",
+        "jasmine.bloom",
+        "jasmine.clinic"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "jasmine|theme|headerLogoPlacement",
@@ -10763,6 +10789,19 @@
       "evidence": "static"
     },
     {
+      "id": "lamma|theme|gridGutter",
+      "skin": "lamma",
+      "looks": [
+        "lamma.table",
+        "lamma.notebook",
+        "lamma.market"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "lamma|theme|headerLogoPlacement",
       "skin": "lamma",
       "looks": [
@@ -14637,6 +14676,19 @@
       "evidence": "static"
     },
     {
+      "id": "qamar|theme|gridGutter",
+      "skin": "qamar",
+      "looks": [
+        "qamar.atelier",
+        "qamar.lookbook",
+        "qamar.vitrine"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
+    },
+    {
       "id": "qamar|theme|headerLogoPlacement",
       "skin": "qamar",
       "looks": [
@@ -18509,6 +18561,19 @@
       "control": "foregroundColor",
       "status": "wired",
       "evidence": "static"
+    },
+    {
+      "id": "souq|theme|gridGutter",
+      "skin": "souq",
+      "looks": [
+        "souq.catalogue",
+        "souq.night",
+        "souq.showroom"
+      ],
+      "surface": "theme",
+      "control": "gridGutter",
+      "status": "wired",
+      "evidence": "static (traits.ts)"
     },
     {
       "id": "souq|theme|headerLogoPlacement",

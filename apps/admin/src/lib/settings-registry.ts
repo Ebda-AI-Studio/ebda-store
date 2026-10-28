@@ -877,6 +877,13 @@ export const SETTINGS: SettingEntry[] = [
         'شارات تصنيف الخامة الكارت الرئيسية اخفاء اظهار',
       ],
       [
+        'builder.grid-gutter',
+        'builder.theme.gridGutter',
+        'select=theme',
+        'grid gutter gap spacing space between cards home tight airy',
+        'مسافة فاصل بين الكروت الرئيسية ضيقة واسعة الشبكة',
+      ],
+      [
         'builder.heading-weight',
         'builder.theme.headingWeight',
         'select=theme',

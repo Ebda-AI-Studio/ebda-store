@@ -162,6 +162,10 @@ export const BEHAVIOUR_READERS: Readonly<Record<string, { file: string; pattern:
     file: 'packages/shared/src/looks/traits.ts',
     pattern: /cardTags/,
   },
+  'theme/gridGutter': {
+    file: 'packages/shared/src/looks/traits.ts',
+    pattern: /gridGutter/,
+  },
   'theme/headingWeight': {
     file: 'packages/shared/src/looks/traits.ts',
     pattern: /headingWeight/,

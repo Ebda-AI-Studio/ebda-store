@@ -44,6 +44,9 @@ export function traitDefault(key: string, lookId?: string | null): string | bool
     case 'cardSwatches':
     case 'cardTags':
       return getLook(lookId) ? 'off' : undefined;
+    case 'gridGutter':
+      // Only the Atelier mock runs 3px gutters; the other mocks sit on the old 10-12px gaps ('regular').
+      return getLook(lookId) ? (lookId === 'qamar.atelier' ? 'tight' : 'regular') : undefined;
     case 'heroRatio':
       return undefined; // the look's own mock ratio; the editor shows "same as the look"
     default:
@@ -58,6 +61,7 @@ export const TRAIT_ATTRS = {
   cardHeart: 'data-card-heart',
   cardSwatches: 'data-card-swatches',
   cardTags: 'data-card-tags',
+  gridGutter: 'data-grid-gutter',
 } as const;
 
 /** The look accent reaches 4.5:1 on the page and the card (when the theme carries those colours; else assumed fine). */

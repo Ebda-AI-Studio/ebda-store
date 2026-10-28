@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DRAFT_THEME_KEYS,
   HERO_RATIOS,
+  GRID_GUTTERS,
   CARD_CHROME,
   HEADING_WEIGHTS,
   PRICE_COLOURS,
@@ -162,5 +163,19 @@ describe('card chrome (P5)', () => {
       'data-card-swatches': 'off',
     });
     expect(lookTraitAttrs({ cardHeart: 'on' }, null)).toEqual({}); // no look: cards untouched
+  });
+});
+
+describe('gridGutter (P6)', () => {
+  it('is validated, draftable, look-owned, shown on all five skins', () =>
+    validated('gridGutter', GRID_GUTTERS));
+
+  it('Atelier defaults to hairline gutters; other looks keep the old gaps; a pick overrides; no look = none', () => {
+    expect(lookTraitAttrs({}, 'qamar.atelier')['data-grid-gutter']).toBe('tight');
+    expect(lookTraitAttrs({}, 'souq.night')['data-grid-gutter']).toBe('regular');
+    expect(lookTraitAttrs({ gridGutter: 'airy' }, 'qamar.atelier')['data-grid-gutter']).toBe(
+      'airy'
+    );
+    expect(lookTraitAttrs({ gridGutter: 'tight' }, null)).toEqual({});
   });
 });

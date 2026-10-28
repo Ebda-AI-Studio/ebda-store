@@ -64,6 +64,9 @@ export type PriceColour = (typeof PRICE_COLOURS)[number];
 /** A bit of card chrome on home grids (TEMPLATES-MOCK-7): the wishlist heart, colour dots, tag chips. Unset = off on a look store. */
 export const CARD_CHROME = ['on', 'off'] as const;
 export type CardChrome = (typeof CARD_CHROME)[number];
+/** Gutter of the home product grids (TEMPLATES-MOCK-8): `tight` 3px columns / 22px rows (the Atelier mock), `regular` the pre-mock gaps, `airy` 24px / 32px. */
+export const GRID_GUTTERS = ['tight', 'regular', 'airy'] as const;
+export type GridGutter = (typeof GRID_GUTTERS)[number];
 export const TAB_BARS = ['always', 'inner', 'never'] as const;
 export type TabBarMode = (typeof TAB_BARS)[number];
 export type HeaderSearchPlacement = (typeof HEADER_SEARCH_PLACEMENTS)[number];
@@ -268,6 +271,7 @@ export const MOCK_TRAIT_KEYS = [
   'cardHeart',
   'cardSwatches',
   'cardTags',
+  'gridGutter',
 ] as const satisfies readonly (keyof StoreTheme)[];
 
 /** Every StoreTheme key a design reset clears: the look's tokens, its optional UI tokens, and the merchant's header overrides. */

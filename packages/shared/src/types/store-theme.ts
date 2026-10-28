@@ -22,6 +22,7 @@ import type {
   HeadingWeight,
   PriceColour,
   CardChrome,
+  GridGutter,
   CardCta,
   CardHover,
   CardBadge,
@@ -187,6 +188,8 @@ export interface StoreTheme {
   cardHeart?: CardChrome;
   cardSwatches?: CardChrome;
   cardTags?: CardChrome;
+  // TEMPLATES-MOCK-8: home product grid gutter; unset = the look's own (tight on qamar.atelier, else the old gaps).
+  gridGutter?: GridGutter;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
