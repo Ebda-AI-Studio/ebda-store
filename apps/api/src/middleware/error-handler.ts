@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v3';
 import { Prisma } from '@ebda/database';
 import { isGoldPriceManaged, uniqueViolationTarget } from '../lib/prisma-errors';
 import logger from '../lib/logger';

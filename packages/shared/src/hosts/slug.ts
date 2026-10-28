@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { isReservedSlug, isDemoShowroomSlug } from './reserved-slugs';
 import { isProtectedSlug } from '../abuse/protected-slugs';
 

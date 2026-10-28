@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const captureException = vi.fn();
 vi.mock('@sentry/node', () => ({

@@ -17,7 +17,7 @@
  *   2. The real Sentry gate: 4xx-mapped errors are not captured, 5xx ones are.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v3';
 
 const captureException = vi.fn();
 vi.mock('@sentry/node', () => ({

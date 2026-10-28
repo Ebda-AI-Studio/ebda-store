@@ -3,7 +3,7 @@
  * unknown key is refused, never stripped. Bounds mirror the formula's (`commerce/gold-price.ts`) and
  * the migration's CHECK constraints, so a value the API accepts is a value the database accepts.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   GOLD_MAKING_VALUE_MAX,
   GOLD_MARGIN_BPS_MAX,

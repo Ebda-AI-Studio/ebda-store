@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runInTenantContext, type RfmSegment } from '@ebda/database';
 import type { McpStore } from '../resolve-store';

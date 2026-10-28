@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { runInTenantContext, withUser } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { publicLimiter, writeLimiter } from '../middleware/security';

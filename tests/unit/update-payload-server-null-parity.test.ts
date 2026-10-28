@@ -23,7 +23,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import type { ZodTypeAny } from 'zod';
+import type { ZodTypeAny } from 'zod/v3';
 // Source, not the package entry: `@ebda/shared` resolves to the last DIST build.
 import { locationInputSchema } from '@shared/src/schemas/location';
 import { SCAN_ROOTS } from '../../scripts/check-update-payload-clear.mjs';

@@ -5,7 +5,7 @@
  * while the feature is off). Zod `.strict()` at the edge: an unknown key, including any `price`-shaped one, is a 400.
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';

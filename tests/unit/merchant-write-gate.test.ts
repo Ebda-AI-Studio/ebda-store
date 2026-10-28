@@ -8,7 +8,7 @@
  *   audit row actor=mcp · audit failure FAILS CLOSED (mutation never runs).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 const m = vi.hoisted(() => ({
   featureEnabled: vi.fn(),

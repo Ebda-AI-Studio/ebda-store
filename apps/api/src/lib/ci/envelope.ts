@@ -5,7 +5,7 @@
  * address line) fails validation instead of riding along. `buyerKey` is the only buyer identifier.
  * Adding a key to `data` is a minor change (add it here, optional); renaming or removing one is `v: 2`.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { RETURN_REASON_CODES, RETURN_REASON_RAW_MAX, asciiDigits } from './return-reason';
 
 export const CI_PRODUCTS = ['store', 'whatsapp', 'crm', 'erp'] as const;

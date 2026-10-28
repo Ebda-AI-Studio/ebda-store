@@ -15,7 +15,7 @@
  * Every failure (no binding, timeout, quota, bad JSON) is the caller's cue to fall back to manual entry.
  * The model is `INSTAPAY_RECEIPT_AI_MODEL` (default below); real-receipt accuracy is NOT verified here (see Ruling M003-1).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   INSTAPAY_RECEIPT_REFERENCE_MAX,
   normalizeInstapayReceiver,
