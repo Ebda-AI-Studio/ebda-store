@@ -320,7 +320,7 @@ async function seedDemoStore(ownerId: string) {
       },
       email: 'contact@demostore.com',
       phone: '+20 101 234 5678',
-      phoneAr: '+٢٠ ١٠١ ٢٣٤ ٥٦٧٨',
+      phoneAr: '+20 101 234 5678',
       whatsapp: '+201012345678',
       address: 'Cairo, Egypt',
       addressAr: 'القاهرة، مصر',

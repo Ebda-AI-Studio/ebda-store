@@ -45,6 +45,7 @@ export const LEGAL_EXTRA_SLUGS = [
   'legal/whatsapp-terms',
   'legal/whatsapp-privacy',
   'legal/whatsapp-dpa',
+  'refund',
 ] as const;
 export type LegalExtraSlug = (typeof LEGAL_EXTRA_SLUGS)[number];
 export const COMPARE_SLUGS = [
@@ -56,6 +57,11 @@ export const COMPARE_SLUGS = [
   'expandcart',
 ] as const;
 export type CompareSlug = (typeof COMPARE_SLUGS)[number];
+/** The per-vertical ad landing pages (/for/<slug>/): see lib/verticals.ts. */
+export const FOR_SLUGS = ['fashion', 'electronics', 'beauty', 'food', 'jewellery'] as const;
+export type ForSlug = (typeof FOR_SLUGS)[number];
+export type ForPage = `for/${ForSlug}`;
+export const FOR_PAGES: readonly ForPage[] = FOR_SLUGS.map(s => `for/${s}` as const);
 export type ComparePage = `compare/${CompareSlug}`;
 export type PageSlug =
   | ''
@@ -65,6 +71,7 @@ export type PageSlug =
   | 'features'
   | 'whatsapp'
   | ComparePage
+  | ForPage
   | LegalSlug
   | LegalExtraSlug;
 
@@ -79,6 +86,7 @@ export const SITE_PAGES = [
   'features',
   'whatsapp',
   ...COMPARE_PAGES,
+  ...FOR_PAGES,
   'about',
   'contact',
   'credits',

@@ -9,6 +9,15 @@ import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } fro
 import { devSuffixesAllowed } from './src/lib/platform-host';
 import { studioHostResponse } from './studio-host';
 import { DEMO_LOOK_HEADER, parseDemoLook } from './src/lib/demo-look-param';
+import {
+  LOCALE_PATH_HEADER,
+  LOCALE_PENDING_HEADER,
+  LOCALE_REST_HEADER,
+  LOCALE_SEARCH_HEADER,
+  decideLocalePath,
+  localePathsOn,
+  type PathLocale,
+} from './src/lib/locale-paths';
 
 /**
  * HOST ROUTING (program plan §1, design cloudflare-backend §4).
@@ -230,9 +239,11 @@ function buildStoreTreeUrl(
   request: NextRequest,
   tenantKey: string,
   pathname: string,
-  storeKey: string
+  storeKey: string,
+  /** The language carried by a `/ar|/en` URL (LOCALE-PATHS-1): it wins over the cookie. */
+  urlLocale?: PathLocale
 ): URL {
-  const locale = resolveTrackALocale(request, storeKey);
+  const locale = urlLocale ?? resolveTrackALocale(request, storeKey);
   const url = request.nextUrl.clone();
   const suffix = pathname === '/' ? '' : pathname;
   url.pathname = `/tenant-store/${encodeURIComponent(tenantKey)}/${locale}${suffix}`;
@@ -375,6 +386,54 @@ function handleStoreHost(
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
+  // Language in the URL (Ruling LOCALE-PATHS-1): only for a store that opted in, never inside the admin preview
+  // iframe, never for a demo-look preview. See `src/lib/locale-paths.ts` for the rules.
+  const localePaths = !isPreviewIframe && !demoLook && localePathsOn(storeKey);
+  if (localePaths) {
+    const decision = decideLocalePath({
+      pathname: request.nextUrl.pathname,
+      search: request.nextUrl.search,
+      method: request.method,
+    });
+    if (decision.kind === 'redirect') {
+      return NextResponse.redirect(new URL(decision.location, request.url), 301);
+    }
+    if (decision.kind === 'pending') {
+      // An old unprefixed URL. Only the root layout knows the store's default language (middleware has no store),
+      // so it does the redirect; the request carries what it needs. Never cacheable as a page in the meantime.
+      requestHeaders.set(LOCALE_PENDING_HEADER, '1');
+      requestHeaders.set(LOCALE_REST_HEADER, decision.rest);
+      requestHeaders.set(LOCALE_SEARCH_HEADER, request.nextUrl.search);
+      const pending = NextResponse.next({ request: { headers: requestHeaders } });
+      pending.headers.set('x-store-domain', host);
+      pending.headers.set('Cache-Control', 'private, no-store');
+      return pending;
+    }
+    if (decision.kind === 'rewrite') {
+      requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
+      requestHeaders.set(LOCALE_REST_HEADER, decision.rest);
+      let target: URL;
+      if (isTenantTreeEligible(decision.rest, isPreviewIframe, storeKey)) {
+        target = buildStoreTreeUrl(request, host, decision.rest, storeKey, decision.locale);
+      } else {
+        target = request.nextUrl.clone();
+        target.pathname = decision.rest;
+      }
+      const response = NextResponse.rewrite(target, { request: { headers: requestHeaders } });
+      response.headers.set('x-store-domain', host);
+      // The URL decides the language; keep the cookie in step so the unprefixed pages (cart, checkout) match.
+      if (request.cookies.get('force-language')?.value !== decision.locale) {
+        response.cookies.set('force-language', decision.locale, {
+          path: '/',
+          maxAge: 31536000,
+          sameSite: 'lax',
+          secure: true,
+        });
+      }
+      return response;
+    }
+  }
+
   if (!demoLook && isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeKey)) {
     const storeTreeUrl = buildStoreTreeUrl(request, host, request.nextUrl.pathname, storeKey);
     const response = NextResponse.rewrite(storeTreeUrl, {
@@ -449,6 +508,11 @@ export const MIDDLEWARE_ASSERTED_HEADERS = [
   'x-original-host',
   // Demo-showroom look preview; re-set below only from a validated `?look=`.
   'x-demo-look',
+  // Language-in-URL (LOCALE-PATHS-1); re-set below only from a validated `/ar|/en` prefix.
+  LOCALE_PATH_HEADER,
+  LOCALE_PENDING_HEADER,
+  LOCALE_REST_HEADER,
+  LOCALE_SEARCH_HEADER,
 ] as const;
 
 export function middleware(request: NextRequest) {

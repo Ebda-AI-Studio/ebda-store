@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { NavBehavior } from './NavBehavior';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import { HeaderSearch } from './HeaderSearch';
@@ -174,6 +175,7 @@ export function Header({
           </SiteLink>
         </div>
       </div>
+      <NavBehavior />
     </header>
   );
 }

@@ -20,6 +20,7 @@ import publicRoutes from '@api/routes/public.routes';
 import { publicStoreContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const PREFIX = 'rspar-';
@@ -79,9 +80,7 @@ describe.skipIf(!hasDb)('GET /public/store/resolve payload parity (ebda_app)', (
 
   beforeAll(async () => {
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-    await owner.$executeRawUnsafe(
-      `ALTER ROLE ebda_app WITH LOGIN PASSWORD '${process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'}'`
-    );
+    await setAppRoleLogin(owner, process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw');
     await cleanup();
     const mkOwner = (tag: string) =>
       owner.user.create({

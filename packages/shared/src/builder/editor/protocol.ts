@@ -23,7 +23,7 @@
  * `event.source === iframe.contentWindow`. A payload from anywhere else is
  * dropped without being read further.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { BUILDER_LIMITS, pageDefinitionSchema, SECTION_ID_RE } from '../schema';
 
 export const BUILDER_PROTOCOL = 'ebda-builder:v1' as const;

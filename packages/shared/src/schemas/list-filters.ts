@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { type ReportRange, reportRangeParams, parseReportRange } from './report-range';
 
 /**

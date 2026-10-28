@@ -74,8 +74,10 @@ The damage-bounding directives are already in place: `base-uri 'self'`,
 directive from `script-src`, so Next's inline flight data keeps working while an
 injected `onclick=` / `onerror=` attribute no longer runs. `unsafe-inline` and
 `unsafe-eval` in `script-src` are unchanged (decision above; OneSignal needs eval).
-Pinned by `tests/unit/csp-directive-floor.test.ts`. `apps/admin` can take the same
-line; it was not part of that change.
+Pinned by `tests/unit/csp-directive-floor.test.ts`. `apps/admin` took the same
+line in SEC-4 (2026-10-26), together with a full nonce + `strict-dynamic` CSP that has no
+`'unsafe-inline'` or `'unsafe-eval'` in `script-src`: see `docs/architecture/admin-csp.md`. The
+storefront decision above is unchanged.
 
 ## The tripwire — when to revisit
 

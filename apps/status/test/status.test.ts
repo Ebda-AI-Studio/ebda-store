@@ -192,12 +192,14 @@ describe('end to end: forced probe failure -> incident on the public page', () =
   it('serves the page with two same-origin scripts (the shared nav and the optional search) and a restrictive CSP', async () => {
     const r = await get('/en');
     const html = await r.text();
-    expect(html.match(/<script\b[^>]*>/gi)).toEqual([
+    // the JSON-LD blocks are data (never run, so CSP does not apply); strip them before counting scripts
+    const scripts = html.replace(/<script type="application\/ld\+json">.*?<\/script>/gs, '');
+    expect(scripts.match(/<script\b[^>]*>/gi)).toEqual([
       '<script src="/assets/site-nav.js" defer>',
       '<script src="/assets/typeahead.js" defer>',
     ]);
     expect(
-      /<script\b[^>]*>\s*\S/i.test(html.replace(/<script src="[^"]*" defer><\/script>/g, ''))
+      /<script\b[^>]*>\s*\S/i.test(scripts.replace(/<script src="[^"]*" defer><\/script>/g, ''))
     ).toBe(false);
     const csp = r.headers.get('content-security-policy') ?? '';
     expect(csp).toContain("default-src 'none'");
@@ -240,6 +242,27 @@ describe('header search (components, incidents, help)', () => {
     expect(has(html, 'id="c-admin"')).toBe(true);
     expect(has(html, 'action="https://help.ebda.app/en/search/"')).toBe(true);
     expect(has(html, '/search.json?lang=en||docs')).toBe(true);
+  });
+});
+
+describe('trust details (audit UI-2, UI-9)', () => {
+  it('the footer year is the request-time year, never 1970 (the Worker clock is frozen at module scope)', async () => {
+    const year = String(new Date().getUTCFullYear());
+    for (const path of ['/', '/en']) {
+      const html = await (await get(path)).text();
+      expect(has(html, `© ${year}`)).toBe(true);
+      expect(has(html, '1970')).toBe(false);
+    }
+  });
+
+  it('HTML is no-transform, so the zone does not inject an analytics beacon the CSP blocks', async () => {
+    expect((await get('/en')).headers.get('cache-control')).toContain('no-transform');
+  });
+
+  it('probes a storefront product page on its own (UI-7)', () => {
+    expect(
+      COMPONENTS.some(c => c.id === 'storefront-product' && c.url.includes('/products/'))
+    ).toBe(true);
   });
 });
 
@@ -428,5 +451,16 @@ describe('master brand, products and discovery files (BRAND-ARCH-1, 6c)', () => 
     expect(sec).toContain('Canonical: https://status.ebda.app/.well-known/security.txt');
     const exp = new Date(/^Expires: (.+)$/m.exec(sec)![1]).getTime();
     expect(exp - Date.now()).toBeGreaterThan(90 * 86_400_000);
+  });
+});
+
+describe('llms.txt (audit M-119)', () => {
+  it('says what the host is and links the page and the JSON feed', async () => {
+    const r = await get('/llms.txt');
+    expect(r.status).toBe(200);
+    const t = await r.text();
+    expect(t).toContain('# Ebda AI Studio Status');
+    expect(t).toContain('https://status.ebda.app/en');
+    expect(t).toContain('https://status.ebda.app/api/status.json');
   });
 });

@@ -6,14 +6,16 @@ Self-serve, Shopify-style store builder for Egypt, by **Ebda AI Studio**. Sign u
 
 ## Where things live
 
-| Host                                                      | What                                                       |
-| --------------------------------------------------------- | ---------------------------------------------------------- |
-| `ebda.app`                                                | Marketing site                                             |
-| `store.ebda.app`                                          | Merchant dashboard (`apps/admin`)                          |
-| `<slug>.ebda.app` + custom domains                        | Storefronts (`apps/web`)                                   |
-| `orders.ebda.app`                                         | Orders PWA for fulfilment staff (`apps/orders`)            |
-| `api.ebda.app`                                            | API (`apps/api`)                                           |
-| `docs.` / `help.` / `status.` / `whatsapp.` (`.ebda.app`) | Developer docs, help centre, status page, WhatsApp (later) |
+| Host                                        | What                                                  |
+| ------------------------------------------- | ----------------------------------------------------- |
+| `ebda.app`                                  | Marketing site                                        |
+| `store.ebda.app`                            | Merchant dashboard (`apps/admin`)                     |
+| `<slug>.ebda.app` + custom domains          | Storefronts (`apps/web`)                              |
+| `orders.ebda.app`                           | Orders PWA for fulfilment staff (`apps/orders`)       |
+| `api.ebda.app`                              | API (`apps/api`)                                      |
+| `docs.` / `help.` / `status.` (`.ebda.app`) | Developer docs, help centre, status page              |
+| `wa.ebda.app`                               | Ebda WhatsApp (own Worker; API base `/api/v1`)        |
+| `accounts.ebda.app`                         | Shared identity service (one login for every product) |
 
 Brand identity (name, colours, fonts, domains, sender addresses, legal URLs) is a single source of truth: `BRAND` in `packages/shared/src/brand/index.ts`, imported from `@ebda/shared`. Do not re-hardcode those values; `tests/unit/no-force-branding.test.ts` fails on any inherited brand, tenant, domain, country or currency string anywhere in the tracked repository (migration history excepted).
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma, Prisma, runInTenantContext } from '@ebda/database';
 import {
   CAMPAIGN_MAX_SCHEDULE_DAYS,
@@ -22,6 +22,7 @@ import logger from '../lib/logger';
 import { StoreMailer } from '../services/store-mailer.service';
 import { storeHidesPoweredBy } from '../services/email.service';
 import { AIService } from '../services/ai.service';
+import { requireAiEnabled } from '../lib/store-ai-switch';
 import {
   CAMPAIGN_STORE_SELECT,
   audienceCount,
@@ -598,6 +599,7 @@ campaignAiDraftRouter.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('email_campaigns'),
+  requireAiEnabled,
   storeScopeContext,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {

@@ -121,6 +121,7 @@ ol {
 
 /* header */
 .site-header {
+  overflow-x: clip; /* the closed mobile menu must not widen the page (audit UI-1: 379px on a 360px phone) */
   position: sticky;
   top: 0;
   z-index: 50;
@@ -440,6 +441,19 @@ html[lang='en'] .wm-name {
   }
 }
 
+/* The open mobile menu hangs from the 46px menu button, so its 220px panel ran off the left edge in Arabic (x -40)
+   and off the right in English: on a phone it spans the viewport instead. */
+@media (max-width: 520px) {
+  .nav-menu ul {
+    position: fixed;
+    inset-inline: 16px;
+    top: 72px;
+    min-width: 0;
+    max-height: calc(100dvh - 88px);
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 400px) {
   /* 360px: wordmark + menu + WhatsApp + start must fit one row (the start button overflowed the viewport by 21px in Arabic) */
   .wm-name {
@@ -447,6 +461,9 @@ html[lang='en'] .wm-name {
   }
   .header-actions .btn {
     padding: 0 10px;
+  }
+  .header-actions .wa-compact {
+    display: none;
   }
 }
 
@@ -523,6 +540,13 @@ html[lang='ar'] .hero h1 {
   letter-spacing: 0;
   line-height: 1.4;
 }
+.hero-saving {
+  margin: -14px 0 28px;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
 .hero-sub {
   font-size: clamp(1.1rem, 2.4vw, 1.35rem);
   color: var(--muted);
@@ -533,10 +557,12 @@ html[lang='ar'] .hero h1 {
 @media (prefers-reduced-motion: no-preference) {
   .hero h1,
   .hero-sub,
+  .hero-saving,
   .hero .actions {
     animation: rise 0.9s var(--ease) both;
   }
-  .hero-sub {
+  .hero-sub,
+  .hero-saving {
     animation-delay: 0.08s;
   }
   .hero .actions {

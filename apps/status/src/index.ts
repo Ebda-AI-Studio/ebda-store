@@ -170,6 +170,11 @@ export default {
     // Discovery files (site trust standard): this host's own robots, sitemap and security.txt
     if (path === '/robots.txt')
       return text(`User-agent: *\nAllow: /\nSitemap: ${url.origin}/sitemap.xml\n`);
+    // For AI assistants (help and docs have one): what this host is, and the machine-readable feed
+    if (path === '/llms.txt')
+      return text(
+        `# ${BRAND.company.shortNameEn} Status\n\n> Live status of the ${BRAND.company.shortNameEn} products (${BRAND.product.nameEn} and the services around it), with recent incidents. Arabic at ${url.origin}/, English at ${url.origin}/en.\n\n- [Status page (English)](${url.origin}/en)\n- [Status page (Arabic)](${url.origin}/)\n- [JSON status feed](${url.origin}/api/status.json)\n`
+      );
     if (path === '/sitemap.xml')
       return text(
         `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${[
@@ -219,7 +224,8 @@ export default {
       return new Response(renderStatusPage(snap, path === '/' ? 'ar' : 'en', url.origin), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'public, max-age=30',
+          // no-transform: Cloudflare then does not inject its Web Analytics beacon, which this page's CSP (rightly) blocks
+          'cache-control': 'public, max-age=30, no-transform',
           ...SECURITY_HEADERS,
         },
       });

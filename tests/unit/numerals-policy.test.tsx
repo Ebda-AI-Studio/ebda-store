@@ -1,7 +1,7 @@
 /**
- * Ruling NUMERALS-1 (Ahmad 2026-10-07): Western digits (0-9) are the default
- * everywhere, in Arabic AND English. Arabic-Indic (٠-٩) only for an Arabic
- * reader of a store that opted in (`theme.arabicNumerals === true`).
+ * Ruling DIGITS-1 (Ahmad 2026-10-26, superseding NUMERALS-1's per-store opt-in): Western digits (0-9) in
+ * EVERY Ebda surface, in Arabic AND English. Arabic-Indic digits (٠-٩) are never produced, whatever a store
+ * theme or a caller asks for.
  *
  * The defect this pins: an Arabic store with the option OFF rendered product
  * card prices as `٤٥٠٫٠٠ ج.م` because `<Price isRtl>` asked the formatter for
@@ -31,7 +31,8 @@ describe('the default is Western digits in both languages', () => {
   it('a store with no / false / malformed flag is Western', () => {
     for (const theme of [undefined, null, {}, { arabicNumerals: false }, { arabicNumerals: 'yes' }])
       expect(storeNumerals(theme as never)).toBe('latn');
-    expect(storeNumerals({ arabicNumerals: true })).toBe('arab');
+    // the retired opt-in no longer does anything
+    expect(storeNumerals({ arabicNumerals: true })).toBe('latn');
   });
 
   it('prices: 450 ج.م in Arabic, EGP 450 in English, no Arabic-Indic', () => {
@@ -68,31 +69,33 @@ describe('the default is Western digits in both languages', () => {
   });
 });
 
-describe('the opt-in: Arabic-Indic only for Arabic readers of an opted-in store', () => {
+describe('the retired opt-in is ignored (DIGITS-1): asking for Arabic-Indic still gives Western', () => {
+  const arab = 'arab' as never;
   it('prices', () => {
-    expect(formatPrice(45_000, { locale: 'ar', numerals: 'arab' })).toBe('٤٥٠ ج.م');
-    expect(formatPrice(45_000, { locale: 'en', numerals: 'arab' })).toBe('EGP 450');
-    const html = renderToStaticMarkup(<Price price={45_000} isRtl numerals="arab" />);
-    expect(html).toContain('٤٥٠\u00A0ج.م');
-    const en = renderToStaticMarkup(<Price price={45_000} numerals="arab" />);
-    expect(en).not.toMatch(ARAB);
+    expect(formatPrice(45_000, { locale: 'ar', numerals: arab })).toBe('450 ج.م');
+    expect(formatMoney(145_050, 'ar', { easternArabicDigits: true, numerals: arab })).toBe(
+      '1,450.50 ج.م'
+    );
+    const html = renderToStaticMarkup(<Price price={45_000} isRtl numerals={arab} />);
+    expect(html).toContain('450\u00A0ج.م');
+    expect(html).not.toMatch(ARAB);
   });
 
-  it('dates, counts, badges', () => {
-    expect(formatDate(DATE, { language: 'ar', numerals: 'arab' })).toMatch(ARAB);
-    expect(formatDate(DATE, { language: 'en', numerals: 'arab' })).not.toMatch(ARAB);
-    expect(formatCount(1234, 'ar', 'arab')).toMatch(ARAB);
+  it('dates, counts, badges, digits', () => {
+    expect(formatDate(DATE, { language: 'ar', numerals: arab })).not.toMatch(ARAB);
+    expect(formatCount(1234, 'ar', arab)).toBe('1,234');
     expect(
       getDiscountBadgeText(
         { price: 45_000, compareAtPrice: 54_000 },
         true,
         undefined,
         undefined,
-        'arab'
+        arab
       )
-    ).toBe('\u2066\u2212١٧%\u2069');
-    expect(effectiveNumerals('en', 'arab')).toBe('latn');
-    expect(localizeDigits('12', 'arab')).toBe('١٢');
-    expect(localizeDigits('12')).toBe('12');
+    ).toBe('\u2066\u221217%\u2069');
+    expect(effectiveNumerals('ar', arab)).toBe('latn');
+    expect(localizeDigits('12', arab)).toBe('12');
+    expect(intlLocale('ar', arab)).toBe('ar-EG-u-nu-latn');
+    expect(withNumerals({}, arab).numberingSystem).toBe('latn');
   });
 });

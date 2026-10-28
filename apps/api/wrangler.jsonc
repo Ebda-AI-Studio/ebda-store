@@ -74,7 +74,11 @@
   // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
   // public hostname: no host to keep pointed at the storefront wildcard, no public hop
   // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
-  "services": [{ "binding": "STOREFRONT", "service": "ebda-web" }],
+  "services": [
+    { "binding": "STOREFRONT", "service": "ebda-web" },
+    // The shared identity service (Rulings ID-1/ID-2): JWKS over fetch, isRevoked/getAccountState/... over RPC.
+    { "binding": "ACCOUNTS", "service": "ebda-accounts", "entrypoint": "Accounts" },
+  ],
 
   // Outbound email (G6, Ruling INFRA-CF-1): Cloudflare Email Service, sender domain ebda.app
   // (onboarded 2026-10-24; DKIM/SPF live on cf-bounce.ebda.app). No API key. services/mail-transport.ts.
@@ -185,7 +189,7 @@
 
   // Scheduled work that used to be setInterval loops (index.ts, Node only): see src/cf/cron.ts.
   "triggers": {
-    // The four legacy loops (src/cf/cron.ts CRON_SCHEDULE) plus every Inngest schedule ported to
+    // The four legacy loops (src/cf/cron.ts CRON_SCHEDULE) plus every former Inngest schedule, now
     // Cloudflare (G5, src/lib/jobs/schedule.ts: a Cairo-time cron appears twice, winter and summer
     // UTC, and is guarded by the real local time). tests/unit/jobs-schedule.test.ts pins this list
     // to the code. Budget rule: nothing under 30 minutes except the pre-existing */15 cart sweep.
@@ -257,13 +261,9 @@
     "TRUST_PROXY_HOPS": "1",
     // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
-    // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
-    // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
-    "JOBS_CF_GROUPS": "1,2,3,4",
     // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
     // comma list of function ids or "all"; "" = every schedule stays a cron.
     "JOBS_CF_ALARMS": "",
-    "INNGEST_SERVE_HOST": "https://api.ebda.app",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
     // Semantic search kill switch (docs/ENVIRONMENT.md "Semantic search"). Flipped ONLY here, by a PR

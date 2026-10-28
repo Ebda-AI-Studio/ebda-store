@@ -1,9 +1,11 @@
+import { localePathContext } from '../../../lib/seo/locale-alternates';
+import { localizeJsonLdUrls } from '../../../lib/locale-paths';
 import type { Metadata } from 'next';
 import { permanentRedirect, notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
-import { storeAbsoluteUrl } from '../../../lib/structured-data';
+import { getSiteUrl, storeAbsoluteUrl } from '../../../lib/structured-data';
 import { jsonLdScriptContent } from '../../../lib/json-ld-script';
 import { BlogPostClient, type BlogDetail } from './BlogPostClient';
 
@@ -128,7 +130,15 @@ export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug
           // Serialized via jsonLdScriptContent, which escapes `<`/`>` so
           // merchant-authored blog titles/excerpts cannot break out of this
           // <script> block. Never switch this back to bare JSON.stringify.
-          dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(jsonLd) }}
+          dangerouslySetInnerHTML={{
+            __html: jsonLdScriptContent(
+              localizeJsonLdUrls(
+                jsonLd,
+                getSiteUrl(store),
+                (await localePathContext())?.locale ?? null
+              )
+            ),
+          }}
         />
       )}
       <BlogPostClient

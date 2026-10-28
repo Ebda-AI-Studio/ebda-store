@@ -84,15 +84,13 @@ export function verifySignupFormToken(
 ): { verdict: FormTokenVerdict; sig?: string } {
   if (typeof token !== 'string') return { verdict: 'invalid' };
   const parts = token.split('.');
-  // 3 parts since FU46-11; 2 parts = a token issued before it, accepted until it ages out.
-  // TODO(remove after 2026-10-23): drop the legacy 2-part branch once every pre-FU46-11 token has expired.
-  if (parts.length !== 2 && parts.length !== 3) return { verdict: 'invalid' };
-  const ts = parts[0];
-  const nonce = parts.length === 3 ? parts[1] : null;
-  const sig = parts[parts.length - 1];
+  // Exactly `<ts>.<nonce>.<sig>`. The legacy nonce-less 2-part form (pre FU46-11) had a replay-weaker signature
+  // and is gone: its stated removal date (2026-10-23) passed and tokens expire within minutes (finding M-155).
+  if (parts.length !== 3) return { verdict: 'invalid' };
+  const [ts, nonce, sig] = parts;
   if (!/^\d{10,15}$/.test(ts)) return { verdict: 'invalid' };
-  if (nonce !== null && !NONCE_RE.test(nonce)) return { verdict: 'invalid' };
-  const expected = sign(nonce === null ? ts : `${ts}.${nonce}`);
+  if (!NONCE_RE.test(nonce)) return { verdict: 'invalid' };
+  const expected = sign(`${ts}.${nonce}`);
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return { verdict: 'invalid' };

@@ -23,6 +23,10 @@
     "target": "d1",
     "reason": "staff login resolves cross-store membership by user"
   },
+  "StaffInvite": {
+    "target": "d1",
+    "reason": "an invitation is resolved by its token across stores, like store_staff membership"
+  },
   "SlugRedirect": {
     "target": "d1",
     "reason": "host/slug directory: resolves host to store before any DO is reachable"
@@ -598,6 +602,14 @@
   "StoreWhatsAppConsent": {
     "target": "store-do",
     "reason": "storeId-scoped marketing consent keyed by buyer key, read only in one store context"
+  },
+  "BillingReferral": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
+  "BillingGrant": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
   },
   "EtaConnection": {
     "target": "store-do",

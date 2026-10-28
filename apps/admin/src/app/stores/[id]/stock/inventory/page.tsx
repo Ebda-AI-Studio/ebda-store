@@ -455,12 +455,12 @@ export default function StockInventoryPage() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="truncate max-w-[10rem]">{p.name}</span>
                         {hasReorder && (
-                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 shrink-0">
                             {t('badgeReorder')}
                           </span>
                         )}
                         {hasDead && (
-                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 shrink-0">
                             {t('badgeDeadstock')}
                           </span>
                         )}

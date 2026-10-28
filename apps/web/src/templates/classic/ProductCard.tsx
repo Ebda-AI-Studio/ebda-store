@@ -4,7 +4,7 @@ import { memo, useId } from 'react';
 import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import { lookCardCta } from '../shared/look-card';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
 import {

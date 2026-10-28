@@ -35,7 +35,11 @@ describe('email_campaigns plan gating', () => {
 
   it('the upsell names the PUBLIC plan (Growth), not the legacy tier label', () => {
     expect(lowestPlanForFeature('email_campaigns')).toBe('professional');
-    expect(publicPlanLabelForFeature('email_campaigns')).toEqual({ en: 'Growth', ar: 'النمو' });
+    expect(publicPlanLabelForFeature('email_campaigns')).toEqual({
+      code: 'growth',
+      en: 'Growth',
+      ar: 'النمو',
+    });
     expect(publicPlanLabelForFeature('coupons')).toBeNull();
   });
 });

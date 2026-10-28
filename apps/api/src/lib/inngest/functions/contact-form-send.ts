@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { EmailService } from '../../../services/email.service';
 import { storeContactTarget } from '../../../services/store-contact.service';
 import logger from '../../logger';
@@ -69,7 +69,7 @@ export async function handleContactFormSubmitted({
   });
 }
 
-export const contactFormSend: InngestFunction.Any = inngest.createFunction(
+export const contactFormSend: JobDef = inngest.createFunction(
   {
     id: 'contact-form-send',
     name: 'Send a storefront contact message to its store',

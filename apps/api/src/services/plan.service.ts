@@ -3,6 +3,7 @@
  * `plan-entitlements.ts`; the guard lives in `plan-limit.service.ts`.
  */
 
+import { expireInvitesBeyondSeats } from './staff-invite.service';
 import { prisma, withStore } from '@ebda/database';
 import {
   planLimitsSchema,
@@ -106,6 +107,15 @@ export const planService = {
       },
     });
     const storeIds = await storeIdsOnPlan(code);
+    const newSeats = limits.maxStaff;
+    if (typeof newSeats === 'number') {
+      // Sequential on purpose: one transaction at a time, so a popular plan cannot exhaust the connection pool.
+      for (const storeId of storeIds) {
+        await expireInvitesBeyondSeats(storeId).catch(err =>
+          logger.warn({ err, storeId }, '[plan] could not expire over-limit staff invites')
+        );
+      }
+    }
     await Promise.all(
       storeIds.map(storeId =>
         featureService
@@ -169,6 +179,10 @@ export const planService = {
     // A plan change can grow or shrink the owner's store allowance (Business ->
     // Growth suspends the extra stores; back to Business restores them).
     await reconcileStoreAccess(storeId);
+    // Pending staff invitations that no longer fit the new plan's seats expire (Ruling ID-13).
+    await expireInvitesBeyondSeats(storeId).catch(err =>
+      logger.warn({ err, storeId }, '[plan] could not expire over-limit staff invites')
+    );
     return { planCode: plan.code, status };
   },
 };

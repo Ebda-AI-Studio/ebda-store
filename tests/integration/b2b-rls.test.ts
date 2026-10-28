@@ -16,6 +16,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { TextFallbackClient } from '../../packages/database/src/client';
 import { createPrismaClient, runWithRequestDb, prisma, type AppPrismaClient } from '@ebda/database';
+import { setAppRoleLogin } from '../helpers/app-role-login';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
@@ -56,7 +57,7 @@ async function cleanup() {
 
 beforeAll(async () => {
   owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
-  await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+  await setAppRoleLogin(owner, APP_PASSWORD);
   await cleanup();
   const mk = (tag: string, role: string, storeId: string | null) =>
     owner.user.create({

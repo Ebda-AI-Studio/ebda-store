@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma, Prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';

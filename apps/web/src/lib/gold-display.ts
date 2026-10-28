@@ -16,16 +16,11 @@ export function goldRateIsStale(
 }
 
 /** When the rate was recorded, in the Egyptian clock so SSR and the browser print the same text. */
-export function goldRateTime(
-  rateAppliedAt: string,
-  lang: 'ar' | 'en',
-  numerals: 'latn' | 'arab' = 'latn'
-): string {
+export function goldRateTime(rateAppliedAt: string, lang: 'ar' | 'en', _numerals?: 'latn'): string {
   const d = new Date(rateAppliedAt);
   if (Number.isNaN(d.getTime())) return '';
-  // Western digits unless the merchant opted into Arabic-Indic (NUMERALS-1): `ar-EG` alone prints them.
-  const nu = lang === 'ar' && numerals === 'arab' ? 'arab' : 'latn';
-  return new Intl.DateTimeFormat(`${lang === 'ar' ? 'ar-EG' : 'en-GB'}-u-nu-${nu}`, {
+  // Western digits always (DIGITS-1): `ar-EG` alone prints Arabic-Indic ones.
+  return new Intl.DateTimeFormat(`${lang === 'ar' ? 'ar-EG' : 'en-GB'}-u-nu-latn`, {
     timeZone: 'Africa/Cairo',
     day: 'numeric',
     month: 'short',

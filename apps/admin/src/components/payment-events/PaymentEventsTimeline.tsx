@@ -204,6 +204,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   paymob: 'Paymob',
   kashier: 'Kashier',
   fawry: 'Fawry',
+  geidea: 'Geidea',
   instapay: 'InstaPay',
   cod: 'COD',
 };
@@ -253,7 +254,7 @@ function PayloadModal({ eventId, onClose }: PayloadModalProps) {
       {loading && (
         <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
           <svg
-            className="mr-2 h-4 w-4 animate-spin"
+            className="me-2 h-4 w-4 animate-spin"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -446,7 +447,7 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
           {t('toggleLabel')}
           {countLabel}
           {isSuperAdmin && (
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+            <span className="ms-1.5 text-xs font-normal text-muted-foreground">
               {t('superAdminBadge')}
             </span>
           )}

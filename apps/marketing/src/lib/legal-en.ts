@@ -2,6 +2,7 @@ import { BRAND } from '@ebda/shared/brand';
 import { PRIVACY_STACK } from '@ebda/shared/legal';
 import { POST_CUTOVER } from './legal-privacy-stack';
 import { DELETION_EN } from './legal-deletion';
+import { REFUND_EN } from './legal-refund';
 import { LEGAL_WA_EN } from './legal-wa-en';
 import type { LegalPages } from './legal-types';
 
@@ -421,10 +422,12 @@ export const LEGAL_EN: LegalPages = {
     ],
   },
   dataDeletion: DELETION_EN,
+  refund: REFUND_EN,
   ...LEGAL_WA_EN,
   more: {
     h: 'More legal documents',
     links: [
+      { slug: 'refund', label: 'Refund and cancellation policy' },
       { slug: 'legal/data-deletion', label: 'Data deletion and export' },
       { slug: 'legal/whatsapp-terms', label: 'Ebda WhatsApp Terms of Service' },
       { slug: 'legal/whatsapp-privacy', label: 'Ebda WhatsApp Privacy Policy' },

@@ -7,8 +7,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 
-const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
-vi.mock('../../lib/api', () => ({ apiPost }));
+const { accountsFetch } = vi.hoisted(() => ({ accountsFetch: vi.fn() }));
+vi.mock('../../lib/accounts', () => ({
+  accountsFetch,
+  AccountsError: class AccountsError extends Error {
+    constructor(
+      public status: number,
+      public code: string,
+      message: string
+    ) {
+      super(message);
+    }
+  },
+}));
+
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
@@ -43,13 +55,13 @@ afterEach(() => {
 });
 
 describe('forgot-password page', () => {
-  it('posts the trimmed address with no storeId and shows the neutral sent screen', async () => {
-    apiPost.mockResolvedValue({ data: { message: 'x' }, error: null });
+  it('posts the trimmed address to the identity service and shows the neutral sent screen', async () => {
+    accountsFetch.mockResolvedValue({ status: 'sent_if_registered' });
     renderPage();
     submit('  owner@shop.test ');
     expect(await screen.findByText('auth.forgot.sentTitle')).toBeTruthy();
-    expect(apiPost).toHaveBeenCalledWith('/api/v1/auth/forgot-password', {
-      email: 'owner@shop.test',
+    expect(accountsFetch).toHaveBeenCalledWith('/password/forgot', {
+      json: { email: 'owner@shop.test' },
     });
   });
 
@@ -57,14 +69,12 @@ describe('forgot-password page', () => {
     renderPage();
     submit('not-an-email');
     expect(screen.getByText('auth.forgot.emailInvalid')).toBeTruthy();
-    expect(apiPost).not.toHaveBeenCalled();
+    expect(accountsFetch).not.toHaveBeenCalled();
   });
 
   it('a 429 reads as rate-limited and stays on the form', async () => {
-    apiPost.mockResolvedValue({
-      data: null,
-      error: { code: 'RATE_LIMITED', message: 'x', status: 429 },
-    });
+    const { AccountsError } = await import('../../lib/accounts');
+    accountsFetch.mockRejectedValue(new AccountsError(429, 'TOO_MANY_ATTEMPTS', 'x'));
     renderPage();
     submit('owner@shop.test');
     expect(await screen.findByText('auth.forgot.rateLimited')).toBeTruthy();

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /** Row caps, shared by the schema and the admin editor. */
 export const PRODUCT_FACTS_MAX = 24;

@@ -1,3 +1,5 @@
+import { resolveDefaultLanguage, storeOrigin } from '@ebda/shared';
+import { localePathsOn, localizeJsonLdUrls, storeKeyForHost } from '../../../lib/locale-paths';
 import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 
@@ -16,8 +18,14 @@ import { API_URL } from '../../../lib/api';
  * through and the feed is keyed per host.
  */
 
-/** Resolve the host to a store id (for the purge tag). */
-async function resolveStoreIdFromDomain(domain: string): Promise<string | null> {
+/** Resolve the host to the store (id for the purge tag, slug/domain/default language for the URLs). */
+async function resolveStoreFromDomain(domain: string): Promise<{
+  id: string | null;
+  slug: string | null;
+  domain: string | null;
+  defaultLanguage: string | undefined;
+}> {
+  const none = { id: null, slug: null, domain: null, defaultLanguage: undefined };
   try {
     const res = await fetch(`${API_URL}/public/store/resolve`, {
       next: {
@@ -26,14 +34,45 @@ async function resolveStoreIdFromDomain(domain: string): Promise<string | null> 
       },
       headers: { 'Content-Type': 'application/json', 'x-store-domain': domain },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return none;
     const json = await res.json();
     // The endpoint answers { data: { store: {...}, enabledFeatures, ... } } —
     // reading data.id was always undefined, so the custom-domain branch (the
     // majority of real storefronts) silently fell back to an untagged fetch.
-    return (json?.data?.store?.id as string | undefined) ?? null;
+    const store = json?.data?.store;
+    return {
+      id: (store?.id as string | undefined) ?? null,
+      slug: (store?.slug as string | undefined) ?? null,
+      domain: (store?.domain as string | undefined) ?? null,
+      defaultLanguage: store?.settings?.defaultLanguage as string | undefined,
+    };
   } catch {
-    return null;
+    return none;
+  }
+}
+
+/**
+ * A store with language-in-the-URL ON (LOCALE-PATHS-1) publishes the CANONICAL product URLs (the default-language prefix),
+ * so a shopping agent never follows an old URL through a redirect. Every string on the store's own origin is localized
+ * like an href; off, or a body that is not JSON, the feed is forwarded byte for byte.
+ */
+async function localizedFeed(
+  text: string,
+  host: string,
+  store: { slug: string | null; domain: string | null; defaultLanguage: string | undefined }
+): Promise<string> {
+  if (!localePathsOn(storeKeyForHost(host))) return text;
+  try {
+    const origins = [
+      `https://${host}`,
+      ...(store.domain ? [`https://${store.domain}`] : []),
+      ...(store.slug ? [storeOrigin(store.slug)] : []),
+    ];
+    return JSON.stringify(
+      localizeJsonLdUrls(JSON.parse(text), origins, resolveDefaultLanguage(store.defaultLanguage))
+    );
+  } catch {
+    return text;
   }
 }
 
@@ -46,7 +85,8 @@ export async function GET() {
 
   // The cache tag has to key on the store ID because that is what the API
   // purges with, so resolve one for the host.
-  const storeId = await resolveStoreIdFromDomain(domain);
+  const resolved = await resolveStoreFromDomain(domain);
+  const storeId = resolved.id;
 
   const upstream = await fetch(`${API_URL}/public/feed/products.json`, {
     headers: feedHeaders,
@@ -73,7 +113,7 @@ export async function GET() {
   // feed's own cache, so the window is what keeps a displayed price within a minute of the rate.
   // Checkout re-prices from the database, so no one is charged the old figure. Other stores: unchanged.
   const gold = upstream.headers.get('x-gold-pricing') === '1';
-  return new Response(await upstream.text(), {
+  return new Response(await localizedFeed(await upstream.text(), domain, resolved), {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',

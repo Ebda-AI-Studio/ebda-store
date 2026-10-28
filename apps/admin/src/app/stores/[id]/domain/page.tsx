@@ -405,7 +405,7 @@ export default function StoreDomainPage() {
                           onClick={() => {
                             void navigator.clipboard.writeText(record.value);
                           }}
-                          className="max-md:min-h-11 max-md:min-w-11 shrink-0 rounded border border-border bg-background px-2 py-0.5 max-md:px-3 text-[10px] font-medium text-foreground hover:bg-muted transition-colors"
+                          className="max-md:min-h-11 max-md:min-w-11 shrink-0 rounded border border-border bg-background px-2 py-0.5 max-md:px-3 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                           aria-label={t('copyValueAriaLabel', { type: record.type })}
                           title={t('copy')}
                         >

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { validateRegistration } from './validate-registration';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '../../../components/StoreLink';
 import { Button, Input } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';

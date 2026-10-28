@@ -1,4 +1,4 @@
-import { z, type ZodRawShape } from 'zod';
+import { z, type ZodRawShape } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runInTenantContext, withStore } from '@ebda/database';
 import type { FeatureKey } from '@ebda/shared';

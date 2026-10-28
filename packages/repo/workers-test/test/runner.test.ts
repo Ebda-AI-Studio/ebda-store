@@ -1,3 +1,4 @@
+import { computeGoldUnitPrice } from '../../../shared/src/commerce/gold-price';
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
 
@@ -142,5 +143,465 @@ describe('phase 3 on a real Durable Object: money and stock under 100 parallel c
     for (const good of ['#a1b2c3', '#A1B2C3', null]) expect(await s.insertSwatch(good)).toBe('ok');
     for (const bad of ['#a1b2c', '#a1b2c3d', '#g1b2c3', 'a1b2c3d'])
       expect(await s.insertSwatch(bad)).toMatch(/CHECK|constraint/i);
+  });
+});
+
+describe('gold rate write concurrent with checkouts on a real Durable Object', () => {
+  const stub = () => env.LITE_DO.get(env.LITE_DO.idFromName(`gold-${Math.random()}`)) as any;
+  const unit = (rate: number) =>
+    computeGoldUnitPrice(
+      {
+        karat: 21,
+        weightMg: 10_000,
+        makingChargeType: 'fixed',
+        makingChargeValue: 50_000,
+        marginBps: 500,
+      },
+      rate,
+      100
+    ).unitPrice;
+
+  it('50 checkouts interleaved with 10 rate writes: every order is priced with a rate that was current at its commit', async () => {
+    const s = stub();
+    await s.seedGold(100);
+    const rates = Array.from({ length: 10 }, (_, i) => 300_000 + (i + 1) * 5_000); // +1.6% each, under the 5% gate
+    const calls: Promise<any>[] = [];
+    for (let i = 0; i < 50; i++) {
+      calls.push(
+        s.checkout({
+          lines: [{ productId: 'ring', quantity: 1 }],
+          customerId: 'cust',
+          shippingAddress: { i },
+          idempotencyKey: `g-${i}`,
+          goldRequireQuote: false,
+        })
+      );
+      if (i % 5 === 2) calls.push(s.applyRate(rates[Math.floor(i / 5)]));
+    }
+    const res = await Promise.all(calls);
+    expect(res.filter(r => r.ok === false).map(r => r.code)).toEqual([]);
+    const orders = await s.goldOrders();
+    expect(orders).toHaveLength(50);
+    // price == formula(rate stamped on the line), exact piastres
+    for (const o of orders) expect(o.price).toBe(unit(o.rate));
+    // rates only ever rose, so commit order must see a non-decreasing rate: no order priced with a rate that had already been replaced
+    for (let i = 1; i < orders.length; i++)
+      expect(orders[i].rate).toBeGreaterThanOrEqual(orders[i - 1].rate);
+    // non-vacuous: the writes really interleaved with the checkouts
+    expect(new Set(orders.map(o => o.rate)).size).toBeGreaterThanOrEqual(5);
+    // the rates seen are all real ones
+    const real = new Set([300_000, ...rates]);
+    for (const o of orders) expect(real.has(o.rate)).toBe(true);
+    const st = await s.goldState();
+    expect(st).toMatchObject({ stock: 50, rate: rates[9], price: unit(rates[9]) });
+  });
+
+  it('with a shopper quote: a rate write between quote and commit is refused PRICE_CHANGED, never charged the old price', async () => {
+    const s = stub();
+    await s.seedGold(100);
+    const quote = unit(300_000);
+    const calls: Promise<any>[] = [];
+    for (let i = 0; i < 50; i++) {
+      calls.push(
+        s.checkout({
+          lines: [{ productId: 'ring', quantity: 1, quotedUnitPrice: quote }],
+          customerId: 'cust',
+          shippingAddress: { i },
+          idempotencyKey: `q-${i}`,
+        })
+      );
+      if (i === 24) calls.push(s.applyRate(310_000));
+    }
+    const res = await Promise.all(calls);
+    const orders = await s.goldOrders();
+    const refused = res.filter(r => r.ok === false);
+    expect(refused.every(r => r.code === 'PRICE_CHANGED')).toBe(true);
+    expect(orders.length + refused.length).toBe(50);
+    for (const o of orders) {
+      expect(o.rate).toBe(300_000);
+      expect(o.price).toBe(quote);
+    }
+  });
+});
+
+describe('product search on a real Durable Object (FTS5 trigram)', () => {
+  it('FTS5 + trigram works inside workerd: substring, short-word start, Arabic folding, no drift', async () => {
+    const s = env.LITE_DO.get(env.LITE_DO.idFromName(`search-${Math.random()}`)) as any;
+    expect(
+      await s.searchSeed([
+        ['a', 'Black crepe abaya', 'عباية كريب سوداء'],
+        ['b', 'Navy chiffon abaya', 'عباية شيفون كحلي'],
+        ['c', 'Leather boots', 'بوت جلد'],
+        ['d', 'Gas cooker', 'بوتاجاز'],
+      ])
+    ).toBe(4);
+    expect((await s.search('abaya')).sort()).toEqual(['a', 'b']);
+    expect(await s.search('عبايه سوداء')).toEqual(['a']); // folded: ه for ة, no hamza
+    expect((await s.search('بوت')).sort()).toEqual(['c', 'd']); // substring, like pg_trgm LIKE
+    expect(await s.search('ch')).toEqual(['b']); // all words under 3 chars: word-start mode
+    expect(await s.search('rep')).toEqual(['a']);
+    expect(await s.searchDrift()).toEqual({ missing: [], orphaned: [], stale: [] });
+  });
+});
+
+describe('refund, loyalty and hold-cap races on a real Durable Object', () => {
+  const stub = async () => {
+    const s = env.LITE_DO.get(env.LITE_DO.idFromName(`race-${Math.random()}`)) as any;
+    await s.seedMoney(10, 1000, 20_000); // sku x10 @1500, coupon SALE (-100), wallet 20,000 for cust
+    return s;
+  };
+  const base = { customerId: 'cust', shippingAddress: { name: 'A' } };
+
+  it('30 parallel cancel + full-refund calls on one order: stock back ONCE, coupon released ONCE, wallet reversed ONCE', async () => {
+    const s = await stub();
+    const orderId = await s.placeRaw({
+      ...base,
+      lines: [{ productId: 'sku', quantity: 3 }],
+      couponCode: 'SALE',
+      walletAmount: 1000,
+    });
+    expect(await s.sqlOne(`SELECT inventory AS n FROM products WHERE id='sku'`)).toEqual({ n: 7 });
+    const res = await Promise.all(
+      Array.from({ length: 30 }, (_, i) => (i % 2 ? s.cancel(orderId) : s.refund({ orderId })))
+    );
+    // cancelled -> refunded is legal, so some of these succeed and some are refused; the money effects never repeat
+    expect(res.some(r => r.ok)).toBe(true);
+    expect(await s.sqlOne(`SELECT inventory AS n FROM products WHERE id='sku'`)).toEqual({ n: 10 });
+    expect(await s.sqlOne(`SELECT usage_count AS n FROM coupons WHERE id='c'`)).toEqual({ n: 0 });
+    expect(await s.sqlOne(`SELECT balance AS n FROM customer_wallets WHERE id='w'`)).toEqual({
+      n: 20_000,
+    });
+    expect(
+      await s.sqlOne(
+        `SELECT count(*) AS n FROM wallet_transactions WHERE type='order_payment_reversal'`
+      )
+    ).toEqual({ n: 1 });
+    expect(
+      await s.sqlOne(`SELECT count(*) AS n FROM inventory_history WHERE type='return_stock'`)
+    ).toEqual({ n: 1 });
+  });
+
+  it('20 parallel one-unit partial returns (distinct keys) of a 5-unit line restock exactly 5 (never more); a repeated key is a replay', async () => {
+    const s = await stub();
+    const orderId = await s.placeRaw({ ...base, lines: [{ productId: 'sku', quantity: 5 }] });
+    await s.sqlRun(`UPDATE orders SET status = 'confirmed' WHERE id = ?`, orderId);
+    const itemId = (await s.sqlOne(
+      `SELECT id AS n FROM order_items WHERE order_id = ?`,
+      orderId
+    )) as any;
+    const res = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        s.refund({
+          orderId,
+          refundKey: `r-${i % 10}`,
+          lines: [{ orderItemId: itemId.n ?? itemId.id, quantity: 1 }],
+        })
+      )
+    );
+    // 10 distinct keys were processed once each (the other 10 calls are replays); only 5 units could ever come back
+    expect(res.filter(r => r.ok && !r.replayed).length).toBe(10);
+    expect(res.filter(r => r.ok && r.replayed).length).toBe(10);
+    expect(await s.sqlOne(`SELECT inventory AS n FROM products WHERE id='sku'`)).toEqual({ n: 10 });
+    expect(
+      await s.sqlOne(
+        `SELECT coalesce(sum(quantity),0) AS n FROM inventory_history WHERE type='return_stock'`
+      )
+    ).toEqual({ n: 5 });
+  });
+
+  it('amount-only partial refunds in parallel never exceed the order total (cumulative cap)', async () => {
+    const s = await stub();
+    const orderId = await s.placeRaw({ ...base, lines: [{ productId: 'sku', quantity: 2 }] }); // total 3000
+    await s.sqlRun(
+      `UPDATE orders SET status = 'confirmed', payment_status = 'paid' WHERE id = ?`,
+      orderId
+    );
+    const total = (await s.sqlOne(`SELECT total AS n FROM orders WHERE id = ?`, orderId)).n;
+    const res = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        s.refund({ orderId, refundKey: `a-${i}`, amount: Math.floor(total / 4) })
+      )
+    );
+    expect(res.filter(r => r.ok && !r.replayed).length).toBe(4);
+    expect(res.filter(r => !r.ok).length).toBe(16);
+  });
+
+  it('loyalty: 30 parallel checkouts each redeeming 1,000 of 5,000 points never overdraw; points burned == points on orders', async () => {
+    const s = await stub();
+    await s.sqlRun(`INSERT INTO store_config (store_id, loyalty_enabled) VALUES ('s1', 1)`);
+    await s.sqlRun(
+      `INSERT INTO loyalty_points (id, store_id, customer_id, points, total_earned) VALUES ('lp', 's1', 'cust', 5000, 5000)`
+    );
+    await s.sqlRun(`UPDATE products SET inventory = 1000 WHERE id = 'sku'`);
+    const res = await Promise.all(
+      Array.from({ length: 30 }, (_, i) =>
+        s.checkout({
+          ...base,
+          lines: [{ productId: 'sku', quantity: 4 }],
+          pointsToRedeem: 1000,
+          loyaltyFeatureEnabled: true,
+          idempotencyKey: `l-${i}`,
+        })
+      )
+    );
+    expect(res.filter(r => !r.ok).map(r => r.code)).toEqual([]);
+    const bal = await s.sqlOne(`SELECT points AS n FROM loyalty_points WHERE id='lp'`);
+    const onOrders = await s.sqlOne(
+      `SELECT coalesce(sum(loyalty_points_redeemed),0) AS n FROM orders`
+    );
+    expect(bal.n).toBeGreaterThanOrEqual(0);
+    expect(bal.n + onOrders.n).toBe(5000);
+    expect(onOrders.n).toBe(5000); // all 5 redemptions that fit were granted, none more
+  });
+
+  it('hold cap: 20 parallel COD checkouts from one phone admit exactly 2', async () => {
+    const s = await stub();
+    await s.sqlRun(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);
+    const res = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        s.checkout({
+          lines: [{ productId: 'sku', quantity: 1 }],
+          paymentMethod: 'cod',
+          shippingAddress: { phone: '01012345678', i },
+          idempotencyKey: `h-${i}`,
+        })
+      )
+    );
+    expect(res.filter(r => r.ok).length).toBe(2);
+    expect(new Set(res.filter(r => !r.ok).map(r => r.code))).toEqual(
+      new Set(['TOO_MANY_OPEN_ORDERS'])
+    );
+  });
+});
+
+describe('search freshness and gold admin on a real Durable Object', () => {
+  const stub = (n: string) =>
+    env.LITE_DO.get(env.LITE_DO.idFromName(`${n}-${Math.random()}`)) as any;
+
+  it('triggers installed by the bootstrap keep product, customer and guest-order search fresh for RAW writes', async () => {
+    const s = stub('fresh');
+    await s.sqlRun(
+      `INSERT INTO products (id, store_id, name, slug, price, status) VALUES ('p', 's1', 'alpha lamp', 'p', 1, 'active')`
+    );
+    expect(await s.search('alpha')).toEqual(['p']);
+    await s.sqlRun(`UPDATE products SET search_terms = 'omegaterm' WHERE id = 'p'`);
+    expect(await s.search('omegaterm')).toEqual(['p']);
+    await s.sqlRun(`DELETE FROM products WHERE id = 'p'`);
+    expect(await s.search('alpha')).toEqual([]);
+    await s.sqlRun(
+      `INSERT INTO customers (id, store_id, first_name, last_name, phone) VALUES ('c', 's1', 'محمد', 'علي', '01012345678')`
+    );
+    expect((await s.customerSearch('محمد')).userIds).toEqual(['c']);
+    expect((await s.customerSearch('+20 101 234 5678')).userIds).toEqual(['c']);
+    await s.sqlRun(
+      `INSERT INTO orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address) VALUES ('g', 's1', 'N1', 0, 0, '{"firstName":"Guesty","phone":"01099999999"}', '{}')`
+    );
+    expect((await s.customerSearch('guesty')).guestOrderIds).toEqual(['g']);
+    expect(await s.searchDrift()).toEqual({ missing: [], orphaned: [], stale: [] });
+  });
+
+  it('gold: pending feed rate reject / confirm, rounding re-price, per-product re-price (atomic on the DO)', async () => {
+    const s = stub('goldadmin');
+    await s.seedGold(5);
+    const unit = (rate: number, step: 1 | 100 | 500 | 1000 = 100) =>
+      computeGoldUnitPrice(
+        {
+          karat: 21,
+          weightMg: 10_000,
+          makingChargeType: 'fixed',
+          makingChargeValue: 50_000,
+          marginBps: 500,
+        },
+        rate,
+        step
+      ).unitPrice;
+    const rejected = (await s.goldApplyFeed(500_000)).pending[0];
+    expect(await s.goldDecide(rejected.id, 'reject')).toEqual({ status: 'rejected', repriced: 0 });
+    expect((await s.goldState()).rate).toBe(300_000);
+    const pending = (await s.goldApplyFeed(520_000)).pending[0];
+    expect(await s.goldDecide(pending.id, 'confirm')).toMatchObject({
+      status: 'applied',
+      repriced: 1,
+    });
+    expect(await s.goldState()).toMatchObject({ rate: 520_000, price: unit(520_000) });
+    expect(await s.goldSettings(1000)).toEqual({ repriced: 1 });
+    expect((await s.goldState()).price).toBe(unit(520_000, 1000));
+    expect(await s.goldSettings(1000)).toEqual({ repriced: 0 });
+    await s.sqlRun(`UPDATE products SET gold_weight_mg = 20000 WHERE id = 'ring'`);
+    expect(await s.goldRepriceProduct('ring')).toBe(1);
+    // a checkout after the admin actions is priced from the new state
+    const r = await s.checkout({
+      lines: [{ productId: 'ring', quantity: 1 }],
+      customerId: 'cust',
+      shippingAddress: {},
+      goldRequireQuote: false,
+    });
+    expect(r.ok).toBe(true);
+    expect((await s.goldOrders())[0].rate).toBe(520_000);
+  });
+});
+
+describe('payments on a real Durable Object: webhooks and refunds under races', () => {
+  const stub = async () => {
+    const s = env.LITE_DO.get(env.LITE_DO.idFromName(`pay-${Math.random()}`)) as any;
+    await s.seedMoney(100, 1000, 0);
+    return s;
+  };
+  const place = async (s: any, qty: number, i = 0) =>
+    s.placeRaw({
+      lines: [{ productId: 'sku', quantity: qty }],
+      shippingAddress: { phone: `010${String(i).padStart(8, '0')}` },
+      idempotencyKey: `p-${Math.random()}`,
+    });
+  const ev = (ref: string, id: string, extra: Record<string, unknown>) => ({
+    provider: 'paymob',
+    providerRef: ref,
+    eventId: id,
+    ...extra,
+  });
+  /** a paid order that already has one completed refund, so the payment carries a per-refund ledger (provenance known) */
+  const paidWithLedger = async (s: any, qty = 6) => {
+    const p = await paid(s, qty);
+    const c = await s.payBegin({ paymentId: p.paymentId, amount: 50 });
+    await s.payComplete({ claimId: c.claimId, refundId: 'R-seed' });
+    return p;
+  };
+  const paid = async (s: any, qty = 6) => {
+    const orderId = await place(s, qty);
+    const paymentId = await s.payCreate({ orderId, provider: 'paymob', transactionId: 'T1' });
+    const total = (await s.sqlOne('SELECT total AS n FROM orders WHERE id = ?', orderId))
+      .n as number;
+    expect(
+      (
+        await s.payEvent(
+          ev('T1', 'pay', { kind: 'payment', status: 'completed', amount: total, currency: 'EGP' })
+        )
+      ).ok
+    ).toBe(true);
+    return { orderId, paymentId, total };
+  };
+
+  it('the same webhook delivered 3x IN PARALLEL (with a slow gateway confirm in between) has ONE effect', async () => {
+    const s = await stub();
+    const orderId = await place(s, 2);
+    const total = (await s.sqlOne('SELECT total AS n FROM orders WHERE id = ?', orderId)).n;
+    await s.payCreate({ orderId, provider: 'kashier', transactionId: 'K1' });
+    const e = {
+      provider: 'kashier',
+      providerRef: 'K1',
+      eventId: 'k-1',
+      kind: 'payment',
+      status: 'completed',
+      amount: total,
+      currency: 'EGP',
+    };
+    const res = await Promise.all(
+      [1, 2, 3].map(() => s.payEvent(e, { delayMs: 30, kind: 'payment', status: 'SUCCESS' }))
+    );
+    expect(res.every(r => r.ok)).toBe(true);
+    expect(res.filter(r => r.outcome === 'applied')).toHaveLength(1);
+    expect(res.filter(r => r.outcome === 'replayed')).toHaveLength(2);
+    expect(
+      await s.sqlOne(`SELECT count(*) AS n FROM order_events WHERE to_status = 'confirmed'`)
+    ).toEqual({ n: 1 });
+    expect(
+      await s.sqlOne(`SELECT count(*) AS n FROM payment_events WHERE event_type = 'webhook'`)
+    ).toEqual({ n: 1 });
+  });
+
+  it('a refund webhook racing the in-band answer = ONE effect, in either arrival order (40 rounds)', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 8);
+    let expected = 50;
+    for (let round = 0; round < 40; round++) {
+      const begin = await s.payBegin({ paymentId, amount: 100 });
+      expect(JSON.stringify(begin)).toContain('claimId');
+      expected += 100;
+      const refundId = `R${round}`;
+      const hook = s.payEvent(
+        ev('T1', `rw-${round}`, {
+          kind: 'refund',
+          refund: { refundId, status: 'completed', amount: 100 },
+        })
+      );
+      const done = s.payComplete({ claimId: begin.claimId, refundId });
+      if (round % 2) await Promise.all([done, hook]);
+      else await Promise.all([hook, done]);
+      expect(await s.sqlOne('SELECT refunded_amount AS n FROM payments')).toEqual({ n: expected });
+    }
+    // 40 refunds booked exactly once each on the order
+    expect(
+      await s.sqlOne(
+        `SELECT count(*) AS n FROM order_events WHERE to_status = 'partial_refund_recorded'`
+      )
+    ).toEqual({ n: 41 });
+  });
+
+  it('30 parallel claims + their 30 webhooks (same amount) + 3 replays each: total = claims exactly, none lost, none doubled', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 40);
+    const claims: Array<{ claimId: string }> = [];
+    for (let i = 0; i < 30; i++) claims.push(await s.payBegin({ paymentId, amount: 100 }));
+    const calls: Promise<unknown>[] = [];
+    claims.forEach((c, i) => {
+      for (let r = 0; r < 3; r++)
+        calls.push(
+          s.payEvent(
+            ev('T1', `rw-${i}`, {
+              kind: 'refund',
+              refund: { refundId: `R${i}`, status: 'completed', amount: 100 },
+            })
+          )
+        );
+      calls.push(s.payComplete({ claimId: c.claimId, refundId: `R${i}` }));
+    });
+    await Promise.all(calls);
+    expect(await s.sqlOne('SELECT refunded_amount AS n FROM payments')).toEqual({ n: 3050 });
+    expect(
+      await s.sqlOne(
+        `SELECT count(*) AS n FROM payment_events WHERE event_type = 'refund_webhook_absorbed'`
+      )
+    ).toEqual({ n: 30 });
+  });
+
+  it('two genuine concurrent same-amount refunds (claim + dashboard) are BOTH booked', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 8);
+    const c = await s.payBegin({ paymentId, amount: 100 });
+    const res = await Promise.all([
+      s.payEvent(
+        ev('T1', 'rw-a', {
+          kind: 'refund',
+          refund: { refundId: 'RA', status: 'completed', amount: 100 },
+        })
+      ),
+      s.payEvent(
+        ev('T1', 'rw-b', {
+          kind: 'refund',
+          refund: { refundId: 'RB', status: 'completed', amount: 100 },
+        })
+      ),
+      s.payComplete({ claimId: c.claimId, refundId: 'RA' }),
+    ]);
+    expect(res.slice(0, 2).every((r: any) => r.ok)).toBe(true);
+    expect(await s.sqlOne('SELECT refunded_amount AS n FROM payments')).toEqual({ n: 250 });
+  });
+
+  it('release racing a webhook never un-books money the gateway reported', async () => {
+    const s = await stub();
+    const { paymentId } = await paidWithLedger(s, 8);
+    const c = await s.payBegin({ paymentId, amount: 100 });
+    await Promise.all([
+      s.payEvent(
+        ev('T1', 'rw', {
+          kind: 'refund',
+          refund: { refundId: 'R1', status: 'completed', amount: 100 },
+        })
+      ),
+      s.payRelease({ claimId: c.claimId }),
+    ]);
+    const n = (await s.sqlOne('SELECT refunded_amount AS n FROM payments')).n;
+    // either order is safe: released first -> the webhook adds the real refund; absorbed first -> release becomes a review
+    expect(n).toBe(150);
   });
 });

@@ -3,14 +3,22 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { authenticate } from '../middleware/auth';
+import {
+  eraseIdentityUser,
+  getAccountState,
+  inviteIdentity,
+  setAccountRole,
+  setAccountStatus,
+} from '../lib/identity-client';
 import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
 import { bustStoreCaches } from '../services/store.service';
 import { featureService } from '../services/feature.service';
 import { invalidateCached } from '../lib/public-cache';
+import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { searchProductIds } from '../services/product-search.service';
@@ -66,6 +74,7 @@ import {
   excelMoneyFormat,
   updatePlanSchema,
   assignSubscriptionSchema,
+  isReservedSlug,
 } from '@ebda/shared';
 import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
@@ -152,6 +161,8 @@ const updateStoreAdminSchema = z.object({
     .string()
     .regex(/^[a-z0-9-]+$/)
     .max(100)
+    // A platform host (`accounts`, `wa`, `api`...) must never become a merchant store, even by a super admin's slip.
+    .refine(s => !isReservedSlug(s), 'This slug is reserved for a platform host')
     .optional(),
   plan: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
   status: z.enum(['active', 'suspended']).optional(),
@@ -401,6 +412,22 @@ router.get(
         })
         .parse(req.query);
       res.json({ success: true, data: { events: await listLedger(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Free-month grants (FOUNDING-1): founding-20 + referral ledger with totals. */
+router.get(
+  '/billing/grants',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = z
+        .object({ limit: z.coerce.number().int().min(1).max(500).optional() })
+        .parse(req.query);
+      res.json({ success: true, data: await listGrants(q.limit) });
     } catch (error) {
       next(error);
     }
@@ -930,8 +957,10 @@ router.post(
         email: z.string().email().max(255),
         firstName: z.string().min(1).max(100),
         lastName: z.string().min(1).max(100),
-        password: z.string().min(8).max(255),
-        role: z.enum(['super_admin', 'store_admin']),
+        /** Ignored: the invitee sets their own password from the mailed link (kept so older clients still validate). */
+        password: z.string().min(8).max(255).optional(),
+        // Platform administrators are operator-only (Ruling ID-12): this endpoint can only invite merchants.
+        role: z.literal('store_admin'),
       });
       const data = schema.parse(req.body);
       const email = data.email.toLowerCase();
@@ -950,17 +979,35 @@ router.post(
         return;
       }
 
-      const newPasswordHash = await bcrypt.hash(data.password, 12);
+      // The identity service owns the credential: it creates an unverified account and mails the invitee a one-time code
+      // to set their own password (Ruling ID-2). The Store keeps the profile row under the same id.
+      const requestedInviteId = crypto.randomUUID();
+      const invited = await inviteIdentity({
+        id: requestedInviteId,
+        email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: 'store_admin',
+        language: 'en',
+      });
+      if (!invited.created || invited.id !== requestedInviteId) {
+        res.status(409).json({
+          success: false,
+          error: { code: 'EMAIL_TAKEN', message: 'An admin user with this email already exists' },
+        });
+        return;
+      }
       const user = await asPlatformOperator(req.user!.userId, () =>
         prisma.user.create({
           data: {
+            id: invited.id,
             email,
             firstName: data.firstName,
             lastName: data.lastName,
-            passwordHash: newPasswordHash,
-            role: data.role as UserRole,
+            passwordHash: '!pending',
+            role: UserRole.store_admin,
             status: 'active',
-            emailVerified: true,
+            emailVerified: false,
             language: 'en',
           },
           select: {
@@ -1076,6 +1123,44 @@ router.put(
           error: { code: 'NOT_FOUND', message: 'User not found' },
         });
         return;
+      }
+
+      // Merchant, staff and super-admin accounts (users.store_id NULL) keep their credentials, email, role and status in the
+      // shared identity service (Rulings ID-1/ID-2). The Store refuses to edit a credential or an email here (it would only
+      // change a profile row the identity service ignores); status and role go to the identity service first.
+      const identityManaged = existing.storeId === null && existing.role !== 'customer';
+      if (
+        identityManaged &&
+        (data.password ||
+          data.role === 'customer' ||
+          (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()))
+      ) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'MANAGED_BY_IDENTITY',
+            message:
+              'This account is managed by the sign-in service: use its password reset, not an admin edit, for the password and email.',
+          },
+        });
+        return;
+      }
+      if (data.role === 'super_admin' && existing.role !== 'super_admin') {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'OPERATOR_ONLY',
+            message:
+              'Platform administrators are granted by the platform operator, not through this endpoint.',
+          },
+        });
+        return;
+      }
+      if (identityManaged && data.status !== undefined && data.status !== existing.status) {
+        await setAccountStatus(id, data.status, 'admin-update');
+      }
+      if (identityManaged && data.role !== undefined && data.role !== existing.role) {
+        await setAccountRole(id, data.role as 'store_admin', 'admin-update');
       }
 
       // Email collision: if changing email, ensure no other user has it.
@@ -1225,6 +1310,7 @@ router.delete(
             id: true,
             email: true,
             role: true,
+            storeId: true,
             stores: { select: { id: true, name: true } },
           },
         })
@@ -1270,6 +1356,10 @@ router.delete(
         });
         return;
       }
+
+      // The identity is erased FIRST: its sessions, refresh tokens and passkeys go with it, so no token of this user can be
+      // honoured again and the Store cannot re-create the profile row from it. If this fails the user still exists everywhere.
+      if (target.storeId === null && target.role !== 'customer') await eraseIdentityUser(id);
 
       // WA-CONSENT-1: withdraw the account's WhatsApp marketing consent before the hard delete.
       const doomed = await asPlatformOperator(req.user!.userId, () =>
@@ -2408,6 +2498,7 @@ router.post(
             storeId: true,
             deletedAt: true,
             tokenVersion: true,
+            status: true,
           },
         })
       );
@@ -2424,6 +2515,21 @@ router.post(
         res.status(410).json({
           success: false,
           error: { code: 'USER_DELETED', message: 'Cannot impersonate a deleted user' },
+        });
+        return;
+      }
+
+      // A suspended or deactivated account must not be re-entered through an impersonation token (the Store row, and for an
+      // identity-managed account also the identity service, which is the source of truth for status).
+      let targetStatus: string = target.status;
+      if (target.storeId === null && target.role !== 'customer') {
+        const acc = await getAccountState(target.id);
+        if (acc) targetStatus = acc.status === 'active' ? targetStatus : acc.status;
+      }
+      if (targetStatus !== 'active') {
+        res.status(403).json({
+          success: false,
+          error: { code: 'ACCOUNT_SUSPENDED', message: 'Cannot impersonate an inactive account' },
         });
         return;
       }

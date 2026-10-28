@@ -954,6 +954,18 @@
     "synAr": "مزايا اضافات تفعيل"
   },
   {
+    "id": "ai.switch",
+    "kind": "setting",
+    "route": "/ai-usage",
+    "access": "owner",
+    "en": "Use AI features",
+    "ar": "استخدام ميزات الذكاء الاصطناعي",
+    "synEn": "ai on off disable enable turn off assistant gemini switch",
+    "synAr": "ذكاء اصطناعي تشغيل ايقاف قفل تفعيل مساعد",
+    "pageEn": "Usage",
+    "pageAr": "الاستخدام"
+  },
+  {
     "id": "branding.logo",
     "kind": "setting",
     "route": "/branding",
@@ -1014,19 +1026,6 @@
     "ar": "شعار التذييل (اختياري)",
     "synEn": "footer logo white logo invert",
     "synAr": "شعار التذييل الفوتر شعار ابيض",
-    "query": "tab=theme",
-    "pageEn": "Store Branding",
-    "pageAr": "هوية المتجر"
-  },
-  {
-    "id": "branding.arabic-numerals",
-    "kind": "setting",
-    "route": "/branding",
-    "access": "owner",
-    "en": "Store numerals: 123 / ١٢٣",
-    "ar": "شكل الأرقام في المتجر: 123 / ١٢٣",
-    "synEn": "arabic numbers eastern digits indian numerals",
-    "synAr": "الارقام العربية ارقام هندية شكل الارقام",
     "query": "tab=theme",
     "pageEn": "Store Branding",
     "pageAr": "هوية المتجر"
@@ -1652,6 +1651,19 @@
     "ar": "غيّر الستايل",
     "synEn": "change look style template preview apply",
     "synAr": "غيّر الشكل الستايل القالب معاينة تطبيق",
+    "pageEn": "Editor",
+    "pageAr": "المحرر"
+  },
+  {
+    "id": "builder.ai-patch",
+    "kind": "setting",
+    "route": "/builder",
+    "access": "staff",
+    "en": "Ask AI",
+    "ar": "اسأل الذكاء",
+    "synEn": "ask ai edit page change describe assistant patch",
+    "synAr": "اسأل الذكاء الاصطناعي تعديل الصفحة تغيير وصف مساعد",
+    "query": "select=ai",
     "pageEn": "Editor",
     "pageAr": "المحرر"
   },

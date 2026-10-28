@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { storefrontOrigin } from '@ebda/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { prisma, runInTenantContext, withTenantContext } from '@ebda/database';

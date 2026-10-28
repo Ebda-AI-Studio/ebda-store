@@ -33,7 +33,7 @@
         "bundles": 15,
         "bundle_items": 5,
         "cart_bundles": 6,
-        "orders": 58,
+        "orders": 60,
         "order_events": 8,
         "order_items": 26,
         "payments": 17,
@@ -108,7 +108,7 @@
         "warehouses": 13,
         "warehouse_stock": 8,
         "answer_engine_checks": 12,
-        "store_page_revisions": 14,
+        "store_page_revisions": 15,
         "store_tax_profiles": 15,
         "store_tax_documents": 11,
         "fiscal_documents": 26,
@@ -130,10 +130,11 @@
       }
     },
     "d1": {
-      "tables": 25,
-      "maxColumns": 36,
+      "tables": 28,
+      "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
+        "staff_invites": 10,
         "SlugRedirect": 7,
         "webhook_events": 16,
         "system_settings": 7,
@@ -145,9 +146,9 @@
         "answer_engine_provider_configs": 5,
         "merchant_api_keys": 12,
         "plans": 12,
-        "store_subscriptions": 26,
+        "store_subscriptions": 27,
         "billing_events": 21,
-        "instapay_receipts": 36,
+        "instapay_receipts": 38,
         "manual_payment_claims": 17,
         "billing_reminders": 6,
         "store_lifecycle_emails": 6,
@@ -155,6 +156,8 @@
         "provider_activation_requests": 11,
         "provider_verifications": 9,
         "provider_verification_events": 10,
+        "billing_referrals": 3,
+        "billing_grants": 17,
         "stores": 31,
         "entity_index": 4,
         "platform_audit_log": 8
@@ -417,6 +420,14 @@
       "unique": true,
       "pgCols": "\"store_id\", \"provider\"",
       "pgWhere": "\"status\" IN ('requested', 'activated')"
+    },
+    {
+      "name": "instapay_receipts_retention_idx",
+      "table": "instapay_receipts",
+      "db": "d1",
+      "unique": false,
+      "pgCols": "\"status\", \"reviewed_at\"",
+      "pgWhere": "\"image_deleted_at\" IS NULL OR \"personal_scrubbed_at\" IS NULL"
     }
   ],
   "supersededUniques": [
@@ -1138,6 +1149,54 @@
       "disposition": "store-do:orders"
     },
     {
+      "kind": "check",
+      "name": "staff_invites_role_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
+    },
+    {
+      "kind": "check",
+      "name": "staff_invites_status_check",
+      "table": "staff_invites",
+      "disposition": "d1:staff_invites"
+    },
+    {
+      "kind": "check",
+      "name": "billing_referrals_not_self",
+      "table": "billing_referrals",
+      "disposition": "d1:billing_referrals"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_kind_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_status_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_months_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "billing_grants_value_check",
+      "table": "billing_grants",
+      "disposition": "d1:billing_grants"
+    },
+    {
+      "kind": "check",
+      "name": "store_subscriptions_billing_anchor_day_check",
+      "table": "store_subscriptions",
+      "disposition": "d1:store_subscriptions"
+    },
+    {
       "kind": "index",
       "name": "users_admin_email_key",
       "table": "users",
@@ -1448,6 +1507,12 @@
       "name": "orders_store_buyer_key_created_idx",
       "table": "orders",
       "disposition": "store-do:orders"
+    },
+    {
+      "kind": "index",
+      "name": "instapay_receipts_retention_idx",
+      "table": "instapay_receipts",
+      "disposition": "d1:instapay_receipts"
     },
     {
       "kind": "index",

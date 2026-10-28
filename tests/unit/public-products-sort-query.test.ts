@@ -1,6 +1,6 @@
 /** `sort` on GET /public/products is a scalar Zod enum at the edge (search PR4 rule). */
 import { describe, it, expect } from 'vitest';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v3';
 import {
   parseOptionalSortQuery,
   assertOnSaleQuery,

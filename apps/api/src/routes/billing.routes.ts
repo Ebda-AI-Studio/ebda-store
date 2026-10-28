@@ -11,7 +11,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { STUB_WEBHOOK_SECRET, StubBillingProvider, getBillingProvider } from '../services/billing';
 import {
   cancelSubscription,
@@ -58,6 +58,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const payOn = await assertPayableStore(storeId).then(
+        () => null,
+        (err: { code?: string; details?: { parentStoreId?: string; included?: boolean } }) =>
+          err?.code === 'PAY_ON_PARENT_STORE' ? (err.details ?? null) : null
+      );
       const [{ entitlements: e, usage }, availablePlans] = await Promise.all([
         getUsageSummary(storeId),
         planService.listPlans({ publicOnly: true }),
@@ -96,11 +101,9 @@ router.get(
            * Set when this store is beyond the owner's store allowance: paying HERE buys
            * nothing (audit M4); the UI sends the merchant to the main store instead.
            */
-          payOnStore: await assertPayableStore(storeId).then(
-            () => null,
-            (err: { code?: string; details?: { parentStoreId?: string } }) =>
-              err?.code === 'PAY_ON_PARENT_STORE' ? (err.details?.parentStoreId ?? null) : null
-          ),
+          payOnStore: payOn?.parentStoreId ?? null,
+          /** true = a child INCLUDED in the main store's plan; false = paused beyond the allowance. */
+          payOnStoreIncluded: payOn ? payOn.included === true : false,
           /** `inactive` until the go-live gate passes (onboarding / this page). */
           storeStatus:
             (await prisma.store.findUnique({ where: { id: storeId }, select: { status: true } }))

@@ -12,11 +12,11 @@
  *    re-runs the handler (backoff, the job's `retries`, then the failure path). `step.sleep` is not
  *    available there.
  *  - `alarm`: a store-iterating schedule that becomes a per-store Durable Object alarm once StoreDO
- *    owns the data (phases 2-3, other agents). Until then it runs as a Cron Trigger -> Workflow.
+ *    owns the data (phases 2-3, other agents). Alarm-ready ones run as alarms when `JOBS_CF_ALARMS` lists them (lib/jobs/alarm-flag.ts); otherwise as a Cron Trigger -> Workflow.
  * Cron Triggers start every `cron` function (lib/jobs/schedule.ts); events start the `event` ones.
  *
- * Rollout order = group number. Flip a group with `JOBS_CF_GROUPS` (comma list, or `all`) in
- * wrangler.jsonc vars. `tests/unit/jobs-map.test.ts` pins this table against the real registry.
+ * The group number is the order jobs were ported in (all run on Cloudflare now).
+ * `tests/unit/jobs-map.test.ts` pins this table against the real registry.
  */
 export type JobKind = 'workflow' | 'queue';
 
@@ -49,6 +49,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   },
   'bulk-import-orphan-cleanup': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'domain-claim-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'instapay-receipt-retention-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'order-anonymize-5y-monthly': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'r2-orphan-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'search-log-purge-daily': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },

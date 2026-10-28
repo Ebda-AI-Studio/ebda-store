@@ -4,7 +4,7 @@
 // Why a standalone module: this is a pure function (no I/O, no DB) so it
 // gets the cheapest possible unit tests — feed it a plain object, assert
 // the from-line. The full StoreMailer composes this helper.
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { BRAND } from '@ebda/shared';
 import logger from '../lib/logger';
 

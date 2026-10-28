@@ -90,7 +90,6 @@ async function main(): Promise<number> {
     SEARCH_EMBED_GLOBAL_DAILY_CAP: '1000000',
     SEARCH_EMBED_STORE_DAILY_CAP: '1000000',
     AI_STORE_DAILY_REQUEST_CAP: '100000',
-    INNGEST_DRY_RUN: 'true',
     LOG_LEVEL: 'warn',
   }))
     process.env[k] ??= v;

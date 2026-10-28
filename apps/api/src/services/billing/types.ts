@@ -138,6 +138,16 @@ export interface BillingProvider {
   /** Hosted page that saves a card and takes the first charge. */
   createCheckoutForSubscription(req: CheckoutRequest): Promise<CheckoutResult>;
   chargeSavedCard(req: ChargeRequest): Promise<ChargeResult>;
+  /**
+   * Ask the gateway what became of a charge whose answer never reached us (timeout / 5xx). `null` = the gateway
+   * does not know it. Optional: a provider without a status lookup leaves the stuck-charge sweep to alert and,
+   * after the give-up window, hand the row to dunning (M-023).
+   */
+  getChargeStatus?(req: {
+    idempotencyKey: string;
+    merchantOrderId: string;
+    chargeId: string | null;
+  }): Promise<ChargeResult | null>;
   refund(req: RefundRequest): Promise<RefundResult>;
   verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent;
   /** False when the credentials this provider needs are missing (its webhooks then answer 503). */

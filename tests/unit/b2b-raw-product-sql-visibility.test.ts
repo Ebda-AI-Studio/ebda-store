@@ -73,6 +73,11 @@ const CLASSIFIED: Record<
     kind: 'admin',
     reason: 'warehouse stock sync / search (merchant)',
   },
+  'services/accounting/purchase-order.service.ts': {
+    statements: 1,
+    kind: 'system',
+    reason: 'row lock by id (SELECT id ... FOR UPDATE) for a purchase-order receipt, store-scoped',
+  },
   'services/product-index.service.ts': {
     statements: 7,
     kind: 'system',

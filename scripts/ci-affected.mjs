@@ -70,6 +70,7 @@ export const UNIT_PATHS = {
   'packages/shared': ['packages/shared/src'],
   'packages/database': ['packages/database/src'],
   'packages/cf-schema': ['packages/cf-schema'],
+  'packages/cf-migrate': ['packages/cf-migrate'],
   'packages/repo': ['packages/repo'],
   'apps/web': ['apps/web'],
   'apps/admin': ['apps/admin/src'],

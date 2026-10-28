@@ -2,7 +2,14 @@
  * apps/marketing SEO surface: sitemap (both locales, hreflang, ebda.app only), robots,
  * JSON-LD (parses, offers come from PLANS) and per-page metadata with a canonical.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// RootShell loads its fonts through next/font, which only exists inside the Next compiler.
+vi.mock('next/font/google', () => {
+  const font = () => ({ className: '', variable: '', style: {} });
+  return { Geist: font, Geist_Mono: font, IBM_Plex_Sans_Arabic: font };
+});
+
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sitemap from '../../apps/marketing/src/app/sitemap';
@@ -152,7 +159,33 @@ describe('every page exports metadata with a canonical', () => {
       expect(meta.description).toBeTruthy();
       expect(meta.alternates.canonical).toBe(pagePath(isEn ? 'en' : 'ar', page));
       expect(Object.keys(meta.alternates.languages).sort()).toEqual(['ar', 'en', 'x-default']);
-      expect(meta.openGraph.images[0].url).toBe(wa ? '/og-whatsapp.png' : '/og.png');
+      // the five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs): 1200x630 PNG under 300 KB
+      const vertical = page?.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];
+      const card = vertical ? `/og/${vertical}.png` : wa ? '/og-whatsapp.png' : '/og.png';
+      // electronics leads with the lantern ad poster and carries the video; the vertical card follows
+      if (vertical === 'electronics') {
+        expect(meta.openGraph.images.map((i: { url: string }) => i.url)).toEqual([
+          '/ads/lantern-poster.png',
+          card,
+        ]);
+        expect(meta.openGraph.videos[0].url).toBe('/ads/lantern-1080x1350.mp4');
+        expect(
+          statSync(path.resolve(__dirname, '../../apps/marketing/public/ads/lantern-poster.png'))
+            .size
+        ).toBeLessThan(300 * 1024);
+        expect(
+          statSync(path.resolve(__dirname, '../../apps/marketing/public/ads/lantern-1080x1350.mp4'))
+            .size
+        ).toBeLessThan(4 * 1024 * 1024);
+      } else {
+        expect(meta.openGraph.images[0].url).toBe(card);
+        expect(meta.openGraph.videos).toBeUndefined();
+      }
+      expect(meta.twitter.images[0]).toBe(meta.openGraph.images[0].url);
+      if (vertical) {
+        const file = path.resolve(__dirname, `../../apps/marketing/public/og/${vertical}.png`);
+        expect(statSync(file).size).toBeLessThan(300 * 1024);
+      }
       expect(meta.twitter.card).toBe('summary_large_image');
     });
   }

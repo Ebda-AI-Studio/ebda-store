@@ -1,7 +1,8 @@
+import { localePathsOn, localizeUrlsInText, storeKeyForHost } from '../../lib/locale-paths';
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 import { resolvedViaCookie } from '../../lib/agent-store-resolver';
-import { storeOrigin, BRAND } from '@ebda/shared';
+import { storeOrigin, BRAND, resolveDefaultLanguage } from '@ebda/shared';
 
 import { minorToDecimalString, REGION } from '@ebda/shared';
 /**
@@ -50,6 +51,8 @@ interface PublicStore {
   // reads client-side). Used to conditionally advertise the agent_feed and
   // agent_checkout add-ons below.
   enabledFeatures?: string[];
+  /** `settings.defaultLanguage` is the language the prefixed URLs use on a locale-path store (LOCALE-PATHS-1). */
+  settings?: Record<string, unknown> | null;
 }
 
 interface PublicCategory {
@@ -501,7 +504,12 @@ export function fixCategoryLinks(body: string, categories: Array<{ slug: string 
 // than through GET(). `viaCookie` defaults to false (URL/Host-resolved, the
 // shared-cacheable path) for those single-arg call sites; GET() below always
 // passes it explicitly.
-export async function perStoreResponse(store: PublicStore, viaCookie = false): Promise<Response> {
+export async function perStoreResponse(
+  store: PublicStore,
+  viaCookie = false,
+  /** The request host (`x-store-domain`): the language-in-URL allowlist is keyed by it. */
+  requestHost?: string
+): Promise<Response> {
   // The public store endpoint always includes id, so this should never fall
   // back to slug — but we guard anyway.
   const storeId: string = store.id || store.slug;
@@ -561,6 +569,17 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
   // short edge TTL so the next request retries (#1853).
   if (categories !== null) body = fixCategoryLinks(body, categories);
 
+  // A store with language-in-the-URL ON (LOCALE-PATHS-1): the links this index publishes are the CANONICAL ones (the store's
+  // default-language prefix), so an agent never lands on an old URL that redirects. Off: unchanged.
+  const hostKey = storeKeyForHost(requestHost ?? store.domain ?? store.slug);
+  if (localePathsOn(hostKey)) {
+    body = localizeUrlsInText(
+      body,
+      [storeBaseUrl(store), ...(requestHost ? [`https://${requestHost}`] : [])],
+      resolveDefaultLanguage(store.settings?.defaultLanguage as string | undefined)
+    );
+  }
+
   return new Response(body, {
     status: 200,
     headers: {
@@ -599,7 +618,7 @@ export async function GET() {
       return new Response('Not Found', { status: 404 });
     }
     // Host-based resolution, never cookie-based.
-    return perStoreResponse(store, viaCookie);
+    return perStoreResponse(store, viaCookie, storeDomain);
   }
 
   // ── Platform mode (ebda.app/llms.txt + the Ebda landing) ───────

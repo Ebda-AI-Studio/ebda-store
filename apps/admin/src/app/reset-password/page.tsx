@@ -6,20 +6,20 @@ import { useRouter } from 'next/navigation';
 import { Button, Input } from '@ebda/ui';
 import { PASSWORD_RESET_TTL_MINUTES } from '@ebda/shared';
 import { PublicShell } from '../../components/onboarding/PublicShell';
-import { apiPost } from '../../lib/api';
+import { AccountsError, accountsFetch } from '../../lib/accounts';
 import { isStrongPassword } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
 
 type Phase = 'loading' | 'form' | 'invalid' | 'success';
 
-/** 32 random bytes as hex: anything else cannot be a reset token. */
-const TOKEN_SHAPE = /^[0-9a-f]{64}$/;
+/** The emailed link carries the address in the query and a 6 digit code in the fragment (`#code=`): never sent to any server. */
+const CODE_SHAPE = /^\d{6}$/;
 
 /**
  * Ebda Store "choose a new password", opened from the reset email
- * (`/reset-password?token=…`).
+ * (`/reset-password?email=…#code=…`).
  *
- * The token is a bearer credential for the account, so it is read once and
+ * The code is a bearer credential for the account, so it is read once and
  * removed from the address bar before anything else can see it: analytics
  * pageviews, error reports, the browser history and a Referer would all
  * otherwise carry the full URL. React runs this page's effect before the
@@ -29,7 +29,8 @@ export default function ResetPasswordPage() {
   const t = useT('auth.reset');
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('loading');
-  const [token, setToken] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
@@ -42,10 +43,12 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const raw = new URLSearchParams(window.location.search).get('token') ?? '';
+    const mail = new URLSearchParams(window.location.search).get('email') ?? '';
+    const raw = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('code') ?? '';
     window.history.replaceState(null, '', window.location.pathname);
-    if (TOKEN_SHAPE.test(raw)) {
-      setToken(raw);
+    if (CODE_SHAPE.test(raw) && mail) {
+      setEmail(mail);
+      setCode(raw);
       setPhase('form');
     } else {
       setPhase('invalid');
@@ -62,16 +65,21 @@ export default function ResetPasswordPage() {
     if (Object.keys(found).length > 0) return;
 
     setSubmitting(true);
-    const { error } = await apiPost('/api/v1/auth/reset-password', { token, password });
-    setSubmitting(false);
-    if (!error) {
-      setToken('');
+    try {
+      await accountsFetch('/password/reset', { json: { email, code, newPassword: password } });
+      setSubmitting(false);
+      setCode('');
       setPhase('success');
-      return;
+    } catch (e) {
+      setSubmitting(false);
+      if (e instanceof AccountsError && e.code === 'INVALID_CODE') setPhase('invalid');
+      else if (e instanceof AccountsError && e.code === 'VALIDATION_ERROR')
+        setErrors({ password: t('passwordWeak') });
+      else
+        setFormError(
+          e instanceof AccountsError && e.status === 429 ? t('rateLimited') : t('generic')
+        );
     }
-    if (error.code === 'TOKEN_INVALID') setPhase('invalid');
-    else if (error.code === 'VALIDATION_ERROR') setErrors({ password: t('passwordWeak') });
-    else setFormError(error.status === 429 ? t('rateLimited') : t('generic'));
   }
 
   if (phase === 'loading') {

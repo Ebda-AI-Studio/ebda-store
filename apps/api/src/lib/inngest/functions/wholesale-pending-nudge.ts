@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { storeDirectory, withStore } from '@ebda/database';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
@@ -35,7 +35,7 @@ export async function nudgeStore(storeId: string, now: Date = new Date()): Promi
   return pending;
 }
 
-export const wholesalePendingNudgeCron: InngestFunction.Any = inngest.createFunction(
+export const wholesalePendingNudgeCron: JobDef = inngest.createFunction(
   {
     id: 'wholesale-pending-nudge-cron',
     name: 'Wholesale applications - 48h merchant nudge',

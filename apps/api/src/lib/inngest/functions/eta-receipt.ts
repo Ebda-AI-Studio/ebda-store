@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { EtaReceiptService, type ReturnEvent } from '../../../services/eta-receipt.service';
@@ -16,7 +16,7 @@ import { withStore } from '@ebda/database';
  *                     held for hours.
  *  etaReceiptRedrive  durable timer: sleeps until `at`, re-sends eta/receipt.submit.
  */
-export const etaReceiptEnqueue: InngestFunction.Any = inngest.createFunction(
+export const etaReceiptEnqueue: JobDef = inngest.createFunction(
   {
     id: 'eta-receipt-enqueue',
     name: 'ETA e-receipt — queue a receipt for a created or refunded order',
@@ -44,7 +44,7 @@ export const etaReceiptEnqueue: InngestFunction.Any = inngest.createFunction(
   }
 );
 
-export const etaReceiptSubmit: InngestFunction.Any = inngest.createFunction(
+export const etaReceiptSubmit: JobDef = inngest.createFunction(
   {
     id: 'eta-receipt-submit',
     name: 'ETA e-receipt — submit one receipt / poll its verdict',
@@ -88,7 +88,7 @@ export const etaReceiptSubmit: InngestFunction.Any = inngest.createFunction(
   }
 );
 
-export const etaReceiptRedrive: InngestFunction.Any = inngest.createFunction(
+export const etaReceiptRedrive: JobDef = inngest.createFunction(
   {
     id: 'eta-receipt-redrive',
     name: 'ETA e-receipt — wait, then attempt again',

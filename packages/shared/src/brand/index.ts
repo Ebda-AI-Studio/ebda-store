@@ -60,7 +60,7 @@ export const BRAND = {
     /**
      * The Ebda Store merchant app (sign-up, plan, payment, onboarding, dashboard).
      * `admin.ebda.app` is RETIRED (Ruling HOST-STORE-1): no surface, reserved slug, 404.
-     * Future products follow the same pattern (`whatsapp.`, `crm.`, one login at `accounts.`).
+     * Future products follow the same pattern (`wa.`, `crm.`, one login at `accounts.`).
      */
     storeApp: 'store.ebda.app',
     api: 'api.ebda.app',
@@ -92,7 +92,7 @@ export const BRAND = {
   legalUrls: {
     terms: 'https://ebda.app/terms',
     privacy: 'https://ebda.app/privacy',
-    refunds: 'https://ebda.app/refunds',
+    refunds: 'https://ebda.app/refund/',
   },
 } as const;
 

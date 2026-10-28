@@ -205,13 +205,7 @@ export interface StoreTheme {
   // conversion funnel + lets the customer see ingredients/spec first).
   showQuickAdd?: boolean;
 
-  // Opt-in Eastern Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) on the Arabic storefront.
-  // Default false/undefined — the storefront renders Western digits (0-9)
-  // everywhere in both languages. When true AND the visitor is browsing the
-  // Arabic locale, numeric displays (prices, counts, quantities, page
-  // numbers, loyalty points) render with Arabic-Indic digits. Identifiers
-  // (order numbers, SKUs, phone numbers, tracking numbers) always stay
-  // Western digits regardless of this flag. English locale is unaffected.
+  /** RETIRED (Ruling DIGITS-1, 2026-10-26): Western digits everywhere; this flag is ignored. Kept so stored themes still parse. */
   arabicNumerals?: boolean;
 
   // Section dividers (2026-05-17 evening) — see DividerSettings + admin

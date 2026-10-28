@@ -13,6 +13,8 @@
  * Object is the drop-in upgrade.
  */
 export const WINDOW_MS = 15 * 60_000;
+/** The longest window any budget uses: the opportunistic cleanup keeps rows for twice this, so a long-window budget is never trimmed by a short one. */
+export const MAX_WINDOW_MS = 60 * 60_000;
 
 export interface Budget {
   /** Namespace: separates this budget's counters from every other budget's. */
@@ -21,6 +23,8 @@ export interface Budget {
   perKey: number;
   /** Attempts allowed per client IP in the window (failures and in-flight only; successes are refunded). */
   perIp: number;
+  /** Window for this budget (default 15 min, at most MAX_WINDOW_MS). */
+  windowMs?: number;
 }
 
 export const LOGIN: Budget = { name: 'login', perKey: 5, perIp: 60 };
@@ -52,7 +56,7 @@ export async function hit(
   budget: Budget
 ): Promise<Attempt> {
   const at = Date.now();
-  const since = at - WINDOW_MS;
+  const since = at - Math.min(budget.windowMs ?? WINDOW_MS, MAX_WINDOW_MS);
   const sKey = `s:${budget.name}:${key}`;
   const iKey = `i:${budget.name}:${ip}`;
   const guarded = `INSERT INTO login_attempts (key, at) SELECT ?1, ?2 WHERE (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
@@ -67,7 +71,7 @@ export async function hit(
       .prepare(skipIp ? `SELECT NULL AS id WHERE 0` : guarded)
       .bind(...(skipIp ? [] : [iKey, at, since, budget.perIp])),
     // opportunistic cleanup keeps the table small
-    db.prepare(`DELETE FROM login_attempts WHERE at < ?1`).bind(at - 2 * WINDOW_MS),
+    db.prepare(`DELETE FROM login_attempts WHERE at < ?1`).bind(at - 2 * MAX_WINDOW_MS),
   ]);
   const sId = (res[0].results[0] as { id: number } | undefined)?.id;
   const iId = (res[1].results[0] as { id: number } | undefined)?.id;
@@ -89,4 +93,19 @@ export async function hit(
       ]);
     },
   };
+}
+
+/** Seconds until the oldest counted attempt of `key` (a budget's subject key) leaves its window; at least 1. */
+export async function retryAfterSeconds(
+  db: D1Database,
+  budget: Budget,
+  key: string
+): Promise<number> {
+  const windowMs = Math.min(budget.windowMs ?? WINDOW_MS, MAX_WINDOW_MS);
+  const row = await db
+    .prepare(`SELECT min(at) AS oldest FROM login_attempts WHERE key = ?1 AND at > ?2`)
+    .bind(`s:${budget.name}:${key}`, Date.now() - windowMs)
+    .first<{ oldest: number | null }>();
+  if (!row?.oldest) return 60;
+  return Math.max(1, Math.ceil((row.oldest + windowMs - Date.now()) / 1000));
 }

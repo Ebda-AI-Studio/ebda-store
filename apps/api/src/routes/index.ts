@@ -93,6 +93,7 @@ import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import staffRoutes from './staff.routes';
+import staffInviteRoutes from './staff-invite.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import lifecycleEmailsRoutes from './lifecycle-emails.routes';
@@ -146,6 +147,7 @@ router.use('/mcp', mcpRoutes);
 router.use('/auth/me/sms-consent', smsConsentAccountRoutes);
 router.use('/auth/merchant', merchantSignupRoutes);
 router.use('/auth', authRoutes);
+router.use('/staff-invites', staffInviteRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
 // Must come AFTER auth routes and BEFORE any catch-all.

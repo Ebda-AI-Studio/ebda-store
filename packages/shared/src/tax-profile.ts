@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Egypt VAT gate (ruling TAX-2, docs/plans/2026-10-07-egypt-vat-and-eta.md).

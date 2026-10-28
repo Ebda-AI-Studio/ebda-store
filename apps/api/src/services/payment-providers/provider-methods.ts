@@ -32,6 +32,9 @@ export function enabledMethods(provider: string, settings: unknown): string[] {
       const parsed = fawrySettingsSchema.safeParse(raw);
       return parsed.success ? parsed.data.methods : [];
     }
+    case 'geidea':
+      // One hosted card page; Geidea has no per-merchant method settings in our catalog.
+      return ['card'];
     default:
       return [];
   }

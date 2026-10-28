@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
+import Link from '../../components/StoreLink';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ShopChrome } from '../../components';

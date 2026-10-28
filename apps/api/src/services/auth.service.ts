@@ -1,7 +1,9 @@
+import { InstapayReceiptService } from './payment-providers/instapay-receipt.service';
 import { scrubProviderVerifier } from './provider-verification.service';
 import { redactWebhookCustomerData } from './webhook-erasure';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { forgotIdentityPassword, revokeIdentityIfManaged } from '../lib/identity-client';
 import crypto from 'crypto';
 import {
   prisma,
@@ -837,6 +839,17 @@ export class AuthService {
     // still log in with its password — `status` was recorded but never read.
     loginGate.assertActive(user);
 
+    // Merchants, staff and super admins sign in at the shared identity service (Rulings ID-1/ID-2). This legacy path would
+    // accept a password hash the identity service no longer controls (a reset there would not reach it), so it is closed for
+    // them: the right password here proves nothing and issues nothing.
+    if (user.storeId === null && user.role !== 'customer') {
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
+    }
+
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
     // TOTP code via /auth/mfa/verify to exchange it for a real session.
@@ -910,6 +923,15 @@ export class AuthService {
     // (`deletedAt: null`), and this path must not either.
     if (user.status !== 'active' || user.deletedAt) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+    }
+    // The only place a legacy (HS256) session is minted for a login: closed for identity-managed accounts, which sign in at
+    // the identity service. Covers the passkey and MFA completions that reach here.
+    if (user.storeId === null && user.role !== 'customer') {
+      throw new AppError(
+        409,
+        'USE_IDENTITY_SERVICE',
+        'Sign in through the Ebda AI Studio account service'
+      );
     }
 
     const tokens = await this.generateTokens({
@@ -1146,6 +1168,11 @@ export class AuthService {
       })
     );
     if (!tokenOwner) {
+      throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
+    }
+    // A legacy refresh token of an identity-managed account is dead: the session now lives at the identity service
+    // (Ruling ID-5: one re-login). Nothing here can mint a Store token for it.
+    if (tokenOwner.storeId === null && tokenOwner.role !== 'customer') {
       throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
     }
     const storedToken = { ...storedRow, user: tokenOwner };
@@ -1612,6 +1639,11 @@ export class AuthService {
       logger.error({ err, userId }, '[auth.revokeAllSessions] tokenVersion push failed')
     );
 
+    // Merchant / staff / super-admin sessions live in the identity service (Rulings ID-1/ID-2): end them THERE too, or the
+    // user's 15 minute token and the refresh behind it keep working after every revocation reason handled here (password
+    // change, logout everywhere, admin suspension). Fails loud: a revocation that did not reach the source is not a revocation.
+    await revokeIdentityIfManaged(userId, reason);
+
     // Revoke all live refresh tokens — prevents session resumption via
     // token rotation even before the access token's tv is checked.
     //
@@ -1703,6 +1735,7 @@ export class AuthService {
           firstName: true,
           lastName: true,
           storeId: true,
+          role: true,
           language: true,
         },
       },
@@ -1712,6 +1745,17 @@ export class AuthService {
     if (!user || (await ownsDemoStore(user.id))) {
       // Silently return to prevent email enumeration (and never mail the demo owner, B1-13)
       return null;
+    }
+
+    if (user.storeId === null && user.role !== 'customer') {
+      // Admin namespace (merchant / staff / operator): the credential lives in the identity service, which issues and mails
+      // its own one-time code. The Store issues no password token for these accounts (Ruling ID-2).
+      cfWaitUntil(
+        forgotIdentityPassword(user.email).catch(err =>
+          logger.error({ err, userId: user.id }, 'identity password-reset request failed')
+        )
+      );
+      return { userId: user.id };
     }
 
     const resetToken = await this.issuePasswordSetToken(user.id);
@@ -1731,23 +1775,6 @@ export class AuthService {
           },
           language
         ).catch(err => logger.error({ err, userId: user.id }, 'password-reset mail failed'))
-      );
-    } else {
-      // Admin namespace (merchant / staff / operator on Ebda Store): no store
-      // context, so the platform sender. Until 2026-10-07 this branch sent
-      // NOTHING — a merchant who forgot their password had no way back in.
-      cfWaitUntil(
-        sendMerchantPasswordResetEmail(
-          {
-            email: user.email,
-            name,
-            resetUrl: `${storeAppOrigin()}/reset-password?token=${resetToken}`,
-            expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
-          },
-          language
-        ).catch(err =>
-          logger.error({ err, userId: user.id }, 'merchant password-reset mail failed')
-        )
       );
     }
     return { userId: user.id };
@@ -2013,14 +2040,15 @@ export class AuthService {
       // Webhook delivery log: strip the shopper's contact data from stored payloads (Ruling WH-7).
       // Must run before the orders lose their customer link below. Already-delivered payloads on
       // the merchant's own server cannot be recalled.
+      const erasedOrderIds = (
+        await tx.order.findMany({
+          where: { customerId: userId, storeId: eraseStoreId },
+          select: { id: true },
+        })
+      ).map(o => o.id);
       await redactWebhookCustomerData(tx, {
         storeId: eraseStoreId,
-        orderIds: (
-          await tx.order.findMany({
-            where: { customerId: userId, storeId: eraseStoreId },
-            select: { id: true },
-          })
-        ).map(o => o.id),
+        orderIds: erasedOrderIds,
         email: user.email,
       });
       const ownOrders = await tx.order.findMany({
@@ -2037,6 +2065,9 @@ export class AuthService {
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
         : undefined;
+      // InstaPay receipts of those orders: the payer's typed / AI-read personal fields and the screenshot go (M-025);
+      // the amount, reference and status stay with the order's financial record.
+      await InstapayReceiptService.scrubForOrders(tx, eraseStoreId, erasedOrderIds);
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before

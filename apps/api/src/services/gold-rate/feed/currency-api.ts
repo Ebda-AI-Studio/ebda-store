@@ -3,7 +3,7 @@
  * ounce is `egp / xau` from a SINGLE response (the two legs of the primary cannot disagree here). CC0,
  * no limits. jsDelivr first, the Cloudflare-pages mirror if that fails (Ruling B5-15).
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { MAX_QUOTE_AGE_MS, isFreshQuoteTime, type FetchLike } from './gold-api';
 
 export const FALLBACK_URLS = [

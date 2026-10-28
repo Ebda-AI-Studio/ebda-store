@@ -27,6 +27,7 @@ export interface LegalPages {
   acceptableUse: LegalDoc;
   merchant: LegalDoc;
   dataDeletion: LegalDoc;
+  refund: LegalDoc;
   waTerms: LegalDoc;
   waPrivacy: LegalDoc;
   waDpa: LegalDoc;

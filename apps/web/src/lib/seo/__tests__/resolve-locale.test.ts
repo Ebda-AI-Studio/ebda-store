@@ -23,6 +23,7 @@ function setCookie(name: string, val: string | undefined) {
 }
 
 vi.mock('next/headers', () => ({
+  headers: async () => new Headers(),
   cookies: async () => ({
     get: (k: string) => {
       const v = cookieBag.value.get(k);

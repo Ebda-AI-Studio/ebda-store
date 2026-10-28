@@ -498,6 +498,7 @@ model Store {
   instapayReceipts           InstapayReceipt[]
   billingReminders           BillingReminder[]
   lifecycleEmails            StoreLifecycleEmail[]
+  staffInvites               StaffInvite[]
 
   @@index([ownerId])
   @@index([status])
@@ -600,6 +601,32 @@ model StoreStaff {
   @@index([storeId])
   @@index([userId])
   @@map("store_staff")
+}
+
+/// A staff invitation sent to an address that already has an account (Ruling ID-13). `id` is the jti of the signed link:
+/// the link is valid only while this row is `pending` and unexpired, and accepting it flips the row in the SAME transaction
+/// that creates the StoreStaff row, so a link works once. Removing the member, re-inviting the address, or the owner revoking
+/// the invite ends it. RLS: strict store policy. Moves to the StoreDO schema with the other store tables.
+model StaffInvite {
+  id         String    @id @default(uuid())
+  storeId    String    @map("store_id")
+  /// lower-cased address the link was sent to
+  email      String
+  /// staff (the only role an invitation can grant)
+  role       String    @default("staff")
+  /// pending | accepted | revoked | expired
+  status     String    @default("pending")
+  invitedBy  String?   @map("invited_by")
+  acceptedBy String?   @map("accepted_by")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  decidedAt  DateTime? @map("decided_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status])
+  @@index([storeId, email])
+  @@map("staff_invites")
 }
 
 // ==========================================
@@ -1105,7 +1132,7 @@ model Product {
   // Barcode lookup index — barcode scan resolves within a store scope.
   // Added 2026-06-15 for inventory.barcode Enterprise feature.
   // BARCODE-1: the partial unique `products_store_id_barcode_uniq` (store_id, barcode WHERE barcode IS NOT
-  // NULL AND deleted_at IS NULL) lives in SQL only (migration 20261106000300_barcode_unique).
+  // NULL AND deleted_at IS NULL) lives in SQL only (migration 20261107000270_barcode_unique).
   @@index([storeId, barcode])
   @@index([sizeChartId])
   @@map("products")
@@ -1305,7 +1332,7 @@ model ProductVariant {
   @@index([sku])
   // Barcode lookup — scan resolves to a variant within a product.
   // BARCODE-1: the partial unique `product_variants_product_id_barcode_uniq` (product_id, barcode WHERE
-  // barcode IS NOT NULL) lives in SQL only (migration 20261106000300_barcode_unique).
+  // barcode IS NOT NULL) lives in SQL only (migration 20261107000270_barcode_unique).
   @@index([productId, barcode])
   @@map("product_variants")
 }
@@ -1811,6 +1838,12 @@ model Order {
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")
 
+  /// Checkout idempotency (audit M-012): sha256(sessionId|Idempotency-Key header) of the request that created this order, unique
+  /// per store. A retry of the same request returns this order instead of creating a second one. NOT the webhook key above.
+  checkoutIdempotencyKey String? @map("checkout_idempotency_key")
+  /// sha256 of what the shopper asked for, stored with the key: a retry that changed the request is 409, not the first order.
+  checkoutRequestHash    String? @map("checkout_request_hash")
+
   // LEGACY (retained, unused since 2026-07-18). Formerly the dedupe stamp for
   // the always-on "Payment pending — follow up" stuck-payment sweep, which was
   // removed as a redundant duplicate of the `payment_abandonment` "Checkout
@@ -1909,6 +1942,7 @@ model Order {
   // Payment-gateway abandoners list (Enterprise).
   // Added 20260622130000.
   @@index([storeId, paymentGatewayAbandonedAt])
+  @@unique([storeId, checkoutIdempotencyKey], map: "orders_store_id_checkout_idempotency_key_key")
   // InstaPay expiry sweep: the awaiting orders whose hold has run out.
   @@index([paymentConfirmationExpiresAt])
   // Open-unpaid-hold admission uses separate contact (phone OR canonical
@@ -5164,6 +5198,8 @@ model StoreSubscription {
   // (0 = none); `nextRetryAt` is when the cron retries (day 3, then day 7).
   billingInterval String    @default("monthly") @map("billing_interval")
   pendingPlanCode String?   @map("pending_plan_code")
+  /// Day of month (UTC, 1-31) the paid cycle started on; every renewal clamps from it (M-125). Null = derived from the period end.
+  billingAnchorDay Int?     @map("billing_anchor_day")
   dunningAttempts Int       @default(0) @map("dunning_attempts")
   /// First time this subscription went past_due (WA-GRACE-1). Maintained by the
   /// store_subscriptions_past_due_since trigger on every write path; null unless status = past_due.
@@ -5287,6 +5323,10 @@ model InstapayReceipt {
   reviewNote          String?   @map("review_note")
   reviewedBy          String?   @map("reviewed_by")
   reviewedAt          DateTime? @map("reviewed_at")
+  /// The screenshot (private R2) was deleted: on approval, or by the retention sweep. Null = the object may still exist.
+  imageDeletedAt      DateTime? @map("image_deleted_at")
+  /// payer / receiver / note / AI-read personal fields were scrubbed (retention sweep, or the shopper's erasure).
+  personalScrubbedAt  DateTime? @map("personal_scrubbed_at")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
@@ -5371,6 +5411,58 @@ model StoreLifecycleEmail {
   @@map("store_lifecycle_emails")
 }
 
+/// Who referred a merchant (FOUNDING-1 / M-082). One row per referred store, captured when the
+/// store is created from a referral link (`ref` = the referrer's store slug). Platform data: it
+/// carries two store ids and nothing else, no store_id column, no RLS (same class as
+/// billing_webhook_events); read and written only by the billing service and super-admin.
+model BillingReferral {
+  referredStoreId String   @id @map("referred_store_id")
+  referrerStoreId String   @map("referrer_store_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([referrerStoreId])
+  @@map("billing_referrals")
+}
+
+/// Append-only ledger of free months (FOUNDING-1 / M-082): one row per grant, whole months only
+/// (integer), plus the plan price it was worth in minor units. `idempotencyKey` is UNIQUE, so a
+/// replayed payment event can never grant twice; the caps (20 founding, 3 per referrer) are counted
+/// under an advisory lock in grants.service. A grant is `pending` until the store has a billing
+/// period to extend, then `applied` with the period end before/after. Platform data (no RLS, see
+/// BillingReferral); viewer: super-admin /billing-events -> Grants.
+model BillingGrant {
+  id               String    @id @default(uuid())
+  /// founding | referral_referrer | referral_referred
+  kind             String
+  /// The store that receives the free month.
+  beneficiaryId    String    @map("beneficiary_id")
+  /// referral kinds: the other side of the referral.
+  counterpartId    String?   @map("counterpart_id")
+  months           Int       @default(1)
+  valueMinor       Int       @default(0) @map("value_minor")
+  /// pending | applied | revoked (the qualifying payment was refunded / charged back)
+  status           String    @default("pending")
+  /// The qualifying payment (billing_events.id) and the store it belongs to. A referral grant to the referrer
+  /// points at the REFERRED store's payment.
+  sourceEventId    String?   @map("source_event_id")
+  sourceStoreId    String?   @map("source_store_id")
+  revokedAt        DateTime? @map("revoked_at")
+  revokeReason     String?   @map("revoke_reason")
+  /// Set once the free month taken back from `currentPeriodEnd` (applied grants only).
+  restoredAt       DateTime? @map("restored_at")
+  idempotencyKey   String    @unique @map("idempotency_key")
+  periodEndBefore  DateTime? @map("period_end_before")
+  periodEndAfter   DateTime? @map("period_end_after")
+  appliedAt        DateTime? @map("applied_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([beneficiaryId, status])
+  @@index([kind, createdAt])
+  @@index([sourceEventId])
+  @@index([sourceStoreId, status])
+  @@map("billing_grants")
+}
+
 /// Provider webhook inbox (SP5 task 3): UNIQUE (provider, eventId) makes a
 /// replayed delivery a no-op. Written in the SAME transaction as the
 /// settlement it triggers, so a crash can never mark an event "seen" without
@@ -5403,23 +5495,26 @@ model BillingWebhookEvent {
 // stores.layout_settings through the adapter so every legacy reader keeps
 // working. Strict RLS (R-EBDA-001) in the same migration.
 model StorePageRevision {
-  id            String    @id @default(uuid())
-  storeId       String    @map("store_id")
-  pageKey       String    @map("page_key")
-  rev           Int
+  id              String    @id @default(uuid())
+  storeId         String    @map("store_id")
+  pageKey         String    @map("page_key")
+  rev             Int
   // draft | published | archived (CHECK constraint in the migration)
-  status        String
-  schemaVersion Int       @map("schema_version")
-  document      Json
-  docBytes      Int       @map("doc_bytes")
-  baseRev       Int?      @map("base_rev")
-  note          String?
+  status          String
+  schemaVersion   Int       @map("schema_version")
+  document        Json
+  docBytes        Int       @map("doc_bytes")
+  baseRev         Int?      @map("base_rev")
+  note            String?
   // User id of the editor. No FK: users are identity-keyed under RLS and an
   // erased user must not take a store's page history with them.
-  createdBy     String?   @map("created_by")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  publishedAt   DateTime? @map("published_at")
+  createdBy       String?   @map("created_by")
+  // Who made this revision live (publish, rollback, restore): a user id only, no FK like created_by,
+  // pseudonymised on offboarding (OFFBOARD-1). The name is looked up at read time, never copied here.
+  publishedBy     String?   @map("published_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  publishedAt     DateTime? @map("published_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

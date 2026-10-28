@@ -3,6 +3,7 @@
 //   - `index.ts`  : the Node server (Railway/Docker/dev): http server, socket.io,
 //                   background loops, graceful shutdown.
 //   - `worker.ts` : the Cloudflare Worker (`httpServerHandler`), R-EBDA-001.
+import { requestShapeGuard } from './middleware/request-shape-guard';
 import { installWaWriteObservers } from './lib/wa/observers';
 import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
@@ -22,14 +23,14 @@ import {
   restrictPlatformOnlyOrigins,
   makeRateLimitStore,
   rateLimitRedisClient,
-  inngestLimiter,
 } from './middleware/security';
+import { writeFreeze } from './middleware/write-freeze';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import billingWebhookRoutes from './routes/billing-webhook.routes';
-import { assertBillingConfigAtBoot } from './services/billing';
+import { assertBillingConfigAtBoot, billingProviderUnsetWarning } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import { setupSwagger } from './docs/swagger';
 import { prisma, setDbHopObserver } from '@ebda/database';
@@ -39,9 +40,8 @@ import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
 import { SentryService } from './services/sentry.service';
 import { sendAlert } from './services/alerts.service';
-import { inngest } from './lib/inngest/client';
-import { inngestFunctions } from './lib/inngest/functions';
-import { serve as inngestServe } from 'inngest/express';
+// Side effect: registers every background job (lib/inngest/functions) for the Worker's runners.
+import './lib/inngest/functions';
 import { installClosedTenantTxAlerting } from './lib/after-tenant-commit';
 import logger from './lib/logger';
 
@@ -62,6 +62,18 @@ import { healthPayload } from './lib/health-payload';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 assertBillingConfigAtBoot();
+{
+  // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
+  const unset = billingProviderUnsetWarning();
+  if (unset) {
+    logger.error(unset);
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: BILLING_PROVIDER is not set',
+      body: unset,
+    }).catch(() => undefined);
+  }
+}
 
 // Every plan / subscription / catalog write anywhere tells Ebda WhatsApp (lib/wa/observers.ts).
 installWaWriteObservers();
@@ -122,6 +134,8 @@ setDbHopObserver(recordHop);
 
 // Request ID for tracing
 app.use(requestId);
+// Cutover read-only window (WRITES_FROZEN=1, docs/runbooks/cutover-cf.md): 503 to every write, reads stay open.
+app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
@@ -377,12 +391,6 @@ app.use(
   })
 );
 
-// issue 2063: the Inngest serve path's own bucket — counts only caller-fault
-// answers (4xx except 429: forged/unsigned/malformed calls; never a failing
-// step's 5xx, issue 2314), and sits BEFORE the body parser so a
-// capped caller is refused before its body is read. See inngestLimiter.
-app.use('/api/v1/inngest', inngestLimiter);
-
 // Subscription-billing webhooks (SP5 task 3): raw body for HMAC, mounted BEFORE
 // the generic payment webhooks and the JSON parser.
 app.use(
@@ -395,35 +403,17 @@ app.use(
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 
 // Body parsing
+// 10mb = API_JSON_BODY_LIMIT_BYTES, the byte cap the guard below also enforces (tests/unit/zod-huge-array-bounds).
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+// Size and shape caps before any route or schema parses the body (Ruling ITEST-11).
+app.use(requestShapeGuard);
 
 // External-service-to-Telegram alert bridge. Sentry / BetterStack /
 // PostHog all POST to /api/v1/alerts/webhooks/<source> and we fan
 // out to the same Telegram chat via the internal alerts.service.
 // Protected by ALERTS_WEBHOOK_TOKEN env var (querystring or header).
 app.use('/api/v1/alerts/webhooks', alertWebhookRoutes);
-
-// Inngest serve handler. Mounted before auth/CSRF because Inngest's
-// platform calls this endpoint with its own request signature
-// (verified inside the SDK using INNGEST_SIGNING_KEY) — it must not
-// be subject to our cookie-based CSRF gate. The handler responds to
-// PUT (function registration) and POST (function invocation).
-app.use(
-  '/api/v1/inngest',
-  inngestServe({
-    client: inngest,
-    functions: inngestFunctions,
-    // Advertise the real public origin to Inngest Cloud. Without this the SDK
-    // guesses from the Host header of the registering request — and our
-    // post-boot self-PUT hits 127.0.0.1, registering an unreachable
-    // localhost URL (see config.inngestServeHost). Only pass it when set so
-    // local dev keeps the SDK's default host-introspection.
-    ...(config.inngestServeHost
-      ? { serveHost: config.inngestServeHost, servePath: '/api/v1/inngest' }
-      : {}),
-  })
-);
 
 // Cookie parsing (for HTTP-only auth cookie support)
 app.use(cookieParser());

@@ -66,30 +66,43 @@ if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
     echo "! scripts/blast-radius.sh missing; skipping blast-radius"
   fi
 
-  echo "-> AI-OS gate: Opus AI review of this diff (advisory)..."
+  # Model routing (LEAN mode, Ahmad 2026-10-28): Sonnet reviews every push; Opus only when
+  # the diff touches a critical path (money, auth/identity, secrets, consent/erasure,
+  # tenancy/RLS, migrations, CI/hooks). Force one with AI_REVIEW_MODEL=opus|sonnet.
+  CRITICAL_RE='(migrations/|payment|billing|wallet|refund|payout|webhook|auth|mfa|passkey|login|session|identity|encrypt|crypto|secret|consent|erasure|privacy|rls|tenant|cod-reconciliation|price|coupon|fiscal|tax|money|\.husky/|\.github/workflows/)'
+  if [ -n "${AI_REVIEW_MODEL:-}" ]; then
+    review_model="$AI_REVIEW_MODEL"
+  elif git diff --name-only "$RANGE" 2>/dev/null | grep -Eiq "$CRITICAL_RE"; then
+    review_model=opus
+  else
+    review_model=sonnet
+  fi
+  echo "-> AI-OS gate: AI review of this diff with $review_model (advisory)..."
   if command -v claude >/dev/null 2>&1; then
-    git diff "$RANGE" -- ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' > /tmp/force-prepush.diff 2>/dev/null || true
-    if [ -s /tmp/force-prepush.diff ]; then
+    review_dir=$(mktemp -d)
+    git diff "$RANGE" -- ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' > "$review_dir/diff" 2>/dev/null || true
+    if [ -s "$review_dir/diff" ]; then
       # Dedup gate: skip the LLM call when this exact diff was already reviewed on
       # this branch. Session mining 2026-07-11 found 11/15 review calls were
       # byte-identical re-reviews (one diff reviewed 5x) — pure Opus spend for
       # zero new signal. Marker lives in the worktree's git dir, keyed by branch.
-      diff_hash=$(shasum -a 256 /tmp/force-prepush.diff | cut -c1-16)
+      diff_hash=$(shasum -a 256 "$review_dir/diff" | cut -c1-16)
       marker="$(git rev-parse --git-dir)/.ai-review-$(printf '%s' "$current_branch" | tr '/' '_')"
       if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$diff_hash" ]; then
         echo "-> AI review skipped: identical diff already reviewed on this branch ($diff_hash)"
       else
         {
           printf 'Review this diff for CRITICAL bugs, security issues, and regressions ONLY. Be terse; list nothing if clean.\n\n'
-          cat /tmp/force-prepush.diff
-        } > /tmp/force-prepush-review.md
-        if claude -p --model claude-opus-4-8 < /tmp/force-prepush-review.md; then
+          cat "$review_dir/diff"
+        } > "$review_dir/review.md"
+        if claude -p --model "$review_model" < "$review_dir/review.md"; then
           printf '%s' "$diff_hash" > "$marker"
         else
           echo "! AI review advisory failed (non-blocking)"
         fi
       fi
     fi
+    rm -rf "$review_dir"
   else
     echo "! claude CLI not found; skipping AI review (npm i -g @anthropic-ai/claude-code)"
   fi

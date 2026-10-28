@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { queryWithSearchHeader } from '../lib/search-term';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
@@ -169,6 +169,8 @@ router.get(
   '/export.xlsx',
   ...adminMiddleware,
   requirePermission('orders:read'),
+  // SEC-14: the order sheet carries every customer's name, phone and address.
+  requirePermission('customers:export'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -433,6 +435,21 @@ router.get(
       // middleware/request-transaction.ts (one `res.send`, no `res.write`), so
       // the tx COMMITS BEFORE the bytes go out rather than after.
       const xlsxBuffer = await workbook.xlsx.writeBuffer();
+
+      await auditLog({
+        action: 'orders.exported',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'order_export',
+        details: {
+          actorRole: req.user!.role,
+          impersonatedBy: req.user!.impersonatedBy ?? null,
+          rows: orders.length,
+          filtered: Boolean(req.query.search || req.query.status),
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.setHeader(
         'Content-Type',
@@ -1991,7 +2008,7 @@ const adminOrderSchema = z
     billingAddress: z.record(z.unknown()).optional(),
     items: z.array(adminOrderItemSchema).min(1),
     paymentMethod: z.enum(['online', 'cod']).optional(),
-    paymentProvider: z.enum(['paymob', 'kashier', 'fawry', 'instapay', 'cod']).optional(),
+    paymentProvider: z.enum(['paymob', 'kashier', 'fawry', 'geidea', 'instapay', 'cod']).optional(),
     notes: z.string().optional(),
     couponCode: z.string().optional(),
     currency: z.string().optional(),
@@ -2100,7 +2117,7 @@ router.post(
  */
 const issuePaymentLinkSchema = z.object({
   notifyVia: z.enum(['link', 'email', 'all']).optional().default('link'),
-  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
+  provider: z.enum(['paymob', 'kashier', 'fawry', 'geidea']).optional(),
   method: z.enum(['card', 'meeza', 'wallet', 'valu', 'payatfawry']).optional(),
 });
 

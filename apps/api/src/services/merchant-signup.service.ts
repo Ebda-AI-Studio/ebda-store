@@ -11,13 +11,17 @@
  * owner of an existing address gets a "you already have an account" mail.
  */
 import bcrypt from 'bcryptjs';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { withUser, type Prisma } from '@ebda/database';
 import { normalizeEgyptianMobile } from '@ebda/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
-import { AuthService } from './auth.service';
+import { findUserIdByEmail } from '../lib/definer';
+import {
+  createIdentity,
+  getAccountState,
+  resendIdentityVerification,
+} from '../lib/identity-client';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
 import { buildAcquisition, signupTrackingSchema } from './ebda-ads.service';
 import { signupAcceptanceRows } from './legal-notice.service';
@@ -73,9 +77,6 @@ export type MerchantSignupInput = z.infer<typeof merchantSignupSchema>;
 
 export const GENERIC_SIGNUP_RESULT = { emailVerificationSent: true } as const;
 
-/** One verification mail per address per minute from the resend route. */
-const RESEND_COOLDOWN_MS = 60 * 1000;
-
 const SALT_ROUNDS = 12;
 
 // Cost-12 hash of random bytes (plaintext discarded), a constant: the unknown-address
@@ -83,6 +84,17 @@ const SALT_ROUNDS = 12;
 // uniform. Not computed at import: bcrypt needs random bytes, which workerd forbids in
 // global scope (R-EBDA-001).
 const DUMMY_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
+
+/** Same address, unverified in the identity service, and no Store profile row under that id. */
+async function isAdoptableOrphan(identityId: string, email: string): Promise<boolean> {
+  const acc = await getAccountState(identityId).catch(() => null);
+  if (!acc || acc.emailVerified || acc.email.trim().toLowerCase() !== email.trim().toLowerCase())
+    return false;
+  const profile = await withUser(identityId, tx =>
+    tx.user.findUnique({ where: { id: identityId }, select: { id: true } })
+  );
+  return !profile;
+}
 
 export class MerchantSignupService {
   static async signup(
@@ -92,8 +104,8 @@ export class MerchantSignupService {
     const { email, name, language } = input;
     const phone = input.phone ? normalizeEgyptianMobile(input.phone) : null;
 
-    // Always hash, even when the address is taken (timing parity).
-    const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+    // Always spend a bcrypt, even when the address is taken (timing parity): the real hash is made by the identity service.
+    await bcrypt.hash(input.password, SALT_ROUNDS);
 
     // Nobody is signed in, and the admin namespace (users.store_id NULL) is not
     // visible from any scope: the id comes from the `ebda_auth_find_user_id`
@@ -108,14 +120,7 @@ export class MerchantSignupService {
         )
       : null;
 
-    if (existing && existing.role === 'store_admin' && !existing.emailVerified) {
-      // Signed up before but never verified (lost mail): treat as a resend. Records NO
-      // acceptance: nothing here proves the submitter owns the account (the password is
-      // never checked), so the owner's original signup rows stand untouched.
-      return this.resendVerification(existing.email);
-    }
-
-    if (existing) {
+    if (existing && existing.emailVerified) {
       await sendMerchantDuplicateSignupNotice(
         { email: existing.email, name: existing.firstName || existing.email },
         language
@@ -125,54 +130,72 @@ export class MerchantSignupService {
       return GENERIC_SIGNUP_RESULT;
     }
 
+    // The credential now lives in the shared identity service (Ruling ID-1): it hashes the password, binds it to the
+    // verification code it mails, and never overwrites an existing row's credential. A signup over a still-unverified
+    // address re-registers it (the newest code carries the newest password).
     const parts = name.split(/\s+/);
-    // Find-or-create through the `ebda_admin_user_ensure` definer (it can only
-    // mint a store_admin or staff account). `created: false` means another signup
-    // for the same address won the race: indistinguishable from "taken".
-    const created = await ensureAdminUser({
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ');
+    // The id is OURS: generated here (or the existing profile's), sent to the identity service, and the answer must be exactly it.
+    // The profile row and the legal acceptances are only ever written under an id this function chose (Ruling SIGNUP-TAKEOVER-1),
+    // so a wrong, replayed or attacker-influenced answer cannot bind a Store profile to someone else's identity.
+    const requestedId = existing?.id ?? crypto.randomUUID();
+    const identity = await createIdentity({
+      id: requestedId,
       email,
-      passwordHash,
-      firstName: parts[0],
-      lastName: parts.slice(1).join(' '),
-      role: 'store_admin',
-      emailVerified: false,
+      password: input.password,
+      firstName,
+      lastName,
+      phone: phone ?? undefined,
+      language: language ?? 'ar',
     });
-    if (!created.created) return GENERIC_SIGNUP_RESULT;
-    // Phone and language are not part of the definer's contract: set them as the
-    // new user (its own row, under its own user scope).
+    if (!identity) return GENERIC_SIGNUP_RESULT; // verified by someone else in the meantime: indistinguishable from "taken"
+    let profileId = requestedId;
+    if (identity.id !== requestedId) {
+      // The identity service already holds this address under another id. That is legitimate in exactly one case, an ORPHAN
+      // from a half-finished earlier signup: no Store profile for this address (existing is null), the identity is for the
+      // SAME address, still unverified, and no profile row exists under its id. Then the merchant adopts it (otherwise they
+      // would be stuck forever). Anything else writes nothing, logs an error and answers the same generic result.
+      const adopt = !existing && (await isAdoptableOrphan(identity.id, email));
+      if (!adopt) {
+        logger.error(
+          { email: maskEmail(email), requestedId, returnedId: identity.id },
+          'merchant signup: identity id does not match the requested id; no profile written'
+        );
+        return GENERIC_SIGNUP_RESULT;
+      }
+      logger.warn(
+        { email: maskEmail(email), adoptedId: identity.id },
+        'merchant signup: adopting the id of an orphan unverified identity'
+      );
+      profileId = identity.id;
+    }
+    if (existing) return GENERIC_SIGNUP_RESULT; // unverified: the profile row and the acceptance rows already stand
+
+    // Profile row (same id as the identity, so every foreign key resolves) + click-wrap acceptance in ONE transaction, as
+    // the new user (Ruling LEGAL-4). Credentials are NOT stored here.
     const acquisition = buildAcquisition(input.tracking, request);
-    // Profile + click-wrap acceptance in ONE transaction, as the new user (Ruling LEGAL-4).
-    await withUser(created.id, async tx => {
-      await tx.user.update({
-        where: { id: created.id },
+    await withUser(profileId, async tx => {
+      await tx.user.create({
         data: {
+          id: profileId,
+          storeId: null,
+          email,
+          passwordHash: '!identity',
+          firstName,
+          lastName,
           phone,
+          role: 'store_admin',
+          emailVerified: false,
           language: language ?? 'ar',
           ...(acquisition ? { acquisition: acquisition as unknown as Prisma.InputJsonValue } : {}),
         },
       });
       await tx.legalAcceptance.createMany({
-        data: signupAcceptanceRows(created.id, request),
+        data: signupAcceptanceRows(profileId, request),
         skipDuplicates: true,
       });
     });
-    const user = {
-      id: created.id,
-      email: created.email,
-      firstName: created.firstName,
-      lastName: created.lastName,
-    };
-
-    await AuthService.sendVerificationEmail(
-      user.id,
-      user.email,
-      `${user.firstName} ${user.lastName}`.trim() || user.email,
-      null,
-      language
-    ).catch(err =>
-      // The account exists; the user can use "resend". Never fail the response.
-      logger.error({ err, userId: user.id }, 'merchant verification mail failed after signup')
-    );
 
     return GENERIC_SIGNUP_RESULT;
   }
@@ -182,51 +205,11 @@ export class MerchantSignupService {
    * existing, still-unverified merchant account with no mail in the last minute.
    */
   static async resendVerification(email: string): Promise<typeof GENERIC_SIGNUP_RESULT> {
-    const userId = await findUserIdByEmail(email, null, { caseInsensitive: true });
-    const found = userId
-      ? await withUser(userId, tx =>
-          tx.user.findUnique({
-            where: { id: userId },
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              emailVerified: true,
-              language: true,
-              role: true,
-            },
-          })
-        )
-      : null;
-    const user = found?.role === 'store_admin' ? found : null;
-
-    if (!user || user.emailVerified) {
-      await bcrypt.compare('x', DUMMY_HASH);
-      return GENERIC_SIGNUP_RESULT;
-    }
-
-    // `verification_tokens` is user-keyed: read AS the user.
-    const recent = await withUser(user.id, tx =>
-      tx.verificationToken.findFirst({
-        where: {
-          userId: user.id,
-          type: 'email',
-          createdAt: { gt: new Date(Date.now() - RESEND_COOLDOWN_MS) },
-        },
-        select: { id: true },
-      })
+    // The identity service owns verification codes (and their throttles); it answers nothing for an unknown or verified address.
+    await bcrypt.compare('x', DUMMY_HASH); // uniform cost with the signup paths
+    await resendIdentityVerification(email).catch(err =>
+      logger.error({ err, email: maskEmail(email) }, 'merchant resend verification failed')
     );
-    if (recent) return GENERIC_SIGNUP_RESULT;
-
-    await AuthService.sendVerificationEmail(
-      user.id,
-      user.email,
-      `${user.firstName} ${user.lastName}`.trim() || user.email,
-      null,
-      (user.language as 'ar' | 'en' | undefined) ?? undefined
-    ).catch(err => logger.error({ err, userId: user.id }, 'merchant resend verification failed'));
-
     return GENERIC_SIGNUP_RESULT;
   }
 }

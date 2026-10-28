@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Merchant-configured instalment display (`Store.settings.instalments`, Ruling B2-9).

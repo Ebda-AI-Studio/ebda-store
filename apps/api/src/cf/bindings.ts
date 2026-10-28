@@ -64,6 +64,66 @@ export interface EmailBindingLike {
   }): Promise<{ messageId: string }>;
 }
 
+/** RPC surface of the shared identity service (apps/accounts/src/index.ts `Accounts`). */
+export interface AccountsRpc {
+  isRevoked?(sid: string): Promise<boolean>;
+  revokeSession?(sid: string, reason: string): Promise<void>;
+  revokeUser?(userId: string, reason: string): Promise<void>;
+  setStatus?(
+    userId: string,
+    status: 'active' | 'inactive' | 'suspended',
+    reason: string
+  ): Promise<void>;
+  getAccountState?(userId: string): Promise<AccountState | null>;
+  resendVerification?(email: string): Promise<void>;
+  /** Store deletion: remove the store's integrator clients, secrets and trail (idempotent). */
+  deleteStoreClients?(storeId: string): Promise<{ clients: number }>;
+  eraseUser?(userId: string, requestId?: string): Promise<{ erased: boolean; remaining: number }>;
+  exportUser?(userId: string): Promise<Record<string, unknown[]>>;
+  setRole?(
+    userId: string,
+    role: 'store_admin' | 'staff',
+    reason: string,
+    ifCurrentRole?: 'store_admin' | 'staff'
+  ): Promise<boolean>;
+  inviteUser?(input: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'store_admin' | 'staff';
+    language?: 'en' | 'ar';
+    storeName?: string;
+  }): Promise<
+    | { id: string; created: true }
+    | { id: string; created: false; emailVerified: boolean; role: AccountState['role'] }
+  >;
+  forgotPassword?(email: string): Promise<void>;
+  createUser?(input: {
+    id?: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    language?: 'en' | 'ar';
+  }): Promise<{ id: string } | null>;
+}
+
+export interface AccountState {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  mfaEnabled: boolean;
+  mfaEnrolledAt: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  role: 'customer' | 'store_admin' | 'super_admin' | 'staff';
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  language: string;
+}
+
 /** R2 bucket, as the CI sink uses it (conditional put returns null when the precondition fails). */
 export interface R2BucketCasLike {
   get(
@@ -118,6 +178,8 @@ export interface CfBindings {
   CF_VERSION_METADATA?: { id?: string; tag?: string };
   /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
   STOREFRONT?: ServiceBindingLike;
+  /** Service Binding to the shared identity service (ebda-accounts): JWKS over fetch, `isRevoked`/`revokeUser` over RPC. */
+  ACCOUNTS?: ServiceBindingLike & AccountsRpc;
   /** Workers AI (search embeddings, bge-m3). Always remote, also in `wrangler dev`. */
   AI?: AiBindingLike;
   [name: string]: unknown;

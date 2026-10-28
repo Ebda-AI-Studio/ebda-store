@@ -18,6 +18,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet } from '../../../../lib/api';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
+import { AiSwitchCard } from '../../../../components/ai/AiSwitchCard';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 import { useT } from '../../../../i18n/useT';
 import { formatSpend } from '../../../../lib/ai-spend';
@@ -185,6 +186,10 @@ export default function AiUsagePage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+      <div className="mb-4" data-setting-id="ai.switch">
+        {storeId && <AiSwitchCard storeId={storeId} />}
+      </div>
+
       {/* ── Quota summary card (shared with AI Tools page) ─────────── */}
       <div className="mb-6">
         {storeId && <AiUsageSummaryCard storeId={storeId} embedded={false} />}

@@ -185,8 +185,9 @@ describe('surface: media (R2)', () => {
 });
 
 describe('surface: customer intelligence (R2)', () => {
-  const ev = (buyerKey: string | null, n: number) =>
-    JSON.stringify({ type: 'order.placed', buyerKey, n });
+  // storeId rides every real row; the store-scoped customer erase (Ruling CI-8) matches on it.
+  const ev = (buyerKey: string | null, n: number, storeId = 'ci-1') =>
+    JSON.stringify({ type: 'order.placed', buyerKey, n, storeId });
   async function fixture() {
     const A = 'outcomes/v1/store=ci-1/dt=2026-11-01/a.ndjson.gz';
     const B = 'outcomes/v1/store=ci-2/dt=2026-11-01/b.ndjson.gz';
@@ -195,8 +196,8 @@ describe('surface: customer intelligence (R2)', () => {
       A,
       await gzipText([ev(BK, 1), ev(OTHER, 2), ev(null, 3)].join('\n') + '\n')
     );
-    await e.CI_BUCKET.put(B, await gzipText(ev(BK, 4) + '\n')); // only this buyer: file goes away
-    await e.CI_BUCKET.put(C, await gzipText(ev(OTHER, 5) + '\n'));
+    await e.CI_BUCKET.put(B, await gzipText(ev(BK, 4, 'ci-2') + '\n')); // only this buyer: file goes away
+    await e.CI_BUCKET.put(C, await gzipText(ev(OTHER, 5, 'ci-3') + '\n'));
     await e.CI_BUCKET.put(ciBuyerIndexKey(BK), JSON.stringify({ partitions: [A, B] }));
     return { A, B, C };
   }
@@ -234,7 +235,7 @@ describe('surface: customer intelligence (R2)', () => {
       await e.CI_BUCKET.get('outcomes/v1/store=ci-m2/dt=2026-11-01/x.ndjson.gz')
     ).not.toBeNull();
   });
-  it('reports remaining > 0 when an erase did not take (the verify can go red)', async () => {
+  it('fails loud when an erase did not take (a dropped write cannot pass as erased)', async () => {
     await fixture();
     const real = r2(e.CI_BUCKET);
     // A bucket whose writes and deletes are silently dropped: the post-erase re-read must catch it.
@@ -244,8 +245,9 @@ describe('surface: customer intelligence (R2)', () => {
       put: async () => undefined,
       delete: async () => undefined,
     };
-    const r = await ciSurface(wrapped).eraseSubject(customer());
-    expect(r.remaining).toBeGreaterThan(0);
+    // The store-scoped erase (Ruling CI-8) rewrites by compare-and-set, so a dropped write surfaces as
+    // contention (a failed surface) instead of a silent remaining > 0.
+    await expect(ciSurface(wrapped).eraseSubject(customer())).rejects.toThrow(/contention/);
   });
 });
 

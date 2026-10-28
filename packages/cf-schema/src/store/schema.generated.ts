@@ -1528,6 +1528,8 @@ export const orders = sqliteTable('orders', {
   }),
   idempotencyKey: text('idempotency_key'),
   webhookProcessedAt: integer('webhook_processed_at', { mode: 'timestamp_ms' }),
+  checkoutIdempotencyKey: text('checkout_idempotency_key'),
+  checkoutRequestHash: text('checkout_request_hash'),
   stuckPaymentAlertedAt: integer('stuck_payment_alerted_at', { mode: 'timestamp_ms' }),
   orderCreatedNotifiedAt: integer('order_created_notified_at', { mode: 'timestamp_ms' }),
   refundReversedAt: integer('refund_reversed_at', { mode: 'timestamp_ms' }),
@@ -2616,6 +2618,7 @@ export const storePageRevisions = sqliteTable('store_page_revisions', {
   baseRev: integer('base_rev'),
   note: text('note'),
   createdBy: text('created_by'),
+  publishedBy: text('published_by'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

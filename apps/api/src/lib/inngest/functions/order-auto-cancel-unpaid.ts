@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import type { JobDef } from '../../jobs/types';
 import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -132,7 +132,7 @@ export function decideAutoCancelAction(input: {
   return 'cancel';
 }
 
-export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction(
+export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
   {
     id: 'order-auto-cancel-unpaid',
     name: 'Auto-cancel stale unpaid orders (daily cron)',
@@ -377,10 +377,29 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
             // updateStatus reads + writes the order via Prisma — run it inside the
             // order's tenant context so FORCE RLS policies (read + write) are
             // satisfied on this non-HTTP cron path.
-            await runInTenantContext(order.storeId, () =>
-              OrderService.updateStatus(order.storeId, order.id, 'cancelled')
-            );
-            return true;
+            // The row lock + re-check make the cancel atomic with a payment landing: a webhook that paid the order
+            // after this run's provider answer ('expired') either commits first (the order is paid: not cancelled)
+            // or waits and finds it cancelled (its claim is then blocked and raised loudly). confirmed -> cancelled is
+            // an allowed transition, so without this a freshly PAID order was cancelled.
+            const cancelled = await runInTenantContext(order.storeId, async () => {
+              const rows = await prisma.$queryRaw<
+                Array<{ status: string; payment_status: string }>
+              >`
+                SELECT status::text AS status, payment_status::text AS payment_status
+                  FROM orders WHERE id = ${order.id} AND store_id = ${order.storeId} FOR UPDATE`;
+              const cur = rows[0];
+              if (!cur || cur.payment_status === 'paid' || cur.payment_status === 'refunded')
+                return false;
+              await OrderService.updateStatus(order.storeId, order.id, 'cancelled');
+              return true;
+            });
+            if (!cancelled) {
+              logger.warn(
+                { orderId: order.id, storeId: order.storeId },
+                'order-auto-cancel-unpaid: order was paid while the sweep ran; not cancelled'
+              );
+            }
+            return cancelled;
           } catch (err) {
             logger.error(
               { err, orderId: order.id, storeId: order.storeId },

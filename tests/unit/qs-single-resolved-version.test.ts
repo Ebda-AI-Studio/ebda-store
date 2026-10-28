@@ -1,6 +1,6 @@
 // #1192 — package.json declared `overrides.qs` at the top level AND again
 // inside `overrides["typed-rest-client"].qs` / `overrides["@lhci/cli"].qs`,
-// all pinned to the same 6.16.0 today. Nothing enforces that they stay in
+// all pinned to the same 6.16.2 today. Nothing enforces that they stay in
 // sync, so the next advisory bump can move the top-level pin while the two
 // nested copies quietly re-strand their subtrees on the old version — the
 // exact failure mode `qs` has already had here once.
@@ -16,7 +16,7 @@ describe('qs stays single-sourced through the top-level override (#1192)', () =>
   };
 
   it('has a top-level qs override', () => {
-    expect(pkg.overrides.qs).toBe('6.16.0');
+    expect(pkg.overrides.qs).toBe('6.16.2');
   });
 
   it('no nested override re-declares qs — the top-level pin must be the only source', () => {

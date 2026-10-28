@@ -1,5 +1,6 @@
 'use client';
 
+import { StoreAnchor } from '../../components/StoreLink';
 import { PoweredByEbda } from '../shared/PoweredByEbda';
 import { FooterLegalRow } from '../shared/FooterLegalRow';
 import { FooterWhatsApp } from '../shared/FooterWhatsApp';
@@ -135,13 +136,13 @@ export default function MinimalFooter({
           {allLinks.length > 0 && (
             <nav className="flex flex-wrap gap-x-6 gap-y-2">
               {allLinks.map(({ label, href }) => (
-                <a
+                <StoreAnchor
                   key={href}
                   href={href}
                   className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   {label}
-                </a>
+                </StoreAnchor>
               ))}
             </nav>
           )}

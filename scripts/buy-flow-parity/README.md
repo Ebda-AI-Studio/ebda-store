@@ -184,7 +184,6 @@ harness cannot inject it):
 | `DATABASE_URL`                                        | the side's DB as the `ebda_app` RLS (override: `PARITY_APP_ROLE`) role (like prod/CI) |
 | `ENCRYPTION_KEY`                                      | harness key (default in `run.mjs`; or `--encryption-key`)                             |
 | `LOAD_TEST_BYPASS_TOKEN`                              | `bfp-parity-load-test-token`                                                          |
-| `INNGEST_BASE_URL` and `INNGEST_DEV`                  | `http://127.0.0.1:4690` (the harness stub)                                            |
 | `PAYMOB_BASE_URL`                                     | `http://127.0.0.1:4690/paymob`                                                        |
 | `NODE_ENV=development` (or `PAYMENT_PROVIDER_STUB=1`) | required for the override to be honoured                                              |
 
@@ -232,7 +231,7 @@ point that at the head database with
 `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgresql://...` (a pgbouncer in
 transaction mode, or the database directly). The harness variables of the table above are
 passed as `wrangler dev --var NAME:value` (`NODE_ENV`, `API_URL`, `JWT_SECRET`,
-`ENCRYPTION_KEY`, `INNGEST_BASE_URL`, `INNGEST_DEV`, `BFP_STUB_URL`, `LOAD_TEST_BYPASS_TOKEN`,
+`ENCRYPTION_KEY`, `BFP_STUB_URL`, `LOAD_TEST_BYPASS_TOKEN`,
 the payment-stub base URL variable named above (Paymob since SP6b), `PAYMENT_PROVIDER_STUB`, the four `PAYMENT_*` budgets above). The full
 procedure and the verdict are in `docs/ebda/design/stage2-parity.md`.
 

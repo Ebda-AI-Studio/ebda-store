@@ -5,7 +5,7 @@
  *    digit, or Code 128 text) or a 422 `BARCODE_INVALID`.
  *  - `assertBarcodeAvailable`: store-wide uniqueness across products AND variants (a 409
  *    `BARCODE_IN_USE` naming who holds it). The two partial unique indexes are the DB backstop
- *    (migration 20261106000300); variants carry no store_id, so the cross-table rule lives here.
+ *    (migration 20261107000270); variants carry no store_id, so the cross-table rule lives here.
  *  - `allocateBarcodes`: EAN-13 in the GS1 in-store range (prefix 20), next serials after the
  *    store's highest 20-prefixed code, taken under `pg_advisory_xact_lock(hashtext(store||':barcode'))`
  *    so two requests can never be handed the same code. The lock lives to the end of the

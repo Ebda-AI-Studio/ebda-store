@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Define test schemas (matching API schemas)
 const createStoreSchema = z.object({

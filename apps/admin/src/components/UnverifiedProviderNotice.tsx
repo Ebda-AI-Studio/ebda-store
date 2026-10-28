@@ -7,14 +7,17 @@ import { useT } from '@/i18n/useT';
  * other. This line says so honestly: the check on save tells the merchant whether their credentials
  * work, and the first real order is what confirms the whole flow (Ebda is told about it at once).
  */
-export function UnverifiedProviderNotice() {
+/**
+ * `pending`: Ebda cannot confirm this provider's payments yet (GEIDEA-2), so buyers are not offered it.
+ */
+export function UnverifiedProviderNotice({ pending = false }: { pending?: boolean }) {
   const t = useT('providerUnverified');
   return (
     <p className="text-sm text-muted-foreground" data-testid="unverified-provider-notice">
       <span className="me-2 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-ink">
-        {t('chip')}
+        {pending ? t('pendingChip') : t('chip')}
       </span>
-      {t('note')}
+      {pending ? t('pendingNote') : t('note')}
     </p>
   );
 }

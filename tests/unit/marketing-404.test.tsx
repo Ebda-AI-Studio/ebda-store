@@ -8,6 +8,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 vi.mock('../../apps/marketing/src/app/globals.css', () => ({}));
+// RootShell loads its fonts through next/font, which only exists inside the Next compiler.
+vi.mock('next/font/google', () => {
+  const font = () => ({ className: '', variable: '', style: {} });
+  return { Geist: font, Geist_Mono: font, IBM_Plex_Sans_Arabic: font };
+});
 
 const { default: NotFound, metadata } = await import('../../apps/marketing/src/app/not-found');
 

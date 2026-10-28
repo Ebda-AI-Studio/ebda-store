@@ -82,7 +82,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
   ar: {
     meta: {
       title: 'واتساب لمتجرك: صندوق وارد وطلبات وحملات',
-      desc: `${AR} من ${STUDIO_AR}: صندوق وارد مشترك، وطلبات وتأكيد دفع عند الاستلام مربوطين بمتجرك على ${STORE_AR}، وحملات بموافقة العميل، ومساعد ذكي بيرد بالمصري. على واجهة واتساب للأعمال الرسمية من Meta.`,
+      desc: `${AR} من ${STUDIO_AR}: صندوق وارد مشترك، وتأكيد طلبات ودفع عند الاستلام مربوط بمتجرك، وحملات بموافقة العميل، ومساعد ذكي بيرد بالمصري.`,
     },
     h1: 'واتساب شغلك كله في مكان واحد.',
     lead: `${AR} من ${STUDIO_AR} بيخلّيك تكلّم عملاءك على واتساب من شاشة واحدة، ومربوط بمتجرك على ${STORE_AR}. بيشتغل على واجهة واتساب للأعمال الرسمية من Meta، وبتدخله بنفس حسابك على ${STUDIO_AR}.`,
@@ -208,7 +208,7 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
   en: {
     meta: {
       title: 'WhatsApp for your store: inbox, orders, campaigns',
-      desc: `${EN} by ${STUDIO_EN}: a shared inbox, orders and cash-on-delivery confirmations linked to ${STORE_EN}, consent-based campaigns, and an AI agent that answers in Egyptian Arabic. Built on Meta's official WhatsApp Business Platform.`,
+      desc: `${EN} by ${STUDIO_EN}: a shared inbox, order and COD confirmations linked to ${STORE_EN}, consent-based campaigns and an AI agent in Egyptian Arabic.`,
     },
     h1: 'All your WhatsApp, in one place.',
     lead: `${EN} by ${STUDIO_EN} lets you talk to your customers on WhatsApp from one screen, linked to ${STORE_EN}. It runs on Meta's official WhatsApp Business Platform, and you sign in with the same ${STUDIO_EN} account.`,

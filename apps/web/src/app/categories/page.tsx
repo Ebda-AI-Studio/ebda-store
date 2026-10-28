@@ -1,7 +1,7 @@
+import { storefrontAlternates } from '@/lib/seo/locale-alternates';
 import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound, isResolvedStore } from '../../lib/store-resolver';
 import { getPreviewDraftToken } from '../../lib/preview-draft';
-import { storeAbsoluteUrl } from '../../lib/structured-data';
 import { CategoriesPageBody } from './CategoriesPageBody';
 
 // This page had a static `metadata` export with no canonical at all (A3 in
@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: 'Explore product categories and find exactly what you are looking for.',
     // No canonical for an unresolved store (#1855) — it would name the demo store.
     ...(isResolvedStore(store)
-      ? { alternates: { canonical: storeAbsoluteUrl(store, '/categories') } }
+      ? { alternates: await storefrontAlternates(store, '/categories', true) }
       : {}),
   };
 }

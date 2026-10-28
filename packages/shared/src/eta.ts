@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Egyptian Tax Authority (ETA) e-receipt connector, shared contract.

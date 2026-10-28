@@ -971,12 +971,13 @@
     "db": "store-do",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["created_by"],
+    "piiColumns": ["created_by", "published_by"],
     "subjectKeys": ["userId"],
     "note": "staff/actor user ids nulled on user erasure or offboarding (OFFBOARD-1); the rows themselves are business records",
-    "userIdColumns": ["created_by"],
+    "userIdColumns": ["created_by", "published_by"],
     "actorScrub": {
-      "created_by": null
+      "created_by": null,
+      "published_by": null
     }
   },
   "store-do:store_tax_profiles": {
@@ -1119,6 +1120,16 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": ""
+  },
+  "d1:staff_invites": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "delete",
+    "piiColumns": ["email", "invited_by", "accepted_by"],
+    "subjectKeys": ["email"],
+    "note": "invitee address; pending invites expire, rows leave with the store",
+    "userIdColumns": ["invited_by", "accepted_by"],
+    "actorScrub": { "invited_by": null, "accepted_by": null }
   },
   "d1:store_staff": {
     "db": "d1",
@@ -1413,5 +1424,21 @@
     "piiColumns": ["address", "credentials_enc"],
     "subjectKeys": [],
     "note": "merchant ETA credentials (encrypted) and branch address; destroyed with the store"
+  },
+  "d1:billing_grants": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
+  },
+  "d1:billing_referrals": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
   }
 }

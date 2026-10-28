@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 /**
  * Email campaigns (D2, 2026-09-25) — the request contracts shared by the API
