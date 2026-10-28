@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { recordSlugRedirect } from './slug-redirect.service';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Per-store blog service (Bucket E1, 2026-05-17).
@@ -57,7 +58,8 @@ export class BlogService {
   static async listPublished(storeId: string, options: { limit?: number; offset?: number } = {}) {
     const limit = Math.min(50, Math.max(1, options.limit ?? 20));
     const offset = Math.max(0, options.offset ?? 0);
-    const posts = await prisma.blogPost.findMany({
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    const posts = await db.blogPost.findMany({
       where: { storeId, isPublished: true },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit,
@@ -80,7 +82,8 @@ export class BlogService {
   /** Public-read: single post by slug. Returns null if unpublished. */
   static async getPublishedBySlug(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);
-    const post = await prisma.blogPost.findFirst({
+    const db = await storeDb(storeId);
+    const post = await db.blogPost.findFirst({
       where: { storeId, slug, isPublished: true },
       select: {
         id: true,

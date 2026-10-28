@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
-import { decodeRpc } from '@ebda-src/repo';
+import { createDoClient, decodeRpc } from '@ebda-src/repo';
+import { Prisma } from '@prisma/client';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 import { MIGRATIONS, SCHEMA_VERSION, runMigrations } from '../src/cf/store-do/migrations';
 import meta from '@ebda-src/prisma-meta';
@@ -176,5 +177,69 @@ describe('StoreDO.query: prisma-lite reads for the API Worker, reads only', () =
     expect((await stub.query('q-refuse', [{ model: 'User', op: 'findMany' }])).ok).toBe(false); // D1 model: not in a store DO
     const after = await stub.query('q-refuse', [{ model: 'Product', op: 'count' }]);
     expect(after.ok && decodeRpc<number[]>(after.json)[0]).toBe(1);
+  });
+});
+
+describe('the Worker-side read client over a real Durable Object', () => {
+  const clientFor = (name: string, calls: unknown[][] = []) => {
+    const stub = stubFor(name);
+    const client = createDoClient(q => (calls.push(q), stub.query(name, q)));
+    return { stub, client: client as any, calls };
+  };
+
+  it('returns Prisma-shaped values: Date, Prisma.Decimal, nested include, and a real PrismaClientKnownRequestError', async () => {
+    const { stub, client } = clientFor('cl-shape');
+    await stub.seed({
+      products: [product('cl-shape', 'p1', { createdAt: 1_700_000_000_000, hasVariants: true })],
+      variants: [{ id: 'v1', productId: 'p1', sku: 'S', price: 1500, inventory: 2 }],
+    });
+    const rows = await client.product.findMany({
+      where: { status: 'active' },
+      include: { variants: true },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].createdAt).toBeInstanceOf(Date);
+    // a Decimal column (tax_rates.rate, scale 2: stored as the integer 1400) comes back as a Prisma.Decimal 14
+    await runInDurableObject(stub, async (_i, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO tax_rates (id, store_id, name, rate) VALUES ('t1', 'cl-shape', 'VAT', 1400)"
+      );
+    });
+    const rate = await client.taxRate.findUnique({ where: { id: 't1' } });
+    expect(Prisma.Decimal.isDecimal(rate.rate)).toBe(true);
+    expect(String(rate.rate)).toBe('14');
+    expect(rows[0].variants.map((v: { id: string }) => v.id)).toEqual(['v1']);
+    expect(await client.product.count()).toBe(1);
+    expect(await client.product.findUnique({ where: { id: 'none' } })).toBeNull();
+    const err = await client.product.findUniqueOrThrow({ where: { id: 'none' } }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect((err as Prisma.PrismaClientKnownRequestError).code).toBe('P2025');
+  });
+
+  it('$transaction of reads is ONE round trip; writes and raw access do not exist on the client', async () => {
+    const calls: unknown[][] = [];
+    const { stub, client } = clientFor('cl-batch', calls);
+    await stub.seed({ products: [product('cl-batch', 'p1'), product('cl-batch', 'p2')] });
+    const [n, first] = await client.$transaction([
+      client.product.count(),
+      client.product.findFirst({ orderBy: { slug: 'asc' }, select: { slug: true } }),
+    ]);
+    expect(n).toBe(2);
+    expect(first).toEqual({ slug: 'slug-p1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toHaveLength(2);
+    expect(client.product.create).toBeUndefined();
+    expect(client.product.deleteMany).toBeUndefined();
+    expect(() => client.$queryRaw).toThrow(/not available/);
+  });
+
+  it("a client for store A pointed at store B's id gets STORE_MISMATCH, not B's rows", async () => {
+    const a = stubFor('cl-iso-A');
+    await a.seed({ products: [product('cl-iso-A', 'pa')] });
+    const wrong = createDoClient(q => a.query('cl-iso-B', q)) as any;
+    await expect(wrong.product.findMany()).rejects.toThrow(/different store/);
   });
 });

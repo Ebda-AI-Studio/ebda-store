@@ -536,6 +536,7 @@ Paths: new package `packages/cf-schema/` (`src/platform/*.ts` for D1, `src/store
 - [ ] Steps: implement read-only modules first (catalog, search, stats), run the same contract tests against the DO implementation using `@cloudflare/vitest-pool-workers`.
 - **Verify:** `npm run cf:test -w apps/api` plus `npx vitest run packages/repo/test/contract --config vitest.workers.config.mts` exit 0.
 - **Done:** read contracts green on both backends.
+- **Status (PR C, 2026-10-28; rulings CF-DO-SCHEMA-1, CF-REPO-1; `docs/cf/repo-factory.md`):** the StoreDO runs the full generated schema (versioned, idempotent) and answers prisma-lite reads over RPC; `lib/repo-factory.ts` (`storeDb`) picks pg or the DO per store; 5 services / 10 read methods are moved and contract-tested against both backends (`tests/integration/repo-factory-contract.test.ts`). Left: tasks 2.2 and 2.3 for raw SQL, locks, writes, aggregate/groupBy, interactive transactions and the D1 models (PR D).
 
 ### Phase 3: Money and stock correctness (port last; Opus final review of the whole branch)
 

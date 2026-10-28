@@ -46,6 +46,7 @@ import {
   searchProductIds,
 } from './product-search.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -2217,7 +2218,8 @@ export class ProductService {
    * returned, so no chip is a dead end.
    */
   static async getPublicTags(storeId: string) {
-    const rows = await prisma.tag.findMany({
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    const rows = await db.tag.findMany({
       where: {
         storeId,
         products: {
@@ -2256,7 +2258,8 @@ export class ProductService {
    * `storeId` on the tag row; not cached (one indexed lookup, the name is caller-controlled).
    */
   static async getPublicTagByName(storeId: string, name: string) {
-    const row = await prisma.tag.findFirst({
+    const db = await storeDb(storeId);
+    const row = await db.tag.findFirst({
       where: {
         storeId,
         name,

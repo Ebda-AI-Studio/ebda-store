@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { withSavepoint } from '../lib/savepoint';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Per-store Pages CMS service.
@@ -195,7 +196,8 @@ export type PublicPageResult =
 export class PagesService {
   /** List all pages for a store, ordered by position then slug. */
   static async list(storeId: string) {
-    return prisma.storePage.findMany({
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    return db.storePage.findMany({
       where: { storeId },
       orderBy: [{ position: 'asc' }, { slug: 'asc' }],
     });
@@ -204,7 +206,8 @@ export class PagesService {
   /** Fetch a single page by slug. Returns null when not found. */
   static async get(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);
-    return prisma.storePage.findUnique({
+    const db = await storeDb(storeId);
+    return db.storePage.findUnique({
       where: { storeId_slug: { storeId, slug } },
     });
   }
@@ -225,7 +228,8 @@ export class PagesService {
    */
   static async getPublic(storeId: string, slugRaw: string): Promise<PublicPageResult> {
     const slug = normalizeSlug(slugRaw);
-    const page = await prisma.storePage.findUnique({
+    const db = await storeDb(storeId);
+    const page = await db.storePage.findUnique({
       where: { storeId_slug: { storeId, slug } },
     });
     if (!page) return { status: 'not_found' };

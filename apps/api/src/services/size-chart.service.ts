@@ -2,6 +2,7 @@ import { prisma, Prisma } from '@ebda/database';
 import { toPublicSizeChart, type PublicSizeChart, type SizeChart } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * Size charts (B0 Task 9). Store-owned tables linked from `products.size_chart_id` and
@@ -153,7 +154,8 @@ export class SizeChartService {
 
   /** Every valid chart in the store, for the storefront `/size-guide` page. */
   static async listPublic(storeId: string): Promise<PublicSizeChart[]> {
-    const rows = await prisma.sizeChart.findMany({
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    const rows = await db.sizeChart.findMany({
       where: { storeId },
       orderBy: { createdAt: 'asc' },
       select: SIZE_CHART_PUBLIC_SELECT,

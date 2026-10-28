@@ -357,6 +357,16 @@ export class Engine {
           out.push(
             `(SELECT ${a}.${q(cf.column)} FROM ${q(t.table)} ${a} WHERE ${join}) ${dd} NULLS ${dd === 'ASC' ? 'LAST' : 'FIRST'}`
           );
+        } else if (
+          f.list &&
+          isPlain(dir) &&
+          Object.keys(dir).length === 1 &&
+          own(dir as object, '_count')
+        ) {
+          // Prisma's own shape for ordering by how many related rows there are: `{ products: { _count: 'desc' } }`
+          out.push(
+            `${this.countSubquery(this.listRelation(m, key), alias)} ${sortDir(dir._count)}`
+          );
         } else throw new Error(`prisma-lite: unsupported orderBy on relation ${key}`);
       }
     }

@@ -61,6 +61,7 @@ import {
 import { healthPayload } from './lib/health-payload';
 import { hopTiming, markHop, recordHop } from './lib/hop-timing';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
+import { repoScope } from './lib/repo-factory';
 assertBillingConfigAtBoot();
 {
   // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
@@ -139,6 +140,8 @@ app.use(writeFreeze);
 // Operator-only per-hop timing LOG (x-hop-timing must equal the HOP_TIMING_TOKEN secret; never a
 // response header), see lib/hop-timing.ts.
 app.use(hopTiming);
+// Per-request repo scope (lib/repo-factory.ts, Ruling CF-REPO-1): lets a service ask for its store's backend by store id.
+app.use(repoScope);
 
 // Graceful shutdown middleware
 app.use((_req, res, next) => {

@@ -1,17 +1,20 @@
 import { prisma, withStore } from '@ebda/database';
 import type { LocationInput } from '@ebda/shared';
 import { bustStoreCaches } from './store.service';
+import { storeDb } from '../lib/repo-factory';
 
 export class LocationsService {
-  static list(storeId: string) {
-    return prisma.storeLocation.findMany({
+  static async list(storeId: string) {
+    const db = await storeDb(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-REPO-1)
+    return db.storeLocation.findMany({
       where: { storeId },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
-  static listPublished(storeId: string) {
-    return prisma.storeLocation.findMany({
+  static async listPublished(storeId: string) {
+    const db = await storeDb(storeId);
+    return db.storeLocation.findMany({
       where: { storeId, isPublished: true },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
     });
