@@ -28,7 +28,7 @@ Each PR: touched tests, `blast-radius` sweep over the removed identifiers (`DATA
 
 ## 2. Backups stop depending on Neon (plan 7.2)
 
-Confirm before anything is deleted: the nightly DO export alarm wrote an object per store per day for 7 days, D1 time travel answers (`wrangler d1 time-travel info ebda-platform`), the missed-backup alert fires in a test, and the restore drill (plan task 0.6) passes on a production export. Then remove ONLY the Ebda project entry from `~/.claude/scripts/backup-all-neon.sh` (list the script's project set first and show it before editing; the other Force AI projects stay) and the `com.ebda.neon-backup` launchd job.
+Confirm before anything is deleted: the nightly DO export alarm wrote an object per store per day for 7 days, D1 time travel answers (`wrangler d1 time-travel info ebda-platform`), the missed-backup alert fires in a test, and the restore drill (plan task 0.6) passes on a production export. Then remove ONLY the Ebda project entry from `~/.claude/scripts/backup-all-neon.sh` (list the script's project set first and show it before editing; the other projects stay) and the `com.ebda.neon-backup` launchd job.
 
 ## 3. Final encrypted dump to R2 and the restore drill (scripts: `final-dump`, `restore-drill`)
 
