@@ -49,6 +49,8 @@ import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import { assertEmbeddingConfig } from './lib/search/embedding-provider';
 import { assertWhatsAppLinkConfig } from './lib/wa/config';
+import { assertCiCaptureConfig, CI_EVENTS_DLQ, CI_EVENTS_QUEUE } from './lib/ci/config';
+import { handleCiEventsBatch } from './lib/ci/sink';
 import * as Sentry from '@sentry/cloudflare';
 import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
@@ -137,6 +139,7 @@ function prepare(env: CfBindings): void {
   // The WhatsApp link needs SUITE_BUYER_KEY_SECRET; fail loud here, not on the first order.
   if (!whatsAppConfigChecked) {
     assertWhatsAppLinkConfig(env);
+    assertCiCaptureConfig(env);
     whatsAppConfigChecked = true;
   }
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
@@ -352,7 +355,9 @@ async function queue(batch: MessageBatchLike, env: CfBindings, ctx: Ctx): Promis
     // WhatsApp -> Store events (lib/wa) own their ack/retry; everything else is the cf/queues consumers.
     batch.queue === STORE_EVENTS_QUEUE || batch.queue === STORE_EVENTS_DLQ
       ? handleStoreEventsBatch(batch)
-      : handleQueueBatch(batch)
+      : batch.queue === CI_EVENTS_QUEUE || batch.queue === CI_EVENTS_DLQ
+        ? handleCiEventsBatch(batch, env)
+        : handleQueueBatch(batch)
   );
 }
 

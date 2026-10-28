@@ -118,10 +118,26 @@ export function applyCarrierCredentialUpdate(
   };
 }
 
-/** A fresh blob with a new `webhookSecret` (rotation): the old callback URL stops working. */
-export function rotateBlobWebhookSecret(cipher: string | null, settings?: unknown): string {
+/**
+ * A fresh blob with a new `webhookSecret` (rotation). By default the old callback URL stops working
+ * at once (the merchant's Rotate button, used when a secret leaked). With `grace` the old secret is
+ * kept as `previousWebhook` so shipments already registered at the carrier keep their status
+ * callbacks until they are delivered or 30 days pass (see `previousSecretGraceOpen`); a second
+ * rotation replaces it.
+ */
+export function rotateBlobWebhookSecret(
+  cipher: string | null,
+  settings?: unknown,
+  opts: { grace?: boolean; now?: Date } = {}
+): string {
   const blob = decryptCarrierBlob(cipher, settings);
+  const old = blob.webhookSecret;
   blob.webhookSecret = crypto.randomBytes(24).toString('hex');
+  if (opts.grace && old) {
+    blob.previousWebhook = { secret: old, rotatedAt: (opts.now ?? new Date()).toISOString() };
+  } else {
+    delete blob.previousWebhook;
+  }
   return encryptCarrierBlob(blob);
 }
 
