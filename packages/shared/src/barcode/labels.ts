@@ -4,7 +4,7 @@
  * the barcode with its digits, and an optional store QR. Anything that does not fit a small
  * label is dropped in a fixed order and reported in `dropped`, never squeezed unreadable.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { RECEIPT_BARCODE_SHAPES } from './shapes';
 import { parseBarcodeInput } from './ean';
 import { code128Modules } from './code128';

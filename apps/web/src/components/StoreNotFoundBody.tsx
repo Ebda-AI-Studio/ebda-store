@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import Link from 'next/link';
+import Link from './StoreLink';
 import { useRouter } from 'next/navigation';
 import { api, type Category } from '../lib/api';
 import { useLanguage } from '../contexts/LanguageContext';

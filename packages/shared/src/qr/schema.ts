@@ -3,7 +3,7 @@
  * the stored shape without pulling the encoder into the Worker bundle (STARTUP-CPU-1).
  * Stored under `Store.settings.qr`; edited at admin `/stores/[id]/qr`.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { validateColours } from './contrast';
 
 export const QR_STYLES = ['square', 'rounded', 'dots'] as const;
