@@ -263,7 +263,7 @@
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
     // Which background-job groups run on Cloudflare instead of Inngest (src/lib/jobs/flag.ts,
     // src/lib/jobs/jobs-map.ts). Comma list of group numbers/names, or "all"; "" = all on Inngest.
-    "JOBS_CF_GROUPS": "1,2,3,4",
+    "JOBS_CF_GROUPS": "1,2,3,4,5",
     // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
     // comma list of function ids or "all"; "" = every schedule stays a cron.
     "JOBS_CF_ALARMS": "",
