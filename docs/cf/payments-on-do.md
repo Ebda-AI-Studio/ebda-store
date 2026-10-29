@@ -30,7 +30,7 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 | `restoreInventory:false`                                  | cancel (CF-ORDERS-1)                                                             |
 | any other status of a DO order                            | 501 `ORDER_STATUS_NOT_ON_DO`                                                     |
 | partial-return pro-rata journal                           | 501 `PARTIAL_RETURN_JOURNAL_NOT_ON_DO`                                           |
-| gold `setProductPricing`, `asRepricer`, `bulkSwitchMode`  | 501 `GOLD_PRICING_NOT_ON_DO`                                                     |
+| gold `setProductPricing`, `asRepricer`, `bulkSwitchMode`  | `goldSetProductPricing` / `goldCreateVariant` / `goldBulkSwitchMode` (CF-LAST-1) |
 | InstaPay ORDER receipt upload / submit                    | 501 `INSTAPAY_RECEIPTS_NOT_ON_DO`                                                |
 
 ## Not moved (the flip gate stays closed)
@@ -43,3 +43,7 @@ Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document an
 - `tests/integration/repo-factory-payments-contract.test.ts` (3, Postgres 17 vs the DO schema): trial balance parity, refund by status, gold re-pricing.
 - `apps/api/workers-do/payments.test.ts` (6, real workerd): 20 concurrent webhook replays apply once; 20 concurrent full-refund claims, one wins; one `refundKey` x20 one claim; 20 whole-order refund bookings restore stock once; 20 sale / refund posts post once with distinct numbers; `STORE_MISMATCH`.
 - `tests/unit/webhook-do-resolver.test.ts` (8), `tests/unit/ledger-do-cash-codes.test.ts`.
+
+## PR D2b-5 (Ruling CF-LAST-1)
+
+Gold product pricing edits are money ops (`do/gold-pricing.ts`); `PaymentService.handleWebhook` / `refund` have an end-to-end Postgres-vs-DO contract (`tests/integration/repo-factory-payment-service-contract.test.ts`, stub provider adapter). The open list is `docs/cf/not-on-do.json`.

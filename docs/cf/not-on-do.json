@@ -34,9 +34,6 @@
     },
     {
       "flow": "CSV import orchestrator (stock and non-stock fields, slug redirects, gold specs in one DO op)"
-    },
-    {
-      "flow": "PaymentService.handleWebhook / refund end-to-end contract test with a provider stub adapter"
     }
   ]
 }
