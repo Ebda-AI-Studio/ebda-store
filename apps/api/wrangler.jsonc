@@ -274,5 +274,8 @@
     // + cf-api-deploy.yml, so the post-deploy /health probe sees the boot check; never as a secret
     // (cf-api-deploy refuses that) or from the dashboard (a new version with no probe, no rollback).
     "SEARCH_SEMANTIC_ENABLED": "false",
+    // Billing is InstaPay-only until Kashier is approved (Rulings EBDA-FUNNEL-17, BILLING-NONE-1): "none" acknowledges it, so
+    // an unset provider no longer pages a P1 at every boot (M-032). Card billing refuses cleanly; set "kashier" to turn cards on.
+    "BILLING_PROVIDER": "none",
   },
 }
