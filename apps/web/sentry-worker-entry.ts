@@ -40,7 +40,12 @@
 // repo or in a plain `tsc` typecheck, only inside an actual CF build.
 import { default as nextHandler } from './.open-next/worker.js';
 import * as Sentry from '@sentry/cloudflare';
-import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
+import {
+  healthResponse,
+  isHealthRequest,
+  scrubSentryBreadcrumb,
+  scrubSentryEvent,
+} from '@ebda/shared';
 import { companyHostRoute } from './company-host-route';
 import { DEMO_EDGE_API_URL, isDemoStoreHost, serveDemoEdge } from './demo-edge-cache';
 import {
@@ -87,6 +92,8 @@ interface WorkerEnv {
  */
 const baseHandler = {
   async fetch(request: Request, env: WorkerEnv, ctx: unknown): Promise<Response> {
+    // GET /health: commit + deploymentId, answered before Next (Ruling HEALTH-ALL-1).
+    if (isHealthRequest(request)) return healthResponse('web', env, request.method);
     const { hostname, pathname, search } = new URL(request.url);
     const route = companyHostRoute(hostname, pathname, search);
     if (route.kind === 'redirect') {

@@ -78,7 +78,7 @@ jobs:
           SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN_WEB }}
         run: |
           # Server-side Sentry DSN for sentry-worker-entry.ts; omitted (clean no-op) when unset.
-          if [ -n "$SENTRY_DSN" ]; then npx wrangler deploy --var "SENTRY_DSN:$SENTRY_DSN" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}"; else npx wrangler deploy --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}"; fi
+          if [ -n "$SENTRY_DSN" ]; then npx wrangler deploy --var "BUILD_COMMIT_SHA:$GITHUB_SHA" --var "SENTRY_DSN:$SENTRY_DSN" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}"; else npx wrangler deploy --var "BUILD_COMMIT_SHA:$GITHUB_SHA" --var "SHOW_DEMO_STORE_LINK:${{ vars.SHOW_DEMO_STORE_LINK || 'false' }}"; fi
       - name: Verify the live Worker serves THIS build, roll back automatically if not
         # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
         # previous version for a few seconds). Identity: /_next/static/<BUILD_ID>/_buildManifest.js
@@ -94,6 +94,7 @@ jobs:
             --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" --window 120 --resolve-ip "$ip" \
             --probe "https://ebda-deploy-probe.ebda.app/_next/static/$BUILD_ID/_buildManifest.js|200" \
             --probe "https://ebda-deploy-probe.ebda.app/|404" \
+            --probe "https://ebda-deploy-probe.ebda.app/health|200|commit=$GITHUB_SHA" \
             --rollback-probe "https://ebda-deploy-probe.ebda.app/|404"
 
   # OPS-5: a failed deploy used to be silent (the storefront stayed on an old build for days). Alerts the Telegram bridge;
