@@ -75,6 +75,10 @@ regexes = [
   # blanket removed above was masking that this entry was dead on arrival; without it,
   # gitleaks correctly flags this fixture (private-key rule) until fixed here.
   '''nDjm07wI9wchYGBdTM7cFDagEuV6dm7xXAFfY5mkviqnPNWmjWChxTLTYs14cL0y''',
+  # sha256 content pins of published docs pages (support-wa-docs-drift.test.ts,
+  # `'en/api.mdx': '<64 hex>'`) - public file digests, not credentials. Matches the
+  # pin line shape only, commit-independent.
+  '''['"](?:ar|en)/[a-z-]+\.mdx['"]\s*:\s*['"][0-9a-f]{64}['"]''',
 ]
 
 # CORRECTED 2026-09-02 (adversarial audit, P2): this used to also carry a
