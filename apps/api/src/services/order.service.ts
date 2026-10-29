@@ -101,7 +101,7 @@ import {
   openUnpaidHoldCap,
   openUnpaidHoldIpCap,
 } from '../lib/stock-hold-cap';
-import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
+import { storeDb, storeMoney, type CreateOrderArgs, type MoneyClient } from '../lib/repo-factory';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -811,12 +811,6 @@ export class OrderService {
     // wallet debit and the order rows are ONE section there, in place of the interactive transaction below.
     const money = await storeMoney(storeId);
     if (money) {
-      if (requestContext?.dryRun)
-        throw new AppError(
-          501,
-          'QUOTE_NOT_ON_DO',
-          'A quote for a Durable Object store is not ported'
-        );
       return OrderService.createOnDo(money, {
         storeId,
         customerId,
@@ -2361,6 +2355,7 @@ export class OrderService {
       cart: {
         id: string;
         items: Array<{
+          id: string;
           productId: string;
           quantity: number;
           variantId?: string | null;
@@ -2368,7 +2363,7 @@ export class OrderService {
           note?: string | null;
           product: { personalisation?: unknown };
         }>;
-        bundles: Array<{ bundleId: string; quantity: number }>;
+        bundles: Array<{ id?: string; bundleId: string; quantity: number }>;
       };
       referralCode?: string;
       requestContext?: {
@@ -2381,13 +2376,14 @@ export class OrderService {
   ) {
     const { storeId, customerId, data } = c;
     // Options the Postgres path honours that the engine does not: refuse them loudly rather than drop them (CF-ORDERS-1).
-    if (data.deliveryDate || data.deliveryWindowId)
+    const isQuote = c.requestContext?.dryRun === true;
+    if (!isQuote && (data.deliveryDate || data.deliveryWindowId))
       throw new AppError(
         501,
         'DELIVERY_SLOT_NOT_ON_DO',
         'Delivery slots are not available for this store yet'
       );
-    if (c.cart.items.some(i => i.note))
+    if (!isQuote && c.cart.items.some(i => i.note))
       throw new AppError(
         501,
         'PERSONALISATION_NOT_ON_DO',
@@ -2422,43 +2418,75 @@ export class OrderService {
       });
       walletAmount = w?.balance ?? 0; // the engine caps it to the order total
     }
-    const placed = await OrderService.translateDoRefusal(() =>
-      money.createOrder({
-        lines: c.cart.items.map(i => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          ...(i.variantId ? { variantId: i.variantId } : {}),
-          quotedUnitPrice: i.quotedUnitPrice ?? null,
+    // The cart STATE this order consumes, claimed atomically with the order (Ruling CF-FINAL-1, closes CF-ORDERS-CART-1): the
+    // row ids make a re-purchase after the cart was cleared a new state, and a double submit of one state the same one.
+    const cartFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify([
+          c.cart.items.map(i => [i.id, i.quantity]).sort(),
+          c.cart.bundles.map(b => [b.id ?? b.bundleId, b.quantity]).sort(),
+        ])
+      )
+      .digest('hex');
+    const orderArgs: CreateOrderArgs = {
+      cartClaim: { id: c.cart.id, fingerprint: cartFingerprint },
+      lines: c.cart.items.map(i => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        ...(i.variantId ? { variantId: i.variantId } : {}),
+        quotedUnitPrice: i.quotedUnitPrice ?? null,
+      })),
+      bundles: c.cart.bundles.map(b => ({ bundleId: b.bundleId, quantity: b.quantity })),
+      buyer: c.requestContext?.buyer,
+      customerId,
+      couponCode: data.couponCode,
+      walletAmount,
+      pointsToRedeem: customerId ? data.pointsToRedeem : undefined,
+      paymentMethod: data.paymentMethod,
+      idempotencyKey: c.requestContext?.idempotencyKey
+        ? (checkoutIdempotencyHash(c.cart.id, c.requestContext.idempotencyKey) ?? undefined)
+        : undefined,
+      shippingAddress: data.shippingAddress,
+      billingAddress: data.billingAddress,
+      checkoutIp: c.requestContext?.checkoutIp ?? undefined,
+      holdCaps: {
+        manual: openUnpaidHoldCap(),
+        gateway: openUnpaidGatewayHoldCap(),
+        ip: openUnpaidHoldIpCap(),
+      },
+      wholesaleEntitled: wholesale,
+      loyaltyFeatureEnabled: loyaltyOn,
+      backorderEnabled: backorderOn,
+      goldRequireQuote: c.requestContext?.dryRun !== true,
+      expectedTotal: data.expectedTotal,
+      orderNotes: data.notes,
+      locale: data.locale,
+      smsOptIn: data.smsOptIn === true,
+      source: data.source ?? 'web',
+    };
+    if (isQuote) {
+      const q = await OrderService.translateDoRefusal(() => money.quoteOrder(orderArgs));
+      return {
+        subtotal: q.subtotal,
+        discount: q.discount,
+        shipping: q.shipping,
+        codFee: q.codFee,
+        tax: q.tax,
+        total: q.total,
+        taxIncludedInPrice: q.taxIncludedInPrice,
+        lines: q.lines.map(l => ({
+          itemId: c.cart.items[l.index].id,
+          productId: l.productId,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          lineTotal: l.lineTotal,
+          listPrice: l.listPrice,
+          priceSource: l.priceSource,
+          priceTierMinQty: l.priceTierMinQty,
         })),
-        bundles: c.cart.bundles.map(b => ({ bundleId: b.bundleId, quantity: b.quantity })),
-        buyer: c.requestContext?.buyer,
-        customerId,
-        couponCode: data.couponCode,
-        walletAmount,
-        pointsToRedeem: customerId ? data.pointsToRedeem : undefined,
-        paymentMethod: data.paymentMethod,
-        idempotencyKey: c.requestContext?.idempotencyKey
-          ? (checkoutIdempotencyHash(c.cart.id, c.requestContext.idempotencyKey) ?? undefined)
-          : undefined,
-        shippingAddress: data.shippingAddress,
-        billingAddress: data.billingAddress,
-        checkoutIp: c.requestContext?.checkoutIp ?? undefined,
-        holdCaps: {
-          manual: openUnpaidHoldCap(),
-          gateway: openUnpaidGatewayHoldCap(),
-          ip: openUnpaidHoldIpCap(),
-        },
-        wholesaleEntitled: wholesale,
-        loyaltyFeatureEnabled: loyaltyOn,
-        backorderEnabled: backorderOn,
-        goldRequireQuote: c.requestContext?.dryRun !== true,
-        expectedTotal: data.expectedTotal,
-        orderNotes: data.notes,
-        locale: data.locale,
-        smsOptIn: data.smsOptIn === true,
-        source: data.source ?? 'web',
-      })
-    );
+      } as never;
+    }
+    const placed = await OrderService.translateDoRefusal(() => money.createOrder(orderArgs));
     // the cart is consumed (it still lives in Postgres until carts move)
     if (!placed.replayed) {
       await prisma.cartItem.deleteMany({ where: { cartId: c.cart.id } });

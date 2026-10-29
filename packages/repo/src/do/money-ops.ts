@@ -4,7 +4,7 @@ import {
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
 } from './loyalty';
-import { placeOrder, type CheckoutInput } from './checkout';
+import { CART_CLAIMS_DDL, placeOrder, quoteOrder, type CheckoutInput } from './checkout';
 import { cancelOrder, refundOrder } from './refund';
 import {
   applyPaymentEventSync,
@@ -65,7 +65,8 @@ export type MoneyOpName =
   | 'goldUpdateSettings'
   | 'goldRepriceProduct'
   | 'fanoutDisarm'
-  | 'orderStatus';
+  | 'orderStatus'
+  | 'quoteOrder';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -89,10 +90,14 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'goldRepriceProduct',
   'fanoutDisarm',
   'orderStatus',
+  'quoteOrder',
 ];
 
 const TABLE = '_money_ops';
-export const ensureMoneyOpsSchema = (db: SyncSql): void => ensureKeyedSchema(db, TABLE);
+export const ensureMoneyOpsSchema = (db: SyncSql): void => {
+  ensureKeyedSchema(db, TABLE);
+  db.run(CART_CLAIMS_DDL, []);
+};
 
 const id = (v: unknown, what: string): string =>
   typeof v === 'string' && v.length > 0 && v.length <= 128
@@ -279,6 +284,11 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
         [id(a.orderId, 'orderId'), storeId, a.requestedAt as number]
       ).changes > 0,
   }),
+  /** OrderService.quote (dryRun): the totals and per-line prices of a cart, nothing reserved, nothing written. */
+  quoteOrder: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a as Partial<CheckoutInput>;
+    return quoteOrder(db, { ...(rest as CheckoutInput), storeId });
+  },
   /** The plain status transitions (confirmed, processing, shipped, delivered): see `changeOrderStatus`. */
   orderStatus: (db, storeId, a) =>
     changeOrderStatus(db, {

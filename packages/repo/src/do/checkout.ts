@@ -60,6 +60,14 @@ export interface CheckoutInput {
    * instead of creating a second order. Also scopes `idempotencyKey` to this cart.
    */
   cart?: { id: string };
+  /**
+   * The cart STATE this checkout consumes when the cart rows live elsewhere (Postgres) - Ruling CF-FINAL-1, closing
+   * CF-ORDERS-CART-1. `fingerprint` is the cart's own version (id, its last-change time and the lines and boxes read). It is
+   * claimed in the SAME section as the order in `_cart_claims`: a second checkout of the same cart state (no key, a different
+   * key, a request that read the cart before the first one cleared it) finds the claim and fails with CART_CHANGED instead of
+   * creating a second order. Any change to the cart yields a new fingerprint, so a re-purchase is never blocked.
+   */
+  cartClaim?: { id: string; fingerprint: string };
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
@@ -75,7 +83,51 @@ export interface CheckoutInput {
   /** the total the shopper last saw: a different server total aborts with PRICE_CHANGED (Ruling B2B-9). */
   expectedTotal?: number;
   customerNotes?: string;
+  /**
+   * A QUOTE (Ruling CF-FINAL-1): price the cart exactly as an order would, take no stock, no wallet, no hold slot, write
+   * nothing, and answer with the totals and the per-line prices (`quoteOrder`). Only `quoteOrder` sets it.
+   */
+  dryRun?: boolean;
   now?: number;
+}
+export interface OrderQuoteResult {
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  codFee: number;
+  tax: number;
+  total: number;
+  taxIncludedInPrice: boolean;
+  /** one entry per loose line, in the order of `lines` of the input (bundle components are not quoted, as on Postgres) */
+  lines: Array<{
+    index: number;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    listPrice: number;
+    priceSource: string;
+    priceTierMinQty: number | null;
+  }>;
+}
+class QuoteSignal {
+  constructor(readonly quote: OrderQuoteResult) {}
+}
+/** Price a cart as an order would (Ruling CF-FINAL-1): the section is abandoned, so a quote writes nothing at all. */
+export function quoteOrder(db: SyncSql, input: CheckoutInput): OrderQuoteResult {
+  try {
+    placeOrder(db, {
+      ...input,
+      dryRun: true,
+      idempotencyKey: undefined,
+      cart: undefined,
+      cartClaim: undefined,
+    });
+  } catch (e) {
+    if (e instanceof QuoteSignal) return e.quote;
+    throw e;
+  }
+  throw new MoneyError('QUOTE_FAILED', 'the quote did not complete', 500);
 }
 export interface PlacedOrder {
   orderId: string;
@@ -96,6 +148,10 @@ export interface PlacedOrder {
 }
 
 const MAX_TOTAL = 2_000_000_000;
+/** A cart claim outlives any realistic double-submit window; a changed cart has a new fingerprint, so it never blocks a re-purchase. */
+export const CART_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+export const CART_CLAIMS_DDL =
+  'CREATE TABLE IF NOT EXISTS _cart_claims (cart_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, claimed_at INTEGER NOT NULL)';
 const orderNumber = (now: number) =>
   `ORD-${Math.floor(now / 1000)
     .toString(36)
@@ -259,6 +315,24 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
     }
 
+    if (input.cartClaim) {
+      const { id, fingerprint } = input.cartClaim;
+      if (!id || !fingerprint || id.length > 128 || fingerprint.length > 256)
+        throw new MoneyError('BAD_ARGS', 'cartClaim', 400);
+      db.run('DELETE FROM _cart_claims WHERE claimed_at < ?', [now - CART_CLAIM_TTL_MS]);
+      const prior = db.all('SELECT fingerprint FROM _cart_claims WHERE cart_id = ?', [id])[0];
+      if (prior && prior.fingerprint === fingerprint)
+        throw new MoneyError(
+          'CART_CHANGED',
+          'The cart changed or was already checked out. Review it and try again.',
+          409
+        );
+      db.run(
+        'INSERT INTO _cart_claims (cart_id, fingerprint, claimed_at) VALUES (?, ?, ?) ON CONFLICT (cart_id) DO UPDATE SET fingerprint = excluded.fingerprint, claimed_at = excluded.claimed_at',
+        [id, fingerprint, now]
+      );
+    }
+
     if (input.cart) {
       const owned = db.all('SELECT id FROM carts WHERE id = ? AND store_id = ?', [
         input.cart.id,
@@ -399,6 +473,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       stockTaken: number;
     }[] = [];
     const take = (productId: string, variantId: string | null, qty: number, lineIndex: number) => {
+      if (input.dryRun) return; // a quote reserves nothing
       const p = db.all(
         'SELECT track_inventory, allow_backorder FROM products WHERE id = ? AND store_id = ?',
         [productId, input.storeId]
@@ -744,6 +819,26 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     const total = taxFields.total;
     if (total < 0) throw new MoneyError('NEGATIVE_TOTAL', 'order total cannot be negative', 500);
     if (total > MAX_TOTAL) throw new MoneyError('TOTAL_TOO_LARGE', 'order total too large', 400);
+    if (input.dryRun)
+      throw new QuoteSignal({
+        subtotal,
+        discount,
+        shipping,
+        codFee,
+        tax: taxFields.tax,
+        total,
+        taxIncludedInPrice: taxFields.taxIncludedInPrice === 1,
+        lines: priced.lines.map((l, index) => ({
+          index,
+          productId: l.productId,
+          quantity: l.qty,
+          unitPrice: l.resolved.unitMinor,
+          lineTotal: l.resolved.unitMinor * l.qty,
+          listPrice: l.resolved.listMinor,
+          priceSource: l.resolved.source,
+          priceTierMinQty: l.resolved.tierMinQty,
+        })),
+      });
     if (input.expectedTotal !== undefined && input.expectedTotal !== total)
       throw new MoneyError(
         'PRICE_CHANGED',

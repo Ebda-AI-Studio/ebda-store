@@ -189,6 +189,8 @@ export interface MoneyClient {
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
   /** OrderService.create on the DO (Ruling CF-ORDERS-1): ONE section = stock, hold cap, coupon, loyalty redeem, wallet, rows. */
   createOrder(a: CreateOrderArgs, key?: string): Promise<PlacedOrderResult>;
+  /** OrderService.quote (dryRun): totals and per-line prices; nothing reserved, nothing written (Ruling CF-FINAL-1). */
+  quoteOrder(a: CreateOrderArgs): Promise<OrderQuoteAnswer>;
   confirmPayment(
     a: { orderId: string; actorUserId?: string | null; proofSubmitted?: boolean },
     key?: string
@@ -274,6 +276,26 @@ export interface MoneyClient {
   ): Promise<OrderStatusResult>;
 }
 
+export interface OrderQuoteAnswer {
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  codFee: number;
+  tax: number;
+  total: number;
+  taxIncludedInPrice: boolean;
+  lines: Array<{
+    index: number;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    listPrice: number;
+    priceSource: 'base' | 'tier' | 'group';
+    priceTierMinQty: number | null;
+  }>;
+}
+
 export interface OrderStatusResult {
   orderId: string;
   from: string;
@@ -348,6 +370,8 @@ export interface CreateOrderArgs {
   currency?: string;
   idempotencyKey?: string;
   cart?: { id: string };
+  /** Ruling CF-FINAL-1: the cart state claimed atomically with the order (the cart rows are on Postgres) */
+  cartClaim?: { id: string; fingerprint: string };
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
@@ -466,6 +490,7 @@ export function makeMoneyClient(
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
     createOrder: (a, key) => call('createOrder', a, key),
+    quoteOrder: a => call('quoteOrder', a),
     confirmPayment: (a, key) => call('confirmPayment', a, key),
     cancel: (a, key) => call('cancel', a, key),
     expireHold: (a, key) => call('expireHold', a, key),

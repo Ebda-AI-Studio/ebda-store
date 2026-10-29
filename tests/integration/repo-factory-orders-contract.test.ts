@@ -603,4 +603,75 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.out.ok.back.err.code).toBe('INVALID_STATUS_TRANSITION');
     expect(t.out.ok.after.status).toBe('shipped');
   });
+
+  it('quote (dryRun): the same totals and line prices on both backends, nothing reserved, no refusal for stock', async () => {
+    const t = await parity(1, async w => {
+      const sessionId = cartSessionId('d2b4q');
+      const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
+      await prisma.cartItem.create({
+        data: { cartId: cart.id, productId: w.product, quantity: 3 },
+      });
+      const q = await OrderService.quote(
+        STORE,
+        undefined,
+        sessionId,
+        { shippingAddress: address(1), paymentMethod: 'cod', couponCode: w.coupon } as never,
+        { kind: 'anonymous' } as never
+      );
+      // the cart is untouched and (3 > 1 in stock) the order itself is refused
+      const again = await settle(() =>
+        OrderService.create(
+          STORE,
+          undefined,
+          sessionId,
+          { shippingAddress: address(1), paymentMethod: 'cod' } as never,
+          undefined,
+          undefined
+        )
+      );
+      return { q, again };
+    });
+    expect(t.out.ok.q).toMatchObject({ subtotal: 30_000, discount: 1_000 });
+    expect(t.out.ok.q.lines).toHaveLength(1);
+    expect(t.out.ok.again.err.code).toBe('INSUFFICIENT_INVENTORY');
+    expect(t.state.products[0].inventory).toBe(1);
+    expect(t.state.coupons[0].usageCount).toBe(0);
+    expect(t.state.orders).toHaveLength(0);
+  });
+
+  it('two concurrent submits of one cart create exactly one order on both backends (CF-ORDERS-CART-1 closed)', async () => {
+    const counts: Record<string, number> = {};
+    for (const [name, on, mirror] of [
+      ['pg', onPg, false],
+      ['do', onDo, true],
+    ] as const) {
+      phoneSeq++;
+      const w = await world(10, mirror);
+      const out = await on(async () => {
+        const sessionId = cartSessionId('d2b4c');
+        const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
+        await prisma.cartItem.create({
+          data: { cartId: cart.id, productId: w.product, quantity: 2 },
+        });
+        const submit = (i: number) =>
+          settle(() =>
+            OrderService.create(
+              STORE,
+              undefined,
+              sessionId,
+              { shippingAddress: address(i), paymentMethod: 'cod' } as never,
+              undefined,
+              undefined
+            )
+          );
+        return Promise.all([submit(1), submit(1), submit(1)]);
+      });
+      const made = out.filter((o: any) => o.ok);
+      counts[name] = made.length;
+      for (const o of out.filter((x: any) => x.err))
+        expect(['CART_CHANGED', 'EMPTY_CART']).toContain((o as any).err.code);
+      expect((await on(() => state(w))).products[0].inventory).toBe(8);
+    }
+    expect(counts).toEqual({ pg: 1, do: 1 });
+  });
 });
