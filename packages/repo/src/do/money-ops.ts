@@ -37,6 +37,7 @@ import {
   type ProductPricingInput,
   type VariantPricingInput,
 } from './gold-pricing';
+import { searchOrderIds } from './order-search';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -80,7 +81,8 @@ export type MoneyOpName =
   | 'orderStatus'
   | 'quoteOrder'
   | 'fiscalRefund'
-  | 'fiscalCancelSale';
+  | 'fiscalCancelSale'
+  | 'searchOrders';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -110,6 +112,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'quoteOrder',
   'fiscalRefund',
   'fiscalCancelSale',
+  'searchOrders',
 ];
 
 const TABLE = '_money_ops';
@@ -359,6 +362,14 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       now: Date.now(),
     }),
   }),
+  /** The admin order-list search (Ruling CF-R4-1): the id sets of the order-number, registered-customer and guest-contact arms. A read; a retry is a fresh read. */
+  searchOrders: (db, storeId, a) =>
+    searchOrderIds(
+      db,
+      storeId,
+      typeof a.search === 'string' ? a.search : '',
+      typeof a.numberLimit === 'number' && a.numberLimit > 0 ? a.numberLimit : undefined
+    ),
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),

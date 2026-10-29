@@ -7,7 +7,7 @@
  * Cancel: Postgres reverses through the `order/refunded` fanout (run inline here), the DO inside the one section.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { prisma } from '@ebda/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import {
   answerMoneyOp,
   decodeRpc,
@@ -16,6 +16,7 @@ import {
   createDoClient,
   createPrismaLite,
   ensureIdempotencySchema,
+  ensureSearchIndex,
   runReads,
   runWrites,
 } from '@ebda-src/repo';
@@ -25,6 +26,7 @@ import { featureService } from '../../apps/api/src/services/feature.service';
 import { handleOrderRefunded } from '../../apps/api/src/lib/inngest/functions/order-refunded';
 import {
   makeMoneyClient,
+  storeMoney,
   storeWriter,
   withRepo,
   type StoreReads,
@@ -49,6 +51,7 @@ function doRepo() {
   ensureIdempotencySchema(sql);
   const sync = nodeSyncSql(sqlite);
   ensureMoneyOpsSchema(sync);
+  ensureSearchIndex(sync);
   const lite = createPrismaLite(META as never, sql, 'store-do', { storeId: STORE }) as never;
   const c = createDoClient(
     q => runReads(lite, q),
@@ -725,11 +728,145 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.out.ok.gone.err.status).toBe(404);
   });
 
-  it('order search on a DO store is refused loudly (never answered empty)', async () => {
-    const refused = await settle(() =>
-      onDo(() => OrderService.list(STORE, { search: 'anything' }))
-    );
-    expect(refused).toMatchObject({ err: { status: 501, code: 'ORDER_SEARCH_NOT_ON_DO' } });
+  it('admin order search (Ruling CF-R4-1): order number, registered customers, guest contacts, Arabic folding, any phone form, e-mail, literal wildcards', async () => {
+    const t = await parity(40, async w => {
+      const regs = [
+        { first: 'أحمد', last: 'سعيد', phone: '+201012345678', mail: 'ahmed.reg@example.test' },
+        { first: 'Laila', last: 'Hassan', phone: '+201199887766', mail: 'laila.reg@example.test' },
+      ];
+      const users: string[] = [];
+      let i = 0;
+      for (const r of regs) {
+        const user = await prisma.user.create({
+          data: {
+            email: `${Math.random().toString(36).slice(2)}-${r.mail}`,
+            passwordHash: 'x'.repeat(60),
+            firstName: r.first,
+            lastName: r.last,
+            phone: r.phone,
+            role: 'customer',
+            storeId: STORE,
+            status: 'active',
+          },
+        });
+        users.push(user.id);
+        if (await storeMoney(STORE))
+          sqlite
+            .prepare(
+              `INSERT OR IGNORE INTO customers (id, store_id, email, first_name, last_name, phone) VALUES (?, ?, ?, ?, ?, ?)`
+            )
+            .run(user.id, STORE, user.email, r.first, r.last, r.phone);
+        const sessionId = cartSessionId('r4s');
+        await (
+          await storeWriter(STORE)
+        ).cartItem.create({
+          data: {
+            cartId: (await CartService.getOrCreate(STORE, sessionId, user.id)).id,
+            productId: w.product,
+            quantity: 1,
+          },
+        });
+        await OrderService.create(
+          STORE,
+          user.id,
+          sessionId,
+          { shippingAddress: address(++i), paymentMethod: 'cod' } as never,
+          undefined,
+          undefined
+        );
+      }
+      const guests = [
+        {
+          firstName: 'فاطمة',
+          lastName: 'الزهراء',
+          phone: '01234567890',
+          email: 'fatma.guest@example.test',
+        },
+        {
+          firstName: 'Mostafa',
+          lastName: 'Kamel',
+          phone: '+20 109 555 0102',
+          email: 'mk@shop.example',
+        },
+        {
+          firstName: 'Ahmed',
+          lastName: 'Saeed',
+          phone: '٠١٠٠٢٢٢٣٣٣٣',
+          email: 'ahmed.saeed@example.test',
+        },
+      ];
+      const placed: Array<{ id: string; orderNumber: string }> = [];
+      for (const g of guests)
+        placed.push(
+          (await place(w, 1, { shippingAddress: { ...address(++i), ...g } }, i)) as never
+        );
+      const brief = (o: any) =>
+        o.customer
+          ? `${o.customer.firstName} ${o.customer.lastName}`
+          : `${o.shippingAddress?.firstName} ${o.shippingAddress?.lastName}`;
+      const search = async (q: string, extra: Record<string, unknown> = {}) => {
+        // the Postgres search definers take the store only from `app.current_store_id` (what tenantContext gives a real request)
+        const r = await settle(() =>
+          runInTenantContext(STORE, () =>
+            OrderService.list(STORE, { search: q, ...extra } as never)
+          )
+        );
+        if ('err' in r) return r;
+        return { names: r.ok.orders.map(brief).sort(), total: r.ok.meta.total };
+      };
+      const num = placed[0].orderNumber;
+      const terms = [
+        num, // the whole number
+        num.slice(-6), // a part of it
+        'ORD-', // matches every order
+        'احمد', // folded: finds أحمد (registered) and Ahmed is Latin so not
+        'أحمد',
+        'ahmed', // latin: the guest, not the Arabic registered customer
+        'سعيد',
+        'فاطمه', // ة / ه fold
+        'Laila Hassan', // both tokens (AND)
+        'hassan laila', // any order
+        '01012345678', // phone, national form
+        '+20 101 234 5678',
+        '٠١٠١٢٣٤٥٦٧٨', // Arabic-Indic digits
+        '0109 555 0102', // guest, spaced
+        '01002223333', // guest typed in Arabic-Indic digits
+        'laila.reg', // e-mail part
+        'mk@shop', // guest e-mail
+        'EXAMPLE.TEST', // case-insensitive
+        '%', // literal
+        '_',
+        'zzzzzz', // no match
+        'ab', // shorter than a trigram
+      ];
+      const out: Record<string, unknown> = {};
+      for (const q of terms)
+        out[q === num ? '<num>' : q === num.slice(-6) ? '<part>' : q] = await search(q);
+      out['own orders'] = await search('hassan', { customerId: users[1] });
+      out['other customer'] = await search('hassan', { customerId: users[0] });
+      out['status filter'] = await search('example.test', { status: 'cancelled' });
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o['<num>'].total).toBe(1);
+    expect(o['احمد'].names).toEqual(expect.arrayContaining(['أحمد سعيد']));
+    expect(o['Laila Hassan'].total).toBe(1);
+    expect(o['zzzzzz'].total).toBe(0);
+  });
+
+  it('admin order search: a term that matches nothing is empty, a scanned order barcode opens exactly that order', async () => {
+    const t = await parity(5, async w => {
+      const o = (await place(w, 1, {}, 1)) as { orderNumber: string };
+      const list = (q: string) =>
+        runInTenantContext(STORE, () => OrderService.list(STORE, { search: q } as never));
+      const none = await list('no-such-person-xyz');
+      return {
+        none: none.orders.length,
+        byNumber: (await OrderService.list(STORE, { search: o.orderNumber } as never)).orders
+          .length,
+      };
+    });
+    expect(t.out.ok).toEqual({ none: 0, byNumber: 1 });
   });
 
   it('a plain order: totals, items, stock and the sale ledger row are the same', async () => {

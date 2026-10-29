@@ -368,6 +368,31 @@ export function orderNumberFromScan(input: string): string | null {
   return n.startsWith('ORD-') ? n : null;
 }
 
+/**
+ * The OR arms of the order search for a DO store (Ruling CF-R4-1): the same three arms as the indexed Postgres path (order
+ * number, registered customers by `customer_id`, guest orders by id), their ids resolved inside the StoreDO from its derived
+ * search index (Arabic-folded names, any phone form, email, the guest contact snapshot). There is no relation fallback on a
+ * DO, so a term so broad that a cap is hit is refused loudly rather than answered with a short list.
+ */
+async function orderSearchArmsOnDo(
+  money: MoneyClient,
+  search: string
+): Promise<Prisma.OrderWhereInput[]> {
+  const r = await money.searchOrders({ search });
+  if (r.truncated)
+    throw new AppError(
+      422,
+      'ORDER_SEARCH_TOO_BROAD',
+      'That search matches too many orders: add more of the name, number or phone'
+    );
+  const arms: Prisma.OrderWhereInput[] = [];
+  if (r.numberIds.length) arms.push({ id: { in: r.numberIds } });
+  if (r.userIds.length) arms.push({ customerId: { in: r.userIds } });
+  if (r.guestOrderIds.length) arms.push({ id: { in: r.guestOrderIds } });
+  if (arms.length === 0) arms.push({ id: { in: [] } });
+  return arms;
+}
+
 export async function orderSearchWhere(
   storeId: string,
   search: string,
@@ -383,6 +408,9 @@ export async function orderSearchWhere(
   // Still store-scoped: callers AND this with their own `storeId`.
   const scanned = orderNumberFromScan(search);
   if (scanned) return [{ orderNumber: scanned }];
+  // A store on its Durable Object answers from the DO's own search index (Ruling CF-R4-1); the Postgres code below is untouched.
+  const money = await storeMoney(storeId);
+  if (money) return orderSearchArmsOnDo(money, search);
   const contains = { contains: search, mode: 'insensitive' as const };
   const customerMatch: Prisma.UserWhereInput[] = [
     { firstName: contains },
@@ -569,15 +597,6 @@ export class OrderService {
 
     const repo = await storeRepo(storeId);
     const onDo = repo.backend === 'do';
-    // The admin order SEARCH resolves customers and guest orders through Postgres definers over the Postgres `orders` table,
-    // and a guest's contact lives in a JSON snapshot prisma-lite cannot filter: refused for a DO store, never answered empty
-    // (listed in docs/cf/not-on-do.json).
-    if (onDo && options.search?.trim())
-      throw new AppError(
-        501,
-        'ORDER_SEARCH_NOT_ON_DO',
-        'Searching orders is not available for this store yet'
-      );
     const where = await OrderService.listWhere(storeId, options);
 
     const baseFindManyArgs = {

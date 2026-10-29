@@ -10,11 +10,6 @@
       "code": "INSTAPAY_RECEIPTS_NOT_ON_DO",
       "file": "apps/api/src/services/payment-providers/instapay-receipt.service.ts",
       "needs": "a D1 entity-index kind for the cross-store reference_key uniqueness, then the receipt upload/submit as one moneyOp"
-    },
-    {
-      "code": "ORDER_SEARCH_NOT_ON_DO",
-      "file": "apps/api/src/services/order.service.ts",
-      "needs": "admin order search over the DO: the customer and guest-order lookups are Postgres definers over the Postgres orders table, and a guest's contact is a JSON snapshot prisma-lite cannot filter; port onto the D1 entity index (kind order) and a DO-side contact index"
     }
   ],
   "postgresOnly": [

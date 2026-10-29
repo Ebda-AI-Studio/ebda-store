@@ -279,6 +279,13 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ document: { number: string } | null }>;
+  /** The admin order-list search's id sets, resolved from the DO's derived search index (Ruling CF-R4-1). A read. */
+  searchOrders(a: { search: string; numberLimit?: number }): Promise<{
+    numberIds: string[];
+    userIds: string[];
+    guestOrderIds: string[];
+    truncated: boolean;
+  }>;
   goldSetProductPricing(a: Record<string, unknown>, key?: string): Promise<any>;
   goldBulkSwitchMode(a: Record<string, unknown>, key?: string): Promise<any>;
   goldCreateVariant(a: Record<string, unknown>, key?: string): Promise<{ id: string }>;
@@ -536,6 +543,7 @@ export function makeMoneyClient(
     orderStatus: (a, key) => call('orderStatus', a, key),
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
+    searchOrders: a => call('searchOrders', a),
   };
 }
 
