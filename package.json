@@ -184,6 +184,7 @@
     "qs": "6.16.2",
     "wrangler": "4.116.0",
     "basic-ftp": "6.2.2",
+    "systeminformation": "5.33.16",
     "postcss-selector-parser": "7.1.6",
     "@lhci/utils": {
       "lighthouse": "13.5.0"
