@@ -493,59 +493,6 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
     labelAr: 'كروت المنتجات',
     settings: [
       {
-        id: 'cardHeart',
-        type: 'select',
-        labelEn: 'Wishlist heart on home cards',
-        labelAr: 'قلب المفضلة على كروت الرئيسية',
-        hintEn:
-          'The heart button on each product card in home page sections. Product pages keep theirs.',
-        hintAr: 'زر القلب على كل كارت منتج في أقسام الصفحة الرئيسية. صفحات المنتج بتفضل فيها.',
-        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
-        trait: true,
-        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
-      },
-      {
-        id: 'cardSwatches',
-        type: 'select',
-        labelEn: 'Colour dots on home cards',
-        labelAr: 'نقط الألوان على كروت الرئيسية',
-        hintEn:
-          'The small colour dots under the price. Hidden, the card stays clean; the colours still show on the product page.',
-        hintAr:
-          'النقط الصغيرة تحت السعر. لو مخفية الكارت بيفضل نضيف، والألوان بتظهر في صفحة المنتج.',
-        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
-        trait: true,
-        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
-      },
-      {
-        id: 'cardTags',
-        type: 'select',
-        labelEn: 'Tag chips on home cards',
-        labelAr: 'شارات التصنيف على كروت الرئيسية',
-        hintEn: 'The small outlined tags (material, origin...) on each card.',
-        hintAr: 'الشارات الصغيرة (الخامة والمنشأ...) على كل كارت.',
-        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
-        trait: true,
-        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
-      },
-      {
-        id: 'gridGutter',
-        type: 'select',
-        labelEn: 'Space between home cards',
-        labelAr: 'المسافة بين كروت الرئيسية',
-        hintEn:
-          'Tight (a hairline between photos, like a lookbook), regular, or airy. Home page sections only.',
-        hintAr:
-          'ضيقة (فاصل رفيع بين الصور زي اللوك بوك) أو عادية أو واسعة. أقسام الصفحة الرئيسية بس.',
-        options: [
-          opt('tight', 'Tight', 'ضيقة'),
-          opt('regular', 'Regular', 'عادية'),
-          opt('airy', 'Airy', 'واسعة'),
-        ],
-        trait: true,
-        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
-      },
-      {
         id: 'showBrandBadge',
         type: 'checkbox',
         labelEn: 'Store name on cards',
@@ -611,6 +558,59 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
           opt('pureWhite', 'White', 'أبيض'),
           opt('brandColor', 'Brand colour', 'لون العلامة'),
         ],
+      },
+      {
+        id: 'cardHeart',
+        type: 'select',
+        labelEn: 'Wishlist heart on home cards',
+        labelAr: 'قلب المفضلة على كروت الرئيسية',
+        hintEn:
+          'The heart button on each product card in home page sections. Product pages keep theirs.',
+        hintAr: 'زر القلب على كل كارت منتج في أقسام الصفحة الرئيسية. صفحات المنتج بتفضل فيها.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'cardSwatches',
+        type: 'select',
+        labelEn: 'Colour dots on home cards',
+        labelAr: 'نقط الألوان على كروت الرئيسية',
+        hintEn:
+          'The small colour dots under the price. Hidden, the card stays clean; the colours still show on the product page.',
+        hintAr:
+          'النقط الصغيرة تحت السعر. لو مخفية الكارت بيفضل نضيف، والألوان بتظهر في صفحة المنتج.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'cardTags',
+        type: 'select',
+        labelEn: 'Tag chips on home cards',
+        labelAr: 'شارات التصنيف على كروت الرئيسية',
+        hintEn: 'The small outlined tags (material, origin...) on each card.',
+        hintAr: 'الشارات الصغيرة (الخامة والمنشأ...) على كل كارت.',
+        options: [opt('off', 'Hidden', 'مخفي'), opt('on', 'Shown', 'ظاهر')],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
+      },
+      {
+        id: 'gridGutter',
+        type: 'select',
+        labelEn: 'Space between home cards',
+        labelAr: 'المسافة بين كروت الرئيسية',
+        hintEn:
+          'Tight (a hairline between photos, like a lookbook), regular, or airy. Home page sections only.',
+        hintAr:
+          'ضيقة (فاصل رفيع بين الصور زي اللوك بوك) أو عادية أو واسعة. أقسام الصفحة الرئيسية بس.',
+        options: [
+          opt('tight', 'Tight', 'ضيقة'),
+          opt('regular', 'Regular', 'عادية'),
+          opt('airy', 'Airy', 'واسعة'),
+        ],
+        trait: true,
+        shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
       },
       {
         id: 'heroRatio',
