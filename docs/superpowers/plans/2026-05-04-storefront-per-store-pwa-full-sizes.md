@@ -193,7 +193,7 @@ Update `apps/admin/src/app/stores/[id]/pwa/_components/PwaManifestPreview.tsx` t
 
 ### Task 7 — Migrate existing 2 stores
 
-Done as `scripts/backfill-store-pwa-icons.ts` (Ruling PWA-BACKFILL-1): walks every `pwaEnabled` store, source = `iconSource`, else `icon512`, else `icon192`, else the store logo (a store with none is skipped), resizes with `sharp`, persists the URLs. Dry run unless `--apply`; idempotent (skips a store with all 8 icon keys, re-checks before writing); resumable (`--after <storeId>`, `--limit <n>`). Run from the repo root with the prod `DATABASE_URL` and the R2 storage env exported:
+Done as `scripts/backfill-store-pwa-icons.ts` (Ruling PWA-BACKFILL-1): walks every `pwaEnabled` store, source = `iconSource`, else `icon512`, else `icon192`, else the store logo (a store with none is skipped), resizes with `sharp`, persists the URLs. Dry run unless `--apply`; idempotent (skips a store with all 8 icon keys, re-checks before writing); resumable (`--after <storeId>`, `--limit <n>`). Run from the repo root with the prod `DATABASE_URL`, the R2 storage env and `STORAGE_PUBLIC_URL` exported:
 
 ```bash
 npx tsx scripts/backfill-store-pwa-icons.ts                      # dry run

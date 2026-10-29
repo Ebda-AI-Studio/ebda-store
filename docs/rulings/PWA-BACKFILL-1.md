@@ -5,7 +5,7 @@ resizer, not a Worker job, and it never runs from an agent.** `scripts/backfill-
 already existed but was stale (run through the retired `railway run`, source limited to an existing
 icon512/icon192, so a store with only a logo was skipped, no cursor, no real race check). It now:
 takes `iconSource`, else icon512, else icon192, else the store logo, and skips a store with none;
-requires a public https source and a decodable image of at least 256px (a square PNG of 512+ is
+fetches ONLY the platform's own media origins (`media.ebda.app` plus the host of `STORAGE_PUBLIC_URL`, via `isEbdaMediaUrl`; a hostname screen is bypassable by a public DNS name that resolves to loopback/LAN, and the script holds prod credentials), refuses every redirect (`redirect: 'manual'`), logs every other source as skipped `source_not_platform_media`, and requires a decodable image of at least 256px (a square PNG of 512+ is
 used as is, any other logo is centred on a transparent square); is DRY RUN unless `--apply`;
 skips a store whose pwaSettings already carry all 8 icon keys and re-reads the settings right
 before the write so a merchant's own upload wins; walks stores by id in batches with `--after` and

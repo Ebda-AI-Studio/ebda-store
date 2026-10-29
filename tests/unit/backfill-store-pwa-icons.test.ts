@@ -43,7 +43,8 @@ import {
   normalizeSource,
   backfillStore,
   parseArgs,
-  safeSourceUrl,
+  isPlatformMediaUrl,
+  fetchImageBuffer,
   type BackfillDeps,
 } from '../../scripts/backfill-store-pwa-icons';
 
@@ -69,7 +70,7 @@ function deps(over: Partial<BackfillDeps> = {}): BackfillDeps {
 const store = (over: Record<string, unknown> = {}) => ({
   id: 's-1',
   slug: 'abc',
-  logo: 'https://cdn.example/logo.png',
+  logo: 'https://media.ebda.app/logo.png',
   pwaSettings: {},
   ...over,
 });
@@ -89,18 +90,57 @@ describe('iconSetComplete / pickIconSource', () => {
   });
 });
 
-describe('safeSourceUrl', () => {
-  it('only public https hosts', () => {
-    expect(safeSourceUrl('https://cdn.example/x.png')).toBe(true);
+describe('isPlatformMediaUrl (SSRF allowlist)', () => {
+  it('accepts only the platform media host', () => {
+    expect(isPlatformMediaUrl('https://media.ebda.app/stores/s/logo.png')).toBe(true);
+  });
+  it('refuses an evil hostname, lookalikes, IP literals and non-https', () => {
     for (const bad of [
-      'http://cdn.example/x.png',
-      'https://localhost/x',
-      'https://127.0.0.1/x',
-      'https://10.0.0.5/x',
+      'https://evil.example/x.png',
+      'https://media.ebda.app.evil.example/x.png',
+      'https://evil.example/media.ebda.app/x.png',
+      'https://media.ebda.app@evil.example/x.png',
+      'https://rebind.evil.example/x.png', // a public name that resolves to 127.0.0.1
+      'https://127.0.0.1/x.png',
+      'https://169.254.169.254/latest/meta-data',
+      'https://[::1]/x.png',
+      'http://media.ebda.app/x.png',
+      'https://media.ebda.app:8443/x.png',
       'file:///etc/passwd',
       'not a url',
     ])
-      expect(safeSourceUrl(bad), bad).toBe(false);
+      expect(isPlatformMediaUrl(bad), bad).toBe(false);
+  });
+  it('also accepts the STORAGE_PUBLIC_URL host when exported', () => {
+    process.env.STORAGE_PUBLIC_URL = 'https://pub-abc.r2.dev';
+    try {
+      expect(isPlatformMediaUrl('https://pub-abc.r2.dev/a.png')).toBe(true);
+      expect(isPlatformMediaUrl('https://pub-other.r2.dev/a.png')).toBe(false);
+    } finally {
+      delete process.env.STORAGE_PUBLIC_URL;
+    }
+  });
+});
+
+describe('fetchImageBuffer', () => {
+  it('asks for redirect: manual and refuses a redirect off the allowlist', async () => {
+    const fake = vi.fn(
+      async () => new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/x' } })
+    );
+    await expect(
+      fetchImageBuffer('https://media.ebda.app/a.png', fake as unknown as typeof fetch)
+    ).rejects.toThrow(/redirect refused/);
+    expect(fake.mock.calls[0][1]).toMatchObject({ redirect: 'manual' });
+  });
+  it('refuses an opaque redirect response too', async () => {
+    const fake = async () => ({ type: 'opaqueredirect', status: 0, ok: false }) as Response;
+    await expect(fetchImageBuffer('https://media.ebda.app/a.png', fake)).rejects.toThrow(
+      /redirect refused/
+    );
+  });
+  it('returns the bytes of a normal 200', async () => {
+    const fake = async () => new Response(new Uint8Array([1, 2, 3]));
+    expect((await fetchImageBuffer('https://media.ebda.app/a.png', fake)).length).toBe(3);
   });
 });
 
@@ -181,14 +221,14 @@ describe('backfillStore', () => {
     expect(await backfillStore(store(), true, lost)).toMatchObject({ status: 'failed' });
   });
 
-  it('an unsafe source url is skipped before any fetch', async () => {
+  it('a source off the platform media host is skipped before any fetch', async () => {
     const d = deps();
-    expect(await backfillStore(store({ logo: 'http://169.254.169.254/x' }), true, d)).toMatchObject(
-      {
-        status: 'skipped',
-        reason: 'unsafe_source_url',
-      }
-    );
+    expect(
+      await backfillStore(store({ logo: 'https://evil.example/x.png' }), true, d)
+    ).toMatchObject({
+      status: 'skipped',
+      reason: 'source_not_platform_media',
+    });
     expect(d.fetchSource).not.toHaveBeenCalled();
   });
 });

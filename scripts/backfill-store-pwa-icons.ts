@@ -38,6 +38,7 @@
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import { prisma } from '@ebda/database';
+import { isEbdaMediaUrl } from '@ebda/shared';
 import {
   generatePwaIconSet,
   PWAService,
@@ -101,19 +102,15 @@ export function pickIconSource(
   return pick ?? null;
 }
 
-/** The URL comes from a merchant-editable column: public https hosts only (no SSRF into the LAN). */
-export function safeSourceUrl(raw: string): boolean {
-  let u: URL;
-  try {
-    u = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (u.protocol !== 'https:') return false;
-  const h = u.hostname.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal')) return false;
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(h) || h.includes(':')) return false; // IP literals
-  return true;
+/**
+ * The URL comes from a merchant-editable column and this runs on a machine holding prod
+ * credentials, so a hostname screen is not enough (a public DNS name can resolve to loopback or
+ * the LAN). Only the platform's own media origins are fetched: `media.ebda.app` plus the host of
+ * STORAGE_PUBLIC_URL (the same allowlist as the OG card renderer, @ebda/shared isEbdaMediaUrl).
+ * https only, no credentials, no port, no IP literals; every other source is skipped and logged.
+ */
+export function isPlatformMediaUrl(raw: string): boolean {
+  return isEbdaMediaUrl(raw, process.env.STORAGE_PUBLIC_URL);
 }
 
 export type SourceVerdict = { png: Buffer } | { skip: 'source_unreadable' | 'source_too_small' };
@@ -191,7 +188,8 @@ export async function backfillStore(
   if (iconSetComplete(settings)) return { status: 'skipped', reason: 'complete' };
   const source = pickIconSource(settings, store.logo);
   if (!source) return { status: 'skipped', reason: 'no_logo' };
-  if (!safeSourceUrl(source)) return { status: 'skipped', reason: 'unsafe_source_url' };
+  if (!isPlatformMediaUrl(source))
+    return { status: 'skipped', reason: 'source_not_platform_media' };
 
   try {
     const verdict = await normalizeSource(await deps.fetchSource(source));
@@ -215,15 +213,23 @@ export async function backfillStore(
   }
 }
 
-async function fetchImageBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url, {
+/** A redirect is refused outright: the allowlist was checked on the FIRST url only. */
+export async function fetchImageBuffer(
+  url: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<Buffer> {
+  const res = await fetchImpl(url, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    redirect: 'error',
+    redirect: 'manual',
   });
+  if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+    throw new Error(`fetch ${url} -> redirect refused (HTTP ${res.status})`);
+  }
   if (!res.ok) throw new Error(`fetch ${url} -> HTTP ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_SOURCE_BYTES)
+  if (buf.length > MAX_SOURCE_BYTES) {
     throw new Error(`source is ${buf.length} bytes (max ${MAX_SOURCE_BYTES})`);
+  }
   return buf;
 }
 
