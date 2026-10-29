@@ -313,21 +313,13 @@ export default function ContentEditorPage() {
                 "where did the data go?" confusion. */}
             {(slug === 'faq' || slug === 'how-to-guides') && (
               <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
-                <p className="font-medium">
-                  {slug === 'faq'
-                    ? 'AI-generated FAQ items live in SEO Tools, not here.'
-                    : 'AI-generated How-To guides live in SEO Tools, not here.'}
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  This editor controls the static page wrapper (cover image, intro paragraphs,
-                  etc.). The accordion content the storefront actually renders comes from a separate
-                  surface.
-                </p>
+                <p className="font-medium">{slug === 'faq' ? t('aiFaqNote') : t('aiHowToNote')}</p>
+                <p className="mt-1 text-muted-foreground">{t('wrapperNote')}</p>
                 <Link
                   href={`/stores/${storeId}/seo#${slug === 'faq' ? 'faqs' : 'howtos'}`}
                   className="mt-2 inline-flex items-center text-sm font-medium text-primary hover:underline"
                 >
-                  {slug === 'faq' ? 'Open FAQ items in SEO →' : 'Open How-To items in SEO →'}
+                  {slug === 'faq' ? t('openFaqInSeo') : t('openHowToInSeo')}
                 </Link>
               </div>
             )}
@@ -649,7 +641,9 @@ function BlockFields({
               onChange={e => onChange({ ...block, level: Number(e.target.value) === 3 ? 3 : 2 })}
               className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
+              {/* i18n-gate-allow: heading level token */}
               <option value={2}>H2</option>
+              {/* i18n-gate-allow: heading level token */}
               <option value={3}>H3</option>
             </select>
           </label>

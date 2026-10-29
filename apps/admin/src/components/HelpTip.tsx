@@ -19,7 +19,7 @@ export function HelpTip({ text }: HelpTipProps) {
       aria-label={text}
       className="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
     >
-      i
+      {/* i18n-gate-allow: info glyph, not copy */}i
     </span>
   );
 }

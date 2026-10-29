@@ -372,7 +372,7 @@ export function SectionPreview({
                       fontWeight: productPriceZone?.fontWeight,
                     }}
                   >
-                    50.00 EGP
+                    {t('samplePrice')}
                   </div>
                   <div
                     className="mt-0.5 rounded-sm py-0.5 text-center text-[8px] font-medium uppercase tracking-wider"

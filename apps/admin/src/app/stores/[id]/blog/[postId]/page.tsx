@@ -195,7 +195,7 @@ export default function BlogPostEditorPage({
                 value={form.titleAr}
                 onChange={e => update('titleAr', e.target.value)}
                 className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="ما الجديد في متجرك..."
+                placeholder={t('titleArPlaceholder')}
               />
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function BlogPostEditorPage({
                 onChange={e => update('excerptAr', e.target.value)}
                 rows={3}
                 className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="جملة أو اثنتان تظهران في قائمة المدونة..."
+                placeholder={t('excerptArPlaceholder')}
               />
             </div>
           </div>
@@ -285,7 +285,7 @@ export default function BlogPostEditorPage({
                 onChange={e => update('contentAr', e.target.value)}
                 rows={14}
                 className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
+                placeholder={t('bodyArPlaceholder')}
               />
             </div>
           </div>

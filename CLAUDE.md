@@ -43,7 +43,7 @@ Every DB table whose rows have business meaning MUST have a UI surface. Plan tim
 2. **Header/footer/nav** → the shared base chrome (`templates/base/Header.tsx`, `templates/base/Footer.tsx`, `templates/base/AnnouncementBar.tsx`), each template's chrome wrapper (`templates/qamar/Header.tsx`, `templates/souq/Header.tsx`, `templates/jasmine/Header.tsx`, `templates/lamma/Header.tsx`) and Dahab (`templates/dahab/`). Ship the active merchant's template first; the same batch or an immediate follow-up lands the others.
 3. **Storefront copy** → `apps/web/src/contexts/LanguageContext.tsx` translations map (EN + AR). Never hardcode user-facing strings in a theme.
 4. **Schema/API/business logic** → `apps/api` + `packages/database`, per-store scoping via `storeId`. Never branch on a `store.slug`.
-5. **Admin tooling** → built once in `apps/admin` for every store. Never wire to a tenant ID. A new admin page or settings control is registered for ⌘K/Settings search in `apps/admin/src/lib/settings-registry.ts` (coverage-gated; `docs/architecture/admin-search.md`).
+5. **Admin tooling** → built once in `apps/admin` for every store. Never wire to a tenant ID. A new admin page or settings control is registered for ⌘K/Settings search in `apps/admin/src/lib/settings-registry.ts` (coverage-gated; `docs/architecture/admin-search.md`). **Admin copy**: no hardcoded user-visible text in `apps/admin` JSX, wrap with `useT` and add the key to BOTH `en.json` and `ar.json` (Egyptian Arabic sentences, neutral buttons); `npm run check:admin-i18n` (CI Lint, Ruling ADM-I18N-GATE-1) fails otherwise, waive non-copy only with `i18n-gate-allow: <reason>`.
 
 Refuse: "ship on one tenant first, roll out later", "setting for store X only", "hardcode for the demo tenant".
 

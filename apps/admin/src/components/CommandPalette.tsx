@@ -301,6 +301,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             aria-label={t('placeholder')}
           />
           <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+            {/* i18n-gate-allow: keyboard keycap */}
             ESC
           </kbd>
         </div>

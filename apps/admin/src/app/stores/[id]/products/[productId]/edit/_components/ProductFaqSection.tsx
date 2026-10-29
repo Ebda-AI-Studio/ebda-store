@@ -496,6 +496,7 @@ interface FaqEditFormProps {
 }
 
 function FaqEditForm({ state, onChange, onSave, onCancel, saving, t }: FaqEditFormProps) {
+  const tl = useT('products.edit');
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
       <div className="mb-3 grid gap-3 sm:grid-cols-2">
@@ -503,14 +504,14 @@ function FaqEditForm({ state, onChange, onSave, onCancel, saving, t }: FaqEditFo
           label={t('question')}
           value={state.question}
           onChange={e => onChange({ ...state, question: e.target.value })}
-          placeholder="e.g. What sizes are available?"
+          placeholder={tl('faqQuestionEnSample')}
           required
         />
         <Input
           label={t('questionAr')}
           value={state.questionAr}
           onChange={e => onChange({ ...state, questionAr: e.target.value })}
-          placeholder="مثال: ما الأحجام المتوفرة؟"
+          placeholder={tl('faqQuestionArSample')}
           lang="ar"
           dir="rtl"
         />
@@ -520,7 +521,7 @@ function FaqEditForm({ state, onChange, onSave, onCancel, saving, t }: FaqEditFo
           label={t('answer')}
           value={state.answer}
           onChange={e => onChange({ ...state, answer: e.target.value })}
-          placeholder="e.g. Available in S, M, L, XL."
+          placeholder={tl('faqAnswerEnSample')}
           rows={3}
           required
         />
@@ -528,7 +529,7 @@ function FaqEditForm({ state, onChange, onSave, onCancel, saving, t }: FaqEditFo
           label={t('answerAr')}
           value={state.answerAr}
           onChange={e => onChange({ ...state, answerAr: e.target.value })}
-          placeholder="مثال: متوفر بمقاسات S وM وL وXL."
+          placeholder={tl('faqAnswerArSample')}
           rows={3}
           lang="ar"
           dir="rtl"

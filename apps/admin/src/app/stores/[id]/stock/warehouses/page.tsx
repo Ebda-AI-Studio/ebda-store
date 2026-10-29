@@ -328,7 +328,7 @@ export default function WarehousesPage() {
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="Main Warehouse"
+                    placeholder={t('warehouseNameEnSample')}
                   />
                 </label>
                 <label className="block">
@@ -341,7 +341,7 @@ export default function WarehousesPage() {
                     value={form.nameAr}
                     onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="المستودع الرئيسي"
+                    placeholder={t('warehouseNameArSample')}
                   />
                 </label>
               </div>
@@ -418,7 +418,7 @@ export default function WarehousesPage() {
                   value={form.address}
                   onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  placeholder="Shuwaikh Industrial Area, Egypt"
+                  placeholder={t('addressSample')}
                 />
               </label>
 

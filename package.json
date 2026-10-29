@@ -53,6 +53,7 @@
     "test:fixed-bars": "node scripts/visual/measure-fixed-bars.mjs",
     "test:defence-mutations": "node scripts/defence-mutation-record.mjs",
     "check:clear-on-empty": "node scripts/check-update-payload-clear.mjs",
+    "check:admin-i18n": "node scripts/check-admin-i18n-literals.mjs",
     "test:unit": "vitest run tests/unit",
     "ai:cost:baseline": "tsx scripts/ai-cost-baseline.ts",
     "test:e2e": "vitest run tests/e2e",

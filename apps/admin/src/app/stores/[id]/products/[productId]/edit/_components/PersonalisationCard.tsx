@@ -140,7 +140,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
               value={value.labelAr}
               maxLength={60}
               onChange={e => set({ labelAr: e.target.value })}
-              placeholder="الاسم للتطريز"
+              placeholder={t('embroideryNameArSample')}
               lang="ar"
               dir="rtl"
             />
@@ -149,7 +149,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
               value={value.label}
               maxLength={60}
               onChange={e => set({ label: e.target.value })}
-              placeholder="Name to embroider"
+              placeholder={t('embroideryNameEnSample')}
               lang="en"
               dir="ltr"
             />

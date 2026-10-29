@@ -69,12 +69,13 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function SpamBadge({ score }: { score: number | null }) {
+  const t = useT('reviews');
   if (score === null) return null;
   const pct = Math.round(score * 100);
   const variant = score >= 0.7 ? 'destructive' : score >= 0.3 ? 'secondary' : 'outline';
   return (
     <Badge variant={variant as 'destructive' | 'secondary' | 'outline'} className="text-xs">
-      Spam {pct}%
+      {t('spam')} {pct}%
     </Badge>
   );
 }

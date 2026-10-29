@@ -417,7 +417,7 @@ export default function UsersPage() {
         <form onSubmit={handleInvite}>
           <ModalBody className="space-y-4">
             <div>
-              <Label htmlFor="invite-email">{t('email') || 'Email'}</Label>
+              <Label htmlFor="invite-email">{t('email')}</Label>
               <Input
                 id="invite-email"
                 type="email"
@@ -429,7 +429,7 @@ export default function UsersPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="invite-first">{t('firstName') || 'First name'}</Label>
+                <Label htmlFor="invite-first">{t('firstName')}</Label>
                 <Input
                   id="invite-first"
                   required
@@ -438,7 +438,7 @@ export default function UsersPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="invite-last">{t('lastName') || 'Last name'}</Label>
+                <Label htmlFor="invite-last">{t('lastName')}</Label>
                 <Input
                   id="invite-last"
                   required
@@ -448,7 +448,7 @@ export default function UsersPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="invite-password">{t('password') || 'Password'}</Label>
+              <Label htmlFor="invite-password">{t('password')}</Label>
               <Input
                 id="invite-password"
                 type="password"
@@ -472,8 +472,8 @@ export default function UsersPage() {
                   })
                 }
               >
-                <option value="store_admin">{t('roleStoreAdmins') || 'Store Admin'}</option>
-                <option value="super_admin">{t('roleSuperAdmins') || 'Super Admin'}</option>
+                <option value="store_admin">{t('roleStoreAdmins')}</option>
+                <option value="super_admin">{t('roleSuperAdmins')}</option>
               </select>
             </div>
             {inviteError && (
@@ -492,10 +492,10 @@ export default function UsersPage() {
               }}
               disabled={inviting}
             >
-              {tc('cancel') || 'Cancel'}
+              {tc('cancel')}
             </Button>
             <Button type="submit" disabled={inviting}>
-              {inviting ? tc('saving') || 'Saving…' : t('inviteUser')}
+              {inviting ? tc('saving') : t('inviteUser')}
             </Button>
           </ModalFooter>
         </form>

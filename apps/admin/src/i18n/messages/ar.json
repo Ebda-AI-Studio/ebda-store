@@ -70,7 +70,9 @@
       "empty": "مفيش نتايج لـ «{q}»",
       "error": "البحث مش شغال دلوقتي. جرّب تاني.",
       "count": "{n, plural, =0 {مفيش نتايج} one {نتيجة واحدة} two {نتيجتين} few {{n} نتايج} other {{n} نتيجة}}"
-    }
+    },
+    "egp": "ج.م",
+    "egpParen": "(ج.م)"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -441,6 +443,9 @@
         "createFailed": "تعذّر إنشاء المتجر",
         "generic": "حدث خطأ ما"
       }
+    },
+    "avatar": {
+      "logoAlt": "شعار {name}"
     }
   },
   "products": {
@@ -580,7 +585,9 @@
         "selected": "{count} محدد",
         "massEdit": "تعديل جماعي",
         "clear": "إلغاء التحديد"
-      }
+      },
+      "priceFrom": "من",
+      "selectProduct": "اختار {name}"
     },
     "detail": {
       "loading": "جارٍ التحميل...",
@@ -809,7 +816,9 @@
         "maxLength": "أقصى عدد حروف",
         "required": "لازم يتكتب قبل الإضافة للسلة",
         "needLabel": "التخصيص محتاج عنوان بالعربي أو الإنجليزي.",
-        "invalidMax": "أقصى عدد حروف لازم يكون رقم صحيح من 1 لـ 200."
+        "invalidMax": "أقصى عدد حروف لازم يكون رقم صحيح من 1 لـ 200.",
+        "embroideryNameArSample": "الاسم للتطريز",
+        "embroideryNameEnSample": "Name to embroider"
       },
       "fulfilment": {
         "title": "التجهيز",
@@ -817,7 +826,19 @@
         "leadTime": "مدة التجهيز (أيام)",
         "placeholder": "جاهز للشحن",
         "invalid": "مدة التجهيز لازم تكون رقم صحيح من 0 لـ {max}."
-      }
+      },
+      "balanceFailed": "فشلت الموازنة، حاول مجددًا",
+      "balanceTitle": "موازنة اللغات (الاسم والوصف بالعربي والإنجليزي)",
+      "retryWarn": "⚠ إعادة المحاولة",
+      "balanced": "✓ تمت الموازنة",
+      "balanceLanguages": "موازنة اللغات",
+      "revertFailed": "فشل التراجع، حاول مجددًا",
+      "revertTitle": "التراجع عن الموازنة واسترجاع الأصل",
+      "revert": "↩ تراجع",
+      "faqQuestionEnSample": "e.g. What sizes are available?",
+      "faqQuestionArSample": "مثال: ما الأحجام المتوفرة؟",
+      "faqAnswerEnSample": "e.g. Available in S, M, L, XL.",
+      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL."
     },
     "recommendations": {
       "loading": "جارٍ التحميل...",
@@ -1235,7 +1256,8 @@
         "retry": "إعادة المحاولة",
         "confirmInstapay": "تعذّر تأكيد دفعة إنستاباي"
       },
-      "agentBadge": "وكيل ذكي"
+      "agentBadge": "وكيل ذكي",
+      "newOrder": "+ طلب جديد"
     },
     "status": {
       "pending": "قيد الانتظار",
@@ -1615,7 +1637,10 @@
         "successTitle": "ملأ الذكاء الاصطناعي حقول الشارة العلوية والعنوان الفرعي الفارغة",
         "generating": "جارٍ التوليد…",
         "generateWithAi": "توليد بالذكاء الاصطناعي"
-      }
+      },
+      "fontFamilyExample": "مثال: Cairo, Inter, \"Open Sans\"",
+      "fontNameExample": "مثال: \"My Brand Sans\"",
+      "uploadFileSize": "{name} ({kb} ك.ب)"
     },
     "devices": {
       "title": "أجهزة الإشعارات",
@@ -1627,7 +1652,8 @@
       "removeConfirmDescription": "لن تصل الإشعارات الفورية إلى هذا الجهاز. يمكنك إعادة التفعيل من نفس المتصفح.",
       "loading": "جاري تحميل الأجهزة…",
       "error": "فشل تحميل الأجهزة",
-      "removeError": "فشل حذف الجهاز"
+      "removeError": "فشل حذف الجهاز",
+      "browserFallback": "المتصفح"
     },
     "invoice": {
       "title": "الفاتورة",
@@ -1979,7 +2005,9 @@
       "group": "مجموعة الجملة",
       "empty": "لسه مفيش مبيعات في الفترة دي.",
       "loadFailed": "معرفناش نحمّل تقسيم الجملة."
-    }
+    },
+    "dateTo": "إلى",
+    "dateFrom": "من"
   },
   "settings": {
     "page": {
@@ -2974,7 +3002,15 @@
       "addCustomLocationHint": "أضف دولة ومحافظة ومنطقة غير موجودة في القائمة أعلاه.",
       "remove": "حذف",
       "deleteFailed": "تعذّر حذف المنطقة",
-      "incompleteRowsError": "هذه المناطق الجديدة تحتاج إلى رسوم توصيل (أو تفعيلها) قبل أن يمكن حفظها: {areas}"
+      "incompleteRowsError": "هذه المناطق الجديدة تحتاج إلى رسوم توصيل (أو تفعيلها) قبل أن يمكن حفظها: {areas}",
+      "areaNameEnSample": "Area name",
+      "areaNameArSample": "اسم المنطقة",
+      "countryEnSample": "e.g. Saudi Arabia",
+      "countryArSample": "مثال: المملكة العربية السعودية",
+      "cityEnSample": "e.g. Riyadh",
+      "cityArSample": "مثال: الرياض",
+      "districtEnSample": "e.g. Al Olaya",
+      "districtArSample": "مثال: العليا"
     },
     "returnPolicy": {
       "title": "سياسة الإرجاع",
@@ -3492,7 +3528,18 @@
         "payout_completed": "اكتملت عملية الدفع",
         "payout_failed": "فشلت عملية الدفع"
       }
-    }
+    },
+    "subtitle": "المسوقون",
+    "backToAffiliates": "رجوع للمسوقين",
+    "auditTrail2": "سجل المراجعة ←",
+    "noEventsYet": "لسه مفيش أحداث",
+    "eventHistory": "سجل الأحداث",
+    "orderLabel": "الطلب:",
+    "commissionLabel": "العمولة:",
+    "amountLabel": "المبلغ:",
+    "via": "عن طريق",
+    "eventsTitle": "{name} — الأحداث",
+    "eventsTitleFallback": "أحداث المسوّق"
   },
   "bulk": {
     "page": {
@@ -3623,7 +3670,8 @@
       "broadcastCancel": "إلغاء",
       "broadcastSent": "تم الإرسال!",
       "broadcastSentCount": "تم الإرسال إلى {sent} من أصل {total} مشترك.",
-      "broadcastClose": "إغلاق"
+      "broadcastClose": "إغلاق",
+      "chunksFailed": "فشلت {count} دفعة، راجع سجلات السيرفر"
     },
     "table": {
       "email": "البريد الإلكتروني",
@@ -4219,7 +4267,12 @@
         "numbered": "قائمة مرقمة",
         "image": "صورة",
         "button": "زر"
-      }
+      },
+      "aiFaqNote": "الأسئلة الشائعة اللي بيولّدها الذكاء الاصطناعي موجودة في أدوات السيو، مش هنا.",
+      "aiHowToNote": "أدلة الخطوات اللي بيولّدها الذكاء الاصطناعي موجودة في أدوات السيو، مش هنا.",
+      "wrapperNote": "المحرر ده بيتحكم في إطار الصفحة الثابت (صورة الغلاف والفقرات التعريفية وغيرها). محتوى الأكورديون اللي بيظهر في المتجر فعلاً بييجي من شاشة تانية.",
+      "openFaqInSeo": "افتح الأسئلة الشائعة في السيو ←",
+      "openHowToInSeo": "افتح أدلة الخطوات في السيو ←"
     }
   },
   "pages": {
@@ -4479,7 +4532,8 @@
       "tabs": {
         "settings": "الإعدادات",
         "members": "الأعضاء"
-      }
+      },
+      "transactions": "المعاملات"
     },
     "stats": {
       "totalMembers": "إجمالي الأعضاء",
@@ -5085,7 +5139,10 @@
       "socialRedirectNote": "روابط منصات التواصل الاجتماعي (إنستغرام، فيسبوك، تيك توك...) تُدار في الهوية البصرية ← التواصل الاجتماعي. عدِّلها هناك لتُبقي كل شيء في مكان واحد.",
       "socialRedirectNoteLinkText": "الذهاب إلى الهوية البصرية ← التواصل الاجتماعي",
       "redirectsLoadMore": "عرض المزيد",
-      "redirectsLoadingMore": "جارٍ التحميل…"
+      "redirectsLoadingMore": "جارٍ التحميل…",
+      "generating": "جارٍ التوليد…",
+      "generateWithAi": "ولّد بالذكاء الاصطناعي",
+      "stepsCount": "{count, plural, one {خطوة} two {خطوتين} few {{count} خطوات} other {{count} خطوة}}"
     }
   },
   "language": {
@@ -5160,7 +5217,8 @@
       "wwwAutoAttachedTitle": "تم ربط النطاق الفرعي www تلقائياً",
       "wwwAutoAttachedMessage": "سيصل الزوار الذين يكتبون www.{domain} إلى متجرك أيضاً. لا تحتاج إلى أي إعداد إضافي في DNS لـ www — نقوم بربطه تلقائياً على مستوى المنصة عند حفظ النطاق.",
       "copy": "نسخ",
-      "copyValueAriaLabel": "نسخ قيمة {type}"
+      "copyValueAriaLabel": "نسخ قيمة {type}",
+      "ttlAuto": "ساعة"
     }
   },
   "categories": {
@@ -5197,7 +5255,9 @@
       "bestSellersTileShown": "تم إظهار بطاقة الأكثر مبيعًا",
       "bestSellersTileHidden": "تم إخفاء بطاقة الأكثر مبيعًا",
       "bestSellersCoverUpdated": "تم تحديث غلاف الأكثر مبيعًا",
-      "bestSellersCoverRemoved": "تمت إزالة غلاف الأكثر مبيعًا"
+      "bestSellersCoverRemoved": "تمت إزالة غلاف الأكثر مبيعًا",
+      "countUnitEnSample": "pieces",
+      "countUnitArSample": "قطعة"
     },
     "form": {
       "editTitle": "تعديل الفئة",
@@ -5375,7 +5435,8 @@
       "aiSaveResponseFailed": "تعذّر حفظ الرد. يرجى المحاولة مرة أخرى.",
       "saving": "جارٍ الحفظ...",
       "searchPlaceholder": "ابحث في المراجعات…"
-    }
+    },
+    "spam": "سبام"
   },
   "audit": {
     "title": "سجلات التدقيق",
@@ -5944,7 +6005,8 @@
       "subtitleDefault": "مختارات منسّقة",
       "productNamePlaceholder": "منتج",
       "addToCartLabel": "أضف",
-      "headingSuffix": "عنوان {label}"
+      "headingSuffix": "عنوان {label}",
+      "samplePrice": "50.00 ج.م"
     },
     "colorContrastPreview": {
       "backgroundLabel": "الخلفية: {label}",
@@ -5960,7 +6022,12 @@
       "notTracked": "غير متتبَّع للدفع كضيف",
       "registeredOnly": "العملاء المسجَّلون فقط",
       "checkoutsTableNote": "عمليات الدفع التي بدأت غير متتبَّعة للدفع كضيف — تظهر تلك الأيام «—» بدلاً من 0."
-    }
+    },
+    "title": "مسار الإرجاع",
+    "noEvents": "لسه مفيش أحداث في المسار",
+    "by": "بواسطة",
+    "reasonLabel": "السبب:",
+    "refundViaLabel": "الاسترداد عن طريق:"
   },
   "finance": {
     "accounts": {
@@ -6268,7 +6335,8 @@
         "error": "فشل الاستيراد.",
         "fileTypesHint": "CSV أو Excel (.xlsx) أو OFX (بحد أقصى 5 ميغابايت)",
         "skippedLabel": "تم التجاوز",
-        "viewReconciliation": "عرض المطابقة"
+        "viewReconciliation": "عرض المطابقة",
+        "andMore": "…و{count} كمان"
       },
       "tx": {
         "date": "التاريخ",
@@ -6303,7 +6371,8 @@
         "confirm": "ربط",
         "cancel": "إلغاء",
         "entryIdHelp": "يمكنك العثور على معرّفات القيود في المالية ← دفتر اليومية.",
-        "confirming": "جارٍ الربط…"
+        "confirming": "جارٍ الربط…",
+        "uuidExample": "مثال: 550e8400-e29b-41d4-a716-446655440000"
       },
       "difference": {
         "title": "فارق المطابقة",
@@ -6354,7 +6423,8 @@
       "colRate": "السعر (ج.م)",
       "colDate": "التاريخ",
       "colRecorded": "وقت التسجيل",
-      "loading": "جارٍ التحميل…"
+      "loading": "جارٍ التحميل…",
+      "rateExample2": "مثال: 50.00"
     }
   },
   "stock": {
@@ -6404,7 +6474,8 @@
       "loadFailed": "تعذّر تحميل المنتجات — {error}",
       "filteredLabel": "الفلتر:",
       "filterLowStock": "مخزون منخفض",
-      "filterOutOfStock": "نفد المخزون"
+      "filterOutOfStock": "نفد المخزون",
+      "showingFiltered": "عرض {shown} من {total} منتج"
     },
     "scan": {
       "title": "مسح الباركود",
@@ -6470,7 +6541,15 @@
       "colItem": "الصنف",
       "colPicked": "المُلتقط",
       "pickItemsTableLabel": "أصناف الطلب",
-      "countLinesTableLabel": "أسطر الجرد"
+      "countLinesTableLabel": "أسطر الجرد",
+      "onHandLabel": "المتاح:",
+      "countSession": "جلسة جرد",
+      "linesSuffix": "سطر",
+      "systemQtyLabel": "الكمية في النظام:",
+      "adjustmentLabel": "التسوية:",
+      "skuLabel": "رمز المنتج: {sku}",
+      "linesAdjusted": "{count, plural, one {اتسوّى سطر واحد.} two {اتسوّى سطرين.} few {اتسوّت {count} سطور.} other {اتسوّى {count} سطر.}}",
+      "sessionReconciledOn": "الجلسة اتسوّت في {date}."
     },
     "adjustments": {
       "title": "تسويات المخزون",
@@ -6551,7 +6630,9 @@
         "itemsTableLabel": "بنود التسوية"
       },
       "searchPlaceholder": "ابحث في التسويات…",
-      "emptyState": "لا توجد تسويات مخزون بعد. أنشئ واحدة باستخدام الزر أعلاه."
+      "emptyState": "لا توجد تسويات مخزون بعد. أنشئ واحدة باستخدام الزر أعلاه.",
+      "reasonEnPlaceholder": "السبب بالإنجليزي (اختياري)",
+      "reasonArPlaceholder": "سبب التسوية بالعربي (اختياري)"
     },
     "suppliers": {
       "title": "الموردون",
@@ -6584,7 +6665,13 @@
         "leadTimeDays": "مدة التوريد (أيام)",
         "leadTimeDaysTip": "عدد الأيام من وضع الطلب لدى هذا المورد حتى وصول البضاعة. يستخدمها محرك إعادة الطلب عند عدم وجود قاعدة خاصة بالمنتج تتجاوزها."
       },
-      "searchPlaceholder": "ابحث عن مورد…"
+      "searchPlaceholder": "ابحث عن مورد…",
+      "supplierNameEnSample": "e.g. Al-Mutlaq Trading",
+      "supplierNameArPlaceholder": "اسم المورد بالعربي",
+      "termsDaysExample": "مثال: 45",
+      "notesEnPlaceholder": "ملاحظات بالإنجليزي (اختياري)",
+      "notesArPlaceholder": "ملاحظات بالعربي (اختياري)",
+      "termsDays": "{count, plural, one {يوم} two {يومين} few {{count} أيام} other {{count} يوم}}"
     },
     "purchaseOrders": {
       "title": "أوامر الشراء",
@@ -6648,7 +6735,9 @@
         "VARIANT_REQUIRED_RECEIVE": "هذا السطر لا يحدد متغيرًا مع أن لمنتجه متغيرات، لذلك لا يمكن استلامه. ألغِ أمر الشراء هذا وأنشئه من جديد لكل متغير."
       },
       "emptyState": "لا توجد أوامر شراء بعد. أنشئ واحداً باستخدام الزر أعلاه.",
-      "totalCount": "{total} أمر شراء"
+      "totalCount": "{total} أمر شراء",
+      "backToPurchaseOrders": "→ رجوع لأوامر الشراء",
+      "notesArPlaceholder": "ملاحظات بالعربي (اختياري)"
     },
     "backorders": {
       "title": "طلبات الانتظار المفتوحة",
@@ -6750,7 +6839,10 @@
       },
       "validation": {
         "nameCodeRequired": "الاسم والرمز مطلوبان"
-      }
+      },
+      "warehouseNameEnSample": "Main Warehouse",
+      "warehouseNameArSample": "المستودع الرئيسي",
+      "addressSample": "منطقة الشويخ الصناعية، مصر"
     },
     "warehouseStock": {
       "title": "مخزون المستودع",
@@ -6782,7 +6874,8 @@
       "reconcileHint": "يتم مطابقة أعداد كل مستودع مع مخزون المنتج المعتمد لديك.",
       "searchTruncated": "هذه أقرب النتائج فقط، أضف كلمة لتضييق البحث",
       "reconcileDone": "تمت مطابقة {reconciled} منتج (فشل {failed})",
-      "reconcileStarted": "بدأت عملية المطابقة — ستُحدَّث أعداد المستودعات قريباً"
+      "reconcileStarted": "بدأت عملية المطابقة — ستُحدَّث أعداد المستودعات قريباً",
+      "deltaExample": "+10 أو -5"
     }
   },
   "insights": {
@@ -6804,7 +6897,9 @@
       "colSku": "رمز المنتج (SKU)",
       "colName": "الاسم",
       "colSold7d": "المباع (7 أيام)",
-      "colVelocity": "معدل البيع"
+      "colVelocity": "معدل البيع",
+      "perDay": "/يوم",
+      "topSegmentCustomers": "{count, plural, one {عميل} two {عميلين} few {{count} عملاء} other {{count} عميل}}"
     },
     "cohorts": {
       "title": "شرائح العملاء الزمنية",
@@ -6818,7 +6913,9 @@
       "ltvByCohortTitle": "القيمة الدائمة التراكمية حسب الشريحة",
       "colTotalRevenue": "إجمالي الإيرادات (ج.م)",
       "colLtvPerCustomer": "القيمة الدائمة / عميل",
-      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت القاهرة."
+      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت القاهرة.",
+      "cellTitle": "{active} / {total} عميل نشط",
+      "legendNote": "الخلايا بتوضّح نسبة عملاء المجموعة اللي عملوا طلب في الفترة دي. الأخضر = احتفاظ عالي، والأحمر = احتفاظ ضعيف."
     },
     "funnel": {
       "title": "قمع إتمام الشراء",
@@ -7623,7 +7720,8 @@
       "revokeFailed": "معرفناش نلغي الدعوة",
       "sentTitle": "اتبعتت الدعوة",
       "sentDesc": "{email} هيوصله إيميل يقبل منه الدعوة. مفيش حاجة بتتغير في حسابه قبل ما يقبل."
-    }
+    },
+    "removeBody": "هتشيل <b>{name}</b> ({email}) من المتجر ده؟ هيفقد الوصول فوراً."
   },
   "blog": {
     "page": {
@@ -7675,7 +7773,10 @@
       "cancel": "إلغاء",
       "createPost": "إنشاء التدوينة",
       "saveChanges": "حفظ التغييرات",
-      "saving": "جاري الحفظ…"
+      "saving": "جاري الحفظ…",
+      "titleArPlaceholder": "ما الجديد في متجرك...",
+      "excerptArPlaceholder": "جملة أو اثنتان تظهران في قائمة المدونة...",
+      "bodyArPlaceholder": "اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
     }
   },
   "checkoutDelivery": {
@@ -8011,7 +8112,13 @@
     "savedToast": "تم حفظ الودجة العائمة",
     "saveHint": "تُطبَّق التغييرات على واجهة المتجر الفعلية بعد الحفظ.",
     "saving": "جارٍ الحفظ…",
-    "saveChanges": "حفظ التغييرات"
+    "saveChanges": "حفظ التغييرات",
+    "menuLabelEnSample": "Open menu",
+    "menuLabelArSample": "القائمة",
+    "prefillExample": "أهلاً! عايز أسأل عن…",
+    "handleSampleDemoShop": "demo-shop",
+    "handleSample": "mystore",
+    "emailSubjectExample": "سؤال عن متجرك"
   },
   "zoneEditor": {
     "resetToDefault": "إعادة التعيين إلى الافتراضي",
@@ -8478,7 +8585,8 @@
         "prefix": "أوافق على ",
         "sep": "، ",
         "lastSep": " و"
-      }
+      },
+      "companyWebsite": "موقع الشركة"
     },
     "verify": {
       "verifying": "جارٍ تأكيد بريدك…",
@@ -9795,7 +9903,8 @@
       "noteRequired": "اكتب ملاحظة من 3 حروف على الأقل.",
       "cancel": "إلغاء",
       "working": "جاري التنفيذ…"
-    }
+    },
+    "unknown": "غير معروف"
   },
   "goldRates": {
     "page": {

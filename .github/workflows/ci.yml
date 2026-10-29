@@ -253,6 +253,12 @@ jobs:
       - name: Clear-on-empty payload gate
         run: npm run check:clear-on-empty
 
+      # Hardcoded user-visible copy in apps/admin JSX must go through useT / next-intl
+      # (Ruling ADM-I18N-GATE-1). AST-based and cheap; runs only when admin is in the affected set.
+      - name: Admin i18n literal gate
+        if: contains(needs.changes.outputs.lint, 'apps/admin')
+        run: npm run check:admin-i18n
+
   typecheck:
     name: Type Check
     needs: [changes]

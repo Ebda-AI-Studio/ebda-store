@@ -406,9 +406,9 @@ function ReceiveMode({ storeId }: { storeId: string }) {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">
-              {lookup.sku ? `SKU: ${lookup.sku}` : ''}
+              {lookup.sku ? t('skuLabel', { sku: lookup.sku }) : ''}
               {lookup.sku ? ' · ' : ''}
-              On hand: {lookup.inventory}
+              {t('onHandLabel')} {lookup.inventory}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -835,10 +835,10 @@ function CountMode({ storeId }: { storeId: string }) {
                 onClick={() => loadSession(s.id)}
                 className="w-full text-start rounded-xl border border-border bg-card p-4 hover:bg-muted/30 min-h-[44px]"
               >
-                <p className="text-sm font-medium">{s.note || 'Count Session'}</p>
+                <p className="text-sm font-medium">{s.note || t('countSession')}</p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(s.createdAt).toLocaleString(undefined, withNumerals())} · {s.lineCount}{' '}
-                  lines
+                  {t('linesSuffix')}
                 </p>
               </button>
             ))}
@@ -877,7 +877,7 @@ function CountMode({ storeId }: { storeId: string }) {
       {/* Session header */}
       <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-medium">{activeSession.note || 'Count Session'}</p>
+          <p className="text-sm font-medium">{activeSession.note || t('countSession')}</p>
           <p className="text-xs text-muted-foreground">
             {t('counting.sessionStatus', { status: activeSession.status })} ·{' '}
             {t('counting.linesCount', { count: String(activeSession.lines.length) })}
@@ -936,7 +936,7 @@ function CountMode({ storeId }: { storeId: string }) {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  System qty: {lookupResult.inventory}
+                  {t('systemQtyLabel')} {lookupResult.inventory}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -1050,20 +1050,22 @@ function CountMode({ storeId }: { storeId: string }) {
             ? t('counting.reconciled', { id: reconcileResult.adjustmentId.slice(0, 8) + '…' })
             : t('counting.noVariances')}
           <p className="text-xs mt-1 text-green-700">
-            {reconcileResult.linesReconciled} lines adjusted.
+            {t('linesAdjusted', { count: reconcileResult.linesReconciled })}
           </p>
         </div>
       )}
 
       {sessionDone && (
         <div className="rounded-lg bg-muted/30 border border-border px-4 py-3 text-sm text-muted-foreground">
-          Session reconciled on{' '}
-          {activeSession.reconciledAt
-            ? new Date(activeSession.reconciledAt).toLocaleString(undefined, withNumerals())
-            : '—'}
-          .
+          {t('sessionReconciledOn', {
+            date: activeSession.reconciledAt
+              ? new Date(activeSession.reconciledAt).toLocaleString(undefined, withNumerals())
+              : '—',
+          })}
           {activeSession.adjustmentId && (
-            <p className="text-xs mt-1">Adjustment: {activeSession.adjustmentId.slice(0, 8)}…</p>
+            <p className="text-xs mt-1">
+              {t('adjustmentLabel')} {activeSession.adjustmentId.slice(0, 8)}…
+            </p>
           )}
         </div>
       )}

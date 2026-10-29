@@ -70,7 +70,9 @@
       "empty": "No results for “{q}”",
       "error": "Search is unavailable right now. Try again.",
       "count": "{n, plural, one {{n} result} other {{n} results}}"
-    }
+    },
+    "egp": "EGP",
+    "egpParen": "(EGP)"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -441,6 +443,9 @@
         "createFailed": "Failed to create store",
         "generic": "Something went wrong"
       }
+    },
+    "avatar": {
+      "logoAlt": "{name} logo"
     }
   },
   "products": {
@@ -580,7 +585,9 @@
         "selected": "{count} selected",
         "massEdit": "Mass edit",
         "clear": "Clear selection"
-      }
+      },
+      "priceFrom": "From",
+      "selectProduct": "Select {name}"
     },
     "detail": {
       "loading": "Loading...",
@@ -809,7 +816,9 @@
         "maxLength": "Max characters",
         "required": "Required before adding to cart",
         "needLabel": "Personalisation needs a label in Arabic or English.",
-        "invalidMax": "Max characters must be a whole number from 1 to 200."
+        "invalidMax": "Max characters must be a whole number from 1 to 200.",
+        "embroideryNameArSample": "الاسم للتطريز",
+        "embroideryNameEnSample": "Name to embroider"
       },
       "fulfilment": {
         "title": "Fulfilment",
@@ -817,7 +826,19 @@
         "leadTime": "Made-to-order days",
         "placeholder": "Ready to ship",
         "invalid": "Made-to-order days must be a whole number from 0 to {max}."
-      }
+      },
+      "balanceFailed": "Balance failed — try again",
+      "balanceTitle": "Balance languages (name + description EN/AR)",
+      "retryWarn": "⚠ Retry",
+      "balanced": "✓ Balanced",
+      "balanceLanguages": "Balance languages",
+      "revertFailed": "Revert failed — try again",
+      "revertTitle": "Revert balance — restore originals",
+      "revert": "↩ Revert",
+      "faqQuestionEnSample": "e.g. What sizes are available?",
+      "faqQuestionArSample": "مثال: ما الأحجام المتوفرة؟",
+      "faqAnswerEnSample": "e.g. Available in S, M, L, XL.",
+      "faqAnswerArSample": "مثال: متوفر بمقاسات S وM وL وXL."
     },
     "recommendations": {
       "loading": "Loading...",
@@ -1235,7 +1256,8 @@
         "retry": "Retry",
         "confirmInstapay": "Could not confirm the InstaPay payment"
       },
-      "agentBadge": "Agent"
+      "agentBadge": "Agent",
+      "newOrder": "+ New order"
     },
     "status": {
       "pending": "Pending",
@@ -1615,7 +1637,10 @@
         "successTitle": "AI filled empty kicker + subtitle fields",
         "generating": "Generating…",
         "generateWithAi": "Generate with AI"
-      }
+      },
+      "fontFamilyExample": "e.g. Cairo, Inter, \"Open Sans\"",
+      "fontNameExample": "e.g. \"My Brand Sans\"",
+      "uploadFileSize": "{name} ({kb} KB)"
     },
     "devices": {
       "title": "Notification devices",
@@ -1627,7 +1652,8 @@
       "removeConfirmDescription": "Push notifications will stop arriving on this device. You can re-enable from the same browser.",
       "loading": "Loading devices…",
       "error": "Failed to load devices",
-      "removeError": "Failed to remove device"
+      "removeError": "Failed to remove device",
+      "browserFallback": "Browser"
     },
     "invoice": {
       "title": "Invoice",
@@ -1979,7 +2005,9 @@
       "group": "Wholesale group",
       "empty": "No sales in this period yet.",
       "loadFailed": "Could not load the wholesale split."
-    }
+    },
+    "dateTo": "To",
+    "dateFrom": "From"
   },
   "settings": {
     "page": {
@@ -2974,7 +3002,15 @@
       "addCustomLocationHint": "Add a country, province and area that aren't in the list above.",
       "remove": "Remove",
       "deleteFailed": "Couldn't delete the area",
-      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}"
+      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}",
+      "areaNameEnSample": "Area name",
+      "areaNameArSample": "اسم المنطقة",
+      "countryEnSample": "e.g. Saudi Arabia",
+      "countryArSample": "مثال: المملكة العربية السعودية",
+      "cityEnSample": "e.g. Riyadh",
+      "cityArSample": "مثال: الرياض",
+      "districtEnSample": "e.g. Al Olaya",
+      "districtArSample": "مثال: العليا"
     },
     "returnPolicy": {
       "title": "Return policy",
@@ -3492,7 +3528,18 @@
         "payout_completed": "Payout completed",
         "payout_failed": "Payout failed"
       }
-    }
+    },
+    "subtitle": "Affiliates",
+    "backToAffiliates": "Back to Affiliates",
+    "auditTrail2": "Audit Trail →",
+    "noEventsYet": "No events yet",
+    "eventHistory": "Event History",
+    "orderLabel": "Order:",
+    "commissionLabel": "Commission:",
+    "amountLabel": "Amount:",
+    "via": "via",
+    "eventsTitle": "{name} — Events",
+    "eventsTitleFallback": "Affiliate Events"
   },
   "bulk": {
     "page": {
@@ -3623,7 +3670,8 @@
       "broadcastCancel": "Cancel",
       "broadcastSent": "Broadcast sent!",
       "broadcastSentCount": "Sent to {sent} of {total} subscriber(s).",
-      "broadcastClose": "Close"
+      "broadcastClose": "Close",
+      "chunksFailed": "{count} chunk(s) failed — check server logs"
     },
     "table": {
       "email": "Email",
@@ -4219,7 +4267,12 @@
         "numbered": "Numbered list",
         "image": "Image",
         "button": "Button"
-      }
+      },
+      "aiFaqNote": "AI-generated FAQ items live in SEO Tools, not here.",
+      "aiHowToNote": "AI-generated How-To guides live in SEO Tools, not here.",
+      "wrapperNote": "This editor controls the static page wrapper (cover image, intro paragraphs, etc.). The accordion content the storefront actually renders comes from a separate surface.",
+      "openFaqInSeo": "Open FAQ items in SEO →",
+      "openHowToInSeo": "Open How-To items in SEO →"
     }
   },
   "pages": {
@@ -4479,7 +4532,8 @@
       "tabs": {
         "settings": "Settings",
         "members": "Members"
-      }
+      },
+      "transactions": "Transactions"
     },
     "stats": {
       "totalMembers": "Total Members",
@@ -5085,7 +5139,10 @@
       "socialRedirectNote": "Social platform links (Instagram, Facebook, TikTok, etc.) are managed in Branding → Social. Edit them there to keep everything in one place.",
       "socialRedirectNoteLinkText": "Go to Branding → Social",
       "redirectsLoadMore": "Load more",
-      "redirectsLoadingMore": "Loading…"
+      "redirectsLoadingMore": "Loading…",
+      "generating": "Generating…",
+      "generateWithAi": "Generate with AI",
+      "stepsCount": "{count, plural, one {{count} step} other {{count} steps}}"
     }
   },
   "language": {
@@ -5160,7 +5217,8 @@
       "wwwAutoAttachedTitle": "www subdomain handled automatically",
       "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain.",
       "copy": "Copy",
-      "copyValueAriaLabel": "Copy {type} value"
+      "copyValueAriaLabel": "Copy {type} value",
+      "ttlAuto": "1 Hour"
     }
   },
   "categories": {
@@ -5197,7 +5255,9 @@
       "bestSellersTileShown": "Best Sellers tile shown",
       "bestSellersTileHidden": "Best Sellers tile hidden",
       "bestSellersCoverUpdated": "Best Sellers cover updated",
-      "bestSellersCoverRemoved": "Best Sellers cover removed"
+      "bestSellersCoverRemoved": "Best Sellers cover removed",
+      "countUnitEnSample": "pieces",
+      "countUnitArSample": "قطعة"
     },
     "form": {
       "editTitle": "Edit Category",
@@ -5375,7 +5435,8 @@
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
       "saving": "Saving...",
       "searchPlaceholder": "Search reviews…"
-    }
+    },
+    "spam": "Spam"
   },
   "audit": {
     "title": "Audit Logs",
@@ -5944,7 +6005,8 @@
       "subtitleDefault": "Curated picks",
       "productNamePlaceholder": "Product",
       "addToCartLabel": "Add",
-      "headingSuffix": "{label} heading"
+      "headingSuffix": "{label} heading",
+      "samplePrice": "50.00 EGP"
     },
     "colorContrastPreview": {
       "backgroundLabel": "Background: {label}",
@@ -5960,7 +6022,12 @@
       "notTracked": "Not tracked for guest checkout",
       "registeredOnly": "Registered customers only",
       "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
-    }
+    },
+    "title": "Return Timeline",
+    "noEvents": "No timeline events yet",
+    "by": "by",
+    "reasonLabel": "Reason:",
+    "refundViaLabel": "Refund via:"
   },
   "finance": {
     "accounts": {
@@ -6268,7 +6335,8 @@
         "error": "Import failed.",
         "fileTypesHint": "CSV, Excel (.xlsx), or OFX (max 5 MB)",
         "skippedLabel": "Skipped",
-        "viewReconciliation": "View Reconciliation"
+        "viewReconciliation": "View Reconciliation",
+        "andMore": "…and {count} more"
       },
       "tx": {
         "date": "Date",
@@ -6303,7 +6371,8 @@
         "confirm": "Link",
         "cancel": "Cancel",
         "entryIdHelp": "You can find entry IDs in Finance → Journal.",
-        "confirming": "Linking…"
+        "confirming": "Linking…",
+        "uuidExample": "e.g. 550e8400-e29b-41d4-a716-446655440000"
       },
       "difference": {
         "title": "Reconciliation Difference",
@@ -6354,7 +6423,8 @@
       "colRate": "Rate (EGP)",
       "colDate": "Date",
       "colRecorded": "Recorded",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "rateExample2": "e.g. 50.00"
     }
   },
   "stock": {
@@ -6404,7 +6474,8 @@
       "loadFailed": "Couldn't load products — {error}",
       "filteredLabel": "Filtered:",
       "filterLowStock": "Low stock",
-      "filterOutOfStock": "Out of stock"
+      "filterOutOfStock": "Out of stock",
+      "showingFiltered": "Showing {shown} of {total} products"
     },
     "scan": {
       "title": "Barcode Scan",
@@ -6470,7 +6541,15 @@
       "colItem": "Item",
       "colPicked": "Picked",
       "pickItemsTableLabel": "Order items",
-      "countLinesTableLabel": "Count lines"
+      "countLinesTableLabel": "Count lines",
+      "onHandLabel": "On hand:",
+      "countSession": "Count Session",
+      "linesSuffix": "lines",
+      "systemQtyLabel": "System qty:",
+      "adjustmentLabel": "Adjustment:",
+      "skuLabel": "SKU: {sku}",
+      "linesAdjusted": "{count, plural, one {{count} line adjusted.} other {{count} lines adjusted.}}",
+      "sessionReconciledOn": "Session reconciled on {date}."
     },
     "adjustments": {
       "title": "Stock Adjustments",
@@ -6551,7 +6630,9 @@
         "itemsTableLabel": "Adjustment items"
       },
       "searchPlaceholder": "Search adjustments…",
-      "emptyState": "No stock adjustments yet. Create one with the button above."
+      "emptyState": "No stock adjustments yet. Create one with the button above.",
+      "reasonEnPlaceholder": "Optional reason in English",
+      "reasonArPlaceholder": "Reason in Arabic (optional)"
     },
     "suppliers": {
       "title": "Suppliers",
@@ -6584,7 +6665,13 @@
         "leadTimeDays": "Net lead time (days)",
         "leadTimeDaysTip": "Number of days from placing an order with this supplier until stock arrives. Used by the reorder engine when no per-product rule overrides it."
       },
-      "searchPlaceholder": "Search suppliers…"
+      "searchPlaceholder": "Search suppliers…",
+      "supplierNameEnSample": "e.g. Al-Mutlaq Trading",
+      "supplierNameArPlaceholder": "Supplier name in Arabic",
+      "termsDaysExample": "e.g. 45",
+      "notesEnPlaceholder": "Optional notes in English",
+      "notesArPlaceholder": "Notes in Arabic (optional)",
+      "termsDays": "{count, plural, one {{count} day} other {{count} days}}"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -6648,7 +6735,9 @@
         "VARIANT_REQUIRED_RECEIVE": "This line names no variant, but its product has variants, so it cannot be received. Cancel this purchase order and draft it again per variant."
       },
       "emptyState": "No purchase orders yet. Create one with the button above.",
-      "totalCount": "{total} purchase orders"
+      "totalCount": "{total} purchase orders",
+      "backToPurchaseOrders": "← Back to purchase orders",
+      "notesArPlaceholder": "Notes in Arabic (optional)"
     },
     "backorders": {
       "title": "Open Backorders",
@@ -6750,7 +6839,10 @@
       },
       "validation": {
         "nameCodeRequired": "Name and code are required"
-      }
+      },
+      "warehouseNameEnSample": "Main Warehouse",
+      "warehouseNameArSample": "المستودع الرئيسي",
+      "addressSample": "Shuwaikh Industrial Area, Egypt"
     },
     "warehouseStock": {
       "title": "Warehouse Stock",
@@ -6782,7 +6874,8 @@
       "reconcileHint": "Per-warehouse counts are reconciled from your authoritative product stock.",
       "searchTruncated": "These are the closest matches only. Add a word to narrow the search.",
       "reconcileDone": "Reconciled {reconciled} SKU(s), {failed} failed",
-      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly"
+      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly",
+      "deltaExample": "+10 or -5"
     }
   },
   "insights": {
@@ -6804,7 +6897,9 @@
       "colSku": "SKU",
       "colName": "Name",
       "colSold7d": "Sold 7d",
-      "colVelocity": "Velocity"
+      "colVelocity": "Velocity",
+      "perDay": "/day",
+      "topSegmentCustomers": "{count, plural, one {{count} customer} other {{count} customers}}"
     },
     "cohorts": {
       "title": "Customer Cohorts",
@@ -6818,7 +6913,9 @@
       "ltvByCohortTitle": "Cumulative LTV by Cohort",
       "colTotalRevenue": "Total Revenue (EGP)",
       "colLtvPerCustomer": "LTV / Customer",
-      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time."
+      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time.",
+      "cellTitle": "{active} / {total} customers active",
+      "legendNote": "Cells show % of cohort customers who placed an order in that period. Green = high retention, red = low."
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -7623,7 +7720,8 @@
       "revokeFailed": "Could not revoke the invitation",
       "sentTitle": "Invitation sent",
       "sentDesc": "{email} will get an email to accept. Nothing changes on their account until they do."
-    }
+    },
+    "removeBody": "Remove <b>{name}</b> ({email}) from this store? They will lose access immediately."
   },
   "blog": {
     "page": {
@@ -7675,7 +7773,10 @@
       "cancel": "Cancel",
       "createPost": "Create post",
       "saveChanges": "Save changes",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "titleArPlaceholder": "ما الجديد في متجرك...",
+      "excerptArPlaceholder": "جملة أو اثنتان تظهران في قائمة المدونة...",
+      "bodyArPlaceholder": "اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
     }
   },
   "checkoutDelivery": {
@@ -8011,7 +8112,13 @@
     "savedToast": "Floating widget saved",
     "saveHint": "Changes apply to the live storefront after save.",
     "saving": "Saving…",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save changes",
+    "menuLabelEnSample": "Open menu",
+    "menuLabelArSample": "القائمة",
+    "prefillExample": "Hi! I'd like to ask about…",
+    "handleSampleDemoShop": "demo-shop",
+    "handleSample": "mystore",
+    "emailSubjectExample": "Question about your store"
   },
   "zoneEditor": {
     "resetToDefault": "Reset to default",
@@ -8478,7 +8585,8 @@
         "prefix": "I agree to the ",
         "sep": ", the ",
         "lastSep": " and the "
-      }
+      },
+      "companyWebsite": "Company website"
     },
     "verify": {
       "verifying": "Verifying your email…",
@@ -9795,7 +9903,8 @@
       "noteRequired": "Enter a note of at least 3 characters.",
       "cancel": "Cancel",
       "working": "Working…"
-    }
+    },
+    "unknown": "unknown"
   },
   "goldRates": {
     "page": {

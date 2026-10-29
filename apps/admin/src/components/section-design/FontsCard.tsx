@@ -167,7 +167,7 @@ export function FontsCard({
               type="text"
               value={family}
               onChange={e => setFamily(e.target.value)}
-              placeholder='e.g. Cairo, Inter, "Open Sans"'
+              placeholder={t('fontFamilyExample')}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
             />
           </label>
@@ -215,7 +215,7 @@ export function FontsCard({
               type="text"
               value={uploadFamily}
               onChange={e => setUploadFamily(e.target.value)}
-              placeholder='e.g. "My Brand Sans"'
+              placeholder={t('fontNameExample')}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
             />
           </label>
@@ -231,7 +231,10 @@ export function FontsCard({
             />
             {uploadFile && (
               <span className="text-[11px] text-muted-foreground">
-                {uploadFile.name} ({Math.round(uploadFile.size / 1024)} KB)
+                {t('uploadFileSize', {
+                  name: uploadFile.name,
+                  kb: Math.round(uploadFile.size / 1024),
+                })}
               </span>
             )}
           </label>

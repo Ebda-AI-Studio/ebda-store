@@ -545,7 +545,9 @@ export default function NewExpensePage() {
               required
             />
             {isNonBase && rawAmount > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">= {minorToMajor(baseAmountFils)} EGP</p>
+              <p className="text-xs text-muted-foreground">
+                = {minorToMajor(baseAmountFils)} {tc('egp')}
+              </p>
             )}
           </label>
           <label className="block space-y-1">
@@ -561,7 +563,9 @@ export default function NewExpensePage() {
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
             />
             {isNonBase && rawTax > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">= {minorToMajor(baseTaxFils)} EGP</p>
+              <p className="text-xs text-muted-foreground">
+                = {minorToMajor(baseTaxFils)} {tc('egp')}
+              </p>
             )}
           </label>
         </div>
@@ -573,12 +577,16 @@ export default function NewExpensePage() {
               <span className="text-muted-foreground">
                 {t('totalInBaseConverted', { rate: fxRateNum })}{' '}
               </span>
-              <span className="font-semibold font-mono">{totalMajor} EGP</span>
+              <span className="font-semibold font-mono">
+                {totalMajor} {tc('egp')}
+              </span>
             </>
           ) : (
             <>
               <span className="text-muted-foreground">{t('totalInBase')}: </span>
-              <span className="font-semibold font-mono">{totalMajor} EGP</span>
+              <span className="font-semibold font-mono">
+                {totalMajor} {tc('egp')}
+              </span>
             </>
           )}
         </div>

@@ -55,6 +55,7 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
         <span className="text-muted-foreground">
+          {/* i18n-gate-allow: standard name */}
           {t('autoFixedLabel')} <span className="font-mono">{autoFg}</span> · WCAG{' '}
           {autoRatio.toFixed(1)} : 1{' '}
           {autoRatio >= HEADING_AA_MIN ? '✓' : autoRatio >= LARGE_AA_MIN ? '⚠' : '✗'}

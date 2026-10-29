@@ -564,7 +564,7 @@ export default function StoreCategoriesPage() {
               type="text"
               value={countUnitEn}
               onChange={e => setCountUnitEn(e.target.value)}
-              placeholder="pieces"
+              placeholder={t('countUnitEnSample')}
               maxLength={30}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
@@ -583,7 +583,7 @@ export default function StoreCategoriesPage() {
               dir="rtl"
               value={countUnitAr}
               onChange={e => setCountUnitAr(e.target.value)}
-              placeholder="قطعة"
+              placeholder={t('countUnitArSample')}
               maxLength={30}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
@@ -599,8 +599,8 @@ export default function StoreCategoriesPage() {
             {savingCountUnit ? tCommon('saving') : t('saveLabelButton')}
           </button>
           <span className="text-xs text-muted-foreground">
-            {t('previewLabel')} <strong>{countUnitEn || 'pieces'}</strong> /{' '}
-            <strong dir="rtl">{countUnitAr || 'قطعة'}</strong>
+            {t('previewLabel')} <strong>{countUnitEn || t('countUnitEnSample')}</strong> /{' '}
+            <strong dir="rtl">{countUnitAr || t('countUnitArSample')}</strong>
           </span>
         </div>
       </div>
