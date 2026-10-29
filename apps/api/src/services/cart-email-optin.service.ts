@@ -17,6 +17,7 @@ import { verifyCartRestoreToken } from '../lib/cart-restore-token';
 import logger from '../lib/logger';
 import { CartService } from './cart.service';
 import { featureService } from './feature.service';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 const emailSchema = z.string().trim().email().max(254);
 
@@ -32,13 +33,15 @@ export async function recordCartEmailConsent(
   sessionId: string,
   input: { email: string; consent: boolean; language?: 'en' | 'ar' }
 ): Promise<{ status: CartEmailConsentStatus }> {
-  const cart = await prisma.cart.findFirst({ where: { storeId, sessionId }, select: { id: true } });
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  const cart = await db.cart.findFirst({ where: { storeId, sessionId }, select: { id: true } });
   if (!cart) return { status: 'no_cart' };
 
   if (!input.consent) {
     // Withdraw this cart's consent only; an existing subscription is the subscriber's to cancel
     // (one-click unsubscribe), not a checkbox's.
-    await prisma.cart.updateMany({
+    await w.cart.updateMany({
       where: { id: cart.id, storeId },
       data: { guestEmail: null, guestEmailConsentAt: null },
     });
@@ -78,7 +81,7 @@ export async function recordCartEmailConsent(
     }
   }
 
-  await prisma.cart.updateMany({
+  await w.cart.updateMany({
     where: { id: cart.id, storeId },
     data: { guestEmail: email, guestEmailConsentAt: new Date() },
   });
@@ -88,7 +91,9 @@ export async function recordCartEmailConsent(
 /** Show the checkout box only when it can lead to an email: plan feature on AND channel on. */
 export async function cartEmailOptInAvailable(storeId: string): Promise<boolean> {
   try {
-    const cfg = await prisma.abandonedCartConfig.findFirst({
+    const cfg = await (
+      await storeDb(storeId)
+    ).abandonedCartConfig.findFirst({
       where: { storeId },
       select: { emailEnabled: true },
     });
@@ -119,7 +124,8 @@ export async function restoreCartIntoSession(
   const ids = verifyCartRestoreToken(token);
   if (!ids || ids.storeId !== storeId) return { restored: false, reason: 'invalid' };
 
-  const source = await prisma.cart.findFirst({
+  const db = await storeDb(storeId);
+  const source = await db.cart.findFirst({
     where: { id: ids.cartId, storeId },
     select: { id: true, sessionId: true },
   });
@@ -127,23 +133,23 @@ export async function restoreCartIntoSession(
   if (source.sessionId === sessionId) return { restored: true, added: 0 };
 
   const [items, bundles, mine] = await Promise.all([
-    prisma.cartItem.findMany({
+    db.cartItem.findMany({
       where: { cartId: source.id },
       select: { productId: true, variantId: true, quantity: true, note: true },
     }),
-    prisma.cartBundle.findMany({
+    db.cartBundle.findMany({
       where: { cartId: source.id },
       select: { bundleId: true, quantity: true },
     }),
-    prisma.cart.findFirst({ where: { storeId, sessionId }, select: { id: true } }),
+    db.cart.findFirst({ where: { storeId, sessionId }, select: { id: true } }),
   ]);
   const [myItems, myBundles] = mine
     ? await Promise.all([
-        prisma.cartItem.findMany({
+        db.cartItem.findMany({
           where: { cartId: mine.id },
           select: { productId: true, variantId: true },
         }),
-        prisma.cartBundle.findMany({ where: { cartId: mine.id }, select: { bundleId: true } }),
+        db.cartBundle.findMany({ where: { cartId: mine.id }, select: { bundleId: true } }),
       ])
     : [[], []];
 

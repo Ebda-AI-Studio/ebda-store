@@ -24,6 +24,7 @@ import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { resolveBundle } from './bundle.service';
 import { featureService } from './feature.service';
+import { storeDb, storeRepo, storeWriter, type StoreReads } from '../lib/repo-factory';
 import {
   sweepCartRecoveryEmails,
   CART_EMAIL_DEFAULT_DELAY_MINUTES,
@@ -608,7 +609,9 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   async markRecovered(abandonedCartId: string, orderId: string): Promise<void> {
-    await prisma.abandonedCart.update({
+    await (
+      await storeWriter(currentStoreId())
+    ).abandonedCart.update({
       where: { id: abandonedCartId, storeId: currentStoreId() },
       data: {
         status: 'recovered',
@@ -625,7 +628,9 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   async getConfig(storeId: string): Promise<AbandonedCartConfigDefaults> {
-    const row = await prisma.abandonedCartConfig.findUnique({
+    const row = await (
+      await storeDb(storeId)
+    ).abandonedCartConfig.findUnique({
       where: { storeId },
     });
 
@@ -653,7 +658,9 @@ class AbandonedCartService {
     storeId: string,
     data: Partial<AbandonedCartConfigDefaults>
   ): Promise<AbandonedCartConfigDefaults> {
-    const row = await prisma.abandonedCartConfig.upsert({
+    const row = await (
+      await storeWriter(storeId)
+    ).abandonedCartConfig.upsert({
       where: { storeId },
       create: {
         storeId,
@@ -710,11 +717,25 @@ class AbandonedCartService {
     recoveryRate: number;
     recoveredRevenue: number;
   }> {
-    const grouped = await prisma.abandonedCart.groupBy({
-      by: ['status'],
-      where: { storeId },
-      _count: { id: true },
-    });
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    // prisma-lite has no groupBy: a DO store counts the rows per status itself (a store's abandoned carts are few)
+    const grouped = onDo
+      ? [
+          ...(
+            await repo.db.abandonedCart.findMany({ where: { storeId }, select: { status: true } })
+          )
+            .reduce(
+              (m, r) => m.set(r.status, (m.get(r.status) ?? 0) + 1),
+              new Map<string, number>()
+            )
+            .entries(),
+        ].map(([status, n]) => ({ status, _count: { id: n } }))
+      : await prisma.abandonedCart.groupBy({
+          by: ['status'],
+          where: { storeId },
+          _count: { id: true },
+        });
 
     const byStatus: Record<string, number> = {};
     let totalAbandoned = 0;
@@ -724,7 +745,9 @@ class AbandonedCartService {
     }
     const totalRecovered = byStatus.recovered ?? 0;
 
-    const revenueRows = await prisma.$queryRaw<Array<{ revenue: bigint | null }>>`
+    const revenueRows = onDo
+      ? [{ revenue: await doRecoveredRevenue(repo.db, storeId) }]
+      : await prisma.$queryRaw<Array<{ revenue: bigint | null }>>`
       SELECT COALESCE(SUM(o.total), 0)::bigint AS revenue
       FROM public.abandoned_carts ac
       JOIN public.orders o ON o.id = ac.recovered_order_id
@@ -760,20 +783,28 @@ class AbandonedCartService {
       where.status = status;
     }
 
-    const [records, total] = await Promise.all([
-      prisma.abandonedCart.findMany({
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const [found, total] = await Promise.all([
+      repo.db.abandonedCart.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          customer: {
-            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-          },
-        },
+        // `customer` is a User on the platform database: for a DO store it is attached below
+        ...(onDo
+          ? {}
+          : {
+              include: {
+                customer: {
+                  select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+                },
+              },
+            }),
       }),
-      prisma.abandonedCart.count({ where }),
+      repo.db.abandonedCart.count({ where }),
     ]);
+    const records = onDo ? await withCustomers(storeId, found) : found;
 
     return {
       records,
@@ -784,6 +815,25 @@ class AbandonedCartService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /** One abandoned cart with its customer (a DO store attaches the platform `User` itself). Null when not this store's. */
+  async getAbandoned(storeId: string, id: string) {
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.abandonedCart.findUnique({
+      where: { id, storeId },
+      ...(onDo
+        ? {}
+        : {
+            include: {
+              customer: {
+                select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+              },
+            },
+          }),
+    });
+    return found && onDo ? (await withCustomers(storeId, [found]))[0] : found;
   }
 
   // ──────────────────────────────────────────
@@ -840,6 +890,43 @@ class AbandonedCartService {
         return 0;
     }
   }
+}
+
+/** The recovered orders' revenue for a DO store: orders that count as revenue elsewhere (the SQL twin above), summed here. */
+async function doRecoveredRevenue(db: StoreReads, storeId: string): Promise<number> {
+  const recovered = await db.abandonedCart.findMany({
+    where: { storeId, status: 'recovered', recoveredOrderId: { not: null } },
+    select: { recoveredOrderId: true },
+  });
+  const ids = recovered.map(r => r.recoveredOrderId).filter((x): x is string => !!x);
+  if (ids.length === 0) return 0;
+  const orders = await db.order.findMany({
+    where: {
+      id: { in: ids },
+      storeId,
+      deletedAt: null,
+      status: { notIn: ['cancelled', 'refunded', 'awaiting_payment_confirmation'] },
+      paymentStatus: { not: 'failed' },
+    },
+    select: { total: true },
+  });
+  return orders.reduce((n, o) => n + o.total, 0);
+}
+
+/** `AbandonedCart.customer` (a platform `User`) for rows read from a DO. */
+async function withCustomers<T extends { customerId: string | null }>(storeId: string, rows: T[]) {
+  const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
+  const users = ids.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ids }, storeId },
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+      })
+    : [];
+  const byId = new Map(users.map(u => [u.id, u]));
+  return rows.map(r => ({
+    ...r,
+    customer: r.customerId ? (byId.get(r.customerId) ?? null) : null,
+  }));
 }
 
 // Singleton

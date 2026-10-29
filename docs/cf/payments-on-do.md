@@ -35,7 +35,7 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 
 ## Not moved (the flip gate stays closed)
 
-Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document and credit notes), delivery slots, personalisation notes, quotes (`dryRun`), InstaPay receipts, the Return row lifecycle (`return.service.ts`: its refund legs reach the DO only through `PaymentService.refund` and `refundBook`), the order reads, expense / PO / stock-adjustment journals, the wallet-movement journal (WALLET-GL-1, open PR), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
+Carts, fiscal documents and the order reads (moved in R2, Ruling CF-R2-1), delivery slots, personalisation notes and quotes (moved in D2b-4), InstaPay receipts, the Return row lifecycle (`return.service.ts`: its refund legs reach the DO only through `PaymentService.refund` and `refundBook`), expense / PO / stock-adjustment journals, the wallet-movement journal (WALLET-GL-1, open PR), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
 
 ## Tests
 

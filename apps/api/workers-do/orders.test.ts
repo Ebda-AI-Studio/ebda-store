@@ -34,6 +34,12 @@ async function seed(store: string, stock: number, extra = '') {
   const stub = stubFor(store);
   await op(stub, store, 'cancel', { orderId: 'nope' }); // binds the store (a refusal, nothing written)
   await runInDurableObject(stub, (_i, s) => {
+    // a DO store always has its profile row; an order's sale document reads the seller from it (Ruling CF-R2-1)
+    s.storage.sql.exec(
+      `INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES (?, 'Shop', ?, 'owner')`,
+      store,
+      store
+    );
     s.storage.sql.exec(
       `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p1', ?, 'Widget', 'widget', 1000, ?, 'active')`,
       store,
@@ -183,29 +189,91 @@ describe('StoreDO.moneyOp orders', () => {
     expect(answers.length).toBe(20);
   });
 
-  // PR D2b-4 (Ruling CF-FINAL-1)
-  it('40 concurrent submits of one cart state create exactly one order (the cart claim, no row lock)', async () => {
-    const stub = await seed('ord-cart', 100);
+  // PR R2 (Ruling CF-R2-1, closes CF-ORDERS-CART-1): the cart rows live on this DO and the claim is one section
+  it('40 concurrent submits of one cart create exactly one order (the cart rows claimed with the order, no row lock)', async () => {
+    const stub = await seed(
+      'ord-cart',
+      100,
+      `INSERT INTO carts (id, store_id, session_id) VALUES ('cart-1', '$S', 'sess');;INSERT INTO cart_items (id, cart_id, product_id, quantity) VALUES ('ci1', 'cart-1', 'p1', 1)`
+    );
     const answers = await Promise.all(
       Array.from({ length: 40 }, () =>
-        op(
-          stub,
-          'ord-cart',
-          'createOrder',
-          order({ cartClaim: { id: 'cart-1', fingerprint: 'v1' } })
-        )
+        op(stub, 'ord-cart', 'createOrder', order({ cart: { id: 'cart-1' } }))
       )
     );
     expect(codes(answers)).toEqual({ ok: 1, CART_CHANGED: 39 });
     expect(await num(stub, `SELECT count(*) AS n FROM orders`)).toBe(1);
+    expect(await num(stub, `SELECT count(*) AS n FROM cart_items`)).toBe(0);
     expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(99);
-    const again = await op(
-      stub,
-      'ord-cart',
-      'createOrder',
-      order({ cartClaim: { id: 'cart-1', fingerprint: 'v2' } })
+    await runInDurableObject(stub, (_i, s) => {
+      s.storage.sql.exec(
+        `INSERT INTO cart_items (id, cart_id, product_id, quantity) VALUES ('ci2', 'cart-1', 'p1', 1)`
+      );
+    });
+    const again = await op(stub, 'ord-cart', 'createOrder', order({ cart: { id: 'cart-1' } }));
+    expect(again.ok).toBe(true); // a refilled cart is a new purchase
+  });
+
+  // PR R2 (Ruling CF-R2-1): GAPLESS fiscal numbering
+  it('80 concurrent orders get 80 consecutive receipt numbers: no gap, no duplicate, the failed ones burn none', async () => {
+    const stub = await seed('fiscal-gapless', 60);
+    const answers = await Promise.all(
+      Array.from({ length: 80 }, () => op(stub, 'fiscal-gapless', 'createOrder', order()))
     );
-    expect(again.ok).toBe(true); // a changed cart is a new purchase
+    expect(codes(answers)).toEqual({ ok: 60, OUT_OF_STOCK: 20 }); // 20 are refused after the numbers were being taken
+    const serials = await runInDurableObject(stub, (_i, s) =>
+      s.storage.sql
+        .exec(`SELECT serial FROM fiscal_documents WHERE doc_type = 'receipt' ORDER BY serial`)
+        .toArray()
+        .map(r => r.serial as number)
+    );
+    expect(serials).toEqual(Array.from({ length: 60 }, (_, i) => i + 1));
+    expect(
+      await num(
+        stub,
+        `SELECT last_serial AS n FROM fiscal_document_counters WHERE doc_type = 'receipt'`
+      )
+    ).toBe(60);
+    expect(await num(stub, `SELECT count(DISTINCT number) AS n FROM fiscal_documents`)).toBe(60);
+    expect(await num(stub, `SELECT count(*) AS n FROM orders`)).toBe(60);
+  });
+
+  it('concurrent orders interleaved with cancels and refunds keep every series gapless (RCT, CRN, RFR)', async () => {
+    const stub = await seed('fiscal-mixed', 100);
+    const placed = (
+      await Promise.all(
+        Array.from({ length: 30 }, () => op(stub, 'fiscal-mixed', 'createOrder', order()))
+      )
+    ).map(a => decodeRpc<{ orderId: string }>((a as { json: string }).json).orderId);
+    // half the orders are cancelled (unpaid: the sale document is cancelled, keeping its number) while 30 more are placed and
+    // 15 partial credit notes are issued, all racing
+    const racing = await Promise.all([
+      ...placed.slice(0, 15).map(id => op(stub, 'fiscal-mixed', 'cancel', { orderId: id })),
+      ...Array.from({ length: 30 }, () => op(stub, 'fiscal-mixed', 'createOrder', order())),
+      ...placed.slice(15, 30).map((id, i) =>
+        op(stub, 'fiscal-mixed', 'fiscalRefund', {
+          orderId: id,
+          refundRef: `refund:${i}`,
+          amount: 100,
+        })
+      ),
+    ]);
+    expect(racing.every(a => a.ok)).toBe(true);
+    for (const [type, expected] of [
+      ['receipt', 60],
+      ['refund_receipt', 15],
+    ] as const) {
+      const serials = await runInDurableObject(stub, (_i, s) =>
+        s.storage.sql
+          .exec(`SELECT serial FROM fiscal_documents WHERE doc_type = ? ORDER BY serial`, type)
+          .toArray()
+          .map(r => r.serial as number)
+      );
+      expect(serials).toEqual(Array.from({ length: expected }, (_, i) => i + 1));
+    }
+    expect(
+      await num(stub, `SELECT count(*) AS n FROM fiscal_documents WHERE status = 'cancelled'`)
+    ).toBe(15);
   });
 
   it('30 concurrent deliveries of one COD order settle the payment once and write one event', async () => {

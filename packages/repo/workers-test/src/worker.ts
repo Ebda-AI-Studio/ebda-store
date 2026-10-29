@@ -97,7 +97,14 @@ export class LiteDO extends DurableObject {
       `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit_per_user, scope_product_ids, scope_category_ids) VALUES ('pu', 's1', 'ONCE', 'once', 'fixed', 100, 1, '[]', '[]')`
     );
   }
+  /** A DO store always has its profile row; an order's sale document reads the seller from it (Ruling CF-R2-1). */
+  private profile(): void {
+    this.ctx.storage.sql.exec(
+      `INSERT OR IGNORE INTO store_profile (store_id, name, slug, owner_id) VALUES ('s1', 'Shop', 's1', 'owner')`
+    );
+  }
   checkout(input: CheckoutInput): { ok: true; orderId: string } | { ok: false; code: string } {
+    this.profile();
     try {
       return {
         ok: true,
@@ -115,7 +122,7 @@ export class LiteDO extends DurableObject {
       orders: one('SELECT count(*) AS n FROM orders'),
       items: one(`SELECT coalesce(sum(quantity), 0) AS n FROM order_items`),
       sold: one(
-        `SELECT coalesce(sum(quantity), 0) AS n FROM inventory_history WHERE type = 'sale'`
+        `SELECT coalesce(-sum(quantity), 0) AS n FROM inventory_history WHERE type = 'sale'` // a sale row is negative (CF-ORDERS-1 fixed the sign)
       ),
       couponUsed: one(`SELECT usage_count AS n FROM coupons WHERE id = 'c'`),
       couponOrders: one(`SELECT count(*) AS n FROM orders WHERE coupon_code = 'SALE'`),
@@ -205,6 +212,7 @@ export class LiteDO extends DurableObject {
     return this.ctx.storage.sql.exec(q, ...p).one() as Record<string, number>;
   }
   placeRaw(input: CheckoutInput): string {
+    this.profile();
     return placeOrder(doSyncSql(this.ctx.storage), { ...input, storeId: 's1' }).orderId;
   }
   cancel(orderId: string): { ok: true; replayed: boolean } | { ok: false; code: string } {

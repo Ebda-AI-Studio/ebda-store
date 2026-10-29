@@ -44,6 +44,11 @@ async function seed(store: string) {
   await op(stub, store, 'cancel', { orderId: 'nope' }); // binds the store
   await runInDurableObject(stub, (_i, s) => {
     s.storage.sql.exec(
+      `INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES (?, 'Shop', ?, 'owner')`,
+      store,
+      store
+    );
+    s.storage.sql.exec(
       `INSERT INTO products (id, store_id, name, slug, price, inventory, status, cost_price) VALUES ('p1', ?, 'Widget', 'widget', 1000, 20, 'active', 400)`,
       store
     );
