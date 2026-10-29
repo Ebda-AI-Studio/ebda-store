@@ -89,6 +89,7 @@ import { cartRecoveryEmail } from './cart-recovery-email';
 import { legalNoticeSend } from './legal-notice-send';
 import { waStoreEvents, waPlanSync } from './wa-store-events';
 import { ciOutcomes } from './ci-outcomes';
+import { ciAggregationDaily, ciHintCalibrationWeekly } from './ci-aggregation';
 import { ciErasureSecondPassFn } from './ci-erasure-second-pass';
 
 /**
@@ -248,6 +249,8 @@ const allInngestFunctions: JobDef[] = [
   legalNoticeSend,
   waStoreEvents,
   ciOutcomes,
+  ciAggregationDaily,
+  ciHintCalibrationWeekly,
   ciErasureSecondPassFn,
   waPlanSync,
   // Gold-rate pricing (Phase B5, Ruling B5-15/B5-16): the free automatic rate (6-hourly) and the stale-rate
