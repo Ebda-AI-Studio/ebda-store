@@ -15,6 +15,7 @@ import {
   ciCohortLatestKey,
   ciMetricAggKey,
   ciPartitionPrefix,
+  ciStoreAggPrefix,
   ciStoreDayAggKey,
   ciStoreWindowKey,
 } from '../layout';
@@ -110,8 +111,13 @@ export async function rebuildWindow(
 ): Promise<StoreWindow> {
   const own = emptyCells();
   const shared = emptyCells();
+  // ONE list of the store's aggregate prefix, then a get for each day file that really exists in the
+  // window: a store with 3 days of history costs 4 reads, not 91 (Ruling CI-14).
+  const have = new Set(await listAll(ci, ciStoreAggPrefix(storeId)));
   for (let i = 0; i < CI_AGG_WINDOW_DAYS; i++) {
-    const obj = await ci.get(ciStoreDayAggKey(storeId, addDays(asOf, -i)));
+    const key = ciStoreDayAggKey(storeId, addDays(asOf, -i));
+    if (!have.has(key)) continue;
+    const obj = await ci.get(key);
     if (!obj) continue;
     const d = JSON.parse(await obj.text()) as StoreDay;
     mergeCells(own, d.own);
@@ -129,36 +135,77 @@ export async function rebuildWindow(
   return w;
 }
 
-/** Merge the opted-in stores' `shared` windows; suppress every cell under the k-thresholds. */
-export function buildCohort(windows: StoreWindow[], asOf: string): Cohort {
-  const metrics = {} as Cohort['metrics'];
+/**
+ * The cohort fold, split so it can run in chunks (Ruling CI-14): `accumulateWindows` is the part that
+ * touches R2 (one get per store window) and returns a plain, JSON-safe partial; `mergeAccs` adds partials;
+ * `finalizeCohort` applies the k-thresholds. `buildCohort` is all three on windows already in memory.
+ */
+export type CohortAcc = Record<
+  string,
+  Record<string, { n: number; hit: number; sum: number; perStore: number[] }>
+>;
+
+export function accumulateWindows(windows: StoreWindow[]): CohortAcc {
+  const acc: CohortAcc = {};
   for (const m of METRICS) {
-    const acc = new Map<string, { cell: Cell; perStore: number[] }>();
+    const byKey: CohortAcc[string] = (acc[m] = {});
     for (const w of windows) {
       for (const [key, c] of Object.entries(w.shared[m] ?? {})) {
-        const a = acc.get(key) ?? {
-          cell: { n: 0, hit: 0, sum: 0, first: c.first, last: c.last },
-          perStore: [],
-        };
-        a.cell.n += c.n;
-        a.cell.hit += c.hit;
-        a.cell.sum += c.sum;
+        const a = (byKey[key] ??= { n: 0, hit: 0, sum: 0, perStore: [] });
+        a.n += c.n;
+        a.hit += c.hit;
+        a.sum += c.sum;
         a.perStore.push(c.n);
-        acc.set(key, a);
       }
     }
+  }
+  return acc;
+}
+
+export function mergeAccs(parts: CohortAcc[]): CohortAcc {
+  const out: CohortAcc = {};
+  for (const m of METRICS) {
+    const byKey: CohortAcc[string] = (out[m] = {});
+    for (const part of parts) {
+      for (const [key, c] of Object.entries(part[m] ?? {})) {
+        const a = (byKey[key] ??= { n: 0, hit: 0, sum: 0, perStore: [] });
+        a.n += c.n;
+        a.hit += c.hit;
+        a.sum += c.sum;
+        a.perStore.push(...c.perStore);
+      }
+    }
+  }
+  return out;
+}
+
+/** One get per store (missing = a store with no window yet, skipped). At most `windowIds.length` R2 reads. */
+export async function readWindowsAcc(ci: CiBucket, storeIds: string[]): Promise<CohortAcc> {
+  const windows: StoreWindow[] = [];
+  for (const id of storeIds) {
+    const obj = await ci.get(ciStoreWindowKey(id));
+    if (obj) windows.push(JSON.parse(await obj.text()) as StoreWindow);
+  }
+  return accumulateWindows(windows);
+}
+
+/** Apply the k-thresholds to an accumulated cohort; every cell under them is `{ suppressed: true }` only. */
+export function finalizeCohort(acc: CohortAcc, asOf: string): Cohort {
+  const metrics = {} as Cohort['metrics'];
+  for (const m of METRICS) {
     const out: Record<string, PublishedCell> = {};
-    for (const key of [...acc.keys()].sort()) {
-      const { cell, perStore } = acc.get(key)!;
-      const maxShare = Math.max(...perStore) / cell.n;
+    const byKey = acc[m] ?? {};
+    for (const key of Object.keys(byKey).sort()) {
+      const { n, hit, sum, perStore } = byKey[key]!;
+      const maxShare = Math.max(...perStore) / n;
       out[key] =
-        cell.n >= COHORT_MIN_N &&
+        n >= COHORT_MIN_N &&
         perStore.length >= COHORT_MIN_STORES &&
         maxShare <= COHORT_MAX_STORE_SHARE
           ? {
-              n: cell.n,
-              hit: cell.hit,
-              sum: Math.round(cell.sum * 100) / 100,
+              n,
+              hit,
+              sum: Math.round(sum * 100) / 100,
               stores: perStore.length,
               maxShare: Math.round(maxShare * 1000) / 1000,
             }
@@ -167,6 +214,11 @@ export function buildCohort(windows: StoreWindow[], asOf: string): Cohort {
     metrics[m] = out;
   }
   return { v: 1, asOf, windowDays: CI_AGG_WINDOW_DAYS, metrics };
+}
+
+/** Merge the opted-in stores' `shared` windows; suppress every cell under the k-thresholds. */
+export function buildCohort(windows: StoreWindow[], asOf: string): Cohort {
+  return finalizeCohort(accumulateWindows(windows), asOf);
 }
 
 export async function publishCohort(ci: CiBucket, cohort: Cohort): Promise<void> {
@@ -195,8 +247,79 @@ export interface AggregationResult {
 }
 
 /**
- * The daily run. `days` are the UTC days to (re)fold, oldest first; `asOf` (the newest) is the window end.
- * A store that throws is logged and left out of the cohort for this run; the next run rebuilds it.
+ * R2 calls one store may make in one run (Ruling CI-14). A Worker invocation allows 1000 subrequests, so
+ * the daily job runs ONE STORE PER STEP and every step is held to this budget. Typical cost: 2 days x
+ * (1 list + the batch objects + 1 put) + 1 list + the day files that exist (<= 90) + 1 put, about 100 at
+ * full history and about 10 for a new store.
+ */
+export const MAX_R2_CALLS_PER_STORE = 400;
+export class CiBudgetExceeded extends Error {}
+
+/** Counts every call and throws past `limit`, so a runaway store fails loudly instead of killing the Worker. */
+export function budgeted(
+  ci: CiBucket,
+  limit = MAX_R2_CALLS_PER_STORE
+): { ci: CiBucket; calls: () => number } {
+  let calls = 0;
+  const hit = () => {
+    if (++calls > limit) throw new CiBudgetExceeded(`more than ${limit} R2 calls for one store`);
+  };
+  const wrapped = {
+    get: async (...a: Parameters<CiBucket['get']>) => {
+      hit();
+      return ci.get(...a);
+    },
+    put: async (...a: Parameters<CiBucket['put']>) => {
+      hit();
+      return ci.put(...a);
+    },
+    list: async (...a: Parameters<CiBucket['list']>) => {
+      hit();
+      return ci.list(...a);
+    },
+    delete: async (...a: Parameters<CiBucket['delete']>) => {
+      hit();
+      return ci.delete(...a);
+    },
+  } as unknown as CiBucket;
+  return { ci: wrapped, calls: () => calls };
+}
+
+/** One store, one run: fold `days` into day files, rebuild its window. Throws if the store fails. */
+export async function aggregateStore(
+  ci: CiBucket,
+  storeId: string,
+  days: string[]
+): Promise<{ skippedLines: number; r2Calls: number }> {
+  const b = budgeted(ci);
+  let skippedLines = 0;
+  for (const day of days) skippedLines += (await aggregateStoreDay(b.ci, storeId, day)).skipped;
+  await rebuildWindow(b.ci, storeId, days.at(-1)!);
+  return { skippedLines, r2Calls: b.calls() };
+}
+
+/** The cohort from the stores' windows, read in chunks of `chunk` (<= `chunk` R2 reads each), then published. */
+export async function publishCohortFor(
+  ci: CiBucket,
+  storeIds: string[],
+  asOf: string,
+  chunk = COHORT_READ_CHUNK
+): Promise<Cohort> {
+  const parts: CohortAcc[] = [];
+  for (let i = 0; i < storeIds.length; i += chunk) {
+    parts.push(await readWindowsAcc(ci, storeIds.slice(i, i + chunk)));
+  }
+  const cohort = finalizeCohort(mergeAccs(parts), asOf);
+  await publishCohort(ci, cohort);
+  return cohort;
+}
+/** Windows read per cohort step: well under the 1000-subrequest limit. */
+export const COHORT_READ_CHUNK = 400;
+
+/**
+ * The daily run in one process (tests, scripts). `days` are the UTC days to (re)fold, oldest first; `asOf`
+ * (the newest) is the window end. A store that throws is logged and left out of the cohort for this run; the
+ * next run rebuilds it. The Inngest job calls `aggregateStore` / `publishCohortFor` itself, one step each.
  */
 export async function runCiAggregation(
   ci: CiBucket,
@@ -204,23 +327,22 @@ export async function runCiAggregation(
   days: string[]
 ): Promise<AggregationResult & { failed: string[] }> {
   const asOf = days.at(-1)!;
-  const windows: StoreWindow[] = [];
+  const done: string[] = [];
   const failed: string[] = [];
   let skippedLines = 0;
   for (const storeId of storeIds) {
     try {
-      for (const day of days) skippedLines += (await aggregateStoreDay(ci, storeId, day)).skipped;
-      windows.push(await rebuildWindow(ci, storeId, asOf));
+      skippedLines += (await aggregateStore(ci, storeId, days)).skippedLines;
+      done.push(storeId);
     } catch (err) {
       logger.error({ err, storeId }, '[ci-agg] store aggregation failed');
       failed.push(storeId);
     }
   }
-  const cohort = buildCohort(windows, asOf);
-  await publishCohort(ci, cohort);
+  const cohort = await publishCohortFor(ci, done, asOf);
   const cells = METRICS.flatMap(m => Object.values(cohort.metrics[m]));
   return {
-    stores: windows.length,
+    stores: done.length,
     days,
     skippedLines,
     cohortCells: cells.length,
