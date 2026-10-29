@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
-import worker, { runProbes, thresholdsFrom } from '../src/index';
+import worker, { alertOnOutcome, runProbes, thresholdsFrom } from '../src/index';
 import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS } from '../src/config';
 import { probe, type Fetcher } from '../src/probe';
@@ -451,6 +451,57 @@ describe('master brand, products and discovery files (BRAND-ARCH-1, 6c)', () => 
     expect(sec).toContain('Canonical: https://status.ebda.app/.well-known/security.txt');
     const exp = new Date(/^Expires: (.+)$/m.exec(sec)![1]).getTime();
     expect(exp - Date.now()).toBeGreaterThan(90 * 86_400_000);
+  });
+});
+
+describe('human alerting (OPS-5)', () => {
+  const sent: { url: string; body: string }[] = [];
+  const send = async (url: string, init: RequestInit) => {
+    sent.push({ url, body: String(init.body) });
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  const withSecrets = {
+    ...env,
+    TELEGRAM_BOT_TOKEN: 't',
+    TELEGRAM_ALERT_CHAT_ID: '42',
+  } as typeof env;
+
+  it('sends one Telegram message naming the component when an incident opens', async () => {
+    sent.length = 0;
+    const t0 = Date.now();
+    let outcome = { opened: [] as number[], resolved: [] as number[] };
+    for (let i = 0; i < 3; i++)
+      outcome = await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
+    expect(outcome.opened.length).toBe(1);
+    expect(await alertOnOutcome(withSecrets, outcome, send)).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toContain('/bott/sendMessage');
+    expect(sent[0].body).toContain('DOWN');
+    expect(sent[0].body).toContain('"chat_id":"42"');
+  });
+
+  it('says RECOVERED when it resolves', async () => {
+    sent.length = 0;
+    const t0 = Date.now();
+    for (let i = 0; i < 3; i++) await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
+    let outcome = { opened: [] as number[], resolved: [] as number[] };
+    for (let i = 3; i < 5; i++)
+      outcome = await runProbes(env, { fetcher: healthy, now: t0 + i * MIN });
+    expect(outcome.resolved.length).toBe(1);
+    await alertOnOutcome(withSecrets, outcome, send);
+    expect(sent[0].body).toContain('RECOVERED');
+  });
+
+  it('is a no-op (false) without the secrets, and when nothing changed', async () => {
+    sent.length = 0;
+    expect(await alertOnOutcome(env, { opened: [1], resolved: [] }, send)).toBe(false);
+    expect(await alertOnOutcome(withSecrets, { opened: [], resolved: [] }, send)).toBe(false);
+    expect(sent).toHaveLength(0);
+  });
+
+  it('probes the orders and accounts Workers too (M-070)', () => {
+    const ids = COMPONENTS.map(c => c.id);
+    expect(ids).toEqual(expect.arrayContaining(['orders', 'accounts']));
   });
 });
 

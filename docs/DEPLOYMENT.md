@@ -698,3 +698,39 @@ Workers Routes, delete `*/*` (ebda-web). API: `curl -X GET -H "Authorization: Be
 to find the route id, then `curl -X DELETE ... /zones/$ZONE/workers/routes/$ID`. Then revert the PR and redeploy ebda-web so the
 next deploy does not re-add it. Store subdomains (`*.ebda.app/*`) are unaffected throughout; the explicit apex/accounts routes are
 harmless to leave in place.
+
+## CI deploy token: minimum scope, and where it can be reached from (Ruling DEPLOY-PARITY-1)
+
+`Whisky-11/ebda-store` is a Free-plan private repo: GitHub offers no required reviewers, no environment protection and no
+enforced CODEOWNERS here, so the controls are in code. They are enforced by tests and a required check:
+
+- **A pull request can never reach a deploy secret.** `tests/unit/deploy-secrets-never-on-pr.test.ts` fails the build if any
+  workflow triggered by `pull_request`, `pull_request_target` or `workflow_run` references `secrets.CLOUDFLARE_*`,
+  `EBDA_MIGRATE_DATABASE_URL`, `SENTRY_AUTH_TOKEN`, `secrets: inherit` or `toJSON(secrets)`; every `cf-*-deploy.yml` must trigger
+  only on push to `main` or manual dispatch; `db-backup.yml` only on schedule or dispatch.
+- **A change to how production deploys needs a human label.** The required check "Deploy workflow changes need the
+  deploy-change label" (`.github/workflows/deploy-change-label.yml`, `scripts/ci/deploy-change-label.mjs`) fails a PR that edits
+  `cf-*-deploy.yml`, `db-backup.yml`, `scripts/ci/deploy-guard.mjs`, `scripts/ci/api-required-secrets.json`, `scripts/cf-build.sh` or
+  `scripts/ebda-cf-api-config.mjs` unless it carries the `deploy-change` label, which only a person applies after reading the diff.
+- **The CI Cloudflare token is `ebda-github-deploy` (`CLOUDFLARE_API_TOKEN`, production environment secret).** Checked in the
+  Cloudflare dashboard on 2026-10-27 by the controller: it is scoped to **1 account (Ebda's) and 1 zone (`ebda.app`)**, never
+  "all accounts" or "all zones", and carries **10 permissions**, each justified. Read vs Edit levels were not visible in that
+  review; the intent is Edit only where deploys write.
+
+  | Permission                   | Scope           | Why a deploy needs it                                                                                                              |
+  | ---------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | Account · Workers Scripts    | account         | `wrangler deploy` for the 9 Workers; `wrangler secret list` in the secret gate                                                     |
+  | Account · Workers KV Storage | account         | the cache namespace binding (`EBDA_KV_CACHE_ID`)                                                                                   |
+  | Account · D1                 | account         | `Apply D1 migrations (ebda-identity)` and the D1 bindings                                                                          |
+  | Account · Workers R2 Storage | account         | the nightly `db-backup.yml` upload to `ebda-db-backups`, and R2 bindings (cache, uploads)                                          |
+  | Account · Queues             | account         | the queue producer/consumer bindings on the API Worker                                                                             |
+  | Account · Hyperdrive         | account         | the Hyperdrive binding (`EBDA_HYPERDRIVE_ID`) to Neon                                                                              |
+  | Account · Account Settings   | account         | wrangler resolves the account and its subdomain on deploy (the broadest line here: review it first if the token is ever tightened) |
+  | Zone · Workers Routes        | zone `ebda.app` | the `<host>/*` zone routes in the `wrangler.jsonc` files, including the storefront `*/*` for merchant custom domains               |
+  | Zone · DNS                   | zone `ebda.app` | Workers **Custom Domains** create their DNS records on deploy                                                                      |
+  | Zone · DNS Settings          | zone `ebda.app` | read alongside DNS when a Custom Domain is attached                                                                                |
+
+  Everything else (Members, API Tokens, Firewall, Billing, Logs, other zones, other accounts) is OFF. If a deploy ever needs a
+  permission not listed, add exactly that one and update this table in the same PR (the `deploy-change` label check forces a
+  human to look at the diff). The repo cannot read its own token's permissions, so this table is a record of the dashboard, not
+  something CI proves.

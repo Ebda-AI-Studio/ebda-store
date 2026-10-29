@@ -76,7 +76,7 @@ describe('links that leave ebda.app open in a new tab', () => {
     expect(isExternalHref('https://store.ebda.app/signup')).toBe(true);
     expect(isExternalHref('https://storedemo-souq.ebda.app/?look=souq.night')).toBe(true);
     expect(isExternalHref('https://orders.ebda.app/')).toBe(true);
-    expect(isExternalHref('https://wa.me/201207761882')).toBe(true);
+    expect(isExternalHref('https://wa.me/201514191411')).toBe(true);
     expect(isExternalHref('https://example.com/x')).toBe(true);
     expect(isExternalHref('https://ebda.app/features/')).toBe(false);
     expect(isExternalHref('https://www.ebda.app/')).toBe(false);

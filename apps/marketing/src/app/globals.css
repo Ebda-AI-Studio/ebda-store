@@ -14,7 +14,7 @@
   /* gold as TEXT would fail AA at body size, so the text form is the brand gold mixed toward black */
   --accent-text: color-mix(in srgb, var(--gold) 70%, #000);
   --radius: 14px;
-  --maxw: 1160px;
+  --maxw: 1280px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* a deliberately dark band (the footer): same names, night values */
@@ -388,25 +388,44 @@ html[lang='en'] .wm-name {
 .nav-menu .wa-label {
   display: inline;
 }
-@media (min-width: 900px) {
+/* One header row at every width: below 1200px the five links collapse into the Menu button; from 1200px they sit
+   inline and FAQ / About / Contact live in "More". No label ever wraps (white-space: nowrap). */
+.nav-links a,
+.nav-products summary,
+.header-actions .btn,
+.wa-link,
+.lang-toggle,
+.link-login,
+.nav-menu summary {
+  white-space: nowrap;
+}
+.nav-more > details > ul {
+  width: min(220px, calc(100vw - 32px));
+}
+@media (min-width: 1200px) {
   .nav-links {
     display: flex;
+    gap: 18px;
+    padding-inline-start: 8px;
   }
   .nav-menu {
     display: none;
   }
 }
-@media (min-width: 1040px) {
+@media (min-width: 1480px) {
+  .nav-links {
+    gap: 24px;
+    padding-inline-start: 20px;
+  }
   .wa-compact .wa-label {
     display: inline;
   }
 }
 @media (max-width: 520px) {
   .wm-name {
-    white-space: normal;
+    white-space: nowrap;
     font-size: 0.8rem;
     line-height: 1.25;
-    max-width: 7.5rem;
   }
   .link-login,
   .header-actions .lang-toggle {
@@ -457,13 +476,23 @@ html[lang='en'] .wm-name {
 @media (max-width: 400px) {
   /* 360px: wordmark + menu + WhatsApp + start must fit one row (the start button overflowed the viewport by 21px in Arabic) */
   .wm-name {
-    max-width: 6.5rem;
+    font-size: 0.8125rem;
+  }
+  /* the full studio name stays on one line; the mark gives its room up (it is decorative, the name is the link label) */
+  .wordmark img {
+    display: none;
   }
   .header-actions .btn {
     padding: 0 10px;
   }
   .header-actions .wa-compact {
     display: none;
+  }
+}
+
+@media (max-width: 374px) {
+  .wm-name {
+    font-size: 0.75rem;
   }
 }
 
@@ -554,6 +583,43 @@ html[lang='ar'] .hero h1 {
   margin: 0 0 28px;
   max-width: 46ch;
 }
+.hero-visual {
+  display: none;
+}
+/* From 900px the hero is two columns: copy on the start side, the finished store in a phone on the end side, so the
+   product is in the first screen and the side bands are used. Below 900px it stays the centred single column. */
+@media (min-width: 900px) {
+  .hero {
+    padding-block: clamp(20px, 3vw, 44px) clamp(16px, 2.5vw, 40px);
+  }
+  .hero-inner {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: clamp(24px, 5vw, 96px);
+    align-items: center;
+    justify-items: stretch;
+    text-align: start;
+  }
+  .hero .actions {
+    justify-content: flex-start;
+  }
+  .hero h1 {
+    font-size: clamp(2.6rem, 4.6vw, 4.4rem);
+    max-width: 13ch;
+  }
+  .hero-sub,
+  .hero-saving {
+    max-width: 52ch;
+  }
+  .hero-visual {
+    display: grid;
+    align-items: center;
+    justify-items: start; /* the phone sits next to the copy, not stranded at the far edge of its column */
+    padding-inline-start: clamp(0px, 3vw, 48px);
+  }
+  .hero-phone {
+    --w: min(300px, calc((100svh - 190px) / 2.07));
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .hero h1,
   .hero-sub,
@@ -590,7 +656,7 @@ html[lang='ar'] .hero h1 {
 
 /* sections */
 .section {
-  padding-block: clamp(56px, 8vw, 104px);
+  padding-block: clamp(48px, 6vw, 84px);
   scroll-margin-top: 72px;
 }
 .section h2 {
@@ -598,8 +664,8 @@ html[lang='ar'] .hero h1 {
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.025em;
-  max-width: 18ch;
-  margin-bottom: clamp(32px, 5vw, 56px);
+  max-width: 24ch;
+  margin-bottom: clamp(24px, 3.5vw, 44px);
   text-wrap: balance;
 }
 html[lang='ar'] .section h2 {
@@ -806,8 +872,9 @@ html[lang='ar'] .story h2 {
     transform: translateY(calc((1 - var(--act)) * 8px));
     will-change: opacity, transform;
   }
-  /* the dimmed (inactive) steps blend with the canvas, so their small text uses the full ink: muted ink at 62% fails AA */
-  .story-step-d {
+  /* the dimmed (inactive) steps blend with the canvas, so their small text uses the full ink: muted ink at 62% fails AA.
+     `.story .` outranks the later plain `.story-step-d { color: muted }` rule, which was silently winning (axe 2.78:1 on /en/). */
+  .story .story-step-d {
     color: var(--fg);
   }
 }
@@ -818,7 +885,8 @@ html[lang='ar'] .story h2 {
   perspective: 1400px;
 }
 /* one frame per step, stacked: each later frame fades in over the one beneath it as --p crosses its mark */
-.story-frame {
+.story-frame,
+.hero-frame {
   position: absolute;
   inset: 0;
   opacity: 1;
@@ -836,7 +904,8 @@ html[lang='ar'] .story h2 {
   opacity: clamp(0, calc((var(--p) - var(--t)) / 0.06), 1);
   will-change: opacity;
 }
-.story-frame img {
+.story-frame img,
+.hero-frame img {
   display: block;
   width: 100%;
   height: 100%;
