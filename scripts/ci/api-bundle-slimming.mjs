@@ -45,9 +45,20 @@ export function slimPrismaSchema(schema) {
   );
 }
 
+/**
+ * Two defunct office formats are left out because their file extensions (a KDE word processor's and a project-planning
+ * tool's) are repository-brand tokens that tests/unit/no-force-branding.test.ts and no-wbs-refs.test.ts forbid in any
+ * tracked file. Lookups of those two extensions no longer resolve; nothing in the API serves or accepts them.
+ */
+export const MIME_OMITTED_TYPES = [
+  'application/vnd.criticaltools.wbs+xml',
+  'application/vnd.kde.kword',
+];
+
 export function slimMimeDb(db) {
   const out = {};
   for (const type of Object.keys(db).sort()) {
+    if (MIME_OMITTED_TYPES.includes(type)) continue;
     const { extensions, charset, source } = db[type];
     if (!extensions && !charset) continue;
     out[type] = {

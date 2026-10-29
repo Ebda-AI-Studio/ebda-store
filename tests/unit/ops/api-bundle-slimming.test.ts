@@ -4,7 +4,11 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // @ts-expect-error plain .mjs helpers, no types
-import { slimMimeDb, slimPrismaSchema } from '../../../scripts/ci/api-bundle-slimming.mjs';
+import {
+  MIME_OMITTED_TYPES,
+  slimMimeDb,
+  slimPrismaSchema,
+} from '../../../scripts/ci/api-bundle-slimming.mjs';
 // @ts-expect-error plain .mjs helper, no types
 import { renderSlimMimeDb, SLIM_PATH } from '../../../scripts/ci/gen-mime-db-slim.mjs';
 // @ts-expect-error plain .mjs helper, no types
@@ -106,11 +110,23 @@ describe('slimMimeDb', () => {
     { source?: string; extensions?: string[]; charset?: string; compressible?: boolean }
   >;
 
-  it('resolves every extension to the same type and every charset to the same value', () => {
+  it('omits exactly the two brand-token types and nothing else', () => {
+    expect(MIME_OMITTED_TYPES).toHaveLength(2);
     const slim = slimMimeDb(full);
-    expect(extensionTable(slim)).toEqual(extensionTable(full));
-    for (const type of Object.keys(full)) {
-      expect(slim[type]?.charset).toBe(full[type].charset);
+    for (const type of MIME_OMITTED_TYPES) {
+      expect(full[type]).toBeDefined();
+      expect(slim[type]).toBeUndefined();
+    }
+  });
+
+  it('resolves every other extension to the same type and every charset to the same value', () => {
+    const slim = slimMimeDb(full);
+    const kept: typeof full = {};
+    for (const type of Object.keys(full))
+      if (!MIME_OMITTED_TYPES.includes(type)) kept[type] = full[type];
+    expect(extensionTable(slim)).toEqual(extensionTable(kept));
+    for (const type of Object.keys(kept)) {
+      expect(slim[type]?.charset).toBe(kept[type].charset);
     }
   });
 
