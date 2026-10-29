@@ -272,10 +272,14 @@ async function mirrorRates() {
 }
 let rateNo = 576_000;
 const applyRate = async () => {
-  await GoldRateService.applyRates(
-    STORE,
-    { rates: [{ karat: 21, ratePerGram: rateNo }], confirm: true },
-    { userId: ownerId }
+  // the world is built on Postgres and then mirrored: the rate write itself must stay on Postgres here, not follow the DO
+  // repo of the scenario that is running (GoldRateService.applyRates follows the store's backend since CF-PAY-1)
+  await onPg(() =>
+    GoldRateService.applyRates(
+      STORE,
+      { rates: [{ karat: 21, ratePerGram: rateNo }], confirm: true },
+      { userId: ownerId }
+    )
   );
   await mirrorRates();
 };
