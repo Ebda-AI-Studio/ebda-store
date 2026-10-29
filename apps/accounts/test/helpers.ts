@@ -17,6 +17,14 @@ export interface Fakes {
   suspendedStores: Set<string>;
   /** Per-test overrides merged over the worker env (e.g. MFA_KEY / MFA_KEY_PREV during a rotation). */
   envOverride: Record<string, unknown>;
+  /** The ebda-wa `WhatsAppOtp.sendOtp` fake. `bound: false` (the default) = the binding is ABSENT, which is production's state until the service binding ships. */
+  whatsapp: {
+    bound: boolean;
+    calls: Array<{ storeId: string; phone: string; code: string }>;
+    /** Per call, in order; the last entry repeats. Default `ok`. */
+    results: Array<{ ok: true } | { ok: false; reason: string }>;
+    throws: boolean;
+  };
 }
 export const fakes: Fakes = {
   stores: [],
@@ -26,6 +34,7 @@ export const fakes: Fakes = {
   deletedStores: new Set<string>(),
   suspendedStores: new Set<string>(),
   envOverride: {},
+  whatsapp: { bound: false, calls: [], results: [{ ok: true }], throws: false },
 };
 
 export const testEnv = (): Cloudflare.Env =>
@@ -49,6 +58,17 @@ export const testEnv = (): Cloudflare.Env =>
         return !fakes.deletedStores.has(id) && !fakes.suspendedStores.has(id);
       },
     },
+    ...(fakes.whatsapp.bound
+      ? {
+          WHATSAPP_OTP: {
+            sendOtp: async (storeId: string, phone: string, code: string) => {
+              const n = fakes.whatsapp.calls.push({ storeId, phone, code });
+              if (fakes.whatsapp.throws) throw new Error('ebda-wa down');
+              return fakes.whatsapp.results[Math.min(n - 1, fakes.whatsapp.results.length - 1)];
+            },
+          },
+        }
+      : { WHATSAPP_OTP: undefined }),
     MAILER: {
       sendNotice: async (m: { to: string; kind: string; factor: string }) => {
         fakes.notices.push({ to: m.to, kind: m.kind, factor: m.factor });

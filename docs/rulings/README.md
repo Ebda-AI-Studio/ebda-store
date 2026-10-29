@@ -9,7 +9,7 @@ Never append to `docs/RULINGS.md` (frozen pointer; its entries were split out in
 
 Where an Ebda ruling (`R-EBDA-*`) and an inherited ruling disagree, the Ebda ruling wins in this repo.
 
-1442 rulings.
+1443 rulings.
 
 | ID                                                      | Decision                                                                                                                                                                | Date       | File                                                                                                                     |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -1455,3 +1455,4 @@ Where an Ebda ruling (`R-EBDA-*`) and an inherited ruling disagree, the Ebda rul
 | SKIN-DEL-7                                              | `templates/minimal/*` is re-homed, not deleted:                                                                                                                         |            | [SKIN-DEL-7.md](SKIN-DEL-7.md)                                                                                           |
 | SKIN-DEL-8                                              | the Postgres enum `StoreTemplate` and `schema.prisma` KEEP the five old values (no enum-contract migration, the plan's PR C).                                           |            | [SKIN-DEL-8.md](SKIN-DEL-8.md)                                                                                           |
 | WEBHOOK-SCOPE-1                                         | a provider reference never decides on its own which store a delivery belongs to.                                                                                        | 2026-10-28 | [WEBHOOK-SCOPE-1.md](WEBHOOK-SCOPE-1.md)                                                                                 |
+| ID-WA-OTP-1                                             | a password-reset code also goes over WhatsApp through the ebda-wa `WhatsAppOtp` binding; fails closed; signup, enrolment and admin recovery stay email-only.            | 2026-10-29 | [ID-WA-OTP-1.md](ID-WA-OTP-1.md)                                                                                         |

@@ -26,6 +26,15 @@ export default defineConfig(async () => {
                 export class IdentityMailer extends WorkerEntrypoint { async sendCode() {} }
                 export default { fetch() { return new Response('stub'); } };`,
             },
+            {
+              // wrangler.jsonc binds WHATSAPP_OTP to ebda-wa; workerd refuses to start with a binding to a missing service. Tests inject their own fake (test/helpers.ts).
+              name: 'ebda-wa',
+              compatibilityDate: '2026-08-01',
+              modules: true,
+              script: `import { WorkerEntrypoint } from 'cloudflare:workers';
+                export class WhatsAppOtp extends WorkerEntrypoint { async sendOtp() { return { ok: false, reason: 'disabled' }; } }
+                export default { fetch() { return new Response('stub'); } };`,
+            },
           ],
           bindings: {
             TEST_MIGRATIONS: migrations,

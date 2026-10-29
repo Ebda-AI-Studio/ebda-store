@@ -34,6 +34,9 @@
   "services": [
     { "binding": "STORE_DIRECTORY", "service": "ebda-api", "entrypoint": "StoreDirectory" },
     { "binding": "MAILER", "service": "ebda-api", "entrypoint": "IdentityMailer" },
+    // One-time codes over WhatsApp (Ruling ID-WA-OTP-1): the ebda-wa Worker's `WhatsAppOtp` entrypoint. ebda-wa must already be deployed with it
+    // (a binding to a missing Worker/entrypoint fails THIS deploy). Absent at runtime = the channel is off and the email path is untouched.
+    { "binding": "WHATSAPP_OTP", "service": "ebda-wa", "entrypoint": "WhatsAppOtp" },
   ],
   "vars": {
     "ISSUER": "https://accounts.ebda.app",

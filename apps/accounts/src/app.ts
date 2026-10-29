@@ -50,6 +50,7 @@ import {
   SECOND_FACTOR,
   type Budget,
 } from './throttle';
+import { sendCodeOverWhatsApp } from './whatsapp-otp';
 import { issueOtp, OTP_TTL_MINUTES, verifyOtp, type OtpType, type PendingSignup } from './otp';
 import * as passkeys from './passkeys';
 import { newSecret, sealCurrent, totpUri, unsealAny, verifyTotp } from './totp';
@@ -485,20 +486,32 @@ export async function issueAndMail(
   opts: { ttlMinutes?: number; storeName?: string } = {}
 ): Promise<void> {
   const code = await issueOtp(env.DB, user, type, pending, opts.ttlMinutes);
-  if (!code || !env.MAILER) return;
-  try {
-    await env.MAILER.sendCode({
-      to: user.email,
-      kind,
-      code,
-      language: (pending?.language ?? user.language) === 'ar' ? 'ar' : 'en',
-      firstName: pending?.first_name ?? user.first_name,
-      ttlMinutes: opts.ttlMinutes ?? OTP_TTL_MINUTES[type],
-      ...(opts.storeName ? { storeName: opts.storeName } : {}),
-    });
-  } catch (e) {
-    console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
-  }
+  if (!code) return;
+  // The WhatsApp channel (ID-WA-OTP-1) is only for a password-reset code going to a VERIFIED, non-platform-admin account's own phone. Signup verification and
+  // invitations stay email-only (the phone is not yet proven to belong to the mailbox owner); factor enrolment stays email-only (Ruling ID-15 makes the e-mailed code
+  // the proof of mailbox control); a platform admin's recovery stays email-only.
+  const whatsapp =
+    kind === 'password_reset' && user.role !== 'super_admin'
+      ? sendCodeOverWhatsApp(env, user, code)
+      : Promise.resolve('skipped' as const);
+  const mail = (async () => {
+    if (!env.MAILER) return;
+    try {
+      await env.MAILER.sendCode({
+        to: user.email,
+        kind,
+        code,
+        language: (pending?.language ?? user.language) === 'ar' ? 'ar' : 'en',
+        firstName: pending?.first_name ?? user.first_name,
+        ttlMinutes: opts.ttlMinutes ?? OTP_TTL_MINUTES[type],
+        ...(opts.storeName ? { storeName: opts.storeName } : {}),
+      });
+    } catch (e) {
+      console.error(JSON.stringify({ msg: 'otp mail failed', kind, error: (e as Error).message }));
+    }
+  })();
+  // Neither channel waits for or can fail the other; sendCodeOverWhatsApp never rejects.
+  await Promise.all([mail, whatsapp]);
 }
 
 /** Mail work runs after the response, so every branch of the caller answers in the same time (no registered-address oracle). */

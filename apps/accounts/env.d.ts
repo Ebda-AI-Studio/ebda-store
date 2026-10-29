@@ -30,6 +30,15 @@ export interface MailerRpc {
   }): Promise<void>;
 }
 
+/** Service Binding RPC surface of ebda-wa (its `WhatsAppOtp` entrypoint, src/index.ts in ebda-whatsapp). Anything but `ok` means: fall back to the email. */
+export interface WhatsAppOtpRpc {
+  sendOtp(
+    storeId: string,
+    phone: string,
+    code: string
+  ): Promise<{ ok: true } | { ok: false; reason: string }>;
+}
+
 declare global {
   namespace Cloudflare {
     interface Env {
@@ -60,6 +69,8 @@ declare global {
       CLIENT_SECRET_PEPPER?: string;
       STORE_DIRECTORY?: StoreDirectoryRpc;
       MAILER?: MailerRpc;
+      /** ebda-wa `WhatsAppOtp`. Absent = the WhatsApp channel is off (fail closed); the email path never depends on it. */
+      WHATSAPP_OTP?: WhatsAppOtpRpc;
       TEST_MIGRATIONS?: D1Migration[];
     }
   }
