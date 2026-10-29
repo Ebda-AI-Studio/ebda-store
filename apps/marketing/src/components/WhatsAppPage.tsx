@@ -15,6 +15,7 @@ import { WHATSAPP_APP_URL, WHATSAPP_PAGE, WHATSAPP_YEARLY_SAVING_PCT } from '../
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { Reveal } from './Motion';
+import { WaChatVisual } from './WaChatVisual';
 import { JsonLd } from './JsonLd';
 import { SiteLink } from './SiteLink';
 
@@ -138,17 +139,20 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
       <JsonLd data={whatsappJsonLd(locale, p.faq)} />
       <Header locale={locale} page="whatsapp" />
       <main id="main" className="wrap page">
-        <header className="page-head">
-          <h1>{p.h1}</h1>
-          <p className="lead">{p.lead}</p>
-          <p className="actions">
-            <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
-              {p.ctaStart}
-            </SiteLink>
-            <SiteLink href={WHATSAPP_APP_URL} locale={locale} className="btn btn-ghost btn-lg">
-              {p.ctaApp}
-            </SiteLink>
-          </p>
+        <header className="page-head wa-head">
+          <div className="wa-head-copy">
+            <h1>{p.h1}</h1>
+            <p className="lead">{p.lead}</p>
+            <p className="actions">
+              <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
+                {p.ctaStart}
+              </SiteLink>
+              <SiteLink href={WHATSAPP_APP_URL} locale={locale} className="btn btn-ghost btn-lg">
+                {p.ctaApp}
+              </SiteLink>
+            </p>
+          </div>
+          <WaChatVisual locale={locale} />
         </header>
 
         <section className="page-sec" aria-labelledby="wa-feats-h">
