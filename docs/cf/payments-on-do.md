@@ -29,13 +29,13 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 | external refund exceeding the order / on a reversed order | recorded in full, `review` flag + alert (`external: true`), never thrown         |
 | `restoreInventory:false`                                  | cancel (CF-ORDERS-1)                                                             |
 | any other status of a DO order                            | 501 `ORDER_STATUS_NOT_ON_DO`                                                     |
-| partial-return pro-rata journal                           | 501 `PARTIAL_RETURN_JOURNAL_NOT_ON_DO`                                           |
+| partial-return pro-rata journal                           | `journalPartialReturn` (CF-RETURNS-1)                                            |
 | gold `setProductPricing`, `asRepricer`, `bulkSwitchMode`  | `goldSetProductPricing` / `goldCreateVariant` / `goldBulkSwitchMode` (CF-LAST-1) |
 | InstaPay ORDER receipt upload / submit                    | 501 `INSTAPAY_RECEIPTS_NOT_ON_DO`                                                |
 
 ## Not moved (the flip gate stays closed)
 
-Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document and credit notes), delivery slots, personalisation notes, quotes (`dryRun`), InstaPay receipts, the Return row lifecycle (`return.service.ts`: its refund legs reach the DO only through `PaymentService.refund` and `refundBook`), the order reads, expense / PO / stock-adjustment journals, the wallet-movement journal (WALLET-GL-1, open PR), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
+Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document and credit notes), delivery slots, personalisation notes, quotes (`dryRun`), InstaPay receipts, the order reads, expense / PO / stock-adjustment journals, the wallet-movement journal (WALLET-GL-1, open PR), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
 
 ## Tests
 

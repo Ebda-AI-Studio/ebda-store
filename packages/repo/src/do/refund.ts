@@ -30,7 +30,7 @@ import { MoneyError, type SyncSql } from './sync-sql';
  *     return flow with the gateway legs): pass `walletCredit` for a store-credit refund instead;
  *   - the pre-2026-09-30 admin-order coupon cutover (DO orders always reserve their coupon) and the single-line
  *     backorder cancel/heal (`cancelBackorder`): this slice cancels open lines for a whole-order event only;
- *   - the Return row lifecycle (`returns`/`return_items` status) and tier/B2B return adjustments.
+ *   - the Return row lifecycle (`returns`/`return_items` status) and tier/B2B return adjustments live in `do/returns.ts` (CF-RETURNS-1).
  * Hardening vs the original: a partial line that does not belong to the order is REFUSED (the original skips it), and a
  * partial restock is capped at the line's REMAINING restorable quantity, not just its quantity.
  */
