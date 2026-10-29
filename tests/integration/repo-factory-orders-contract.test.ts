@@ -633,6 +633,105 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     }
   });
 
+  it('order reads: getById, getByOrderNumber, list (filters, cursor), customer orders and the created order carry the same shape, customer attached', async () => {
+    const t = await parity(10, async w => {
+      const user = await prisma.user.create({
+        data: {
+          email: `reader-${Math.random().toString(36).slice(2)}@example.test`,
+          passwordHash: 'x'.repeat(60),
+          firstName: 'Reader',
+          lastName: 'One',
+          phone: '+201099999999',
+          role: 'customer',
+          storeId: STORE,
+          status: 'active',
+        },
+      });
+      sqlite
+        .prepare(
+          `INSERT OR IGNORE INTO customers (id, store_id, email, first_name, last_name) VALUES (?, ?, ?, 'Reader', 'One')`
+        )
+        .run(user.id, STORE, user.email);
+      const mine = async (extra: Record<string, unknown>, i: number) => {
+        const sessionId = cartSessionId('d2b2r');
+        await (
+          await storeWriter(STORE)
+        ).cartItem.create({
+          data: {
+            cartId: (await CartService.getOrCreate(STORE, sessionId, user.id)).id,
+            productId: w.product,
+            quantity: 1,
+          },
+        });
+        return OrderService.create(
+          STORE,
+          user.id,
+          sessionId,
+          { shippingAddress: address(i), paymentMethod: 'cod', ...extra } as never,
+          undefined,
+          undefined
+        );
+      };
+      const a = (await mine({}, 1)) as { id: string; orderNumber: string };
+      const b = (await mine({ notes: 'second' }, 2)) as { id: string };
+      await place(w, 1, {}, 3); // a guest order: not in the customer's list
+      await OrderService.updateStatus(STORE, b.id, 'cancelled');
+      if ((await (await import('../../apps/api/src/lib/repo-factory')).storeMoney(STORE)) === null)
+        await handleOrderRefunded(b.id, STORE, true, false, inlineStep);
+      const brief = (o: any) => ({
+        status: o.status,
+        total: o.total,
+        items: o.items?.map((i: any) => ({ qty: i.quantity, total: i.total })),
+        payments: o.payments,
+        count: o._count,
+        customer: o.customer && {
+          email: o.customer.email === user.email ? '<email>' : o.customer.email,
+          firstName: o.customer.firstName,
+          lastName: o.customer.lastName,
+          phone: o.customer.phone,
+        },
+      });
+      const byId = await OrderService.getById(STORE, a.id);
+      const byNumber = await OrderService.getByOrderNumber(STORE, a.orderNumber);
+      const list = await OrderService.list(STORE, { customerId: user.id, limit: 1 });
+      const next = await OrderService.list(STORE, {
+        customerId: user.id,
+        limit: 1,
+        cursor: list.orders[0].id,
+      });
+      const cancelledOnly = await OrderService.list(STORE, {
+        customerId: user.id,
+        status: 'cancelled',
+      });
+      const mineOrders = await OrderService.getCustomerOrders(STORE, user.id);
+      const gone = await settle(() => OrderService.getById(STORE, 'does-not-exist'));
+      return {
+        byId: brief(byId),
+        byNumber: brief(byNumber),
+        list: {
+          orders: list.orders.map(brief),
+          total: list.meta.total,
+          next: !!list.meta.nextCursor,
+        },
+        page2: { orders: next.orders.map(brief), total: next.meta.total },
+        cancelledOnly: cancelledOnly.orders.map(brief),
+        mine: { n: mineOrders.orders.length, total: mineOrders.meta.total },
+        gone,
+      };
+    });
+    expect(t.out.ok.byId.customer).toMatchObject({ firstName: 'Reader' });
+    expect(t.out.ok.list.total).toBe(2);
+    expect(t.out.ok.cancelledOnly).toHaveLength(1);
+    expect(t.out.ok.gone.err.status).toBe(404);
+  });
+
+  it('order search on a DO store is refused loudly (never answered empty)', async () => {
+    const refused = await settle(() =>
+      onDo(() => OrderService.list(STORE, { search: 'anything' }))
+    );
+    expect(refused).toMatchObject({ err: { status: 501, code: 'ORDER_SEARCH_NOT_ON_DO' } });
+  });
+
   it('a plain order: totals, items, stock and the sale ledger row are the same', async () => {
     const t = await parity(10, w => place(w, 3));
     expect(t.state.products[0].inventory).toBe(7);

@@ -453,6 +453,36 @@ export async function orderSearchWhere(
   return arms;
 }
 
+/**
+ * An order read for a store on its Durable Object (Ruling CF-R2-1). `Order.customer` is a `User` on the platform database,
+ * which the DO cannot join: the DO read leaves the relation out of the include and the customers are attached here, with the
+ * same select and the same visibility the Postgres relation join had under `ebda_app` (a customer registered on THIS store).
+ */
+async function attachCustomers<T extends { customerId: string | null }>(
+  storeId: string,
+  rows: T[],
+  select: Prisma.UserSelect
+): Promise<T[]> {
+  const ids = [...new Set(rows.map(r => r.customerId).filter((x): x is string => !!x))];
+  const users = ids.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ids }, storeId },
+        select: { id: true, ...select },
+      })
+    : [];
+  const byId = new Map(users.map(u => [u.id, u]));
+  return rows.map(r => ({
+    ...r,
+    customer: r.customerId ? (byId.get(r.customerId) ?? null) : null,
+  }));
+}
+/** The include of an order read: on a DO store without the `customer` relation (see `attachCustomers`). */
+function forBackend<const I extends { customer?: unknown }>(onDo: boolean, include: I): I {
+  if (!onDo) return include;
+  const { customer: _external, ...rest } = include;
+  return rest as I;
+}
+
 export class OrderService {
   /**
    * WHERE clause for the order list and its export. Async because a search
@@ -537,11 +567,22 @@ export class OrderService {
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    // The admin order SEARCH resolves customers and guest orders through Postgres definers over the Postgres `orders` table,
+    // and a guest's contact lives in a JSON snapshot prisma-lite cannot filter: refused for a DO store, never answered empty
+    // (listed in docs/cf/not-on-do.json).
+    if (onDo && options.search?.trim())
+      throw new AppError(
+        501,
+        'ORDER_SEARCH_NOT_ON_DO',
+        'Searching orders is not available for this store yet'
+      );
     const where = await OrderService.listWhere(storeId, options);
 
     const baseFindManyArgs = {
       where,
-      include: {
+      include: forBackend(onDo, {
         // `phone` is included so the admin customers page can surface
         // it without doing a second query. Stays nullable on the User
         // record itself.
@@ -551,7 +592,7 @@ export class OrderService {
         items: true,
         payments: { select: { provider: true, status: true } },
         _count: { select: { items: true } },
-      },
+      }),
       // `id` is the tiebreaker, and it is load-bearing rather than tidiness.
       // Keyset pagination is only stable when the ORDER BY uniquely identifies
       // the cursor row, and createdAt is not unique — bulk-imported or
@@ -566,10 +607,18 @@ export class OrderService {
       ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1, take: limit + 1 }
       : { ...baseFindManyArgs, skip, take: limit };
 
-    const [ordersRaw, total] = await Promise.all([
-      prisma.order.findMany(findManyArgs),
-      prisma.order.count({ where }),
+    const [found, total] = await Promise.all([
+      repo.db.order.findMany(findManyArgs),
+      repo.db.order.count({ where }),
     ]);
+    const ordersRaw = onDo
+      ? await attachCustomers(storeId, found, {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+        })
+      : found;
 
     const orders = cursor && ordersRaw.length > limit ? ordersRaw.slice(0, limit) : ordersRaw;
     const nextCursor =
@@ -588,9 +637,11 @@ export class OrderService {
   }
 
   static async getById(storeId: string, orderId: string) {
-    const order = await prisma.order.findFirst({
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.order.findFirst({
       where: { id: orderId, storeId, deletedAt: null },
-      include: {
+      include: forBackend(onDo, {
         customer: {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
@@ -610,12 +661,21 @@ export class OrderService {
         // columns already returned by `include`) so admin/customer order
         // views can show the promotion's name, not just its opaque id.
         appliedPromotion: { select: { id: true, name: true, nameAr: true } },
-      },
+      }),
     });
 
-    if (!order) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
+    const order = onDo
+      ? (
+          await attachCustomers(storeId, [found], {
+            email: true,
+            firstName: true,
+            lastName: true,
+          })
+        )[0]
+      : found;
 
     // InstaPay (SP6a): what the merchant needs to match the transfer against their
     // InstaPay app: the reference the customer entered and the hold deadline. A
@@ -630,7 +690,7 @@ export class OrderService {
       };
     } = order;
     if (order.payments?.some(p => p.provider === 'instapay')) {
-      const ip = await prisma.payment.findFirst({
+      const ip = await repo.db.payment.findFirst({
         where: { orderId, provider: 'instapay' },
         orderBy: { createdAt: 'desc' },
         select: { metadata: true },
@@ -650,6 +710,7 @@ export class OrderService {
 
   /** The order a previous request with this checkout key created, in the shape `create` returns; null when none. */
   static async findCheckoutReplay(storeId: string, idemHash: string, reqHash: string) {
+    // (a DO store's keyed retry is answered by its engine, which keys on `idempotency_key`: see `createOnDo`)
     const found = await prisma.order.findFirst({
       where: { storeId, checkoutIdempotencyKey: idemHash },
       select: { id: true, checkoutRequestHash: true },
@@ -660,22 +721,30 @@ export class OrderService {
     return OrderService.loadCreatedOrder(storeId, found.id);
   }
 
-  private static loadCreatedOrder(storeId: string, orderId: string) {
-    return prisma.order.findFirst({
+  private static async loadCreatedOrder(storeId: string, orderId: string) {
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.order.findFirst({
       where: { id: orderId, storeId },
-      include: {
+      include: forBackend(onDo, {
         items: true,
         customer: { select: { id: true, email: true, firstName: true, lastName: true } },
-      },
+      }),
     });
+    if (!found || !onDo) return found;
+    return (
+      await attachCustomers(storeId, [found], { email: true, firstName: true, lastName: true })
+    )[0];
   }
 
   static async getByOrderNumber(storeId: string, orderNumberOrScan: string) {
     // Accepts the typed number or the scanned barcode digits (Ruling BARCODE-4).
     const orderNumber = orderNumberFromScan(orderNumberOrScan) ?? orderNumberOrScan;
-    const order = await prisma.order.findFirst({
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const found = await repo.db.order.findFirst({
       where: { orderNumber, storeId, deletedAt: null },
-      include: {
+      include: forBackend(onDo, {
         customer: {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
@@ -691,14 +760,18 @@ export class OrderService {
         },
         payments: { select: ORDER_PAYMENT_SELECT },
         appliedPromotion: { select: { id: true, name: true, nameAr: true } },
-      },
+      }),
     });
 
-    if (!order) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
 
-    return order;
+    return onDo
+      ? (
+          await attachCustomers(storeId, [found], { email: true, firstName: true, lastName: true })
+        )[0]
+      : found;
   }
 
   /**
@@ -3690,8 +3763,9 @@ export class OrderService {
 
     const where: Prisma.OrderWhereInput = { storeId, customerId, deletedAt: null };
 
+    const repo = await storeRepo(storeId);
     const [orders, total] = await Promise.all([
-      prisma.order.findMany({
+      repo.db.order.findMany({
         where,
         skip,
         take: limit,
@@ -3706,7 +3780,7 @@ export class OrderService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.order.count({ where }),
+      repo.db.order.count({ where }),
     ]);
 
     return {
