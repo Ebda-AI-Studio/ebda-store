@@ -276,6 +276,8 @@ export interface Copy {
     terms: string;
     merchant: string;
     acceptableUse: string;
+    /** Footer link to /legal/data-deletion. */
+    dataDeletion: string;
     contact: string;
     legalVersion: string;
     about: string;
@@ -699,6 +701,7 @@ export const COPY: Record<Locale, Copy> = {
       terms: 'الشروط',
       merchant: 'اتفاقية التاجر',
       acceptableUse: 'الاستخدام المقبول',
+      dataDeletion: 'حذف البيانات',
       contact: 'تواصل: ahlan@ebda.app',
       legalVersion: `آخر تحديث للوثائق القانونية: ${formatLegalDate(LEGAL_UPDATED, 'ar')}.`,
       about: 'عن ابدأ استوديو للذكاء الاصطناعي',
@@ -1128,6 +1131,7 @@ export const COPY: Record<Locale, Copy> = {
       terms: 'Terms',
       merchant: 'Merchant agreement',
       acceptableUse: 'Acceptable use',
+      dataDeletion: 'Data deletion',
       contact: 'Contact: ahlan@ebda.app',
       legalVersion: `Legal documents updated ${formatLegalDate(LEGAL_UPDATED, 'en')}.`,
       about: 'About Ebda AI Studio',

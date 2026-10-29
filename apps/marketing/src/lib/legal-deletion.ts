@@ -5,7 +5,7 @@ import type { LegalDoc } from './legal-types';
  * and docs/RETENTION.md really do (self-serve erasure, merchant-initiated customer erase and export, 90-day store
  * deletion in the Privacy Policy, 30-day backups). Version and date are its own; change them with any edit.
  */
-const META = { version: '1.0', publishedAt: '2026-10-25' } as const;
+const META = { version: '1.1', publishedAt: '2026-10-29' } as const;
 
 export const DELETION_EN: LegalDoc = {
   title: 'Data deletion and export',
@@ -60,6 +60,7 @@ export const DELETION_EN: LegalDoc = {
       h: '8. Ebda WhatsApp',
       p: [
         "A merchant who deletes a contact removes its data from the live workspace, including stored message text. When a merchant's account ends, the workspace data is deleted within 30 days. Customers can stop marketing messages at any time by replying STOP.",
+        'If you connected WhatsApp through Meta and later remove the Ebda app from your Facebook or Meta settings, Meta sends us a signed deletion request automatically. We erase the link between your Meta account and Ebda, and give you a confirmation code to check the status of the request. This does not delete a merchant workspace; for that, write to privacy@ebda.app.',
         'WhatsApp is run by Meta Platforms, which keeps its own copy under its own policy. To erase what Meta holds, ask Meta directly. The Ebda WhatsApp Privacy Policy and Data Processing Agreement give the details.',
       ],
     },
@@ -125,6 +126,7 @@ export const DELETION_AR: LegalDoc = {
       h: '8. ابدأ واتساب',
       p: [
         'إذا حذف التاجر جهة اتصال أُزيلت بياناتها من مساحة العمل الحية، بما في ذلك نصوص الرسائل المخزّنة. وعند انتهاء حساب التاجر تُحذف بيانات مساحة العمل خلال 30 يومًا. ويستطيع العملاء إيقاف الرسائل التسويقية في أي وقت بالرد بكلمة STOP.',
+        'إذا ربطت واتساب عبر Meta ثم أزلت تطبيق ابدأ من إعدادات فيسبوك أو Meta، ترسل لنا Meta طلب حذف موقّعًا تلقائيًا. نحذف الربط بين حسابك على Meta وابدأ، ونعطيك رمز تأكيد لمتابعة حالة الطلب. ولا يؤدي ذلك إلى حذف مساحة عمل التاجر؛ ولذلك راسلنا على privacy@ebda.app.',
         'واتساب تشغّله Meta Platforms وتحتفظ بنسخة خاصة بها وفق سياستها. ولحذف ما لدى Meta اطلب منها مباشرة. وتفصّل سياسة الخصوصية واتفاقية معالجة البيانات الخاصة بخدمة ابدأ واتساب ذلك.',
       ],
     },
