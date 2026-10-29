@@ -326,7 +326,11 @@ export interface MoneyClient {
   }>;
   returnRelease(a: { returnId: string }, key?: string): Promise<{ released: boolean }>;
   journalPartialReturn(
-    a: { orderId: string; refundKey: string; items: Array<{ orderItemId: string; quantity: number }> },
+    a: {
+      orderId: string;
+      refundKey: string;
+      items: Array<{ orderItemId: string; quantity: number }>;
+    },
     key?: string
   ): Promise<{ posted: number; skipped?: string }>;
   journalAmountOnlyRefund(

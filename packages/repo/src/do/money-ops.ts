@@ -356,7 +356,10 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** The Return row lifecycle and the partial-return journal (Ruling CF-RETURNS-1): see `do/returns.ts`. */
   returnCreate: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a;
-    return createReturn(db, { ...(rest as unknown as Parameters<typeof createReturn>[1]), storeId });
+    return createReturn(db, {
+      ...(rest as unknown as Parameters<typeof createReturn>[1]),
+      storeId,
+    });
   },
   returnStatus: (db, storeId, a) =>
     setReturnStatus(db, {
@@ -378,9 +381,13 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   },
   returnFinish: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a;
-    return finishReturn(db, { ...(rest as unknown as Parameters<typeof finishReturn>[1]), storeId });
+    return finishReturn(db, {
+      ...(rest as unknown as Parameters<typeof finishReturn>[1]),
+      storeId,
+    });
   },
-  returnRelease: (db, storeId, a) => releaseReturn(db, { storeId, returnId: id(a.returnId, 'returnId') }),
+  returnRelease: (db, storeId, a) =>
+    releaseReturn(db, { storeId, returnId: id(a.returnId, 'returnId') }),
   journalPartialReturn: (db, storeId, a) =>
     postPartialReturnJournal(db, {
       storeId,

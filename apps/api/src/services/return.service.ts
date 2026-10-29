@@ -246,6 +246,32 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
   }
 }
 
+/**
+ * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
+ * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
+ */
+async function withCustomer<T extends { customerId: string }>(
+  storeId: string,
+  rows: T[],
+  select: Prisma.UserSelect
+): Promise<Array<T & { customer: unknown }>> {
+  const ids = Array.from(new Set(rows.map(r => r.customerId)));
+  const users = ids.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ids }, storeId },
+        select: { id: true, ...select },
+      })
+    : [];
+  const byId = new Map(users.map(u => [u.id, u]));
+  return rows.map(r => {
+    const u = byId.get(r.customerId) as ({ id: string } & Record<string, unknown>) | undefined;
+    if (!u) return { ...r, customer: null };
+    const { id: _id, ...rest } = u;
+    const keep = Object.fromEntries(Object.keys(select).map(k => [k, rest[k]]));
+    return { ...r, customer: { ...(select.id ? { id: u.id } : {}), ...keep } };
+  });
+}
+
 type UpdatedReturn = Prisma.ReturnGetPayload<{
   include: {
     customer: { select: { email: true; firstName: true; lastName: true } };
@@ -265,14 +291,18 @@ export class ReturnService {
     notes?: string
   ): Promise<UpdatedReturn> {
     await money.returnStatus({ returnId, status, userId, notes });
-    const row = await (await storeDb(storeId)).return.findFirst({
+    const found = await (
+      await storeDb(storeId)
+    ).return.findFirst({
       where: { id: returnId, storeId },
-      include: {
-        customer: { select: { email: true, firstName: true, lastName: true } },
-        order: { select: { orderNumber: true, locale: true } },
-      },
+      include: { order: { select: { orderNumber: true, locale: true } } },
     });
-    if (!row) throw new AppError(404, 'NOT_FOUND', 'Return request not found');
+    if (!found) throw new AppError(404, 'NOT_FOUND', 'Return request not found');
+    const [row] = await withCustomer(storeId, [found], {
+      email: true,
+      firstName: true,
+      lastName: true,
+    });
     // the Store row is authoritative in D1/Postgres, not on the DO
     const store = await prisma.store.findFirst({ where: { id: storeId }, select: { name: true } });
     return { ...row, store: { name: store?.name ?? '' } } as unknown as UpdatedReturn;
@@ -296,14 +326,15 @@ export class ReturnService {
       include: { items: true },
     });
     if (!returnRequest) throw new AppError(404, 'NOT_FOUND', 'Return request not found');
-    const order = await db.order.findFirst({
+    const orderRow = await db.order.findFirst({
       where: { id: data.orderId, storeId },
-      select: {
-        orderNumber: true,
-        locale: true,
-        customer: { select: { email: true, firstName: true, lastName: true } },
-      },
+      select: { orderNumber: true, locale: true },
     });
+    const customer = await prisma.user.findFirst({
+      where: { id: data.customerId, storeId },
+      select: { email: true, firstName: true, lastName: true },
+    });
+    const order = orderRow ? { ...orderRow, customer } : null;
     const store = await prisma.store.findFirst({ where: { id: storeId }, select: { name: true } });
     const orderLocale = (order?.locale ?? undefined) as 'en' | 'ar' | undefined;
     const customerName =
@@ -363,7 +394,8 @@ export class ReturnService {
     }
 
     const db = await storeDb(storeId);
-    const [returns, total] = await Promise.all([
+    const onDo = !!(await storeMoney(storeId));
+    const [listed, total] = await Promise.all([
       db.return.findMany({
         where,
         skip,
@@ -372,9 +404,13 @@ export class ReturnService {
           order: {
             select: { orderNumber: true, total: true },
           },
-          customer: {
-            select: { id: true, email: true, firstName: true, lastName: true },
-          },
+          ...(onDo
+            ? {}
+            : {
+                customer: {
+                  select: { id: true, email: true, firstName: true, lastName: true },
+                },
+              }),
           // `orderItem` select pulls the bundle-tagging snapshot
           // (bundleGroupId/bundleName/bundleNameAr — see OrderItem in
           // schema.prisma) so the admin returns list/drawer can group a
@@ -395,9 +431,17 @@ export class ReturnService {
       }),
       db.return.count({ where }),
     ]);
+    const returns = onDo
+      ? await withCustomer(storeId, listed as never[], {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+        })
+      : listed;
 
     return {
-      returns,
+      returns: returns as typeof listed,
       meta: {
         page,
         limit,
@@ -411,7 +455,10 @@ export class ReturnService {
    * Get return by ID
    */
   static async getById(storeId: string, returnId: string) {
-    const returnRequest = await (await storeDb(storeId)).return.findFirst({
+    const onDo = !!(await storeMoney(storeId));
+    const found = await (
+      await storeDb(storeId)
+    ).return.findFirst({
       where: { id: returnId, storeId },
       include: {
         order: {
@@ -422,9 +469,13 @@ export class ReturnService {
             shippingAddress: true,
           },
         },
-        customer: {
-          select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-        },
+        ...(onDo
+          ? {}
+          : {
+              customer: {
+                select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+              },
+            }),
         items: {
           include: {
             product: {
@@ -445,9 +496,20 @@ export class ReturnService {
       },
     });
 
-    if (!returnRequest) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Return request not found');
     }
+    if (onDo) {
+      const [withUser] = await withCustomer(storeId, [found as never], {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+      });
+      return withUser as typeof found;
+    }
+    const returnRequest = found;
 
     return returnRequest;
   }
@@ -1444,7 +1506,9 @@ export class ReturnService {
           });
         }
       }
-      const row = await (await storeDb(storeId)).return.findFirst({
+      const row = await (
+        await storeDb(storeId)
+      ).return.findFirst({
         where: { id: returnId, storeId },
       });
       return { ...row!, tierCarryWaived: done.tierCarryWaived };
@@ -1490,7 +1554,9 @@ export class ReturnService {
     let isFullReturn = false;
     let orderLines: AllocationLine[] = [];
     if (returnRequest.orderId) {
-      orderLines = await (await storeDb(storeId)).orderItem.findMany({
+      orderLines = await (
+        await storeDb(storeId)
+      ).orderItem.findMany({
         where: { orderId: returnRequest.orderId },
         select: { id: true, quantity: true, price: true, priceSource: true },
       });
@@ -1948,7 +2014,8 @@ export class ReturnService {
   ) {
     // a DO store's claims live in its own payment_events: the claim section (`returnClaim`) read them
     const outstanding =
-      doOutstanding ?? (await findOutstandingRefundClaims(paymentId, `return:${returnId}`, storeId));
+      doOutstanding ??
+      (await findOutstandingRefundClaims(paymentId, `return:${returnId}`, storeId));
     if (outstanding.length > 0) {
       throw new AppError(
         409,
@@ -2192,7 +2259,9 @@ export class ReturnService {
     const money = await storeMoney(storeId);
     if (money) {
       await money.returnTracking({ returnId, trackingNumber });
-      return (await (await storeDb(storeId)).return.findFirst({
+      return (await (
+        await storeDb(storeId)
+      ).return.findFirst({
         where: { id: returnId, storeId },
       }))!;
     }

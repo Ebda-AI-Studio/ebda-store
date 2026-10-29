@@ -1,9 +1,5 @@
 import { MoneyError, type SyncSql } from './sync-sql';
-import {
-  allocatePartialReturn,
-  splitByPaymentMix,
-  type AllocationLine,
-} from './return-allocation';
+import { allocatePartialReturn, splitByPaymentMix, type AllocationLine } from './return-allocation';
 import {
   productReturnAdjustment,
   type ReturnLineInput,
@@ -391,7 +387,11 @@ function lineAdjustmentsFrom(
     let overrideReason: string | null = null;
     const ov = overrides[it.id];
     if (ov) {
-      if (!Number.isInteger(ov.amountMinor) || ov.amountMinor < 0 || ov.amountMinor > standardRefund)
+      if (
+        !Number.isInteger(ov.amountMinor) ||
+        ov.amountMinor < 0 ||
+        ov.amountMinor > standardRefund
+      )
         throw new MoneyError(
           'OVERRIDE_OUT_OF_RANGE',
           'A refund override must be between 0 and the standard refund for that item.',
@@ -680,7 +680,14 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
 
 export function setReturnStatus(
   db: SyncSql,
-  a: { storeId: string; returnId: string; status: string; userId: string; notes?: string; now?: number }
+  a: {
+    storeId: string;
+    returnId: string;
+    status: string;
+    userId: string;
+    notes?: string;
+    now?: number;
+  }
 ): { returnId: string; status: string } {
   const now = a.now ?? Date.now();
   if (!(RETURN_STATUSES as readonly string[]).includes(a.status))
@@ -729,19 +736,23 @@ export function setReturnTracking(
 ): { returnId: string } {
   return db.transactionSync(() => {
     loadReturn(db, a.storeId, sid(a.returnId, 'returnId'));
-    db.run('UPDATE returns SET tracking_number = ?1, updated_at = ?2 WHERE id = ?3 AND store_id = ?4', [
-      optStr(a.trackingNumber, 200),
-      a.now ?? Date.now(),
-      a.returnId,
-      a.storeId,
-    ]);
+    db.run(
+      'UPDATE returns SET tracking_number = ?1, updated_at = ?2 WHERE id = ?3 AND store_id = ?4',
+      [optStr(a.trackingNumber, 200), a.now ?? Date.now(), a.returnId, a.storeId]
+    );
     return { returnId: a.returnId };
   });
 }
 
 // ---------------------------------------------------------------- refund claims of a return (payment.factory twins)
 
-function refundEvents(db: SyncSql, storeId: string, orderId: string, refundKey: string, types: string[]) {
+function refundEvents(
+  db: SyncSql,
+  storeId: string,
+  orderId: string,
+  refundKey: string,
+  types: string[]
+) {
   return db
     .all(
       `SELECT payment_id, event_type, provider, details FROM payment_events
@@ -756,14 +767,27 @@ function refundEvents(db: SyncSql, storeId: string, orderId: string, refundKey: 
       } catch {
         d = {};
       }
-      return { paymentId: r.payment_id as string, type: r.event_type as string, provider: (r.provider as string | null) ?? null, d };
+      return {
+        paymentId: r.payment_id as string,
+        type: r.event_type as string,
+        provider: (r.provider as string | null) ?? null,
+        d,
+      };
     });
 }
 /** findOutstandingRefundClaims: claims for `refundKey` not yet released (the claim row of an unreleased refund). */
-function outstandingClaims(db: SyncSql, storeId: string, orderId: string, refundKey: string): string[] {
+function outstandingClaims(
+  db: SyncSql,
+  storeId: string,
+  orderId: string,
+  refundKey: string
+): string[] {
   const claimed = new Set<string>();
   const released = new Set<string>();
-  for (const e of refundEvents(db, storeId, orderId, refundKey, [REFUND_CLAIM_EVENT, REFUND_RELEASED_EVENT])) {
+  for (const e of refundEvents(db, storeId, orderId, refundKey, [
+    REFUND_CLAIM_EVENT,
+    REFUND_RELEASED_EVENT,
+  ])) {
     const id = e.d.claimId;
     if (typeof id !== 'string') continue;
     (e.type === REFUND_CLAIM_EVENT ? claimed : released).add(id);
@@ -773,7 +797,14 @@ function outstandingClaims(db: SyncSql, storeId: string, orderId: string, refund
 /** reconcileOutstandingRefundClaims: a non-gateway completion is the merchant settling an indeterminate gateway refund. */
 function reconcileClaims(
   db: SyncSql,
-  a: { storeId: string; orderId: string; refundKey: string; refundMethod: string; userId: string; now: number }
+  a: {
+    storeId: string;
+    orderId: string;
+    refundKey: string;
+    refundMethod: string;
+    userId: string;
+    now: number;
+  }
 ): string[] {
   const claims = new Map<string, { paymentId: string; provider: string | null; amount: unknown }>();
   const closed = new Set<string>();
@@ -785,7 +816,8 @@ function reconcileClaims(
   ])) {
     const id = e.d.claimId;
     if (typeof id !== 'string') continue;
-    if (e.type === REFUND_CLAIM_EVENT) claims.set(id, { paymentId: e.paymentId, provider: e.provider, amount: e.d.amount });
+    if (e.type === REFUND_CLAIM_EVENT)
+      claims.set(id, { paymentId: e.paymentId, provider: e.provider, amount: e.d.amount });
     else closed.add(id);
   }
   const open = [...claims].filter(([id]) => !closed.has(id));
@@ -1028,7 +1060,8 @@ function planReturn(
 
 function overridesOf(v: unknown): Overrides {
   if (v === undefined || v === null) return {};
-  if (typeof v !== 'object' || Array.isArray(v)) throw new MoneyError('BAD_ARGS', 'refundOverrides', 400);
+  if (typeof v !== 'object' || Array.isArray(v))
+    throw new MoneyError('BAD_ARGS', 'refundOverrides', 400);
   const out: Overrides = {};
   for (const [k, o] of Object.entries(v as Record<string, unknown>)) {
     const x = o as { amountMinor?: unknown; reason?: unknown };
@@ -1174,7 +1207,8 @@ export function finishReturn(
 
     // the stock effects first (the refund ceiling reads the wallet ledger), then the money legs
     if (plan.isInventoryRestoring && plan.orderId && !a.gatewayRanFullEffects) {
-      if (plan.isFullReturn) reverseOrderEffects(db, { storeId: a.storeId, orderId: plan.orderId, now });
+      if (plan.isFullReturn)
+        reverseOrderEffects(db, { storeId: a.storeId, orderId: plan.orderId, now });
       else {
         refundOrder(db, {
           storeId: a.storeId,
