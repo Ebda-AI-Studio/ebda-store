@@ -112,12 +112,15 @@ describe('orderCodRisk', () => {
 describe('courierSuggestion', () => {
   it('returns a ranking only while both switches are on', async () => {
     h.feature.mockResolvedValueOnce(false);
-    expect(await courierSuggestion(ST, 'EG-C', ['bosta'])).toEqual({ enabled: false });
+    expect(await courierSuggestion(ST, OR, ['bosta'])).toEqual({ enabled: false });
+    h.order.mockResolvedValue({ areaKey: 'EG-C' });
     h.load.mockResolvedValue({ window: null, cohort: null, now: NOW });
-    expect(await courierSuggestion(ST, 'EG-C', ['bosta'])).toEqual({
+    expect(await courierSuggestion(ST, OR, ['bosta'])).toEqual({
       enabled: true,
       ranked: [{ carrier: 'bosta', status: 'insufficient' }],
       suggested: null,
     });
+    h.order.mockResolvedValue(null);
+    await expect(courierSuggestion(ST, OR, ['bosta'])).rejects.toMatchObject({ statusCode: 404 });
   });
 });

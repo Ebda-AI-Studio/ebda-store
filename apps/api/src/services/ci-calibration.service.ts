@@ -5,7 +5,7 @@ import {
   type CalibrationResult,
   type CalibrationRow,
 } from '../lib/ci/hints/calibration';
-import { CI_HINT_FEATURES, setGate, type CiHintFeature } from '../lib/ci/hints/gates';
+import { CI_HINT_FEATURES } from '../lib/ci/hints/gates';
 import { sendAlert } from './alerts.service';
 
 const DAY = 86_400_000;
@@ -63,6 +63,7 @@ export async function resolveAndSummarise(
   for (const d of done) {
     const k = `${d.feature}|${d.band}`;
     const r = rows.get(k) ?? {
+      storeId,
       feature: d.feature,
       band: d.band,
       resolved: 0,
@@ -79,7 +80,6 @@ export async function resolveAndSummarise(
 
 export interface CalibrationDeps {
   collect(): Promise<CalibrationRow[]>;
-  closeGate(feature: CiHintFeature, reason: string): Promise<unknown>;
   alert(feature: string, reason: string): Promise<unknown>;
 }
 
@@ -91,23 +91,22 @@ const defaultDeps: CalibrationDeps = {
     });
     return per.flatMap(p => p.value);
   },
-  closeGate: (feature, reason) => setGate(feature, false, reason),
   alert: (feature, reason) =>
     sendAlert({
       level: 'p1',
       scope: 'platform',
       source: 'ci.calibration_off',
-      title: `Customer Intelligence hint "${feature}" was switched off automatically`,
+      title: `Customer Intelligence hint "${feature}" is mis-calibrated: review the gate`,
       body: reason,
     }),
 };
 
-/** Weekly: evaluate every band; close the gate of any feature with a band off by more than 10 points, and alert. */
+/** Weekly: evaluate every band; ALERT for any feature with a band off by more than 10 points. The platform gate is never closed here (Ruling CI-11). */
 export async function runCalibration(
   deps: CalibrationDeps = defaultDeps
-): Promise<{ results: CalibrationResult[]; closed: string[] }> {
+): Promise<{ results: CalibrationResult[]; alerted: string[] }> {
   const results = evaluateCalibration(await deps.collect());
-  const closed: string[] = [];
+  const alerted: string[] = [];
   for (const feature of CI_HINT_FEATURES) {
     const off = results.filter(r => r.feature === feature && r.off);
     if (off.length === 0) continue;
@@ -117,9 +116,8 @@ export async function runCalibration(
           `${r.band}: predicted ${(r.predicted! * 100).toFixed(1)}% vs actual ${(r.actual! * 100).toFixed(1)}% over ${r.resolved} hints`
       )
       .join('; ');
-    await deps.closeGate(feature, reason);
     await deps.alert(feature, reason);
-    closed.push(feature);
+    alerted.push(feature);
   }
-  return { results, closed };
+  return { results, alerted };
 }

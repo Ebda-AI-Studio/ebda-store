@@ -1,4 +1,6 @@
 /** CI-2 insights (guarded, rule-based) and CI-3 calibration (auto-disable at > 10 points). */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
@@ -85,58 +87,101 @@ describe('generateInsights', () => {
 });
 
 describe('evaluateCalibration', () => {
-  const row = (band: string, resolved: number, returned: number, predicted: number) => ({
+  const row = (
+    band: string,
+    resolved: number,
+    returned: number,
+    predicted: number,
+    storeId = 's1'
+  ) => ({
+    storeId,
     feature: 'cod_risk',
     band,
     resolved,
     returned,
     predictedSum: predicted * resolved,
   });
-  it('29 resolved is not evaluated; 30 is; the gap must exceed 10 points', () => {
-    expect(evaluateCalibration([row('elevated', 29, 29, 0.1)])[0]).toMatchObject({
+  /** Spread over 5 stores so the cohort rules pass. */
+  const spread = (band: string, perStore: number, returned: number, predicted: number) =>
+    [1, 2, 3, 4, 5].map(i => row(band, perStore, returned, predicted, `s${i}`));
+  it('under 30 resolved is not evaluated; the gap must exceed 10 points', () => {
+    expect(evaluateCalibration(spread('elevated', 5, 5, 0.1))[0]).toMatchObject({
+      evaluated: false,
+    }); // 25 total
+    expect(evaluateCalibration(spread('elevated', 6, 0, 0.1))[0]).toMatchObject({
+      evaluated: true,
+      off: true,
+    }); // 30 total
+    expect(evaluateCalibration(spread('elevated', 20, 2, 0.1))[0]).toMatchObject({ off: false }); // exactly 10 points
+    expect(evaluateCalibration(spread('elevated', 20, 5, 0.1))[0]).toMatchObject({ off: true });
+  });
+  it('a below-k band is "not evaluated": under 5 stores, or one store above 40%', () => {
+    expect(evaluateCalibration([row('elevated', 500, 500, 0.1)])[0]).toMatchObject({
       evaluated: false,
       off: false,
     });
-    expect(evaluateCalibration([row('elevated', 30, 3, 0.1)])[0]).toMatchObject({
-      evaluated: true,
-      off: false,
-    }); // actual 10% = predicted
-    expect(evaluateCalibration([row('elevated', 100, 20, 0.1)])[0]).toMatchObject({ off: false }); // exactly 10 points
-    expect(evaluateCalibration([row('elevated', 100, 21, 0.1)])[0]).toMatchObject({ off: true });
-    expect(evaluateCalibration([row('elevated', 100, 0, 0.12)])[0]).toMatchObject({
-      off: true,
-      actual: 0,
-    });
+    const four = [1, 2, 3, 4].map(i => row('elevated', 50, 50, 0.1, `s${i}`));
+    expect(evaluateCalibration(four)[0]).toMatchObject({ evaluated: false, off: false });
+    const skew = [
+      row('elevated', 500, 500, 0.1, 's1'),
+      ...[2, 3, 4, 5].map(i => row('elevated', 10, 1, 0.1, `s${i}`)),
+    ];
+    expect(evaluateCalibration(skew)[0]).toMatchObject({ evaluated: false, off: false });
   });
   it('rows from several stores merge before judging', () => {
-    const r = evaluateCalibration([row('typical', 20, 10, 0.1), row('typical', 20, 10, 0.1)]);
-    expect(r).toHaveLength(1);
-    expect(r[0]).toMatchObject({ resolved: 40, evaluated: true, off: true });
+    expect(evaluateCalibration(spread('typical', 8, 8, 0.1))).toHaveLength(1);
   });
   it('the insufficient band is never judged', () => {
-    expect(evaluateCalibration([row('insufficient', 100, 90, 0)])[0]).toMatchObject({
+    expect(evaluateCalibration(spread('insufficient', 50, 45, 0))[0]).toMatchObject({
       evaluated: false,
     });
   });
 });
 
 describe('runCalibration', () => {
-  it('closes the gate of a feature that is off and alerts; leaves a calibrated one alone', async () => {
-    const closeGate = vi.fn();
+  it('alerts for a mis-calibrated feature and leaves a calibrated one alone', async () => {
     const alert = vi.fn();
+    const rows = (feature: string, returned: number) =>
+      [1, 2, 3, 4, 5].map(i => ({
+        storeId: `s${i}`,
+        feature,
+        band: 'elevated',
+        resolved: 20,
+        returned,
+        predictedSum: 3,
+      }));
     const out = await runCalibration({
-      collect: async () => [
-        { feature: 'cod_risk', band: 'elevated', resolved: 100, returned: 60, predictedSum: 15 },
-        { feature: 'courier', band: 'typical', resolved: 100, returned: 10, predictedSum: 10 },
-      ],
-      closeGate,
+      collect: async () => [...rows('cod_risk', 12), ...rows('courier', 3)],
       alert,
     });
-    expect(out.closed).toEqual(['cod_risk']);
-    expect(closeGate).toHaveBeenCalledWith(
+    expect(out.alerted).toEqual(['cod_risk']);
+    expect(alert).toHaveBeenCalledWith(
       'cod_risk',
       expect.stringContaining('predicted 15.0% vs actual 60.0%')
     );
-    expect(alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('one store feeding skewed outcomes alerts nobody and cannot close a platform gate', async () => {
+    const alert = vi.fn();
+    const out = await runCalibration({
+      collect: async () => [
+        {
+          storeId: 'evil',
+          feature: 'cod_risk',
+          band: 'elevated',
+          resolved: 500,
+          returned: 500,
+          predictedSum: 50,
+        },
+      ],
+      alert,
+    });
+    expect(out.alerted).toEqual([]);
+    expect(alert).not.toHaveBeenCalled();
+    const src = readFileSync(
+      join(__dirname, '../../apps/api/src/services/ci-calibration.service.ts'),
+      'utf8'
+    );
+    expect(src).not.toMatch(/setGate|closeGate/);
   });
 });

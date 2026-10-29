@@ -67,6 +67,6 @@ export const ciHintCalibrationWeekly: JobDef = inngest.createFunction(
   },
   async () => {
     const r = await runCalibration();
-    return { closed: r.closed, bands: r.results.length };
+    return { alerted: r.alerted, bands: r.results.length };
   }
 );

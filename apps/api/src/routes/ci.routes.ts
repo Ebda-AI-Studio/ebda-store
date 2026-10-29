@@ -19,7 +19,7 @@ import {
  *   GET /stores/:storeId/ci/overview             status, sharing opt-in, COD-amount card, hint counts
  *   PUT /stores/:storeId/ci/sharing              the cross-store opt-in (default OFF)
  *   GET /stores/:storeId/ci/orders/:orderId/hint COD risk note for one order   (needs `customer_intelligence`)
- *   GET /stores/:storeId/ci/courier              courier ranking for an area   (needs `customer_intelligence`)
+ *   GET /stores/:storeId/ci/courier?orderId=&carriers=  courier ranking for the order's area   (needs `customer_intelligence`)
  *
  * These endpoints only ADVISE. No checkout, order-create or booking handler calls them; the admin UI does.
  */
@@ -29,9 +29,8 @@ router.param('storeId', tenantContext);
 const base = [authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess];
 const hints = [...base, requireFeature('customer_intelligence')];
 
-const AREA = /^EG(-[A-Za-z0-9]{1,16}){0,1}(-[a-z0-9-]{1,48})?$/;
 const courierQuery = z.object({
-  areaKey: z.string().regex(AREA).max(64).optional(),
+  orderId: z.string().uuid(),
   carriers: z
     .string()
     .max(400)
@@ -108,7 +107,7 @@ router.get(
       const q = parseInput(courierQuery, req.query);
       res.json({
         success: true,
-        data: await courierSuggestion(req.params.storeId, q.areaKey ?? null, q.carriers),
+        data: await courierSuggestion(req.params.storeId, q.orderId, q.carriers),
       });
     } catch (e) {
       next(e);

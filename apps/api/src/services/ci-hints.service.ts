@@ -69,14 +69,15 @@ export async function orderCodRisk(storeId: string, orderId: string): Promise<Or
   return { enabled: true, applicable: true, hint };
 }
 
-export async function courierSuggestion(
-  storeId: string,
-  areaKey: string | null,
-  carriers: string[]
-) {
+export async function courierSuggestion(storeId: string, orderId: string, carriers: string[]) {
   if (!(await enabled(storeId, 'courier'))) return { enabled: false as const };
+  const o = await prisma.order.findFirst({
+    where: { id: orderId, storeId },
+    select: { areaKey: true },
+  });
+  if (!o) throw new AppError(404, 'NOT_FOUND', 'Order not found');
   const data = await loadHintData(storeId);
-  return { enabled: true as const, ...rankCouriers(data, areaKey, carriers) };
+  return { enabled: true as const, ...rankCouriers(data, o.areaKey, carriers) };
 }
 
 export interface CiOverview {
