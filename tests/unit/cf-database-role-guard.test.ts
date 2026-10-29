@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDatabaseRoleGuard } from '../../apps/api/src/cf/database-role-guard';
 
-const safe = [{ currentUser: 'ebda_app', bypass: false }];
+const safe = [{ currentUser: 'ebda_app', bypass: false, ownsUnforcedRls: false }];
 
 describe('Worker database role guard', () => {
   it('caches only verified safe role success', async () => {
@@ -16,6 +16,13 @@ describe('Worker database role guard', () => {
     ['bypass role', [{ currentUser: 'owner', bypass: true }]],
     ['missing role', []],
     ['unknown bypass state', [{ currentUser: 'unknown' }]],
+    // Ruling F9-ROLE-1: a table owner is exempt from RLS unless the table is FORCE'd, so an owner role with
+    // NOBYPASSRLS is just as unsafe as a bypass role.
+    [
+      'owner of an RLS table that is not FORCEd',
+      [{ currentUser: 'migrator', bypass: false, ownsUnforcedRls: true }],
+    ],
+    ['unknown ownership state', [{ currentUser: 'x', bypass: false }]],
   ])('rejects %s and permits a later successful retry', async (_name, rows) => {
     const guard = createDatabaseRoleGuard();
     await expect(guard(async () => rows as typeof safe)).rejects.toThrow('Unsafe or unverifiable');

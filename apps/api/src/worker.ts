@@ -110,13 +110,24 @@ let redisReady: Promise<void> | undefined;
  */
 async function checkRole(): Promise<void> {
   await validateDatabaseRole(async () => {
-    const rows = await prisma.$queryRaw<Array<{ currentUser: string; bypass: boolean }>>`
-      SELECT current_user::text AS "currentUser", (rolbypassrls OR rolsuper) AS bypass
-      FROM pg_roles WHERE rolname = current_user`;
-    const bypass = rows[0]?.bypass === true;
+    const rows = await prisma.$queryRaw<
+      Array<{ currentUser: string; bypass: boolean; ownsUnforcedRls: boolean }>
+    >`
+      SELECT current_user::text AS "currentUser", (r.rolbypassrls OR r.rolsuper) AS bypass,
+        EXISTS (
+          SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relowner = r.oid
+            AND c.relrowsecurity AND NOT c.relforcerowsecurity
+        ) AS "ownsUnforcedRls"
+      FROM pg_roles r WHERE r.rolname = current_user`;
+    const row = rows[0];
     logger.info(
-      { currentUser: rows[0]?.currentUser, rolbypassrls: bypass },
-      `[SECURITY] DB role check: current_user=${rows[0]?.currentUser ?? 'unknown'} rolbypassrls=${bypass}`
+      {
+        currentUser: row?.currentUser,
+        rolbypassrls: row?.bypass === true,
+        ownsUnforcedRls: row?.ownsUnforcedRls,
+      },
+      `[SECURITY] DB role check: current_user=${row?.currentUser ?? 'unknown'} rolbypassrls=${row?.bypass === true} ownsUnforcedRls=${row?.ownsUnforcedRls}`
     );
     return rows;
   });
