@@ -24,6 +24,7 @@ import {
 import { z } from 'zod/v3';
 import { AppError } from '../../middleware/error-handler';
 import { auditLog } from '../../middleware/security';
+import { storeMoney } from '../../lib/repo-factory';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import {
@@ -181,6 +182,33 @@ export class GoldRateService {
   ): Promise<{ applied: RateRow[]; pending: RateRow[]; repriced: number }> {
     const input = goldRateInputSchema.parse(rawInput);
     const isFeed = 'feed' in actor;
+    // Store on its Durable Object (Ruling CF-PAY-1): the jump gate, the history row, the current row and the repricer (flag on)
+    // are ONE section there; an order priced in another section sees the old rate or the new one, never half.
+    const money = await storeMoney(storeId);
+    if (money) {
+      const done = await money.goldApplyRates({
+        input,
+        ...(isFeed
+          ? { feed: actor.feed, forcePending: actor.forcePending === true }
+          : { userId: actor.userId }),
+      });
+      for (const row of [...done.applied, ...done.pending] as RateRow[])
+        await auditLog({
+          action: row.status === 'applied' ? 'gold_rate.set' : 'gold_rate.pending',
+          userId: actorUserId(actor) ?? undefined,
+          storeId,
+          resourceType: 'gold_rate',
+          resourceId: row.id,
+          details: {
+            karat: row.karat,
+            to: row.ratePerGram,
+            jumpBps: row.jumpBps,
+            source: row.source,
+          },
+        }).catch(() => undefined);
+      if (done.applied.length > 0) await purgeGoldPrices(storeId);
+      return done;
+    }
     const out = await withMoneyTx(prisma, async tx => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const settings = await loadSettings(tx, storeId);
@@ -306,6 +334,19 @@ export class GoldRateService {
     return out;
   }
 
+  /**
+   * Operations that run arbitrary Postgres writes inside the repricer's transaction cannot reach a Durable Object store.
+   * Refused, never dropped (Ruling CF-PAY-1): the spec edit goes through the DO writer and `goldRepriceProduct`.
+   */
+  private static async refuseOnDo(storeId: string, what: string): Promise<void> {
+    if (await storeMoney(storeId))
+      throw new AppError(
+        501,
+        'GOLD_PRICING_NOT_ON_DO',
+        `${what} is not ported to the store Durable Object yet`
+      );
+  }
+
   /** Confirm or reject a PENDING (feed) rate. Confirming applies it exactly as typed. */
   static async decidePending(
     storeId: string,
@@ -313,6 +354,23 @@ export class GoldRateService {
     decision: 'confirm' | 'reject',
     actor: { userId: string }
   ): Promise<{ status: 'applied' | 'rejected'; repriced: number }> {
+    const money = await storeMoney(storeId);
+    if (money) {
+      const done = (await money.goldDecidePending({ rateId, decision, userId: actor.userId })) as {
+        status: 'applied' | 'rejected';
+        repriced: number;
+      };
+      await auditLog({
+        action: decision === 'confirm' ? 'gold_rate.confirmed' : 'gold_rate.rejected',
+        userId: actor.userId,
+        storeId,
+        resourceType: 'gold_rate',
+        resourceId: rateId,
+        details: { decision },
+      }).catch(() => undefined);
+      if (done.status === 'applied') await purgeGoldPrices(storeId);
+      return done;
+    }
     const out = await withMoneyTx(prisma, async tx => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const row = await tx.goldRate.findFirst({
@@ -383,6 +441,26 @@ export class GoldRateService {
     actor: { userId: string }
   ): Promise<GoldSettings & { repriced: number }> {
     const input = goldRateSettingsSchema.parse(rawInput);
+    const money = await storeMoney(storeId);
+    if (money) {
+      const done = (await money.goldUpdateSettings({ input, userId: actor.userId })) as {
+        repriced: number;
+      };
+      await auditLog({
+        action: 'gold_rate.settings',
+        userId: actor.userId,
+        storeId,
+        resourceType: 'gold_rate_settings',
+        resourceId: storeId,
+        details: { to: input },
+      }).catch(() => undefined);
+      await purgeGoldPrices(storeId);
+      return {
+        ...input,
+        roundingStep: input.roundingStep as GoldRoundingStep,
+        repriced: done.repriced,
+      };
+    }
     const out = await withMoneyTx(prisma, async tx => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const before = await loadSettings(tx, storeId);
@@ -441,6 +519,7 @@ export class GoldRateService {
     },
     actor: { userId: string }
   ): Promise<{ pricingMode: 'fixed' | 'gold_rate'; price: number }> {
+    await GoldRateService.refuseOnDo(storeId, 'setProductPricing');
     const product = productGoldPricingInputSchema.parse(rawInput.product);
     const variantInputs = (rawInput.variants ?? []).map(v => {
       const { id, ...rest } = v;
@@ -626,6 +705,7 @@ export class GoldRateService {
     productId: string,
     fn: (tx: Prisma.TransactionClient) => Promise<T>
   ): Promise<T> {
+    await GoldRateService.refuseOnDo(storeId, 'asRepricer');
     const out = await withMoneyTx(prisma, async tx => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const settings = await loadSettings(tx, storeId);
@@ -654,6 +734,7 @@ export class GoldRateService {
     mode: 'fixed' | 'gold_rate',
     actor: { userId: string }
   ) {
+    await GoldRateService.refuseOnDo(storeId, 'bulkSwitchMode');
     const unique = [...new Set(ids)].slice(0, 500);
     const rows = await prisma.product.findMany({
       where: { storeId, id: { in: unique }, deletedAt: null },

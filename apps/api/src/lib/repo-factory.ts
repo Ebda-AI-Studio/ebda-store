@@ -258,6 +258,11 @@ export interface MoneyClient {
   goldDecidePending(a: Record<string, unknown>, key?: string): Promise<any>;
   goldUpdateSettings(a: Record<string, unknown>, key?: string): Promise<any>;
   goldRepriceProduct(a: { productId: string }, key?: string): Promise<{ repriced: number }>;
+  /** Disarm a status fanout that was superseded (the stuck sweep): conditional on it still being unclaimed. */
+  fanoutDisarm(
+    a: { orderId: string; requestedAt: number },
+    key?: string
+  ): Promise<{ disarmed: boolean }>;
 }
 
 export interface DoWebhookInput {
@@ -458,6 +463,7 @@ export function makeMoneyClient(
     goldDecidePending: (a, key) => call('goldDecidePending', a, key),
     goldUpdateSettings: (a, key) => call('goldUpdateSettings', a, key),
     goldRepriceProduct: (a, key) => call('goldRepriceProduct', a, key),
+    fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
   };
 }
 

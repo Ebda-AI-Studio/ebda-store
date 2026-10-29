@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
 import { postEntry } from '../journal.service';
 import logger from '../../../lib/logger';
+import { storeMoney } from '../../../lib/repo-factory';
 
 /**
  * Maps a Payment.provider value to the COA system account code that should
@@ -55,6 +56,17 @@ export async function postOrderPaymentJournal(args: {
   tx?: Prisma.TransactionClient;
 }): Promise<void> {
   const { orderId, tx } = args;
+  // A store on its Durable Object posts its own ledger there, in one section (Ruling CF-LEDGER-1).
+  const money = await storeMoney(currentStoreId());
+  if (money) {
+    const r = await money.journalSale({ orderId });
+    if (!r.posted)
+      logger.info(
+        { orderId, skipped: r.skipped },
+        'postOrderPaymentJournal: not posted (Durable Object)'
+      );
+    return;
+  }
   const client: Prisma.TransactionClient | typeof prisma = tx ?? prisma;
 
   const order = await client.order.findUnique({

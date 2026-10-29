@@ -190,15 +190,22 @@ export async function resolveDoStoreFromWebhookRef(ref: {
   transactionId?: string | null;
   invoiceId?: string | null;
   provider?: string | null;
+  /** The store a per-store webhook URL names: the D1 answer is accepted only if it IS this store (WEBHOOK-SCOPE-1). */
+  preferStoreId?: string | null;
 }): Promise<string | null> {
-  if (enabledStoreIds().size === 0) return null;
+  // Same contract as the Postgres resolver (`ebda_webhook_resolve_store_scoped`): a reference is unique per PROVIDER, so an
+  // empty provider resolves nothing, and only the provider-scoped `webhook` key is read - never the unscoped `payment` kind.
+  if (!ref.provider || enabledStoreIds().size === 0) return null;
   const d1 = (cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB;
   if (!d1) return null;
-  const { routePaymentWebhook } = await import('@ebda-src/repo');
+  const { resolveStoreId } = await import('@ebda-src/repo');
   for (const r of [ref.transactionId, ref.invoiceId]) {
     if (!r) continue;
-    const routed = await routePaymentWebhook(d1 as never, ref.provider ?? '', r);
-    if ('storeId' in routed && enabledStoreIds().has(routed.storeId)) return routed.storeId;
+    const id = await resolveStoreId(d1, 'webhook', `${ref.provider}:${r}`);
+    if (!id || !enabledStoreIds().has(id)) continue;
+    // a URL that names store A never accepts store B's reference: same answer as an unknown one
+    if (ref.preferStoreId && id !== ref.preferStoreId) return null;
+    return id;
   }
   return null;
 }

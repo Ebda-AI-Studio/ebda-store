@@ -62,7 +62,8 @@ export type MoneyOpName =
   | 'goldApplyRates'
   | 'goldDecidePending'
   | 'goldUpdateSettings'
-  | 'goldRepriceProduct';
+  | 'goldRepriceProduct'
+  | 'fanoutDisarm';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -84,6 +85,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'goldDecidePending',
   'goldUpdateSettings',
   'goldRepriceProduct',
+  'fanoutDisarm',
 ];
 
 const TABLE = '_money_ops';
@@ -265,6 +267,14 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     updateGoldSettings(db, storeId, a.input as GoldSettingsInput, {
       userId: id(a.userId, 'userId'),
     }),
+  /** The stuck status-fanout sweep gives up on a transition a later status superseded: conditional, so a claimed one is left alone. */
+  fanoutDisarm: (db, storeId, a) => ({
+    disarmed:
+      db.run(
+        'UPDATE orders SET status_fanout_requested_at = NULL WHERE id = ? AND store_id = ? AND status_fanout_claimed_at IS NULL AND status_fanout_requested_at = ?',
+        [id(a.orderId, 'orderId'), storeId, a.requestedAt as number]
+      ).changes > 0,
+  }),
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),

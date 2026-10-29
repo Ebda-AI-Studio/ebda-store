@@ -1,11 +1,12 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { stepRunUnlessEmpty } from '../empty-exit';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';
 import { sweepAcrossStores } from '../../cross-store';
+import { storeDb, storeMoney } from '../../repo-factory';
+import { withStore } from '@ebda/database';
 
 /**
  * Stuck status-change fanout sweep — scheduled safety net (#619).
@@ -85,8 +86,8 @@ export async function handleOrderStatusFanoutStuckSweep(
     'find-stuck-status-fanouts',
     async () =>
       sweepAcrossStores({
-        fetch: storeId =>
-          prisma.order.findMany({
+        fetch: async storeId =>
+          (await storeDb(storeId)).order.findMany({
             where: {
               storeId,
               statusFanoutClaimedAt: null,
@@ -152,16 +153,25 @@ export async function handleOrderStatusFanoutStuckSweep(
       // Disarm, so the same lost transition is reported once, not every tick.
       await Promise.all(
         superseded.map(o =>
-          withStore(o.storeId, tx =>
-            tx.order.updateMany({
-              where: {
-                id: o.id,
-                storeId: o.storeId,
-                statusFanoutClaimedAt: null,
-                statusFanoutRequestedAt: o.statusFanoutRequestedAt,
-              },
-              data: { statusFanoutRequestedAt: null },
-            })
+          storeMoney(o.storeId).then(
+            async (money): Promise<unknown> =>
+              money
+                ? // a Durable Object order (Ruling CF-PAY-1): the same conditional disarm, one DO section
+                  money.fanoutDisarm({
+                    orderId: o.id,
+                    requestedAt: new Date(o.statusFanoutRequestedAt ?? 0).getTime(),
+                  })
+                : withStore(o.storeId, tx =>
+                    tx.order.updateMany({
+                      where: {
+                        id: o.id,
+                        storeId: o.storeId,
+                        statusFanoutClaimedAt: null,
+                        statusFanoutRequestedAt: o.statusFanoutRequestedAt,
+                      },
+                      data: { statusFanoutRequestedAt: null },
+                    })
+                  )
           )
         )
       );
@@ -257,8 +267,8 @@ async function reportFailedAfterClaim(
 ): Promise<number> {
   const failed = await stepRunUnlessEmpty(step, 'find-failed-after-claim', () =>
     sweepAcrossStores({
-      fetch: storeId =>
-        prisma.order.findMany({
+      fetch: async storeId =>
+        (await storeDb(storeId)).order.findMany({
           where: {
             storeId,
             statusFanoutClaimedAt: { lt: cutoff, gt: floorCutoff },

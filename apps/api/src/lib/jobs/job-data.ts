@@ -22,7 +22,11 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'billing-renewal-daily',
 ]);
 
-export const PORTED_JOBS: ReadonlySet<string> = new Set(['wholesale-pending-nudge-cron']);
+export const PORTED_JOBS: ReadonlySet<string> = new Set([
+  'wholesale-pending-nudge-cron',
+  // reads through storeDb and disarms through the DO money op (Ruling CF-PAY-1)
+  'order-status-fanout-stuck-sweep',
+]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([
   'payment-webhook-process',
@@ -35,7 +39,6 @@ export const MONEY_JOBS: ReadonlySet<string> = new Set([
   'order-created-fanout',
   'order-created-stuck-sweep',
   'order-status-changed-fanout',
-  'order-status-fanout-stuck-sweep',
   'order-auto-cancel-unpaid',
   'instapay-expiry',
   'instapay-receipt-extract',
