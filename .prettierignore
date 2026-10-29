@@ -51,3 +51,8 @@ apps/marketing/legal-source
 tests/vectors/ebda-wa/
 # vendored verbatim from the ebda-whatsapp repo (sha256-pinned by tests/unit/marketing-wa-legal-drift.test.ts)
 apps/marketing/legal-source
+
+# Vendored from ebda-foundation (foundation.lock.json): byte-pinned by tests/unit/foundation-parity.test.ts, never reformatted.
+packages/shared/src/foundation
+foundation.lock.json
+tests/unit/foundation-parity.test.ts
