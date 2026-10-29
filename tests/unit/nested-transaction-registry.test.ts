@@ -155,7 +155,9 @@ function code(file: string): string {
 }
 
 /** Opens its own transaction: directly, or through `withMoneyTx`. */
-const OPENS_TRANSACTION = /prisma\.\$transaction\b|\bwithMoneyTx\(/;
+// `w.$transaction` is the same call through `storeWriter` (lib/repo-factory.ts): on Postgres it IS `prisma.$transaction`, so a
+// route that moved to the writer must stay visible to this guard (CF-WRITES-1).
+const OPENS_TRANSACTION = /(?:prisma|\bw)\.\$transaction\b|\bwithMoneyTx\(/;
 
 /** Files that open a transaction at all. */
 function callers(): string[] {

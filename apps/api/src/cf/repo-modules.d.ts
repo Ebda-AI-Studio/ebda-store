@@ -91,10 +91,27 @@ declare module '@ebda-src/repo' {
   export function encodeRpc(value: unknown): string;
   export function decodeRpc<T = unknown>(text: string): T;
   export type DoTransport = (queries: DoQuery[]) => Promise<DoQueryResult>;
-  export function createDoClient(send: DoTransport): StoreReadClient;
+  export interface DoMutation {
+    key?: string;
+    ops: Array<{ model: string; op: string; args?: Record<string, unknown> }>;
+  }
+  export type DoMutateTransport = (m: DoMutation) => Promise<DoQueryResult>;
+  export function runWrites(
+    lite: Record<string, unknown>,
+    sql: SqlRunner,
+    m: DoMutation
+  ): Promise<DoQueryResult>;
+  export function ensureIdempotencySchema(sql: SqlRunner): void;
+  export const DO_WRITABLE_MODELS: ReadonlySet<string>;
+  export function createDoClient(send: DoTransport, mutate?: DoMutateTransport): StoreReadClient;
   /** Prisma-shaped read client of one store's Durable Object. Delegates are typed loosely: callers narrow. */
   export type StoreReadClient = Record<
     string,
     Record<ReadOp, (args?: Record<string, unknown>) => PromiseLike<any>>
-  > & { $transaction(reads: PromiseLike<unknown>[]): Promise<unknown[]> };
+  > & {
+    $transaction(
+      reads: PromiseLike<unknown>[],
+      opts?: { idempotencyKey?: string }
+    ): Promise<unknown[]>;
+  };
 }

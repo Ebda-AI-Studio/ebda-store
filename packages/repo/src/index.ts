@@ -17,4 +17,13 @@ export {
   type DoQueryResult,
   type ReadOp,
 } from './rpc/reads';
-export { createDoClient, type DoTransport } from './rpc/client';
+export { createDoClient, type DoTransport, type DoMutateTransport } from './rpc/client';
+export {
+  runWrites,
+  checkMutation,
+  ensureIdempotencySchema,
+  DO_WRITABLE_MODELS,
+  WRITE_OPS,
+  type DoMutation,
+  type WriteOp,
+} from './rpc/writes';

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { StoreDO } from '../src/cf/store-do/store-do';
+import { storeTables } from '../src/cf/store-do/tables';
 import {
   STORE_DO_REGISTRY,
   unclassifiedTables,
@@ -77,20 +78,30 @@ const merchant = (over: Partial<MerchantSubject> = {}): MerchantSubject => ({
 });
 
 describe('registry contract with the phase-1 schema', () => {
-  // The StoreDO carries the full cf-schema (122 tables); the registry that turns erasure-classification.json into
-  // match/scrub entries is the G10 follow-up. Until it covers the schema a CUSTOMER subject fails CLOSED: it must
-  // never answer "nothing found" for tables it does not know about.
+  // The StoreDO carries the full generated cf-schema (122 tables) and the registry is generated from the same
+  // classification (CF-ERASE-3), so a customer subject is served. A table the registry does not know STILL fails closed:
+  // a customer subject must never answer "nothing found" for data it cannot classify.
   it('unclassifiedTables names every live table the registry does not cover', () => {
     expect(unclassifiedTables(['products', 'customers'], { products: { kind: 'no-pii' } })).toEqual(
       ['customers']
     );
   });
-  it('a customer export/erase on a DO whose schema the registry does not cover is refused, a merchant export is not', async () => {
+  it('the registry covers every table of the live DO schema', async () => {
+    await seed('er-covered');
+    const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-covered'));
+    const live = await runInDurableObject(stub, async d => storeTables(d.ctx.storage.sql));
+    expect(live.length).toBeGreaterThan(100);
+    expect(unclassifiedTables(live)).toEqual([]);
+  });
+  it('a customer export/erase is served on the full schema, and refused (closed) once the DO holds a table the registry lacks', async () => {
     await seed('er-closed');
     const stub = e.STORE_DO.get(e.STORE_DO.idFromName('er-closed'));
+    const out = await stub.exportSubject(customer());
+    expect(out.tables).toBeDefined(); // served: no ERASURE_REGISTRY_INCOMPLETE
     // Caught inside the DO: an exception that crosses the RPC edge is also reported by the pool as unhandled.
     const refusal = (call: (d: StoreDO) => unknown) =>
       runInDurableObject(stub, async d => {
+        d.ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS zz_unclassified (id TEXT PRIMARY KEY)');
         try {
           await call(d);
           return 'allowed';

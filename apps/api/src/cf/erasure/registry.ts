@@ -4,12 +4,13 @@
  * refuses a customer subject while any table is unclassified, so a missing entry fails CLOSED, never silently skips PII).
  * Column names are SQLite column names.
  *
- * STATE (INFRA-CF-1 PR C): the StoreDO carries the full generated cf-schema (122 tables) but this registry is still
- * EMPTY. The classification itself exists (packages/cf-schema/erasure-classification.json, test-enforced against the
- * schema); turning it into `match`/`scrub` entries (customerId joins, NOT NULL scrub values) is the G10 phase-1
- * follow-up and a cutover blocker. The Phase 0 entries (thin demo tables) were removed: they described tables that
- * no longer exist in that shape (carts/orders now carry customer identifiers).
+ * STATE (INFRA-CF-1 PR D1, Ruling CF-ERASE-3): the registry is GENERATED (registry.generated.ts) from
+ * packages/cf-schema/erasure-classification.json and the store migrations by scripts/cf/gen-erasure-registry.mjs; CI runs
+ * it with `--check`, so a schema or classification change that is not regenerated fails the build. Every one of the
+ * 122 tables is classified, and a table the live DO has that the registry lacks still fails customer subjects closed.
  */
+
+import { GENERATED_STORE_DO_REGISTRY } from './registry.generated';
 
 export type TableClass =
   | { kind: 'no-pii' }
@@ -18,14 +19,23 @@ export type TableClass =
   | {
       kind: 'customer-pii';
       /** Columns that identify the customer; a row matches when ANY supplied subject key equals ONE of them. */
-      match: { buyerKey?: string; email?: string; phone?: string; userId?: string };
+      match: {
+        buyerKey?: string;
+        email?: string;
+        phone?: string;
+        userId?: string;
+        /** Column holding a `customers.id`: matched through the customers rows the subject resolves to (see store-do-sql). */
+        customerId?: string;
+      };
+      /** The table has no subject column of its own and is reached through its parent (shipments -> orders). */
+      via?: { column: string; table: string };
       /** 'delete' removes the row; 'scrub' keeps it (orders keep money history) and overwrites the columns. */
       action: 'delete' | 'scrub';
       /** For 'scrub': column -> replacement (NOT NULL columns need a string, e.g. '[erased]'). */
       scrub?: Record<string, string | null>;
     };
 
-export const STORE_DO_REGISTRY: Record<string, TableClass> = {};
+export const STORE_DO_REGISTRY: Record<string, TableClass> = GENERATED_STORE_DO_REGISTRY;
 
 export const classifiedTables = (): string[] => Object.keys(STORE_DO_REGISTRY);
 /** Tables of a live StoreDO (`storeTables(sql)`) that have no registry entry. */

@@ -18,17 +18,22 @@
  * another store's rows, because there are none in this instance.
  *
  * Every money/stock section is one synchronous `transactionSync`: no `await` between the stock read and the write.
- * Reads from the API Worker arrive as prisma-lite queries over `query()` (reads only; writes are PR D).
+ * Reads from the API Worker arrive as prisma-lite queries over `query()`; the non-money catalogue/content WRITES arrive
+ * over `mutate()` (PR D1): one atomic transaction per call, optionally idempotent, allow-listed models only. Money, stock
+ * and lock paths are not here (PR D2).
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
   createPrismaLite,
   doSqlRunner,
   doSyncSql,
+  ensureIdempotencySchema,
   ensurePaymentSchema,
   ensureSearchIndex,
   MoneyError,
   runReads,
+  runWrites,
+  type DoMutation,
   type DoQuery,
   type DoQueryResult,
   type Meta,
@@ -88,6 +93,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       );
       ensureSearchIndex(this.sync);
       ensurePaymentSchema(this.sync);
+      ensureIdempotencySchema(doSqlRunner(ctx.storage));
     });
   }
 
@@ -144,6 +150,21 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   async query(storeId: string, queries: DoQuery[]): Promise<DoQueryResult> {
     try {
       return await runReads(await this.lite(storeId), queries);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', message: e.message };
+      throw e;
+    }
+  }
+
+  /**
+   * Catalogue/content writes for the API Worker (lib/repo-factory.ts `storeWriter`). ONE atomic transaction per call;
+   * `m.key` makes a retry return the first run's result. Refuses (as an answer, never a throw) a model that is not on the
+   * D1 allow-list, a stock-column write, another store's id, and anything runWrites does not know.
+   */
+  async mutate(storeId: string, m: DoMutation): Promise<DoQueryResult> {
+    try {
+      return await runWrites(await this.lite(storeId), doSqlRunner(this.ctx.storage), m);
     } catch (e) {
       if (e instanceof StoreMismatch)
         return { ok: false, code: 'STORE_MISMATCH', message: e.message };

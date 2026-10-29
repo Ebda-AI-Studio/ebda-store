@@ -1,8 +1,8 @@
-import { prisma, Prisma } from '@ebda/database';
+import { Prisma } from '@ebda/database';
 import { toPublicSizeChart, type PublicSizeChart, type SizeChart } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 /**
  * Size charts (B0 Task 9). Store-owned tables linked from `products.size_chart_id` and
@@ -55,7 +55,9 @@ export async function assertSizeChartInStore(
   sizeChartId: string | null | undefined
 ): Promise<void> {
   if (!sizeChartId) return;
-  const found = await prisma.sizeChart.findFirst({
+  const found = await (
+    await storeDb(storeId)
+  ).sizeChart.findFirst({
     where: { id: sizeChartId, storeId },
     select: { id: true },
   });
@@ -98,8 +100,9 @@ function writeData(data: SizeChart) {
 }
 
 export class SizeChartService {
-  static list(storeId: string) {
-    return prisma.sizeChart.findMany({
+  static async list(storeId: string) {
+    const db = await storeDb(storeId);
+    return db.sizeChart.findMany({
       where: { storeId },
       orderBy: { createdAt: 'asc' },
       select: ADMIN_SELECT,
@@ -107,7 +110,8 @@ export class SizeChartService {
   }
 
   static async get(storeId: string, id: string) {
-    const chart = await prisma.sizeChart.findFirst({
+    const db = await storeDb(storeId);
+    const chart = await db.sizeChart.findFirst({
       where: { id, storeId },
       select: ADMIN_SELECT,
     });
@@ -116,7 +120,9 @@ export class SizeChartService {
   }
 
   static async create(storeId: string, data: SizeChart) {
-    const chart = await prisma.sizeChart.create({
+    const chart = await (
+      await storeWriter(storeId)
+    ).sizeChart.create({
       data: { storeId, ...writeData(data) },
       select: ADMIN_SELECT,
     });
@@ -126,12 +132,13 @@ export class SizeChartService {
   }
 
   static async update(storeId: string, id: string, data: SizeChart) {
-    const existing = await prisma.sizeChart.findFirst({
+    const w = await storeWriter(storeId);
+    const existing = await w.sizeChart.findFirst({
       where: { id, storeId },
       select: { id: true },
     });
     if (!existing) throw notFound();
-    const chart = await prisma.sizeChart.update({
+    const chart = await w.sizeChart.update({
       where: { id, storeId },
       data: writeData(data),
       select: ADMIN_SELECT,
@@ -142,13 +149,14 @@ export class SizeChartService {
   }
 
   static async delete(storeId: string, id: string) {
-    const existing = await prisma.sizeChart.findFirst({
+    const w = await storeWriter(storeId);
+    const existing = await w.sizeChart.findFirst({
       where: { id, storeId },
       select: { id: true },
     });
     if (!existing) throw notFound();
     // products.size_chart_id / categories.size_chart_id are ON DELETE SET NULL.
-    await prisma.sizeChart.delete({ where: { id, storeId } });
+    await w.sizeChart.delete({ where: { id, storeId } });
     await invalidateStoreProductCaches(storeId);
   }
 

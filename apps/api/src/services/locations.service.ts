@@ -1,7 +1,7 @@
-import { prisma, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
 import type { LocationInput } from '@ebda/shared';
 import { bustStoreCaches } from './store.service';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 export class LocationsService {
   static async list(storeId: string) {
@@ -21,22 +21,26 @@ export class LocationsService {
   }
 
   static async create(storeId: string, data: LocationInput) {
-    const location = await prisma.storeLocation.create({ data: { ...data, storeId } });
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+    const location = await w.storeLocation.create({ data: { ...data, storeId } });
     await LocationsService.bustFooterCache(storeId);
     return location;
   }
 
   static async update(storeId: string, id: string, data: Partial<LocationInput>) {
     // store-scope the update so a tenant can't touch another store's row by id
-    const res = await prisma.storeLocation.updateMany({ where: { id, storeId }, data });
+    const w = await storeWriter(storeId);
+    const res = await w.storeLocation.updateMany({ where: { id, storeId }, data });
     if (res.count === 0) return null;
-    const location = await prisma.storeLocation.findUnique({ where: { id, storeId } });
+    const location = await w.storeLocation.findUnique({ where: { id, storeId } });
     await LocationsService.bustFooterCache(storeId);
     return location;
   }
 
   static async remove(storeId: string, id: string) {
-    const res = await prisma.storeLocation.deleteMany({ where: { id, storeId } });
+    const res = await (
+      await storeWriter(storeId)
+    ).storeLocation.deleteMany({ where: { id, storeId } });
     if (res.count > 0) await LocationsService.bustFooterCache(storeId);
     return res.count > 0;
   }

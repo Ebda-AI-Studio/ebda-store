@@ -23,9 +23,14 @@
  * ISOLATION: the DO client is built per store id and the DO itself refuses any other store (StoreDO.bind), so a client
  * for store A can never read store B's rows.
  *
- * WHAT IS NOT HERE (PR D): writes, raw SQL, `$queryRaw`, interactive `$transaction`, aggregate/groupBy, row locks. The type
- * `StoreReads` offers only the read operations prisma-lite answers, so a service that compiles against it cannot call
- * anything else on either backend.
+ * WRITES (PR D1, Ruling CF-WRITES-1): `storeWriter(storeId)` is the write client for the NON-MONEY catalogue/content models
+ * (WritableModel below = DO_WRITABLE_MODELS in packages/repo/src/rpc/writes.ts; a unit test keeps the two equal). On 'pg'
+ * it is the `prisma` proxy (request transaction, tenant guard, RLS unchanged); on 'do' each call is ONE atomic `mutate`
+ * RPC and `$transaction([...], { idempotencyKey })` ships the whole batch as one atomic, replay-safe unit.
+ *
+ * WHAT IS NOT HERE (PR D2): raw SQL, `$queryRaw`, interactive `$transaction`, aggregate/groupBy, row locks, money/stock
+ * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
+ * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
@@ -33,6 +38,14 @@ import { prisma, type AppPrismaClient } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 
+type WriteOp =
+  | 'create'
+  | 'createMany'
+  | 'update'
+  | 'updateMany'
+  | 'upsert'
+  | 'delete'
+  | 'deleteMany';
 type ReadOp =
   | 'findMany'
   | 'findFirst'
@@ -48,10 +61,46 @@ export type StoreReads = {
     : never]: Pick<AppPrismaClient[K], Extract<keyof AppPrismaClient[K], ReadOp>>;
 };
 
+/** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
+export type WritableModel =
+  | 'product'
+  | 'productVariant'
+  | 'productOption'
+  | 'productOptionValue'
+  | 'productVariantOption'
+  | 'productImage'
+  | 'productCategory'
+  | 'productFaq'
+  | 'productRelation'
+  | 'productPriceTier'
+  | 'productTag'
+  | 'tag'
+  | 'category'
+  | 'blogPost'
+  | 'storePage'
+  | 'storePageRevision'
+  | 'storeLocation'
+  | 'sizeChart';
+/** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
+export type StoreWrites = {
+  [K in WritableModel]: Pick<
+    AppPrismaClient[K],
+    Extract<keyof AppPrismaClient[K], ReadOp | WriteOp>
+  >;
+} & {
+  /** Array form only. `idempotencyKey` is honoured by the DO (a replay returns the first result); Postgres ignores it. */
+  $transaction<T extends readonly PromiseLike<unknown>[]>(
+    ops: [...T],
+    opts?: { idempotencyKey?: string }
+  ): Promise<{ [I in keyof T]: Awaited<T[I]> }>;
+};
+
 export interface StoreRepo {
   storeId: string;
   backend: StoreBackend;
   db: StoreReads;
+  /** The write client (see StoreWrites). Resolved with the repo, so one flag read serves both. */
+  writer: StoreWrites;
 }
 
 type RequestLike = Pick<Request, 'headers'>;
@@ -64,6 +113,12 @@ const NO_REQUEST: RequestLike = { headers: {} };
 
 /** The StoreDO stub's read entry point (lib/store-backend.ts types the rest of the stub). */
 interface QueryStub {
+  mutate(
+    storeId: string,
+    m: { key?: string; ops: Array<{ model: string; op: string; args?: Record<string, unknown> }> }
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; message: string; json?: string }
+  >;
   query(
     storeId: string,
     queries: Array<{ model: string; op: string; args?: Record<string, unknown> }>
@@ -72,18 +127,35 @@ interface QueryStub {
   >;
 }
 
-async function doReads(storeId: string): Promise<StoreReads> {
+async function doClients(storeId: string): Promise<{ db: StoreReads; writer: StoreWrites }> {
   const stub = storeDo(storeId) as unknown as QueryStub; // 503 here when the binding is absent
   // Dynamic: the Node build cannot resolve the @ebda-src alias (apps/api/src/cf/repo-modules.d.ts); only a Worker with a
   // bound StoreDO ever reaches this line.
   const { createDoClient } = await import('@ebda-src/repo');
-  return createDoClient(queries => stub.query(storeId, queries as never)) as unknown as StoreReads;
+  const send = (queries: unknown[]) => stub.query(storeId, queries as never);
+  return {
+    // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
+    db: createDoClient(send as never) as unknown as StoreReads,
+    writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
+  };
+}
+
+/** pg writer: the `prisma` proxy, minus the DO-only second argument of `$transaction`. */
+function pgWriter(): StoreWrites {
+  return new Proxy({} as object, {
+    get(_t, prop) {
+      if (prop === '$transaction') return (ops: unknown) => (prisma as any).$transaction(ops);
+      return (prisma as any)[prop];
+    },
+  }) as unknown as StoreWrites;
 }
 
 async function resolve(storeId: string, req: RequestLike): Promise<StoreRepo> {
   const backend = await Promise.resolve(backendFor(storeId, req as Request)); // async once the D1 flag lands
-  if (backend === 'do') return { storeId, backend, db: await doReads(storeId) };
-  return { storeId, backend: 'pg', db: prisma as unknown as StoreReads };
+  if (backend === 'do') {
+    return { storeId, backend, ...(await doClients(storeId)) };
+  }
+  return { storeId, backend: 'pg', db: prisma as unknown as StoreReads, writer: pgWriter() };
 }
 
 /** The repo for a store: pg (default) or its Durable Object, per the store's flag. Memoised per request. */
@@ -105,6 +177,11 @@ export function storeRepo(storeId: string): Promise<StoreRepo> {
 /** The read client services use: `const db = await storeDb(storeId); db.blogPost.findMany(...)`. */
 export async function storeDb(storeId: string): Promise<StoreReads> {
   return (await storeRepo(storeId)).db;
+}
+
+/** The write client for a store's non-money catalogue/content models: `const w = await storeWriter(id); await w.blogPost.create(...)`. */
+export async function storeWriter(storeId: string): Promise<StoreWrites> {
+  return (await storeRepo(storeId)).writer;
 }
 
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */

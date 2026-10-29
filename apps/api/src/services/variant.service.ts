@@ -7,6 +7,7 @@ import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { throwIfBundleFkViolation } from '../lib/bundle-fk-errors';
 import { withSavepoint } from '../lib/savepoint';
+import { storeWriter } from '../lib/repo-factory';
 
 interface CreateOptionInput {
   name: string;
@@ -117,8 +118,9 @@ export class VariantService {
    * Add option to a product
    */
   static async addOption(storeId: string, productId: string, input: CreateOptionInput) {
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
     // Verify product exists
-    const product = await prisma.product.findFirst({
+    const product = await w.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { options: true },
     });
@@ -133,7 +135,7 @@ export class VariantService {
     }
 
     // Check for duplicate option name
-    const existingOption = await prisma.productOption.findFirst({
+    const existingOption = await w.productOption.findFirst({
       where: { productId, name: input.name },
     });
 
@@ -142,7 +144,7 @@ export class VariantService {
     }
 
     // Create option with values
-    const option = await prisma.productOption.create({
+    const option = await w.productOption.create({
       data: {
         productId,
         name: input.name,
@@ -165,7 +167,7 @@ export class VariantService {
 
     // Mark product as having variants if it's the first option
     if (!product.hasVariants) {
-      await prisma.product.update({
+      await w.product.update({
         where: { id: productId, storeId },
         data: { hasVariants: true },
       });
@@ -186,7 +188,8 @@ export class VariantService {
     optionId: string,
     input: { name?: string; nameAr?: string | null }
   ) {
-    const option = await prisma.productOption.findFirst({
+    const w = await storeWriter(storeId);
+    const option = await w.productOption.findFirst({
       where: {
         id: optionId,
         product: { id: productId, storeId, deletedAt: null },
@@ -197,7 +200,7 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option not found');
     }
 
-    return prisma.productOption.update({
+    return w.productOption.update({
       where: { id: optionId },
       data: {
         name: input.name,

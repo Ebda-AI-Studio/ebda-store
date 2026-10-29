@@ -46,7 +46,7 @@ import {
   searchProductIds,
 } from './product-search.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
-import { storeDb } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -1140,7 +1140,9 @@ export class ProductService {
       return { count: 0 };
     }
 
-    const result = await prisma.product.updateMany({
+    const result = await (
+      await storeWriter(storeId)
+    ).product.updateMany({
       where: { storeId, id: { in: safeIds }, deletedAt: null },
       data: { lowStockThreshold: threshold },
     });
