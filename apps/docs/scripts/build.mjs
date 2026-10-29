@@ -212,12 +212,6 @@ for (const p of waEn) {
     bodyHtml: html,
   });
 }
-const arNav = [
-  { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
-  { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
-  { href: `https://${BRAND.domains.help}`, label: 'مركز المساعدة' },
-  { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
-];
 const arFooter = renderFooter({
   copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
   links: [{ href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail }],
@@ -256,7 +250,7 @@ for (const p of waAr) {
       ],
       siteLabel: 'وثائق المطوّرين',
       homeHref: '/ar/',
-      nav: arNav,
+      active: 'docs',
       langSwitch: { href: url(p.slug), label: 'English', lang: 'en' },
       search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
       sidebar: arWaSidebar(p.slug),
