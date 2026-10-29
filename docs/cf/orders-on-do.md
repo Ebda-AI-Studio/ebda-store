@@ -61,6 +61,10 @@ Other transitions (`confirmed`, `processing`, `shipped`, `delivered`) move no st
    - Refused loudly (501), never dropped, because the engine cannot honour them yet: a delivery slot (`DELIVERY_SLOT_NOT_ON_DO`) and a personalisation note (`PERSONALISATION_NOT_ON_DO`); a missing required personalisation is `PERSONALISATION_REQUIRED` 400 as on Postgres.
 6. A quote (`dryRun`) for a DO store answers 501 `QUOTE_NOT_ON_DO` (the engine has no dry run; the gate forbids a flip until it does).
 
+## PR D2b-4a (Ruling CF-FINAL-1)
+
+`orderStatus` (confirmed/processing/shipped/delivered, COD settled on delivery, fanout armed), `quoteOrder` (dry run, writes nothing), an atomic cart claim inside `createOrder` (`cartClaim`, `_cart_claims`), the delivery date note and the per-line personalisation text now run on the DO; the residuals below about the cart claim, delivery slots, personalisation and the status fanout arming are CLOSED. What is still open is the machine-checked list `docs/cf/not-on-do.json`.
+
 ## Residuals and follow-ups (the flip gate stays closed)
 
 - Carts (`carts`, `cart_items`, `cart_bundles`) and the abandoned-cart table are still read and cleared on Postgres; the order is created on the DO from the cart's lines and bundles (CF-ORDERS-CART-1). Until carts move, the cart claim is not atomic with the order: two concurrent submits of one cart without a key can both read the full cart (the engine's own `cart` claim exists and is tested, `money-stock.test.ts`, but is not used from the Worker). A keyed retry is safe (the key is hashed with the cart id).

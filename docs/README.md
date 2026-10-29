@@ -88,6 +88,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
 - [cf/payments-on-do.md](cf/payments-on-do.md) - Payments, webhooks, refunds, ledger and gold repricing on the store Durable Object (INFRA-CF-1 PR D2b-3)
+- [cf/not-on-do.json](cf/not-on-do.json) - The flip-gate inventory: every refusal and Postgres-only flow of a Durable Object store (INFRA-CF-1 PR D2b-4, `node scripts/cf/not-on-do.mjs`)
 - [cf/repo-factory.md](cf/repo-factory.md) - Repo factory: reads on the store's backend (INFRA-CF-1 PR C, Ruling CF-REPO-1)
 
 ## contracts - Service and API contracts

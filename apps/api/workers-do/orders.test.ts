@@ -182,4 +182,53 @@ describe('StoreDO.moneyOp orders', () => {
     expect(stock).toBe(status === 'cancelled' ? 5 : 4);
     expect(answers.length).toBe(20);
   });
+
+  // PR D2b-4 (Ruling CF-FINAL-1)
+  it('40 concurrent submits of one cart state create exactly one order (the cart claim, no row lock)', async () => {
+    const stub = await seed('ord-cart', 100);
+    const answers = await Promise.all(
+      Array.from({ length: 40 }, () =>
+        op(
+          stub,
+          'ord-cart',
+          'createOrder',
+          order({ cartClaim: { id: 'cart-1', fingerprint: 'v1' } })
+        )
+      )
+    );
+    expect(codes(answers)).toEqual({ ok: 1, CART_CHANGED: 39 });
+    expect(await num(stub, `SELECT count(*) AS n FROM orders`)).toBe(1);
+    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(99);
+    const again = await op(
+      stub,
+      'ord-cart',
+      'createOrder',
+      order({ cartClaim: { id: 'cart-1', fingerprint: 'v2' } })
+    );
+    expect(again.ok).toBe(true); // a changed cart is a new purchase
+  });
+
+  it('30 concurrent deliveries of one COD order settle the payment once and write one event', async () => {
+    const stub = await seed('ord-deliver', 5);
+    const first = await op(stub, 'ord-deliver', 'createOrder', order({ paymentMethod: 'cod' }));
+    if (!first.ok) throw new Error('seed order refused');
+    const placed = decodeRpc<{ orderId: string; total: number }>(first.json);
+    await op(stub, 'ord-deliver', 'paymentCreate', {
+      orderId: placed.orderId,
+      provider: 'cod',
+      amount: placed.total,
+    });
+    const answers = await Promise.all(
+      Array.from({ length: 30 }, () =>
+        op(stub, 'ord-deliver', 'orderStatus', { orderId: placed.orderId, status: 'delivered' })
+      )
+    );
+    expect(answers.every(a => a.ok)).toBe(true);
+    expect(
+      await num(stub, `SELECT count(*) AS n FROM payment_events WHERE event_type = 'status_change'`)
+    ).toBe(1);
+    expect(await num(stub, `SELECT count(*) AS n FROM payments WHERE status = 'completed'`)).toBe(
+      1
+    );
+  });
 });
