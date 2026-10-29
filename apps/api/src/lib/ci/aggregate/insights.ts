@@ -36,7 +36,7 @@ const pct = (r: number) => `${Math.round(r * 1000) / 10}%`;
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 
 function cut(cohort: Cohort, metric: Metric, key: string) {
-  const c = cohort.metrics[metric][key];
+  const c = cohort.metrics[metric]?.[key];
   return live(c) ? c : undefined;
 }
 
@@ -143,7 +143,7 @@ export function generateInsights(cohort: Cohort): InsightDraft[] {
   const amtBase = cut(cohort, 'cod_return_by_amount', ANY);
   if (amtBase) {
     const baseRate = amtBase.hit / amtBase.n;
-    for (const [key, c] of Object.entries(cohort.metrics.cod_return_by_amount)) {
+    for (const [key, c] of Object.entries(cohort.metrics.cod_return_by_amount ?? {})) {
       if (!live(c) || key === ANY) continue;
       const lb = wilsonLower(c.hit, c.n);
       if (lb > baseRate) {
@@ -163,6 +163,64 @@ export function generateInsights(cohort: Cohort): InsightDraft[] {
             },
           },
           'elevated'
+        );
+      }
+    }
+  }
+
+  // Shipping fee: a fee band whose COD return rate clears the overall COD rate (the fee hint's source, CI-13).
+  const feeBase = cut(cohort, 'return_by_shipping_fee', ANY);
+  if (feeBase) {
+    const baseRate = feeBase.hit / feeBase.n;
+    for (const [key, c] of Object.entries(cohort.metrics.return_by_shipping_fee ?? {})) {
+      if (!live(c) || key === ANY) continue;
+      const lb = wilsonLower(c.hit, c.n);
+      if (lb > baseRate) {
+        push(
+          {
+            metric: 'return_by_shipping_fee',
+            cohort: key,
+            finding: `COD orders in shipping-fee band ${key} return more: ${pct(c.hit / c.n)} of ${c.n} (all COD ${pct(baseRate)}).`,
+            findingAr: `طلبات الدفع عند الاستلام في شريحة الشحن ${key} ترجع أكتر: ${pct(c.hit / c.n)} من ${c.n} (المتوسط ${pct(baseRate)}).`,
+            evidence: {
+              n: c.n,
+              stores: c.stores,
+              rate: round3(c.hit / c.n),
+              baselineRate: round3(baseRate),
+              bound: round3(lb),
+              asOf: cohort.asOf,
+            },
+          },
+          'elevated'
+        );
+      }
+    }
+  }
+
+  // Online payments: a provider whose failure rate clears the platform's.
+  const payBase = cut(cohort, 'payment_failure', ANY);
+  if (payBase) {
+    const baseRate = payBase.hit / payBase.n;
+    for (const [key, c] of Object.entries(cohort.metrics.payment_failure ?? {})) {
+      if (!live(c) || key === ANY) continue;
+      const lb = wilsonLower(c.hit, c.n);
+      if (lb > baseRate) {
+        push(
+          {
+            metric: 'payment_failure',
+            cohort: key,
+            finding: `Payments through ${key} fail more: ${pct(c.hit / c.n)} of ${c.n} (platform ${pct(baseRate)}).`,
+            findingAr: `الدفع عن طريق ${key} بيفشل أكتر: ${pct(c.hit / c.n)} من ${c.n} (المتوسط ${pct(baseRate)}).`,
+            evidence: {
+              n: c.n,
+              stores: c.stores,
+              rate: round3(c.hit / c.n),
+              baselineRate: round3(baseRate),
+              bound: round3(lb),
+              asOf: cohort.asOf,
+            },
+          },
+          'failing'
         );
       }
     }

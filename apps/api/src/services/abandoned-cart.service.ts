@@ -30,6 +30,8 @@ import {
 } from './cart-recovery-email.service';
 import logger from '../lib/logger';
 import { sendEventAfterCommit } from '../lib/inngest/send-after-commit';
+import { CI_CART_REMINDER_EVENT } from '../lib/ci/events';
+import { sendCartRecoveredToCi } from '../lib/ci/emit';
 import crypto from 'crypto';
 import { config } from '../config';
 import type { NotificationData, NotificationEvent } from '@ebda/shared';
@@ -535,6 +537,22 @@ class AbandonedCartService {
       where: { id: abandonedCart.id, storeId },
       data: updateData,
     });
+
+    // CI-13: the reminder went out (the dispatcher routes push/SMS/WhatsApp per store). Never fails the sweep.
+    await sendEventAfterCommit(
+      'ci-cart-reminder',
+      {
+        name: CI_CART_REMINDER_EVENT,
+        data: {
+          storeId,
+          abandonedCartId: abandonedCart.id,
+          channel: 'notification',
+          step: stepNumber,
+          at: new Date().toISOString(),
+        },
+      },
+      { ifUnhookable: 'send' }
+    );
   }
 
   // ──────────────────────────────────────────
@@ -617,6 +635,7 @@ class AbandonedCartService {
       },
     });
 
+    await sendCartRecoveredToCi(currentStoreId(), abandonedCartId, orderId);
     logger.info({ abandonedCartId, orderId }, '[AbandonedCart] Cart marked as recovered');
   }
 

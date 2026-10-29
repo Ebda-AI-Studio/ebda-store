@@ -655,6 +655,25 @@ export const ciHintLogs = sqliteTable('ci_hint_logs', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const ciStoreGates = sqliteTable('ci_store_gates', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  feature: text('feature').notNull(),
+  band: text('band').notNull(),
+  predictedRate: real('predicted_rate').notNull(),
+  actualRate: real('actual_rate').notNull(),
+  resolved: integer('resolved').notNull(),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const codRemittances = sqliteTable('cod_remittances', {
   id: text('id')
     .primaryKey()

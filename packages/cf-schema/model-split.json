@@ -483,6 +483,10 @@
     "target": "store-do",
     "reason": "storeId-scoped, written when a hint is shown on this store's order, read in one store context"
   },
+  "CiStoreGate": {
+    "target": "store-do",
+    "reason": "storeId-scoped pause state written by the weekly calibration in this store's own scope, read in one store context on every hint"
+  },
   "CountSession": {
     "target": "store-do",
     "reason": "storeId-scoped, read only in one store context"

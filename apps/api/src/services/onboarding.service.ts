@@ -10,6 +10,7 @@
  * COD payment config, subscription).
  */
 import { recordReferral } from './billing/grants.service';
+import { sendOnboardingStepToCi } from '../lib/ci/emit';
 import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
   getLook,
@@ -281,6 +282,7 @@ export class OnboardingService {
             )
           );
         }
+        await sendOnboardingStepToCi(result.store.id, 'store_created');
         // Only a failed look application is reported (the default look is applied like a chosen one).
         const lookApplied = await this.applyChosenLook(result.store.id, look.id, owner.userId);
         return { store: result.store, lookApplied };
@@ -364,6 +366,7 @@ export class OnboardingService {
       });
     }
     await SetupGuideService.setManual(storeId, 'payment', true);
+    await sendOnboardingStepToCi(storeId, 'payment_methods');
     return { cod: methods.cod };
   }
 
@@ -391,6 +394,7 @@ export class OnboardingService {
         tx.store.update({ where: { id: storeId }, data: { status: 'active' } })
       );
       await bustStoreCaches(store.id, store.slug, store.domain);
+      await sendOnboardingStepToCi(store.id, 'went_live');
     }
     return {
       id: store.id,

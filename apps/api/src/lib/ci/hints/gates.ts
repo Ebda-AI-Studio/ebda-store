@@ -58,3 +58,44 @@ export async function setGate(
   });
   return parse(feature, value);
 }
+
+// ---------------------------------------------------------------- per-store gate (Ruling CI-13)
+
+/**
+ * A store's own auto-gate: a row in `ci_store_gates` means THAT store's hints for `feature` are paused
+ * because its own calibration was off. Staleness class NEVER-stale like the platform gate (a paused hint
+ * must stop on the next request): read straight from the database, no cache. Callers run in the store's
+ * tenant context, so the read is scoped by RLS and by the explicit `storeId`.
+ */
+export interface StoreGateRow {
+  feature: string;
+  band: string;
+  predictedRate: number;
+  actualRate: number;
+  resolved: number;
+  closedAt: Date;
+}
+
+export async function storeGateClosed(storeId: string, feature: CiHintFeature): Promise<boolean> {
+  const row = await prisma.ciStoreGate.findFirst({
+    where: { storeId, feature },
+    select: { id: true },
+  });
+  return row != null;
+}
+
+export async function storeGates(storeId: string): Promise<StoreGateRow[]> {
+  return prisma.ciStoreGate.findMany({
+    where: { storeId },
+    orderBy: { feature: 'asc' },
+    select: {
+      feature: true,
+      band: true,
+      predictedRate: true,
+      actualRate: true,
+      resolved: true,
+      closedAt: true,
+    },
+    take: CI_HINT_FEATURES.length,
+  });
+}

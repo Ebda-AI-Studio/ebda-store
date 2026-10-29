@@ -165,6 +165,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       customerRfmSnapshots: 'CustomerRfmSnapshot',
       productDailyViews: 'ProductDailyView',
       qrScanDaily: 'QrScanDaily',
+      ciStoreGates: 'CiStoreGate',
       ciHintLogs: 'CiHintLog',
       paymentEvents: 'PaymentEvent',
       orderEvents: 'OrderEvent',
@@ -1336,6 +1337,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       store: 'Store',
       order: 'Order',
+    },
+  },
+  {
+    name: 'CiStoreGate',
+    table: 'ci_store_gates',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {

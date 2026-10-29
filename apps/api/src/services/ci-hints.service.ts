@@ -12,13 +12,20 @@ import { loadHintData } from '../lib/ci/hints/data';
 import { codRiskHint, type BuyerHistory, type CodRiskHint } from '../lib/ci/hints/cod-risk';
 import { rankCouriers } from '../lib/ci/hints/courier';
 import { feeHint } from '../lib/ci/hints/fee';
-import { allGates, gateState, type CiHintFeature } from '../lib/ci/hints/gates';
+import {
+  allGates,
+  gateState,
+  storeGateClosed,
+  storeGates,
+  type CiHintFeature,
+} from '../lib/ci/hints/gates';
 import { AppError } from '../middleware/error-handler';
 
-/** Never call a hint without both the merchant's switch and the platform gate. */
+/** Never call a hint without the merchant's switch, the platform gate AND this store's own auto-gate (CI-13). */
 async function enabled(storeId: string, feature: CiHintFeature): Promise<boolean> {
   if (!(await featureService.isFeatureEnabled(storeId, 'customer_intelligence'))) return false;
-  return (await gateState(feature)).enabled;
+  if (!(await gateState(feature)).enabled) return false;
+  return !(await storeGateClosed(storeId, feature));
 }
 
 async function buyerHistory(
@@ -84,20 +91,32 @@ export interface CiOverview {
   hintsEnabled: boolean;
   ciSharing: boolean;
   gates: Array<{ feature: CiHintFeature; enabled: boolean }>;
+  /** Features paused for THIS store because its own hints were off (Ruling CI-13). */
+  pausedForStore: Array<{
+    feature: string;
+    band: string;
+    predictedRate: number;
+    actualRate: number;
+    resolved: number;
+  }>;
   fee: ReturnType<typeof feeHint> | null;
   aggregates: { storeAsOf: string | null; cohortAsOf: string | null };
   shown30d: Array<{ feature: string; band: string; count: number }>;
 }
 
 export async function ciOverview(storeId: string): Promise<CiOverview> {
-  const [hintsEnabled, store, gates] = await Promise.all([
+  const [hintsEnabled, store, gates, paused] = await Promise.all([
     featureService.isFeatureEnabled(storeId, 'customer_intelligence'),
     prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } }),
     allGates(),
+    storeGates(storeId),
   ]);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   const data = await loadHintData(storeId);
-  const feeOpen = hintsEnabled && (gates.find(g => g.feature === 'fee')?.enabled ?? true);
+  const feeOpen =
+    hintsEnabled &&
+    (gates.find(g => g.feature === 'fee')?.enabled ?? true) &&
+    !paused.some(p => p.feature === 'fee');
   const since = new Date(Date.now() - 30 * 86_400_000);
   const rows = await prisma.ciHintLog.groupBy({
     by: ['feature', 'band'],
@@ -108,6 +127,7 @@ export async function ciOverview(storeId: string): Promise<CiOverview> {
     hintsEnabled,
     ciSharing: store.ciSharing,
     gates: gates.map(g => ({ feature: g.feature, enabled: g.enabled })),
+    pausedForStore: paused.map(({ closedAt: _closedAt, ...p }) => p),
     fee: feeOpen ? feeHint(data) : null,
     aggregates: { storeAsOf: data.window?.asOf ?? null, cohortAsOf: data.cohort?.asOf ?? null },
     shown30d: rows.map(r => ({ feature: r.feature, band: r.band, count: r._count._all })),

@@ -4,14 +4,25 @@ import { inngest } from '../client';
 import { suiteBuyerKeySecret } from '../../wa/config';
 import { commerceOutcomesPort, type CommerceOutcomesPort } from '../../ci/port';
 import {
+  planCartReminder,
+  planCartRecovered,
+  planOnboardingStep,
   planOrderCreated,
   planOrderStatusChanged,
+  planPaymentFailed,
   planShipmentBooked,
   planShipmentUpdated,
   type PlanCtx,
 } from '../../ci/planner';
 import { prismaCiSource } from '../../ci/source';
-import { CI_SHIPMENT_BOOKED_EVENT, CI_SHIPMENT_TRACKED_EVENT } from '../../ci/events';
+import {
+  CI_CART_RECOVERED_EVENT,
+  CI_CART_REMINDER_EVENT,
+  CI_ONBOARDING_STEP_EVENT,
+  CI_PAYMENT_FAILED_EVENT,
+  CI_SHIPMENT_BOOKED_EVENT,
+  CI_SHIPMENT_TRACKED_EVENT,
+} from '../../ci/events';
 
 /**
  * Customer Intelligence capture (CI-1): turns the Store's existing domain events into append-only
@@ -41,7 +52,15 @@ export async function emitCiOutcomesFor(
           ? await planShipmentBooked(ctx, d)
           : event.name === CI_SHIPMENT_TRACKED_EVENT
             ? await planShipmentUpdated(ctx, d)
-            : [];
+            : event.name === CI_PAYMENT_FAILED_EVENT
+              ? await planPaymentFailed(ctx, d)
+              : event.name === CI_CART_REMINDER_EVENT
+                ? await planCartReminder(ctx, d)
+                : event.name === CI_CART_RECOVERED_EVENT
+                  ? await planCartRecovered(ctx, d)
+                  : event.name === CI_ONBOARDING_STEP_EVENT
+                    ? await planOnboardingStep(ctx, d)
+                    : [];
   await (deps.port ?? commerceOutcomesPort()).emit(planned);
   return planned.length;
 }
@@ -56,6 +75,10 @@ export const ciOutcomes: JobDef = inngest.createFunction(
       { event: 'order/status-changed' },
       { event: CI_SHIPMENT_TRACKED_EVENT },
       { event: CI_SHIPMENT_BOOKED_EVENT },
+      { event: CI_PAYMENT_FAILED_EVENT },
+      { event: CI_CART_REMINDER_EVENT },
+      { event: CI_CART_RECOVERED_EVENT },
+      { event: CI_ONBOARDING_STEP_EVENT },
     ],
   },
   async ({ event, step }) => {

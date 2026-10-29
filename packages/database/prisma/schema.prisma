@@ -479,6 +479,7 @@ model Store {
   customerRfmSnapshots       CustomerRfmSnapshot[]
   productDailyViews          ProductDailyView[]
   qrScanDaily                QrScanDaily[]
+  ciStoreGates               CiStoreGate[]
   ciHintLogs                 CiHintLog[]
   paymentEvents              PaymentEvent[]
   orderEvents                OrderEvent[]
@@ -4844,6 +4845,26 @@ model CiHintLog {
   @@index([storeId, createdAt(sort: Desc)])
   @@index([feature, outcome, createdAt])
   @@map("ci_hint_logs")
+}
+
+/// Per-store auto-gate (Ruling CI-13): a row means THIS store's hints for `feature` are paused because
+/// its own calibration was off by more than 10 points. Written only by the weekly calibration job in
+/// the store's own scope; never read across stores and never touches the platform gate.
+model CiStoreGate {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  feature       String   @db.VarChar(24)
+  band          String   @db.VarChar(16)
+  predictedRate Float    @map("predicted_rate")
+  actualRate    Float    @map("actual_rate")
+  resolved      Int
+  closedAt      DateTime @default(now()) @map("closed_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, feature])
+  @@map("ci_store_gates")
 }
 
 // Answer Engine Insights (AEO) — Google Search Console daily metrics.

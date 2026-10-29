@@ -2,6 +2,7 @@ import { acrossStores, prisma } from '@ebda/database';
 import logger from '../lib/logger';
 import {
   evaluateCalibration,
+  evaluateStoreGates,
   type CalibrationResult,
   type CalibrationRow,
 } from '../lib/ci/hints/calibration';
@@ -78,6 +79,50 @@ export async function resolveAndSummarise(
   return [...rows.values()];
 }
 
+/**
+ * Per-store auto-gating (Ruling CI-13). Runs inside the store's own tenant scope with that store's rows
+ * only: a feature whose OWN hints were off by more than 10 points (>= 30 resolved) gets a `ci_store_gates`
+ * row, which pauses that feature for that store alone; a paused feature whose own numbers are no longer off
+ * (or have aged out of the 90-day window, since a paused feature logs nothing new) is reopened. Never writes
+ * the platform gate and never reads another store.
+ */
+export async function applyStoreGates(
+  storeId: string,
+  rows: CalibrationRow[]
+): Promise<{ closed: string[]; reopened: string[] }> {
+  const verdicts = evaluateStoreGates(rows.filter(r => r.storeId === storeId));
+  const existing = await prisma.ciStoreGate.findMany({
+    where: { storeId },
+    select: { feature: true },
+    take: 50,
+  });
+  const paused = new Set(existing.map(e => e.feature));
+  const closed: string[] = [];
+  for (const v of verdicts.filter(x => x.off)) {
+    const data = {
+      band: v.band!,
+      predictedRate: v.predicted!,
+      actualRate: v.actual!,
+      resolved: v.resolved,
+    };
+    await prisma.ciStoreGate.upsert({
+      where: { storeId_feature: { storeId, feature: v.feature } },
+      create: { storeId, feature: v.feature, ...data },
+      update: data,
+    });
+    if (!paused.has(v.feature)) closed.push(v.feature);
+  }
+  const stillOff = new Set(verdicts.filter(v => v.off).map(v => v.feature));
+  const reopened = [...paused].filter(f => !stillOff.has(f));
+  if (reopened.length) {
+    await prisma.ciStoreGate.deleteMany({ where: { storeId, feature: { in: reopened } } });
+  }
+  if (closed.length || reopened.length) {
+    logger.info({ storeId, closed, reopened }, '[ci-calibration] store gate changed');
+  }
+  return { closed, reopened };
+}
+
 export interface CalibrationDeps {
   collect(): Promise<CalibrationRow[]>;
   alert(feature: string, reason: string): Promise<unknown>;
@@ -85,10 +130,20 @@ export interface CalibrationDeps {
 
 const defaultDeps: CalibrationDeps = {
   async collect() {
-    const per = await acrossStores(id => resolveAndSummarise(id), {
-      onStoreError: (storeId, err) =>
-        logger.error({ err, storeId }, '[ci-calibration] store failed'),
-    });
+    const per = await acrossStores(
+      async id => {
+        const rows = await resolveAndSummarise(id);
+        // One store's gating failing must not lose its rows for the platform check.
+        await applyStoreGates(id, rows).catch(err =>
+          logger.error({ err, storeId: id }, '[ci-calibration] store gate failed')
+        );
+        return rows;
+      },
+      {
+        onStoreError: (storeId, err) =>
+          logger.error({ err, storeId }, '[ci-calibration] store failed'),
+      }
+    );
     return per.flatMap(p => p.value);
   },
   alert: (feature, reason) =>

@@ -108,10 +108,16 @@ describe('evaluateCalibration', () => {
     expect(evaluateCalibration(spread('elevated', 5, 5, 0.1))[0]).toMatchObject({
       evaluated: false,
     }); // 25 total
+    // 30 total; an exact 10-point gap is NOT off (CI-13: 0.1 * 30 / 30 floats to 0.10000000000000002,
+    // which used to read as "more than 10 points"), 12 points is.
     expect(evaluateCalibration(spread('elevated', 6, 0, 0.1))[0]).toMatchObject({
       evaluated: true,
+      off: false,
+    });
+    expect(evaluateCalibration(spread('elevated', 6, 0, 0.12))[0]).toMatchObject({
+      evaluated: true,
       off: true,
-    }); // 30 total
+    });
     expect(evaluateCalibration(spread('elevated', 20, 2, 0.1))[0]).toMatchObject({ off: false }); // exactly 10 points
     expect(evaluateCalibration(spread('elevated', 20, 5, 0.1))[0]).toMatchObject({ off: true });
   });

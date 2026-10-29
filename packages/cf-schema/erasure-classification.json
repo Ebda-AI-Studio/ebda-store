@@ -1441,6 +1441,14 @@
     "subjectKeys": [],
     "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
   },
+  "store-do:ci_store_gates": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "a feature name, a band and three numbers per store: no buyer key, phone or text; goes with the store (CASCADE)"
+  },
   "store-do:ci_hint_logs": {
     "db": "store-do",
     "class": "no-pii",

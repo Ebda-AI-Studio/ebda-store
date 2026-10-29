@@ -22,6 +22,7 @@ function order(over: Partial<CiOrderFacts> = {}): CiOrderFacts {
     id: ORDER,
     storeId: STORE,
     totalMinor: 150000,
+    shippingMinor: 6000,
     currency: 'EGP',
     channel: 'web',
     status: 'pending',
@@ -31,7 +32,14 @@ function order(over: Partial<CiOrderFacts> = {}): CiOrderFacts {
     phoneE164: PHONE,
     area: { areaKey: 'EG-C-nasr-city', level: 'district' },
     payments: [
-      { provider: 'cod', method: null, status: 'cod_pending', paidAt: null, failureReason: null },
+      {
+        id: 'p1',
+        provider: 'cod',
+        method: null,
+        status: 'cod_pending',
+        paidAt: null,
+        failureReason: null,
+      },
     ],
     transitions: [],
     shipment: null,
@@ -70,6 +78,8 @@ function src(
     priorOrdersByBuyer: vi.fn(async () => 0),
     stampOrder: vi.fn(async () => undefined),
     storeCiSharing: vi.fn(async () => false),
+    abandonedCart: vi.fn(async () => null),
+    storeSetup: vi.fn(async () => null),
   } as never;
 }
 const ctx = (s: CiSource) => ({ source: s, secret: SECRET });
@@ -317,6 +327,7 @@ describe('shipments', () => {
       hoursSincePickup: 7,
       attempts: 1,
       areaKey: 'EG-C-nasr-city',
+      shippingFeeMinor: 6000, // the order's real shipping fee, not the COD amount (CI-13)
     });
     expect(new Set(out.map(o => o.seed)).size).toBe(3);
   });
@@ -341,6 +352,7 @@ describe('shipments', () => {
       attempts: 2,
       hoursSincePickup: 9,
       areaKey: 'EG-C-nasr-city',
+      shippingFeeMinor: 6000,
     });
   });
 

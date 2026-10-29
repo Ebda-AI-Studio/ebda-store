@@ -135,7 +135,7 @@ export function buildCohort(windows: StoreWindow[], asOf: string): Cohort {
   for (const m of METRICS) {
     const acc = new Map<string, { cell: Cell; perStore: number[] }>();
     for (const w of windows) {
-      for (const [key, c] of Object.entries(w.shared[m])) {
+      for (const [key, c] of Object.entries(w.shared[m] ?? {})) {
         const a = acc.get(key) ?? {
           cell: { n: 0, hit: 0, sum: 0, first: c.first, last: c.last },
           perStore: [],

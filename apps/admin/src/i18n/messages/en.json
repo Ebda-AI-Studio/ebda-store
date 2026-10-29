@@ -10665,7 +10665,7 @@
     "saveFailed": "Could not save that change. Try again.",
     "hints": {
       "title": "Show smart hints",
-      "body": "A COD risk note on each order, which courier has delivered best to an area, and a COD amount suggestion. Every hint shows how many orders it rests on.",
+      "body": "A COD risk note on each order, which courier has delivered best to an area, and a shipping-fee suggestion. Every hint shows how many orders it rests on.",
       "on": "Hints are on for this store.",
       "off": "Hints are off. Nothing is shown until you switch them on."
     },
@@ -10674,9 +10674,9 @@
       "body": "If you agree, your store's numbers (never a name, phone number, email or address) are counted together with other stores so the hints get more accurate for everyone. Nobody sees your store or any of your customers, and you can stop this at any time. It is off until you switch it on."
     },
     "fee": {
-      "title": "COD amount suggestion",
-      "suggestion": "COD orders above {amount} come back {rate} of the time ({base} on average, from {n} orders). Think about asking for an InstaPay deposit above that amount.",
-      "none": "No amount band is returning clearly more than the rest."
+      "title": "Shipping fee suggestion",
+      "suggestion": "COD orders with a shipping fee of {amount} or more come back {rate} of the time ({base} on average, from {n} orders). Think about lowering the shipping fee or asking for an InstaPay deposit on those orders.",
+      "none": "No shipping-fee band is returning clearly more than the rest."
     },
     "notEnough": "Not enough data yet. Hints appear once enough orders have been delivered or returned.",
     "status": {
@@ -10690,8 +10690,12 @@
       "features": {
         "cod_risk": "COD risk",
         "courier": "Courier",
-        "fee": "Amount"
+        "fee": "Shipping fee"
       }
+    },
+    "paused": {
+      "title": "Paused for your store",
+      "item": "{feature}: this hint predicted {predicted} but {actual} actually happened over {resolved} of your orders, so it is paused for your store only. It switches itself back on once your own numbers line up again."
     },
     "bands": {
       "typical": "Typical",
@@ -10744,7 +10748,7 @@
       "features": {
         "cod_risk": "COD risk note",
         "courier": "Courier suggestion",
-        "fee": "COD amount card"
+        "fee": "Shipping fee card"
       }
     }
   }

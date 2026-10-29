@@ -1408,6 +1408,13 @@
           "optional": false,
           "external": true
         },
+        "ciStoreGates": {
+          "kind": "relation",
+          "type": "CiStoreGate",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
         "ciHintLogs": {
           "kind": "relation",
           "type": "CiHintLog",
@@ -17430,6 +17437,94 @@
           "owner": true,
           "from": ["order_id"],
           "fromProps": ["orderId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "CiStoreGate": {
+      "table": "ci_store_gates",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["storeId", "feature"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "feature": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "feature",
+          "list": false,
+          "optional": false
+        },
+        "band": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "band",
+          "list": false,
+          "optional": false
+        },
+        "predictedRate": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "predicted_rate",
+          "list": false,
+          "optional": false
+        },
+        "actualRate": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "actual_rate",
+          "list": false,
+          "optional": false
+        },
+        "resolved": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "resolved",
+          "list": false,
+          "optional": false
+        },
+        "closedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "closed_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "Cascade"

@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
   shipCount: vi.fn(),
   createMany: vi.fn(),
   load: vi.fn(),
+  storeGate: vi.fn(),
+  storeGates: vi.fn(),
 }));
 vi.mock('@ebda/database', () => ({
   prisma: {
@@ -19,7 +21,12 @@ vi.mock('@ebda/database', () => ({
 vi.mock('../../apps/api/src/services/feature.service', () => ({
   featureService: { isFeatureEnabled: h.feature },
 }));
-vi.mock('../../apps/api/src/lib/ci/hints/gates', () => ({ gateState: h.gate, allGates: vi.fn() }));
+vi.mock('../../apps/api/src/lib/ci/hints/gates', () => ({
+  gateState: h.gate,
+  allGates: vi.fn(),
+  storeGateClosed: h.storeGate,
+  storeGates: h.storeGates,
+}));
 vi.mock('../../apps/api/src/lib/ci/hints/data', () => ({ loadHintData: h.load }));
 
 import { courierSuggestion, orderCodRisk } from '../../apps/api/src/services/ci-hints.service';
@@ -50,6 +57,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.feature.mockResolvedValue(true);
   h.gate.mockResolvedValue({ enabled: true });
+  h.storeGate.mockResolvedValue(false);
+  h.storeGates.mockResolvedValue([]);
 });
 
 describe('orderCodRisk', () => {
@@ -58,6 +67,13 @@ describe('orderCodRisk', () => {
     expect(await orderCodRisk(ST, OR)).toEqual({ enabled: false });
     h.gate.mockResolvedValueOnce({ enabled: false });
     expect(await orderCodRisk(ST, OR)).toEqual({ enabled: false });
+    expect(h.order).not.toHaveBeenCalled();
+  });
+
+  it("is off when THIS store's own auto-gate is closed, and reads nothing then (CI-13)", async () => {
+    h.storeGate.mockResolvedValueOnce(true);
+    expect(await orderCodRisk(ST, OR)).toEqual({ enabled: false });
+    expect(h.storeGate).toHaveBeenCalledWith(ST, 'cod_risk');
     expect(h.order).not.toHaveBeenCalled();
   });
 

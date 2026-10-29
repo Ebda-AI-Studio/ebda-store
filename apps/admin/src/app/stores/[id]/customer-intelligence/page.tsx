@@ -23,6 +23,14 @@ interface Overview {
   ciSharing: boolean;
   gates: Array<{ feature: string; enabled: boolean }>;
   fee: FeeHint | null;
+  /** Features paused for THIS store because its own hints were off (Ruling CI-13). */
+  pausedForStore: Array<{
+    feature: string;
+    band: string;
+    predictedRate: number;
+    actualRate: number;
+    resolved: number;
+  }>;
   aggregates: { storeAsOf: string | null; cohortAsOf: string | null };
   shown30d: Array<{ feature: string; band: string; count: number }>;
 }
@@ -64,7 +72,7 @@ function Switch({
 
 /**
  * Smart hints (Customer Intelligence, CI-3, Ruling CI-10). The merchant's own switches (hints, sharing),
- * what the data currently supports, and the COD-amount suggestion card. Every number shows how many
+ * what the data currently supports, and the shipping-fee suggestion card. Every number shows how many
  * orders it rests on; below the thresholds the page says "not enough data yet", never a guess.
  */
 export default function CustomerIntelligencePage() {
@@ -180,6 +188,26 @@ export default function CustomerIntelligencePage() {
                   <p className="mt-2 text-sm text-muted-foreground">{t('notEnough')}</p>
                 )}
               </section>
+
+              {data.pausedForStore.length > 0 && (
+                <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-paused">
+                  <h2 id="ci-paused" className="text-base font-semibold text-foreground">
+                    {t('paused.title')}
+                  </h2>
+                  <ul className="mt-2 space-y-1 text-sm text-foreground">
+                    {data.pausedForStore.map(p => (
+                      <li key={p.feature}>
+                        {t('paused.item', {
+                          feature: t(`shown.features.${p.feature}`),
+                          predicted: pct(p.predictedRate),
+                          actual: pct(p.actualRate),
+                          resolved: p.resolved,
+                        })}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
 
               <section className="rounded-xl border bg-card p-5" aria-labelledby="ci-status">
                 <h2 id="ci-status" className="text-base font-semibold text-foreground">

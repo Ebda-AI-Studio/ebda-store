@@ -29,6 +29,7 @@ const overview = (o: object = {}) => ({
     hintsEnabled: true,
     ciSharing: false,
     gates: [],
+    pausedForStore: [],
     fee: { status: 'insufficient', suggestion: null },
     aggregates: { storeAsOf: null, cohortAsOf: null },
     shown30d: [],
@@ -70,6 +71,34 @@ describe('Smart hints page', () => {
     const el = await screen.findByText(/^fee\.suggestion:/);
     expect(el.textContent).toContain('"n":150');
     expect(el.textContent).toContain('"rate":"30%"');
+  });
+
+  it('lists a feature paused for this store, with its own numbers', async () => {
+    api.apiGet.mockResolvedValue(
+      overview({
+        pausedForStore: [
+          {
+            feature: 'cod_risk',
+            band: 'elevated',
+            predictedRate: 0.4,
+            actualRate: 0.2,
+            resolved: 40,
+          },
+        ],
+      })
+    );
+    render(<Page />);
+    const el = await screen.findByText(/^paused\.item:/);
+    expect(el.textContent).toContain('"predicted":"40%"');
+    expect(el.textContent).toContain('"actual":"20%"');
+    expect(el.textContent).toContain('"resolved":40');
+  });
+
+  it('shows no paused section when nothing is paused', async () => {
+    api.apiGet.mockResolvedValue(overview());
+    render(<Page />);
+    await screen.findByText('notEnough');
+    expect(screen.queryByText('paused.title')).toBeNull();
   });
 
   it('the sharing switch starts off and saves the opt-in', async () => {

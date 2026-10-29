@@ -56,14 +56,14 @@ export function pickCell(
   if (scope === 'store') {
     if (!data.window || !aggregateFresh(data.window.asOf, data.now)) return undefined;
     for (const k of keys) {
-      const c = data.window.own[metric][k];
+      const c = data.window.own[metric]?.[k];
       if (c && storeCellShowable(c)) return { scope, n: c.n, hit: c.hit, sum: c.sum };
     }
     return undefined;
   }
   if (!data.cohort || !aggregateFresh(data.cohort.asOf, data.now)) return undefined;
   for (const k of keys) {
-    const c = data.cohort.metrics[metric][k];
+    const c = data.cohort.metrics[metric]?.[k];
     if (c && !('suppressed' in c) && cohortCellShowable(c)) {
       return { scope, n: c.n, hit: c.hit, sum: c.sum };
     }

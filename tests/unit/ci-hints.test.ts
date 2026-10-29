@@ -30,6 +30,10 @@ const empty = (): Cells => ({
   delivery_hours: {},
   cod_confirmation: {},
   cod_return_by_amount: {},
+  return_by_shipping_fee: {},
+  payment_failure: {},
+  onboarding_step: {},
+  cart_recovery: {},
 });
 function win(own: Partial<Record<Metric, Record<string, Cell>>>, asOf = AS_OF): StoreWindow {
   return { v: 1, storeId: 's', asOf, windowDays: 90, own: { ...empty(), ...own }, shared: empty() };
@@ -44,6 +48,10 @@ function cohort(metrics: Partial<Record<Metric, Record<string, unknown>>>, asOf 
       delivery_hours: {},
       cod_confirmation: {},
       cod_return_by_amount: {},
+      return_by_shipping_fee: {},
+      payment_failure: {},
+      onboarding_step: {},
+      cart_recovery: {},
       ...metrics,
     } as Cohort['metrics'],
   };
@@ -213,23 +221,30 @@ describe('rankCouriers', () => {
 });
 
 describe('feeHint', () => {
-  const amt = (b4: ReturnType<typeof pub>) => ({
+  // Fee bands (CI-13): f0 free .. f4 100+ EGP; the hint reads the REAL shipping fee, not the COD amount.
+  const amt = (f4: ReturnType<typeof pub>) => ({
     '*': pub(1000, 100),
-    b1: pub(300, 30),
-    b2: pub(300, 30),
-    b3: pub(200, 20),
-    b4,
+    f1: pub(300, 30),
+    f2: pub(300, 30),
+    f3: pub(200, 20),
+    f4,
   });
   it('suggests the lowest band that returns clearly more', () => {
-    const f = feeHint(data(null, cohort({ cod_return_by_amount: amt(pub(150, 45)) })));
+    const f = feeHint(data(null, cohort({ return_by_shipping_fee: amt(pub(150, 45)) })));
     expect(f.status).toBe('ok');
-    expect(f.suggestion).toMatchObject({ thresholdMinor: 200_000, scope: 'cohort', n: 150 });
+    expect(f.suggestion).toMatchObject({ thresholdMinor: 10_000, scope: 'cohort', n: 150 });
   });
   it('no suggestion when no band clears the baseline, and insufficient with no baseline at all', () => {
-    expect(feeHint(data(null, cohort({ cod_return_by_amount: amt(pub(150, 15)) })))).toEqual({
+    expect(feeHint(data(null, cohort({ return_by_shipping_fee: amt(pub(150, 15)) })))).toEqual({
       status: 'ok',
       suggestion: null,
     });
     expect(feeHint(data(null, null))).toEqual({ status: 'insufficient', suggestion: null });
+  });
+  it('the COD-amount proxy no longer feeds the hint (CI-13)', () => {
+    const f = feeHint(
+      data(null, cohort({ cod_return_by_amount: { '*': pub(1000, 100), b4: pub(150, 45) } }))
+    );
+    expect(f).toEqual({ status: 'insufficient', suggestion: null });
   });
 });

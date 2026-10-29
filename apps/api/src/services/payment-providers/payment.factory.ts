@@ -12,6 +12,8 @@ import {
 } from '../payment-state-claims';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
+import { sendEventAfterCommit } from '../../lib/inngest/send-after-commit';
+import { CI_PAYMENT_FAILED_EVENT } from '../../lib/ci/events';
 import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
 import { CardTestingGuard } from '../card-testing-guard.service';
@@ -2435,6 +2437,21 @@ export class PaymentService {
         webhookData.status === 'expired' ||
         webhookData.status === 'cancelled')
     ) {
+      // CI-13: the webhook that won the `unpaid -> failed` claim reports the outcome (never blocks it).
+      await sendEventAfterCommit(
+        'ci-payment-failed',
+        {
+          name: CI_PAYMENT_FAILED_EVENT,
+          data: {
+            storeId: order.storeId,
+            orderId: order.id,
+            paymentId: payment.id,
+            kind: webhookData.status,
+            at: new Date().toISOString(),
+          },
+        },
+        { ifUnhookable: 'send' }
+      );
       // Card-testing bookkeeping (SP5 task 4): only a DECLINE counts, not a
       // customer who cancelled / let the invoice expire. Idempotent per payment
       // (webhooks retry) and never throws.

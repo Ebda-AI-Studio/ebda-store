@@ -3,7 +3,7 @@
  * today `prismaCiSource` (Postgres, one row per call, by id, under the store's tenant scope); after the
  * StoreDO cutover the repo layer supplies a StoreDO-backed one. No method scans a table.
  */
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext, withUser } from '@ebda/database';
 import { toE164 } from '@ebda/shared';
 import { areaKeyFor, type AreaKeyResult } from './area-key';
 
@@ -11,6 +11,8 @@ export interface CiOrderFacts {
   id: string;
   storeId: string;
   totalMinor: number;
+  /** What the buyer was charged for shipping (`orders.shipping`, piastres). */
+  shippingMinor: number;
   currency: string;
   channel: string;
   status: string;
@@ -21,6 +23,7 @@ export interface CiOrderFacts {
   phoneE164: string | null;
   area: AreaKeyResult;
   payments: Array<{
+    id: string;
     provider: string;
     method: string | null;
     status: string;
@@ -49,6 +52,22 @@ export interface CiShipmentFacts {
   returnReasonRaw: string | null;
 }
 
+/** An abandoned-cart row, reduced to when reminders went out and when (if) the cart turned into an order. */
+export interface CiAbandonedCartFacts {
+  id: string;
+  firstReminderAt: Date | null;
+  /** Which sender reached the buyer FIRST: the push/SMS/WhatsApp steps, or the recovery email. */
+  firstChannel: 'email' | 'notification' | null;
+  recoveredAt: Date | null;
+}
+
+export interface CiStoreSetupFacts {
+  /** When the owner's account was created (the signup), or null if unknown. */
+  ownerSignupAt: Date | null;
+  template: string | null;
+  ciSharing: boolean;
+}
+
 export interface CiSource {
   order(storeId: string, orderId: string): Promise<CiOrderFacts | null>;
   shipment(storeId: string, shipmentId: string): Promise<CiShipmentFacts | null>;
@@ -67,6 +86,8 @@ export interface CiSource {
     orderId: string,
     v: { areaKey: string | null; buyerKey: string | null }
   ): Promise<void>;
+  abandonedCart(storeId: string, abandonedCartId: string): Promise<CiAbandonedCartFacts | null>;
+  storeSetup(storeId: string): Promise<CiStoreSetupFacts | null>;
   /** The shipment's own flag for ciSharing lookups of a shipment's store. */
   storeCiSharing(storeId: string): Promise<boolean>;
 }
@@ -82,6 +103,7 @@ export const prismaCiSource: CiSource = {
           select: {
             id: true,
             total: true,
+            shipping: true,
             currency: true,
             source: true,
             status: true,
@@ -91,6 +113,7 @@ export const prismaCiSource: CiSource = {
             _count: { select: { items: true } },
             payments: {
               select: {
+                id: true,
                 provider: true,
                 method: true,
                 status: true,
@@ -115,6 +138,7 @@ export const prismaCiSource: CiSource = {
         id: o.id,
         storeId,
         totalMinor: o.total,
+        shippingMinor: o.shipping,
         currency: o.currency,
         channel: o.source || 'web',
         status: String(o.status),
@@ -213,6 +237,55 @@ export const prismaCiSource: CiSource = {
         data: { areaKey: v.areaKey, buyerKey: v.buyerKey },
       });
     });
+  },
+
+  async abandonedCart(storeId, abandonedCartId) {
+    return runInTenantContext(storeId, async () => {
+      const a = await prisma.abandonedCart.findFirst({
+        where: { id: abandonedCartId, storeId },
+        select: {
+          id: true,
+          step1SentAt: true,
+          step2SentAt: true,
+          step3SentAt: true,
+          emailSentAt: true,
+          recoveredAt: true,
+        },
+      });
+      if (!a) return null;
+      const push = [a.step1SentAt, a.step2SentAt, a.step3SentAt]
+        .filter((d): d is Date => d != null)
+        .sort((x, y) => x.getTime() - y.getTime())[0];
+      const email = a.emailSentAt ?? undefined;
+      const first = [push, email]
+        .filter((d): d is Date => d != null)
+        .sort((x, y) => x.getTime() - y.getTime())[0];
+      return {
+        id: a.id,
+        firstReminderAt: first ?? null,
+        firstChannel: !first ? null : first === email ? 'email' : 'notification',
+        recoveredAt: a.recoveredAt,
+      };
+    });
+  },
+
+  async storeSetup(storeId) {
+    const s = await runInTenantContext(storeId, () =>
+      prisma.store.findFirst({
+        where: { id: storeId },
+        select: { template: true, ciSharing: true, ownerId: true },
+      })
+    );
+    if (!s) return null;
+    // `users` rows are visible only under their own user context (strict RLS), never the store's.
+    const owner = await withUser(s.ownerId, tx =>
+      tx.user.findFirst({ where: { id: s.ownerId }, select: { createdAt: true } })
+    );
+    return {
+      ownerSignupAt: owner?.createdAt ?? null,
+      template: s.template ? String(s.template) : null,
+      ciSharing: s.ciSharing ?? false,
+    };
   },
 
   async storeCiSharing(storeId) {

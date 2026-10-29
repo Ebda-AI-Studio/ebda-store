@@ -10,6 +10,9 @@ export const CALIBRATION_MAX_GAP = 0.1;
 export const CALIBRATION_MIN_STORES = 5;
 export const CALIBRATION_MAX_STORE_SHARE = 0.4;
 
+/** |a - b| rounded to 6 places so an exact 10-point gap (0.4 - 0.3 = 0.10000000000000003) is not "more than 10". */
+const gapOf = (a: number, b: number) => Math.round(Math.abs(a - b) * 1e6) / 1e6;
+
 export interface CalibrationRow {
   storeId: string;
   feature: string;
@@ -59,7 +62,53 @@ export function evaluateCalibration(rows: CalibrationRow[]): CalibrationResult[]
         predicted,
         actual,
         evaluated,
-        off: evaluated && Math.abs(actual! - predicted!) > CALIBRATION_MAX_GAP,
+        off: evaluated && gapOf(actual!, predicted!) > CALIBRATION_MAX_GAP,
       };
     });
+}
+
+export interface StoreGateVerdict {
+  feature: string;
+  /** True when one of this store's own bands is off by more than the gap: the store's gate for `feature` closes. */
+  off: boolean;
+  band: string | null;
+  predicted: number | null;
+  actual: number | null;
+  resolved: number;
+}
+
+/**
+ * Per-store auto-gating (Ruling CI-13). The SAME numbers as the platform check (>= 30 resolved hints, more
+ * than 10 points off) but over ONE store's own hint log and with no cohort rule: the answer only ever
+ * switches off THAT store's own hints. It cannot touch another store or the platform gate. `rows` must all
+ * belong to one store (the caller passes `resolveAndSummarise`'s output for it); a mixed list throws.
+ */
+export function evaluateStoreGates(rows: CalibrationRow[]): StoreGateVerdict[] {
+  if (new Set(rows.map(r => r.storeId)).size > 1) {
+    throw new Error('evaluateStoreGates: rows from more than one store');
+  }
+  const byFeature = new Map<string, StoreGateVerdict>();
+  for (const r of rows) {
+    const verdict = byFeature.get(r.feature) ?? {
+      feature: r.feature,
+      off: false,
+      band: null,
+      predicted: null,
+      actual: null,
+      resolved: 0,
+    };
+    byFeature.set(r.feature, verdict);
+    if (r.resolved < CALIBRATION_MIN_RESOLVED || r.band === 'insufficient') continue;
+    const predicted = r.predictedSum / r.resolved;
+    const actual = r.returned / r.resolved;
+    // Keep the worst band as the stated reason.
+    const gap = gapOf(actual, predicted);
+    if (
+      gap > CALIBRATION_MAX_GAP &&
+      (!verdict.off || gap > gapOf(verdict.actual!, verdict.predicted!))
+    ) {
+      Object.assign(verdict, { off: true, band: r.band, predicted, actual, resolved: r.resolved });
+    }
+  }
+  return [...byFeature.values()].sort((a, b) => a.feature.localeCompare(b.feature));
 }

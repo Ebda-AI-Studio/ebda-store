@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 123,
+      "tables": 124,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -102,6 +102,7 @@
         "funnel_snapshots": 11,
         "customer_rfm_snapshots": 11,
         "ci_hint_logs": 11,
+        "ci_store_gates": 9,
         "count_sessions": 10,
         "count_lines": 8,
         "bank_statements": 9,
@@ -1221,6 +1222,18 @@
       "name": "ci_hint_logs_outcome_check",
       "table": "ci_hint_logs",
       "disposition": "store-do:ci_hint_logs"
+    },
+    {
+      "kind": "check",
+      "name": "ci_store_gates_feature_check",
+      "table": "ci_store_gates",
+      "disposition": "store-do:ci_store_gates"
+    },
+    {
+      "kind": "check",
+      "name": "ci_store_gates_band_check",
+      "table": "ci_store_gates",
+      "disposition": "store-do:ci_store_gates"
     },
     {
       "kind": "index",
