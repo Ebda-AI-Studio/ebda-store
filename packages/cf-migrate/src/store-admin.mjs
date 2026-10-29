@@ -14,6 +14,7 @@
 // __seal    marks the store as live on the DO and records a per-row baseline of every table.
 // __diff    rows added / changed / deleted since the seal (the data a rollback would otherwise lose).
 // __rebase  baseline := current state, after a verified rollback replay.
+// __tables  every application table of the DO (verify checks each is mapped, a CF-only rule or a runtime table).
 // __unseal  {confirm:'wipe-and-unseal'}: wipes the DO so a retried cutover can re-import.
 import { PK_SEP, TableDigest, canonRow, canonValue, sha256Hex } from './canon.mjs';
 
@@ -372,6 +373,11 @@ function doUnseal(request, { sql, transactionSync }, body) {
   return json({ ok: true, sealed: false, wiped: true });
 }
 
+// TABLES: the names of every application table the DO holds, so verify can prove it looked at all of them.
+function doTables({ sql }) {
+  return json({ ok: true, tables: appTables(sql).map(t => t.table) });
+}
+
 function doStatus({ sql }) {
   ensureLedger(sql);
   const ledger = sql
@@ -396,6 +402,7 @@ export async function handleStoreAdmin(request, ctx) {
     if (request.method === 'POST' && path.endsWith('/__unseal'))
       return doUnseal(request, ctx, await request.json().catch(() => null));
     if (request.method === 'GET' && path.endsWith('/__status')) return doStatus(ctx);
+    if (request.method === 'GET' && path.endsWith('/__tables')) return doTables(ctx);
     return json({ ok: false, error: 'not found' }, 404);
   } catch (e) {
     if (e instanceof HttpError) return json({ ok: false, error: e.message, ...e.extra }, e.status);

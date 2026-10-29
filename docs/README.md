@@ -300,7 +300,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [runbooks/support-wholesaler-sees-retail.md](runbooks/support-wholesaler-sees-retail.md) - Support: "a wholesaler sees the retail price"
 - [runbooks/tenant-routing-canary.md](runbooks/tenant-routing-canary.md) - Tenant routing canary (demo-boutique first)
 - [runbooks/whatsapp-og-preview.md](runbooks/whatsapp-og-preview.md) - WhatsApp / Social Link Preview Runbook
-- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1)
+- [runbooks/cutover-cf.md](runbooks/cutover-cf.md) - Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1); go/no-go, write freeze, rollback replay, Neon decommission gate; rehearsed by `scripts/cf/rehearse-cutover.sh` (Ruling CUTOVER-5)
 - [runbooks/neon-decommission.md](runbooks/neon-decommission.md) - Neon decommission (INFRA-CF-1 phase 7)
 
 ## security - Security

@@ -49,6 +49,9 @@ const d = {
 const FORWARD_FIX =
   'docs/runbooks/cutover-cf.md section 9 (forward-fix): fix the problem on the Cloudflare side and keep serving from it';
 const NOT_IN_PG = new Set(['entity_index', 'platform_audit_log']);
+// The backend selector is the switch this script itself throws, not live data: it has no Postgres column by design and
+// a rollback sets it back to 'pg', so a changed D1 stores row must not be refused for carrying it (Ruling CUTOVER-5).
+const SELECTOR_COLUMNS = new Set(['stores.storage_backend']);
 
 const doCall = async (id, op, body) => {
   const r = await fetch(`${args.doUrl}/cutover/stores/${id}/${op}`, {
@@ -169,7 +172,7 @@ async function replayAndVerify(stores, plan, changes) {
               const hits = [...x.added, ...x.changed].filter(
                 r => r[i] !== null && r[i] !== undefined
               ).length;
-              if (hits)
+              if (hits && !SELECTOR_COLUMNS.has(`${name}.${col}`))
                 lossy.push(`${tag}.${name}.${col}: ${hits} row(s) with data, no Postgres column`);
             }
           }
