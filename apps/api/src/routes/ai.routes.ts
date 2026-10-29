@@ -34,6 +34,7 @@ import {
 } from '../services/ai-autofill.service';
 import { withSavepoint } from '../lib/savepoint';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -59,7 +60,7 @@ router.put('/settings', writeLimiter, async (req: Request, res: Response, next: 
   try {
     const { storeId } = req.params;
     const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(req.body);
-    await prisma.store.update({ where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
+    await storeUpdate(prisma, { where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
     await auditLog({
       action: enabled ? 'store.ai.enabled' : 'store.ai.disabled',
       userId: req.user!.userId,

@@ -11,6 +11,7 @@ import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import { recordSlugRedirect } from '../services/slug-redirect.service';
 import logger from '../lib/logger';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -116,7 +117,7 @@ router.put(
       });
       const previous = existing?.bestSellersImage ?? null;
 
-      const store = await prisma.store.update({
+      const store = await storeUpdate(prisma, {
         where: { id: storeId },
         data: { bestSellersImage: data.image },
         select: { bestSellersImage: true },

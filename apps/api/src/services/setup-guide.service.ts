@@ -13,6 +13,7 @@
  * callers wrap it in `readInStoreContext`.
  */
 import { prisma, withStore } from '@ebda/database';
+import { syncStoreFields } from '../lib/repo-factory';
 import {
   getLook,
   SETUP_GUIDE_ITEMS,
@@ -117,6 +118,7 @@ export class SetupGuideService {
                     || jsonb_build_object(${key}::text, ${done}::boolean)
         ), true)
       WHERE id = ${storeId}`;
+    await syncStoreFields(storeId, ['settings']);
     return this.get(storeId);
   }
 
@@ -127,6 +129,7 @@ export class SetupGuideService {
         COALESCE(settings->'setupGuide', '{}'::jsonb)
           || jsonb_build_object('dismissed', ${dismissed}::boolean), true)
       WHERE id = ${storeId}`;
+    await syncStoreFields(storeId, ['settings']);
     return this.get(storeId);
   }
 }

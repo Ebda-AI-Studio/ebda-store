@@ -7,6 +7,7 @@ import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { getAutomationFlags } from './plan-entitlements';
+import { storeUpdate } from '../lib/repo-factory';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -457,7 +458,7 @@ class FeatureService {
     userId: string
   ): Promise<Record<FeatureKey, boolean>> {
     await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: { plan, updatedAt: new Date() },
       })

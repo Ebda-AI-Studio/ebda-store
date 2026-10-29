@@ -9,6 +9,7 @@ import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
+import { storeUpdate } from '../../repo-factory';
 
 /**
  * Catalogue-wide SEO sweep. Fills missing SEO meta on the store row,
@@ -232,7 +233,7 @@ const bulkAiSeoFn = inngest.createFunction(
                       }),
                     `seo:store:${storeId}`
                   );
-                  await prisma.store.update({
+                  await storeUpdate(prisma, {
                     where: { id: storeId },
                     data: {
                       metaTitle: s.metaTitle?.trim() || r.suggestion.title,

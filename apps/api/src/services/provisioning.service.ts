@@ -31,6 +31,7 @@ import {
   defaultNewStoreLook,
   isBuiltSkin,
 } from '@ebda/shared';
+import { storeUpdate } from '../lib/repo-factory';
 
 // ==========================================
 // Store Provisioning Service
@@ -482,7 +483,7 @@ export class ProvisioningService {
    */
   static async updateStoreStatus(storeId: string, status: 'active' | 'inactive' | 'suspended') {
     const store = await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: { status },
       })

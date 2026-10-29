@@ -18,6 +18,7 @@ import { bustStoreCachesById } from '../../../services/store.service';
 import { storeOrigin } from '@ebda/shared';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
 import { EGYPTIAN_ARABIC_REGISTER } from '../../ai/arabic-register';
+import { storeUpdate } from '../../repo-factory';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -248,7 +249,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
             const text = genResult.response.text().trim();
 
             if (text.length > 50 && !isPlaceholderText(text)) {
-              await prisma.store.update({
+              await storeUpdate(prisma, {
                 where: { id: storeId },
                 data: { llmsTxt: text.slice(0, 4000) },
               });
@@ -785,7 +786,7 @@ Populate using only the information provided above. For keyCategories, use the c
             const facts = normalizeBrandFacts(JSON.parse(raw));
 
             if (facts) {
-              await prisma.store.update({ where: { id: storeId }, data: { aboutJson: facts } });
+              await storeUpdate(prisma, { where: { id: storeId }, data: { aboutJson: facts } });
               filled++;
             } else {
               skipped++;

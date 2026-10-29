@@ -1,4 +1,4 @@
-# Repo factory: reads and non-money writes on the store's backend (INFRA-CF-1 PR C + D1, Rulings CF-REPO-1, CF-WRITES-1, CF-ERASE-3)
+# Repo factory: reads and non-money writes on the store's backend (INFRA-CF-1 PR C + D1 + D1c, Rulings CF-REPO-1, CF-WRITES-1..3, CF-ERASE-3)
 
 Code: `apps/api/src/lib/repo-factory.ts` (factory + request scope), `packages/repo/src/rpc/*` (wire codec, read executor, write executor `writes.ts`, Worker-side client), `apps/api/src/cf/store-do/store-do.ts` (`query()`), `lib/store-backend.ts` (`backendFor`, the flag). Contract tests: `tests/integration/repo-factory-contract.test.ts` (reads) and `tests/integration/repo-factory-writes-contract.test.ts` (writes): Postgres vs the Durable Object schema, `tests/unit/repo-factory.test.ts`, `apps/api/workers-do/store-do-schema.test.ts` (real workerd).
 
@@ -78,20 +78,29 @@ Same mechanism as D1, plus named in-DO procedures (`$proc`, `DO_PROCS`) for the 
 
 Collections: there is no `Collection` model; the storefront's collection surfaces are `Category` and the page-builder document (`pageKey` collection), both already DO models.
 
-### Settings copy: what is still unrouted (cutover gate)
+### Settings copy: every Store write is routed (PR D1c, Ruling CF-WRITES-3)
 
-38 `store.update` / `updateMany` / `upsert` sites outside `StoreService` (agent credential, typography, store layout, tax profile, admin, AI jobs' store-level SEO) and 2 `async tx => ...` forms inside it still write only the authoritative row. Each must go through `updateStoreThrough` before any store is flipped.
+The cutover gate of CF-WRITES-2 is closed. The 39 direct `store.update` / `updateMany` calls and 4 raw `UPDATE stores ... jsonb_set` writes now go through `storeUpdate` / `storeUpdateMany` / `syncStoreFields` (`lib/repo-factory.ts`) or `updateStoreThrough` (`StoreService`). `tests/unit/store-settings-routed.test.ts` walks `apps/api/src` with the TypeScript AST and fails on a new direct write; the only allow-listed file is `lib/repo-factory.ts` (it holds the helpers' own call). A relation write (`credentials`) is directory-only in the copy.
+
+```ts
+await storeUpdate(tx, { where: { id: storeId }, data: { pwaEnabled } }); // authoritative write on YOUR client, then the DO copy
+await storeUpdateMany(tx, {
+  where: { id: storeId, pendingDomain },
+  data: { domainStatus: 'failed' },
+}); // copies only if a row matched
+await syncStoreFields(storeId, ['settings']); // after a raw jsonb_set: re-read, copy the whole value
+```
 
 ## Left for D2 or later from the D1b list (with reason)
 
-| Item                                                                                           | Reason                                                                          |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Bulk CSV import transactions (`bulk.service.ts` product and variant import)                    | write `inventory` per row inside one interactive transaction                    |
-| `VariantService.bulkUpdateInventory`, variant `inventoryHistory` rows, opening stock on create | stock columns                                                                   |
-| Barcode sequences (`barcode.service.ts`)                                                       | advisory lock + sequence                                                        |
-| Provisioning seeds (`provisioning.service.ts`)                                                 | the store does not exist in a DO yet; the import carries them                   |
-| `ai-autofill-cleanup`                                                                          | mixes D2 models (AiRecommendation, FrequentlyBoughtTogether) in one transaction |
-| Job READS (every `bulk-ai-*` selects through Postgres)                                         | PR E                                                                            |
+| Item                                                                                           | Reason                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bulk CSV import transactions (`bulk.service.ts` product and variant import)                    | write `inventory` per row inside one interactive transaction with D1 slug redirects and gold specs: not routed in D1c (it stays on Postgres), needs the stock operation of D2a plus an import orchestrator |
+| `VariantService.bulkUpdateInventory`, variant `inventoryHistory` rows, opening stock on create | stock columns                                                                                                                                                                                              |
+| Barcode sequences (`barcode.service.ts`)                                                       | advisory lock + sequence                                                                                                                                                                                   |
+| Provisioning seeds (`provisioning.service.ts`)                                                 | the store does not exist in a DO yet; the import carries them                                                                                                                                              |
+| `ai-autofill-cleanup`                                                                          | mixes D2 models (AiRecommendation, FrequentlyBoughtTogether) in one transaction                                                                                                                            |
+| Job READS (every `bulk-ai-*` selects through Postgres)                                         | PR E                                                                                                                                                                                                       |
 
 ## Left for PR D2 (money, stock and lock paths; measured on this branch, `apps/api/src`)
 

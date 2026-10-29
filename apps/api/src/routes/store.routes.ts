@@ -41,6 +41,7 @@ import {
 } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router();
 
@@ -1489,7 +1490,7 @@ router.put(
         // Clearing: drop the verified domain AND any pending claim.
         await DomainClaimService.cancelPending(id, domainSvc);
         if (oldDomain) {
-          await prisma.store.update({
+          await storeUpdate(prisma, {
             where: { id },
             data: { domain: null, domainStatus: null, domainVerifiedAt: null },
           });

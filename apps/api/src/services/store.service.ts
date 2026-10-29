@@ -9,7 +9,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
-import { copyStoreSettings } from '../lib/repo-factory';
+import { copyStoreSettings, syncStoreFields } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -1155,7 +1155,7 @@ export class StoreService {
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that
     // must not be overwritten.
-    const updated = await withStore(storeId, async tx => {
+    const updated = await updateStoreThrough(storeId, async tx => {
       const live = await tx.store.findUnique({
         where: { id: storeId },
         select: { theme: true },
@@ -1384,6 +1384,7 @@ export class StoreService {
             updated_at = now()
         WHERE id = ${storeId}`
     );
+    await syncStoreFields(storeId, ['settings']);
     await StoreService.invalidateCache(store);
   }
 
@@ -1398,6 +1399,7 @@ export class StoreService {
             updated_at = now()
         WHERE id = ${storeId}`
     );
+    await syncStoreFields(storeId, ['settings']);
     await StoreService.invalidateCache(store);
   }
 

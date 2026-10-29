@@ -4,6 +4,7 @@ import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
 import { fromMinor, minorToDecimalString } from '@ebda/shared';
+import { storeUpdate } from '../lib/repo-factory';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -215,7 +216,7 @@ export class LoyaltyService {
       : currentSettings;
 
     const store = await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: {
           loyaltyEnabled: data.loyaltyEnabled,

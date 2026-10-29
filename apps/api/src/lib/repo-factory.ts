@@ -34,7 +34,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextFunction, Request, Response } from 'express';
-import { prisma, type AppPrismaClient } from '@ebda/database';
+import { prisma, withStore, type AppPrismaClient, type Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 
@@ -213,6 +213,54 @@ export async function copyStoreSettings(
   const { encodeRpc } = await import('@ebda-src/repo');
   const r = await stub.applySettings(storeId, encodeRpc(fields));
   if (!r.ok) throw new AppError(502, 'SETTINGS_COPY_FAILED', `settings copy refused: ${r.code}`);
+}
+
+/**
+ * Routed `Store` writes (Ruling CF-WRITES-3). Every `Store` write outside `StoreService.updateStoreThrough` uses one of
+ * these so the DO settings copy cannot drift; `tests/unit/store-settings-routed.test.ts` fails on a direct
+ * `.store.update|updateMany|upsert(`. The authoritative write runs first on the caller's own client (so a request
+ * transaction, tenant guard and RLS are unchanged), the copy follows in the same request; on 'pg' the copy does nothing.
+ * `updateMany` copies only when a row matched. Residual (as CF-WRITES-2): a caller that later rolls back its own
+ * transaction leaves the DO ahead of the authoritative row until the next settings write converges it.
+ */
+// structural on purpose: the request `prisma` proxy, a `withStore` tx and the extended client all differ in their generic
+// delegate types, but all take Store update args; the result type comes from `A`, not from the client.
+type StoreUpdateClient = { store: { update: (args: any) => PromiseLike<unknown> } };
+type StoreUpdateManyClient = {
+  store: { updateMany: (args: any) => PromiseLike<{ count: number }> };
+};
+
+export async function storeUpdate<A extends Prisma.StoreUpdateArgs>(
+  db: StoreUpdateClient,
+  args: Prisma.SelectSubset<A, Prisma.StoreUpdateArgs>
+): Promise<Prisma.StoreGetPayload<A>> {
+  const a = args as Prisma.StoreUpdateArgs;
+  const row = (await db.store.update(a)) as Prisma.StoreGetPayload<A>;
+  await copyStoreSettings(a.where.id as string, a.data as Record<string, unknown>);
+  return row;
+}
+
+export async function storeUpdateMany(
+  db: StoreUpdateManyClient,
+  args: Prisma.StoreUpdateManyArgs & { where: { id: string } }
+): Promise<Prisma.BatchPayload> {
+  const res = await db.store.updateMany(args);
+  if (res.count > 0) await copyStoreSettings(args.where.id, args.data as Record<string, unknown>);
+  return res;
+}
+
+/**
+ * For a raw-SQL write to `stores` (jsonb_set on `settings`): re-read the named columns from the authoritative row and copy
+ * them, so a partial JSON write reaches the DO as the whole resulting value.
+ */
+export async function syncStoreFields(storeId: string, fields: string[]): Promise<void> {
+  if ((await storeRepo(storeId)).backend !== 'do') return;
+  const select = Object.fromEntries(fields.map(f => [f, true]));
+  const row = (await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select })
+  )) as Record<string, unknown> | null;
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'store not found');
+  await copyStoreSettings(storeId, row);
 }
 
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */

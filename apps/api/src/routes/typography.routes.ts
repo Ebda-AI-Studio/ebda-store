@@ -10,6 +10,7 @@ import { prisma } from '@ebda/database';
 import { invalidateCached } from '../lib/public-cache';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import logger from '../lib/logger';
+import { storeUpdate } from '../lib/repo-factory';
 
 const router = Router({ mergeParams: true });
 
@@ -75,7 +76,7 @@ router.put(
         logger.warn({ err, storeId }, '[typography PUT] previous read failed');
       }
 
-      const store = await prisma.store.update({
+      const store = await storeUpdate(prisma, {
         where: { id: storeId },
         data: { typography: data },
         select: { typography: true },

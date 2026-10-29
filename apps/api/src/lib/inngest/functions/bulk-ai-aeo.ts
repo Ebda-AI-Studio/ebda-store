@@ -17,6 +17,7 @@ import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
 import { EGYPTIAN_ARABIC_REGISTER } from '../../ai/arabic-register';
+import { storeUpdate } from '../../repo-factory';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -182,7 +183,7 @@ async function ensureFooterSupportLinkEnabled(
     };
 
     await withStore(storeId, tx =>
-      tx.store.update({
+      storeUpdate(tx, {
         where: { id: storeId },
         data: { settings: nextSettings },
       })
@@ -1079,7 +1080,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                   parsed.en.trim() &&
                   !isPlaceholderText(parsed.en)
                 ) {
-                  await prisma.store.update({
+                  await storeUpdate(prisma, {
                     where: { id: storeId },
                     data: {
                       metaDescriptionAeo: parsed.en.trim().slice(0, 160),

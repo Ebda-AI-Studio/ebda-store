@@ -9,6 +9,7 @@ import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { requestStoreReindex } from '../../search/reindex';
+import { storeUpdate } from '../../repo-factory';
 
 /**
  * Catalogue-wide translation sweep. Walks every product + category
@@ -462,7 +463,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
             if (Object.keys(updates).length > 0) {
               try {
-                await prisma.store.update({ where: { id: storeId }, data: updates });
+                await storeUpdate(prisma, { where: { id: storeId }, data: updates });
               } catch (err) {
                 await recordError({
                   entityKind: 'store',

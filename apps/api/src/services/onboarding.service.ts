@@ -39,6 +39,7 @@ import {
 } from './billing/subscription-billing.service';
 import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
 import { emitEbdaConversion } from './ebda-ads-emit';
+import { storeUpdate } from '../lib/repo-factory';
 
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
@@ -388,7 +389,7 @@ export class OnboardingService {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');
       }
       await withStore(storeId, tx =>
-        tx.store.update({ where: { id: storeId }, data: { status: 'active' } })
+        storeUpdate(tx, { where: { id: storeId }, data: { status: 'active' } })
       );
       await bustStoreCaches(store.id, store.slug, store.domain);
     }

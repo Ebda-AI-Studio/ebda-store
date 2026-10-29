@@ -53,6 +53,7 @@ import {
   vatOfPaidAmount,
   type LedgerVat,
 } from './charge-amount';
+import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -72,7 +73,7 @@ export async function suspendForBilling(
 ): Promise<boolean> {
   // The billing cycle runs outside any store scope: open this store's own.
   const { count } = await withStore(storeId, tx =>
-    tx.store.updateMany({
+    storeUpdateMany(tx, {
       where: { id: storeId, status: 'active', billingSuspendedReason: null, deletedAt: null },
       data: { status: 'suspended', billingSuspendedReason: reason, billingSuspendedAt: now },
     })
@@ -112,7 +113,7 @@ export async function restoreFromBilling(
   reason: BillingSuspendReason
 ): Promise<boolean> {
   const { count } = await withStore(storeId, tx =>
-    tx.store.updateMany({
+    storeUpdateMany(tx, {
       where: { id: storeId, status: 'suspended', billingSuspendedReason: reason },
       data: { status: 'active', billingSuspendedReason: null, billingSuspendedAt: null },
     })
@@ -303,7 +304,7 @@ export async function syncChildSubscriptions(ownerId: string, now: Date = new Da
         },
       });
       if (r.count > 0 && featureTier) {
-        await tx.store.update({ where: { id: child.id }, data: { plan: featureTier } });
+        await storeUpdate(tx, { where: { id: child.id }, data: { plan: featureTier } });
       }
       return r;
     });
@@ -990,7 +991,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     } else {
       await tx.storeSubscription.create({ data: { storeId: input.storeId, ...data } });
     }
-    await tx.store.update({ where: { id: input.storeId }, data: { plan: plan.featureTier } });
+    await storeUpdate(tx, { where: { id: input.storeId }, data: { plan: plan.featureTier } });
     // Confirm the merchant's claim: the named one, or the pending one with this reference.
     await tx.manualPaymentClaim.updateMany({
       where: {

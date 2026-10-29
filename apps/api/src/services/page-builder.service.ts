@@ -91,6 +91,7 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { bustStoreCaches } from './store.service';
 import { cleanupRemovedJsonUrls, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import logger from '../lib/logger';
+import { storeUpdate } from '../lib/repo-factory';
 
 export const HOME_PAGE_KEY = 'home';
 /** The page documents the builder edits (home plus the product / collection / cart section pages). */
@@ -634,7 +635,7 @@ async function applyPublishedLayout(
       }
       // a reorder or a hidden section changes no layout key: leave the store row alone
       if (!isDeepStrictEqual(merged, current))
-        await tx.store.update({
+        await storeUpdate(tx, {
           where: { id: storeId },
           data: { layoutSettings: merged as object },
         });
@@ -680,7 +681,7 @@ async function applyPublishedLayout(
         .filter(f => f.type === 'custom' && f.url && !kept.has(f.url))
         .map(f => f.url as string);
     }
-    return tx.store.update({
+    return storeUpdate(tx, {
       where: { id: storeId },
       data: {
         layoutSettings: layout as unknown as object,
