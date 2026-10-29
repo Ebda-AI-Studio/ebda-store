@@ -2489,15 +2489,9 @@ export class OrderService {
         tax: q.tax,
         total: q.total,
         taxIncludedInPrice: q.taxIncludedInPrice,
-        lines: q.lines.map(l => ({
-          itemId: c.cart.items[l.index].id,
-          productId: l.productId,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          lineTotal: l.lineTotal,
-          listPrice: l.listPrice,
-          priceSource: l.priceSource,
-          priceTierMinQty: l.priceTierMinQty,
+        lines: q.lines.map(({ index, ...priced }) => ({
+          itemId: c.cart.items[index].id,
+          ...priced,
         })),
       } as never;
     }
