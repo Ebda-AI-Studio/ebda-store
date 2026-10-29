@@ -4,6 +4,7 @@ import { encryption } from './encryption.service';
 import { smsService } from './sms.service';
 import type { SmsConfig } from './sms.service';
 import logger from '../lib/logger';
+import { config as appConfig } from '../config';
 import { AppError } from '../middleware/error-handler';
 
 // ==========================================
@@ -299,7 +300,9 @@ class NotificationConfigService {
    *      a sanitized error (no credential values) when creds are missing or
    *      rejected by the provider.
    *
-   * Other channels: returns {success: true} until their providers are wired.
+   * Push: checks the platform VAPID keys and that at least one device is subscribed.
+   *
+   * Any other channel (whatsapp, unknown): {success: false, message: 'not testable'} - never a fake success.
    */
   async testConnection(
     storeId: string,
@@ -334,12 +337,29 @@ class NotificationConfigService {
       return { success: true };
     }
 
-    // Other channels (push, whatsapp) — no provider test wired yet.
-    logger.debug(
-      { storeId, channel },
-      '[NotificationConfigService] testConnection: channel not yet wired, returning true'
-    );
-    return { success: true };
+    // Push: web-push uses the platform's VAPID keys (no per-store credentials), so the honest test is
+    // "can this platform send, and is there a device to send to". No notification is sent to a shopper.
+    if (channel === 'push' || channel === 'push_notifications') {
+      if (!appConfig.vapidPublicKey || !appConfig.vapidPrivateKey) {
+        return {
+          success: false,
+          message: 'Push is not configured on the platform (VAPID keys are missing).',
+        };
+      }
+      const devices = await prisma.pushSubscription.count({ where: { storeId } });
+      if (devices === 0) {
+        return {
+          success: false,
+          message:
+            'Push is set up, but no device is subscribed yet, so there is nothing to deliver to.',
+        };
+      }
+      return { success: true, message: `Push is ready: ${devices} subscribed device(s).` };
+    }
+
+    // WhatsApp is a separate product, and any other channel has no provider test: never a fake success.
+    logger.debug({ storeId, channel }, '[NotificationConfigService] testConnection: not testable');
+    return { success: false, message: `The ${channel} channel is not testable from here.` };
   }
 
   /**
