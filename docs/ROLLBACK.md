@@ -77,7 +77,7 @@ Effect:
 > # verify, then promote `recover` to primary in the Neon console (or repoint DATABASE_URL). See DB-BACKUP-RESTORE.md.
 > ```
 
-> **DR policy:** the dump layer is a daily local `pg_dump` on the developer Mac (launchd `com.ebda.neon-backup` → `~/.claude/scripts/backup-all-neon.sh`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/ebda/`, entry registered in `~/.claude/scripts/lib/backup-projects.sh`) + a daily encrypted copy to R2. Per-commit Neon snapshot branches are NOT used for Ebda. Neon PITR (7-day window) is the primary recovery mechanism; the local dump is belt-and-suspenders for a restore window beyond 7 days or if PITR itself is unavailable.
+> **DR policy:** the dump layer is a daily local `pg_dump` on the developer Mac (launchd `com.ebda.neon-backup` → `~/.claude/scripts/backup-all-neon.sh`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/ebda/`, entry registered in `~/.claude/scripts/lib/backup-projects.sh`) + a daily encrypted copy to R2. Per-commit Neon snapshot branches are NOT used for Ebda. Neon PITR (6-hour window, measured 2026-10-26) is the primary recovery mechanism; the off-machine encrypted dump in R2 (`ebda-db-backups`, nightly workflow `db-backup.yml`) is the answer for anything older than 6 hours or if PITR itself is unavailable.
 
 Ebda uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. They apply via the normal CI/deploy path, not a Railway `preDeployCommand` (that mechanism belongs to a different, Railway-hosted project and never applied here) — confirm a migration landed by checking `_prisma_migrations` directly:
 

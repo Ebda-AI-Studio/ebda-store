@@ -654,6 +654,8 @@ export async function registerPending(
 // App
 // ----------------------------------------------------------------------------------------------------------------
 
+const STORE_SIGN_IN_URL = 'https://store.ebda.app/login';
+
 export function createApp() {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -755,6 +757,14 @@ export function createApp() {
     }
     return schema.parse(body);
   };
+
+  // ---- human entry points ----
+  // This host is API-only (no UI by design, Ruling ID-1): the sign-in form is the Store app's /login, which posts to this
+  // service. A person who types the bare host, /login or /sign-in lands there instead of a 404 (Ruling ACCOUNTS-ENTRY-1).
+  // Cost if wrong: when a dedicated accounts UI ships, point these three at it.
+  for (const path of ['/', '/login', '/sign-in']) {
+    app.get(path, c => c.redirect(STORE_SIGN_IN_URL, 302));
+  }
 
   // ---- discovery ----
   app.get('/health', c =>

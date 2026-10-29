@@ -15,7 +15,7 @@ Source review: impeccable critique of the live site, 26/40 (full report kept in 
 3. Section order as in MKT-1; merge story + how.
 4. Delete breakout + story scroll (+ their assets, incl. `public/devices/dahab-story-*`).
 5. Product name in header/hero; studio story to /about.
-6. WhatsApp contact +20 120 776 1882 (Ahmad, 2026-10-14) via `BRAND` (one source), wa.me/201207761882 link plus the number shown as selectable text.
+6. WhatsApp contact +20 151 419 1411 (Ahmad, 2026-10-14) via `BRAND` (one source), wa.me/201514191411 link plus the number shown as selectable text.
 7. Ad readiness: conversion events on signup CTAs + UTM pass-through to signup — reconcile with the existing `feat/ebda-own-ads-tracking` branch (Pixel + CAPI + UTM + PostHog) rather than duplicating it.
 
 ## P1

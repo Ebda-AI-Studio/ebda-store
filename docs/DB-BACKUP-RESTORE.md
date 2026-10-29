@@ -6,13 +6,13 @@ at the bottom. When something goes wrong, start at the decision table.
 
 ## Which path do I use? (decision table)
 
-| Situation                                                                             | Use                         | RPO (data lost) | RTO (time to recover) |
-| ------------------------------------------------------------------------------------- | --------------------------- | --------------- | --------------------- |
-| Bad migration / accidental `DELETE` / app corrupted rows — **within the last 7 days** | **Layer 0 — Neon PITR**     | seconds         | ~2–5 min              |
-| Same, but older than 7 days                                                           | Layer 1/2 — dump restore    | up to 24h       | ~5–10 min             |
-| Neon project deleted / account lost / provider outage                                 | Layer 2 — R2 encrypted dump | up to 24h       | ~10–20 min            |
-| Local Mac dead but need a dump                                                        | Layer 2 — R2 encrypted dump | up to 24h       | ~10–20 min            |
-| Just need last night's data locally                                                   | Layer 1 — local `.sql.gz`   | up to 24h       | ~5 min                |
+| Situation                                                                              | Use                                             | RPO (data lost) | RTO (time to recover) |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------- | --------------------- |
+| Bad migration / accidental `DELETE` / app corrupted rows — **within the last 6 hours** | **Layer 0 — Neon PITR**                         | seconds         | ~2–5 min              |
+| Same, but older than 6 hours                                                           | Layer 1/2 — dump restore                        | up to 24h       | ~5–10 min             |
+| Neon project deleted / account lost / provider outage                                  | Layer 2 — R2 encrypted dump (`ebda-db-backups`) | up to 24h       | ~10–20 min            |
+| Local Mac dead but need a dump                                                         | Layer 2 — R2 encrypted dump                     | up to 24h       | ~10–20 min            |
+| Just need last night's data locally                                                    | Layer 1 — local `.sql.gz`                       | up to 24h       | ~5 min                |
 
 **Default to Layer 0 (PITR).** It is the primary mechanism, near-zero data loss, and
 never touches production while you verify. The dumps are the belt-and-suspenders for the
@@ -20,26 +20,44 @@ cases PITR can't cover (older than the window, or Neon itself is gone).
 
 ## The 4-layer strategy (what global companies do, and where we stand)
 
-| Layer                      | RPO              | What it is                                                                                                   | Status                                              |
-| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| **Continuous WAL / PITR**  | seconds–minutes  | Restore/branch to any timestamp. Neon does this natively via branch-at-timestamp                             | ✅ **7-day window** (raised from 24h on 2026-07-06) |
-| **Periodic logical dumps** | = interval (24h) | `pg_dump` → independent storage; survives provider loss / account compromise / "someone deleted the project" | ✅ daily → local + R2                               |
-| **3-2-1 rule**             | —                | 3 copies, 2 media, 1 off-site                                                                                | ✅ Neon (primary) + local Mac + R2                  |
-| **GFS retention tiering**  | —                | daily 30d → weekly 90d → monthly 1yr (compliance long-tail)                                                  | ⚠️ flat 30d today (GFS is the next hardening step)  |
+| Layer                      | RPO              | What it is                                                                                                   | Status                                                                                                             |
+| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| **Continuous WAL / PITR**  | seconds–minutes  | Restore/branch to any timestamp. Neon does this natively via branch-at-timestamp                             | ✅ **6-hour window** (measured 2026-10-26: `history_retention_seconds = 21600`; the API refuses more on this plan) |
+| **Periodic logical dumps** | = interval (24h) | `pg_dump` → independent storage; survives provider loss / account compromise / "someone deleted the project" | ✅ daily → local + R2                                                                                              |
+| **3-2-1 rule**             | —                | 3 copies, 2 media, 1 off-site                                                                                | ✅ Neon (primary) + local Mac + R2                                                                                 |
+| **GFS retention tiering**  | —                | daily 30d → weekly 90d → monthly 1yr (compliance long-tail)                                                  | ⚠️ flat 30d today (GFS is the next hardening step)                                                                 |
 
 ---
 
 ## Layer 0 — Neon Point-in-Time Recovery (PITR) · primary, near-zero RPO
 
 Neon continuously retains WAL, so you can spin up an **isolated branch** of the database
-as it existed at **any timestamp in the last 7 days** — without touching production. This
+as it existed at **any timestamp in the last 6 hours** — without touching production. This
 is the fastest recovery for the common failure modes (a migration nuked a column, a script
 mass-deleted rows, a bug corrupted data 20 minutes ago).
 
-- **Window:** 7 days (`history_retention_seconds = 604800`). Raised from the 1-day default
-  on 2026-07-06. To change: `PATCH /projects/<id>` with `{"project":{"history_retention_seconds":<sec>}}`
-  (there is no `neonctl` flag for it). Launch plan supports up to 7 days.
+- **Window: 6 hours** (`history_retention_seconds = 21600`, project `lucky-truth-54548746`, measured with the Neon API on
+  2026-10-26). This runbook used to say 7 days; that was never the live setting. Asking for 7 days
+  (`PATCH /projects/<id>` with `{"project":{"history_retention_seconds":604800}}`) is **refused on the current plan**
+  (21600 s is its maximum), so the window can only grow by changing plan. Anything older than 6 hours is NOT recoverable by
+  PITR: use the off-machine dump below. Re-measure after any plan change and update this line.
 - **Cost:** ~$0 — it's WAL already being written; branches are copy-on-write.
+
+### Off-machine encrypted dump (the answer to "older than 6 hours")
+
+`.github/workflows/db-backup.yml` runs nightly (02:43 UTC, GitHub-hosted, so it survives the Mac and the CI guest being
+down): `pg_dump` 17 (custom format) of production, `scripts/ops/verify-db-dump.sh` (refuses an empty-ish dump), `age`
+encryption to the public key in repo variable `EBDA_BACKUP_AGE_PUBLIC_KEY`, upload to the R2 bucket **`ebda-db-backups`**
+(key `db/YYYY/MM/ebda-<ts>-<sha>.dump.age`; object lock 7 days; expires after 35 days), read-back compare, Telegram alert
+on failure. The **private key is only in Ahmad's macOS Keychain** (service `ebda-db-backup-age-key`); nobody else, and no
+CI job, can decrypt.
+
+```bash
+# restore the newest dump into a scratch Postgres
+npx wrangler r2 object get ebda-db-backups/db/<YYYY>/<MM>/<file>.dump.age --file /tmp/x.dump.age --remote
+security find-generic-password -s ebda-db-backup-age-key -w > /tmp/k && age -d -i /tmp/k -o /tmp/x.dump /tmp/x.dump.age && rm -f /tmp/k
+pg_restore --no-owner --dbname "$SCRATCH_URL" /tmp/x.dump
+```
 
 ### Restore with PITR
 
@@ -117,7 +135,7 @@ Telegram alert, and uploads nothing** — a missing backup is loud, a worthless 
 
 ## Restore from a dump (Layer 1 or 2)
 
-Use when PITR can't cover it (older than 7 days, or Neon itself is gone). **Always restore
+Use when PITR can't cover it (older than 6 hours, or Neon itself is gone). **Always restore
 into a fresh Neon branch or a scratch DB first — never straight over production.**
 
 ```bash
@@ -252,7 +270,7 @@ neonctl branches delete restore-candidate --project-id "$PID" --org-id "$ORG"
 
 ⚠️ **Restore is destructive to writes made since the dump** — orders placed, products edited,
 R2 uploads referenced from new rows — all lost. For Ebda Store that's **per-tenant loss across every
-store**. Prefer PITR (Layer 0) whenever the incident is inside the 7-day window; only fall back
+store**. Prefer PITR (Layer 0) whenever the incident is inside the 6-hour window; only fall back
 to a dump when it isn't. Coordinate with the team before a production cutover.
 
 ---
@@ -289,7 +307,7 @@ A `POST /auth/me/erase` request (GDPR Art. 17 and applicable GCC
 data-protection law — see `docs/privacy/data-map.md`)
 only mutates the LIVE database — it can't retroactively edit a backup that
 was already taken. Full breakdown of the resulting persistence window
-(PITR 7 days + dump retention 30 days below) and what that means for a
+(PITR 6 hours + dump retention 30 days below) and what that means for a
 data-subject request: `docs/privacy/data-map.md` § "Deletion & backups".
 
 ## Retention — current & the GFS hardening step

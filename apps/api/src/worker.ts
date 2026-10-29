@@ -33,6 +33,7 @@ import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { handleStoreEventsBatch } from './lib/wa/store-events-queue';
 import { STORE_EVENTS_DLQ, STORE_EVENTS_QUEUE } from './lib/wa/config';
 import { runScheduled } from './cf/cron';
+import { routeCutover } from './cf/cutover';
 import { runJobWorkflow } from './lib/jobs/run-workflow';
 import type { JobParams } from './lib/jobs/start';
 import { createDatabaseRoleGuard } from './cf/database-role-guard';
@@ -326,6 +327,9 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
     const res = await withWorkerContext(env, ctx, () => devProbe(env, isolateDb!, url));
     if (res) return res;
   }
+  // Cutover admin surface (docs/runbooks/cutover-cf.md): bearer-checked before the StoreDO sees it.
+  const cutover = await routeCutover(request, env);
+  if (cutover) return cutover;
   const flooded = await floodGuard(request, env, path);
   if (flooded) return flooded;
   if (path === '/socket.io/' || path === '/socket.io') {
