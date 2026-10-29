@@ -1,3 +1,4 @@
+import { asciiDigits } from '../return-reason';
 /**
  * `assertAggregateOnly`: the one gate in front of anything that reads aggregates to produce insights or
  * (later) calls a model (plan 3.2, Ruling CI-9). It throws on the first forbidden shape instead of
@@ -13,13 +14,9 @@ const PHONE_SHAPE = /(?:\+|00)?\d(?:[\s().-]?\d){8,}/;
 const EMAIL_SHAPE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 export const MAX_AGGREGATE_ENTRIES = 5000;
 
-const ARABIC_INDIC = /[٠-٩۰-۹]/g;
-const westernDigits = (s: string) =>
-  s.replace(ARABIC_INDIC, c => String((c.charCodeAt(0) - 0x0660) % 16));
-
 export function assertAggregateOnly(payload: unknown, path = 'payload'): void {
   if (typeof payload === 'string') {
-    const t = westernDigits(payload);
+    const t = asciiDigits(payload);
     if (PHONE_SHAPE.test(t) || EMAIL_SHAPE.test(t)) {
       throw new Error(`aggregate guard: ${path} looks like a phone number or email`);
     }

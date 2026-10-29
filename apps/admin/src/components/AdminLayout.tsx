@@ -122,6 +122,7 @@ export function AdminLayout({
     platformProviderActivation: t('navPlatformProviderActivation'),
     platformTaxArchive: t('navPlatformTaxArchive'),
     platformPolicyUpdates: t('navPlatformPolicyUpdates'),
+    platformCiInsights: t('navPlatformCiInsights'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
@@ -149,6 +150,7 @@ export function AdminLayout({
     loyalty: t('hubTabs.loyalty'),
     bundles: t('hubTabs.bundles'),
     wallet: t('hubTabs.wallet'),
+    customerIntelligence: t('hubTabs.customerIntelligence'),
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),
     inventory: t('hubTabs.inventory'),

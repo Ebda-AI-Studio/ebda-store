@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { tenantContext } from '../middleware/tenant-context';
 import { auditLog } from '../middleware/security';
+import { featureService } from '../services/feature.service';
 import { parseInput } from '../lib/parse-input';
 import {
   ciOverview,
@@ -17,6 +18,7 @@ import {
  * Customer Intelligence for the merchant (CI-3, Ruling CI-10). Mounted at the bare '/stores' prefix:
  *
  *   GET /stores/:storeId/ci/overview             status, sharing opt-in, COD-amount card, hint counts
+ *   PUT /stores/:storeId/ci/hints                the merchant's own switch (default OFF; off = turn hints off)
  *   PUT /stores/:storeId/ci/sharing              the cross-store opt-in (default OFF)
  *   GET /stores/:storeId/ci/orders/:orderId/hint COD risk note for one order   (needs `customer_intelligence`)
  *   GET /stores/:storeId/ci/courier?orderId=&carriers=  courier ranking for the order's area   (needs `customer_intelligence`)
@@ -56,6 +58,35 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ success: true, data: await ciOverview(req.params.storeId) });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.put(
+  '/:storeId/ci/hints',
+  ...base,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { enabled } = parseInput(z.object({ enabled: z.boolean() }).strict(), req.body);
+      await featureService.setFeature(
+        req.params.storeId,
+        'customer_intelligence',
+        enabled,
+        req.user!.userId
+      );
+      await auditLog({
+        action: 'store.feature_toggled',
+        userId: req.user!.userId,
+        storeId: req.params.storeId,
+        resourceType: 'store_feature',
+        resourceId: 'customer_intelligence',
+        details: { featureKey: 'customer_intelligence', enabled },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { enabled } });
     } catch (e) {
       next(e);
     }

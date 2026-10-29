@@ -5731,7 +5731,8 @@
         "locations": "Locations",
         "customerGroups": "Customer groups",
         "wallet": "Wallet",
-        "wholesaleApplications": "Wholesale applications"
+        "wholesaleApplications": "Wholesale applications",
+        "customerIntelligence": "Smart hints"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -5771,7 +5772,8 @@
       "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)",
-      "wholesalePendingBadge": "{count} wholesale applications waiting"
+      "wholesalePendingBadge": "{count} wholesale applications waiting",
+      "navPlatformCiInsights": "Customer Intelligence"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -10654,5 +10656,96 @@
     },
     "testNote": "Print one label and scan it with a phone before you print a whole sheet.",
     "loading": "Loading"
+  },
+  "customerIntelligence": {
+    "title": "Smart hints",
+    "subtitle": "Advice from how your own orders were delivered and returned. It only advises: it never holds, delays or cancels an order.",
+    "loadFailed": "Could not load the page.",
+    "retry": "Retry",
+    "saveFailed": "Could not save that change. Try again.",
+    "hints": {
+      "title": "Show smart hints",
+      "body": "A COD risk note on each order, which courier has delivered best to an area, and a COD amount suggestion. Every hint shows how many orders it rests on.",
+      "on": "Hints are on for this store.",
+      "off": "Hints are off. Nothing is shown until you switch them on."
+    },
+    "sharing": {
+      "title": "Learn from other stores too",
+      "body": "If you agree, your store's numbers (never a name, phone number, email or address) are counted together with other stores so the hints get more accurate for everyone. Nobody sees your store or any of your customers, and you can stop this at any time. It is off until you switch it on."
+    },
+    "fee": {
+      "title": "COD amount suggestion",
+      "suggestion": "COD orders above {amount} come back {rate} of the time ({base} on average, from {n} orders). Think about asking for an InstaPay deposit above that amount.",
+      "none": "No amount band is returning clearly more than the rest."
+    },
+    "notEnough": "Not enough data yet. Hints appear once enough orders have been delivered or returned.",
+    "status": {
+      "title": "What the hints are based on",
+      "store": "Your store, data up to",
+      "cohort": "Other stores, data up to",
+      "none": "no data yet"
+    },
+    "shown": {
+      "title": "Hints shown in the last 30 days",
+      "features": {
+        "cod_risk": "COD risk",
+        "courier": "Courier",
+        "fee": "Amount"
+      }
+    },
+    "bands": {
+      "typical": "Typical",
+      "elevated": "Higher than usual",
+      "insufficient": "Not enough data"
+    },
+    "footnote": "Hints are advice only. They never hold, delay or cancel an order, and the final decision is always yours.",
+    "order": {
+      "title": "COD risk",
+      "band": {
+        "typical": "Typical for this area.",
+        "elevated": "Returns are higher than usual here.",
+        "insufficient": "Not enough data yet."
+      },
+      "reason": {
+        "area": "Orders to this area have come back more than average.",
+        "buyer": "This customer has had several returns with your store."
+      },
+      "basedOn": "Based on {n} orders.",
+      "suggest": {
+        "confirm_by_phone": "Confirm by phone before you ship.",
+        "ask_instapay_deposit": "Ask for an InstaPay deposit."
+      },
+      "advisory": "Advice only. The order is not held."
+    },
+    "courier": {
+      "best": "Best delivery record to this area: {carrier} ({rate} delivered, {n} orders). Your selection is unchanged."
+    }
+  },
+  "ciInsights": {
+    "title": "Customer Intelligence",
+    "subtitle": "Findings from the shared numbers of opted-in stores. Nothing changes until a person accepts it.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "Nothing here.",
+    "filter": "Filter by status",
+    "status": {
+      "new": "New",
+      "accepted": "Accepted",
+      "dismissed": "Dismissed"
+    },
+    "evidence": "{n} outcomes across {stores} stores, data up to {date}.",
+    "accept": "Accept",
+    "dismiss": "Dismiss",
+    "gates": {
+      "title": "Hint switches",
+      "body": "Turning one off stops that hint for every store. Calibration only alerts: closing a switch is your decision.",
+      "close": "Turn off",
+      "open": "Turn on",
+      "features": {
+        "cod_risk": "COD risk note",
+        "courier": "Courier suggestion",
+        "fee": "COD amount card"
+      }
+    }
   }
 }

@@ -39,6 +39,7 @@ export type HubLabels = {
   loyalty: string;
   bundles: string;
   wallet: string;
+  customerIntelligence: string;
   // Stock tabs
   stockDashboard: string;
   inventory: string;
@@ -130,6 +131,7 @@ export const HUBS: HubDefinition[] = [
       '/loyalty',
       '/bundles',
       '/wallet',
+      '/customer-intelligence',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
@@ -169,6 +171,8 @@ export const HUBS: HubDefinition[] = [
       // at launch, and a new upsell tab appearing for every merchant on deploy
       // is exactly the visible change the launch must not make.
       { label: labels.wallet, href: `/stores/${storeId}/wallet`, featureKey: 'customer_wallet' },
+      // Smart hints (Customer Intelligence). Always listed: the page is where the merchant switches them on.
+      { label: labels.customerIntelligence, href: `/stores/${storeId}/customer-intelligence` },
     ],
   },
   {

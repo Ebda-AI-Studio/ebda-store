@@ -287,6 +287,16 @@
     "feature": "customer_wallet"
   },
   {
+    "id": "page:/customer-intelligence",
+    "kind": "page",
+    "route": "/customer-intelligence",
+    "access": "staff",
+    "en": "Smart hints",
+    "ar": "تلميحات ذكية",
+    "synEn": "cod risk courier suggestion returns hints intelligence sharing",
+    "synAr": "تلميحات خطر الدفع عند الاستلام شركة الشحن المرتجعات"
+  },
+  {
     "id": "page:/payment-abandonments",
     "kind": "page",
     "route": "/payment-abandonments",

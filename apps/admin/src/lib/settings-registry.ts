@@ -196,6 +196,12 @@ export const PAGES: PageEntry[] = [
     feature: 'customer_wallet',
     syn: { en: 'store credit balance', ar: 'رصيد محفظة' },
   }),
+  page('/customer-intelligence', `${HUB}.customerIntelligence`, 'staff', {
+    syn: {
+      en: 'cod risk courier suggestion returns hints intelligence sharing',
+      ar: 'تلميحات خطر الدفع عند الاستلام شركة الشحن المرتجعات',
+    },
+  }),
   page('/payment-abandonments', `${HUB}.paymentAbandonments`, 'staff', {
     feature: 'payment_abandonment',
     syn: { en: 'failed payment abandoned checkout', ar: 'دفع فاشل تخلي' },

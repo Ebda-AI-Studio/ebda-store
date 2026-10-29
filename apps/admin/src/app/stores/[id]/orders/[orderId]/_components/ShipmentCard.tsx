@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import { apiGet, apiPost } from '../../../../../../lib/api';
 import { ConfirmActionModal } from '../../../../../../components/ConfirmActionModal';
 import { OrderStatusBadge } from '../../../../../../components/OrderStatusBadge';
+import { CourierHint } from './CourierHint';
 import { SHIPMENT_COLORS } from '../../../shipping-carriers/_components/types';
 import { formatMoney } from './format';
 import { ShipmentPickupPanel } from './ShipmentPickupPanel';
@@ -59,6 +60,8 @@ interface ShipmentCardProps {
   orderId: string;
   /** Re-fetch the order after the shipment changes (the order status moves with it). */
   onChanged: () => void;
+  /** Customer Intelligence is on for this store: show the courier suggestion under the picker. */
+  courierHints?: boolean;
 }
 
 /**
@@ -67,7 +70,7 @@ interface ShipmentCardProps {
  * shipment along, and cancel. A booking that failed shows its reason and a Retry; an InstaPay
  * order waiting for confirmation shows why it cannot be shipped yet.
  */
-export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps) {
+export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: ShipmentCardProps) {
   const t = useT('orders.detail.shipment');
   const tStatus = useT('shipping.carriers.shipments');
   const locale = useLocale();
@@ -394,6 +397,14 @@ export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps)
                   ))}
                 </select>
               </label>
+              {courierHints && (
+                <CourierHint
+                  storeId={storeId}
+                  orderId={orderId}
+                  carriers={carriers.filter(c => c.code !== 'manual').map(c => c.code)}
+                  names={Object.fromEntries(carriers.map(c => [c.code, c.name]))}
+                />
+              )}
               {carrier === 'manual' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
