@@ -9,32 +9,40 @@
  * elsewhere; `tests/unit/no-force-branding.test.ts` guards against inherited third-party brand strings.
  */
 
-import { EBDA } from '../foundation/brand';
-
 export const BRAND = {
-  name: EBDA.name,
-  nameAr: EBDA.nameAr,
+  name: 'Ebda AI Studio',
+  nameAr: 'ابدأ استوديو للذكاء الاصطناعي',
   /**
    * The PRODUCT (the store builder). `name`/`nameAr` above name the company; anything naming the product or the Service
    * reads this (ruling PRODUCT-NAME-1). Future products: Ebda WhatsApp / CRM / ERP.
    */
   product: {
-    nameEn: EBDA.products.store.nameEn,
-    nameAr: EBDA.products.store.nameAr,
+    nameEn: 'Ebda Store',
+    nameAr: 'ابدأ ستور',
   },
   /**
    * The WhatsApp PRODUCT (Ebda WhatsApp, by Ebda AI Studio): always the full name, never a bare "Ebda" (BRAND-NAME-1).
    * Lives at `domains.whatsappApp`; its marketing page is /whatsapp on the marketing site.
    */
   productWhatsapp: {
-    nameEn: EBDA.products.whatsapp.nameEn,
-    nameAr: EBDA.products.whatsapp.nameAr,
+    nameEn: 'Ebda WhatsApp',
+    nameAr: 'ابدأ واتساب',
   },
   /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
-  company: EBDA.company,
+  company: {
+    legalNameAr: 'ابدأ استوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
+    legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
+    shortNameAr: 'ابدأ استوديو للذكاء الاصطناعي',
+    shortNameEn: 'Ebda AI Studio',
+    url: 'https://ebda.app',
+  },
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',
-  colors: EBDA.colors,
+  colors: {
+    night: '#0A0B0C',
+    gold: '#B08D57',
+    lift: '#CBA873',
+  },
   fonts: {
     sans: 'Geist',
     mono: 'Geist Mono',
