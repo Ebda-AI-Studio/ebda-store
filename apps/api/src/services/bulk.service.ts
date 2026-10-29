@@ -1349,7 +1349,10 @@ export class BulkService {
             try {
               await recordSlugRedirect(prisma, storeId, SlugEntityType.PRODUCT, r.from, r.to);
             } catch (err) {
-              logger.error({ err, storeId, from: r.from }, '[IMPORT] slug redirect not recorded');
+              logger.error(
+                { err, storeId, fromSlug: r.from },
+                '[IMPORT] slug redirect not recorded'
+              );
             }
           }
         } else

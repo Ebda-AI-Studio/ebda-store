@@ -31,11 +31,13 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 | any other status of a DO order                            | 501 `ORDER_STATUS_NOT_ON_DO`                                                     |
 | partial-return pro-rata journal                           | 501 `PARTIAL_RETURN_JOURNAL_NOT_ON_DO`                                           |
 | gold `setProductPricing`, `asRepricer`, `bulkSwitchMode`  | `goldSetProductPricing` / `goldCreateVariant` / `goldBulkSwitchMode` (CF-LAST-1) |
-| InstaPay ORDER receipt upload / submit                    | 501 `INSTAPAY_RECEIPTS_NOT_ON_DO`                                                |
+| InstaPay ORDER receipt upload / submit / reject / approve | DO table `instapay_order_receipts`, one section each (INSTAPAY-DO-1)             |
+| wallet movement outside a Postgres transaction            | `walletEntry` (ledger row, balance and the 2150 journal half in one section)     |
+| wallet movement INSIDE a Postgres transaction             | 501 `WALLET_IN_TRANSACTION_NOT_ON_DO` (WALLET-DO-TX-1)                           |
 
 ## Not moved (the flip gate stays closed)
 
-Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document and credit notes), delivery slots, personalisation notes, quotes (`dryRun`), InstaPay receipts, the Return row lifecycle (`return.service.ts`: its refund legs reach the DO only through `PaymentService.refund` and `refundBook`), the order reads, expense / PO / stock-adjustment journals, the wallet-movement journal (WALLET-GL-1, open PR), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
+Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document and credit notes), delivery slots, personalisation notes, quotes (`dryRun`), the Return row lifecycle (`return.service.ts`: its refund legs reach the DO only through `PaymentService.refund` and `refundBook`), the order reads, expense / PO / stock-adjustment journals, the callers that hold a Postgres transaction around a wallet movement (return completion, erasure forfeit, order create: WALLET-DO-TX-1), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
 
 ## Tests
 
@@ -47,3 +49,10 @@ Carts and abandoned carts (CF-ORDERS-CART-1), fiscal documents (sale document an
 ## PR D2b-5 (Ruling CF-LAST-1)
 
 Gold product pricing edits are money ops (`do/gold-pricing.ts`); `PaymentService.handleWebhook` / `refund` have an end-to-end Postgres-vs-DO contract (`tests/integration/repo-factory-payment-service-contract.test.ts`, stub provider adapter). The open list is `docs/cf/not-on-do.json`.
+
+## PR R3 (Rulings WALLET-GL-1 / WALLET-DO-TX-1, INSTAPAY-DO-1, IMPORT-DO-1)
+
+- Wallet movements: `walletEntry` journals `admin_adjust` / `credit` / `debit` on 5950 Customer Goodwill and `expire` on 4100 Unused Store Credit against 2150 (`do/ledger.ts` `postWalletMovementJournal`; 2150 / 4100 / 5950 self-heal like the Postgres template). Tests: `tests/integration/repo-factory-wallet-contract.test.ts`, `apps/api/workers-do/wallet.test.ts` (20 concurrent debits cannot overdraw; 20 replays post once).
+- InstaPay order receipts: ops `receiptCreate`, `receiptExtraction`, `receiptGet`, `receiptList`, `receiptProof`, `receiptSubmit`, `receiptReject`, `receiptImageDeleted`, `receiptSweep`; `confirmPayment` approves the submitted receipts in its own section. Cross-store reference claim: D1 `entity_index` kind `instapay_ref`, bound to the receipt (`claim_ref`).
+- CSV import: ops `importBatch` and `importVariants` (`docs/cf/repo-factory.md`).
+- FOUNDING-1 `billing_grants` guard on D1: already ported by CF-LAST-2 (`migrations/platform/0002_invariants.sql`, `packages/cf-schema/test/platform.test.ts`). `PaymentService.handleWebhook` / `refund` end to end with a stub adapter: already `tests/integration/repo-factory-payment-service-contract.test.ts` (CF-LAST-1). Both re-run green in R3; nothing new was needed.
