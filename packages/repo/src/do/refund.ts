@@ -377,13 +377,21 @@ function reverseWholeOrder(
   storeId: string,
   o: OrderRow,
   now: number,
-  into: RefundResult
+  into: RefundResult,
+  restoreInventory = true
 ): void {
-  // arm the completion claim (applyRefundEffects), then run every reversal, then claim (claim-reversed step)
-  db.run(
-    'UPDATE orders SET refund_reversal_requested_at = ?1, refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
-    [now, o.id, storeId]
-  );
+  // arm the completion claim (applyRefundEffects), then run every reversal, then claim (claim-reversed step).
+  // restoreInventory:false (a cancel whose goods are NOT going back on the shelf, MONEYB-5) is never armed, like Postgres.
+  if (restoreInventory)
+    db.run(
+      'UPDATE orders SET refund_reversal_requested_at = ?1, refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
+      [now, o.id, storeId]
+    );
+  else
+    db.run(
+      'UPDATE orders SET refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
+      [now, o.id, storeId]
+    );
 
   const legacy = db.all(
     `SELECT id FROM inventory_history WHERE store_id = ? AND reference = ? AND type = 'adjustment' AND reason = ?`,
@@ -395,7 +403,7 @@ function reverseWholeOrder(
     `SELECT id FROM inventory_history WHERE store_id = ? AND reference = ? AND (type = 'return_stock' OR (type = 'adjustment' AND reason = ?)) LIMIT 1`,
     [storeId, o.id, LEGACY_ROLLBACK_REASON]
   )[0];
-  if (!stockMarker) {
+  if (!stockMarker && restoreInventory) {
     const restored = alreadyRestoredByItem(db, storeId, o.id);
     const neverTaken = neverTakenByItem(db, storeId, o.id);
     for (const item of loadItems(db, o.id)) {
@@ -463,7 +471,7 @@ function reverseWholeOrder(
  */
 export function cancelOrder(
   db: SyncSql,
-  a: { storeId: string; orderId: string; now?: number }
+  a: { storeId: string; orderId: string; now?: number; restoreInventory?: boolean }
 ): RefundResult {
   id(a.storeId, 'storeId');
   id(a.orderId, 'orderId');
@@ -488,7 +496,7 @@ export function cancelOrder(
       addEvent(db, a.storeId, o.id, o.status, 'cancelled', {}, now);
       out.status = 'cancelled';
     }
-    reverseWholeOrder(db, a.storeId, o, now, out);
+    reverseWholeOrder(db, a.storeId, o, now, out, a.restoreInventory !== false);
     return out;
   });
 }

@@ -2360,7 +2360,14 @@ export class OrderService {
       data: CreateOrderData;
       cart: {
         id: string;
-        items: Array<{ productId: string; quantity: number; variantId?: string | null }>;
+        items: Array<{
+          productId: string;
+          quantity: number;
+          variantId?: string | null;
+          quotedUnitPrice?: number | null;
+          note?: string | null;
+          product: { personalisation?: unknown };
+        }>;
         bundles: Array<{ bundleId: string; quantity: number }>;
       };
       referralCode?: string;
@@ -2368,10 +2375,35 @@ export class OrderService {
         checkoutIp?: string | null;
         idempotencyKey?: string | null;
         buyer?: BuyerIdentity;
+        dryRun?: boolean;
       };
     }
   ) {
     const { storeId, customerId, data } = c;
+    // Options the Postgres path honours that the engine does not: refuse them loudly rather than drop them (CF-ORDERS-1).
+    if (data.deliveryDate || data.deliveryWindowId)
+      throw new AppError(
+        501,
+        'DELIVERY_SLOT_NOT_ON_DO',
+        'Delivery slots are not available for this store yet'
+      );
+    if (c.cart.items.some(i => i.note))
+      throw new AppError(
+        501,
+        'PERSONALISATION_NOT_ON_DO',
+        'Personalised items are not available for this store yet'
+      );
+    const missingPersonalisation = c.cart.items.filter(
+      i => activePersonalisation(i.product.personalisation as never)?.required
+    );
+    if (missingPersonalisation.length > 0)
+      throw new AppError(
+        400,
+        'PERSONALISATION_REQUIRED',
+        'Personalisation is required for: ' +
+          missingPersonalisation.map(i => i.productId).join(', '),
+        { productIds: missingPersonalisation.map(i => i.productId) }
+      );
     const [loyaltyOn, backorderOn, wholesale, walletOk] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'loyalty'),
       featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
@@ -2396,6 +2428,7 @@ export class OrderService {
           productId: i.productId,
           quantity: i.quantity,
           ...(i.variantId ? { variantId: i.variantId } : {}),
+          quotedUnitPrice: i.quotedUnitPrice ?? null,
         })),
         bundles: c.cart.bundles.map(b => ({ bundleId: b.bundleId, quantity: b.quantity })),
         buyer: c.requestContext?.buyer,
@@ -2418,9 +2451,12 @@ export class OrderService {
         wholesaleEntitled: wholesale,
         loyaltyFeatureEnabled: loyaltyOn,
         backorderEnabled: backorderOn,
-        goldRequireQuote: false,
+        goldRequireQuote: c.requestContext?.dryRun !== true,
         expectedTotal: data.expectedTotal,
-        customerNotes: data.notes,
+        orderNotes: data.notes,
+        locale: data.locale,
+        smsOptIn: data.smsOptIn === true,
+        source: data.source ?? 'web',
       })
     );
     // the cart is consumed (it still lives in Postgres until carts move)
@@ -2431,7 +2467,7 @@ export class OrderService {
         await affiliateService
           .linkOrderToReferral(storeId, placed.orderId, c.referralCode)
           .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
-      if (data.paymentMethod === 'cod' || placed.paymentStatus === 'paid')
+      if (data.paymentMethod === 'cod' || placed.paymentStatus === 'paid') {
         inngest
           .send({
             name: 'order/created',
@@ -2445,6 +2481,35 @@ export class OrderService {
           .catch((err: unknown) =>
             logger.error({ err, orderId: placed.orderId }, 'Failed to enqueue order/created')
           );
+        try {
+          socketService.newOrderNotification(storeId, {
+            orderId: placed.orderId,
+            orderNumber: placed.orderNumber,
+            total: placed.total,
+            customerName:
+              `${data.shippingAddress.firstName ?? ''} ${data.shippingAddress.lastName ?? ''}`.trim() ||
+              'Customer',
+          });
+        } catch (notifyError) {
+          logger.error({ err: notifyError }, 'Failed to send order notification');
+        }
+      }
+      const consentPhone = data.shippingAddress?.phone;
+      if (data.smsOptIn === true && typeof consentPhone === 'string' && consentPhone.trim()) {
+        const customerKey = customerKeyOf({ customerId, shippingAddress: data.shippingAddress });
+        if (customerKey) {
+          await withSavepoint(() =>
+            SmsConsentService.recordGrant(storeId, {
+              customerKey,
+              userId: customerId ?? null,
+              phone: consentPhone,
+              source: 'checkout',
+            })
+          ).catch(err =>
+            logger.error({ err, orderId: placed.orderId }, '[Order] SMS consent write failed')
+          );
+        }
+      }
       await bustProductCaches(storeId);
       void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
     }
@@ -2700,7 +2765,7 @@ export class OrderService {
     // wallet, backorders) are one section there. The state machine is checked on the DO's own status first.
     if (status === 'cancelled') {
       const money = await storeMoney(storeId);
-      if (money) return OrderService.cancelOnDo(money, storeId, orderId);
+      if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
     }
     const order = await this.getById(storeId, orderId);
 
@@ -2951,6 +3016,8 @@ export class OrderService {
       COUPON_EXHAUSTED: [400, 'INVALID_COUPON'],
       COUPON_USER_LIMIT: [400, 'COUPON_LIMIT_REACHED'],
       COUPON_INVALID: [400, 'INVALID_COUPON'],
+      PRODUCT_UNAVAILABLE: [409, 'PRODUCT_NO_LONGER_AVAILABLE'],
+      GOLD_PRICE_DRIFT: [409, 'PRICE_CHANGED'],
       COUPON_EXPIRED: [400, 'INVALID_COUPON'],
       INSUFFICIENT_WALLET: [409, 'INSUFFICIENT_WALLET_BALANCE'],
       TOO_MANY_OPEN_ORDERS: [429, 'TOO_MANY_OPEN_HOLDS'],
@@ -2964,22 +3031,70 @@ export class OrderService {
     }
   }
 
-  private static async cancelOnDo(money: MoneyClient, storeId: string, orderId: string) {
+  private static async cancelOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    opts: { restoreInventory?: boolean }
+  ) {
     const db = await storeDb(storeId);
     const before = await db.order.findFirst({
       where: { id: orderId, storeId },
-      select: { status: true },
+      select: {
+        status: true,
+        paymentStatus: true,
+        orderNumber: true,
+        customerId: true,
+        payments: { select: { status: true } },
+      },
     });
     if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
     assertValidTransition(before.status, 'cancelled');
-    const r = await money.cancel({ orderId }, `cancel:${orderId}`);
+    const requestedAt = new Date();
+    const r = await money.cancel({ orderId, restoreInventory: opts.restoreInventory !== false });
     if (!r.replayed) {
-      await OrderService.applyRefundEffects(storeId, orderId, { fireRefundNotification: false });
+      // the same tail as the Postgres path: refund fanout, the status fanout, the customer push
+      const hadCapturedPayment = hasCapturedPayment(before);
+      await OrderService.applyRefundEffects(storeId, orderId, {
+        fireRefundNotification: shouldApplyRefundEffects('cancelled', before),
+        ...(opts.restoreInventory === false ? { restoreInventory: false } : {}),
+      });
       void deferAfterTenantCommit('order.updateStatus.invalidateCustomersCache', () =>
         invalidateCustomersCache(storeId)
       ).catch(err =>
         logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
       );
+      inngest
+        .send({
+          name: 'order/status-changed',
+          data: {
+            orderId,
+            storeId,
+            status: 'cancelled',
+            hadCapturedPayment,
+            requestedAt: requestedAt.toISOString(),
+          },
+        })
+        .catch((err: unknown) => {
+          logger.error(
+            { err, orderId },
+            'Failed to enqueue order/status-changed - running fanout inline as fallback'
+          );
+          handleOrderStatusChanged(orderId, storeId, 'cancelled', hadCapturedPayment, {
+            run: <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
+          }).catch((e: unknown) =>
+            logger.error({ err: e, orderId }, 'order/status-changed inline fallback also failed')
+          );
+        });
+      try {
+        if (before.customerId)
+          socketService.orderStatusNotification(before.customerId, {
+            orderNumber: before.orderNumber,
+            status: 'cancelled',
+          });
+      } catch (notifyError) {
+        logger.error({ err: notifyError }, 'Failed to send order status notification');
+      }
     }
     return (await db.order.findFirst({
       where: { id: orderId, storeId },

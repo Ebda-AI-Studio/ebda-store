@@ -69,8 +69,35 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
    * order rows are ONE section. The caller never supplies `storeId` (bound by the DO) nor `now` (the DO clock).
    */
   createOrder: (db, storeId, a) => {
-    const { storeId: _s, now: _n, ...rest } = a as Partial<CheckoutInput>;
-    return placeOrder(db, { ...(rest as CheckoutInput), storeId });
+    const {
+      storeId: _s,
+      now: _n,
+      locale,
+      smsOptIn,
+      source,
+      orderNotes,
+      ...rest
+    } = a as Partial<CheckoutInput> & {
+      locale?: string;
+      smsOptIn?: boolean;
+      source?: string;
+      orderNotes?: string;
+    };
+    const placed = placeOrder(db, { ...(rest as CheckoutInput), storeId });
+    // the columns the order service stamps that the pricing engine does not own (Postgres parity: notes, locale, sms opt-in, source)
+    if (!placed.replayed)
+      db.run(
+        'UPDATE orders SET locale = ?, sms_opt_in = ?, source = ?, notes = ? WHERE id = ? AND store_id = ?',
+        [
+          typeof locale === 'string' ? locale : null,
+          smsOptIn === true ? 1 : 0,
+          typeof source === 'string' && source.length > 0 && source.length <= 32 ? source : 'web',
+          typeof orderNotes === 'string' ? orderNotes : null,
+          placed.orderId,
+          storeId,
+        ]
+      );
+    return placed;
   },
   /** The merchant confirms an InstaPay transfer (OrderService/instapay-confirmation): exactly once. */
   confirmPayment: (db, storeId, a) =>
@@ -81,7 +108,12 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       proofSubmitted: a.proofSubmitted === true,
     }),
   /** updateStatus -> cancelled: status plus the whole reversal (stock, coupon, loyalty, wallet, backorders). */
-  cancel: (db, storeId, a) => cancelOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  cancel: (db, storeId, a) =>
+    cancelOrder(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      restoreInventory: a.restoreInventory !== false,
+    }),
   /** An unconfirmed InstaPay hold whose window ran out is cancelled; 'skipped' when it is not (or no longer) expirable. */
   expireHold: (db, storeId, a) =>
     expireInstapay(db, {

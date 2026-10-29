@@ -191,6 +191,8 @@ function unconditionallyAnsweredBundleCodes(bundleSrc: string): string[] {
  * "I did not write copy for it yet" is not a reason.
  */
 const DELIBERATELY_GENERIC: Record<string, string> = {
+  QUOTE_NOT_ON_DO:
+    'a quote for a store served by its Durable Object (Ruling CF-ORDERS-1): unreachable while every store stays on Postgres (the cutover gate forbids a flip until the engine can quote); remove this entry when the quote is ported',
   // Payment leg (#1826). Both leave the order PENDING — no compensating
   // rollback runs for them — and a retry creates a fresh order that can
   // succeed. The stranded pending order holds its stock until

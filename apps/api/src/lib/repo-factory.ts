@@ -193,7 +193,7 @@ export interface MoneyClient {
     a: { orderId: string; actorUserId?: string | null; proofSubmitted?: boolean },
     key?: string
   ): Promise<{ changed: boolean; orderId: string; status: string }>;
-  cancel(a: { orderId: string }, key?: string): Promise<CancelResult>;
+  cancel(a: { orderId: string; restoreInventory?: boolean }, key?: string): Promise<CancelResult>;
   expireHold(
     a: { orderId: string; proofSubmitted?: boolean },
     key?: string
@@ -227,7 +227,11 @@ export interface CreateOrderArgs {
   backorderEnabled?: boolean;
   goldRequireQuote?: boolean;
   expectedTotal?: number;
-  customerNotes?: string;
+  /** stamped on the order row after the engine wrote it (Postgres parity) */
+  locale?: string;
+  smsOptIn?: boolean;
+  source?: string;
+  orderNotes?: string;
 }
 export interface PlacedOrderResult {
   orderId: string;

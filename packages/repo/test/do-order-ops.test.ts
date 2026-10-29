@@ -219,4 +219,41 @@ describe('order money operations: the door', () => {
     expect(r.code('createOrder', o())).toBe('TOO_MANY_OPEN_ORDERS');
     expect(r.n(`SELECT inventory n FROM products`)).toBe(8);
   });
+
+  it('cancel with restoreInventory:false keeps the goods out of stock but still releases the coupon, unarmed like Postgres', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit, scope_product_ids, scope_category_ids) VALUES ('c', 's1', 'ONE', 'x', 'fixed', 100, 5, '[]', '[]')`
+    );
+    const o = r.op(
+      'createOrder',
+      r.order({ couponCode: 'ONE', lines: [{ productId: 'sku', quantity: 4 }] })
+    );
+    expect(r.op('cancel', { orderId: o.orderId, restoreInventory: false })).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(6);
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBe(0);
+    expect(
+      r.n(`SELECT count(*) n FROM orders WHERE refund_reversal_requested_at IS NOT NULL`)
+    ).toBe(0);
+    expect(r.n(`SELECT count(*) n FROM orders WHERE refund_reversed_at IS NOT NULL`)).toBe(1);
+  });
+
+  it('createOrder stamps notes, locale, sms opt-in and source in the same section', () => {
+    const r = rig();
+    r.op(
+      'createOrder',
+      r.order({ orderNotes: 'ring', locale: 'ar', smsOptIn: true, source: 'agent' })
+    );
+    expect(
+      r.n(
+        `SELECT count(*) n FROM orders WHERE notes = 'ring' AND locale = 'ar' AND sms_opt_in = 1 AND source = 'agent'`
+      )
+    ).toBe(1);
+    r.op('createOrder', r.order());
+    expect(
+      r.n(`SELECT count(*) n FROM orders WHERE sms_opt_in = 0 AND source = 'web' AND notes IS NULL`)
+    ).toBe(1);
+  });
 });

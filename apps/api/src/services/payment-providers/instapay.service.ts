@@ -52,7 +52,7 @@ import {
   type InstapayRefundRecord,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
-import { storeMoney } from '../../lib/repo-factory';
+import { storeDb, storeMoney } from '../../lib/repo-factory';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
@@ -384,21 +384,57 @@ export class InstapayService {
     const { storeId, orderId } = args;
     const now = args.now ?? new Date();
     // Store on its Durable Object (Ruling CF-ORDERS-1): the claim, the payment row and both audit rows are ONE section there.
-    // The receipts table has not moved, so `proofSubmitted` reads Postgres and finds none for a DO store (residual).
+    // The shopper's proof is read from the DO payment metadata and the Postgres receipts (not moved yet); unknown = proof.
     const money = await storeMoney(storeId);
     if (money) {
       const r = await money.confirmPayment({
         orderId,
         actorUserId: args.actorUserId,
-        proofSubmitted: await InstapayService.proofSubmitted(storeId, orderId, null),
+        proofSubmitted: await InstapayService.proofOnDo(storeId, orderId),
       });
       if (r.changed) {
+        // the same post-commit work as the Postgres path: the merchant's confirm approves the submitted receipts and the
+        // screenshots are deleted (M-003), the customers cache is busted, the post-payment fan-out and the socket push fire
+        try {
+          const approved = await InstapayReceiptService.approveSubmitted(
+            prisma as unknown as Prisma.TransactionClient,
+            storeId,
+            { orderId },
+            args.actorUserId,
+            now
+          );
+          await InstapayReceiptService.deleteImages(storeId, approved);
+        } catch (err) {
+          logger.error({ err, orderId }, '[INSTAPAY] receipt approval after confirm failed');
+        }
         await invalidateCustomersCache(storeId);
         await inngest
           .send({ name: 'order/created', data: { orderId, storeId, paymentMethod: 'instapay' } })
           .catch((err: unknown) =>
             logger.error({ err, orderId }, '[INSTAPAY] failed to enqueue order/created')
           );
+        const order = await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: { id: orderId, storeId },
+          select: { orderNumber: true, total: true, shippingAddress: true },
+        });
+        if (order) {
+          const addr = metaOf(order.shippingAddress);
+          const shopper = [addr.firstName, addr.lastName]
+            .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+            .join(' ');
+          try {
+            socketService.newOrderNotification(storeId, {
+              orderId,
+              orderNumber: order.orderNumber,
+              total: order.total,
+              customerName: shopper || order.orderNumber,
+            });
+          } catch (err) {
+            logger.warn({ err, orderId }, '[INSTAPAY] socket emit failed');
+          }
+        }
       }
       return r.changed
         ? { changed: true, orderId: r.orderId, status: 'confirmed' }
@@ -563,13 +599,18 @@ export class InstapayService {
     now: Date = new Date()
   ): Promise<'expired' | 'skipped'> {
     // Store on its Durable Object (Ruling CF-ORDERS-1): the window check, the cancel with its whole reversal and the
-    // payment expiry are ONE section there, safe against a concurrent confirm.
+    // payment expiry are ONE section there, safe against a concurrent confirm. A shopper who sent proof is never expired
+    // (audit O1); if the proof state cannot be read the order is SKIPPED (fail closed), never cancelled.
     const money = await storeMoney(storeId);
     if (money) {
-      const r = await money.expireHold({
-        orderId,
-        proofSubmitted: await InstapayService.proofSubmitted(storeId, orderId, null),
-      });
+      let proof: boolean;
+      try {
+        proof = await InstapayService.proofOnDo(storeId, orderId, true);
+      } catch (err) {
+        logger.error({ err, orderId }, '[INSTAPAY] proof state unreadable, expiry skipped');
+        return 'skipped';
+      }
+      const r = await money.expireHold({ orderId, proofSubmitted: proof });
       if (r === 'expired') {
         await OrderService.applyRefundEffects(storeId, orderId, { fireRefundNotification: false });
         await InstapayService.notifyMerchantExpired(storeId, orderId).catch((err: unknown) =>
@@ -666,6 +707,28 @@ export class InstapayService {
       }
     }
     return { storeId, scanned: due.length, expired, failed };
+  }
+
+  /**
+   * Has the shopper sent proof of this InstaPay transfer? The reference lives in the pending payment's metadata (on the
+   * store's Durable Object), the receipts in Postgres until they move. With `strict` an unreadable state THROWS (the caller
+   * fails closed); otherwise it answers true (a confirm past the window is the safe direction).
+   */
+  static async proofOnDo(storeId: string, orderId: string, strict = false): Promise<boolean> {
+    try {
+      const pay = await (
+        await storeDb(storeId)
+      ).payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true },
+      });
+      return await InstapayService.proofSubmitted(storeId, orderId, pay?.metadata);
+    } catch (err) {
+      if (strict) throw err;
+      logger.error({ err, orderId }, '[INSTAPAY] proof state unreadable, treated as proof sent');
+      return true;
+    }
   }
 
   /** The shopper sent proof that is waiting for the merchant: a submitted receipt, or a legacy reference. */
