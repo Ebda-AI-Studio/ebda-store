@@ -10,8 +10,14 @@ single atomic claim (`updateMany closed -> reconciled`), so two concurrent recon
 adjustment, with a compensating re-open when `createAdjustment`/`postAdjustment` throws, and it
 writes an `inventory.count.reconciled` audit row; (3) help articles `barcode-scan-pick-and-count`
 (en + ar). Stock still moves only through `createAdjustment` + `postAdjustment`, no raw SQL, so the
-Durable Object port (PR D2) re-targets one service. Residuals left as they were: the pick update is
-a read-then-write (two scanners on the same line can both pass the quantity check; picking moves no
-stock and the next progress read shows the truth) and reconcile sets stock to the counted number,
-not counted minus later sales. Cost if wrong: a surplus unit could be recorded as picked by a
-simultaneous scan, or a sale made during a count is overwritten by the counted figure.
+Durable Object port (PR D2) re-targets one service. No residuals (coordinator review): (a) the pick is ONE conditional statement
+(`WITH cur AS (SELECT ... WHERE picked_qty < quantity FOR UPDATE) UPDATE ... RETURNING`), so two
+scanners on a line can never over-pick it; the loser re-resolves to the next open line or
+ALREADY_PICKED; (b) reconcile posts a DELTA: each count line keeps `counted - system qty at the
+moment of its scan` (a re-scan refreshes both together, so the pair always describes the same
+instant), `createAdjustment` takes it as `countDelta` and `postAdjustment(..., { relative: true })`
+applies it as an atomic `increment`, so a sale made after the scan is preserved. Evidence:
+`tests/integration/barcode-pick-count-race.test.ts` on a real Postgres (12 concurrent scans on a
+qty-3 line -> picked exactly 3; stock 10, count 8, sale of 3 -> 5, not 8). Other adjustment types
+still write an absolute quantity, unchanged. Cost if wrong: the history row's `newStock` for a
+count line is the create-time estimate, not the final stock, if a sale lands between create and post.

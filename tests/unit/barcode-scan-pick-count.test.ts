@@ -128,10 +128,10 @@ describe('reconcileCountSession', () => {
     expect(m.createAdjustment).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'cycle_count',
-        items: [{ productId: 'p-1', variantId: undefined, newQty: 8 }],
+        items: [{ productId: 'p-1', variantId: undefined, newQty: 8, countDelta: -2 }],
       })
     );
-    expect(m.postAdjustment).toHaveBeenCalledWith('s-1', 'adj-1', 'u-1');
+    expect(m.postAdjustment).toHaveBeenCalledWith('s-1', 'adj-1', 'u-1', { relative: true });
     expect(m.insertAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'inventory.count.reconciled',

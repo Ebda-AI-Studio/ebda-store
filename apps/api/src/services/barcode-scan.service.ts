@@ -291,57 +291,88 @@ export async function pickOrderItemByBarcode(
   // loose line plus a bundle component — so take the first line still short of
   // its quantity. A bare findFirst capped every scan at the first line and the
   // order could never reach fully-picked.
-  const candidates = await prisma.orderItem.findMany({
-    where: {
-      orderId,
-      productId: lookup.productId,
-      ...(lookup.variantId ? { variantId: lookup.variantId } : {}),
-      order: { storeId },
-    },
-    select: {
-      id: true,
-      orderId: true,
-      productId: true,
-      variantId: true,
-      productName: true,
-      personalisation: true,
-      quantity: true,
-      pickedQty: true,
-    },
-    orderBy: { id: 'asc' },
-  });
-  const target = resolvePickTarget(candidates);
+  // The quantity check and the increment are ONE statement (conditional UPDATE under a row lock),
+  // so two scanners on the same line can never push it past its quantity: the loser re-evaluates
+  // `picked_qty < quantity` on the committed row, matches nothing, and re-resolves to the next
+  // open line or to ALREADY_PICKED.
+  let orderItem: {
+    id: string;
+    orderId: string;
+    productId: string;
+    variantId: string | null;
+    productName: string;
+    personalisation: string | null;
+    quantity: number;
+  } | null = null;
+  let pickedQtyBefore = 0;
+  let newPickedQty = 0;
+  for (let attempt = 0; attempt < 5 && !orderItem; attempt += 1) {
+    const candidates = await prisma.orderItem.findMany({
+      where: {
+        orderId,
+        productId: lookup.productId,
+        ...(lookup.variantId ? { variantId: lookup.variantId } : {}),
+        order: { storeId },
+      },
+      select: {
+        id: true,
+        orderId: true,
+        productId: true,
+        variantId: true,
+        productName: true,
+        personalisation: true,
+        quantity: true,
+        pickedQty: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+    const target = resolvePickTarget(candidates);
 
-  // Mismatch warnings. A real catalogue item that is NOT on this order is the picker grabbing
-  // the wrong thing; an item already at its ordered quantity is a surplus unit. Both are told
-  // apart from "barcode unknown" and neither writes anything (the old code clamped silently).
-  if (target.kind === 'not_in_order') {
-    throw new AppError(409, 'NOT_IN_ORDER', `${lookup.productName} is not in this order`, {
+    // Mismatch warnings. A real catalogue item that is NOT on this order is the picker grabbing
+    // the wrong thing; an item already at its ordered quantity is a surplus unit. Both are told
+    // apart from "barcode unknown" and neither writes anything.
+    if (target.kind === 'not_in_order') {
+      throw new AppError(409, 'NOT_IN_ORDER', `${lookup.productName} is not in this order`, {
+        productName: lookup.productName,
+        productNameAr: lookup.productNameAr,
+        barcode,
+      });
+    }
+    if (target.kind === 'already_picked') {
+      throw new AppError(409, 'ALREADY_PICKED', `${lookup.productName} is already fully picked`, {
+        productName: lookup.productName,
+        productNameAr: lookup.productNameAr,
+        barcode,
+      });
+    }
+
+    const rows = await prisma.$queryRaw<{ before: number; after: number }[]>`
+      WITH cur AS (
+        SELECT id, picked_qty FROM public.order_items
+        WHERE id = ${target.item.id} AND picked_qty < quantity
+        FOR UPDATE
+      )
+      UPDATE public.order_items oi
+      SET picked_qty = LEAST(oi.picked_qty + ${qtyToPick}::int, oi.quantity),
+          picked_at = CASE WHEN oi.picked_qty + ${qtyToPick}::int >= oi.quantity THEN now() ELSE NULL END
+      FROM cur
+      WHERE oi.id = cur.id
+      RETURNING cur.picked_qty AS before, oi.picked_qty AS after
+    `;
+    if (rows.length === 1) {
+      orderItem = target.item;
+      pickedQtyBefore = Number(rows[0].before);
+      newPickedQty = Number(rows[0].after);
+    }
+  }
+  if (!orderItem) {
+    throw new AppError(409, 'ALREADY_PICKED', 'This item was just picked by another scanner', {
       productName: lookup.productName,
       productNameAr: lookup.productNameAr,
       barcode,
     });
   }
-  if (target.kind === 'already_picked') {
-    throw new AppError(409, 'ALREADY_PICKED', `${lookup.productName} is already fully picked`, {
-      productName: lookup.productName,
-      productNameAr: lookup.productNameAr,
-      barcode,
-    });
-  }
-  const orderItem = target.item;
-
-  const pickedQtyBefore = orderItem.pickedQty;
-  const newPickedQty = Math.min(pickedQtyBefore + qtyToPick, orderItem.quantity);
   const fullyPicked = newPickedQty >= orderItem.quantity;
-
-  await prisma.orderItem.update({
-    where: { id: orderItem.id },
-    data: {
-      pickedQty: newPickedQty,
-      pickedAt: fullyPicked ? new Date() : null,
-    },
-  });
 
   // Check if all items in the order are fully picked.
   // Prisma does not support column-to-column comparisons in a filter,
@@ -557,7 +588,8 @@ export async function reconcileCountSession(
 
   try {
     if (nonZeroLines.length > 0) {
-      // newQty = countedQty (the truth after counting). Stock moves ONLY through the
+      // The adjustment is a DELTA (counted - system at scan time), applied as an atomic increment.
+      // Stock moves ONLY through the
       // adjustment service: GL journal + InventoryHistory + cache invalidation live there.
       const adjustment = await runInTenantContext(storeId, () =>
         createAdjustment({
@@ -569,11 +601,15 @@ export async function reconcileCountSession(
             productId: l.productId,
             variantId: l.variantId ?? undefined,
             newQty: l.countedQty,
+            // counted - system qty at the moment of the scan: a sale made since is preserved.
+            countDelta: l.variance,
           })),
         })
       );
       adjustmentId = adjustment.id;
-      await runInTenantContext(storeId, () => postAdjustment(storeId, adjustment.id, reconciledBy));
+      await runInTenantContext(storeId, () =>
+        postAdjustment(storeId, adjustment.id, reconciledBy, { relative: true })
+      );
     }
 
     await prisma.countSession.update({

@@ -35,6 +35,13 @@ export interface CreateAdjustmentInput {
     productId: string;
     variantId?: string;
     newQty: number;
+    /**
+     * Cycle-count reconcile: the signed change the count measured (counted minus the system
+     * quantity at scan time). When set, `newQty` is ignored and recomputed as the CURRENT stock plus
+     * this delta, so a sale that landed mid-count is preserved. Pair with postAdjustment's
+     * `{ relative: true }`, which applies it as an atomic increment.
+     */
+    countDelta?: number;
   }>;
 }
 
@@ -100,14 +107,14 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
       const match = variant && variant.productId === item.productId ? variant : undefined;
       const previousQty = match?.inventory ?? 0;
       const unitCost = match?.costPrice ?? 0;
-      const deltaQty = item.newQty - previousQty;
-      return { ...item, previousQty, unitCost, deltaQty };
+      const deltaQty = item.countDelta ?? item.newQty - previousQty;
+      return { ...item, newQty: previousQty + deltaQty, previousQty, unitCost, deltaQty };
     }
     const product = productById.get(item.productId);
     const previousQty = product?.inventory ?? 0;
     const unitCost = product?.costPrice ?? 0;
-    const deltaQty = item.newQty - previousQty;
-    return { ...item, previousQty, unitCost, deltaQty };
+    const deltaQty = item.countDelta ?? item.newQty - previousQty;
+    return { ...item, newQty: previousQty + deltaQty, previousQty, unitCost, deltaQty };
   });
 
   const totalValueImpact = snapshots.reduce((sum, s) => sum + s.deltaQty * s.unitCost, 0);
@@ -155,7 +162,8 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
 export async function postAdjustment(
   storeId: string,
   id: string,
-  postedBy?: string
+  postedBy?: string,
+  opts: { relative?: boolean } = {}
 ): Promise<AdjustmentWithItems> {
   const adjustment = await prisma.stockAdjustment.findFirst({
     where: { id, storeId },
@@ -191,7 +199,7 @@ export async function postAdjustment(
       if (item.variantId) {
         const res = await tx.productVariant.updateMany({
           where: { id: item.variantId, product: { storeId } },
-          data: { inventory: item.newQty },
+          data: { inventory: opts.relative ? { increment: item.deltaQty } : item.newQty },
         });
         if (res.count !== 1) {
           throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
@@ -199,7 +207,7 @@ export async function postAdjustment(
       } else {
         const res = await tx.product.updateMany({
           where: { id: item.productId, storeId },
-          data: { inventory: item.newQty },
+          data: { inventory: opts.relative ? { increment: item.deltaQty } : item.newQty },
         });
         if (res.count !== 1) {
           throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
