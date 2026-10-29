@@ -152,6 +152,11 @@ export default defineConfig(async () => {
         },
       }),
     ],
+    resolve: {
+      // The test worker bundles workspace packages from source (as wrangler.jsonc's alias block does for the API
+      // Worker); without it `@ebda/shared` resolves to ./dist/index.js, which exists only after a build.
+      alias: { '@ebda/shared': here('../../packages/shared/src/index.ts') },
+    },
     test: {
       include: ['workers-test/**/*.test.ts'],
       testTimeout: 60_000,

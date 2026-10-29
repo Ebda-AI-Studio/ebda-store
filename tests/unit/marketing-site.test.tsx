@@ -117,7 +117,7 @@ describe('marketing hero and structure', () => {
     // No English sentence on the Arabic hero any more (R-EBDA-COPY-1).
     expect(ar).not.toContain('Your business, your store');
   });
-  it('hero = one promise + sub naming the product + ONE button, no second link, no phone (MKT-1, MKT-10, 6b)', () => {
+  it('hero = one promise + sub naming the product + ONE button, no second link, one decorative finished-store phone (MKT-1, HERO-LAYOUT-1, 6b)', () => {
     for (const [html, name] of [
       [ar, 'ابدأ ستور بيديك'],
       [en, 'Ebda Store gives you'],
@@ -127,8 +127,11 @@ describe('marketing hero and structure', () => {
       expect(hero.match(/class="btn btn-primary btn-lg"/g)).toHaveLength(1);
       expect(hero).toContain(`href="${SIGNUP_URL}"`);
       expect(hero.match(/<a /g)).toHaveLength(1); // one promise, one button
-      // MKT-10: the hero phone is gone; the phones live in the looks section, where visitors use them
-      expect(hero).not.toMatch(/look-phone|hero-phone|class="scr"|id="hp-/);
+      // HERO-LAYOUT-1 (supersedes MKT-10's "no hero phone"): exactly one decorative phone, the finished story frame
+      expect(hero.match(/class="dev-phone hero-phone"/g)).toHaveLength(1);
+      expect(hero).toContain('class="hero-visual" aria-hidden="true"');
+      expect(hero).toContain('dahab-story-4-900');
+      expect(hero).not.toMatch(/look-phone|class="scr"|id="hp-/);
       // the retired hero furniture is gone: particles, poster, studio kicker, slug pill
       expect(hero).not.toMatch(/nile|hero-poster|hero-brand|slug-pill|<canvas/);
       expect(hero).not.toMatch(/ابدأ استوديو للذكاء|Ebda AI Studio/);
@@ -426,13 +429,13 @@ describe('marketing honesty', () => {
       const faq = html.match(/<section id="faq".*?<\/section>/s)![0];
       const close = html.match(/<section id="start".*?<\/section>/s)![0];
       for (const part of [header, faq, close]) {
-        expect(part).toContain('href="https://wa.me/201207761882"');
-        expect(part).toMatch(/<a href="https:\/\/wa\.me\/201207761882"[^>]*aria-label="[^"]+"/);
+        expect(part).toContain('href="https://wa.me/201514191411"');
+        expect(part).toMatch(/<a href="https:\/\/wa\.me\/201514191411"[^>]*aria-label="[^"]+"/);
         expect(part).toContain('class="wa-icon"');
         expect(part).toMatch(/class="wa-label">(واتساب|WhatsApp)</);
         // the number is never rendered as text or inside an accessible name; only the wa.me href carries it
-        const noHref = part.replace(/href="https:\/\/wa\.me\/201207761882"/g, '');
-        expect(noHref).not.toMatch(/201207761882|120 776 1882|wa-num/);
+        const noHref = part.replace(/href="https:\/\/wa\.me\/201514191411"/g, '');
+        expect(noHref).not.toMatch(/201514191411|151 419 1411|wa-num/);
       }
     }
     expect(ar).toContain('>واتساب<');
@@ -564,7 +567,7 @@ describe('marketing SEO and trust surface', () => {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(`${word} ${cur.version}`);
         // the WhatsApp button's wa.me href is the only long number on the page, and it is not a registration number
-        const withoutPhone = html.replace(/201207761882/g, '');
+        const withoutPhone = html.replace(/201514191411/g, '');
         expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
       }
     }
