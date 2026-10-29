@@ -3,6 +3,7 @@
  * only the magic bytes decide what a file is, what it is stored as and what the extractor is sent.
  * JPEG, PNG, WebP, HEIC/HEIF and PDF are accepted; GIF, SVG, TIFF, BMP and everything else are refused.
  */
+import { PDFDocument } from '@cantoo/pdf-lib';
 import { sniffImage } from '../upload-sniff';
 
 export type CatalogueMime =
@@ -43,17 +44,49 @@ export function sniffCatalogueFile(
   return null;
 }
 
-/** Pages in a PDF, counted from `/Type /Page` objects (not `/Pages`). At least 1. Cheap, no parser. */
-export function countPdfPages(buf: Buffer): number {
-  const text = buf.toString('latin1');
-  const n = text.match(/\/Type\s*\/Page(?![A-Za-z])/g)?.length ?? 0;
-  return Math.max(1, n);
+export class PdfRefused extends Error {
+  constructor(
+    readonly code: 'UNREADABLE_PDF' | 'TOO_MANY_PAGES',
+    readonly pages = 0
+  ) {
+    super(code);
+  }
 }
 
-/** PDFs carrying active content are accepted (they are only bytes, never executed) but flagged. */
-export function pdfHasActiveContent(buf: Buffer): boolean {
-  const head = buf.subarray(0, 1_048_576).toString('latin1');
-  return /\/(JS|JavaScript|OpenAction|Launch|EmbeddedFile)\b/.test(head);
+/**
+ * Parse a PDF with a real parser (the page tree, not a text scan, so object streams and crafted
+ * decoys cannot hide pages), refuse one that is unreadable, encrypted or over `maxPages`, and
+ * re-emit it containing EXACTLY the counted pages. The re-emitted bytes are what is stored and sent
+ * to the model, so pages sent == pages counted == pages charged; scripts, open-actions, launch
+ * actions and embedded files do not survive the copy.
+ */
+export async function normalizePdf(
+  buf: Buffer,
+  maxPages: number
+): Promise<{ bytes: Buffer; pages: number }> {
+  let src;
+  try {
+    src = await PDFDocument.load(buf, { throwOnInvalidObject: true, updateMetadata: false });
+  } catch {
+    throw new PdfRefused('UNREADABLE_PDF');
+  }
+  let pages: number;
+  try {
+    pages = src.getPageCount();
+  } catch {
+    throw new PdfRefused('UNREADABLE_PDF');
+  }
+  if (pages < 1) throw new PdfRefused('UNREADABLE_PDF');
+  if (pages > maxPages) throw new PdfRefused('TOO_MANY_PAGES', pages);
+  try {
+    const out = await PDFDocument.create();
+    const copied = await out.copyPages(src, src.getPageIndices());
+    copied.forEach(p => out.addPage(p));
+    if (out.getPageCount() !== pages) throw new Error('page count mismatch');
+    return { bytes: Buffer.from(await out.save({ useObjectStreams: false })), pages };
+  } catch {
+    throw new PdfRefused('UNREADABLE_PDF');
+  }
 }
 
 /** Display-only name: no path, no control or bidi characters, capped. Never used as a storage key. */

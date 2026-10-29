@@ -589,7 +589,7 @@ CREATE TABLE IF NOT EXISTS "catalog_import_files" (
   "status" TEXT NOT NULL DEFAULT 'stored',
   "attempts" INTEGER NOT NULL DEFAULT 0,
   "error_code" TEXT,
-  "quota_counted" INTEGER NOT NULL DEFAULT 0,
+  "charged_pages" INTEGER NOT NULL DEFAULT 0,
   "items_found" INTEGER NOT NULL DEFAULT 0,
   "input_tokens" INTEGER,
   "output_tokens" INTEGER,
@@ -599,12 +599,12 @@ CREATE TABLE IF NOT EXISTS "catalog_import_files" (
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "catalog_import_files_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "catalog_import_files_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "catalog_import_jobs" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "catalog_import_files_quota_counted_chk" CHECK ("quota_counted" IN (0, 1)),
   CONSTRAINT "catalog_import_files_status_chk" CHECK ("status" IN ('stored','processing','done','failed','skipped_quota')),
-  CONSTRAINT "catalog_import_files_pages_chk" CHECK ("page_count" >= 1 AND "page_count" <= 100)
+  CONSTRAINT "catalog_import_files_pages_chk" CHECK ("page_count" >= 1 AND "page_count" <= 100),
+  CONSTRAINT "catalog_import_files_charged_chk" CHECK ("charged_pages" >= 0)
 );
 CREATE INDEX IF NOT EXISTS "catalog_import_files_job_id_status_idx" ON "catalog_import_files" ("job_id", "status");
-CREATE INDEX IF NOT EXISTS "catalog_import_files_store_id_quota_counted_started_at_idx" ON "catalog_import_files" ("store_id", "quota_counted", "started_at");
+CREATE INDEX IF NOT EXISTS "catalog_import_files_store_id_charged_pages_started_at_idx" ON "catalog_import_files" ("store_id", "charged_pages", "started_at");
 
 CREATE TABLE IF NOT EXISTS "catalog_import_items" (
   "id" TEXT NOT NULL,

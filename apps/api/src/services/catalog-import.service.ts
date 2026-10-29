@@ -23,8 +23,9 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import {
   CATALOGUE_EXT,
-  countPdfPages,
+  PdfRefused,
   displayFileName,
+  normalizePdf,
   sniffCatalogueFile,
 } from '../lib/catalogue/sniff';
 import {
@@ -87,7 +88,13 @@ export async function createJob(
   }
 
   // Validate EVERYTHING before storing anything: a mixed valid + invalid request stores nothing.
-  const checked = files.map(f => {
+  const checked: Array<{
+    f: UploadedFile;
+    sniffed: NonNullable<ReturnType<typeof sniffCatalogueFile>>;
+    pages: number;
+  }> = [];
+  for (const original of files) {
+    let f = original;
     const sniffed = sniffCatalogueFile(f.buffer);
     if (!sniffed) {
       throw new AppError(
@@ -100,12 +107,29 @@ export async function createJob(
     if (f.buffer.length > cap) {
       throw new AppError(413, 'FILE_TOO_LARGE', 'A file is too large.');
     }
-    const pages = sniffed.kind === 'pdf' ? countPdfPages(f.buffer) : 1;
-    if (sniffed.kind === 'pdf' && pages > lim.maxPdfPages) {
-      throw new AppError(400, 'TOO_MANY_PAGES', `A PDF can have at most ${lim.maxPdfPages} pages.`);
+    let pages = 1;
+    if (sniffed.kind === 'pdf') {
+      // A real parse of the page tree; the stored + extracted bytes are the re-emitted copy holding
+      // exactly `pages` pages, so what is sent is what is counted and charged.
+      try {
+        const n = await normalizePdf(f.buffer, lim.maxPdfPages);
+        pages = n.pages;
+        f = { ...f, buffer: n.bytes };
+      } catch (err) {
+        if (err instanceof PdfRefused) {
+          throw new AppError(
+            err.code === 'TOO_MANY_PAGES' ? 400 : 415,
+            err.code,
+            err.code === 'TOO_MANY_PAGES'
+              ? `A PDF can have at most ${lim.maxPdfPages} pages.`
+              : 'This PDF could not be read.'
+          );
+        }
+        throw err;
+      }
     }
-    return { f, sniffed, pages };
-  });
+    checked.push({ f, sniffed, pages });
+  }
   const pagesTotal = checked.reduce((n, c) => n + c.pages, 0);
   if (pagesTotal > lim.maxPagesPerJob) {
     throw new AppError(400, 'TOO_MANY_PAGES', `At most ${lim.maxPagesPerJob} pages per import.`);
@@ -325,19 +349,41 @@ export async function deleteJob(storeId: string, jobId: string) {
   await prisma.catalogImportJob.deleteMany({ where: { id: jobId, storeId } });
 }
 
+/**
+ * Retry one failed / quota-skipped file. Bounded three ways: attempts per file
+ * (CATALOG_IMPORT_MAX_ATTEMPTS, from `file.attempts`), the active-jobs cap (a retry re-activates its
+ * job, so it counts like a new import), and the page ledger (every attempt that reaches the model is
+ * charged again in `processFile`; an attempt that fails before the model is called is free).
+ */
 export async function retryFile(storeId: string, jobId: string, fileId: string) {
+  const lim = catalogueLimits();
   const file = await prisma.catalogImportFile.findFirst({
     where: { id: fileId, jobId, storeId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, attempts: true, job: { select: { status: true } } },
   });
   if (!file) throw new AppError(404, 'NOT_FOUND', 'File not found.');
   if (file.status !== 'failed' && file.status !== 'skipped_quota') {
     throw new AppError(409, 'NOT_RETRYABLE', 'This file is not waiting for a retry.');
   }
-  await prisma.catalogImportFile.updateMany({
-    where: { id: fileId, storeId },
+  if (ACTIVE.includes(file.job.status) || file.job.status === 'cancelled') {
+    throw new AppError(409, 'NOT_RETRYABLE', 'This import is still running.');
+  }
+  if (file.attempts >= lim.maxAttempts) {
+    throw new AppError(409, 'TOO_MANY_RETRIES', 'This file was tried too many times.');
+  }
+  const otherActive = await prisma.catalogImportJob.count({
+    where: { storeId, status: { in: ACTIVE }, id: { not: jobId } },
+  });
+  if (otherActive >= lim.maxActiveJobs) {
+    throw new AppError(429, 'CATALOG_IMPORT_BUSY', 'Finish the imports in progress first.');
+  }
+  // Atomic claim: two concurrent retries cannot both start the file.
+  const claimed = await prisma.catalogImportFile.updateMany({
+    where: { id: fileId, storeId, status: { in: ['failed', 'skipped_quota'] } },
     data: { status: 'stored', errorCode: null },
   });
+  if (claimed.count !== 1)
+    throw new AppError(409, 'NOT_RETRYABLE', 'This file is already retrying.');
   await prisma.catalogImportJob.updateMany({
     where: { id: jobId, storeId },
     data: { status: 'queued', errorCode: null, completedAt: null },

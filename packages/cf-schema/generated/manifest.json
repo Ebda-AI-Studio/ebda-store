@@ -1219,6 +1219,12 @@
     },
     {
       "kind": "check",
+      "name": "catalog_import_files_charged_chk",
+      "table": "catalog_import_files",
+      "disposition": "store-do:catalog_import_files"
+    },
+    {
+      "kind": "check",
       "name": "catalog_import_items_status_chk",
       "table": "catalog_import_items",
       "disposition": "store-do:catalog_import_items"

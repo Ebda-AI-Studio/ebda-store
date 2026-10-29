@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { PDFDocument, PDFName, PDFString } from '@cantoo/pdf-lib';
 import {
   sniffCatalogueFile,
-  countPdfPages,
-  pdfHasActiveContent,
+  normalizePdf,
+  PdfRefused,
   displayFileName,
 } from '../../apps/api/src/lib/catalogue/sniff';
 import { chargeVerdict } from '../../apps/api/src/lib/catalogue/page-ledger';
@@ -38,15 +39,59 @@ describe('sniffCatalogueFile: the bytes decide, never the name or mime', () => {
   });
 });
 
-describe('pdf helpers', () => {
-  it('counts /Type /Page objects but not /Pages, at least 1', () => {
-    expect(countPdfPages(Buffer.from('<</Type/Pages>><</Type /Page>><</Type/Page>>'))).toBe(2);
-    expect(countPdfPages(Buffer.from('%PDF-'))).toBe(1);
+async function makePdf(pages: number, opts: { objectStreams: boolean; js?: boolean }) {
+  const doc = await PDFDocument.create();
+  for (let i = 0; i < pages; i++) doc.addPage();
+  if (opts.js) {
+    doc.catalog.set(
+      PDFName.of('OpenAction'),
+      doc.context.obj({ S: 'JavaScript', JS: PDFString.of('app.alert(1)') })
+    );
+  }
+  const bytes = Buffer.from(await doc.save({ useObjectStreams: opts.objectStreams }));
+  // Hide the page type from a text scan while any real parser still reads it: "/Page" -> "/#50age"
+  // (a PDF name escape). The page tree, which is what counts, is unchanged.
+  return opts.objectStreams
+    ? Buffer.from(bytes.toString('latin1').replaceAll('/Type /Page\n', '/Type /#50age\n'), 'latin1')
+    : bytes;
+}
+const regexCount = (b: Buffer) =>
+  b.toString('latin1').match(/\/Type\s*\/Page(?![A-Za-z])/g)?.length ?? 0;
+
+describe('normalizePdf: a real parse of the page tree', () => {
+  it('counts pages the old text scan could not see (object streams hide /Type /Page)', async () => {
+    const crafted = await makePdf(9, { objectStreams: true });
+    expect(regexCount(crafted)).toBeLessThan(9); // the regex under-counts: the exploit
+    const n = await normalizePdf(crafted, 10);
+    expect(n.pages).toBe(9);
+    // what is stored/sent has exactly the counted pages
+    expect((await PDFDocument.load(n.bytes)).getPageCount()).toBe(9);
   });
-  it('flags active content without refusing', () => {
-    expect(pdfHasActiveContent(Buffer.from('%PDF-1.4 /OpenAction'))).toBe(true);
-    expect(pdfHasActiveContent(Buffer.from('%PDF-1.4 plain'))).toBe(false);
+  it('refuses over the cap, even when the text scan would see one page', async () => {
+    const crafted = await makePdf(25, { objectStreams: true });
+    expect(regexCount(crafted)).toBeLessThan(11);
+    await expect(normalizePdf(crafted, 10)).rejects.toMatchObject({
+      code: 'TOO_MANY_PAGES',
+      pages: 25,
+    });
   });
+  it('refuses a PDF that cannot be parsed, and a header-only file', async () => {
+    await expect(
+      normalizePdf(Buffer.from('%PDF-1.4\n/Type /Page garbage'), 10)
+    ).rejects.toBeInstanceOf(PdfRefused);
+    await expect(normalizePdf(Buffer.from('%PDF-'), 10)).rejects.toMatchObject({
+      code: 'UNREADABLE_PDF',
+    });
+  });
+  it('drops scripts and open-actions on re-emit', async () => {
+    const withJs = await makePdf(1, { objectStreams: false, js: true });
+    expect(withJs.toString('latin1')).toContain('JavaScript');
+    const n = await normalizePdf(withJs, 10);
+    expect(n.bytes.toString('latin1')).not.toMatch(/JavaScript|OpenAction/);
+  });
+});
+
+describe('display names', () => {
   it('display names carry no path or control characters', () => {
     expect(displayFileName('..\\..\\etc/pass‮wd.jpg')).toBe('passwd.jpg');
     expect(displayFileName('x'.repeat(500)).length).toBe(120);

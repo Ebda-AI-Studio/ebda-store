@@ -21679,13 +21679,13 @@
           "list": false,
           "optional": true
         },
-        "quotaCounted": {
+        "chargedPages": {
           "kind": "scalar",
-          "type": "Boolean",
-          "column": "quota_counted",
+          "type": "Int",
+          "column": "charged_pages",
           "list": false,
           "optional": false,
-          "default": "false"
+          "default": "0"
         },
         "itemsFound": {
           "kind": "scalar",

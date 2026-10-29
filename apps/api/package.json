@@ -23,6 +23,7 @@
     "@aws-sdk/client-s3": "^3.1039.0",
     "@aws-sdk/s3-request-presigner": "^3.1039.0",
     "@axiomhq/pino": "^1.6.1",
+    "@cantoo/pdf-lib": "2.11.1",
     "@ebda/database": "*",
     "@ebda/shared": "*",
     "@google/generative-ai": "^0.24.1",

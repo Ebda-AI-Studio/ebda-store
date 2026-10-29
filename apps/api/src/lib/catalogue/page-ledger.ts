@@ -1,7 +1,8 @@
 /**
  * The page ledger: how many catalogue pages a store may still extract. Rows are counted, never a
- * stored counter (no drift, nothing to reset): a file is charged once, when its first model call
- * returns (`quota_counted`), and a retry of the same file is free. The monthly figure comes from
+ * stored counter (no drift, nothing to reset): every model call that returns a reply adds the
+ * file's pages to `charged_pages`, so a retry that reaches the model is charged again (a retry that
+ * fails before the model is called is free, and attempts are capped at CATALOG_IMPORT_MAX_ATTEMPTS). The monthly figure comes from
  * `plans.limits.catalogImportPagesPerMonth` (null = unlimited, 0 = not included); the per-job,
  * per-day and per-file numbers are env defaults. This is IN ADDITION to `assertAiQuota`.
  */
@@ -18,6 +19,7 @@ export const catalogueLimits = () => ({
   maxPagesPerJob: int(process.env.CATALOG_IMPORT_MAX_PAGES_PER_JOB, 30),
   maxPagesPerDay: int(process.env.CATALOG_IMPORT_MAX_PAGES_PER_DAY, 60),
   maxFilesPerJob: int(process.env.CATALOG_IMPORT_MAX_FILES_PER_JOB, 4),
+  maxAttempts: int(process.env.CATALOG_IMPORT_MAX_ATTEMPTS, 3),
   maxActiveJobs: int(process.env.CATALOG_IMPORT_MAX_ACTIVE_JOBS, 2),
   maxImageBytes: int(process.env.CATALOG_IMPORT_MAX_IMAGE_BYTES, 6 * 1024 * 1024),
   maxPdfBytes: int(process.env.CATALOG_IMPORT_MAX_PDF_BYTES, 6 * 1024 * 1024),
@@ -50,10 +52,10 @@ export async function pageAllowance(storeId: string): Promise<PageAllowance> {
   const sum = async (since: Date) =>
     (
       await prisma.catalogImportFile.aggregate({
-        where: { storeId, quotaCounted: true, startedAt: { gte: since } },
-        _sum: { pageCount: true },
+        where: { storeId, chargedPages: { gt: 0 }, startedAt: { gte: since } },
+        _sum: { chargedPages: true },
       })
-    )._sum.pageCount ?? 0;
+    )._sum.chargedPages ?? 0;
   const [usedMonth, usedToday] = await Promise.all([sum(monthStart), sum(dayStart)]);
   const lim = catalogueLimits();
   return {

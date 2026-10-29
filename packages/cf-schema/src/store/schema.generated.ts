@@ -620,7 +620,7 @@ export const catalogImportFiles = sqliteTable('catalog_import_files', {
   status: text('status').notNull().default('stored'),
   attempts: integer('attempts').notNull().default(0),
   errorCode: text('error_code'),
-  quotaCounted: integer('quota_counted', { mode: 'boolean' }).notNull().default(false),
+  chargedPages: integer('charged_pages').notNull().default(0),
   itemsFound: integer('items_found').notNull().default(0),
   inputTokens: integer('input_tokens'),
   outputTokens: integer('output_tokens'),

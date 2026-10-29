@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
+import { PDFDocument } from '@cantoo/pdf-lib';
 import { prisma, withRlsBypass } from '@ebda/database';
 import {
   hasDb,
@@ -32,9 +33,12 @@ const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(
 
 // Smallest valid-by-magic-bytes files (the sniffer reads bytes only).
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 1)]);
-const PDF = Buffer.from(
-  '%PDF-1.4\n1 0 obj<</Type/Page>>endobj\n2 0 obj<</Type/Page>>endobj\n%%EOF'
-);
+const mkPdf = async (pages: number) => {
+  const d = await PDFDocument.create();
+  for (let i = 0; i < pages; i++) d.addPage();
+  return Buffer.from(await d.save());
+};
+const PDF = await mkPdf(2);
 const TEXT = Buffer.from('hello, not an image');
 const EXE_AS_PNG = Buffer.from('MZ\x90\x00 definitely not a png');
 
@@ -169,8 +173,10 @@ describe.skipIf(!hasDb)('catalogue import', () => {
       [1, 2, 3, 4, 5].map(i => [JPEG, `m${i}.jpg`] as [Buffer, string])
     );
     expect([400, 413]).toContain(many.status);
-    const bigPdf = Buffer.from('%PDF-1.4\n' + '<</Type/Page>>'.repeat(40));
-    const res = await upload(a, [[bigPdf, 'big.pdf']]);
+    const res = await upload(a, [[await mkPdf(40), 'big.pdf']]); // object streams: a text scan sees ~1
+    expect(
+      (await upload(a, [[Buffer.from('%PDF-1.4 not a pdf'), 'bad.pdf']])).body.error.code
+    ).toBe('UNREADABLE_PDF');
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('TOO_MANY_PAGES');
   });
@@ -415,6 +421,93 @@ describe.skipIf(!hasDb)('catalogue import', () => {
       expect(res.headers['content-type']).toMatch(/image\/jpeg/);
       expect(res.headers['x-content-type-options']).toBe('nosniff');
       expect(res.headers['content-security-policy']).toBe('sandbox');
+    });
+  });
+
+  describe('retries are bounded and charged', () => {
+    const fail = (raw: unknown) =>
+      setCatalogueExtractorForTests({
+        name: 'fake',
+        extract: async () => ({
+          raw,
+          inputTokens: 1,
+          outputTokens: 1,
+          model: 'gemini-flash-lite-latest',
+        }),
+      });
+    const settle = async (id: string) => {
+      await vi.waitFor(async () =>
+        expect((await prisma.catalogImportJob.findUniqueOrThrow({ where: { id } })).status).toBe(
+          'queued'
+        )
+      );
+    };
+
+    it('a reply that comes back is charged on EVERY attempt, and attempts stop at the cap', async () => {
+      const up = await upload(b, [[await mkPdf(3), 'p.pdf']]);
+      const id = up.body.data.jobId;
+      fail({ items: 'not-an-array' }); // BAD_RESPONSE after the model returned: charged
+      const file = await withRlsBypass(tx =>
+        tx.catalogImportFile.findFirstOrThrow({ where: { jobId: id } })
+      );
+      await runHandler(catalogImportRun, { jobId: id, storeId: b.storeId });
+      let f = await prisma.catalogImportFile.findUniqueOrThrow({ where: { id: file.id } });
+      expect([f.status, f.chargedPages, f.attempts]).toEqual(['failed', 3, 1]);
+      for (const n of [2, 3]) {
+        expect(
+          (
+            await request(app)
+              .post(url(b, `/${id}/files/${file.id}/retry`))
+              .set(auth(b))
+          ).status
+        ).toBe(202);
+        await settle(id);
+        await runHandler(catalogImportRun, { jobId: id, storeId: b.storeId });
+        f = await prisma.catalogImportFile.findUniqueOrThrow({ where: { id: file.id } });
+        expect([f.chargedPages, f.attempts]).toEqual([3 * n, n]);
+      }
+      const capped = await request(app)
+        .post(url(b, `/${id}/files/${file.id}/retry`))
+        .set(auth(b));
+      expect(capped.status).toBe(409);
+      expect(capped.body.error.code).toBe('TOO_MANY_RETRIES');
+    });
+
+    it('a retry that never reaches the model is free', async () => {
+      const up = await upload(b, [[JPEG, 'q.jpg']]);
+      const id = up.body.data.jobId;
+      const file = await withRlsBypass(tx =>
+        tx.catalogImportFile.findFirstOrThrow({ where: { jobId: id } })
+      );
+      bucket.delete(file.storageKey); // unreadable before any model call
+      await runHandler(catalogImportRun, { jobId: id, storeId: b.storeId });
+      const f = await prisma.catalogImportFile.findUniqueOrThrow({ where: { id: file.id } });
+      expect([f.status, f.errorCode, f.chargedPages]).toEqual(['failed', 'FILE_UNREADABLE', 0]);
+    });
+
+    it('a retry is refused while the store is at its active-jobs cap', async () => {
+      const up = await upload(b, [[JPEG, 'r.jpg']]);
+      const id = up.body.data.jobId;
+      const file = await withRlsBypass(tx =>
+        tx.catalogImportFile.findFirstOrThrow({ where: { jobId: id } })
+      );
+      fail({ items: 'x' });
+      await runHandler(catalogImportRun, { jobId: id, storeId: b.storeId });
+      // two OTHER jobs sit active
+      await withRlsBypass(tx =>
+        tx.catalogImportJob.createMany({
+          data: [1, 2].map(() => ({
+            storeId: b.storeId,
+            status: 'processing',
+            expiresAt: new Date(Date.now() + 1e9),
+          })),
+        })
+      );
+      const res = await request(app)
+        .post(url(b, `/${id}/files/${file.id}/retry`))
+        .set(auth(b));
+      expect(res.status).toBe(429);
+      expect(res.body.error.code).toBe('CATALOG_IMPORT_BUSY');
     });
   });
 

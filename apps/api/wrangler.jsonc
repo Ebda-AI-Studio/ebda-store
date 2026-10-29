@@ -232,6 +232,9 @@
 
   // Node-only packages replaced by Workers-native code or stubbed (see src/cf/stubs/*).
   "alias": {
+    "culori": "./src/cf/stubs/pdf-lib-unused.ts",
+    "html-entities": "./src/cf/stubs/pdf-lib-unused.ts",
+    "node-html-better-parser": "./src/cf/stubs/pdf-lib-unused.ts",
     "ioredis": "./src/cf/stubs/ioredis.ts",
     "socket.io": "./src/cf/stubs/socket-io.ts",
     "@socket.io/redis-adapter": "./src/cf/stubs/socket-io-redis-adapter.ts",

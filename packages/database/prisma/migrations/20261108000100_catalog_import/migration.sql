@@ -3,7 +3,9 @@
 -- published by an explicit click.
 --
 --   catalog_import_jobs   one upload (a batch of files)
---   catalog_import_files  one stored original; an image is one page, a PDF is extracted whole (CATIMP-1)
+--   catalog_import_files  one stored original; an image is one page, a PDF is re-emitted with exactly its counted pages
+--                         and extracted whole (CATIMP-1). charged_pages = pages billed to the plan so far: every model
+--                         call that returns a reply adds page_count, so a retry that reaches the model is charged again
 --   catalog_import_items  one extracted product row awaiting review (never a product until "create drafts")
 --
 -- New tables only: no lock on existing data and no production prerequisite. Strict RLS on all three
@@ -46,7 +48,7 @@ CREATE TABLE IF NOT EXISTS "catalog_import_files" (
     "status" TEXT NOT NULL DEFAULT 'stored',
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "error_code" TEXT,
-    "quota_counted" BOOLEAN NOT NULL DEFAULT false,
+    "charged_pages" INTEGER NOT NULL DEFAULT 0,
     "items_found" INTEGER NOT NULL DEFAULT 0,
     "input_tokens" INTEGER,
     "output_tokens" INTEGER,
@@ -56,7 +58,8 @@ CREATE TABLE IF NOT EXISTS "catalog_import_files" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "catalog_import_files_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "catalog_import_files_status_chk" CHECK ("status" IN ('stored','processing','done','failed','skipped_quota')),
-    CONSTRAINT "catalog_import_files_pages_chk" CHECK ("page_count" >= 1 AND "page_count" <= 100)
+    CONSTRAINT "catalog_import_files_pages_chk" CHECK ("page_count" >= 1 AND "page_count" <= 100),
+    CONSTRAINT "catalog_import_files_charged_chk" CHECK ("charged_pages" >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS "catalog_import_items" (
@@ -97,7 +100,7 @@ CREATE TABLE IF NOT EXISTS "catalog_import_items" (
 CREATE INDEX IF NOT EXISTS "catalog_import_jobs_store_id_created_at_idx" ON "catalog_import_jobs"("store_id", "created_at" DESC);
 CREATE INDEX IF NOT EXISTS "catalog_import_jobs_expires_at_idx" ON "catalog_import_jobs"("expires_at");
 CREATE INDEX IF NOT EXISTS "catalog_import_files_job_id_status_idx" ON "catalog_import_files"("job_id", "status");
-CREATE INDEX IF NOT EXISTS "catalog_import_files_store_id_quota_counted_started_at_idx" ON "catalog_import_files"("store_id", "quota_counted", "started_at");
+CREATE INDEX IF NOT EXISTS "catalog_import_files_store_id_charged_pages_started_at_idx" ON "catalog_import_files"("store_id", "charged_pages", "started_at");
 CREATE INDEX IF NOT EXISTS "catalog_import_items_job_id_status_idx" ON "catalog_import_items"("job_id", "status");
 CREATE INDEX IF NOT EXISTS "catalog_import_items_store_id_sku_idx" ON "catalog_import_items"("store_id", "sku");
 CREATE INDEX IF NOT EXISTS "catalog_import_items_product_id_idx" ON "catalog_import_items"("product_id");

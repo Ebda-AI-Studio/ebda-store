@@ -11,7 +11,7 @@ import { AppError } from '../../middleware/error-handler';
 import { isAiQuotaCapError } from '../ai-quota';
 import logger from '../logger';
 import { StorageService } from '../../services/storage.service';
-import { chargeVerdict, pageAllowance } from './page-ledger';
+import { catalogueLimits, chargeVerdict, pageAllowance } from './page-ledger';
 import { sniffCatalogueFile } from './sniff';
 import { getCatalogueExtractor } from './gemini-vision-extractor';
 import type { CatalogueExtractor } from './extractor';
@@ -48,16 +48,24 @@ export async function processFile(
   const mark = (data: Record<string, unknown>) =>
     prisma.catalogImportFile.updateMany({ where: { id: fileId, storeId }, data });
 
-  // Plan allowance first (a file already charged is free to retry).
-  if (!file.quotaCounted) {
-    const verdict = chargeVerdict(await pageAllowance(storeId), file.pageCount);
-    if (verdict !== 'ok') {
-      await mark({ status: 'skipped_quota', errorCode: verdict, finishedAt: new Date() });
-      return { outcome: 'skipped_quota', calledModel: false };
-    }
+  // Attempts are capped per file; a step retry re-enters a `processing` file without a new attempt.
+  if (file.status === 'stored' && file.attempts >= catalogueLimits().maxAttempts) {
+    await mark({ status: 'failed', errorCode: 'TOO_MANY_RETRIES', finishedAt: new Date() });
+    return { outcome: 'failed', calledModel: false };
   }
 
-  await mark({ status: 'processing', attempts: { increment: 1 }, errorCode: null });
+  // Plan allowance first. Every attempt that reaches the model is charged, so it must fit now.
+  const verdict = chargeVerdict(await pageAllowance(storeId), file.pageCount);
+  if (verdict !== 'ok') {
+    await mark({ status: 'skipped_quota', errorCode: verdict, finishedAt: new Date() });
+    return { outcome: 'skipped_quota', calledModel: false };
+  }
+
+  await mark({
+    status: 'processing',
+    ...(file.status === 'stored' ? { attempts: { increment: 1 } } : {}),
+    errorCode: null,
+  });
 
   if (!file.storageKey.startsWith(keyPrefix(storeId, jobId))) {
     await mark({ status: 'failed', errorCode: 'BAD_STORAGE_KEY', finishedAt: new Date() });
@@ -106,8 +114,8 @@ export async function processFile(
 
   // The reply came back: the page is charged now, whatever the parse says.
   await mark({
-    quotaCounted: true,
-    startedAt: file.startedAt ?? new Date(),
+    chargedPages: { increment: file.pageCount },
+    startedAt: new Date(),
     inputTokens: reply.inputTokens,
     outputTokens: reply.outputTokens,
     model: reply.model,

@@ -6038,7 +6038,7 @@ model CatalogImportFile {
   status       String    @default("stored") // stored|processing|done|failed|skipped_quota
   attempts     Int       @default(0)
   errorCode    String?   @map("error_code")
-  quotaCounted Boolean   @default(false) @map("quota_counted")
+  chargedPages Int @default(0) @map("charged_pages")
   itemsFound   Int       @default(0) @map("items_found")
   inputTokens  Int?      @map("input_tokens")
   outputTokens Int?      @map("output_tokens")
@@ -6052,7 +6052,7 @@ model CatalogImportFile {
   items CatalogImportItem[]
 
   @@index([jobId, status])
-  @@index([storeId, quotaCounted, startedAt])
+  @@index([storeId, chargedPages, startedAt])
   @@map("catalog_import_files")
 }
 
