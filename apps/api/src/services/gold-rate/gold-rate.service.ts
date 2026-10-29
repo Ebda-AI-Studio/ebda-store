@@ -334,19 +334,6 @@ export class GoldRateService {
     return out;
   }
 
-  /**
-   * Operations that run arbitrary Postgres writes inside the repricer's transaction cannot reach a Durable Object store.
-   * Refused, never dropped (Ruling CF-PAY-1): the spec edit goes through the DO writer and `goldRepriceProduct`.
-   */
-  private static async refuseOnDo(storeId: string, what: string): Promise<void> {
-    if (await storeMoney(storeId))
-      throw new AppError(
-        501,
-        'GOLD_PRICING_NOT_ON_DO',
-        `${what} is not ported to the store Durable Object yet`
-      );
-  }
-
   /** Confirm or reject a PENDING (feed) rate. Confirming applies it exactly as typed. */
   static async decidePending(
     storeId: string,
@@ -519,12 +506,49 @@ export class GoldRateService {
     },
     actor: { userId: string }
   ): Promise<{ pricingMode: 'fixed' | 'gold_rate'; price: number }> {
-    await GoldRateService.refuseOnDo(storeId, 'setProductPricing');
     const product = productGoldPricingInputSchema.parse(rawInput.product);
     const variantInputs = (rawInput.variants ?? []).map(v => {
       const { id, ...rest } = v;
       return { id, ...variantGoldPricingInputSchema.parse(rest) };
     });
+    // Store on its Durable Object (Ruling CF-LAST-1): spec, variant overrides and the re-price are ONE section there.
+    const money = await storeMoney(storeId);
+    if (money) {
+      const done = (await money.goldSetProductPricing({
+        productId,
+        product,
+        variants: variantInputs,
+      })) as {
+        pricingMode: 'fixed' | 'gold_rate';
+        price: number;
+        from: string;
+        frozenPrice?: number;
+      };
+      await auditLog({
+        action: 'gold_pricing.product',
+        userId: actor.userId,
+        storeId,
+        resourceType: 'product',
+        resourceId: productId,
+        details: {
+          from: done.from,
+          to: product.pricingMode,
+          frozenPrice: done.frozenPrice,
+          spec:
+            product.pricingMode === 'gold_rate'
+              ? {
+                  karat: product.karat,
+                  weightMg: product.weightMg,
+                  makingChargeType: product.makingChargeType,
+                  makingChargeValue: product.makingChargeValue,
+                  marginBps: product.marginBps ?? 0,
+                }
+              : undefined,
+        },
+      }).catch(() => undefined);
+      await purgeGoldPrices(storeId);
+      return { pricingMode: done.pricingMode, price: done.price };
+    }
     const out = await withMoneyTx(prisma, async tx => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const existing = await tx.product.findFirst({
@@ -703,9 +727,18 @@ export class GoldRateService {
   static async asRepricer<T>(
     storeId: string,
     productId: string,
-    fn: (tx: Prisma.TransactionClient) => Promise<T>
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+    onDo?: () => Promise<T>
   ): Promise<T> {
-    await GoldRateService.refuseOnDo(storeId, 'asRepricer');
+    // Store on its Durable Object (Ruling CF-LAST-1): a closure cannot cross the door and the DO's price guard refuses a
+    // gold variant insert outside the repricer section, so the caller passes `onDo` (one `goldCreateVariant` section).
+    if (await storeMoney(storeId)) {
+      if (!onDo)
+        throw new Error('GoldRateService.asRepricer needs onDo for a Durable Object store');
+      const result = await onDo();
+      await purgeGoldPrices(storeId);
+      return result;
+    }
     const out = await withMoneyTx(prisma, async tx => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${lockKey(storeId)}))`;
       const settings = await loadSettings(tx, storeId);
@@ -734,7 +767,25 @@ export class GoldRateService {
     mode: 'fixed' | 'gold_rate',
     actor: { userId: string }
   ) {
-    await GoldRateService.refuseOnDo(storeId, 'bulkSwitchMode');
+    const money = await storeMoney(storeId);
+    if (money) {
+      // every product is its own nested section on the DO (a refused one is skipped and leaves nothing), as on Postgres
+      const done = (await money.goldBulkSwitchMode({ ids, mode })) as {
+        switched: string[];
+        skipped: Array<{ id: string; reason: string }>;
+      };
+      for (const id of done.switched)
+        await auditLog({
+          action: 'gold_pricing.product',
+          userId: actor.userId,
+          storeId,
+          resourceType: 'product',
+          resourceId: id,
+          details: { to: mode, bulk: true },
+        }).catch(() => undefined);
+      await purgeGoldPrices(storeId);
+      return done;
+    }
     const unique = [...new Set(ids)].slice(0, 500);
     const rows = await prisma.product.findMany({
       where: { storeId, id: { in: unique }, deletedAt: null },

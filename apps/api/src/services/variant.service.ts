@@ -7,7 +7,7 @@ import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { throwIfBundleFkViolation } from '../lib/bundle-fk-errors';
 import { withSavepoint } from '../lib/savepoint';
-import { storeStock, storeWriter } from '../lib/repo-factory';
+import { storeMoney, storeStock, storeWriter } from '../lib/repo-factory';
 import { notifyCatalogChanged } from '../lib/wa/catalog-state';
 
 interface CreateOptionInput {
@@ -555,8 +555,35 @@ export class VariantService {
         },
       });
     const variant = isGold
-      ? await GoldRateService.asRepricer(storeId, productId, tx =>
-          createVariantRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
+      ? await GoldRateService.asRepricer(
+          storeId,
+          productId,
+          tx => createVariantRow(tx as unknown as Pick<typeof prisma, 'productVariant'>),
+          // Durable Object store (Ruling CF-LAST-1): the insert and the re-price are one DO section, then the row is re-read
+          async () => {
+            const money = (await storeMoney(storeId))!;
+            const { id } = await money.goldCreateVariant({
+              productId,
+              variant: {
+                title,
+                titleAr,
+                sku: input.sku,
+                barcode: typedBarcode,
+                price: input.price,
+                compareAtPrice: input.compareAtPrice,
+                costPrice: input.costPrice,
+                inventory: input.inventory,
+                weight: input.weight,
+                imageUrl: input.imageUrl,
+                position: existingVariants.length,
+              },
+              optionValueIds: input.optionValueIds,
+            });
+            return (await storeWriter(storeId)).productVariant.findFirstOrThrow({
+              where: { id },
+              include: { options: { include: { value: { include: { option: true } } } } },
+            }) as unknown as ReturnType<typeof createVariantRow>;
+          }
         )
       : await createVariantRow(
           (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
@@ -799,8 +826,16 @@ export class VariantService {
       // Ruling B5-13: a generated variant of a gold-rate product is born priced by the repricer.
       const variant =
         product.pricingMode === 'gold_rate'
-          ? await GoldRateService.asRepricer(storeId, productId, tx =>
-              createRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
+          ? await GoldRateService.asRepricer(
+              storeId,
+              productId,
+              tx => createRow(tx as unknown as Pick<typeof prisma, 'productVariant'>),
+              async () =>
+                (await storeMoney(storeId))!.goldCreateVariant({
+                  productId,
+                  variant: { title, titleAr, position: product.variants.length + created.length },
+                  optionValueIds: combo.map(value => value.id),
+                }) as never
             )
           : await createRow(
               (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>

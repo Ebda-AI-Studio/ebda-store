@@ -28,6 +28,14 @@ import {
   type ApplyRatesInput,
   type GoldSettingsInput,
 } from './gold-rates';
+import {
+  bulkSwitchGoldMode,
+  createGoldVariant,
+  type NewVariant,
+  setGoldProductPricing,
+  type ProductPricingInput,
+  type VariantPricingInput,
+} from './gold-pricing';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -64,6 +72,9 @@ export type MoneyOpName =
   | 'goldDecidePending'
   | 'goldUpdateSettings'
   | 'goldRepriceProduct'
+  | 'goldSetProductPricing'
+  | 'goldBulkSwitchMode'
+  | 'goldCreateVariant'
   | 'fanoutDisarm'
   | 'orderStatus'
   | 'quoteOrder';
@@ -88,6 +99,9 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'goldDecidePending',
   'goldUpdateSettings',
   'goldRepriceProduct',
+  'goldSetProductPricing',
+  'goldBulkSwitchMode',
+  'goldCreateVariant',
   'fanoutDisarm',
   'orderStatus',
   'quoteOrder',
@@ -296,6 +310,23 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       orderId: id(a.orderId, 'orderId'),
       status: typeof a.status === 'string' ? a.status : '',
     }),
+  /** GoldRateService.setProductPricing (Ruling CF-LAST-1): spec, variant overrides and the re-price are ONE section. */
+  goldSetProductPricing: (db, storeId, a) =>
+    setGoldProductPricing(db, storeId, id(a.productId, 'productId'), {
+      product: a.product as ProductPricingInput,
+      variants: a.variants as VariantPricingInput[] | undefined,
+    }),
+  goldBulkSwitchMode: (db, storeId, a) =>
+    bulkSwitchGoldMode(db, storeId, a.ids as string[], a.mode as 'fixed' | 'gold_rate'),
+  /** The variant INSERT of GoldRateService.asRepricer, born priced, in one section (rolls back when a rate is missing). */
+  goldCreateVariant: (db, storeId, a) =>
+    createGoldVariant(
+      db,
+      storeId,
+      id(a.productId, 'productId'),
+      a.variant as NewVariant,
+      (a.optionValueIds as string[] | undefined) ?? []
+    ),
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),

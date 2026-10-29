@@ -7,11 +7,6 @@
       "needs": "port of postPartialReturnJournal (allocatePartialReturn, loadPriorReversedQty, resolveReturnRefundLegs) onto do/ledger.ts, after the Return row lifecycle"
     },
     {
-      "code": "GOLD_PRICING_NOT_ON_DO",
-      "file": "apps/api/src/services/gold-rate/gold-rate.service.ts",
-      "needs": "setProductPricing, asRepricer and bulkSwitchMode as named moneyOps (their caller closures run arbitrary writes inside the repricer transaction)"
-    },
-    {
       "code": "INSTAPAY_RECEIPTS_NOT_ON_DO",
       "file": "apps/api/src/services/payment-providers/instapay-receipt.service.ts",
       "needs": "a D1 entity-index kind for the cross-store reference_key uniqueness, then the receipt upload/submit as one moneyOp"
@@ -22,11 +17,21 @@
       "flow": "cart rows (carts, cart_items, cart_bundles) and abandoned carts",
       "note": "the cart CLAIM is atomic on the DO since CF-FINAL-1; the rows still live on Postgres"
     },
-    { "flow": "fiscal documents and counters (issueSaleDocument)" },
-    { "flow": "Return row lifecycle (ReturnService)" },
-    { "flow": "order reads that join Postgres-only models" },
-    { "flow": "wallet-movement journal (WALLET-GL-1 / PR #325, not merged)" },
-    { "flow": "partial-return journal (refused 501, listed above)" },
+    {
+      "flow": "fiscal documents and counters (issueSaleDocument)"
+    },
+    {
+      "flow": "Return row lifecycle (ReturnService)"
+    },
+    {
+      "flow": "order reads that join Postgres-only models"
+    },
+    {
+      "flow": "wallet-movement journal (WALLET-GL-1 / PR #325, not merged)"
+    },
+    {
+      "flow": "partial-return journal (refused 501, listed above)"
+    },
     {
       "flow": "CSV import orchestrator (stock and non-stock fields, slug redirects, gold specs in one DO op)"
     },
