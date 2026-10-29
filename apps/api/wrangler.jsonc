@@ -270,10 +270,10 @@
     "JOBS_CF_ALARMS": "",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
-    // Semantic search kill switch (docs/ENVIRONMENT.md "Semantic search"). Flipped ONLY here, by a PR
+    // Semantic search: ON since 2026-10-29 (Ruling SEARCH-SEMANTIC-ON-1). Kill switch (docs/ENVIRONMENT.md "Semantic search"), flipped ONLY here, by a PR
     // + cf-api-deploy.yml, so the post-deploy /health probe sees the boot check; never as a secret
     // (cf-api-deploy refuses that) or from the dashboard (a new version with no probe, no rollback).
-    "SEARCH_SEMANTIC_ENABLED": "false",
+    "SEARCH_SEMANTIC_ENABLED": "true",
     // Billing is InstaPay-only until Kashier is approved (Rulings EBDA-FUNNEL-17, BILLING-NONE-1): "none" acknowledges it, so
     // an unset provider no longer pages a P1 at every boot (M-032). Card billing refuses cleanly; set "kashier" to turn cards on.
     "BILLING_PROVIDER": "none",
