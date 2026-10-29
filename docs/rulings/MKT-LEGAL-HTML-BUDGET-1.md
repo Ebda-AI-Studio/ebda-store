@@ -1,0 +1,3 @@
+# MKT-LEGAL-HTML-BUDGET-1
+
+Ruling MKT-LEGAL-HTML-BUDGET-1 - give the Arabic `/terms` and `/merchant-agreement` pages their own HTML budget (21.8 KB and 21.4 KB gzip) instead of the 20.5 KB default. CI run 40860376266 measured 21.3 KB and 20.9 KB after the #306 header and hero change; the marketing lane only runs on marketing-path PRs, so main grew past the default unnoticed and the next PR to trigger the lane (#322, which touches no marketing file) failed on it. The two pages are long vendored legal text, the same shape as `/legal/whatsapp-terms` (already 26 KB). Ratchet down, never up, without a reviewed reason. Cost if wrong: two legal pages carry ~1 KB more HTML than the default budget allows, a negligible transfer cost.
