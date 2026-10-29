@@ -27,8 +27,30 @@ describe('locale path rules (pure)', () => {
     expect(parseLocalePathStores('demo-boutique, shop.example')).toEqual(
       new Set(['demo-boutique', 'shop.example'])
     );
-    for (const bad of [undefined, '', ' , ', 'all', 'a:ar', 'a:en', 'slug:x', 'Bad Name', '*'])
+    for (const bad of [
+      undefined,
+      '',
+      ' , ',
+      'all,demo-boutique',
+      'a,all',
+      'a:ar',
+      'a:en',
+      'slug:x',
+      'Bad Name',
+      '*',
+    ])
       expect(parseLocalePathStores(bad), String(bad)).toBeNull();
+  });
+
+  it('a LONE `all` opts every store host in (Ruling LOCALE-PATHS-2); the flag still gates it', () => {
+    expect(parseLocalePathStores(' ALL ')).toEqual(new Set(['all']));
+    const env = { STOREFRONT_LOCALE_PATHS: 'true', STOREFRONT_LOCALE_PATHS_STORES: 'all' };
+    expect(localePathsOn('any-store', env)).toBe(true);
+    expect(localePathsOn('shop.example', env)).toBe(true);
+    expect(localePathsOn('any-store', { ...env, STOREFRONT_LOCALE_PATHS: 'false' })).toBe(false);
+    expect(localePathsOn('any-store', { ...env, STOREFRONT_LOCALE_PATHS_STORES: 'all,x' })).toBe(
+      false
+    );
   });
 
   it('is on only with the flag AND a named store', () => {

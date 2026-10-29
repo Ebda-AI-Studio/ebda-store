@@ -9,7 +9,7 @@
  * the cookie to match, so the next unprefixed page (the cart) opens in the same language.
  *
  * Gate: `STOREFRONT_LOCALE_PATHS=true` AND the store named in `STOREFRONT_LOCALE_PATHS_STORES` (store keys only:
- * `demo-boutique,shop.example`; no `all`, and NO language suffix: the default language is the store's own
+ * `demo-boutique,shop.example`, or a lone `all` for every store host (LOCALE-PATHS-2); and NO language suffix: the default language is the store's own
  * `settings.defaultLanguage`, read at request time wherever it is needed, so it can never disagree with the store).
  * Missing, empty or unparseable = no store: it only ever fails closed.
  *
@@ -44,6 +44,8 @@ export const LOCALE_REST_HEADER = 'x-locale-rest';
 export const LOCALE_PENDING_HEADER = 'x-locale-pending';
 export const LOCALE_SEARCH_HEADER = 'x-locale-search';
 
+/** The lone token that opts EVERY store host in (Ruling LOCALE-PATHS-2). */
+const ALL_STORES = 'all';
 const STORE_TOKEN = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
 
 /** `STOREFRONT_LOCALE_PATHS_STORES` -> the store keys; null when missing/empty/unparseable (a `:ar` suffix is rejected). */
@@ -54,6 +56,9 @@ export function parseLocalePathStores(raw: string | undefined): Set<string> | nu
     .map(t => t.trim().toLowerCase())
     .filter(Boolean);
   if (tokens.length === 0) return null;
+  // A LONE `all` is the explicit full-rollout value (Ruling LOCALE-PATHS-2, same shape as TENANT_ROUTING_ROUTES=all);
+  // `all` mixed with anything else stays unparseable, so a typo can never half-widen the list.
+  if (tokens.length === 1 && tokens[0] === ALL_STORES) return new Set([ALL_STORES]);
   const stores = new Set<string>();
   for (const token of tokens) {
     if (token === 'all' || !STORE_TOKEN.test(token)) return null;
@@ -68,9 +73,9 @@ export function localePathsOn(
   env: Record<string, string | undefined> = process.env
 ): boolean {
   if (env.STOREFRONT_LOCALE_PATHS !== 'true') return false;
-  return (
-    parseLocalePathStores(env.STOREFRONT_LOCALE_PATHS_STORES)?.has(storeKey.toLowerCase()) ?? false
-  );
+  const stores = parseLocalePathStores(env.STOREFRONT_LOCALE_PATHS_STORES);
+  if (!stores) return false;
+  return stores.has(ALL_STORES) || stores.has(storeKey.toLowerCase());
 }
 
 /** The allowlist identity of a host: the slug of `<slug>.ebda.app`, the hostname of a custom domain. */
