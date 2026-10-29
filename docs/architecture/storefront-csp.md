@@ -27,9 +27,12 @@
 
 ## Residuals (accepted, Ruling CSP-WEB-1)
 
-- The worker HTML edge cache (`demo-edge-cache.ts`, `store-edge-cache.ts`, opt-in per host) stores the whole
-  response including its CSP header, so a cached page keeps a matching nonce but shares it across visitors
-  for the cache lifetime. That is weaker than a per-visitor nonce on those hosts only.
+- The worker HTML edge caches (`demo-edge-cache.ts`, `store-edge-cache.ts`) store the rendered page with the nonce
+  it was rendered with. A HIT or STALE response is therefore never served as stored: `csp-nonce-renew.ts` mints a
+  fresh nonce per response and replaces the old one in the CSP header and throughout the streamed body (attributes
+  and the flight payload), so no two visitors share a nonce and the stored one is never sent to anyone but the
+  visitor who triggered the MISS. Test: `tests/unit/edge-cache-nonce.test.ts` (two hits, two nonces, header and
+  body agreeing).
 - If `STOREFRONT_TENANT_ROUTING` caching is ever turned on for real, its cached HTML has the same shape:
   decide then between a per-request nonce (no HTML caching) and hash/`strict-dynamic` bootstrap.
 - `/_global-error` is prerendered with no nonce: when the root layout itself crashes its scripts are blocked
@@ -38,8 +41,10 @@
   back to the host list and the nonce on the pixel scripts we render.
 
 Tests: `tests/unit/web-csp-nonce-middleware.test.ts`, `csp-directive-floor.test.ts`,
-`storefront-frame-ancestors-prod.test.ts`, `storefront-csp-google-ads.test.ts`. Browser check:
-`node scripts/qa/storefront-csp-check.mjs` against a local `next start` (every demo template, ar and en).
+`storefront-frame-ancestors-prod.test.ts`, `storefront-csp-google-ads.test.ts`, `edge-cache-nonce.test.ts`. Browser checks:
+`node scripts/qa/storefront-csp-check.mjs` against a local `next start` (every demo template, ar and en) and
+`node scripts/qa/storefront-pixel-csp-check.mjs` (a store with GTM and Meta pixels configured, real loader code,
+stubbed vendor endpoints).
 
 ---
 
