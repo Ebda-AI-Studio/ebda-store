@@ -258,7 +258,18 @@ export interface MoneyClient {
     dueImages: Array<{ id: string; storageKey: string }>;
     scrubbed: number;
   }>;
-  receiptScrub(a: { orderIds: string[] }): Promise<{ scrubbed: number }>;
+  /** One batch of the CSV import (Ruling IMPORT-DO-1): products, stock, links and variants in ONE section. */
+  importBatch(a: { rows: unknown[]; aiFields: string[]; userId?: string | null }): Promise<{
+    created: number;
+    updated: number;
+    variantsCreated: number;
+    products: Array<{ rowIndex: number; productId: string }>;
+    renames: Array<{ from: string; to: string }>;
+  }>;
+  importVariants(a: {
+    productId: string;
+    variants: unknown[];
+  }): Promise<{ variantsCreated: number }>;
   cancel(a: { orderId: string; restoreInventory?: boolean }, key?: string): Promise<CancelResult>;
   expireHold(
     a: { orderId: string; proofSubmitted?: boolean },
@@ -567,7 +578,8 @@ export function makeMoneyClient(
     receiptReject: a => call('receiptReject', a),
     receiptImageDeleted: a => call('receiptImageDeleted', a),
     receiptSweep: a => call('receiptSweep', a ?? {}),
-    receiptScrub: a => call('receiptScrub', a),
+    importBatch: a => call('importBatch', a),
+    importVariants: a => call('importVariants', a),
     createOrder: (a, key) => call('createOrder', a, key),
     quoteOrder: a => call('quoteOrder', a),
     confirmPayment: (a, key) => call('confirmPayment', a, key),

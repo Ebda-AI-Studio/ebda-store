@@ -61,6 +61,22 @@ function piiTables(reg: Registry): Array<[string, PiiClass]> {
     .sort((a, b) => rank(...a) - rank(...b) || (a[0] < b[0] ? -1 : 1));
 }
 
+/** The ids of the rows of `table` that match the subject (same WHERE as the erase), e.g. the subject's orders. */
+export function matchedIds(
+  sql: SqlExec,
+  table: string,
+  s: CustomerSubject,
+  reg: Registry = STORE_DO_REGISTRY
+): string[] {
+  const w = where(reg, table, s);
+  return w
+    ? sql
+        .exec(`SELECT id FROM ${table} WHERE ${w.clause}`, ...w.args)
+        .toArray()
+        .map(r => r.id as string)
+    : [];
+}
+
 export function exportCustomerRows(
   sql: SqlExec,
   s: CustomerSubject,

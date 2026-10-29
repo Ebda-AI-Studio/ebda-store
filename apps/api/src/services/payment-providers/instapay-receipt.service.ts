@@ -708,7 +708,7 @@ export class InstapayReceiptService {
         sameImageSeenBefore: sameImage > 0,
         now,
       });
-      const claim = await claimInstapayReference(referenceKey, storeId);
+      const claim = await claimInstapayReference(referenceKey, storeId, receiptId);
       if (claim === 'taken') {
         throw new AppError(
           409,
@@ -741,8 +741,12 @@ export class InstapayReceiptService {
         });
         return receiptFromDo(out);
       } catch (err) {
-        // a claim this call made is freed again; one the store already held (another receipt of its own) stays
-        if (claim === 'claimed') await releaseInstapayReference(referenceKey, storeId);
+        // The claim this call made is freed only when the DO ANSWERED with a refusal (its section rolled back, so this receipt
+        // is not submitted) and the refusal is not DUPLICATE_REFERENCE (another receipt holds the key). A transport error
+        // leaves the outcome unknown (the section may have committed): the claim stays, fail closed.
+        const code = (err as { code?: string }).code;
+        if (claim === 'claimed' && err instanceof AppError && code !== 'DUPLICATE_REFERENCE')
+          await releaseInstapayReference(referenceKey, storeId, receiptId);
         // the AI read landed between the read and the submit: recompute the flags once
         if ((err as { code?: string }).code === 'RECEIPT_CHANGED' && attempt === 0) continue;
         throw err;
@@ -766,7 +770,8 @@ export class InstapayReceiptService {
       note: args.note,
       actorId: args.actorUserId,
     });
-    if (r.referenceKey) await releaseInstapayReference(r.referenceKey, args.storeId);
+    if (r.referenceKey)
+      await releaseInstapayReference(r.referenceKey, args.storeId, args.receiptId);
     return {
       receiptId: r.receiptId,
       status: 'rejected',
@@ -947,13 +952,6 @@ export class InstapayReceiptService {
       }
     }
     return total;
-  }
-
-  /** The shopper's erasure on a DO store: the receipts of the given orders lose their personal fields (images go with the next sweep). */
-  static async scrubForOrdersOnDo(storeId: string, orderIds: string[]): Promise<number> {
-    const money = await storeMoney(storeId);
-    if (!money || orderIds.length === 0) return 0;
-    return (await money.receiptScrub({ orderIds })).scrubbed;
   }
 
   /**

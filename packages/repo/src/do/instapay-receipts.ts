@@ -516,18 +516,21 @@ export function sweepRetention(
   });
 }
 
-/** The shopper's erasure: the receipts of the given orders lose their personal fields (the images go with the next sweep). */
+/**
+ * The shopper's erasure: the receipts of the given orders lose their personal fields and are marked, so the next retention
+ * sweep deletes their screenshots. Called by the StoreDO's customer erasure with the DO's own order ids, in its section.
+ */
 export function scrubReceiptsForOrders(
   db: SyncSql,
-  a: { storeId: string; orderIds: string[]; now?: number }
+  a: { orderIds: string[]; now?: number }
 ): number {
   if (a.orderIds.length === 0) return 0;
   const now = a.now ?? Date.now();
   let total = 0;
   for (const orderId of a.orderIds)
-    total += db.run(
-      `UPDATE instapay_order_receipts SET ${PERSONAL_SCRUB} WHERE store_id = ? AND order_id = ?`,
-      [now, a.storeId, orderId]
-    ).changes;
+    total += db.run(`UPDATE instapay_order_receipts SET ${PERSONAL_SCRUB} WHERE order_id = ?`, [
+      now,
+      orderId,
+    ]).changes;
   return total;
 }

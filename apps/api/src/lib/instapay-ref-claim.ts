@@ -21,44 +21,56 @@ type D1 = {
 };
 const d1 = (): D1 | undefined => (cfBindings() as { PLATFORM_DB?: D1 } | undefined)?.PLATFORM_DB;
 
+/**
+ * A claim is BOUND to the receipt that made it (`claim_ref`): only that receipt can see it as its own, and only that receipt
+ * can free it. 'taken' = another store, or another receipt of this store, holds the reference.
+ */
 export type RefClaim = 'claimed' | 'ours' | 'taken' | 'unavailable';
 
 export async function claimInstapayReference(
   referenceKey: string,
-  storeId: string
+  storeId: string,
+  receiptId: string
 ): Promise<RefClaim> {
   const db = d1();
   if (!db) return 'unavailable';
   const ins = await db
     .prepare(
-      "INSERT OR IGNORE INTO entity_index (kind, id, store_id) VALUES ('instapay_ref', ?, ?)"
+      "INSERT OR IGNORE INTO entity_index (kind, id, store_id, claim_ref) VALUES ('instapay_ref', ?, ?, ?)"
     )
-    .bind(referenceKey, storeId)
+    .bind(referenceKey, storeId, receiptId)
     .run();
   if ((ins.meta?.changes ?? 0) > 0) return 'claimed';
   const row = await db
-    .prepare("SELECT store_id FROM entity_index WHERE kind = 'instapay_ref' AND id = ?")
+    .prepare("SELECT store_id, claim_ref FROM entity_index WHERE kind = 'instapay_ref' AND id = ?")
     .bind(referenceKey)
-    .first<{ store_id: string }>();
-  return row?.store_id === storeId ? 'ours' : 'taken';
+    .first<{ store_id: string; claim_ref: string | null }>();
+  return row?.store_id === storeId && row.claim_ref === receiptId ? 'ours' : 'taken';
 }
 
-/** Free a reference (a rejected receipt, or a submit that the DO refused). Only the store that holds it can free it. */
+/**
+ * Free a reference, but only the claim THIS receipt of THIS store holds (a rejected receipt; a submit the DO refused with a
+ * rolled-back answer). A claim another receipt holds is never touched, so a late or repeated release cannot reopen a live
+ * reference. Never call it after a duplicate refusal or a transport error (the outcome is not known to be "not submitted").
+ */
 export async function releaseInstapayReference(
   referenceKey: string,
-  storeId: string
+  storeId: string,
+  receiptId: string
 ): Promise<void> {
   const db = d1();
   if (!db) return;
   try {
     await db
-      .prepare("DELETE FROM entity_index WHERE kind = 'instapay_ref' AND id = ? AND store_id = ?")
-      .bind(referenceKey, storeId)
+      .prepare(
+        "DELETE FROM entity_index WHERE kind = 'instapay_ref' AND id = ? AND store_id = ? AND claim_ref = ?"
+      )
+      .bind(referenceKey, storeId, receiptId)
       .run();
   } catch (err) {
     logger.error(
       { err, storeId },
-      '[P1][instapay-ref] could not free a reference claim; it stays taken until cleared'
+      '[P1][instapay-ref] could not free a reference claim; it stays taken (fail closed) until cleared'
     );
   }
 }

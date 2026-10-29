@@ -128,6 +128,7 @@ export const entityIndex = sqliteTable(
     }).notNull(),
     id: text('id').notNull(),
     storeId: text('store_id').notNull(),
+    claimRef: text('claim_ref'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

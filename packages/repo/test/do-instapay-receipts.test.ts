@@ -4,6 +4,7 @@ import { openSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
 import { ensureMoneyOpsSchema, runMoneyOp } from '../src/do/money-ops';
 import { ensurePaymentSchema } from '../src/do/payments';
+import { scrubReceiptsForOrders } from '../src/do/instapay-receipts';
 import { MoneyError } from '../src/do/sync-sql';
 
 const S = 's1';
@@ -67,7 +68,7 @@ function rig() {
       expectedReceiver: 'a@instapay',
     });
   const exec = (sql: string) => raw.exec(sql);
-  return { op, code, q, exec, order, draft, submit, fields };
+  return { op, code, q, exec, order, draft, submit, fields, db };
 }
 
 describe('InstaPay order receipts on the DO', () => {
@@ -217,7 +218,7 @@ describe('InstaPay order receipts on the DO', () => {
       false
     );
     expect(r.op('receiptGet', { receiptId: id }).extracted).toEqual({ a: 1 });
-    expect(r.op('receiptScrub', { orderIds: ['o1'] }).scrubbed).toBe(6);
+    expect(scrubReceiptsForOrders(r.db, { orderIds: ['o1'] })).toBe(6);
     expect(r.op('receiptGet', { receiptId: id }).extracted).toBeNull();
     expect(r.op('receiptSweep', {}).dueImages).toHaveLength(6); // scrubbed rows keep an image until it is deleted
     expect(r.op('receiptImageDeleted', { receiptId: id }).alreadyDeleted).toBe(false);

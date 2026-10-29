@@ -46,11 +46,16 @@ import {
   proofState,
   recordExtraction,
   rejectReceipt,
-  scrubReceiptsForOrders,
   submitReceipt,
   sweepRetention,
   type SubmitFields,
 } from './instapay-receipts';
+import {
+  importProductsBatch,
+  importVariantsForProduct,
+  type ImportRowPlan,
+  type ImportVariantRow,
+} from './catalog-import';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -103,7 +108,8 @@ export type MoneyOpName =
   | 'receiptReject'
   | 'receiptImageDeleted'
   | 'receiptSweep'
-  | 'receiptScrub';
+  | 'importBatch'
+  | 'importVariants';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -141,7 +147,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'receiptReject',
   'receiptImageDeleted',
   'receiptSweep',
-  'receiptScrub',
+  'importBatch',
+  'importVariants',
 ];
 
 const TABLE = '_money_ops';
@@ -376,9 +383,20 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   receiptImageDeleted: (db, storeId, a) =>
     markImageDeleted(db, { storeId, receiptId: id(a.receiptId, 'receiptId') }),
   receiptSweep: (db, storeId) => sweepRetention(db, { storeId }),
-  receiptScrub: (db, storeId, a) => ({
-    scrubbed: scrubReceiptsForOrders(db, { storeId, orderIds: (a.orderIds as string[]) ?? [] }),
-  }),
+  /** One batch of the CSV import (Ruling IMPORT-DO-1): products, stock, links and variants in ONE section. */
+  importBatch: (db, storeId, a) =>
+    importProductsBatch(db, {
+      storeId,
+      rows: (a.rows as ImportRowPlan[]) ?? [],
+      aiFields: (a.aiFields as string[]) ?? [],
+      userId: typeof a.userId === 'string' ? a.userId : null,
+    }),
+  importVariants: (db, storeId, a) =>
+    importVariantsForProduct(db, {
+      storeId,
+      productId: id(a.productId, 'productId'),
+      variants: (a.variants as ImportVariantRow[]) ?? [],
+    }),
   journalSale: (db, storeId, a) =>
     postOrderSaleJournal(db, { storeId, orderId: id(a.orderId, 'orderId') }),
   journalRefund: (db, storeId, a) =>

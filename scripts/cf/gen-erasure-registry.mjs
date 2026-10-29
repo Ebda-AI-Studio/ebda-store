@@ -41,6 +41,29 @@ const RUNTIME_TABLES = {
   payment_event_log:
     'provider, event_id, payment_id, outcome, applied_at: webhook dedupe keys only',
   vector_usage: 'store_id, day, texts: a per-day embedding counter',
+  _cart_claims:
+    'cart_id, fingerprint, claimed_at: the atomic cart-claim marker of CF-FINAL-1 (found unclassified by the receipts erasure test, R3)',
+};
+/**
+ * Runtime tables (as above) that DO hold a buyer's personal data: classified here with the same shape a schema table gets.
+ * `instapay_order_receipts` (Ruling INSTAPAY-DO-1): the payer's typed / AI-read fields on a receipt, reached through the order.
+ */
+const RUNTIME_PII_TABLES = {
+  instapay_order_receipts: {
+    via: { column: 'order_id', table: 'orders' },
+    action: 'scrub',
+    scrub: {
+      payer_name: null,
+      payer_address: null,
+      payer_mobile: null,
+      payer_bank: null,
+      receiver_name: null,
+      receiver_handle: null,
+      receiver_mobile: null,
+      note: null,
+      extracted: null,
+    },
+  },
 };
 const PII_JSON_LIKE = /address|_raw|json/i;
 
@@ -120,6 +143,10 @@ export async function generate() {
   for (const t of Object.keys(RUNTIME_TABLES)) {
     if (out[t]) throw new Error(`${t} is now in the schema: drop it from RUNTIME_TABLES`);
     out[t] = { kind: 'no-pii' };
+  }
+  for (const [t, e] of Object.entries(RUNTIME_PII_TABLES)) {
+    if (out[t]) throw new Error(`${t} is now in the schema: drop it from RUNTIME_PII_TABLES`);
+    out[t] = { kind: 'customer-pii', match: {}, via: e.via, action: e.action, scrub: e.scrub };
   }
   const sorted = Object.fromEntries(Object.entries(out).sort(([a], [b]) => (a < b ? -1 : 1)));
   const body = JSON.stringify(sorted, null, 2)

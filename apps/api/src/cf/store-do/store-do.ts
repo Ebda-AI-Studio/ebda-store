@@ -37,6 +37,7 @@ import {
   type StockAnswer,
   ensureIdempotencySchema,
   ensurePaymentSchema,
+  scrubReceiptsForOrders,
   ensureSearchIndex,
   MoneyError,
   runReads,
@@ -51,7 +52,12 @@ import * as repo from './repo';
 import { StoreError } from './repo';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { exportOrder, storeTables } from './tables';
-import { countCustomerRows, eraseCustomerRows, exportCustomerRows } from '../erasure/store-do-sql';
+import {
+  countCustomerRows,
+  eraseCustomerRows,
+  exportCustomerRows,
+  matchedIds,
+} from '../erasure/store-do-sql';
 import { unclassifiedTables } from '../erasure/registry';
 import type { Subject } from '../erasure/types';
 import {
@@ -412,7 +418,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     const sqlx = this.ctx.storage.sql;
     if (s.kind === 'customer') {
       this.assertRegistryCoversSchema();
-      const erased = this.ctx.storage.transactionSync(() => eraseCustomerRows(sqlx, s));
+      const erased = this.ctx.storage.transactionSync(() => {
+        // InstaPay receipts of the subject's orders (Ruling INSTAPAY-DO-1): the personal fields go AND the rows are marked so the
+        // retention sweep deletes their screenshots. Found through the DO's own order ids, before the orders lose their link.
+        scrubReceiptsForOrders(this.sync, { orderIds: matchedIds(sqlx, 'orders', s) });
+        return eraseCustomerRows(sqlx, s);
+      });
       return { erased, remaining: countCustomerRows(sqlx, s) };
     }
     const erased = this.rowCounts();
