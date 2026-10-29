@@ -191,6 +191,10 @@ function unconditionallyAnsweredBundleCodes(bundleSrc: string): string[] {
  * "I did not write copy for it yet" is not a reason.
  */
 const DELIBERATELY_GENERIC: Record<string, string> = {
+  DELIVERY_SLOT_NOT_ON_DO:
+    'a delivery slot on a store served by its Durable Object (Ruling CF-ORDERS-1): refused instead of dropped; unreachable while every store stays on Postgres (the cutover gate forbids a flip until slots are ported); remove this entry then',
+  PERSONALISATION_NOT_ON_DO:
+    'a personalisation note on a store served by its Durable Object (Ruling CF-ORDERS-1): refused instead of dropped; unreachable while every store stays on Postgres; remove this entry when personalisation is ported',
   QUOTE_NOT_ON_DO:
     'a quote for a store served by its Durable Object (Ruling CF-ORDERS-1): unreachable while every store stays on Postgres (the cutover gate forbids a flip until the engine can quote); remove this entry when the quote is ported',
   // Payment leg (#1826). Both leave the order PENDING — no compensating
