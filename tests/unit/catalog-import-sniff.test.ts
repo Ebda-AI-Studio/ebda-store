@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { PDFDocument, PDFName, PDFString } from '@cantoo/pdf-lib';
+import { zlibSync } from 'fflate';
 import {
   sniffCatalogueFile,
   normalizePdf,
+  scanPdf,
   PdfRefused,
   displayFileName,
 } from '../../apps/api/src/lib/catalogue/sniff';
@@ -55,6 +57,7 @@ async function makePdf(pages: number, opts: { objectStreams: boolean; js?: boole
     ? Buffer.from(bytes.toString('latin1').replaceAll('/Type /Page\n', '/Type /#50age\n'), 'latin1')
     : bytes;
 }
+const MAXB = 6 * 1024 * 1024;
 const regexCount = (b: Buffer) =>
   b.toString('latin1').match(/\/Type\s*\/Page(?![A-Za-z])/g)?.length ?? 0;
 
@@ -62,7 +65,7 @@ describe('normalizePdf: a real parse of the page tree', () => {
   it('counts pages the old text scan could not see (object streams hide /Type /Page)', async () => {
     const crafted = await makePdf(9, { objectStreams: true });
     expect(regexCount(crafted)).toBeLessThan(9); // the regex under-counts: the exploit
-    const n = await normalizePdf(crafted, 10);
+    const n = await normalizePdf(crafted, 10, MAXB);
     expect(n.pages).toBe(9);
     // what is stored/sent has exactly the counted pages
     expect((await PDFDocument.load(n.bytes)).getPageCount()).toBe(9);
@@ -70,24 +73,83 @@ describe('normalizePdf: a real parse of the page tree', () => {
   it('refuses over the cap, even when the text scan would see one page', async () => {
     const crafted = await makePdf(25, { objectStreams: true });
     expect(regexCount(crafted)).toBeLessThan(11);
-    await expect(normalizePdf(crafted, 10)).rejects.toMatchObject({
+    await expect(normalizePdf(crafted, 10, MAXB)).rejects.toMatchObject({
       code: 'TOO_MANY_PAGES',
       pages: 25,
     });
   });
   it('refuses a PDF that cannot be parsed, and a header-only file', async () => {
     await expect(
-      normalizePdf(Buffer.from('%PDF-1.4\n/Type /Page garbage'), 10)
+      normalizePdf(Buffer.from('%PDF-1.4\n/Type /Page garbage'), 10, MAXB)
     ).rejects.toBeInstanceOf(PdfRefused);
-    await expect(normalizePdf(Buffer.from('%PDF-'), 10)).rejects.toMatchObject({
+    await expect(normalizePdf(Buffer.from('%PDF-'), 10, MAXB)).rejects.toMatchObject({
       code: 'UNREADABLE_PDF',
     });
   });
   it('drops scripts and open-actions on re-emit', async () => {
     const withJs = await makePdf(1, { objectStreams: false, js: true });
     expect(withJs.toString('latin1')).toContain('JavaScript');
-    const n = await normalizePdf(withJs, 10);
+    const n = await normalizePdf(withJs, 10, MAXB);
     expect(n.bytes.toString('latin1')).not.toMatch(/JavaScript|OpenAction/);
+  });
+});
+
+describe('decompression-bomb defences (run in the job step, before and after the parser)', () => {
+  const pdfWith = (body: string) => Buffer.from(`%PDF-1.4\n${body}\n%%EOF`, 'latin1');
+  it('many object streams are refused before any parse', () => {
+    const many = pdfWith(
+      Array.from(
+        { length: 30 },
+        (_, i) =>
+          `${i + 1} 0 obj\n<</Type/ObjStm/N 1/First 4/Length 4>>\nstream\nxxxx\nendstream\nendobj`
+      ).join('\n')
+    );
+    expect(() => scanPdf(many)).toThrowError(expect.objectContaining({ code: 'PDF_TOO_COMPLEX' }));
+  });
+  it('a long filter chain is refused', () => {
+    const chain = pdfWith(
+      '1 0 obj\n<</Filter [/ASCII85Decode /LZWDecode /FlateDecode /RunLengthDecode]/Length 4>>\nstream\nxxxx\nendstream\nendobj'
+    );
+    expect(() => scanPdf(chain)).toThrowError(expect.objectContaining({ code: 'PDF_TOO_COMPLEX' }));
+  });
+  it('a tiny file declaring a huge /Length is refused', () => {
+    const lie = pdfWith('1 0 obj\n<</Length 999999999>>\nstream\nxxxx\nendstream\nendobj');
+    expect(lie.length).toBeLessThan(200);
+    expect(() => scanPdf(lie)).toThrowError(expect.objectContaining({ code: 'PDF_TOO_COMPLEX' }));
+    // an indirect "/Length 7 0 R" is not a number and stays legal
+    expect(() =>
+      scanPdf(pdfWith('1 0 obj\n<</Length 7 0 R>>\nstream\nxxxx\nendstream\nendobj'))
+    ).not.toThrow();
+  });
+  it('a real inflate bomb (small file, ~100 MB of zeros) is stopped at the cap', () => {
+    const bomb = zlibSync(new Uint8Array(100 * 1024 * 1024), { level: 9 });
+    expect(bomb.length).toBeLessThan(200 * 1024);
+    const file = Buffer.concat([
+      Buffer.from('%PDF-1.4\n1 0 obj\n<</Filter/FlateDecode/Length 9>>\nstream\n'),
+      Buffer.from(bomb),
+      Buffer.from('\nendstream\nendobj\n%%EOF'),
+    ]);
+    const before = process.memoryUsage().heapUsed;
+    expect(() => scanPdf(file)).toThrowError(expect.objectContaining({ code: 'PDF_TOO_COMPLEX' }));
+    expect(process.memoryUsage().heapUsed - before).toBeLessThan(150 * 1024 * 1024);
+    return expect(normalizePdf(file, 10, MAXB)).rejects.toMatchObject({ code: 'PDF_TOO_COMPLEX' });
+  });
+  it('a normal PDF with real flate streams passes the scan', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage().drawText('hello');
+    const saved = Buffer.from(await doc.save({ useObjectStreams: false }));
+    expect(() => scanPdf(saved)).not.toThrow();
+  });
+  it('the page cap is checked before any page is copied, and the output size cap after save', async () => {
+    const big = await makePdf(30, { objectStreams: false });
+    await expect(normalizePdf(big, 10, MAXB)).rejects.toMatchObject({
+      code: 'TOO_MANY_PAGES',
+      pages: 30,
+    });
+    const ok = await makePdf(3, { objectStreams: false });
+    await expect(normalizePdf(ok, 10, 50)).rejects.toMatchObject({
+      code: 'PDF_TOO_LARGE_AFTER_NORMALIZE',
+    });
   });
 });
 

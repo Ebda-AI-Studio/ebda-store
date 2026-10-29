@@ -8,6 +8,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vites
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { PDFDocument } from '@cantoo/pdf-lib';
+import { zlibSync } from 'fflate';
 import { prisma, withRlsBypass } from '@ebda/database';
 import {
   hasDb,
@@ -173,12 +174,38 @@ describe.skipIf(!hasDb)('catalogue import', () => {
       [1, 2, 3, 4, 5].map(i => [JPEG, `m${i}.jpg`] as [Buffer, string])
     );
     expect([400, 413]).toContain(many.status);
-    const res = await upload(a, [[await mkPdf(40), 'big.pdf']]); // object streams: a text scan sees ~1
-    expect(
-      (await upload(a, [[Buffer.from('%PDF-1.4 not a pdf'), 'bad.pdf']])).body.error.code
-    ).toBe('UNREADABLE_PDF');
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('TOO_MANY_PAGES');
+  });
+
+  it('PDFs are parsed in the job step, never in the request: hostile PDFs fail the FILE, uncharged', async () => {
+    const bomb = Buffer.concat([
+      Buffer.from('%PDF-1.4\n1 0 obj\n<</Filter/FlateDecode/Length 9>>\nstream\n'),
+      Buffer.from(zlibSync(new Uint8Array(100 * 1024 * 1024), { level: 9 })),
+      Buffer.from('\nendstream\nendobj\n%%EOF'),
+    ]);
+    const cases: Array<[Buffer, string]> = [
+      [await mkPdf(40), 'TOO_MANY_PAGES'],
+      [Buffer.from('%PDF-1.4 not a pdf'), 'UNREADABLE_PDF'],
+      [bomb, 'PDF_TOO_COMPLEX'],
+    ];
+    for (const [buf, code] of cases) {
+      const t0 = Date.now();
+      const res = await upload(a, [[buf, 'x.pdf']]);
+      expect(res.status).toBe(202); // the request path only sniffs bytes and stores
+      expect(Date.now() - t0).toBeLessThan(5000);
+      const id = res.body.data.jobId;
+      setCatalogueExtractorForTests({
+        name: 'never',
+        extract: async () => {
+          throw new Error('the model must not be called for a refused PDF');
+        },
+      });
+      await runHandler(catalogImportRun, { jobId: id, storeId: a.storeId });
+      const f = await withRlsBypass(tx =>
+        tx.catalogImportFile.findFirstOrThrow({ where: { jobId: id } })
+      );
+      expect([f.status, f.errorCode, f.chargedPages]).toEqual(['failed', code, 0]);
+      await svc.deleteJob(a.storeId, id);
+    }
   });
 
   it('enqueue failure marks the job failed (never queued) and deletes the originals', async () => {
@@ -223,7 +250,6 @@ describe.skipIf(!hasDb)('catalogue import', () => {
       });
       const files = await withRlsBypass(tx => tx.catalogImportFile.findMany({ where: { jobId } }));
       expect(files.map(f => f.mime).sort()).toEqual(['application/pdf', 'image/jpeg']);
-      expect(files.find(f => f.mime === 'application/pdf')!.pageCount).toBe(2);
       for (const f of files)
         expect(f.storageKey.startsWith(`stores/${a.storeId}/catalogimport-${jobId}/`)).toBe(true);
     });

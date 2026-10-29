@@ -5,6 +5,7 @@
  *
  * Logging: ids and counts only. Never file bytes, prompt, model reply, product text or file names.
  */
+import { createHash } from 'node:crypto';
 import { prisma } from '@ebda/database';
 import { catalogueRawPageSchema, stageCatalogueItems, normalizeArabicSearch } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
@@ -12,7 +13,7 @@ import { isAiQuotaCapError } from '../ai-quota';
 import logger from '../logger';
 import { StorageService } from '../../services/storage.service';
 import { catalogueLimits, chargeVerdict, pageAllowance } from './page-ledger';
-import { sniffCatalogueFile } from './sniff';
+import { PdfRefused, normalizePdf, sniffCatalogueFile } from './sniff';
 import { getCatalogueExtractor } from './gemini-vision-extractor';
 import type { CatalogueExtractor } from './extractor';
 
@@ -54,13 +55,6 @@ export async function processFile(
     return { outcome: 'failed', calledModel: false };
   }
 
-  // Plan allowance first. Every attempt that reaches the model is charged, so it must fit now.
-  const verdict = chargeVerdict(await pageAllowance(storeId), file.pageCount);
-  if (verdict !== 'ok') {
-    await mark({ status: 'skipped_quota', errorCode: verdict, finishedAt: new Date() });
-    return { outcome: 'skipped_quota', calledModel: false };
-  }
-
   await mark({
     status: 'processing',
     ...(file.status === 'stored' ? { attempts: { increment: 1 } } : {}),
@@ -85,13 +79,64 @@ export async function processFile(
     return { outcome: 'failed', calledModel: false };
   }
 
+  // A PDF is parsed HERE (a job step with its own memory and CPU budget), never in the upload request:
+  // bomb pre-scan, real page-tree count, page cap before any copy, size cap after. The sanitised copy
+  // with exactly the counted pages replaces the stored original, so what is sent == counted == charged.
+  let pageCount = file.pageCount;
+  if (mime === 'application/pdf') {
+    try {
+      const lim = catalogueLimits();
+      const n = await normalizePdf(bytes, lim.maxPdfPages, lim.maxPdfBytes);
+      const sha = createHash('sha256').update(n.bytes).digest('hex');
+      if (sha !== file.sha256) {
+        const { key } = await StorageService.putPrivate(n.bytes, {
+          storeId,
+          folder: `catalogimport-${jobId}`,
+          ext: '.pdf',
+          contentType: 'application/pdf',
+        });
+        await StorageService.deletePrivate(file.storageKey).catch(() => undefined);
+        await mark({ storageKey: key, sha256: sha, sizeBytes: n.bytes.length });
+      }
+      bytes = n.bytes;
+      pageCount = n.pages;
+      await mark({ pageCount });
+      const others = await prisma.catalogImportFile.aggregate({
+        where: { jobId, storeId, id: { not: fileId } },
+        _sum: { pageCount: true },
+      });
+      if ((others._sum.pageCount ?? 0) + pageCount > catalogueLimits().maxPagesPerJob) {
+        await mark({ status: 'failed', errorCode: 'TOO_MANY_PAGES', finishedAt: new Date() });
+        return { outcome: 'failed', calledModel: false };
+      }
+    } catch (err) {
+      const code = err instanceof PdfRefused ? err.code : 'UNREADABLE_PDF';
+      await mark({ status: 'failed', errorCode: code, finishedAt: new Date() });
+      logger.warn({ jobId, fileId, code }, '[catalog-import] pdf refused');
+      return { outcome: 'failed', calledModel: false };
+    }
+  }
+
+  // Plan allowance first. Every attempt that reaches the model is charged, so it must fit now.
+  const verdict = chargeVerdict(await pageAllowance(storeId), pageCount);
+  if (verdict !== 'ok') {
+    // Never reached the model: the attempt taken above is given back, so a quota wait is free.
+    await mark({
+      status: 'skipped_quota',
+      errorCode: verdict,
+      finishedAt: new Date(),
+      ...(file.status === 'stored' ? { attempts: { decrement: 1 } } : {}),
+    });
+    return { outcome: 'skipped_quota', calledModel: false };
+  }
+
   let reply;
   try {
     reply = await extractor.extract({
       storeId,
       bytes,
       mime,
-      pageCount: file.pageCount,
+      pageCount,
       categories: categoryNames,
     });
   } catch (err) {
@@ -114,7 +159,7 @@ export async function processFile(
 
   // The reply came back: the page is charged now, whatever the parse says.
   await mark({
-    chargedPages: { increment: file.pageCount },
+    chargedPages: { increment: pageCount },
     startedAt: new Date(),
     inputTokens: reply.inputTokens,
     outputTokens: reply.outputTokens,

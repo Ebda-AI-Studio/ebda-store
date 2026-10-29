@@ -21,13 +21,7 @@ import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
-import {
-  CATALOGUE_EXT,
-  PdfRefused,
-  displayFileName,
-  normalizePdf,
-  sniffCatalogueFile,
-} from '../lib/catalogue/sniff';
+import { CATALOGUE_EXT, displayFileName, sniffCatalogueFile } from '../lib/catalogue/sniff';
 import {
   catalogImportKillSwitchOn,
   catalogueLimits,
@@ -94,7 +88,7 @@ export async function createJob(
     pages: number;
   }> = [];
   for (const original of files) {
-    let f = original;
+    const f = original;
     const sniffed = sniffCatalogueFile(f.buffer);
     if (!sniffed) {
       throw new AppError(
@@ -107,33 +101,13 @@ export async function createJob(
     if (f.buffer.length > cap) {
       throw new AppError(413, 'FILE_TOO_LARGE', 'A file is too large.');
     }
-    let pages = 1;
-    if (sniffed.kind === 'pdf') {
-      // A real parse of the page tree; the stored + extracted bytes are the re-emitted copy holding
-      // exactly `pages` pages, so what is sent is what is counted and charged.
-      try {
-        const n = await normalizePdf(f.buffer, lim.maxPdfPages);
-        pages = n.pages;
-        f = { ...f, buffer: n.bytes };
-      } catch (err) {
-        if (err instanceof PdfRefused) {
-          throw new AppError(
-            err.code === 'TOO_MANY_PAGES' ? 400 : 415,
-            err.code,
-            err.code === 'TOO_MANY_PAGES'
-              ? `A PDF can have at most ${lim.maxPdfPages} pages.`
-              : 'This PDF could not be read.'
-          );
-        }
-        throw err;
-      }
-    }
+    // The request handler only checks magic bytes and size. A PDF's real page count (and its
+    // sanitising re-emit) is the job step's work (processFile): parsing untrusted PDFs, which can be
+    // decompression bombs, never happens on the request path. 1 is a placeholder until then.
+    const pages = 1;
     checked.push({ f, sniffed, pages });
   }
   const pagesTotal = checked.reduce((n, c) => n + c.pages, 0);
-  if (pagesTotal > lim.maxPagesPerJob) {
-    throw new AppError(400, 'TOO_MANY_PAGES', `At most ${lim.maxPagesPerJob} pages per import.`);
-  }
 
   const jobId = randomUUID();
   const stored: string[] = [];
