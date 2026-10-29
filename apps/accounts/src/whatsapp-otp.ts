@@ -1,26 +1,17 @@
 /**
- * One-time codes over WhatsApp (Ruling ID-WA-OTP-1): the password-reset code that was just issued and mailed is ALSO sent to the account's own phone
- * through the ebda-wa Worker's `WhatsAppOtp.sendOtp(storeId, phone, code)` RPC. A channel BESIDE the email, never instead of it.
+ * Password-reset codes over WhatsApp (Rulings ID-WA-OTP-1 and WA-OTP-SENDER-1): the code that was just issued and mailed is ALSO sent to the account's
+ * own phone through the ebda-wa Worker's `PlatformOtp.sendCode(phone, code)`. A channel BESIDE the email, never instead of it.
  *
- * Fails closed, and never gets in the way of the email:
- *  - no `WHATSAPP_OTP` binding, no phone on file, an unverified address or an inactive account = no attempt at all;
- *  - only a store the user OWNS may send (the sender is that store's own connected number; WhatsApp refuses the shared platform number);
- *  - ebda-wa decides whether the store has switched `otpViaWhatsApp` on, allows the country and enforces its toll-fraud limits;
- *  - every failure (a refusal, a throw, a timeout, the directory down) is swallowed after one log line holding the REASON only;
- *    the code and the phone number are never logged.
+ * The sender is the PLATFORM number and nothing else. There is deliberately no store id in this call and no per-store loop: a message sent from a store's
+ * number lands in that store's inbox history, where every staff member of the store can read the owner's code (an account-takeover path, found by the
+ * security review 2026-10-29). Until the platform number exists the channel is OFF: `WHATSAPP_OTP_ENABLED` is not "true" (the default) = no attempt at all.
+ *
+ * Fails closed, and never gets in the way of the email: flag off, no binding, no phone, an unverified or inactive account = no attempt. Every failure
+ * (a refusal, a throw, a timeout) is swallowed after one log line holding the REASON only; the code and the phone number are never logged.
  */
 import type { UserRow } from './data';
 
-type Reason = string;
 const TIMEOUT_MS = 4_000;
-const MAX_STORES = 3;
-/** Refusals that mean "THIS store cannot send"; the next store the user owns may. Anything else (rate limit, bad phone, country, a send error, outage) stops the loop. */
-const TRY_NEXT: ReadonlySet<Reason> = new Set([
-  'disabled',
-  'not_found',
-  'no_number',
-  'template_unavailable',
-]);
 
 const timeout = <T>(p: Promise<T>): Promise<T> =>
   Promise.race([
@@ -29,27 +20,24 @@ const timeout = <T>(p: Promise<T>): Promise<T> =>
   ]);
 
 export async function sendCodeOverWhatsApp(
-  env: Pick<Cloudflare.Env, 'WHATSAPP_OTP' | 'STORE_DIRECTORY'>,
-  user: Pick<UserRow, 'id' | 'phone' | 'email_verified' | 'status'>,
+  env: Pick<Cloudflare.Env, 'WHATSAPP_OTP' | 'WHATSAPP_OTP_ENABLED'>,
+  user: Pick<UserRow, 'phone' | 'email_verified' | 'status'>,
   code: string
 ): Promise<'sent' | 'skipped' | 'failed'> {
   const rpc = env.WHATSAPP_OTP;
   const phone = user.phone?.trim();
-  if (!rpc || !env.STORE_DIRECTORY || !phone || !user.email_verified || user.status !== 'active')
+  if (
+    env.WHATSAPP_OTP_ENABLED !== 'true' ||
+    !rpc ||
+    !phone ||
+    !user.email_verified ||
+    user.status !== 'active'
+  )
     return 'skipped';
   try {
-    const owned = (await timeout(env.STORE_DIRECTORY.storesForUser(user.id)))
-      .filter(s => s.role === 'owner')
-      .slice(0, MAX_STORES);
-    if (!owned.length) return 'skipped';
-    let last: Reason = 'no_store';
-    for (const store of owned) {
-      const r = await timeout(rpc.sendOtp(store.id, phone, code));
-      if (r.ok) return 'sent';
-      last = r.reason;
-      if (!TRY_NEXT.has(r.reason)) break;
-    }
-    console.error(JSON.stringify({ msg: 'whatsapp otp not sent', reason: last }));
+    const r = await timeout(rpc.sendCode(phone, code));
+    if (r.ok) return 'sent';
+    console.error(JSON.stringify({ msg: 'whatsapp otp not sent', reason: r.reason }));
     return 'failed';
   } catch (e) {
     console.error(JSON.stringify({ msg: 'whatsapp otp failed', error: (e as Error).message }));

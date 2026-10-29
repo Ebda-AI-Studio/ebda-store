@@ -17,12 +17,12 @@ export interface Fakes {
   suspendedStores: Set<string>;
   /** Per-test overrides merged over the worker env (e.g. MFA_KEY / MFA_KEY_PREV during a rotation). */
   envOverride: Record<string, unknown>;
-  /** The ebda-wa `WhatsAppOtp.sendOtp` fake. `bound: false` (the default) = the binding is ABSENT, which is production's state until the service binding ships. */
+  /** The ebda-wa `PlatformOtp.sendCode` fake. `bound: false` (the default) = the binding is ABSENT; `enabled` is the WHATSAPP_OTP_ENABLED flag (default off, as in production). */
   whatsapp: {
     bound: boolean;
-    calls: Array<{ storeId: string; phone: string; code: string }>;
-    /** Per call, in order; the last entry repeats. Default `ok`. */
-    results: Array<{ ok: true } | { ok: false; reason: string }>;
+    enabled: boolean;
+    calls: Array<{ phone: string; code: string; args: unknown[] }>;
+    result: { ok: true } | { ok: false; reason: string };
     throws: boolean;
   };
 }
@@ -34,7 +34,7 @@ export const fakes: Fakes = {
   deletedStores: new Set<string>(),
   suspendedStores: new Set<string>(),
   envOverride: {},
-  whatsapp: { bound: false, calls: [], results: [{ ok: true }], throws: false },
+  whatsapp: { bound: false, enabled: false, calls: [], result: { ok: true }, throws: false },
 };
 
 export const testEnv = (): Cloudflare.Env =>
@@ -58,13 +58,14 @@ export const testEnv = (): Cloudflare.Env =>
         return !fakes.deletedStores.has(id) && !fakes.suspendedStores.has(id);
       },
     },
+    WHATSAPP_OTP_ENABLED: fakes.whatsapp.enabled ? 'true' : 'false',
     ...(fakes.whatsapp.bound
       ? {
           WHATSAPP_OTP: {
-            sendOtp: async (storeId: string, phone: string, code: string) => {
-              const n = fakes.whatsapp.calls.push({ storeId, phone, code });
+            sendCode: async (...args: unknown[]) => {
+              fakes.whatsapp.calls.push({ phone: String(args[0]), code: String(args[1]), args });
               if (fakes.whatsapp.throws) throw new Error('ebda-wa down');
-              return fakes.whatsapp.results[Math.min(n - 1, fakes.whatsapp.results.length - 1)];
+              return fakes.whatsapp.result;
             },
           },
         }

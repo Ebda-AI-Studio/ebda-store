@@ -34,9 +34,9 @@
   "services": [
     { "binding": "STORE_DIRECTORY", "service": "ebda-api", "entrypoint": "StoreDirectory" },
     { "binding": "MAILER", "service": "ebda-api", "entrypoint": "IdentityMailer" },
-    // One-time codes over WhatsApp (Ruling ID-WA-OTP-1): the ebda-wa Worker's `WhatsAppOtp` entrypoint. ebda-wa must already be deployed with it
-    // (a binding to a missing Worker/entrypoint fails THIS deploy). Absent at runtime = the channel is off and the email path is untouched.
-    { "binding": "WHATSAPP_OTP", "service": "ebda-wa", "entrypoint": "WhatsAppOtp" },
+    // Password-reset codes over WhatsApp from the PLATFORM number only (Rulings ID-WA-OTP-1, WA-OTP-SENDER-1): the ebda-wa Worker's `PlatformOtp` entrypoint. ebda-wa must already be
+    // deployed with it (a binding to a missing Worker/entrypoint fails THIS deploy). The channel stays OFF (var WHATSAPP_OTP_ENABLED) until the platform number exists.
+    { "binding": "WHATSAPP_OTP", "service": "ebda-wa", "entrypoint": "PlatformOtp" },
   ],
   "vars": {
     "ISSUER": "https://accounts.ebda.app",
@@ -46,6 +46,8 @@
     // Verified 2026-10-25: no production secret is sealed in a legacy format (0 users with a TOTP), so legacy v1/v2 are refused from day one.
     "MFA_REJECT_LEGACY": "true",
     "PRODUCTS": "store,whatsapp,crm,erp",
+    // WhatsApp codes need the platform number (Meta, third party). "true" only after ebda-wa has PLATFORM_OTP_PHONE_NUMBER_ID + PLATFORM_OTP_TEMPLATE set.
+    "WHATSAPP_OTP_ENABLED": "false",
     // Least privilege: a browser origin may only obtain tokens for ITS product audience (an XSS on one product cannot mint another's).
     "ORIGIN_PRODUCTS": "https://store.ebda.app=store,https://orders.ebda.app=store,https://wa.ebda.app=whatsapp",
   },

@@ -32,7 +32,7 @@ export default defineConfig(async () => {
               compatibilityDate: '2026-08-01',
               modules: true,
               script: `import { WorkerEntrypoint } from 'cloudflare:workers';
-                export class WhatsAppOtp extends WorkerEntrypoint { async sendOtp() { return { ok: false, reason: 'disabled' }; } }
+                export class PlatformOtp extends WorkerEntrypoint { async sendCode() { return { ok: false, reason: 'disabled' }; } }
                 export default { fetch() { return new Response('stub'); } };`,
             },
           ],

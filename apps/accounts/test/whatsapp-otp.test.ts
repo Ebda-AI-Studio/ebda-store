@@ -1,11 +1,13 @@
 import { env } from 'cloudflare:test';
+// @ts-expect-error vite raw import
+import callerSource from '../src/whatsapp-otp.ts?raw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { call, fakes, login, seedUser } from './helpers';
 
-// Ruling ID-WA-OTP-1: the password-reset code also goes to the account's own phone over WhatsApp (ebda-wa `WhatsAppOtp`), BESIDE the email, never instead of it.
-// Fail closed: no binding, no phone, an unverified address, or no store that can send = no WhatsApp attempt and the email path is unchanged.
+// Rulings ID-WA-OTP-1 + WA-OTP-SENDER-1: the password-reset code also goes to the account's own phone over WhatsApp, from the PLATFORM number only
+// (ebda-wa `PlatformOtp.sendCode(phone, code)`, no store id), BESIDE the email. OFF by default (WHATSAPP_OTP_ENABLED) until the platform number exists.
+// Fail closed: flag off, no binding, no phone, an unverified address = no WhatsApp attempt and the email path is unchanged.
 const STORE_A = '11111111-1111-4111-8111-111111111111';
-const STORE_B = '22222222-2222-4222-8222-222222222222';
 const PHONE = '+201001234567';
 
 async function seedWithPhone(
@@ -22,25 +24,43 @@ const forgot = (email: string) => call('/password/forgot', { json: { email } });
 beforeEach(() => {
   fakes.mails.length = 0;
   fakes.stores = [{ id: STORE_A, role: 'owner' }];
-  fakes.whatsapp = { bound: true, calls: [], results: [{ ok: true }], throws: false };
+  fakes.directoryDown = false;
+  fakes.whatsapp = { bound: true, enabled: true, calls: [], result: { ok: true }, throws: false };
 });
 
-describe('password reset code over WhatsApp', () => {
-  it('sends the SAME code by email and by WhatsApp, from the first store of the account, to the phone on file', async () => {
+describe('password reset code over WhatsApp (platform sender)', () => {
+  it('sends the SAME code by email and by WhatsApp to the phone on file, with NO store id in the call', async () => {
     const u = await seedWithPhone();
     expect((await forgot(u.email)).status).toBe(202);
     expect(fakes.mails).toHaveLength(1);
-    expect(fakes.whatsapp.calls).toEqual([
-      { storeId: STORE_A, phone: PHONE, code: fakes.mails[0].code },
-    ]);
-    // the code that arrived by WhatsApp really resets the password
+    expect(fakes.whatsapp.calls).toHaveLength(1);
+    expect(fakes.whatsapp.calls[0]).toMatchObject({ phone: PHONE, code: fakes.mails[0].code });
+    expect(fakes.whatsapp.calls[0].args).toEqual([PHONE, fakes.mails[0].code]); // exactly (phone, code): nothing about a store
     const reset = await call('/password/reset', {
       json: { email: u.email, code: fakes.whatsapp.calls[0].code, newPassword: 'N3w!Passw0rdXY' },
     });
     expect(reset.status).toBe(200);
   });
 
-  it('fails closed when the binding is absent: no WhatsApp attempt, email unchanged', async () => {
+  it('never consults the Store directory or a store: the caller has no per-store path at all', async () => {
+    fakes.directoryDown = true; // would have broken a per-store loop
+    fakes.stores = [];
+    const u = await seedWithPhone();
+    await forgot(u.email);
+    expect(fakes.whatsapp.calls).toHaveLength(1);
+    const src = (callerSource as string).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(src).not.toMatch(/storesForUser|STORE_DIRECTORY|storeId|store\.id/);
+  });
+
+  it('is OFF by default: with the flag not "true" nothing is sent even though the binding exists', async () => {
+    fakes.whatsapp.enabled = false;
+    const u = await seedWithPhone();
+    expect((await forgot(u.email)).status).toBe(202);
+    expect(fakes.mails).toHaveLength(1);
+    expect(fakes.whatsapp.calls).toHaveLength(0);
+  });
+
+  it('fails closed when the binding is absent: no attempt, email unchanged', async () => {
     fakes.whatsapp.bound = false;
     const u = await seedWithPhone();
     expect((await forgot(u.email)).status).toBe(202);
@@ -48,75 +68,33 @@ describe('password reset code over WhatsApp', () => {
     expect(fakes.whatsapp.calls).toHaveLength(0);
   });
 
-  it('sends nothing over WhatsApp without a phone, for an unverified address, or when the account owns no store', async () => {
-    const noPhone = await seedWithPhone({}, null);
-    await forgot(noPhone.email);
-    const unverified = await seedWithPhone({ emailVerified: 0 });
-    await forgot(unverified.email);
-    fakes.stores = [];
-    const noStore = await seedWithPhone();
-    await forgot(noStore.email);
+  it('sends nothing over WhatsApp without a phone or for an unverified address', async () => {
+    await forgot((await seedWithPhone({}, null)).email);
+    await forgot((await seedWithPhone({ emailVerified: 0 })).email);
     expect(fakes.whatsapp.calls).toHaveLength(0);
-    expect(fakes.mails.length).toBeGreaterThanOrEqual(2); // the email path still runs for the verified ones
+    expect(fakes.mails.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('only a store the user OWNS may send: a staff role is skipped', async () => {
-    fakes.stores = [
-      { id: STORE_A, role: 'staff' },
-      { id: STORE_B, role: 'owner' },
-    ];
-    const u = await seedWithPhone();
-    await forgot(u.email);
-    expect(fakes.whatsapp.calls.map(c => c.storeId)).toEqual([STORE_B]);
-  });
-
-  it('a store with no usable sender (no_number / disabled) hands over to the next owned store; any other refusal stops', async () => {
-    fakes.stores = [
-      { id: STORE_A, role: 'owner' },
-      { id: STORE_B, role: 'owner' },
-    ];
-    fakes.whatsapp.results = [{ ok: false, reason: 'disabled' }, { ok: true }];
-    const u = await seedWithPhone();
-    await forgot(u.email);
-    expect(fakes.whatsapp.calls.map(c => c.storeId)).toEqual([STORE_A, STORE_B]);
-    fakes.whatsapp.calls = [];
-    fakes.whatsapp.results = [{ ok: false, reason: 'rate_limited' }];
-    const v = await seedWithPhone();
-    await forgot(v.email);
-    expect(fakes.whatsapp.calls).toHaveLength(1); // rate_limited: do not hammer the next store
-  });
-
-  it('an RPC that throws or a directory that is down never blocks the email or leaks the code to logs', async () => {
+  it('a refusal or a throwing RPC never blocks the email and never logs the code or the phone', async () => {
     const lines: string[] = [];
     const orig = console.error;
     console.error = (m: unknown) => {
       lines.push(String(m));
     };
     try {
-      fakes.whatsapp.throws = true;
+      fakes.whatsapp.result = { ok: false, reason: 'disabled' };
       const u = await seedWithPhone();
       expect((await forgot(u.email)).status).toBe(202);
-      expect(fakes.mails).toHaveLength(1);
-      const code = fakes.mails[0].code;
-      fakes.directoryDown = true;
+      fakes.whatsapp.throws = true;
       const v = await seedWithPhone();
       expect((await forgot(v.email)).status).toBe(202);
       expect(fakes.mails).toHaveLength(2);
-      expect(lines.join('\n')).not.toContain(code);
+      for (const m of fakes.mails) expect(lines.join('\n')).not.toContain(m.code);
       expect(lines.join('\n')).not.toContain(PHONE);
+      expect(lines.join('\n')).toContain('disabled');
     } finally {
       console.error = orig;
-      fakes.directoryDown = false;
     }
-  });
-
-  it('the over-cap path sends nothing anywhere (no code was issued)', async () => {
-    const u = await seedWithPhone();
-    for (let i = 0; i < 3; i++) await forgot(u.email);
-    const sent = fakes.whatsapp.calls.length;
-    await call('/password/forgot', { json: { email: u.email } });
-    expect(fakes.whatsapp.calls).toHaveLength(sent);
-    expect(fakes.mails.length).toBe(sent);
   });
 });
 
@@ -138,7 +116,7 @@ describe('what never goes over WhatsApp', () => {
     expect(fakes.mails).toHaveLength(1);
     expect(fakes.whatsapp.calls).toHaveLength(0);
   });
-  it('signup verification and staff invitations stay email-only (the phone is not yet proven to belong to the mailbox owner)', async () => {
+  it('signup verification stays email-only (the phone is not yet proven to belong to the mailbox owner)', async () => {
     const r = await call('/signup', {
       json: {
         email: 'new-wa@example.com',
