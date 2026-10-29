@@ -164,7 +164,11 @@ describe('order status changes', () => {
       status: 'confirmed',
     });
     expect(types(out)).toEqual(['order.cod_confirmed']);
-    expect(out[0]!.data).toEqual({ confirmedVia: 'call', minutesToConfirm: 45 });
+    expect(out[0]!.data).toEqual({
+      confirmedVia: 'call',
+      minutesToConfirm: 45,
+      areaKey: 'EG-C-nasr-city',
+    });
   });
 
   it('a COD outcome that arrived from WhatsApp is NOT re-emitted (WhatsApp already did)', async () => {
@@ -205,7 +209,11 @@ describe('order status changes', () => {
     });
     expect(types(out)).toEqual(['order.cancelled', 'order.cod_unconfirmed']);
     expect(out[0]!.data).toMatchObject({ byActor: 'merchant' });
-    expect(out[1]!.data).toEqual({ confirmedVia: 'none', minutesToConfirm: null });
+    expect(out[1]!.data).toEqual({
+      confirmedVia: 'none',
+      minutesToConfirm: null,
+      areaKey: 'EG-C-nasr-city',
+    });
   });
 
   it('confirmed-then-cancelled, and a returned parcel, are NOT "unconfirmed"', async () => {
@@ -301,12 +309,14 @@ describe('shipments', () => {
       carrier: 'bosta',
       attemptNo: 1,
       reasonCode: 'customer_unreachable',
+      areaKey: 'EG-C-nasr-city',
     });
     expect(out[2]!.data).toEqual({
       carrier: 'bosta',
       codMinor: 150000,
       hoursSincePickup: 7,
       attempts: 1,
+      areaKey: 'EG-C-nasr-city',
     });
     expect(new Set(out.map(o => o.seed)).size).toBe(3);
   });
@@ -330,6 +340,7 @@ describe('shipments', () => {
       returnReasonRaw: 'Consignee refused',
       attempts: 2,
       hoursSincePickup: 9,
+      areaKey: 'EG-C-nasr-city',
     });
   });
 

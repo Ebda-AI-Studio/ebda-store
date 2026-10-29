@@ -479,6 +479,7 @@ model Store {
   customerRfmSnapshots       CustomerRfmSnapshot[]
   productDailyViews          ProductDailyView[]
   qrScanDaily                QrScanDaily[]
+  ciHintLogs                 CiHintLog[]
   paymentEvents              PaymentEvent[]
   orderEvents                OrderEvent[]
   webhookEvents              WebhookEvent[]
@@ -1957,6 +1958,7 @@ model Order {
   // a pg_trgm GIN on order_number, lives in raw SQL only
   // (20261002090000_order_search_trgm_and_fk_indexes) — not declared here.
   @@map("orders")
+  ciHintLogs CiHintLog[]
 }
 
 /// Append-only audit trail for Order.status changes. Rows are written once and
@@ -4794,6 +4796,54 @@ model QrScanDaily {
   @@unique([storeId, date, kind, ref])
   @@index([storeId, date(sort: Desc)])
   @@map("qr_scan_daily")
+}
+
+// Customer Intelligence CI-2: a finding from the cross-store aggregates (Ruling CI-9). PLATFORM table, no
+// store_id: it is built only from cohort cells that passed the k-thresholds and holds no store, order or
+// buyer identifier. A super-admin accepts or dismisses it before it may change any default. Viewer:
+// admin /platform/ci-insights. Erasure: nothing personal.
+model CiInsight {
+  id        String    @id @default(uuid())
+  dedupeKey String    @unique @map("dedupe_key") @db.VarChar(160)
+  metric    String    @db.VarChar(40)
+  cohort    String    @db.VarChar(120)
+  finding   String    @db.VarChar(400)
+  findingAr String    @map("finding_ar") @db.VarChar(400)
+  evidence  Json
+  model     String    @default("rules-v1") @db.VarChar(40)
+  status    String    @default("new") @db.VarChar(12)
+  asOf      DateTime  @map("as_of") @db.Date
+  decidedAt DateTime? @map("decided_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("ci_insights")
+}
+
+// Customer Intelligence CI-3: every hint a merchant was shown, with the n behind it and (later) what
+// happened, so calibration (predicted band vs actual return rate) is a weekly query. One row per
+// (order, feature). Carries no buyer key and no phone. Viewer: admin /stores/[id]/customer-intelligence.
+// Order delete and store delete cascade. Retention 400 days (data-retention job).
+model CiHintLog {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  orderId       String    @map("order_id")
+  feature       String    @db.VarChar(24)
+  band          String    @db.VarChar(16)
+  source        String    @db.VarChar(8)
+  n             Int       @default(0)
+  predictedRate Float?    @map("predicted_rate")
+  outcome       String?   @db.VarChar(12)
+  outcomeAt     DateTime? @map("outcome_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, feature])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([feature, outcome, createdAt])
+  @@map("ci_hint_logs")
 }
 
 // Answer Engine Insights (AEO) — Google Search Console daily metrics.

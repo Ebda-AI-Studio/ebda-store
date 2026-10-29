@@ -475,6 +475,14 @@
     "target": "analytics",
     "reason": "high-volume daily metric/log, cross-store aggregation, no transactional reads"
   },
+  "CiInsight": {
+    "target": "d1",
+    "reason": "platform-wide finding over cross-store cohorts, no store id; a super-admin reads it with no store context"
+  },
+  "CiHintLog": {
+    "target": "store-do",
+    "reason": "storeId-scoped, written when a hint is shown on this store's order, read in one store context"
+  },
   "CountSession": {
     "target": "store-do",
     "reason": "storeId-scoped, read only in one store context"

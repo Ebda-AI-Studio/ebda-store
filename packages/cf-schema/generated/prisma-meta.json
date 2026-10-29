@@ -1408,6 +1408,13 @@
           "optional": false,
           "external": true
         },
+        "ciHintLogs": {
+          "kind": "relation",
+          "type": "CiHintLog",
+          "list": true,
+          "optional": false,
+          "external": true
+        },
         "paymentEvents": {
           "kind": "relation",
           "type": "PaymentEvent",
@@ -6850,6 +6857,18 @@
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "SetNull"
+        },
+        "ciHintLogs": {
+          "kind": "relation",
+          "type": "CiHintLog",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["order_id"],
+          "toProps": ["orderId"]
         }
       }
     },
@@ -17199,6 +17218,218 @@
           "owner": true,
           "from": ["store_id"],
           "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "CiInsight": {
+      "table": "ci_insights",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [["dedupeKey"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "dedupeKey": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "dedupe_key",
+          "list": false,
+          "optional": false
+        },
+        "metric": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "metric",
+          "list": false,
+          "optional": false
+        },
+        "cohort": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "cohort",
+          "list": false,
+          "optional": false
+        },
+        "finding": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "finding",
+          "list": false,
+          "optional": false
+        },
+        "findingAr": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "finding_ar",
+          "list": false,
+          "optional": false
+        },
+        "evidence": {
+          "kind": "scalar",
+          "type": "Json",
+          "column": "evidence",
+          "list": false,
+          "optional": false
+        },
+        "model": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "model",
+          "list": false,
+          "optional": false,
+          "default": "\"rules-v1\""
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"new\""
+        },
+        "asOf": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "as_of",
+          "list": false,
+          "optional": false
+        },
+        "decidedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "decided_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        }
+      }
+    },
+    "CiHintLog": {
+      "table": "ci_hint_logs",
+      "db": "store-do",
+      "pk": ["id"],
+      "uniques": [["orderId", "feature"]],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": false
+        },
+        "orderId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "order_id",
+          "list": false,
+          "optional": false
+        },
+        "feature": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "feature",
+          "list": false,
+          "optional": false
+        },
+        "band": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "band",
+          "list": false,
+          "optional": false
+        },
+        "source": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "source",
+          "list": false,
+          "optional": false
+        },
+        "n": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "n",
+          "list": false,
+          "optional": false,
+          "default": "0"
+        },
+        "predictedRate": {
+          "kind": "scalar",
+          "type": "Float",
+          "column": "predicted_rate",
+          "list": false,
+          "optional": true
+        },
+        "outcome": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "outcome",
+          "list": false,
+          "optional": true
+        },
+        "outcomeAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "outcome_at",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": false,
+          "external": true,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        },
+        "order": {
+          "kind": "relation",
+          "type": "Order",
+          "list": false,
+          "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["order_id"],
+          "fromProps": ["orderId"],
           "to": ["id"],
           "toProps": ["id"],
           "onDelete": "Cascade"

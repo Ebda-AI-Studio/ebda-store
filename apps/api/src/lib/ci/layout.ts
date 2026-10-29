@@ -27,3 +27,15 @@ export function ciSinceDay(orderDates: Date[]): string | undefined {
   const min = Math.min(...orderDates.map(d => d.getTime()));
   return new Date(min - CI_SINCE_MARGIN_DAYS * 86_400_000).toISOString().slice(0, 10);
 }
+
+// ---- CI-2 aggregates (Ruling CI-9): derived counters, never a buyer key or order id.
+/** Days a window / cross-store cohort looks back. */
+export const CI_AGG_WINDOW_DAYS = 90;
+export const ciStoreAggPrefix = (storeId: string) => `aggregates/v1/store=${storeId}/`;
+export const ciStoreDayAggKey = (storeId: string, day: string) =>
+  `${ciStoreAggPrefix(storeId)}dt=${day}.json`;
+export const ciStoreWindowKey = (storeId: string) => `${ciStoreAggPrefix(storeId)}window.json`;
+export const ciMetricAggKey = (metric: string, day: string) =>
+  `aggregates/v1/${metric}/dt=${day}.json`;
+/** The cross-store cohort as of the last run (what the merchant features read). */
+export const ciCohortLatestKey = 'aggregates/v1/xstore/latest.json';

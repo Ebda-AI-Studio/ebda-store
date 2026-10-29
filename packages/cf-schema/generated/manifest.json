@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 122,
+      "tables": 123,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -101,6 +101,7 @@
         "customer_cohort_snapshots": 9,
         "funnel_snapshots": 11,
         "customer_rfm_snapshots": 11,
+        "ci_hint_logs": 11,
         "count_sessions": 10,
         "count_lines": 8,
         "bank_statements": 9,
@@ -130,7 +131,7 @@
       }
     },
     "d1": {
-      "tables": 28,
+      "tables": 29,
       "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
@@ -143,6 +144,7 @@
         "legal_notice_deliveries": 8,
         "store_features": 7,
         "store_usage_snapshots": 21,
+        "ci_insights": 12,
         "answer_engine_provider_configs": 5,
         "merchant_api_keys": 12,
         "plans": 12,
@@ -1195,6 +1197,30 @@
       "name": "store_subscriptions_billing_anchor_day_check",
       "table": "store_subscriptions",
       "disposition": "d1:store_subscriptions"
+    },
+    {
+      "kind": "check",
+      "name": "ci_insights_status_check",
+      "table": "ci_insights",
+      "disposition": "d1:ci_insights"
+    },
+    {
+      "kind": "check",
+      "name": "ci_hint_logs_band_check",
+      "table": "ci_hint_logs",
+      "disposition": "store-do:ci_hint_logs"
+    },
+    {
+      "kind": "check",
+      "name": "ci_hint_logs_source_check",
+      "table": "ci_hint_logs",
+      "disposition": "store-do:ci_hint_logs"
+    },
+    {
+      "kind": "check",
+      "name": "ci_hint_logs_outcome_check",
+      "table": "ci_hint_logs",
+      "disposition": "store-do:ci_hint_logs"
     },
     {
       "kind": "index",

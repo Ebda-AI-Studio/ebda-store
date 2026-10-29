@@ -1440,5 +1440,21 @@
     "piiColumns": [],
     "subjectKeys": [],
     "note": "FOUNDING-1 ledger keyed by store ids only (beneficiary / counterpart / source store); no person column"
+  },
+  "store-do:ci_hint_logs": {
+    "db": "store-do",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "a band, a sample size and a later outcome per order: no buyer key, phone or text; goes with the order (CASCADE)"
+  },
+  "d1:ci_insights": {
+    "db": "d1",
+    "class": "no-pii",
+    "action": "none",
+    "piiColumns": [],
+    "subjectKeys": [],
+    "note": "findings over k-anonymous cohort cells; no store, order or buyer identifier"
   }
 }

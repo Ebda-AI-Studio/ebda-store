@@ -3,7 +3,7 @@
  *
  * One versioned envelope; `data` is a STRICT object per type, so an extra key (a phone, a name, an
  * address line) fails validation instead of riding along. `buyerKey` is the only buyer identifier.
- * Adding a key to `data` is a minor change (add it here, optional); renaming or removing one is `v: 2`.
+ * Adding a key to `data` is a minor change (add it here, optional; CI-2 added `areaKey` to the cod/delivery/return types so a rate can be cut by area without joining events); renaming or removing one is `v: 2`.
  */
 import { z } from 'zod/v3';
 import { RETURN_REASON_CODES, RETURN_REASON_RAW_MAX, asciiDigits } from './return-reason';
@@ -30,10 +30,12 @@ const dataByType = {
   'order.cod_confirmed': z.strictObject({
     confirmedVia: z.enum(['whatsapp', 'call', 'none']),
     minutesToConfirm: z.number().int().nonnegative().nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'order.cod_unconfirmed': z.strictObject({
     confirmedVia: z.enum(['whatsapp', 'call', 'none']),
     minutesToConfirm: z.number().int().nonnegative().nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'order.cancelled': z.strictObject({
     reason: short,
@@ -63,12 +65,14 @@ const dataByType = {
     carrier: short,
     attemptNo: z.number().int().positive(),
     reasonCode: reasonCode.nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'shipment.delivered': z.strictObject({
     carrier: short,
     codMinor: money,
     hoursSincePickup: hours.nullable(),
     attempts: z.number().int().nonnegative(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
   'shipment.returned': z.strictObject({
     carrier: short,
@@ -77,6 +81,7 @@ const dataByType = {
     returnReasonRaw: z.string().max(RETURN_REASON_RAW_MAX).nullable(),
     attempts: z.number().int().nonnegative(),
     hoursSincePickup: hours.nullable(),
+    areaKey: z.string().max(64).nullable().optional(),
   }),
 } as const;
 

@@ -121,6 +121,7 @@ export async function planOrderStatusChanged(
           minutesToConfirm: t
             ? Math.round((t.at.getTime() - o.createdAt.getTime()) / 60_000)
             : null,
+          areaKey: o.area.areaKey,
         },
       });
     }
@@ -155,7 +156,7 @@ export async function planOrderStatusChanged(
         seed: `cod:${o.id}`,
         occurredAt: t?.at ?? new Date(),
         ...base(o, buyerKey),
-        data: { confirmedVia: 'none', minutesToConfirm: null },
+        data: { confirmedVia: 'none', minutesToConfirm: null, areaKey: o.area.areaKey },
       });
     }
   }
@@ -200,6 +201,7 @@ export async function planShipmentUpdated(
   const o = await ctx.source.order(e.storeId, s.orderId);
   if (!o) throw new Error(`order ${s.orderId} not visible yet`);
   const b = base(o, await buyerKeyOf(ctx, o));
+  const areaKey = s.areaKey ?? o.area.areaKey;
   const out: CiOutcomeInput[] = [];
   for (const m of e.ci) {
     const at = new Date(m.at);
@@ -226,6 +228,7 @@ export async function planShipmentUpdated(
             carrier: s.carrier,
             attemptNo: m.attemptNo ?? 1,
             reasonCode: raw ? mapReturnReason(s.carrier, raw).code : null,
+            areaKey,
           },
         });
         break;
@@ -241,6 +244,7 @@ export async function planShipmentUpdated(
             codMinor: s.codMinor,
             hoursSincePickup: since,
             attempts: s.deliveryAttempts,
+            areaKey,
           },
         });
         break;
@@ -263,6 +267,7 @@ export async function planShipmentUpdated(
             returnReasonRaw: reason.raw,
             attempts: s.deliveryAttempts,
             hoursSincePickup: since,
+            areaKey,
           },
         });
         break;
