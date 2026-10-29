@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { storeRepo } from '../lib/repo-factory';
 import { publicLimiter } from '../middleware/security';
 import {
   verifyUnsubscribeToken,
@@ -55,18 +56,20 @@ async function respondSubscriberInfo(
   res: Response,
   ids: { storeId: string; subscriberId: string }
 ): Promise<void> {
-  const found = await runInTenantContext(ids.storeId, async () => {
-    const subscriber = await prisma.newsletterSubscriber.findFirst({
+  // The list is the store's own (Ruling CF-R4-4): its Durable Object, or Postgres inside the tenant context as before.
+  const repo = await storeRepo(ids.storeId);
+  const read = async () => {
+    const subscriber = await repo.db.newsletterSubscriber.findFirst({
       where: { id: ids.subscriberId, storeId: ids.storeId },
       select: { email: true, isActive: true },
     });
     if (!subscriber) return null;
-    const store = await prisma.store.findUnique({
-      where: { id: ids.storeId },
-      select: { name: true, nameAr: true },
-    });
+    const store = await withStore(ids.storeId, tx =>
+      tx.store.findUnique({ where: { id: ids.storeId }, select: { name: true, nameAr: true } })
+    );
     return { subscriber, store };
-  });
+  };
+  const found = await (repo.backend === 'do' ? read() : runInTenantContext(ids.storeId, read));
   if (!found) {
     res.status(404).json({ success: false, error: { code: 'INVALID_TOKEN' } });
     return;
@@ -88,18 +91,20 @@ async function unsubscribeSubscriber(
   res: Response,
   ids: { storeId: string; subscriberId: string }
 ): Promise<void> {
-  const exists = await runInTenantContext(ids.storeId, async () => {
-    const subscriber = await prisma.newsletterSubscriber.findFirst({
+  const repo = await storeRepo(ids.storeId);
+  const write = async () => {
+    const subscriber = await repo.db.newsletterSubscriber.findFirst({
       where: { id: ids.subscriberId, storeId: ids.storeId },
       select: { id: true },
     });
     if (!subscriber) return false;
-    await prisma.newsletterSubscriber.updateMany({
+    await repo.writer.newsletterSubscriber.updateMany({
       where: { id: ids.subscriberId, storeId: ids.storeId, isActive: true },
       data: { isActive: false, unsubscribedAt: new Date() },
     });
     return true;
-  });
+  };
+  const exists = await (repo.backend === 'do' ? write() : runInTenantContext(ids.storeId, write));
   if (!exists) {
     res.status(404).json({ success: false, error: { code: 'INVALID_TOKEN' } });
     return;
@@ -182,7 +187,9 @@ router.post(
         const now = new Date();
         // Withdraw consent on the subscriber row — by id when linked, and by
         // (store, email) so a re-created row for the same address is covered.
-        await prisma.newsletterSubscriber.updateMany({
+        await (
+          await storeRepo(ids.storeId)
+        ).writer.newsletterSubscriber.updateMany({
           where: {
             storeId: ids.storeId,
             OR: [

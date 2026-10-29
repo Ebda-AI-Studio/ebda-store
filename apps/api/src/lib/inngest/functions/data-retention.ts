@@ -2,6 +2,7 @@ import { InstapayReceiptService } from '../../../services/payment-providers/inst
 import type { JobDef } from '../../jobs/types';
 import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
 import { acrossOpts } from '../../jobs/store-scope';
+import { storeRepo } from '../../repo-factory';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -66,8 +67,9 @@ export const abandonedCartPurge: JobDef = inngest.createFunction(
     const candidateCount = await step.run('count-candidates', async () =>
       (
         await acrossStores(
-          storeId =>
-            prisma.abandonedCart.count({
+          // PORTED (Ruling CF-R4-5): the store's own rows, on Postgres or on its Durable Object
+          async storeId =>
+            (await storeRepo(storeId)).db.abandonedCart.count({
               where: { storeId, createdAt: { lt: cutoff }, customerId: null },
             }),
           acrossOpts(event)
@@ -83,14 +85,15 @@ export const abandonedCartPurge: JobDef = inngest.createFunction(
     const deleted = await step.run('delete-batch', async () => {
       let removed = 0;
       for (const { value } of await acrossStores(async storeId => {
-        const candidates = await prisma.abandonedCart.findMany({
+        const repo = await storeRepo(storeId);
+        const candidates = await repo.db.abandonedCart.findMany({
           where: { storeId, createdAt: { lt: cutoff }, customerId: null },
           select: { id: true },
           orderBy: { createdAt: 'asc' },
           take: ABANDONED_CART_BATCH_CAP,
         });
         if (candidates.length === 0) return 0;
-        const result = await prisma.abandonedCart.deleteMany({
+        const result = await repo.writer.abandonedCart.deleteMany({
           where: { id: { in: candidates.map(c => c.id) }, storeId },
         });
         return result.count;

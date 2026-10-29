@@ -52,6 +52,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'CartBundle',
   'AbandonedCart',
   'AbandonedCartConfig',
+  // the newsletter list and its consent (INFRA-CF-1 PR R4, Ruling CF-R4-4)
+  'NewsletterSubscriber',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

@@ -84,7 +84,8 @@ export type MoneyOpName =
   | 'fiscalRefund'
   | 'fiscalCancelSale'
   | 'searchOrders'
-  | 'createAdminOrder';
+  | 'createAdminOrder'
+  | 'recoveryCoupon';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -116,6 +117,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fiscalCancelSale',
   'searchOrders',
   'createAdminOrder',
+  'recoveryCoupon',
 ];
 
 const TABLE = '_money_ops';
@@ -377,6 +379,54 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   createAdminOrder: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a as Partial<AdminOrderInput>;
     return placeAdminOrder(db, { ...(rest as AdminOrderInput), storeId });
+  },
+  /**
+   * The abandoned-cart step-3 recovery coupon (Ruling CF-R4-5): created once per cart (the code is derived from the cart),
+   * re-activated with a fresh expiry when it already exists, and linked to the cart, in ONE section. The upsert and the link
+   * are two Postgres statements; here a crash between them cannot leave an unlinked coupon.
+   */
+  recoveryCoupon: (db, storeId, a) => {
+    const abandonedCartId = id(a.abandonedCartId, 'abandonedCartId');
+    const code = id(a.code, 'code');
+    const percent = a.percent;
+    if (typeof percent !== 'number' || !Number.isInteger(percent) || percent < 0 || percent > 100)
+      throw new MoneyError('BAD_ARGS', 'percent', 400);
+    const expiresAt = a.expiresAt;
+    if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt))
+      throw new MoneyError('BAD_ARGS', 'expiresAt', 400);
+    const maxDiscount = typeof a.maxDiscount === 'number' ? a.maxDiscount : null;
+    return db.transactionSync(() => {
+      const cart = db.all('SELECT id FROM abandoned_carts WHERE id = ? AND store_id = ?', [
+        abandonedCartId,
+        storeId,
+      ])[0];
+      if (!cart) throw new MoneyError('NOT_FOUND', 'abandoned cart not found', 404);
+      const existing = db.all('SELECT id FROM coupons WHERE store_id = ? AND code = ?', [
+        storeId,
+        code,
+      ])[0];
+      let couponId: string;
+      if (existing) {
+        couponId = existing.id as string;
+        db.run('UPDATE coupons SET expires_at = ?, is_active = 1, updated_at = ? WHERE id = ?', [
+          expiresAt,
+          Date.now(),
+          couponId,
+        ]);
+      } else {
+        couponId = crypto.randomUUID();
+        db.run(
+          "INSERT INTO coupons (id, store_id, code, name, type, value, max_discount, usage_limit, usage_limit_per_user, expires_at, is_active, scope_product_ids, scope_category_ids) VALUES (?, ?, ?, 'Cart Recovery Coupon', 'percentage', ?, ?, 1, 1, ?, 1, '[]', '[]')",
+          [couponId, storeId, code, percent, maxDiscount, expiresAt]
+        );
+      }
+      db.run('UPDATE abandoned_carts SET coupon_id = ? WHERE id = ? AND store_id = ?', [
+        couponId,
+        abandonedCartId,
+        storeId,
+      ]);
+      return { couponId, created: !existing };
+    });
   },
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),

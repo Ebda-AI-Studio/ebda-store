@@ -11,6 +11,7 @@ import { CustomerReorderService } from '../services/customer-reorder.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType, withStore } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { recordQrScan, resolveQrScan } from '../services/qr.service';
@@ -2617,7 +2618,10 @@ router.post(
       await assertNotDemoStore(storeId);
       const normalizedEmail = data.email.trim().toLowerCase();
 
-      const existing = await prisma.newsletterSubscriber.findUnique({
+      // the list lives on the store's own backend (Ruling CF-R4-4)
+      const subscribers = await storeDb(storeId);
+      const subscriberWriter = await storeWriter(storeId);
+      const existing = await subscribers.newsletterSubscriber.findUnique({
         where: {
           storeId_email: { storeId, email: normalizedEmail },
         },
@@ -2627,7 +2631,7 @@ router.post(
         // If they had previously unsubscribed, re-activate the row so the
         // admin's send count stays correct.
         if (!existing.isActive) {
-          await prisma.newsletterSubscriber.update({
+          await subscriberWriter.newsletterSubscriber.update({
             where: { id: existing.id, storeId },
             data: {
               isActive: true,
@@ -2645,7 +2649,7 @@ router.post(
         return;
       }
 
-      await prisma.newsletterSubscriber.create({
+      await subscriberWriter.newsletterSubscriber.create({
         data: {
           storeId,
           email: normalizedEmail,

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { runInTenantContext } from '@ebda/database';
+import { storeRepo } from '../../repo-factory';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { deliverCartRecoveryEmail } from '../../../services/cart-recovery-email.service';
@@ -28,12 +29,14 @@ const cartRecoveryEmailFn = inngest.createFunction(
     onFailure: async ({ event }) => {
       const { abandonedCartId, storeId } = (event?.data?.event?.data ?? {}) as EventData;
       if (!abandonedCartId || !storeId) return;
-      const r = await runInTenantContext(storeId, () =>
-        prisma.abandonedCart.updateMany({
+      // PORTED (Ruling CF-R4-5): the row is the store's own, on whichever backend serves it
+      const repo = await storeRepo(storeId);
+      const mark = () =>
+        repo.writer.abandonedCart.updateMany({
           where: { id: abandonedCartId, storeId, emailStatus: 'queued' },
           data: { emailStatus: 'failed', emailDetail: 'SEND_JOB_FAILED' },
-        })
-      );
+        });
+      const r = await (repo.backend === 'do' ? mark() : runInTenantContext(storeId, mark));
       logger.error({ abandonedCartId, storeId, marked: r.count }, '[CartEmail] send job failed');
     },
   },

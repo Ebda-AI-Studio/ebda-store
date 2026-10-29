@@ -26,6 +26,9 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'wholesale-pending-nudge-cron',
   // reads through storeDb and disarms through the DO money op (Ruling CF-PAY-1)
   'order-status-fanout-stuck-sweep',
+  // the abandoned-cart rows and the newsletter consent follow the store's backend (Ruling CF-R4-5)
+  'abandoned-cart-purge-weekly',
+  'cart-recovery-email',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

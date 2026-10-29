@@ -87,7 +87,8 @@ export type WritableModel =
   | 'cartItem'
   | 'cartBundle'
   | 'abandonedCart'
-  | 'abandonedCartConfig';
+  | 'abandonedCartConfig'
+  | 'newsletterSubscriber';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -299,6 +300,17 @@ export interface MoneyClient {
     tax: number;
     total: number;
   }>;
+  /** The step-3 abandoned-cart recovery coupon, created or re-activated and linked to the cart in one section (Ruling CF-R4-5). */
+  recoveryCoupon(
+    a: {
+      abandonedCartId: string;
+      code: string;
+      percent: number;
+      maxDiscount: number | null;
+      expiresAt: number;
+    },
+    key?: string
+  ): Promise<{ couponId: string; created: boolean }>;
   goldSetProductPricing(a: Record<string, unknown>, key?: string): Promise<any>;
   goldBulkSwitchMode(a: Record<string, unknown>, key?: string): Promise<any>;
   goldCreateVariant(a: Record<string, unknown>, key?: string): Promise<{ id: string }>;
@@ -558,6 +570,7 @@ export function makeMoneyClient(
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
     searchOrders: a => call('searchOrders', a),
     createAdminOrder: (a, key) => call('createAdminOrder', a, key),
+    recoveryCoupon: (a, key) => call('recoveryCoupon', a, key),
   };
 }
 

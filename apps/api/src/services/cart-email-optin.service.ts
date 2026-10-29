@@ -12,7 +12,6 @@
  * form, so a deliberate "no" must not be undone by a stranger's checkbox.
  */
 import { z } from 'zod/v3';
-import { prisma } from '@ebda/database';
 import { verifyCartRestoreToken } from '../lib/cart-restore-token';
 import logger from '../lib/logger';
 import { CartService } from './cart.service';
@@ -53,7 +52,7 @@ export async function recordCartEmailConsent(
   const email = parsed.data.toLowerCase();
 
   const find = () =>
-    prisma.newsletterSubscriber.findMany({
+    db.newsletterSubscriber.findMany({
       where: { storeId, email: { equals: email, mode: 'insensitive' } },
       select: { id: true, isActive: true, unsubscribedAt: true },
     });
@@ -63,7 +62,7 @@ export async function recordCartEmailConsent(
   if (existing.length === 0) {
     const now = new Date();
     try {
-      await prisma.newsletterSubscriber.create({
+      await w.newsletterSubscriber.create({
         data: {
           storeId,
           email,

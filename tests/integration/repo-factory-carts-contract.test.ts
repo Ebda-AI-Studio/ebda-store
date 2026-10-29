@@ -5,6 +5,7 @@
  * schema on SQLite (the real wire codec and prisma-lite). Each backend gets its own identical world; the scrubbed traces
  * (return values or error status + code, then the cart rows) must be equal.
  */
+import crypto from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@ebda/database';
 import {
@@ -25,6 +26,7 @@ import {
   makeMoneyClient,
   storeDb,
   storeMoney,
+  storeWriter,
   withRepo,
   type StoreReads,
   type StoreWrites,
@@ -595,6 +597,338 @@ describe.skipIf(!hasDb)('cart (CartService) on Postgres vs the DO', () => {
     expect(t.out.ok.after.status).toBe('cancelled');
     expect(t.state.items.map((i: any) => i.note)).toContain('Sara');
     expect(t.state.bundles).toEqual([{ bundleId: 'bundle', quantity: 1 }]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// PR R4 (Ruling CF-R4-4): the newsletter list and its consent; (Ruling CF-R4-5): the abandoned-cart jobs
+// ---------------------------------------------------------------------------------------------------------------------
+describe.skipIf(!hasDb)('newsletter consent and abandoned-cart jobs on Postgres vs the DO', () => {
+  const mini = async () => {
+    const [{ default: express }, { default: publicRoutes }, { default: campaignPublic }] =
+      await Promise.all([
+        import('express'),
+        import('../../apps/api/src/routes/public.routes'),
+        import('../../apps/api/src/routes/campaign-public.routes'),
+      ]);
+    const app = express();
+    app.use(express.json());
+    app.use('/api/v1/public/campaigns', campaignPublic);
+    app.use('/api/v1/public', publicRoutes);
+    return app;
+  };
+  const row = async (email: string) => {
+    const db = (await storeDb(STORE)) as any;
+    return db.newsletterSubscriber.findMany({
+      where: { storeId: STORE, email: { equals: email, mode: 'insensitive' } },
+      select: {
+        id: true,
+        email: true,
+        isActive: true,
+        language: true,
+        source: true,
+        consentScope: true,
+        consentAt: true,
+        unsubscribedAt: true,
+      },
+    });
+  };
+  it('signup, re-signup, one-click unsubscribe, re-subscribe, the cart opt-in box and the campaign audience keep the same consent rules', async () => {
+    process.env.CAMPAIGN_UNSUBSCRIBE_SECRET ||= 'contract-unsub-secret';
+    const request = (await import('supertest')).default;
+    const { signSubscriberUnsubscribeToken } =
+      await import('../../apps/api/src/lib/campaign-unsubscribe-token');
+    const { recordCartEmailConsent } =
+      await import('../../apps/api/src/services/cart-email-optin.service');
+    const { buildCampaignAudience, audienceCount } =
+      await import('../../apps/api/src/services/campaign.service');
+    const t = await parity(async (w, s) => {
+      const app = await mini();
+      const signup = (email: string, extra: Record<string, unknown> = {}) =>
+        request(app)
+          .post('/api/v1/public/newsletter/subscribe')
+          .set('X-Store-ID', STORE)
+          // the limiter keys on the session id: a fresh one per call keeps the contract off the rate limit
+          .set('X-Session-Id', crypto.randomUUID())
+          .send({ email, language: 'ar', source: 'footer', ...extra });
+      const brief = (r: { status: number; body: any }) => ({
+        status: r.status,
+        already: r.body?.data?.alreadySubscribed,
+        code: r.body?.error?.code,
+      });
+      const out: Record<string, unknown> = {};
+      out.signup = brief(await signup('Reader.One@Example.TEST'));
+      out.again = brief(await signup('reader.one@example.test'));
+      out.badEmail = brief(await signup('not-an-email'));
+      const [sub] = await row('reader.one@example.test');
+      out.afterSignup = { ...sub, id: undefined, consentAt: sub.consentAt !== null };
+      const token = signSubscriberUnsubscribeToken(STORE, sub.id);
+      const info = await request(app).get('/api/v1/public/campaigns/unsubscribe').query({ token });
+      out.info = {
+        status: info.status,
+        email: info.body?.data?.email,
+        already: info.body?.data?.alreadyUnsubscribed,
+      };
+      const unsub = await request(app).post('/api/v1/public/campaigns/unsubscribe').send({ token });
+      out.unsub = { status: unsub.status, done: unsub.body?.data?.unsubscribed };
+      const unsubAgain = await request(app)
+        .post('/api/v1/public/campaigns/unsubscribe')
+        .send({ token });
+      out.unsubAgain = { status: unsubAgain.status, done: unsubAgain.body?.data?.unsubscribed };
+      const info2 = await request(app).get('/api/v1/public/campaigns/unsubscribe').query({ token });
+      out.info2 = info2.body?.data?.alreadyUnsubscribed;
+      const forged = await request(app)
+        .post('/api/v1/public/campaigns/unsubscribe')
+        .send({ token: token.slice(0, -3) + 'abc' });
+      out.forged = forged.status;
+      out.afterUnsub = (await row('reader.one@example.test')).map((r: any) => ({
+        active: r.isActive,
+        unsub: r.unsubscribedAt !== null,
+      }));
+      out.resubscribe = brief(
+        await signup('reader.one@example.test', { source: 'popup', language: 'en' })
+      );
+      out.afterResub = (await row('reader.one@example.test')).map((r: any) => ({
+        active: r.isActive,
+        unsub: r.unsubscribedAt !== null,
+        source: r.source,
+        language: r.language,
+      }));
+      out.noToken = (
+        await request(app).post('/api/v1/public/campaigns/unsubscribe').send({})
+      ).status;
+
+      // the checkout box: narrow consent, never re-activates a "no", withdrawal touches only the cart
+      await CartService.addItem(STORE, s, w.plain, 1);
+      out.optIn = await recordCartEmailConsent(STORE, s, {
+        email: 'Guest.Cart@Example.test',
+        consent: true,
+        language: 'ar',
+      });
+      out.optInAgain = await recordCartEmailConsent(STORE, s, {
+        email: 'guest.cart@example.test',
+        consent: true,
+      });
+      out.optInBad = await recordCartEmailConsent(STORE, s, { email: 'nope', consent: true });
+      await (
+        await storeWriter(STORE)
+      ).newsletterSubscriber.create({
+        data: {
+          storeId: STORE,
+          email: 'said.no@example.test',
+          isActive: false,
+          unsubscribedAt: new Date(),
+        },
+      });
+      // a deliberate "no" is never undone by a stranger's checkbox
+      out.optInOnUnsub = await recordCartEmailConsent(STORE, s, {
+        email: 'Said.No@example.test',
+        consent: true,
+      });
+      out.optInNoCart = await recordCartEmailConsent(STORE, 'no-such-session', {
+        email: 'x@example.test',
+        consent: true,
+      });
+      out.cartRow = (await row('guest.cart@example.test')).map((r: any) => ({
+        scope: r.consentScope,
+        source: r.source,
+        active: r.isActive,
+        consent: r.consentAt !== null,
+      }));
+      out.withdraw = await recordCartEmailConsent(STORE, s, {
+        email: 'guest.cart@example.test',
+        consent: false,
+      });
+
+      // the audience: active + not cart_reminders, deduped by normalised address; the count agrees with the list
+      await signup('dup@example.test');
+      const w2 = await storeWriter(STORE);
+      await w2.newsletterSubscriber.create({
+        data: {
+          storeId: STORE,
+          email: 'DUP@example.test',
+          isActive: true,
+          consentScope: 'newsletter',
+        },
+      });
+      await w2.newsletterSubscriber.create({
+        data: {
+          storeId: STORE,
+          email: 'gone@example.test',
+          isActive: false,
+          consentScope: 'newsletter',
+        },
+      });
+      await w2.newsletterSubscriber.create({
+        data: {
+          storeId: STORE,
+          email: 'broken-address',
+          isActive: true,
+          consentScope: 'newsletter',
+        },
+      });
+      const audience = await buildCampaignAudience(STORE);
+      out.audience = audience.map(a => `${a.email}|${a.language}`).sort();
+      out.audienceCount = await audienceCount(STORE);
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o.signup).toEqual({ status: 200, already: false });
+    expect(o.again).toEqual({ status: 200, already: true });
+    expect(o.unsub.done).toBe(true);
+    expect(o.afterUnsub).toEqual([{ active: false, unsub: true }]);
+    expect(o.optInOnUnsub.status).toBe('unsubscribed');
+    expect(o.cartRow).toEqual([
+      { scope: 'cart_reminders', source: 'checkout', active: true, consent: true },
+    ]);
+    expect(o.audience.some((a: string) => a.startsWith('guest.cart'))).toBe(false);
+    expect(o.audience.some((a: string) => a.startsWith('gone@'))).toBe(false);
+    expect(o.audienceCount).toBe(o.audience.length);
+  });
+
+  // The 15-minute sweep: detection (a customer with a contact, a consented guest, none reachable), the reminder steps, the
+  // recovery coupon and the recovery e-mail's claim, over the store's own rows.
+  it('abandoned-cart detection, reminders, recovery coupon and the e-mail claim: same rows and same dispatches', async () => {
+    const { abandonedCartService } =
+      await import('../../apps/api/src/services/abandoned-cart.service');
+    const { sweepCartRecoveryEmails } =
+      await import('../../apps/api/src/services/cart-recovery-email.service');
+    const { inngest } = await import('../../apps/api/src/lib/inngest/client');
+    const { notificationDispatcher } =
+      await import('../../apps/api/src/services/notification-dispatcher.service');
+    const sent = vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
+    const dispatched: string[] = [];
+    vi.spyOn(notificationDispatcher, 'dispatch').mockImplementation(async (_s, ev, data) => {
+      dispatched.push(
+        `${ev}|${(data as any).customerName}|${(data as any).cartItemCount}|${!!(data as any).couponCode}`
+      );
+    });
+    // the sweep runs for every store with the feature: only this one is under test
+    vi.spyOn(featureService, 'isFeatureEnabled').mockImplementation(
+      async (id: string) => id === STORE
+    );
+    const dir = await import('@ebda/database');
+    vi.spyOn(dir, 'storeDirectory').mockImplementation((async () => [{ id: STORE }]) as never);
+    const t = await parity(async (w, s) => {
+      dispatched.length = 0;
+      const user = await prisma.user.create({
+        data: {
+          email: `ab-${Math.random().toString(36).slice(2)}@example.test`,
+          passwordHash: 'x'.repeat(60),
+          firstName: 'Nour',
+          lastName: 'Aly',
+          phone: '+201055550000',
+          role: 'customer',
+          storeId: STORE,
+          status: 'active',
+        },
+      });
+      w.names[user.id] = 'user';
+      const onDoRun = !!(await storeMoney(STORE));
+      const cfg = (await storeWriter(STORE)).abandonedCartConfig;
+      await cfg.upsert({
+        where: { storeId: STORE },
+        create: { storeId: STORE, emailEnabled: true, emailDelayMinutes: 60 },
+        update: { emailEnabled: true, emailDelayMinutes: 60 },
+      });
+      // three carts: a customer's, a consented guest's, a guest nobody can reach
+      const w3 = await storeWriter(STORE);
+      const idle = new Date(Date.now() - 3 * 3_600_000);
+      const mk = async (sessionId: string, data: Record<string, unknown>) => {
+        const c = await CartService.getOrCreate(
+          STORE,
+          sessionId,
+          data.customerId as string | undefined
+        );
+        await CartService.addItem(STORE, sessionId, w.plain, 2);
+        await w3.cart.update({ where: { id: c.id }, data: { ...data, lastActivityAt: idle } });
+        return c.id;
+      };
+      await mk(s + '-cust', { customerId: user.id });
+      await mk(s + '-guest', {
+        guestEmail: 'guest.recovery@example.test',
+        guestEmailConsentAt: idle,
+      });
+      await mk(s + '-nobody', {});
+      // the guest's consent row (the checkout box wrote it on the real path)
+      await w3.newsletterSubscriber.create({
+        data: {
+          storeId: STORE,
+          email: 'guest.recovery@example.test',
+          consentScope: 'cart_reminders',
+          isActive: true,
+        },
+      });
+      const db = (await storeDb(STORE)) as any;
+      const abandoned = async () =>
+        (
+          await db.abandonedCart.findMany({
+            where: { storeId: STORE },
+            orderBy: { createdAt: 'asc' },
+          })
+        )
+          .map((a: any) => ({
+            customer: a.customerId ? 'user' : null,
+            email:
+              a.customerEmail === 'guest.recovery@example.test'
+                ? 'guest'
+                : a.customerEmail
+                  ? '<email>'
+                  : null,
+            total: a.cartTotal,
+            count: a.cartItemCount,
+            status: a.status,
+            emailStatus: a.emailStatus,
+            hasCoupon: a.couponId !== null,
+            step1: a.step1SentAt !== null,
+            step3: a.step3SentAt !== null,
+            next: a.nextStepAt !== null,
+          }))
+          .sort((a: any, b: any) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      await abandonedCartService.detectNewAbandonments();
+      const afterDetect = await abandoned();
+      // make every step due, run the reminders three times (steps 1, 2, 3 with the recovery coupon)
+      for (let i = 0; i < 3; i++) {
+        await w3.abandonedCart.updateMany({
+          where: { storeId: STORE, nextStepAt: { not: null } },
+          data: { nextStepAt: new Date(Date.now() - 1000) },
+        });
+        await abandonedCartService.processReminders();
+      }
+      const afterReminders = await abandoned();
+      // the e-mail channel: due now, claimed once (NULL -> queued), the event emitted once per cart
+      await w3.abandonedCart.updateMany({ where: { storeId: STORE }, data: { emailStatus: null } });
+      sent.mockClear();
+      const swept = await sweepCartRecoveryEmails(new Date(Date.now() + 5 * 60_000));
+      const sweptAgain = await sweepCartRecoveryEmails(new Date(Date.now() + 5 * 60_000));
+      const coupons = await db.coupon.findMany({
+        where: { storeId: STORE, code: { startsWith: 'RECOVER-' } },
+        select: {
+          type: true,
+          value: true,
+          usageLimit: true,
+          isActive: true,
+          usageLimitPerUser: true,
+        },
+      });
+      void onDoRun;
+      return {
+        afterDetect,
+        afterReminders,
+        dispatched: [...dispatched].sort(),
+        swept,
+        sweptAgain,
+        events: sent.mock.calls.length,
+        coupons,
+      };
+    });
+    const o = t.out.ok;
+    expect(o.afterDetect).toHaveLength(2); // the unreachable guest cart is not recorded
+    expect(o.afterDetect.some((a: any) => a.customer === 'user' && a.next)).toBe(true);
+    expect(o.coupons).toHaveLength(1);
+    expect(o.dispatched.length).toBe(3);
+    expect(o.swept.claimed).toBeGreaterThan(0);
+    expect(o.sweptAgain.claimed).toBe(0);
   });
 });
 

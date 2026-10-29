@@ -1,4 +1,5 @@
 import { prisma, withStore } from '@ebda/database';
+import { storeDb, storeRepo } from '../lib/repo-factory';
 import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@ebda/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
@@ -124,6 +125,10 @@ export function normalizeEmail(email: string): string {
  * instead of materializing every row.
  */
 export async function audienceCount(storeId: string): Promise<number> {
+  // A store on its Durable Object counts the same reachable set from its own rows (Ruling CF-R4-4): the raw aggregate below
+  // is Postgres SQL. Same definition by construction, because it IS `buildCampaignAudience`.
+  if ((await storeRepo(storeId)).backend === 'do')
+    return (await buildCampaignAudience(storeId)).length;
   const rows = await prisma.$queryRaw<{ count: bigint }[]>`
     SELECT COUNT(DISTINCT LOWER(TRIM(email))) AS count
     FROM newsletter_subscribers
@@ -137,7 +142,9 @@ export async function audienceCount(storeId: string): Promise<number> {
 }
 
 export async function buildCampaignAudience(storeId: string): Promise<AudienceMember[]> {
-  const rows = await prisma.newsletterSubscriber.findMany({
+  const rows = await (
+    await storeDb(storeId)
+  ).newsletterSubscriber.findMany({
     // 'cart_reminders' (the checkout box) is consent for cart reminders ONLY, never campaigns.
     where: {
       storeId,
