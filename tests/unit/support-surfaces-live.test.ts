@@ -28,13 +28,9 @@ describe.each([
     if (app === 'docs') expect(read('apps/docs/out/ar/index.html')).toContain(titleAr);
     const home = read('apps', app, 'out', app === 'help' ? 'en/index.html' : 'index.html');
     expect(home).toContain('Ebda Store');
-<<<<<<< HEAD
-    // a product gets its section the day it ships; the shared header's Products menu (NAV-1) lists the live products
+    // a product gets its section the day it ships (WhatsApp ships with Store); the shared header's Products menu (NAV-1) lists the live products
     const withoutNav = home.replace(/<nav class="top-nav"[\s\S]*?<\/nav>/, '');
-    expect(withoutNav).not.toMatch(/Ebda (WhatsApp|CRM|ERP)/);
-=======
-    expect(home).not.toMatch(/Ebda (CRM|ERP)/); // a product gets its section the day it ships (WhatsApp ships with Store)
->>>>>>> c3e80d3f1 (feat(config): help.ebda.app product folders and the 10 ebda whatsapp guides)
+    expect(withoutNav).not.toMatch(/Ebda (CRM|ERP)/);
   });
 
   it('has its own sitemap, robots and a security.txt with its own canonical', () => {
@@ -92,7 +88,7 @@ describe('help.ebda.app product folders (LAUNCH-SUITE-1)', () => {
     const en = readdirSync(path.join(ROOT, 'apps/help/content/en/whatsapp')).filter(f =>
       f.endsWith('.mdx')
     );
-    expect(ar.length).toBe(11);
+    expect(ar.length).toBe(13);
     expect(ar).toEqual(en); // parity: same slugs in both locales
     const out = (...p: string[]) => path.join(ROOT, 'apps/help/out', ...p);
     for (const f of ar) {
