@@ -8,6 +8,7 @@ export { placeOrder, type CheckoutInput, type PlacedOrder } from './do/checkout'
 export { MoneyError, type SyncSql } from './do/sync-sql';
 export { ensureSearchIndex } from './do/search';
 export { ensurePaymentSchema } from './do/payments';
+export { trialBalance, postEntry as postJournalEntry } from './do/ledger';
 export { encodeRpc, decodeRpc } from './rpc/codec';
 export {
   runReads,

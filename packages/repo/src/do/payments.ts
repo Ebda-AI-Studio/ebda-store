@@ -528,6 +528,7 @@ export function completeRefund(
         orderId: p.order_id,
         amount: claim.amount,
         refundKey: a.refundId,
+        external: true,
         now,
       });
       booked = true;
@@ -746,6 +747,37 @@ export async function applyPaymentEvent(
   }
 
   // 3. apply: ONE section
+  return applyPaymentEventSync(db, input, confirmed);
+}
+
+/**
+ * The apply half of `applyPaymentEvent`, synchronous: replay check, ONE section, no I/O. The `moneyOp` registry calls this
+ * directly (the Worker does the gateway confirmation OUTSIDE the Durable Object and hands the answer in), so a provider in
+ * CONFIRM_BEFORE_APPLY with no `confirmed` is refused (503, nothing written): fail closed, like the async wrapper.
+ */
+export function applyPaymentEventSync(
+  db: SyncSql,
+  input: PaymentWebhookInput,
+  confirmed: ConfirmedTransaction | null
+): ApplyResult {
+  need(input.storeId, 'storeId');
+  need(input.provider, 'provider');
+  need(input.eventId, 'eventId');
+  need(input.providerRef, 'providerRef');
+  const payment = findPaymentByRef(db, input.storeId, input.provider, input.providerRef);
+  if (!payment) throw err('PAYMENT_NOT_FOUND', 'no payment for this reference in this store', 404);
+  if (CONFIRM_BEFORE_APPLY.has(input.provider) && !confirmed) {
+    const seenAlready = db.all(
+      'SELECT 1 AS x FROM payment_event_log WHERE provider = ? AND event_id = ?',
+      [input.provider, input.eventId]
+    )[0];
+    if (seenAlready) return replayResult(db, input.storeId, payment);
+    throw err(
+      'WEBHOOK_UNCONFIRMED',
+      'this provider must be confirmed with the gateway before anything is applied',
+      503
+    );
+  }
   const now = input.now ?? Date.now();
   return db.transactionSync(() => {
     const seen = db.all(
@@ -1155,9 +1187,18 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   const s = completed ? s0 : { ...s0, accountedThisEvent: false };
   const orderAlreadyReversed = o.status === 'refunded';
   if (completed && !orderAlreadyReversed && s.isFullRefund) {
-    assertTransition(o.status, 'refunded');
-    refundOrder(db, { storeId: input.storeId, orderId: o.id, now });
-    postCommit.push('order_reversed');
+    // The gateway SAYS the money went back: that is an external fact, recorded and never rejected (CF-PAY-1). An order
+    // state the machine would not leave for `refunded` does not stop the payment bookkeeping; it raises an alert.
+    if (ORDER_STATUS_TRANSITIONS[o.status]?.includes('refunded') || o.status === 'refunded') {
+      refundOrder(db, { storeId: input.storeId, orderId: o.id, now });
+      postCommit.push('order_reversed');
+    } else
+      alerts.push({
+        kind: 'refund_on_unreversible_order',
+        paymentId: p.id,
+        orderId: p.order_id,
+        body: `Order ${o.order_number}: ${input.provider} reports a full refund but the order is ${o.status}, which cannot move to refunded. The refund is recorded on the payment; reverse the order by hand.`,
+      });
   } else if (
     completed &&
     !orderAlreadyReversed &&
@@ -1171,6 +1212,7 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
         orderId: o.id,
         amount: s.settledTotal - p.refunded_amount,
         refundKey: r.refundId,
+        external: true,
         now,
       });
     } catch (e) {

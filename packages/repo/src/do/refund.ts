@@ -354,6 +354,8 @@ export interface RefundResult {
   walletCredited: number;
   loyalty: { earnedReversed: number; redeemedRecredited: number };
   backorderLinesCancelled: number;
+  /** set when an `external` refund was recorded in full but exceeded the order or hit a state a refund would not normally reach */
+  review?: string;
 }
 
 function emptyResult(o: OrderRow, kind: RefundResult['kind'], replayed: boolean): RefundResult {
@@ -547,6 +549,12 @@ export function refundOrder(
     lines?: PartialLine[];
     refundKey?: string;
     walletCredit?: number;
+    /**
+     * The provider or the merchant ALREADY refunded this money (a completed gateway refund, a dashboard refund): an
+     * external fact, recorded in full and never rejected (CF-PAY-1). The ceiling and the order-state checks do not throw;
+     * the full amount is stored on the marker and `review` is set so the surplus or the state is visible.
+     */
+    external?: boolean;
     now?: number;
   }
 ): RefundResult {
@@ -630,14 +638,24 @@ export function refundOrder(
       [a.storeId, a.orderId, PARTIAL_RESTORE_MARKER, PARTIAL_REFUND_MARKER, key]
     )[0];
     if (done) return { ...out, replayed: true };
-    if (o.status === 'cancelled' || o.status === 'refunded')
-      throw new MoneyError(
-        'ORDER_ALREADY_REVERSED',
-        'the order is already cancelled or refunded',
-        409
-      );
-    if (o.status === 'pending' || o.status === 'awaiting_payment_confirmation')
-      throw new MoneyError('INVALID_TRANSITION', 'an unconfirmed order has nothing to refund', 409);
+    let review: string | null = null;
+    if (o.status === 'cancelled' || o.status === 'refunded') {
+      if (!a.external)
+        throw new MoneyError(
+          'ORDER_ALREADY_REVERSED',
+          'the order is already cancelled or refunded',
+          409
+        );
+      review = 'order_already_reversed';
+    } else if (o.status === 'pending' || o.status === 'awaiting_payment_confirmation') {
+      if (!a.external)
+        throw new MoneyError(
+          'INVALID_TRANSITION',
+          'an unconfirmed order has nothing to refund',
+          409
+        );
+      review = 'order_not_confirmed';
+    }
 
     // Bound EVERYTHING credited back for this order, across all partial events and channels, by what was actually paid:
     // provider/cash amounts recorded on events + store credit already written to the wallet ledger + this call.
@@ -657,13 +675,16 @@ export function refundOrder(
       o.payment_status === 'paid' || o.payment_status === 'disputed'
         ? o.total
         : (o.wallet_amount ?? 0);
-    if (priorAmount + priorCredit + (amount ?? 0) + (walletCredit ?? 0) > captured)
-      throw new MoneyError(
-        'REFUND_EXCEEDS_ORDER',
-        'refunds and store credit would exceed what the customer paid',
-        409,
-        { captured, prior: priorAmount + priorCredit }
-      );
+    if (priorAmount + priorCredit + (amount ?? 0) + (walletCredit ?? 0) > captured) {
+      if (a.external) review = review ?? 'refund_exceeds_order';
+      else
+        throw new MoneyError(
+          'REFUND_EXCEEDS_ORDER',
+          'refunds and store credit would exceed what the customer paid',
+          409,
+          { captured, prior: priorAmount + priorCredit }
+        );
+    }
 
     const restored: Array<{ orderItemId: string; quantity: number }> = [];
     if (a.lines !== undefined) {
@@ -716,9 +737,11 @@ export function refundOrder(
         items: restored,
         ...(amount !== undefined ? { amount } : {}),
         ...(walletCredit !== undefined ? { walletCredit } : {}),
+        ...(review ? { review } : {}),
       },
       now
     );
+    if (review) out.review = review;
     return out;
   });
 }
