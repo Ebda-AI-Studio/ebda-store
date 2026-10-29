@@ -215,3 +215,24 @@ describe('the binding is behind a deploy switch', () => {
     expect(wf).toMatch(/EBDA_IMAGES_BINDING: \$\{\{ vars\.EBDA_IMAGES_BINDING \}\}/);
   });
 });
+
+describe('PWA icons with an injected resizer (the Node backfill script, no Images binding)', () => {
+  it('uses the resizer for every target, never the fallback, and raises no resize alert', async () => {
+    const resizer = vi.fn(async (_src: Buffer, t: { size: number }) => fakePng(t.size, t.size));
+    const source = fakePng(1024, 1024);
+    await generatePwaIconSet(STORE_ID, source, { background: '#0A0B0C', resizer });
+    expect(resizer).toHaveBeenCalledTimes(7);
+    expect(resizer.mock.calls.filter(c => (c[1] as { padded: boolean }).padded)).toHaveLength(1);
+    for (const [key, size] of Object.entries(SIZES))
+      expect(pngDimensions(uploaded(key)), key).toEqual({ width: size, height: size });
+    expect(sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('a resizer answering the wrong size is refused, nothing is uploaded', async () => {
+    const resizer = async (_s: Buffer, t: { size: number }) => fakePng(t.size + 1, t.size + 1);
+    await expect(
+      generatePwaIconSet(STORE_ID, fakePng(1024, 1024), { resizer })
+    ).rejects.toMatchObject({ code: 'ICON_GENERATION_FAILED' });
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+});
