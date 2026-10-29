@@ -27,6 +27,8 @@ import {
   createPrismaLite,
   doSqlRunner,
   doSyncSql,
+  applyStoreSettings,
+  decodeRpc,
   ensureIdempotencySchema,
   ensurePaymentSchema,
   ensureSearchIndex,
@@ -169,6 +171,29 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       if (e instanceof StoreMismatch)
         return { ok: false, code: 'STORE_MISMATCH', message: e.message };
       throw e;
+    }
+  }
+
+  /**
+   * The settings copy (Ruling CF-WRITES-2): the API writes the authoritative `Store` row first, then sends the changed
+   * fields here as an RPC JSON string. Applied to `store_profile` / `store_config`; D1-only fields are reported, not stored.
+   */
+  async applySettings(
+    storeId: string,
+    fieldsJson: string
+  ): Promise<Result<{ profile: string[]; config: string[]; directoryOnly: string[] }>> {
+    try {
+      this.bind(storeId);
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const fields = decodeRpc<Record<string, unknown>>(fieldsJson);
+      return {
+        ok: true,
+        data: applyStoreSettings(doSqlRunner(this.ctx.storage), meta, storeId, fields),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
     }
   }
 

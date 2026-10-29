@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -208,7 +209,9 @@ const bulkAiImageAltFn = inngest.createFunction(
                   `image-alt:${image.id}`
                 );
 
-                await prisma.productImage.update({
+                await (
+                  await storeWriter(storeId)
+                ).productImage.update({
                   where: { id: image.id },
                   data: { alt },
                 });

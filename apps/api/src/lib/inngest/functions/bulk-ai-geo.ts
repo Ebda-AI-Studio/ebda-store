@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -531,7 +532,9 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
                 parsed.en.trim() &&
                 !isPlaceholderText(parsed.en)
               ) {
-                await prisma.product.update({
+                await (
+                  await storeWriter(storeId)
+                ).product.update({
                   where: { id: p.id, storeId },
                   data: {
                     citationCopy: parsed.en.trim().slice(0, 500),

@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { ProductService } from '../services/product.service';
@@ -464,9 +465,10 @@ router.put(
       }
 
       // Persist positions in a single transaction — position = index.
-      await prisma.$transaction(
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+      await w.$transaction(
         orderedProductIds.map((id, index) =>
-          prisma.product.update({
+          w.product.update({
             where: { id, storeId },
             data: { newArrivalPosition: index },
           })
@@ -548,9 +550,10 @@ router.put(
       }
 
       // Persist positions in a single transaction — position = index.
-      await prisma.$transaction(
+      const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-1)
+      await w.$transaction(
         orderedProductIds.map((id, index) =>
-          prisma.product.update({
+          w.product.update({
             where: { id, storeId },
             data: { bestSellerPosition: index },
           })
@@ -619,7 +622,9 @@ router.post(
       if (typeof enabled !== 'boolean') {
         throw new AppError(400, 'INVALID_BODY', 'enabled must be true or false');
       }
-      const result = await prisma.product.updateMany({
+      const result = await (
+        await storeWriter(storeId)
+      ).product.updateMany({
         where: { storeId, status: 'active', deletedAt: null },
         data: { allowBackorder: enabled },
       });
@@ -906,7 +911,8 @@ router.get(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
@@ -930,14 +936,15 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
       const body = productFaqSchema.parse(req.body);
-      const faq = await prisma.productFaq.create({
+      const faq = await w.productFaq.create({
         data: {
           productId: req.params.id,
           question: body.question,
@@ -962,14 +969,15 @@ router.put(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
       const body = productFaqSchema.partial().parse(req.body);
-      const result = await prisma.productFaq.updateMany({
+      const result = await w.productFaq.updateMany({
         where: { id: req.params.faqId, productId: req.params.id },
         data: {
           ...(body.question !== undefined && { question: body.question }),
@@ -997,13 +1005,14 @@ router.delete(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const product = await prisma.product.findFirst({
+      const w = await storeWriter(req.params.storeId);
+      const product = await w.product.findFirst({
         where: { id: req.params.id, storeId: req.params.storeId },
         select: { id: true },
       });
       if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
-      const deleted = await prisma.productFaq.deleteMany({
+      const deleted = await w.productFaq.deleteMany({
         where: { id: req.params.faqId, productId: req.params.id },
       });
       if (deleted.count === 0) {

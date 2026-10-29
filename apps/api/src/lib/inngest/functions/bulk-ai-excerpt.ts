@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import type { AiFieldSources } from '@ebda/shared';
 import { config } from '../../../config';
@@ -220,7 +221,9 @@ const bulkAiExcerptFn = inngest.createFunction(
               if (!result.excerpt.trim() && !result.excerptAr.trim()) {
                 bSkipped++;
               } else {
-                await prisma.product.update({
+                await (
+                  await storeWriter(storeId)
+                ).product.update({
                   where: { id: product.id, storeId },
                   data: {
                     excerpt: result.excerpt || product.excerpt,

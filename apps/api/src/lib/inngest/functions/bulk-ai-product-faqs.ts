@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -253,15 +254,18 @@ const bulkAiProductFaqsFn = inngest.createFunction(
               if (validFaqs.length === 0) {
                 bSkipped++;
               } else {
-                await prisma.$transaction(async tx => {
+                const w = await storeWriter(storeId);
+                await w.$transaction([
                   // On force, replace only AI-drafted rows — never clobber
                   // merchant-edited FAQs.
-                  if (force) {
-                    await tx.productFaq.deleteMany({
-                      where: { productId: product.id, aiDrafted: true, manuallyEdited: false },
-                    });
-                  }
-                  await tx.productFaq.createMany({
+                  ...(force
+                    ? [
+                        w.productFaq.deleteMany({
+                          where: { productId: product.id, aiDrafted: true, manuallyEdited: false },
+                        }),
+                      ]
+                    : []),
+                  w.productFaq.createMany({
                     data: validFaqs.map(f => ({
                       productId: product.id,
                       question: f.question.slice(0, 500),
@@ -270,8 +274,8 @@ const bulkAiProductFaqsFn = inngest.createFunction(
                       answerAr: f.answerAr?.slice(0, 2000) ?? null,
                       aiDrafted: true,
                     })),
-                  });
-                });
+                  }),
+                ]);
                 bFilled++;
               }
             } catch (err) {

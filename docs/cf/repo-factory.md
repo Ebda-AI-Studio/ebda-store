@@ -63,18 +63,35 @@ Customer erasure/export on the DO: `cf/erasure/registry.generated.ts` is generat
 2. `recordSlugRedirect(prisma, ...)` on a slug change still writes `SlugRedirect` to Postgres (a D1 platform model: the platform client of PR A).
 3. A method that reads a model that has not moved (for example `ProductService.getById` includes the D1 `Store`) keeps reading Postgres.
 
-## Left for PR D1b (non-money catalogue, same mechanism, not yet moved; measured on this branch)
+## Writes moved in PR D1b (Rulings CF-WRITES-2)
 
-| Group                                          | Sites (non-test)                                                                                                                                                                         | Why it did not move in D1                                                                                           |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Product create/update/delete/restore           | `product.service.ts` (`create`, `update` inside `withMoneyTx` with nested images/categories, `$queryRaw` on `ai_field_sources`, soft delete via `getById` which includes the D1 `Store`) | interactive transaction + raw SQL + a D1 relation include; needs the interactive-tx rewrite and the platform client |
-| Variants generate/update/delete, option values | `variant.service.ts` (`withMoneyTx`, `withSavepoint`, `inventoryHistory` rows, stock columns)                                                                                            | writes `inventory` (refused by design) and history rows; moves with the stock sections in D2                        |
-| Page builder revisions                         | `page-builder.service.ts` (7 StorePageRevision writes)                                                                                                                                   | not reached in this slice; same mechanism                                                                           |
-| Bulk and AI writers                            | `bulk.service.ts`, `lib/inngest/functions/bulk-ai-*` (tags, categories, images, FAQs, product copy), `ai-autofill*.ts`, `store-category-suggest`, `provisioning`                         | jobs resolve the store through Postgres today (PR E); `storeWriter` already answers outside a request               |
-| Price tiers, recommendations, product FAQ      | `price-tier.service.ts` (3), `recommendation.service.ts` (ProductRelation 5), `routes/product.routes.ts` (ProductFaq)                                                                    | same mechanism, not yet moved                                                                                       |
-| Media                                          | no media table: product images are ProductImage rows (above) + R2 objects                                                                                                                | R2 side is unchanged                                                                                                |
-| Collections                                    | no `Collection` model exists in the schema                                                                                                                                               | nothing to move                                                                                                     |
-| Settings copy                                  | store settings live on the D1 `Store` model (`prisma.store.*`, 110 sites)                                                                                                                | D1 platform client (PR A binding), not a store DO                                                                   |
+Same mechanism as D1, plus named in-DO procedures (`$proc`, `DO_PROCS`) for the one statement Prisma cannot express (`mergeAiFieldSources`, the `ai_field_sources` delta merge) and the settings write-through.
+
+| Moved write                                                                                                               | Notes                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product create, update, soft delete, `bulkUpdate` (status, flags, category link, price), `bulkDelete`, `bulkUpdateStatus` | `update` has a Postgres transaction path (unchanged) and a DO batch path (`updateOnDo`) sharing one `updateArgs`; the D1 `store` relation of `getById` is attached separately on the DO |
+| Variants: option values add/update/delete, create/update/delete/generate/reorder, option delete + reorder                 | non-zero `inventory` is refused on the DO (stock = D2)                                                                                                                                  |
+| Page-builder revisions (save draft, publish, rollback, list)                                                              | the head rev is `findFirst(orderBy rev desc)` on the DO, `aggregate` on Postgres                                                                                                        |
+| Price tiers, product relations (replace-all is now atomic), product FAQ                                                   |                                                                                                                                                                                         |
+| AI writers: product copy / category SEO / image alt / tags / FAQs / category links, store-category suggestions            | one batch with generated ids; jobs still READ through Postgres (PR E)                                                                                                                   |
+| Settings copy: 12 `StoreService` writers via `updateStoreThrough`                                                         | D1/Postgres `Store` first, then `StoreDO.applySettings` into `store_profile` / `store_config`                                                                                           |
+
+Collections: there is no `Collection` model; the storefront's collection surfaces are `Category` and the page-builder document (`pageKey` collection), both already DO models.
+
+### Settings copy: what is still unrouted (cutover gate)
+
+38 `store.update` / `updateMany` / `upsert` sites outside `StoreService` (agent credential, typography, store layout, tax profile, admin, AI jobs' store-level SEO) and 2 `async tx => ...` forms inside it still write only the authoritative row. Each must go through `updateStoreThrough` before any store is flipped.
+
+## Left for D2 or later from the D1b list (with reason)
+
+| Item                                                                                           | Reason                                                                          |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Bulk CSV import transactions (`bulk.service.ts` product and variant import)                    | write `inventory` per row inside one interactive transaction                    |
+| `VariantService.bulkUpdateInventory`, variant `inventoryHistory` rows, opening stock on create | stock columns                                                                   |
+| Barcode sequences (`barcode.service.ts`)                                                       | advisory lock + sequence                                                        |
+| Provisioning seeds (`provisioning.service.ts`)                                                 | the store does not exist in a DO yet; the import carries them                   |
+| `ai-autofill-cleanup`                                                                          | mixes D2 models (AiRecommendation, FrequentlyBoughtTogether) in one transaction |
+| Job READS (every `bulk-ai-*` selects through Postgres)                                         | PR E                                                                            |
 
 ## Left for PR D2 (money, stock and lock paths; measured on this branch, `apps/api/src`)
 

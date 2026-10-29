@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -217,7 +218,9 @@ const bulkAiCategorizeFn = inngest.createFunction(
                 if (!best) {
                   bSkipped++;
                 } else {
-                  await prisma.productCategory.create({
+                  await (
+                    await storeWriter(storeId)
+                  ).productCategory.create({
                     data: { productId: product.id, categoryId: best.id, position: 0 },
                   });
                   bFilled++;

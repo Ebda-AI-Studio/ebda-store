@@ -6,6 +6,7 @@
  * `writeLimiter` per-IP rate limiter on top of the AI service's own
  * per-store daily token budget.
  */
+import { storeWriter } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
@@ -2181,7 +2182,9 @@ router.post(
       // autofill core treats it as an empty gap and regenerates it.
       const sources = { ...((product.aiFieldSources as Record<string, string>) ?? {}) };
       delete sources[field];
-      await prisma.product.update({
+      await (
+        await storeWriter(storeId)
+      ).product.update({
         where: { id: productId, storeId },
         data: { [field]: null, aiFieldSources: sources },
       });

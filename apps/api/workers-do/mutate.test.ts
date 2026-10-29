@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { createDoClient, decodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 
@@ -85,5 +85,73 @@ describe('StoreDO.mutate', () => {
     expect(wrongRow.ok).toBe(false);
     const rows = await a.query('mut-iso-a', [{ model: 'StorePage', op: 'findMany' }]);
     expect(rows.ok && decodeRpc<any[][]>(rows.json)[0].map(r => r.slug)).toEqual(['p']);
+  });
+});
+
+describe('StoreDO.mutate procedures and the settings copy (PR D1b)', () => {
+  it('mergeAiFieldSources runs on real workerd SQLite (json_patch / json_remove) inside the batch', async () => {
+    const c = clientFor('mut-proc');
+    const p = await c.product.create({
+      data: {
+        storeId: 'mut-proc',
+        name: 'P',
+        slug: 'p',
+        price: 1,
+        aiFieldSources: { a: 'ai', b: 'ai' },
+      },
+    });
+    const [merged] = await c.$transaction([
+      c.$proc('mergeAiFieldSources', {
+        productId: p.id,
+        set: { a: 'human', c: 'ai' },
+        remove: ['b'],
+      }),
+    ]);
+    expect(merged).toEqual({ a: 'human', c: 'ai' });
+    expect((await c.product.findFirst({ where: { id: p.id } })).aiFieldSources).toEqual({
+      a: 'human',
+      c: 'ai',
+    });
+  });
+
+  it('applySettings writes the profile/config copy, reports D1-only fields, refuses unknown fields and another store', async () => {
+    const stub = stubFor('mut-set');
+    await stub.mutate('mut-set', { ops: [{ model: 'StorePage', op: 'count' }] }); // binds the instance
+    await runInDurableObject(stub, async d => {
+      d.ctx.storage.sql.exec(
+        "INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES ('mut-set', 'S', 's', 'u')"
+      );
+    });
+    const { encodeRpc } = await import('@ebda-src/repo');
+    const ok = await stub.applySettings(
+      'mut-set',
+      encodeRpc({
+        heroTitle: 'Hello',
+        theme: { primary: '#B08D57' },
+        blogEnabled: true,
+        domainStatus: 'active',
+      })
+    );
+    expect(ok).toMatchObject({ ok: true, data: { directoryOnly: ['domainStatus'] } });
+    const row = await runInDurableObject(stub, async d => ({
+      p: d.ctx.storage.sql
+        .exec("SELECT hero_title, theme FROM store_profile WHERE store_id = 'mut-set'")
+        .one(),
+      c: d.ctx.storage.sql
+        .exec("SELECT blog_enabled FROM store_config WHERE store_id = 'mut-set'")
+        .one(),
+    }));
+    expect([row.p.hero_title, JSON.parse(row.p.theme as string), row.c.blog_enabled]).toEqual([
+      'Hello',
+      { primary: '#B08D57' },
+      1,
+    ]);
+    expect(await stub.applySettings('mut-set', encodeRpc({ nope: 1 }))).toMatchObject({
+      ok: false,
+    });
+    expect(await stub.applySettings('someone-else', encodeRpc({ heroTitle: 'x' }))).toMatchObject({
+      ok: false,
+      code: 'STORE_MISMATCH',
+    });
   });
 });

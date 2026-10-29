@@ -88,6 +88,8 @@ export type StoreWrites = {
     Extract<keyof AppPrismaClient[K], ReadOp | WriteOp>
   >;
 } & {
+  /** DO-only named procedure (see DO_PROCS); the Postgres twin is the raw statement kept in the service. */
+  $proc(name: string, args: Record<string, unknown>): PromiseLike<any>;
   /** Array form only. `idempotencyKey` is honoured by the DO (a replay returns the first result); Postgres ignores it. */
   $transaction<T extends readonly PromiseLike<unknown>[]>(
     ops: [...T],
@@ -144,6 +146,12 @@ async function doClients(storeId: string): Promise<{ db: StoreReads; writer: Sto
 function pgWriter(): StoreWrites {
   return new Proxy({} as object, {
     get(_t, prop) {
+      if (prop === '$proc')
+        return () => {
+          throw new Error(
+            '$proc exists on the Durable Object writer only (the service keeps its Postgres statement)'
+          );
+        };
       if (prop === '$transaction') return (ops: unknown) => (prisma as any).$transaction(ops);
       return (prisma as any)[prop];
     },
@@ -182,6 +190,29 @@ export async function storeDb(storeId: string): Promise<StoreReads> {
 /** The write client for a store's non-money catalogue/content models: `const w = await storeWriter(id); await w.blogPost.create(...)`. */
 export async function storeWriter(storeId: string): Promise<StoreWrites> {
   return (await storeRepo(storeId)).writer;
+}
+
+/**
+ * Settings write-through (Ruling CF-WRITES-2). `Store` is authoritative in D1/Postgres; a store on its Durable Object also
+ * carries a settings copy (`store_profile` / `store_config`) that the storefront reads. Called AFTER the authoritative
+ * write, in the same request: on 'pg' it does nothing; on 'do' it sends the changed Prisma `Store` fields to the DO and a
+ * refusal fails the request loudly (the update is idempotent, so the retry converges). No cache, no stale window.
+ */
+export async function copyStoreSettings(
+  storeId: string,
+  fields: Record<string, unknown>
+): Promise<void> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return;
+  const stub = storeDo(storeId) as unknown as {
+    applySettings(
+      storeId: string,
+      fieldsJson: string
+    ): Promise<{ ok: true } | { ok: false; code: string; status: number }>;
+  };
+  const { encodeRpc } = await import('@ebda-src/repo');
+  const r = await stub.applySettings(storeId, encodeRpc(fields));
+  if (!r.ok) throw new AppError(502, 'SETTINGS_COPY_FAILED', `settings copy refused: ${r.code}`);
 }
 
 /** Express middleware: one repo scope per request. Cheap (no I/O); the flag is read lazily by the first `storeDb`. */

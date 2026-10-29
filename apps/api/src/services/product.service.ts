@@ -46,7 +46,7 @@ import {
   searchProductIds,
 } from './product-search.service';
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
-import { storeDb, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -594,13 +594,17 @@ export class ProductService {
   }
 
   static async getById(storeId: string, productId: string) {
-    const product = await prisma.product.findFirst({
+    // On a store served by its Durable Object the `store` relation lives in D1/Postgres (another database), so it is
+    // fetched separately and attached; on Postgres the original single query is unchanged (CF-WRITES-2).
+    const repo = await storeRepo(storeId);
+    const onDo = repo.backend === 'do';
+    const product = await repo.writer.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: {
         images: { orderBy: { position: 'asc' } },
         categories: { include: { category: true } },
         tags: { include: { tag: true } },
-        store: { select: { id: true, name: true, slug: true } },
+        ...(onDo ? {} : { store: { select: { id: true, name: true, slug: true } } }),
         // The admin detail page only needs the variant-aware total (it has a
         // dedicated /variants page for the rows), but admin_get_product (MCP)
         // maps id/name/sku/price off these same rows — select them too so
@@ -624,6 +628,14 @@ export class ProductService {
 
     if (!product) {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
+    }
+    if (onDo) {
+      (product as Record<string, unknown>).store = await readInStoreContext(storeId, () =>
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { id: true, name: true, slug: true },
+        })
+      );
     }
 
     // Same `totalInventory` contract the admin product LIST already returns
@@ -695,7 +707,9 @@ export class ProductService {
   ): Promise<void> {
     const ids = [...new Set(categoryIds ?? [])];
     if (ids.length === 0) return;
-    const found = await prisma.category.findMany({
+    const found = await (
+      await storeDb(storeId)
+    ).category.findMany({
       where: { id: { in: ids }, storeId },
       select: { id: true },
     });
@@ -720,7 +734,8 @@ export class ProductService {
     // Auto-deduplicate slug: append -1, -2, etc. if exists
     let slug = baseSlug;
     let suffix = 0;
-    while (await prisma.product.findFirst({ where: { storeId, slug } })) {
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-2)
+    while (await w.product.findFirst({ where: { storeId, slug } })) {
       suffix++;
       if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
       slug = `${baseSlug}-${suffix}`;
@@ -739,7 +754,7 @@ export class ProductService {
     const typedBarcode = data.barcode?.trim() ? parseBarcodeOrThrow(data.barcode) : undefined;
     if (typedBarcode) await assertBarcodeAvailable(storeId, typedBarcode);
 
-    const product = await prisma.product.create({
+    const product = await w.product.create({
       data: {
         storeId,
         name: data.name,
@@ -761,7 +776,8 @@ export class ProductService {
         discountValue: data.discountValue ?? null,
         sku: data.sku,
         ...(typedBarcode ? { barcode: typedBarcode } : {}),
-        inventory: data.inventory ?? 0,
+        // 0 is the column default; a non-zero opening stock is a stock write (refused on a DO store until D2)
+        ...(data.inventory ? { inventory: data.inventory } : {}),
         ...(data.lowStockThreshold !== undefined
           ? { lowStockThreshold: data.lowStockThreshold }
           : {}),
@@ -878,8 +894,9 @@ export class ProductService {
     if (finalSlug && finalSlug !== product.slug) {
       const baseSlug = finalSlug;
       let suffix = 0;
+      const wSlug = await storeWriter(storeId);
       while (
-        await prisma.product.findFirst({
+        await wSlug.product.findFirst({
           where: { storeId, slug: finalSlug, id: { not: productId } },
         })
       ) {
@@ -929,140 +946,166 @@ export class ProductService {
     );
     const removedSources = Object.keys(prevSources).filter(k => !(k in nextSources));
 
+    // The product write itself, shared by the Postgres transaction and the Durable Object batch below.
+    const updateArgs = {
+      where: { id: productId, storeId },
+      data: {
+        name: data.name,
+        slug: finalSlug,
+        // Free text the merchant can empty — accept only when present in
+        // the patch: `null` clears the column, an omitted key leaves it
+        // alone. Same convention as excerpt / SEO meta below.
+        ...(data.nameAr !== undefined ? { nameAr: data.nameAr } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.descriptionAr !== undefined ? { descriptionAr: data.descriptionAr } : {}),
+        // Excerpt — null clears (bulk-sweep/manual clear), undefined leaves
+        // the existing value alone, same convention as SEO meta below.
+        ...(data.excerpt !== undefined ? { excerpt: data.excerpt } : {}),
+        ...(data.excerptAr !== undefined ? { excerptAr: data.excerptAr } : {}),
+        price: data.price,
+        // Pass through only when present in the patch — undefined leaves
+        // the existing value, explicit null clears it. Same convention
+        // as the curated flags below.
+        ...(data.compareAtPrice !== undefined ? { compareAtPrice: data.compareAtPrice } : {}),
+        ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
+        ...(data.moq !== undefined ? { moq: data.moq } : {}),
+        ...(data.audience !== undefined ? { audience: data.audience } : {}),
+        // Discount input columns — same undefined/null convention.
+        ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
+        ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
+        ...(data.sku !== undefined ? { sku: data.sku } : {}),
+        ...barcodeUpdate,
+        // Card badge — null clears, an omitted key leaves it alone. Same
+        // convention as nameAr / description / excerpt above.
+        ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
+        ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
+        ...(data.searchTerms !== undefined
+          ? { searchTerms: cleanSearchTerms(data.searchTerms) }
+          : {}),
+        ...(data.facts !== undefined ? { facts: data.facts } : {}),
+        ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
+        ...personalisationWrite(data.personalisation),
+        ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
+        inventory: data.inventory,
+        ...(data.lowStockThreshold !== undefined
+          ? { lowStockThreshold: data.lowStockThreshold }
+          : {}),
+        status: data.status,
+        // Curated flags driven by the admin product edit form. We accept
+        // them only when explicitly present in the patch so callers that
+        // omit them don't accidentally clear the existing value.
+        ...(data.isFeatured !== undefined ? { featured: data.isFeatured } : {}),
+        ...(data.isNew !== undefined ? { isNew: data.isNew } : {}),
+        ...(data.isBestSeller !== undefined ? { isBestSeller: data.isBestSeller } : {}),
+        // SEO — accept only when present so omitting them doesn't clear.
+        ...(data.metaTitle !== undefined ? { metaTitle: data.metaTitle } : {}),
+        ...(data.metaTitleAr !== undefined ? { metaTitleAr: data.metaTitleAr } : {}),
+        ...(data.metaDescription !== undefined ? { metaDescription: data.metaDescription } : {}),
+        ...(data.metaDescriptionAr !== undefined
+          ? { metaDescriptionAr: data.metaDescriptionAr }
+          : {}),
+        // AEO — separate conversational copy column.
+        ...(data.metaDescriptionAeo !== undefined
+          ? { metaDescriptionAeo: data.metaDescriptionAeo }
+          : {}),
+        ...(data.metaDescriptionAeoAr !== undefined
+          ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
+          : {}),
+      },
+      include: {
+        images: { orderBy: { position: 'asc' } },
+        categories: { include: { category: true } },
+      },
+    } satisfies Prisma.ProductUpdateArgs;
+
     // Wrap image/category replacement and product update in a transaction
     // so that a failure mid-way does not leave orphaned or missing relations.
-    const updatedProduct = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-      // If images are provided, replace all existing images
-      if (data.images !== undefined) {
-        await tx.productImage.deleteMany({ where: { productId } });
-        if (data.images.length > 0) {
-          await tx.productImage.createMany({
-            data: data.images.map((img, index) => ({
-              productId,
-              url: img.url,
-              alt: img.alt || data.name || product.name,
-              position: index,
-            })),
-          });
-        }
-      }
+    const repoForWrite = await storeRepo(storeId);
+    const updatedProduct =
+      repoForWrite.backend === 'do'
+        ? await this.updateOnDo(repoForWrite.writer, {
+            storeId,
+            productId,
+            data,
+            productName: product.name,
+            updateArgs,
+            setSources,
+            removedSources,
+            slugChanged: Boolean(data.slug && finalSlug !== product.slug),
+            oldSlug: product.slug,
+            finalSlug: finalSlug!,
+          })
+        : await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+            // If images are provided, replace all existing images
+            if (data.images !== undefined) {
+              await tx.productImage.deleteMany({ where: { productId } });
+              if (data.images.length > 0) {
+                await tx.productImage.createMany({
+                  data: data.images.map((img, index) => ({
+                    productId,
+                    url: img.url,
+                    alt: img.alt || data.name || product.name,
+                    position: index,
+                  })),
+                });
+              }
+            }
 
-      // If categories are provided, replace the associations — but PRESERVE the
-      // merchant's per-category drag-sort `position`. Previously this blindly
-      // deleted + recreated every ProductCategory row with the default position
-      // (0), so ANY product save that included `categories` (e.g. toggling a
-      // product out of stock) reset its position to 0 → it jumped to the front
-      // of every category listing. Re-use the saved position for links that
-      // remain; only genuinely-new category links default to 0.
-      if (data.categories !== undefined) {
-        const existingLinks = await tx.productCategory.findMany({
-          where: { productId },
-          select: { categoryId: true, position: true },
-        });
-        const positionByCategory = new Map(existingLinks.map(l => [l.categoryId, l.position]));
-        await tx.productCategory.deleteMany({ where: { productId } });
-        if (data.categories.length > 0) {
-          await tx.productCategory.createMany({
-            data: data.categories.map(categoryId => ({
-              productId,
-              categoryId,
-              position: positionByCategory.get(categoryId) ?? 0,
-            })),
-          });
-        }
-      }
+            // If categories are provided, replace the associations — but PRESERVE the
+            // merchant's per-category drag-sort `position`. Previously this blindly
+            // deleted + recreated every ProductCategory row with the default position
+            // (0), so ANY product save that included `categories` (e.g. toggling a
+            // product out of stock) reset its position to 0 → it jumped to the front
+            // of every category listing. Re-use the saved position for links that
+            // remain; only genuinely-new category links default to 0.
+            if (data.categories !== undefined) {
+              const existingLinks = await tx.productCategory.findMany({
+                where: { productId },
+                select: { categoryId: true, position: true },
+              });
+              const positionByCategory = new Map(
+                existingLinks.map(l => [l.categoryId, l.position])
+              );
+              await tx.productCategory.deleteMany({ where: { productId } });
+              if (data.categories.length > 0) {
+                await tx.productCategory.createMany({
+                  data: data.categories.map(categoryId => ({
+                    productId,
+                    categoryId,
+                    position: positionByCategory.get(categoryId) ?? 0,
+                  })),
+                });
+              }
+            }
 
-      const updated = await tx.product.update({
-        where: { id: productId, storeId },
-        data: {
-          name: data.name,
-          slug: finalSlug,
-          // Free text the merchant can empty — accept only when present in
-          // the patch: `null` clears the column, an omitted key leaves it
-          // alone. Same convention as excerpt / SEO meta below.
-          ...(data.nameAr !== undefined ? { nameAr: data.nameAr } : {}),
-          ...(data.description !== undefined ? { description: data.description } : {}),
-          ...(data.descriptionAr !== undefined ? { descriptionAr: data.descriptionAr } : {}),
-          // Excerpt — null clears (bulk-sweep/manual clear), undefined leaves
-          // the existing value alone, same convention as SEO meta below.
-          ...(data.excerpt !== undefined ? { excerpt: data.excerpt } : {}),
-          ...(data.excerptAr !== undefined ? { excerptAr: data.excerptAr } : {}),
-          price: data.price,
-          // Pass through only when present in the patch — undefined leaves
-          // the existing value, explicit null clears it. Same convention
-          // as the curated flags below.
-          ...(data.compareAtPrice !== undefined ? { compareAtPrice: data.compareAtPrice } : {}),
-          ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
-          ...(data.moq !== undefined ? { moq: data.moq } : {}),
-          ...(data.audience !== undefined ? { audience: data.audience } : {}),
-          // Discount input columns — same undefined/null convention.
-          ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
-          ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
-          ...(data.sku !== undefined ? { sku: data.sku } : {}),
-          ...barcodeUpdate,
-          // Card badge — null clears, an omitted key leaves it alone. Same
-          // convention as nameAr / description / excerpt above.
-          ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
-          ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
-          ...(data.searchTerms !== undefined
-            ? { searchTerms: cleanSearchTerms(data.searchTerms) }
-            : {}),
-          ...(data.facts !== undefined ? { facts: data.facts } : {}),
-          ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
-          ...personalisationWrite(data.personalisation),
-          ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
-          inventory: data.inventory,
-          ...(data.lowStockThreshold !== undefined
-            ? { lowStockThreshold: data.lowStockThreshold }
-            : {}),
-          status: data.status,
-          // Curated flags driven by the admin product edit form. We accept
-          // them only when explicitly present in the patch so callers that
-          // omit them don't accidentally clear the existing value.
-          ...(data.isFeatured !== undefined ? { featured: data.isFeatured } : {}),
-          ...(data.isNew !== undefined ? { isNew: data.isNew } : {}),
-          ...(data.isBestSeller !== undefined ? { isBestSeller: data.isBestSeller } : {}),
-          // SEO — accept only when present so omitting them doesn't clear.
-          ...(data.metaTitle !== undefined ? { metaTitle: data.metaTitle } : {}),
-          ...(data.metaTitleAr !== undefined ? { metaTitleAr: data.metaTitleAr } : {}),
-          ...(data.metaDescription !== undefined ? { metaDescription: data.metaDescription } : {}),
-          ...(data.metaDescriptionAr !== undefined
-            ? { metaDescriptionAr: data.metaDescriptionAr }
-            : {}),
-          // AEO — separate conversational copy column.
-          ...(data.metaDescriptionAeo !== undefined
-            ? { metaDescriptionAeo: data.metaDescriptionAeo }
-            : {}),
-          ...(data.metaDescriptionAeoAr !== undefined
-            ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
-            : {}),
-        },
-        include: {
-          images: { orderBy: { position: 'asc' } },
-          categories: { include: { category: true } },
-        },
-      });
-      if (Object.keys(setSources).length > 0 || removedSources.length > 0) {
-        // wa-catalog: not-catalog-data (ai_field_sources is internal; the product update above is observed)
-        // Per-key merge on the row as it is NOW (this UPDATE holds its lock): concurrent
-        // stamps on other keys survive. store_id keeps the raw statement tenant-keyed.
-        const merged = await tx.$queryRaw<Array<{ ai_field_sources: unknown }>>`
+            const updated = await tx.product.update(updateArgs);
+            if (Object.keys(setSources).length > 0 || removedSources.length > 0) {
+              // wa-catalog: not-catalog-data (ai_field_sources is internal; the product update above is observed)
+              // Per-key merge on the row as it is NOW (this UPDATE holds its lock): concurrent
+              // stamps on other keys survive. store_id keeps the raw statement tenant-keyed.
+              const merged = await tx.$queryRaw<Array<{ ai_field_sources: unknown }>>`
           UPDATE products
              SET ai_field_sources =
                  (COALESCE(ai_field_sources, '{}'::jsonb) || ${JSON.stringify(setSources)}::jsonb)
                  - ${removedSources}::text[]
            WHERE id = ${productId} AND store_id = ${storeId}
        RETURNING ai_field_sources`;
-        (updated as { aiFieldSources: unknown }).aiFieldSources =
-          merged[0]?.ai_field_sources ?? updated.aiFieldSources;
-      }
+              (updated as { aiFieldSources: unknown }).aiFieldSources =
+                merged[0]?.ai_field_sources ?? updated.aiFieldSources;
+            }
 
-      if (data.slug && finalSlug !== product.slug) {
-        await recordSlugRedirect(tx, storeId, SlugEntityType.PRODUCT, product.slug, finalSlug!);
-      }
+            if (data.slug && finalSlug !== product.slug) {
+              await recordSlugRedirect(
+                tx,
+                storeId,
+                SlugEntityType.PRODUCT,
+                product.slug,
+                finalSlug!
+              );
+            }
 
-      return updated;
-    });
+            return updated;
+          });
 
     await this.invalidateStoreProductCache(storeId);
 
@@ -1091,6 +1134,83 @@ export class ProductService {
     return updatedProduct;
   }
 
+  /**
+   * `update`'s write step on a store served by its Durable Object (CF-WRITES-2). The Postgres path is one interactive
+   * transaction; a DO section cannot be interactive, so the same steps ship as ONE atomic batch: images replaced,
+   * category links replaced (the saved drag-sort positions are read first and carried over), the product row, and the
+   * `ai_field_sources` delta merged in-DO (`mergeAiFieldSources`, the twin of the raw jsonb statement). A stock value in
+   * the patch is refused by the DO (stock moves only in the locked sections, D2).
+   */
+  private static async updateOnDo(
+    w: Awaited<ReturnType<typeof storeWriter>>,
+    a: {
+      storeId: string;
+      productId: string;
+      data: UpdateProductData;
+      productName: string;
+      updateArgs: any;
+      setSources: Record<string, string>;
+      removedSources: string[];
+      slugChanged: boolean;
+      oldSlug: string;
+      finalSlug: string;
+    }
+  ) {
+    const { productId, data } = a;
+    const ops: PromiseLike<any>[] = [];
+    if (data.images !== undefined) {
+      ops.push(w.productImage.deleteMany({ where: { productId } }));
+      if (data.images.length > 0)
+        ops.push(
+          w.productImage.createMany({
+            data: data.images.map((img, index) => ({
+              productId,
+              url: img.url,
+              alt: img.alt || data.name || a.productName,
+              position: index,
+            })),
+          })
+        );
+    }
+    if (data.categories !== undefined) {
+      const existingLinks = await w.productCategory.findMany({
+        where: { productId },
+        select: { categoryId: true, position: true },
+      });
+      const positionByCategory = new Map(existingLinks.map(l => [l.categoryId, l.position]));
+      ops.push(w.productCategory.deleteMany({ where: { productId } }));
+      if (data.categories.length > 0)
+        ops.push(
+          w.productCategory.createMany({
+            data: data.categories.map(categoryId => ({
+              productId,
+              categoryId,
+              position: positionByCategory.get(categoryId) ?? 0,
+            })),
+          })
+        );
+    }
+    const productAt = ops.length;
+    ops.push(w.product.update(a.updateArgs));
+    const mergeAt =
+      Object.keys(a.setSources).length > 0 || a.removedSources.length > 0 ? ops.length : -1;
+    if (mergeAt >= 0)
+      ops.push(
+        w.$proc('mergeAiFieldSources', {
+          productId,
+          set: a.setSources,
+          remove: a.removedSources,
+        })
+      );
+    const res = await w.$transaction(ops as never);
+    const updated = res[productAt] as { aiFieldSources: unknown };
+    if (mergeAt >= 0) updated.aiFieldSources = (res[mergeAt] as unknown) ?? updated.aiFieldSources;
+    // SlugRedirect is a D1 platform model: it stays on the platform path until the platform client lands (PR A).
+    if (a.slugChanged)
+      await recordSlugRedirect(prisma, a.storeId, SlugEntityType.PRODUCT, a.oldSlug, a.finalSlug);
+    return updated;
+  }
+
   static async delete(storeId: string, productId: string) {
     // Soft-delete keeps the row + child rows around so the deletion
     // is reversible (admin restore flow). DON'T touch R2 here — those
@@ -1099,7 +1219,9 @@ export class ProductService {
     // deleted" job) is what cleans up R2 long-term.
     await this.getById(storeId, productId);
 
-    await prisma.product.update({
+    await (
+      await storeWriter(storeId)
+    ).product.update({
       where: { id: productId, storeId },
       data: { deletedAt: new Date() },
     });
@@ -1177,11 +1299,12 @@ export class ProductService {
       inventory?: { mode: 'set' | 'adjust'; value: number };
     }
   ): Promise<{ updated: number; skippedVariantProducts: number }> {
+    const w = await storeWriter(storeId); // pg today; the store's Durable Object once its flag says 'do' (CF-WRITES-2)
     const safeIds = productIds.filter(id => typeof id === 'string' && id.length > 0);
     if (safeIds.length === 0) return { updated: 0, skippedVariantProducts: 0 };
 
     // Resolve ids that actually belong to this store and are not deleted.
-    const existing = await prisma.product.findMany({
+    const existing = await w.product.findMany({
       where: { storeId, id: { in: safeIds }, deletedAt: null },
       // The real variant ROWS, never the `hasVariants` column (it can drift): a
       // bulk price/stock write on a variant product would break the inventory
@@ -1222,7 +1345,7 @@ export class ProductService {
     if (fields.isBestSeller !== undefined) scalarData.isBestSeller = fields.isBestSeller;
 
     if (Object.keys(scalarData).length > 0) {
-      await prisma.product.updateMany({
+      await w.product.updateMany({
         where: { storeId, id: { in: allIds }, deletedAt: null },
         data: scalarData,
       });
@@ -1237,7 +1360,7 @@ export class ProductService {
       // Guard: verify the category belongs to this store before linking.
       // Without this check a store-A admin could supply a store-B categoryId
       // and link their products to a foreign category.
-      const categoryExists = await prisma.category.findFirst({
+      const categoryExists = await w.category.findFirst({
         where: { id: categoryId, storeId },
         select: { id: true },
       });
@@ -1246,7 +1369,7 @@ export class ProductService {
       }
 
       // Fetch current links so we only insert missing ones.
-      const existingLinks = await prisma.productCategory.findMany({
+      const existingLinks = await w.productCategory.findMany({
         where: { productId: { in: allIds }, categoryId },
         select: { productId: true },
       });
@@ -1255,13 +1378,14 @@ export class ProductService {
 
       if (toLink.length > 0) {
         // Max position for this category across all products already in it.
-        const maxPos = await prisma.productCategory.aggregate({
+        const top = await w.productCategory.findFirst({
           where: { categoryId },
-          _max: { position: true },
+          orderBy: { position: 'desc' },
+          select: { position: true },
         });
-        const startPos = (maxPos._max.position ?? -1) + 1;
+        const startPos = (top?.position ?? -1) + 1;
 
-        await prisma.productCategory.createMany({
+        await w.productCategory.createMany({
           data: toLink.map((productId, idx) => ({
             productId,
             categoryId,
@@ -1290,7 +1414,7 @@ export class ProductService {
       const { mode, value } = fields.price;
       if (mode === 'set') {
         const piastres = Math.max(0, Math.round(value));
-        await prisma.product.updateMany({
+        await w.product.updateMany({
           where: { storeId, id: { in: priceable.map(p => p.id) }, deletedAt: null },
           data: { price: piastres },
         });
@@ -1303,7 +1427,7 @@ export class ProductService {
         // Run in chunks of 20 to avoid pool exhaustion (up to 500 items).
         await runChunked(priceable, 20, p => {
           const newPrice = Math.min(MAX_INT4, Math.max(0, Math.round(p.price * (1 + pct))));
-          return prisma.product.update({ where: { id: p.id, storeId }, data: { price: newPrice } });
+          return w.product.update({ where: { id: p.id, storeId }, data: { price: newPrice } });
         });
       }
     }

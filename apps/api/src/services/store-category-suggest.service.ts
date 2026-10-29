@@ -8,7 +8,9 @@
  * text is merchant data and travels as a JSON string value, never as instructions (AIService owns the prompt).
  * Every id the model returns is checked against the products we actually showed it.
  */
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod/v3';
+import { storeWriter } from '../lib/repo-factory';
 import { prisma } from '@ebda/database';
 import { AIService } from './ai.service';
 import { invalidateCached } from '../lib/public-cache';
@@ -132,48 +134,51 @@ export async function applyStoreCategories(args: {
   const { storeId } = args;
   const wanted = [...new Set(parsed.data.categories.flatMap(c => c.productIds))];
 
-  const created = await prisma.$transaction(async tx => {
-    const valid = new Set(
-      wanted.length
-        ? (
-            await tx.product.findMany({
-              where: { storeId, deletedAt: null, id: { in: wanted } },
-              select: { id: true },
-            })
-          ).map(p => p.id)
-        : []
+  // Reads first, then ONE atomic batch with category ids generated here (a DO section cannot be interactive, so a later
+  // step cannot read an earlier step's generated id). Same result on Postgres and on the store's Durable Object.
+  const w = await storeWriter(storeId);
+  const valid = new Set(
+    wanted.length
+      ? (
+          await w.product.findMany({
+            where: { storeId, deletedAt: null, id: { in: wanted } },
+            select: { id: true },
+          })
+        ).map(p => p.id)
+      : []
+  );
+  const slugs = new Set(
+    (
+      await w.category.findMany({ where: { storeId, deletedAt: null }, select: { slug: true } })
+    ).map(c => c.slug)
+  );
+  const made: Array<{ id: string; name: string; productCount: number }> = [];
+  const ops: PromiseLike<unknown>[] = [];
+  let position = 0;
+  for (const c of parsed.data.categories) {
+    const base = baseSlug(c.name);
+    let slug = base;
+    for (let n = 1; slugs.has(slug); n++) slug = `${base}-${n}`;
+    slugs.add(slug);
+    const id = randomUUID();
+    const name = norm(c.name);
+    ops.push(
+      w.category.create({
+        data: { id, storeId, name, nameAr: norm(c.nameAr) || null, slug, position: position++ },
+      })
     );
-    const slugs = new Set(
-      (
-        await tx.category.findMany({ where: { storeId, deletedAt: null }, select: { slug: true } })
-      ).map(c => c.slug)
-    );
-    const made: Array<{ id: string; name: string; productCount: number }> = [];
-    let position = 0;
-    for (const c of parsed.data.categories) {
-      const base = baseSlug(c.name);
-      let slug = base;
-      for (let n = 1; slugs.has(slug); n++) slug = `${base}-${n}`;
-      slugs.add(slug);
-      const row = await tx.category.create({
-        data: {
-          storeId,
-          name: norm(c.name),
-          nameAr: norm(c.nameAr) || null,
-          slug,
-          position: position++,
-        },
-      });
-      const ids = [...new Set(c.productIds)].filter(id => valid.has(id));
-      if (ids.length)
-        await tx.productCategory.createMany({
-          data: ids.map((productId, i) => ({ productId, categoryId: row.id, position: i })),
+    const ids = [...new Set(c.productIds)].filter(pid => valid.has(pid));
+    if (ids.length)
+      ops.push(
+        w.productCategory.createMany({
+          data: ids.map((productId, i) => ({ productId, categoryId: id, position: i })),
           skipDuplicates: true,
-        });
-      made.push({ id: row.id, name: row.name, productCount: ids.length });
-    }
-    return made;
-  });
+        })
+      );
+    made.push({ id, name, productCount: ids.length });
+  }
+  await w.$transaction(ops as never);
+  const created = made;
 
   await invalidateCached(`public:categories:${storeId}`);
   await auditLog({

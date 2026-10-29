@@ -102,6 +102,14 @@ declare module '@ebda-src/repo' {
     m: DoMutation
   ): Promise<DoQueryResult>;
   export function ensureIdempotencySchema(sql: SqlRunner): void;
+  export function applyStoreSettings(
+    sql: SqlRunner,
+    meta: Meta,
+    storeId: string,
+    fields: Record<string, unknown>
+  ): { profile: string[]; config: string[]; directoryOnly: string[] };
+  export const DO_PROCS: Record<string, unknown>;
+  export const PROC_MODEL: string;
   export const DO_WRITABLE_MODELS: ReadonlySet<string>;
   export function createDoClient(send: DoTransport, mutate?: DoMutateTransport): StoreReadClient;
   /** Prisma-shaped read client of one store's Durable Object. Delegates are typed loosely: callers narrow. */

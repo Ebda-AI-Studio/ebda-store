@@ -1,4 +1,5 @@
 import { prisma } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
 import { redis } from './redis.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
@@ -113,7 +114,9 @@ class RecommendationService {
     // 2. Cross-sell: manual relations first, fall back to FBT
     let crossSell: unknown[] = [];
 
-    const manualCrossSell = await prisma.productRelation.findMany({
+    const manualCrossSell = await (
+      await storeWriter(storeId)
+    ).productRelation.findMany({
       where: {
         storeId,
         sourceProductId: productId,
@@ -195,7 +198,9 @@ class RecommendationService {
     }
 
     // 3. Upsell: manual relations
-    const upsellRows = await prisma.productRelation.findMany({
+    const upsellRows = await (
+      await storeWriter(storeId)
+    ).productRelation.findMany({
       where: {
         storeId,
         sourceProductId: productId,
@@ -223,7 +228,9 @@ class RecommendationService {
       ...upsell.map((p: any) => p.id),
     ]);
 
-    const productCategories = await prisma.productCategory.findMany({
+    const productCategories = await (
+      await storeWriter(storeId)
+    ).productCategory.findMany({
       where: { productId },
       select: { categoryId: true },
     });
@@ -231,7 +238,9 @@ class RecommendationService {
 
     let alsoLike: unknown[] = [];
     if (categoryIds.length > 0) {
-      const alsoLikeRows = await prisma.product.findMany({
+      const alsoLikeRows = await (
+        await storeWriter(storeId)
+      ).product.findMany({
         where: {
           storeId,
           status: 'active',
@@ -280,7 +289,7 @@ class RecommendationService {
     // used to issue 8 queries to render the "you might also like"
     // strip; now it's two queries regardless of cart size.
     const [manualRows, fbtRows] = await Promise.all([
-      prisma.productRelation.findMany({
+      (await storeWriter(storeId)).productRelation.findMany({
         where: {
           storeId,
           sourceProductId: { in: productIds },
@@ -345,7 +354,9 @@ class RecommendationService {
 
     if (!sortedIds.length) return [];
 
-    const products = await prisma.product.findMany({
+    const products = await (
+      await storeWriter(storeId)
+    ).product.findMany({
       where: {
         id: { in: sortedIds },
         storeId,
@@ -373,22 +384,25 @@ class RecommendationService {
     productId: string,
     relations: Array<{ targetProductId: string; type: string; position?: number }>
   ) {
-    await prisma.productRelation.deleteMany({
-      where: { storeId, sourceProductId: productId },
-    });
-
-    if (relations.length > 0) {
-      await prisma.productRelation.createMany({
-        data: relations.map((r, idx) => ({
-          storeId,
-          sourceProductId: productId,
-          targetProductId: r.targetProductId,
-          type: r.type,
-          position: r.position ?? idx,
-        })),
-        skipDuplicates: true,
-      });
-    }
+    // Replace-all is one atomic batch (a half-applied replace would leave the product with no relations).
+    const w = await storeWriter(storeId);
+    await w.$transaction([
+      w.productRelation.deleteMany({ where: { storeId, sourceProductId: productId } }),
+      ...(relations.length > 0
+        ? [
+            w.productRelation.createMany({
+              data: relations.map((r, idx) => ({
+                storeId,
+                sourceProductId: productId,
+                targetProductId: r.targetProductId,
+                type: r.type,
+                position: r.position ?? idx,
+              })),
+              skipDuplicates: true,
+            }),
+          ]
+        : []),
+    ]);
 
     await this.invalidateCache(storeId, productId);
   }
@@ -402,11 +416,15 @@ class RecommendationService {
     relation: { targetProductId: string; type: string; position?: number }
   ) {
     // Count existing to set position
-    const count = await prisma.productRelation.count({
+    const count = await (
+      await storeWriter(storeId)
+    ).productRelation.count({
       where: { storeId, sourceProductId: productId, type: relation.type },
     });
 
-    const created = await prisma.productRelation.create({
+    const created = await (
+      await storeWriter(storeId)
+    ).productRelation.create({
       data: {
         storeId,
         sourceProductId: productId,
@@ -424,7 +442,9 @@ class RecommendationService {
   // removeRelation — single
   // ----------------------------------------
   async removeRelation(storeId: string, productId: string, relationId: string) {
-    const relation = await prisma.productRelation.findFirst({
+    const relation = await (
+      await storeWriter(storeId)
+    ).productRelation.findFirst({
       where: { id: relationId, storeId, sourceProductId: productId },
     });
 
@@ -432,7 +452,9 @@ class RecommendationService {
       throw Object.assign(new Error('Relation not found'), { statusCode: 404 });
     }
 
-    await prisma.productRelation.delete({ where: { id: relationId, storeId } });
+    await (
+      await storeWriter(storeId)
+    ).productRelation.delete({ where: { id: relationId, storeId } });
     await this.invalidateCache(storeId, productId);
   }
 
@@ -440,7 +462,7 @@ class RecommendationService {
   // getRelations — all relations with target details
   // ----------------------------------------
   async getRelations(storeId: string, productId: string) {
-    return prisma.productRelation.findMany({
+    return (await storeWriter(storeId)).productRelation.findMany({
       where: { storeId, sourceProductId: productId },
       orderBy: [{ type: 'asc' }, { position: 'asc' }],
       select: {

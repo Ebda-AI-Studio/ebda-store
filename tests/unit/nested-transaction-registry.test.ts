@@ -86,6 +86,8 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   // handler writes nothing through the proxy first, so no uncommitted row can be invisible to it.
   'services/store-category-suggest.service.ts':
     'creates categories + product links in one transaction over committed products; no prior write in the request',
+  'services/recommendation.service.ts':
+    'setProductRelations replaces one source product relations in one batch (deleteMany + createMany through the store writer); no prior write in the request',
   'routes/category.routes.ts':
     'reorder batches (category.updateMany / productCategory.updateMany) over existing rows; no prior write in the request',
   'routes/product.routes.ts':

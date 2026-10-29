@@ -9,6 +9,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
+import { copyStoreSettings } from '../lib/repo-factory';
 import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
@@ -111,6 +112,38 @@ export async function bustStoreCaches(
   // layout (`GET /public/stores/:id/layout`); without it a layout save could not
   // reach the Next data cache and stayed stale for the 60s revalidate window.
   revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`] });
+}
+
+/**
+ * Settings write-through (Ruling CF-WRITES-2): runs the authoritative `Store` update (D1/Postgres) exactly as `withStore`
+ * did, then copies the changed fields to the Durable Object's settings copy for a store served by its DO. On Postgres the
+ * copy is a no-op. The patch is captured from the `tx.store.update({ data })` call itself, so no call site restates it.
+ */
+async function updateStoreThrough<T>(
+  storeId: string,
+  run: (tx: Parameters<Parameters<typeof withStore>[1]>[0]) => Promise<T>
+): Promise<T> {
+  let patch: Record<string, unknown> | undefined;
+  const result = await withStore(storeId, tx => {
+    const watched = new Proxy(tx as object, {
+      get(target, prop) {
+        const v = (target as any)[prop];
+        if (prop !== 'store') return v;
+        return new Proxy(v, {
+          get(st, m) {
+            if (m !== 'update') return st[m];
+            return (args: { data: Record<string, unknown> }) => {
+              patch = args.data;
+              return st.update(args);
+            };
+          },
+        });
+      },
+    });
+    return run(watched as typeof tx);
+  });
+  if (patch) await copyStoreSettings(storeId, patch);
+  return result as T;
 }
 
 /**
@@ -280,7 +313,7 @@ export class StoreService {
    * path does.
    */
   static async setStatus(storeId: string, status: StoreStatus) {
-    const store = await withStore(storeId, tx =>
+    const store = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { status },
@@ -557,7 +590,7 @@ export class StoreService {
       ) as Prisma.InputJsonValue;
     }
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1044,7 +1077,7 @@ export class StoreService {
 
     // A bare skin is the legacy way to style a store: picking one leaves the looks
     // system (the storefront composes skin < look < theme only while `look` is set).
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { template: template as StoreTemplate, ...(store.look ? { look: null } : {}) },
@@ -1167,7 +1200,7 @@ export class StoreService {
     const mergedTheme: Record<string, unknown> = { ...existingTheme, ...theme };
     for (const [k, v] of Object.entries(theme)) if (v === null) delete mergedTheme[k];
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { theme: mergedTheme as Prisma.InputJsonValue },
@@ -1198,7 +1231,7 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1250,7 +1283,7 @@ export class StoreService {
   static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { socialLinks },
@@ -1279,7 +1312,7 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1315,7 +1348,7 @@ export class StoreService {
         : {};
     const merged = { ...existing, ...announcementBar };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { announcementBar: merged as Prisma.InputJsonValue },
@@ -1373,7 +1406,7 @@ export class StoreService {
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, floatingWidget };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { settings: mergedSettings as Prisma.InputJsonValue },
@@ -1397,7 +1430,7 @@ export class StoreService {
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, mcpWriteEnabled: enabled };
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: { settings: mergedSettings as Prisma.InputJsonValue },
@@ -1432,7 +1465,7 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {
@@ -1482,7 +1515,7 @@ export class StoreService {
       }
     >;
 
-    const updatedStore = await withStore(storeId, tx =>
+    const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
         data: {

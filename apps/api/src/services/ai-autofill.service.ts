@@ -1,4 +1,5 @@
 import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
+import { storeWriter } from '../lib/repo-factory';
 import { prisma, withStore, hasTenantContext, runInTenantContext } from '@ebda/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
@@ -408,7 +409,9 @@ export async function writeAiFieldsGuarded(
     }
     const written = Object.keys(data);
     if (written.length > 0) {
-      await prisma.product.update({
+      await (
+        await storeWriter(storeId)
+      ).product.update({
         where: { id: productId, storeId },
         data: { ...data, ...(opts.extraData ?? {}), aiFieldSources: nextSources },
       });
@@ -428,8 +431,9 @@ export async function applyFill(plan: FillPlan, gen: FillGeneration): Promise<{ 
     extra: async ({ categoryCount }) => {
       // Only a product that STILL has no category gets the AI's picks.
       if (gen.pickedCategoryIds.length === 0 || categoryCount > 0) return;
+      const w = await storeWriter(storeId);
       await withSavepoint(() =>
-        prisma.productCategory.createMany({
+        w.productCategory.createMany({
           data: gen.pickedCategoryIds.map(categoryId => ({ productId, categoryId })),
           skipDuplicates: true,
         })
@@ -775,7 +779,9 @@ export async function revertProductBalance(
     return { reverted: false };
   }
 
-  await prisma.product.update({
+  await (
+    await storeWriter(storeId)
+  ).product.update({
     where: { id: productId, storeId },
     data: {
       // `name` is non-nullable, so ?? undefined (no-op when the backup happens to

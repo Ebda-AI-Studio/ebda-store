@@ -42,6 +42,7 @@
  * the storefront Next data cache via the `layout:<storeId>` tag, and the
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
+import { storeRepo, storeWriter } from '../lib/repo-factory';
 import { isDeepStrictEqual } from 'node:util';
 import { prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
@@ -195,22 +196,40 @@ function fallbackDefinition(
   return layoutToDefinition(resolvedLayout(store), pageKey);
 }
 
+/** MAX(rev) of a page. Postgres keeps the aggregate; the Durable Object client has no `aggregate`, so it reads the newest row. */
+async function maxRev(storeId: string, pageKey: string): Promise<number> {
+  const repo = await storeRepo(storeId);
+  if (repo.backend === 'pg') {
+    const a = await prisma.storePageRevision.aggregate({
+      where: { storeId, pageKey },
+      _max: { rev: true },
+    });
+    return a._max.rev ?? 0;
+  }
+  const newest = await repo.writer.storePageRevision.findFirst({
+    where: { storeId, pageKey },
+    orderBy: { rev: 'desc' },
+    select: { rev: true },
+  });
+  return newest?.rev ?? 0;
+}
+
 async function loadRows(storeId: string, pageKey: string) {
   const [draft, published, head] = await Promise.all([
-    prisma.storePageRevision.findFirst({
+    (await storeWriter(storeId)).storePageRevision.findFirst({
       where: { storeId, pageKey, status: 'draft' },
       select: { ...META_SELECT, document: true },
     }),
-    prisma.storePageRevision.findFirst({
+    (await storeWriter(storeId)).storePageRevision.findFirst({
       where: { storeId, pageKey, status: 'published' },
       select: { ...META_SELECT, document: true },
     }),
-    prisma.storePageRevision.aggregate({ where: { storeId, pageKey }, _max: { rev: true } }),
+    maxRev(storeId, pageKey),
   ]);
   return {
     draft: draft as RevisionRow | null,
     published: published as RevisionRow | null,
-    head: head._max.rev ?? 0,
+    head,
   };
 }
 
@@ -295,8 +314,8 @@ export async function getPublishedDefinition(
   // The public route may run with no tenant context (a storefront fetch by
   // path id carries no store header): enter the store's scope explicitly, or
   // strict RLS would return no row and every store would silently fall back.
-  const published = await readInStoreContext(storeId, () =>
-    prisma.storePageRevision.findFirst({
+  const published = await readInStoreContext(storeId, async () =>
+    (await storeWriter(storeId)).storePageRevision.findFirst({
       where: { storeId, pageKey, status: 'published' },
       select: { rev: true, document: true },
     })
@@ -347,8 +366,8 @@ export async function getPublishedPageDocument(
   storeId: string,
   kind: SectionPageKind
 ): Promise<{ definition: PageDefinition; rev: number | null }> {
-  const published = await readInStoreContext(storeId, () =>
-    prisma.storePageRevision.findFirst({
+  const published = await readInStoreContext(storeId, async () =>
+    (await storeWriter(storeId)).storePageRevision.findFirst({
       where: { storeId, pageKey: kind, status: 'published' },
       select: { rev: true, document: true },
     })
@@ -385,13 +404,13 @@ function validateDefinitionRefs(storeId: string, input: unknown) {
     resolveRefs: async ({ categorySlugs, productIds }) => {
       const [cats, prods] = await Promise.all([
         categorySlugs.length
-          ? prisma.category.findMany({
+          ? (await storeWriter(storeId)).category.findMany({
               where: { storeId, slug: { in: categorySlugs } },
               select: { slug: true },
             })
           : Promise.resolve([]),
         productIds.length
-          ? prisma.product.findMany({
+          ? (await storeWriter(storeId)).product.findMany({
               where: { storeId, id: { in: productIds } },
               select: { id: true },
             })
@@ -463,13 +482,17 @@ export async function saveDraft(args: {
       if (draft) {
         // Guarded on the rev we read: a concurrent save/publish holding the
         // row lock changes it, the re-check matches 0 rows and we lose.
-        const { count } = await prisma.storePageRevision.updateMany({
+        const { count } = await (
+          await storeWriter(storeId)
+        ).storePageRevision.updateMany({
           where: { id: draft.id, storeId, rev: draft.rev, status: 'draft' },
           data,
         });
         if (count !== 1) throw new RevConflict();
       } else {
-        await prisma.storePageRevision.create({
+        await (
+          await storeWriter(storeId)
+        ).storePageRevision.create({
           data: { ...data, storeId, pageKey, status: 'draft' },
         });
       }
@@ -563,7 +586,9 @@ async function promote(
 ): Promise<'ok' | 'conflict'> {
   try {
     await withSavepoint(async () => {
-      await prisma.storePageRevision.updateMany({
+      await (
+        await storeWriter(storeId)
+      ).storePageRevision.updateMany({
         where: { storeId, pageKey, status: 'published' },
         data: { status: 'archived' },
       });
@@ -750,7 +775,9 @@ export async function publishDraft(args: {
 
   const stamp = publisherStamp(args.userId ?? null);
   const outcome = await promote(storeId, pageKey, async () => {
-    const { count } = await prisma.storePageRevision.updateMany({
+    const { count } = await (
+      await storeWriter(storeId)
+    ).storePageRevision.updateMany({
       where: { id: draft.id, storeId, rev: baseRev, status: 'draft' },
       data: {
         status: 'published',
@@ -793,11 +820,15 @@ async function publishNewRevision(args: {
   const stamp = publisherStamp(args.userId);
   return promote(storeId, pageKey, async () => {
     if (args.archiveDraft)
-      await prisma.storePageRevision.updateMany({
+      await (
+        await storeWriter(storeId)
+      ).storePageRevision.updateMany({
         where: { storeId, pageKey, status: 'draft' },
         data: { status: 'archived', note: `superseded by rev ${rev}` },
       });
-    await prisma.storePageRevision.create({
+    await (
+      await storeWriter(storeId)
+    ).storePageRevision.create({
       data: {
         storeId,
         pageKey,
@@ -1061,7 +1092,9 @@ export async function rollbackToRevision(args: {
       pageKey,
       `The page changed (now rev ${head}); reload before rolling back.`
     );
-  const target = await prisma.storePageRevision.findFirst({
+  const target = await (
+    await storeWriter(storeId)
+  ).storePageRevision.findFirst({
     where: { storeId, pageKey, rev: targetRev, status: { in: ['published', 'archived'] } },
     select: { document: true },
   });
@@ -1180,7 +1213,9 @@ export async function publishLegacyLayout(args: {
       if (!draft || !rebased) return;
       // The draft moves above the new head (its baseRev), so it stays
       // publishable and its next autosave does not 409.
-      const { count } = await prisma.storePageRevision.updateMany({
+      const { count } = await (
+        await storeWriter(storeId)
+      ).storePageRevision.updateMany({
         where: { id: draft.id, storeId, rev: draft.rev, status: 'draft' },
         data: {
           rev: publishedRev + 1,
@@ -1201,7 +1236,9 @@ export async function listRevisions(args: {
   limit: number;
 }) {
   const limit = Math.min(Math.max(args.limit, 1), 50);
-  const rows = await prisma.storePageRevision.findMany({
+  const rows = await (
+    await storeWriter(args.storeId)
+  ).storePageRevision.findMany({
     where: {
       storeId: args.storeId,
       pageKey: args.pageKey,

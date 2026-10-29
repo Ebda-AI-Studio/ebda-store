@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx } from '@ebda/database';
+import { prisma } from '@ebda/database';
 import { GoldRateService } from './gold-rate/gold-rate.service';
 import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
@@ -53,7 +53,9 @@ export class VariantService {
    * Get product with options and variants
    */
   static async getProductVariants(storeId: string, productId: string) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: {
         options: {
@@ -216,7 +218,9 @@ export class VariantService {
    * Delete option (and all associated variants)
    */
   static async deleteOption(storeId: string, productId: string, optionId: string) {
-    const option = await prisma.productOption.findFirst({
+    const option = await (
+      await storeWriter(storeId)
+    ).productOption.findFirst({
       where: {
         id: optionId,
         product: { id: productId, storeId, deletedAt: null },
@@ -233,27 +237,25 @@ export class VariantService {
     // soft-delete), so the image is genuinely orphaned once deleteMany
     // runs. We collect outside the tx so the select is a plain read
     // and doesn't enlarge the transaction window.
-    const variantsToDelete = await prisma.productVariant.findMany({
+    const variantsToDelete = await (
+      await storeWriter(storeId)
+    ).productVariant.findMany({
       where: { productId },
       select: { imageUrl: true },
     });
 
     try {
-      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+      const w = await storeWriter(storeId);
+      await w.$transaction([
         // Delete all variants since they depend on options
-        await tx.productVariant.deleteMany({ where: { productId } });
-
+        w.productVariant.deleteMany({ where: { productId } }),
         // Delete option (cascade will delete values and variant option junctions)
-        await tx.productOption.delete({ where: { id: optionId } });
-
+        w.productOption.delete({ where: { id: optionId } }),
         // If no more options, mark product as not having variants
-        if (option.product.options.length <= 1) {
-          await tx.product.update({
-            where: { id: productId, storeId },
-            data: { hasVariants: false },
-          });
-        }
-      });
+        ...(option.product.options.length <= 1
+          ? [w.product.update({ where: { id: productId, storeId }, data: { hasVariants: false } })]
+          : []),
+      ]);
     } catch (err) {
       // Deleting an option takes ALL its variants with it in one deleteMany
       // — if any one of them is pinned by a bundle_items row, the whole
@@ -293,7 +295,9 @@ export class VariantService {
       swatchImageUrl?: string | null;
     }
   ) {
-    const option = await prisma.productOption.findFirst({
+    const option = await (
+      await storeWriter(storeId)
+    ).productOption.findFirst({
       where: {
         id: optionId,
         product: { id: productId, storeId, deletedAt: null },
@@ -311,7 +315,9 @@ export class VariantService {
       throw new AppError(400, 'DUPLICATE_VALUE', `Value "${input.value}" already exists`);
     }
 
-    const created = await prisma.productOptionValue.create({
+    const created = await (
+      await storeWriter(storeId)
+    ).productOptionValue.create({
       data: {
         optionId,
         value: input.value,
@@ -339,7 +345,9 @@ export class VariantService {
       swatchImageUrl?: string | null;
     }
   ) {
-    const optionValue = await prisma.productOptionValue.findFirst({
+    const optionValue = await (
+      await storeWriter(storeId)
+    ).productOptionValue.findFirst({
       where: {
         id: valueId,
         option: {
@@ -352,7 +360,9 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option value not found');
     }
 
-    const updated = await prisma.productOptionValue.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).productOptionValue.update({
       where: { id: valueId },
       data: {
         value: input.value,
@@ -369,7 +379,9 @@ export class VariantService {
    * Delete option value
    */
   static async deleteOptionValue(storeId: string, productId: string, valueId: string) {
-    const optionValue = await prisma.productOptionValue.findFirst({
+    const optionValue = await (
+      await storeWriter(storeId)
+    ).productOptionValue.findFirst({
       where: {
         id: valueId,
         option: {
@@ -394,7 +406,9 @@ export class VariantService {
 
     // Delete any variants using this value.  Select imageUrl so we can
     // clean up R2 objects after the deletes commit.
-    const variantsWithValue = await prisma.productVariant.findMany({
+    const variantsWithValue = await (
+      await storeWriter(storeId)
+    ).productVariant.findMany({
       where: {
         options: { some: { valueId } },
       },
@@ -403,7 +417,9 @@ export class VariantService {
 
     if (variantsWithValue.length > 0) {
       try {
-        await prisma.productVariant.deleteMany({
+        await (
+          await storeWriter(storeId)
+        ).productVariant.deleteMany({
           where: { id: { in: variantsWithValue.map(v => v.id) } },
         });
       } catch (err) {
@@ -415,7 +431,7 @@ export class VariantService {
       }
     }
 
-    await prisma.productOptionValue.delete({ where: { id: valueId } });
+    await (await storeWriter(storeId)).productOptionValue.delete({ where: { id: valueId } });
     await invalidateStoreProductCaches(storeId);
 
     // Fire-and-forget R2 cleanup for any variant images that were just
@@ -433,7 +449,9 @@ export class VariantService {
    * Create a new variant
    */
   static async createVariant(storeId: string, productId: string, input: CreateVariantInput) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { options: { include: { values: true } } },
     });
@@ -461,7 +479,9 @@ export class VariantService {
     }
 
     // Check for duplicate variant
-    const existingVariants = await prisma.productVariant.findMany({
+    const existingVariants = await (
+      await storeWriter(storeId)
+    ).productVariant.findMany({
       where: { productId },
       include: { options: true },
     });
@@ -475,7 +495,9 @@ export class VariantService {
     }
 
     // Generate title from option values
-    const optionValues = await prisma.productOptionValue.findMany({
+    const optionValues = await (
+      await storeWriter(storeId)
+    ).productOptionValue.findMany({
       where: { id: { in: input.optionValueIds } },
       include: { option: true },
       orderBy: { option: { position: 'asc' } },
@@ -512,7 +534,8 @@ export class VariantService {
           price: input.price,
           compareAtPrice: input.compareAtPrice,
           costPrice: input.costPrice,
-          inventory: input.inventory || 0,
+          // 0 is the column default; a non-zero opening stock is a stock write (refused on a DO store until D2)
+          ...(input.inventory ? { inventory: input.inventory } : {}),
           weight: input.weight,
           imageUrl: input.imageUrl,
           position: existingVariants.length,
@@ -534,7 +557,9 @@ export class VariantService {
       ? await GoldRateService.asRepricer(storeId, productId, tx =>
           createVariantRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
         )
-      : await createVariantRow(prisma);
+      : await createVariantRow(
+          (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
+        );
 
     // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
     const autoBarcode = typedBarcode
@@ -573,7 +598,9 @@ export class VariantService {
     variantId: string,
     input: UpdateVariantInput
   ) {
-    const variant = await prisma.productVariant.findFirst({
+    const variant = await (
+      await storeWriter(storeId)
+    ).productVariant.findFirst({
       where: {
         id: variantId,
         product: { id: productId, storeId, deletedAt: null },
@@ -596,7 +623,9 @@ export class VariantService {
       }
     }
 
-    const updated = await prisma.productVariant.update({
+    const updated = await (
+      await storeWriter(storeId)
+    ).productVariant.update({
       where: { id: variantId },
       data: { ...input, ...barcodeUpdate },
       include: {
@@ -661,7 +690,9 @@ export class VariantService {
    * Delete a variant
    */
   static async deleteVariant(storeId: string, productId: string, variantId: string) {
-    const variant = await prisma.productVariant.findFirst({
+    const variant = await (
+      await storeWriter(storeId)
+    ).productVariant.findFirst({
       where: {
         id: variantId,
         product: { id: productId, storeId, deletedAt: null },
@@ -673,7 +704,7 @@ export class VariantService {
     }
 
     try {
-      await prisma.productVariant.delete({ where: { id: variantId } });
+      await (await storeWriter(storeId)).productVariant.delete({ where: { id: variantId } });
     } catch (err) {
       throwIfBundleFkViolation(err);
       throw err;
@@ -700,7 +731,9 @@ export class VariantService {
    * Generate all possible variants from current options
    */
   static async generateVariants(storeId: string, productId: string) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: {
         options: {
@@ -756,7 +789,6 @@ export class VariantService {
             productId,
             title,
             titleAr,
-            inventory: 0,
             position: product.variants.length + created.length,
             options: {
               create: combo.map(value => ({ valueId: value.id })),
@@ -769,7 +801,9 @@ export class VariantService {
           ? await GoldRateService.asRepricer(storeId, productId, tx =>
               createRow(tx as unknown as Pick<typeof prisma, 'productVariant'>)
             )
-          : await createRow(prisma);
+          : await createRow(
+              (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
+            );
 
       created.push(variant.id);
       await ensureBarcode(storeId, { variantId: variant.id });
@@ -848,7 +882,9 @@ export class VariantService {
    * Reorder options
    */
   static async reorderOptions(storeId: string, productId: string, optionIds: string[]) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { options: true },
     });
@@ -869,9 +905,10 @@ export class VariantService {
       }
     }
 
-    await Promise.all(
+    const w = await storeWriter(storeId);
+    await w.$transaction(
       optionIds.map((optionId, index) =>
-        prisma.productOption.update({
+        w.productOption.update({
           where: { id: optionId },
           data: { position: index },
         })
@@ -883,7 +920,9 @@ export class VariantService {
    * Reorder variants
    */
   static async reorderVariants(storeId: string, productId: string, variantIds: string[]) {
-    const product = await prisma.product.findFirst({
+    const product = await (
+      await storeWriter(storeId)
+    ).product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
       include: { variants: true },
     });
@@ -904,9 +943,10 @@ export class VariantService {
       }
     }
 
-    await Promise.all(
+    const w = await storeWriter(storeId);
+    await w.$transaction(
       variantIds.map((variantId, index) =>
-        prisma.productVariant.update({
+        w.productVariant.update({
           where: { id: variantId },
           data: { position: index },
         })

@@ -1,4 +1,5 @@
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
+import { storeWriter } from '../lib/repo-factory';
 import {
   AI_AUTOFILL_FIELD_NAMES,
   SEARCH_TERMS_MAX_LENGTH,
@@ -1611,7 +1612,9 @@ export class BulkService {
       // it. Fall back to one delete per id ONLY on that specific failure, so
       // the common case (no bundle-pinned products) stays a single query.
       try {
-        const result = await prisma.product.deleteMany({
+        const result = await (
+          await storeWriter(storeId)
+        ).product.deleteMany({
           where: { id: { in: productIds }, storeId },
         });
         return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
@@ -1623,7 +1626,9 @@ export class BulkService {
         const errors: string[] = [];
         for (const id of productIds) {
           try {
-            const r = await prisma.product.deleteMany({ where: { id, storeId } });
+            const r = await (
+              await storeWriter(storeId)
+            ).product.deleteMany({ where: { id, storeId } });
             deleted += r.count;
           } catch (innerErr) {
             if (bundleFkViolationKind(innerErr) === 'product') {
@@ -1640,7 +1645,9 @@ export class BulkService {
     }
 
     // Soft delete: stamp deletedAt on all matching rows in one query
-    const result = await prisma.product.updateMany({
+    const result = await (
+      await storeWriter(storeId)
+    ).product.updateMany({
       where: { id: { in: productIds }, storeId },
       data: { deletedAt: new Date() },
     });
@@ -1663,7 +1670,9 @@ export class BulkService {
     }
 
     // Update all matching rows for this store in one query
-    const result = await prisma.product.updateMany({
+    const result = await (
+      await storeWriter(storeId)
+    ).product.updateMany({
       where: { id: { in: productIds }, storeId, deletedAt: null },
       data: { status },
     });

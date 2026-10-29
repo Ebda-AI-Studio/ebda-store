@@ -225,3 +225,97 @@ describe('client over the RPC', () => {
     expect(() => c.storePage.create({ data: {} })).toThrow(); // no write delegate exists
   });
 });
+
+describe('procedures (PR D1b)', () => {
+  const prod = (r: ReturnType<typeof rig>, sources: string | null) =>
+    r.db
+      .prepare(
+        "INSERT INTO products (id, store_id, name, slug, price, ai_field_sources) VALUES ('p1', ?, 'P', 'p', 1, ?)"
+      )
+      .run(STORE, sources);
+
+  it('mergeAiFieldSources merges the delta into the row as it is now, drops removed keys, returns the map', async () => {
+    const r = rig();
+    prod(r, '{"metaTitle":"ai","excerpt":"ai","keep":"human"}');
+    const out = await r.run({
+      ops: [
+        {
+          model: '$proc',
+          op: 'mergeAiFieldSources',
+          args: { productId: 'p1', set: { metaTitle: 'human', fresh: 'ai' }, remove: ['excerpt'] },
+        },
+      ],
+    });
+    expect(out.ok && decodeRpc<any[]>((out as any).json)[0]).toEqual({
+      metaTitle: 'human',
+      keep: 'human',
+      fresh: 'ai',
+    });
+  });
+
+  it('works on an empty map, no-ops on a missing row, and runs in the batch transaction (rolls back with it)', async () => {
+    const r = rig();
+    prod(r, '{}');
+    const args = { productId: 'p1', set: { a: 'ai' }, remove: [] };
+    expect(
+      decodeRpc<any[]>(
+        ((await r.run({ ops: [{ model: '$proc', op: 'mergeAiFieldSources', args }] })) as any).json
+      )[0]
+    ).toEqual({ a: 'ai' });
+    expect(
+      decodeRpc<any[]>(
+        (
+          (await r.run({
+            ops: [
+              { model: '$proc', op: 'mergeAiFieldSources', args: { ...args, productId: 'nope' } },
+            ],
+          })) as any
+        ).json
+      )[0]
+    ).toBeNull();
+    // a later failing op rolls the merge back
+    const bad = await r.run({
+      ops: [
+        { model: '$proc', op: 'mergeAiFieldSources', args: { ...args, set: { b: 'human' } } },
+        page('x'),
+        page('x'),
+      ],
+    });
+    expect(bad.ok).toBe(false);
+    expect(
+      (r.db.prepare("SELECT ai_field_sources v FROM products WHERE id='p1'").get() as any).v
+    ).not.toContain('"b"');
+  });
+
+  it('refuses unknown procedures and hostile arguments (no SQL text is ever accepted)', async () => {
+    const r = rig();
+    prod(r, '{}');
+    expect(checkMutation({ ops: [{ model: '$proc', op: 'dropEverything' }] })).toMatchObject({
+      code: 'PROC_NOT_ALLOWED',
+    });
+    for (const set of [{ 'a"); DROP TABLE products;--': 'ai' }, { ok: 'robot' }])
+      expect(
+        await r.run({
+          ops: [
+            {
+              model: '$proc',
+              op: 'mergeAiFieldSources',
+              args: { productId: 'p1', set, remove: [] },
+            },
+          ],
+        })
+      ).toMatchObject({ ok: false, code: 'BAD_PROC_ARGS' });
+    expect(
+      await r.run({
+        ops: [
+          {
+            model: '$proc',
+            op: 'mergeAiFieldSources',
+            args: { productId: 'p1', set: {}, remove: ['x"]; --'] },
+          },
+        ],
+      })
+    ).toMatchObject({ ok: false, code: 'BAD_PROC_ARGS' });
+    expect(r.count('products')).toBe(1);
+  });
+});

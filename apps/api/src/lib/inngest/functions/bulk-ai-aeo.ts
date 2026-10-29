@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -1149,7 +1150,9 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                   `meta-aeo:product:${p.id}`
                 );
                 if (generated.en && !isPlaceholderText(generated.en)) {
-                  await prisma.product.update({
+                  await (
+                    await storeWriter(storeId)
+                  ).product.update({
                     where: { id: p.id, storeId },
                     data: {
                       metaDescriptionAeo: generated.en,
@@ -1225,7 +1228,9 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 parsed.en.trim() &&
                 !isPlaceholderText(parsed.en)
               ) {
-                await prisma.category.update({
+                await (
+                  await storeWriter(storeId)
+                ).category.update({
                   where: { id: c.id, storeId },
                   data: {
                     metaDescriptionAeo: parsed.en.trim().slice(0, 160),

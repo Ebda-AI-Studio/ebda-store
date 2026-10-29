@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -223,7 +224,9 @@ const bulkAiTagsFn = inngest.createFunction(
                 const key = name.toLowerCase();
                 let tagId = tagByLowerName.get(key);
                 if (!tagId) {
-                  const created = await prisma.tag.create({ data: { storeId, name } });
+                  const created = await (
+                    await storeWriter(storeId)
+                  ).tag.create({ data: { storeId, name } });
                   tagId = created.id;
                   tagByLowerName.set(key, tagId);
                   existingTagNames.push(name);
@@ -236,7 +239,9 @@ const bulkAiTagsFn = inngest.createFunction(
               if (toLink.length === 0) {
                 bSkipped++;
               } else {
-                await prisma.productTag.createMany({
+                await (
+                  await storeWriter(storeId)
+                ).productTag.createMany({
                   data: toLink.map(tagId => ({ productId: product.id, tagId })),
                   skipDuplicates: true,
                 });

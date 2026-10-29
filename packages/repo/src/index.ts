@@ -23,7 +23,10 @@ export {
   checkMutation,
   ensureIdempotencySchema,
   DO_WRITABLE_MODELS,
+  DO_PROCS,
+  PROC_MODEL,
   WRITE_OPS,
   type DoMutation,
   type WriteOp,
 } from './rpc/writes';
+export { applyStoreSettings } from './rpc/settings';

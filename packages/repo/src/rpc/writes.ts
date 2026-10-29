@@ -54,6 +54,50 @@ const STOCK_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   ProductVariant: ['inventory'],
 };
 
+/**
+ * Named in-DO procedures for the few writes that are one SQL statement Prisma cannot express (the Postgres twin is a raw
+ * `UPDATE ... jsonb ||`). They ride in the same atomic batch as the model ops, take typed args, and never accept SQL text.
+ * Model `$proc`, op = the procedure name. Result = the procedure's return value.
+ */
+export const PROC_MODEL = '$proc';
+const KEY = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+type Proc = (sql: SqlRunner, args: Record<string, unknown>) => unknown;
+export const DO_PROCS: Record<string, Proc> = {
+  /**
+   * products.ai_field_sources: merge `set` (field -> 'ai'|'human') into the row AS IT IS NOW and drop `remove`, so a stamp
+   * another writer committed on a different key survives (review N1). Returns the merged map, or null when no such row.
+   */
+  mergeAiFieldSources(sql, a) {
+    const { productId, set, remove } = a as {
+      productId: unknown;
+      set: unknown;
+      remove: unknown;
+    };
+    if (typeof productId !== 'string' || !productId) throw procErr('productId');
+    if (!set || typeof set !== 'object' || Array.isArray(set)) throw procErr('set');
+    if (!Array.isArray(remove)) throw procErr('remove');
+    const entries = Object.entries(set as Record<string, unknown>);
+    for (const [k, v] of entries)
+      if (!KEY.test(k) || (v !== 'ai' && v !== 'human')) throw procErr(`set.${k}`);
+    for (const k of remove as unknown[])
+      if (typeof k !== 'string' || !KEY.test(k)) throw procErr('remove');
+    const paths = (remove as string[]).map(k => `$."${k}"`);
+    const expr = paths.length
+      ? `json_remove(json_patch(COALESCE(ai_field_sources, '{}'), ?), ${paths.map(() => '?').join(', ')})`
+      : `json_patch(COALESCE(ai_field_sources, '{}'), ?)`;
+    sql.run(`UPDATE products SET ai_field_sources = ${expr} WHERE id = ?`, [
+      JSON.stringify(Object.fromEntries(entries)),
+      ...paths,
+      productId,
+    ]);
+    const row = sql.all('SELECT ai_field_sources AS v FROM products WHERE id = ?', [productId])[0];
+    return row ? JSON.parse((row.v as string) ?? '{}') : null;
+  },
+};
+function procErr(what: string): Error {
+  return Object.assign(new Error(`bad procedure argument: ${what}`), { code: 'BAD_PROC_ARGS' });
+}
+
 export interface DoMutation {
   /** Optional replay key (8-128 chars of [A-Za-z0-9._:-]). */
   key?: string;
@@ -84,7 +128,9 @@ function touchesStock(model: string, value: unknown, depth = 0): boolean {
   if (Array.isArray(value)) return value.some(v => touchesStock(model, v, depth + 1));
   const o = value as Record<string, unknown>;
   return Object.entries(o).some(
-    ([k, v]) => cols.includes(k) || (typeof v === 'object' && touchesStock(model, v, depth + 1))
+    ([k, v]) =>
+      v !== undefined &&
+      (cols.includes(k) || (typeof v === 'object' && touchesStock(model, v, depth + 1)))
   );
 }
 
@@ -95,6 +141,11 @@ export function checkMutation(m: DoMutation): DoQueryResult | undefined {
   if (m.key !== undefined && (typeof m.key !== 'string' || !KEY_RE.test(m.key)))
     return refuse('BAD_IDEMPOTENCY_KEY', 'key');
   for (const q of m.ops) {
+    if (q?.model === PROC_MODEL) {
+      if (!Object.prototype.hasOwnProperty.call(DO_PROCS, q.op as string))
+        return refuse('PROC_NOT_ALLOWED', `procedure ${String(q.op)}`);
+      continue;
+    }
     if (typeof q?.model !== 'string' || !MODEL_RE.test(q.model))
       return refuse('BAD_MODEL', 'model');
     if (isRead(q.op)) continue;
@@ -143,6 +194,10 @@ export async function runWrites(
       }
       const out: unknown[] = [];
       for (const q of m.ops) {
+        if (q.model === PROC_MODEL) {
+          out.push(DO_PROCS[q.op as string](sql, (q.args ?? {}) as Record<string, unknown>));
+          continue;
+        }
         const d = lite[delegateOf(q.model)] as Record<
           string,
           (a?: unknown) => PromiseLike<unknown>

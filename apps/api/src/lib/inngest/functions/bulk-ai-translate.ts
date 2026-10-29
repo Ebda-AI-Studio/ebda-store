@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../../lib/repo-factory';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
@@ -266,7 +267,9 @@ const bulkAiTranslateFn = inngest.createFunction(
 
               if (Object.keys(updates).length > 0) {
                 try {
-                  await prisma.product.update({ where: { id: p.id, storeId }, data: updates });
+                  await (
+                    await storeWriter(storeId)
+                  ).product.update({ where: { id: p.id, storeId }, data: updates });
                   bProductsWritten++;
                 } catch (err) {
                   await recordError({
@@ -365,7 +368,9 @@ const bulkAiTranslateFn = inngest.createFunction(
 
               if (Object.keys(updates).length > 0) {
                 try {
-                  await prisma.category.update({ where: { id: c.id, storeId }, data: updates });
+                  await (
+                    await storeWriter(storeId)
+                  ).category.update({ where: { id: c.id, storeId }, data: updates });
                 } catch (err) {
                   await recordError({
                     entityKind: 'category',

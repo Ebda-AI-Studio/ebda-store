@@ -1,6 +1,6 @@
 import { decodeRpc } from './codec';
 import { rethrow, type DoQuery, type DoQueryResult, type ReadOp, READ_OPS } from './reads';
-import { WRITE_OPS, type DoMutation, type WriteOp } from './writes';
+import { PROC_MODEL, WRITE_OPS, type DoMutation, type WriteOp } from './writes';
 
 /** How the Worker reaches one store's DO: the stub's `query` RPC (or, in tests, an in-process stand-in). */
 export type DoTransport = (queries: DoQuery[]) => Promise<DoQueryResult>;
@@ -36,7 +36,7 @@ async function runAll<T>(
   key?: string
 ): Promise<T[]> {
   // Any write in the batch routes the WHOLE batch to the atomic mutate RPC (reads in it see the writes before them).
-  const writes = queries.some(q => isWriteOp(q.op));
+  const writes = queries.some(q => isWriteOp(q.op) || q.model === PROC_MODEL);
   if (writes && !mutate) throw new Error('DO client: writes are not enabled on this client');
   const r = writes ? await mutate!({ key, ops: queries }) : await send(queries);
   if (!r.ok) rethrow(r);
@@ -62,6 +62,15 @@ export function createDoClient(send: DoTransport, mutate?: DoMutateTransport) {
     get(target, prop) {
       if (prop in target) return target[prop];
       if (typeof prop === 'symbol' || prop === 'then') return undefined;
+      if (prop === '$proc')
+        return (name: string, args: Record<string, unknown>) => {
+          if (!mutate) throw new Error('DO client: procedures are not enabled on this client');
+          return new Pending(
+            { model: PROC_MODEL, op: name, args } as unknown as DoQuery,
+            send,
+            mutate
+          );
+        };
       if (prop === '$transaction')
         return async (arg: unknown, opts?: { idempotencyKey?: string }) => {
           if (!Array.isArray(arg) || !arg.every(a => a instanceof Pending))
@@ -83,6 +92,7 @@ export function createDoClient(send: DoTransport, mutate?: DoMutateTransport) {
     string,
     Record<ReadOp | WriteOp, (args?: Record<string, unknown>) => PromiseLike<any>>
   > & {
+    $proc(name: string, args: Record<string, unknown>): PromiseLike<any>;
     $transaction(
       ops: PromiseLike<unknown>[],
       opts?: { idempotencyKey?: string }
