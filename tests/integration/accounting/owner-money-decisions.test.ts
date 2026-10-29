@@ -578,7 +578,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
         idempotencyKey: `order-payment:${order.id}`,
         orderId: order.id,
       });
-      await postOrderPaymentJournal({ orderId: order.id }); // Ruling W-3: posts nothing
+      await postOrderPaymentJournal({ orderId: order.id }); // WALLET-GL-1: DR cash 3553 + DR 2150 2000
       vi.spyOn(OrderService, 'applyRefundEffects').mockResolvedValue(undefined);
       const provider = providerPays(uid('rf-mix'));
 
@@ -613,19 +613,17 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
       expect(await WalletService.reverseOrderPayment({ storeId, orderId: order.id })).toBeNull();
       expect(await WalletService.getBalance(storeId, customerId)).toBe(2000);
 
-      // Ruling W-3 stands: a wallet-paid order has no sale entry, so the GL
-      // books nothing for either piece.
-      for (const r of [r1, r2]) {
-        await postPartialReturnJournal({
-          orderId: order.id,
-          storeId,
-          refundKey: r.id,
-          items: [{ orderItemId: itemA.id, quantity: 1 }],
-        });
-      }
+      // Ruling WALLET-GL-1: the wallet part of the sale is a DR on 2150, the rest is cash.
+      const sale = await prisma.journalLine.findMany({
+        where: { entry: { storeId, source: 'order', sourceId: order.id } },
+        select: { debit: true, account: { select: { code: true } } },
+      });
+      const debitOn = (code: string) =>
+        sale.filter(l => l.account.code === code).reduce((n, l) => n + l.debit, 0);
+      expect(debitOn('2150')).toBe(2000);
       expect(
-        await prisma.journalEntry.count({ where: { storeId, sourceId: { startsWith: order.id } } })
-      ).toBe(0);
+        sale.filter(l => l.account.code.startsWith('10')).reduce((n, l) => n + l.debit, 0)
+      ).toBe(3553);
     });
 
     it('a whole-order reversal after a split partial returns only the rest of the wallet spend', async () => {

@@ -48,6 +48,13 @@ export const COA_TEMPLATE: CoaTemplateRow[] = [
   { code: '4000', nameEn: 'Sales Revenue', nameAr: 'إيرادات المبيعات', type: 'revenue' },
   { code: '4010', nameEn: 'Shipping Income', nameAr: 'إيرادات الشحن', type: 'revenue' },
   { code: '4090', nameEn: 'Sales Returns', nameAr: 'مرتجعات المبيعات', type: 'revenue' },
+  // Store credit that expired or was forfeited (Ruling WALLET-GL-1): other income, not sales.
+  {
+    code: '4100',
+    nameEn: 'Unused Store Credit',
+    nameAr: 'رصيد متجر غير مستخدم',
+    type: 'revenue',
+  },
   { code: '5000', nameEn: 'Cost of Goods Sold', nameAr: 'تكلفة البضاعة المباعة', type: 'expense' },
   { code: '5010', nameEn: 'COGS Variance', nameAr: 'فرق تكلفة البضاعة', type: 'expense' },
   { code: '5100', nameEn: 'Packaging', nameAr: 'التغليف', type: 'expense' },
@@ -61,5 +68,12 @@ export const COA_TEMPLATE: CoaTemplateRow[] = [
   { code: '5900', nameEn: 'Damage / Loss', nameAr: 'تلف وفقد', type: 'expense' },
   { code: '5910', nameEn: 'Theft', nameAr: 'سرقة', type: 'expense' },
   { code: '5920', nameEn: 'Write-off', nameAr: 'شطب', type: 'expense' },
+  // Goodwill / admin store credit issued to customers (Ruling WALLET-GL-1).
+  {
+    code: '5950',
+    nameEn: 'Customer Goodwill',
+    nameAr: 'مجاملة العملاء',
+    type: 'expense',
+  },
   { code: '5990', nameEn: 'Other', nameAr: 'متفرقات', type: 'expense' },
 ];

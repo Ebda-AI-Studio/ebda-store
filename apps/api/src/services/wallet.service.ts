@@ -6,13 +6,13 @@ import {
   withMoneyTx,
   hasTenantContext,
   type WalletTransactionType,
-  withStore,
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { insertAuditLog } from '../lib/definer';
 import { RETURN_WALLET_SHARE_KEY_PREFIX, returnWalletShareKey } from '../lib/refund-methods';
+import { postWalletMovementJournal } from './accounting/posting/wallet-posting';
 
 /**
  * Customer wallet (store credit) — the ONLY writer of `customer_wallets` and
@@ -238,6 +238,10 @@ export class WalletService {
         where: { id: wallet.id, storeId },
         data: { balance: newBalance },
       });
+      // Ruling WALLET-GL-1: the GL movement commits or rolls back with the wallet row it
+      // mirrors (same transaction), so 2150 cannot drift from the balances. Replays returned
+      // above and never reach here.
+      await postWalletMovementJournal({ entry, tx: c });
 
       return { entry, balance: newBalance, replayed: false };
     });
@@ -326,25 +330,20 @@ export class WalletService {
 
   /**
    * Whether customers of this store can spend their wallet at checkout, and
-   * if not, why. Both feature keys must be on, and accounting must be OFF:
-   * the GL does not model the store-credit liability yet (Ruling W-3), so a
-   * wallet-paid order would be journaled as if the whole total arrived in cash.
+   * if not, why. Both feature keys must be on. Accounting no longer matters:
+   * every movement is journaled on 2150 (Ruling WALLET-GL-1, which retired the
+   * W-3 refusal).
    */
   static async getCheckoutAvailability(storeId: string): Promise<{
     available: boolean;
-    reason: 'feature_off' | 'checkout_feature_off' | 'accounting_enabled' | null;
+    reason: 'feature_off' | 'checkout_feature_off' | null;
   }> {
-    const [walletOn, checkoutOn, store] = await Promise.all([
+    const [walletOn, checkoutOn] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'customer_wallet'),
       featureService.isFeatureEnabled(storeId, 'customer_wallet_checkout'),
-      withStore(storeId, tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { accountingEnabled: true } })
-      ),
     ]);
     if (!walletOn) return { available: false, reason: 'feature_off' };
     if (!checkoutOn) return { available: false, reason: 'checkout_feature_off' };
-    if (!store || store.accountingEnabled)
-      return { available: false, reason: 'accounting_enabled' };
     return { available: true, reason: null };
   }
 
