@@ -473,15 +473,6 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.state.orders[0].status).toBe('cancelled');
   });
 
-  it('options the engine cannot honour are refused, not dropped (delivery slot, personalisation note)', async () => {
-    const w = await world(10, true);
-    const slot = await settle(() => onDo(() => place(w, 1, { deliveryDate: '2030-01-01' })));
-    expect(slot).toMatchObject({ err: { status: 501, code: 'DELIVERY_SLOT_NOT_ON_DO' } });
-    expect(sqlite.prepare('SELECT count(*) n FROM orders').get()).toMatchObject({
-      n: expect.any(Number),
-    });
-  });
-
   it('a plain order: totals, items, stock and the sale ledger row are the same', async () => {
     const t = await parity(10, w => place(w, 3));
     expect(t.state.products[0].inventory).toBe(7);
@@ -673,5 +664,65 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       expect((await on(() => state(w))).products[0].inventory).toBe(8);
     }
     expect(counts).toEqual({ pg: 1, do: 1 });
+  });
+
+  // PR D2b-4 (Ruling CF-FINAL-1): personalisation text and the delivery date, written like Postgres writes them
+  it('personalisation text lands on the order item, and a delivery date becomes the first line of the notes', async () => {
+    const { deliveryDateChoices } = await import('@ebda/shared');
+    const store = await prisma.store.findUniqueOrThrow({ where: { id: STORE } });
+    const prior = store.settings;
+    await prisma.store.update({
+      where: { id: STORE },
+      data: { settings: { checkoutDelivery: { daysAhead: 4 }, deliveryOffDays: [] } as never },
+    });
+    try {
+      const choices = deliveryDateChoices({
+        now: new Date(),
+        timeZone: store.timezone ?? undefined,
+        offDays: [],
+        windows: [],
+        daysAhead: 4,
+        estimateDays: 0,
+        maxLeadTimeDays: 0,
+      });
+      const date = (choices[0] as { date: string }).date;
+      const t = await parity(10, async w => {
+        const place1 = async (extra: Record<string, unknown>, note?: string) => {
+          const sessionId = cartSessionId('d2b4p');
+          const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
+          await prisma.cartItem.create({
+            data: { cartId: cart.id, productId: w.product, quantity: 1, note: note ?? null },
+          });
+          return settle(() =>
+            OrderService.create(
+              STORE,
+              undefined,
+              sessionId,
+              { shippingAddress: address(1), paymentMethod: 'cod', ...extra } as never,
+              undefined,
+              undefined
+            )
+          );
+        };
+        const missing = await place1({});
+        const good = await place1(
+          { deliveryDate: date, notes: 'ring twice' },
+          'Happy birthday Mona'
+        );
+        const { storeDb } = await import('../../apps/api/src/lib/repo-factory');
+        const db = (await storeDb(STORE)) as any;
+        const o = await db.order.findFirst({
+          where: { items: { some: { productId: w.product } } },
+          select: { notes: true, items: { select: { personalisation: true } } },
+        });
+        return { missing, goodOk: 'ok' in good, o };
+      });
+      expect(t.out.ok.missing.err.code).toBe('DELIVERY_SLOT_UNAVAILABLE');
+      expect(t.out.ok.goodOk).toBe(true);
+      expect(t.out.ok.o.items[0].personalisation).toBe('Happy birthday Mona');
+      expect(t.out.ok.o.notes).toMatch(/ring twice/);
+    } finally {
+      await prisma.store.update({ where: { id: STORE }, data: { settings: prior as never } });
+    }
   });
 });

@@ -23,6 +23,8 @@ export interface CheckoutLine {
   quantity: number;
   /** gold-rate lines: the unit price the shopper was shown (the gate refuses a stale quote). */
   quotedUnitPrice?: number | null;
+  /** the shopper's personalisation text for this line (order_items.personalisation, Ruling CF-FINAL-1) */
+  note?: string | null;
 }
 export interface HoldCaps {
   /** open unpaid orders per phone/email for COD and InstaPay (default 2) */
@@ -204,6 +206,7 @@ interface OrderLine {
     tierLadder?: unknown;
   };
   goldSnapshot?: string;
+  personalisation?: string | null;
   bundle?: { bundleId: string; groupId: string; name: string; nameAr: string | null };
 }
 
@@ -605,6 +608,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         costPrice: costOf(l.productId, l.variantId),
         snapshot: l.snapshot as OrderLine['snapshot'],
         goldSnapshot: gold?.snapshotJson.get(l.key),
+        personalisation: input.lines[Number(l.key)]?.note ?? null,
       });
     }
     for (const box of bundles.boxes) {
@@ -942,7 +946,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       const itemId = crypto.randomUUID();
       itemIds.push(itemId);
       db.run(
-        'INSERT INTO order_items (id, order_id, product_id, variant_id, product_name, variant_name, variant_name_ar, sku, quantity, price, cost_price, total, list_price, price_source, price_tier_min_qty, price_group_applied, tier_ladder, gold_snapshot, bundle_id, bundle_group_id, bundle_name, bundle_name_ar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO order_items (id, order_id, product_id, variant_id, product_name, variant_name, variant_name_ar, sku, quantity, price, cost_price, total, list_price, price_source, price_tier_min_qty, price_group_applied, tier_ladder, gold_snapshot, bundle_id, bundle_group_id, bundle_name, bundle_name_ar, personalisation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           itemId,
           orderId,
@@ -966,6 +970,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           it.bundle?.groupId ?? null,
           it.bundle?.name ?? null,
           it.bundle?.nameAr ?? null,
+          it.personalisation ?? null,
         ]
       );
     }

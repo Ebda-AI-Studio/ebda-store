@@ -359,6 +359,7 @@ export interface CreateOrderArgs {
     variantId?: string;
     quantity: number;
     quotedUnitPrice?: number | null;
+    note?: string;
   }>;
   bundles?: Array<{ bundleId: string; quantity: number }>;
   buyer?: unknown;

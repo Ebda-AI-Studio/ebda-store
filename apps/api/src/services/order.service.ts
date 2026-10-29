@@ -2375,20 +2375,7 @@ export class OrderService {
     }
   ) {
     const { storeId, customerId, data } = c;
-    // Options the Postgres path honours that the engine does not: refuse them loudly rather than drop them (CF-ORDERS-1).
     const isQuote = c.requestContext?.dryRun === true;
-    if (!isQuote && (data.deliveryDate || data.deliveryWindowId))
-      throw new AppError(
-        501,
-        'DELIVERY_SLOT_NOT_ON_DO',
-        'Delivery slots are not available for this store yet'
-      );
-    if (!isQuote && c.cart.items.some(i => i.note))
-      throw new AppError(
-        501,
-        'PERSONALISATION_NOT_ON_DO',
-        'Personalised items are not available for this store yet'
-      );
     const missingPersonalisation = c.cart.items.filter(
       i => activePersonalisation(i.product.personalisation as never)?.required
     );
@@ -2428,6 +2415,33 @@ export class OrderService {
         ])
       )
       .digest('hex');
+    // Ruling B4-7 (CF-FINAL-1): the delivery date is validated against the live store row and the cart's longest lead time
+    // (read from the DO's own products) and written as the first line of the order notes, exactly like the Postgres path.
+    // A quote never refuses on it.
+    let orderNotes: string | undefined = data.notes;
+    if (!isQuote) {
+      const storeRow = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { settings: true, timezone: true } })
+      );
+      const leads = await (
+        await storeDb(storeId)
+      ).product.findMany({
+        where: { id: { in: c.cart.items.map(i => i.productId) }, storeId },
+        select: { leadTimeDays: true },
+      });
+      const deliveryNoteLine = resolveOrderDeliveryNote({
+        settings: storeRow?.settings as Record<string, unknown> | null | undefined,
+        timeZone: storeRow?.timezone,
+        now: new Date(),
+        maxLeadTimeDays: Math.max(0, ...leads.map(p => p.leadTimeDays ?? 0)),
+        deliveryDate: data.deliveryDate,
+        deliveryWindowId: data.deliveryWindowId,
+        locale: data.locale,
+        enforce: (data.source ?? 'web') === 'web',
+      });
+      if (deliveryNoteLine)
+        orderNotes = data.notes ? `${deliveryNoteLine}\n${data.notes}` : deliveryNoteLine;
+    }
     const orderArgs: CreateOrderArgs = {
       cartClaim: { id: c.cart.id, fingerprint: cartFingerprint },
       lines: c.cart.items.map(i => ({
@@ -2435,6 +2449,7 @@ export class OrderService {
         quantity: i.quantity,
         ...(i.variantId ? { variantId: i.variantId } : {}),
         quotedUnitPrice: i.quotedUnitPrice ?? null,
+        ...(i.note ? { note: i.note } : {}),
       })),
       bundles: c.cart.bundles.map(b => ({ bundleId: b.bundleId, quantity: b.quantity })),
       buyer: c.requestContext?.buyer,
@@ -2459,7 +2474,7 @@ export class OrderService {
       backorderEnabled: backorderOn,
       goldRequireQuote: c.requestContext?.dryRun !== true,
       expectedTotal: data.expectedTotal,
-      orderNotes: data.notes,
+      orderNotes,
       locale: data.locale,
       smsOptIn: data.smsOptIn === true,
       source: data.source ?? 'web',
