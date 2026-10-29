@@ -111,7 +111,7 @@ export async function openSource(storeId: string, jobId: string, fileId: string)
 export function egpToMinor(input: string): number | null | undefined {
   const s = input
     .trim()
-    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
     .replace('٫', '.');
   if (s === '') return null;
   if (!/^\d+(\.\d{1,2})?$/.test(s)) return undefined;

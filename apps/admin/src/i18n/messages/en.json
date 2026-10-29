@@ -3609,6 +3609,7 @@
       "jobsTitle": "Your imports",
       "noJobs": "No imports yet.",
       "jobLine": "{files} files, {items} products",
+      "reviewLink": "Review",
       "review": {
         "pageTitle": "Review imported products",
         "progress": "{done} of {total} files read",

@@ -65,6 +65,8 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   // the request (rates, products, settings), and the request writes nothing through the proxy first.
   // The atomicity this needs (rate rows + every price commit or roll back together) is exactly what
   // its own transaction gives; tests/integration/gold-rate-apply.test.ts case 5 proves it.
+  'services/catalog-import.service.ts':
+    'variants are written by `withMoneyTx` in createDraftForItem, which only the catalog-import-create-drafts job calls inside `runInStoreScope` (per-query scope, each statement committed), so the draft product it references is already committed and visible; no request-path caller',
   'services/gold-rate/gold-rate.service.ts':
     'rate / settings / spec writes run in one money transaction (advisory lock + FOR UPDATE + repricer); no prior write in the request, reads only committed rows',
   // (AuthService.verifyEmail used to be listed here: it now runs `withUser`, which joins or opens

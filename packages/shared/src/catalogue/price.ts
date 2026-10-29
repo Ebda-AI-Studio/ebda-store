@@ -33,7 +33,8 @@ const NONE: ParsedPrice = {
   ambiguous: false,
 };
 
-const OTHER_CURRENCY = /\$|€|\b(usd|eur|sar|aed|kwd|qar|gbp)\b|دولار|دينار|ريال|درهم|يورو/i;
+const OTHER_CURRENCY =
+  /\$|€|\b(usd|eur|gbp)\b|\u062F\u0648\u0644\u0627\u0631|\u062F\u064A\u0646\u0627\u0631|\u0631\u064A\u0627\u0644|\u062F\u0631\u0647\u0645|\u064A\u0648\u0631\u0648/i;
 const EGP_CURRENCY =
   /\begp\b|(?<![a-z])l\.?\s?e(?![a-z])|e£|£\s?e|£|ج\s?\.\s?م|جنيه|جنية|جنيها|(?:^|[\d\s])ج(?:م)?(?=$|[\s./\d])/i;
 const DISCOUNT = /قبل|بعد|\bwas\b|\bnow\b|\bbefore\b|\bafter\b/i;

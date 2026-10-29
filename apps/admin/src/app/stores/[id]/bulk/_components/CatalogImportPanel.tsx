@@ -132,7 +132,7 @@ export function CatalogImportPanel({ storeId }: { storeId: string }) {
                     href={`/stores/${storeId}/bulk/catalog-import/${j.id}`}
                     className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline sm:min-h-0"
                   >
-                    {j.status === 'review' ? t('review') : t('open')}
+                    {j.status === 'review' ? t('reviewLink') : t('open')}
                   </Link>
                 )}
               </li>

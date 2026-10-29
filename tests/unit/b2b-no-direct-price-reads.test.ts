@@ -287,6 +287,12 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'merchant tier writes validate against the current base price (Task 4)',
     reads: { loadProduct: 1, validate: 3, list: 3 },
   },
+  'services/catalog-import.service.ts': {
+    category: 'writer',
+    reason:
+      'publish verifies a catalogue-import DRAFT has a price above zero (a draft cannot be bought); it reads the stored base price to refuse a zero-price publish, never to price a sale',
+    reads: { publishItems: 5 },
+  },
   'services/bulk.service.ts': {
     category: 'writer',
     reason: 'bulk price edits / import; Task 4 returns tier-above-base warnings',
