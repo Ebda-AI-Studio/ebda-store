@@ -28,9 +28,6 @@
     },
     {
       "flow": "partial-return journal (refused 501, listed above)"
-    },
-    {
-      "flow": "CSV import orchestrator (stock and non-stock fields, slug redirects, gold specs in one DO op)"
     }
   ]
 }
