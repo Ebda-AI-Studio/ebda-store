@@ -16,6 +16,7 @@ import { InventoryService } from './inventory.service';
 import { createAdjustment, postAdjustment } from './accounting/stock-adjustment.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { AppError } from '../middleware/error-handler';
+import { insertAuditLog } from '../lib/definer';
 import logger from '../lib/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -253,6 +254,15 @@ export async function receiveByBarcode(
 // 3. Scan-to-Pick
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Which order line a scan lands on: the first matching line still short of its quantity. */
+export function resolvePickTarget<T extends { pickedQty: number; quantity: number }>(
+  candidates: T[]
+): { kind: 'pick'; item: T } | { kind: 'already_picked' } | { kind: 'not_in_order' } {
+  if (candidates.length === 0) return { kind: 'not_in_order' };
+  const open = candidates.find(c => c.pickedQty < c.quantity);
+  return open ? { kind: 'pick', item: open } : { kind: 'already_picked' };
+}
+
 /**
  * Pick one unit of an order line item identified by barcode scan.
  * Increments pickedQty on the matching OrderItem, sets pickedAt when the
@@ -300,15 +310,26 @@ export async function pickOrderItemByBarcode(
     },
     orderBy: { id: 'asc' },
   });
-  const orderItem = candidates.find(c => c.pickedQty < c.quantity) ?? candidates[0];
+  const target = resolvePickTarget(candidates);
 
-  if (!orderItem) {
-    throw new AppError(
-      404,
-      'ORDER_ITEM_NOT_FOUND',
-      `No matching line item found in order for barcode ${barcode}`
-    );
+  // Mismatch warnings. A real catalogue item that is NOT on this order is the picker grabbing
+  // the wrong thing; an item already at its ordered quantity is a surplus unit. Both are told
+  // apart from "barcode unknown" and neither writes anything (the old code clamped silently).
+  if (target.kind === 'not_in_order') {
+    throw new AppError(409, 'NOT_IN_ORDER', `${lookup.productName} is not in this order`, {
+      productName: lookup.productName,
+      productNameAr: lookup.productNameAr,
+      barcode,
+    });
   }
+  if (target.kind === 'already_picked') {
+    throw new AppError(409, 'ALREADY_PICKED', `${lookup.productName} is already fully picked`, {
+      productName: lookup.productName,
+      productNameAr: lookup.productNameAr,
+      barcode,
+    });
+  }
+  const orderItem = target.item;
 
   const pickedQtyBefore = orderItem.pickedQty;
   const newPickedQty = Math.min(pickedQtyBefore + qtyToPick, orderItem.quantity);
@@ -519,40 +540,63 @@ export async function reconcileCountSession(
   });
   if (!session) throw new AppError(404, 'SESSION_NOT_FOUND', 'Session not found or not closed');
 
+  // Single claim: two concurrent reconciles (double tap, two devices) must post ONE adjustment.
+  // The loser's updateMany matches no closed row and stops here.
+  const claim = await prisma.countSession.updateMany({
+    where: { id: sessionId, storeId, status: 'closed' },
+    data: { status: 'reconciled', reconciledAt: new Date() },
+  });
+  if (claim.count === 0) {
+    throw new AppError(404, 'SESSION_NOT_FOUND', 'Session not found or not closed');
+  }
+
   const nonZeroLines = session.lines.filter(l => l.variance !== 0);
   const zeroVarianceLines = session.lines.length - nonZeroLines.length;
 
   let adjustmentId: string | null = null;
 
-  if (nonZeroLines.length > 0) {
-    // Build adjustment items: newQty = countedQty (the truth after counting)
-    const adjustment = await runInTenantContext(storeId, () =>
-      createAdjustment({
-        storeId,
-        type: 'cycle_count',
-        reason: `Cycle count reconcile — session ${sessionId}`,
-        createdBy: reconciledBy,
-        items: nonZeroLines.map(l => ({
-          productId: l.productId,
-          variantId: l.variantId ?? undefined,
-          newQty: l.countedQty,
-        })),
-      })
-    );
+  try {
+    if (nonZeroLines.length > 0) {
+      // newQty = countedQty (the truth after counting). Stock moves ONLY through the
+      // adjustment service: GL journal + InventoryHistory + cache invalidation live there.
+      const adjustment = await runInTenantContext(storeId, () =>
+        createAdjustment({
+          storeId,
+          type: 'cycle_count',
+          reason: `Cycle count reconcile — session ${sessionId}`,
+          createdBy: reconciledBy,
+          items: nonZeroLines.map(l => ({
+            productId: l.productId,
+            variantId: l.variantId ?? undefined,
+            newQty: l.countedQty,
+          })),
+        })
+      );
+      adjustmentId = adjustment.id;
+      await runInTenantContext(storeId, () => postAdjustment(storeId, adjustment.id, reconciledBy));
+    }
 
-    await runInTenantContext(storeId, () => postAdjustment(storeId, adjustment.id, reconciledBy));
-
-    adjustmentId = adjustment.id;
+    await prisma.countSession.update({
+      where: { id: sessionId, storeId },
+      data: { adjustmentId: adjustmentId ?? undefined },
+    });
+  } catch (err) {
+    // Compensating rollback: nothing was posted, so hand the session back to the merchant.
+    await prisma.countSession.updateMany({
+      where: { id: sessionId, storeId, status: 'reconciled' },
+      data: { status: 'closed', reconciledAt: null },
+    });
+    throw err;
   }
 
-  // Mark session as reconciled and record the adjustment link
-  await prisma.countSession.update({
-    where: { id: sessionId, storeId },
-    data: {
-      status: 'reconciled',
-      reconciledAt: new Date(),
-      adjustmentId: adjustmentId ?? undefined,
-    },
+  // Audit row: who reconciled which count, and what it moved.
+  await insertAuditLog({
+    action: 'inventory.count.reconciled',
+    userId: reconciledBy,
+    storeId,
+    resourceType: 'count_session',
+    resourceId: sessionId,
+    details: { adjustmentId, linesReconciled: nonZeroLines.length, zeroVarianceLines },
   });
 
   logger.info(
