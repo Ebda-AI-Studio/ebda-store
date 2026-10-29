@@ -131,8 +131,8 @@ describe('Cron Triggers', () => {
 });
 
 describe('SEARCH_SEMANTIC_ENABLED is a reviewed var, never a secret (review I2)', () => {
-  it('is declared in vars, default "false", so a flip is a PR + cf-api-deploy (post-deploy probe runs)', () => {
-    expect(config.vars.SEARCH_SEMANTIC_ENABLED).toBe('false');
+  it('is declared in vars, default "true" (semantic search is on), so a flip is a PR + cf-api-deploy (post-deploy probe runs)', () => {
+    expect(config.vars.SEARCH_SEMANTIC_ENABLED).toBe('true');
   });
   it('cf-api-deploy refuses to deploy when it is set as a Worker secret', () => {
     const wf = readFileSync(join(ROOT, '.github/workflows/cf-api-deploy.yml'), 'utf8');
