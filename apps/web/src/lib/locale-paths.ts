@@ -111,6 +111,14 @@ export type LocalePathDecision =
   /** `/products` (an old URL): the root layout redirects it once it has the store's default language. */
   | { kind: 'pending'; rest: string };
 
+function safeDecode(v: string): string {
+  try {
+    return decodeURIComponent(v);
+  } catch {
+    return v;
+  }
+}
+
 /** What the (store-less) middleware does with one request to a store that has locale paths ON. */
 export function decideLocalePath(a: {
   pathname: string;
@@ -122,7 +130,12 @@ export function decideLocalePath(a: {
   if (prefixed) {
     if (isLocalePathRoute(prefixed.rest))
       return { kind: 'rewrite', locale: prefixed.locale, rest: prefixed.rest };
-    return { kind: 'redirect', location: prefixed.rest + a.search };
+    // Open-redirect guard (Ruling LOCALE-PATHS-3): `/ar//evil.com` leaves rest = `//evil.com`, a protocol-relative URL.
+    // A backslash anywhere (raw or %5C), or a decoded rest that starts with two slashes, is refused (no redirect, the
+    // request falls through to a plain 404); leading slashes are otherwise collapsed so the target is always a path.
+    const decoded = safeDecode(prefixed.rest);
+    if (decoded.includes('\\') || /^\/\//.test(decoded)) return { kind: 'none' };
+    return { kind: 'redirect', location: prefixed.rest.replace(/^\/+/, '/') + a.search };
   }
   if (!isLocalePathRoute(a.pathname)) return { kind: 'none' };
   return { kind: 'pending', rest: a.pathname };

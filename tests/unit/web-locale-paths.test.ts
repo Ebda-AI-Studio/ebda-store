@@ -297,6 +297,37 @@ describe('middleware: language in the URL', () => {
     expect(fwd(other, 'x-locale-pending')).toBeNull();
   });
 
+  it('never redirects off-site: protocol-relative / backslash / encoded tails are refused (Ruling LOCALE-PATHS-3)', () => {
+    on();
+    const evil = [
+      '//evil.com',
+      '/\\evil.com',
+      '/%2F%2Fevil.com',
+      '/%5Cevil.com',
+      '/%2f/evil.com',
+      '//%5Cevil.com',
+      '/\\/evil.com',
+      '///evil.com',
+      '/x/..%5Cevil.com',
+    ];
+    for (const l of ['ar', 'en'])
+      for (const tail of evil) {
+        const r = middleware(sub(`/${l}${tail}`));
+        const loc = r.headers.get('location');
+        if (loc) {
+          expect(new URL(loc, 'https://demo-boutique.ebda.app').origin, `${l}${tail}`).toBe(
+            'https://demo-boutique.ebda.app'
+          );
+        }
+        expect(r.status === 301 || r.status === 404 || r.status === 200, `${l}${tail}`).toBe(true);
+        expect(loc ?? '', `${l}${tail}`).not.toMatch(/evil\.com/);
+      }
+    // the legitimate retired-path redirect still works
+    const ok = middleware(sub('/ar/cart'));
+    expect(ok.status).toBe(301);
+    expect(new URL(ok.headers.get('location')!).pathname).toBe('/cart');
+  });
+
   it('marks an old URL pending (the layout redirects it, it has the store) and never caches that response', () => {
     on();
     const r = middleware(sub('/products?category=abayas'));

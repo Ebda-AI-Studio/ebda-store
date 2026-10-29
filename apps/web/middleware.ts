@@ -396,7 +396,16 @@ function handleStoreHost(
       method: request.method,
     });
     if (decision.kind === 'redirect') {
-      return NextResponse.redirect(new URL(decision.location, request.url), 301);
+      // Built from the request's own URL with an explicit pathname + search, and refused unless it stays on this
+      // origin (Ruling LOCALE-PATHS-3: `/ar//evil.com` must never become a cached off-site 301).
+      const target = request.nextUrl.clone();
+      const q = decision.location.indexOf('?');
+      target.pathname = q === -1 ? decision.location : decision.location.slice(0, q);
+      target.search = q === -1 ? '' : decision.location.slice(q);
+      if (target.origin === request.nextUrl.origin && target.pathname.startsWith('/')) {
+        return NextResponse.redirect(target, 301);
+      }
+      return new NextResponse(null, { status: 404 });
     }
     if (decision.kind === 'pending') {
       // An old unprefixed URL. Only the root layout knows the store's default language (middleware has no store),
