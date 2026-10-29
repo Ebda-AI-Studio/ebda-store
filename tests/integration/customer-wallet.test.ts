@@ -28,6 +28,7 @@ import { ReturnService } from '@api/services/return.service';
 import { CartService } from '@api/services/cart.service';
 import { AuthService } from '@api/services/auth.service';
 import { StoreService } from '@api/services/store.service';
+import { configureIdentityClient } from '@api/lib/identity-client';
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { cartSessionId, hasDb } from '../helpers/bundle-fixtures';
 
@@ -215,6 +216,9 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
 
   afterAll(async () => {
     if (!storeId) return;
+    await prisma.journalLine.deleteMany({ where: { entry: { storeId } } });
+    await prisma.journalEntry.updateMany({ where: { storeId }, data: { reversedById: null } });
+    await prisma.journalEntry.deleteMany({ where: { storeId } });
     await prisma.walletTransaction.deleteMany({ where: { storeId } });
     await prisma.customerWallet.deleteMany({ where: { storeId } });
     await prisma.returnItem.deleteMany({ where: { return: { storeId } } });
@@ -628,7 +632,17 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
         role: 'super_admin',
       },
     });
-    await StoreService.delete(s2.id, operator.id);
+    // StoreService.delete asks the identity service about the owner; no ACCOUNTS binding in-process.
+    configureIdentityClient({
+      getAccountState: async () => null,
+      setStatus: async () => undefined,
+      revokeUser: async () => undefined,
+    });
+    try {
+      await StoreService.delete(s2.id, operator.id);
+    } finally {
+      configureIdentityClient(undefined);
+    }
 
     expect(await prisma.store.count({ where: { id: s2.id } })).toBe(0);
     expect(await prisma.customerWallet.count({ where: { storeId: s2.id } })).toBe(0);
