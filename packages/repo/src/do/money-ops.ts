@@ -20,6 +20,7 @@ import {
 } from './payments';
 import { changeOrderStatus } from './order-status';
 import { postOrderSaleJournal, postRefundJournal } from './ledger';
+import { applyWalletEntry, type WalletEntryType } from './refund';
 import {
   applyGoldRates,
   decidePendingGoldRate,
@@ -77,7 +78,8 @@ export type MoneyOpName =
   | 'goldCreateVariant'
   | 'fanoutDisarm'
   | 'orderStatus'
-  | 'quoteOrder';
+  | 'quoteOrder'
+  | 'walletEntry';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -105,6 +107,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fanoutDisarm',
   'orderStatus',
   'quoteOrder',
+  'walletEntry',
 ];
 
 const TABLE = '_money_ops';
@@ -261,6 +264,26 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       external: a.external === true,
       keepPaymentStatus: a.keepPaymentStatus === true,
     }),
+  /** WalletService.applyEntry for a DO store (WALLET-GL-1): the ledger row, the balance and its GL half in one section. */
+  walletEntry: (db, storeId, a) => {
+    const r = applyWalletEntry(db, {
+      storeId,
+      customerId: id(a.customerId, 'customerId'),
+      amount: typeof a.amount === 'number' ? a.amount : NaN,
+      type: a.type as WalletEntryType,
+      idempotencyKey: typeof a.idempotencyKey === 'string' ? a.idempotencyKey : '',
+      orderId: typeof a.orderId === 'string' ? a.orderId : null,
+      returnId: typeof a.returnId === 'string' ? a.returnId : null,
+      actorId: typeof a.actorId === 'string' ? a.actorId : null,
+      note: typeof a.note === 'string' ? a.note : null,
+    });
+    const e = db.all(
+      `SELECT id, store_id, wallet_id, customer_id, amount, balance_after, type, order_id, return_id, idempotency_key, actor_id, note, created_at
+         FROM wallet_transactions WHERE store_id = ? AND idempotency_key = ?`,
+      [storeId, a.idempotencyKey]
+    )[0];
+    return { ...r, entry: e };
+  },
   journalSale: (db, storeId, a) =>
     postOrderSaleJournal(db, { storeId, orderId: id(a.orderId, 'orderId') }),
   journalRefund: (db, storeId, a) =>

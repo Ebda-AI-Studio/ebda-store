@@ -13,7 +13,8 @@ import { MoneyError, type SyncSql } from './sync-sql';
  * Differences kept on purpose, each stated in CF-LEDGER-1:
  *   - a missing system account is `ACCOUNT_NOT_FOUND` (409), not self-healed from `COA_TEMPLATE` (the template lives in the
  *     API package; the import carries the store's accounts across);
- *   - the wallet tender is journaled as in Ruling WALLET-GL-1: DR 2150 for `wallet_amount`, DR cash for the rest;
+ *   - the wallet tender is journaled as in Ruling WALLET-GL-1: DR 2150 for `wallet_amount`, DR cash for the rest; wallet
+ *     movements (`postWalletMovementJournal`) self-heal 2150 / 4100 / 5950 like the Postgres twin;
  *   - partial-return adjustments (`postPartialReturnJournal`) are NOT ported: the Worker refuses them for a DO store (501).
  */
 
@@ -412,4 +413,86 @@ export function trialBalance(
   const debit = rows.reduce((s, r) => s + r.debit, 0);
   const credit = rows.reduce((s, r) => s + r.credit, 0);
   return { rows, debit, credit, balanced: debit === credit };
+}
+
+// ---------------------------------------------------------------- wallet movements (Ruling WALLET-GL-1, port of posting/wallet-posting.ts)
+
+/** Chart rows the Postgres twin self-heals from COA_TEMPLATE (`getSystemAccountIdByCode`); the DO keeps only the ones a wallet movement can need. */
+const HEALABLE_ACCOUNTS: Record<string, { nameEn: string; nameAr: string; type: string }> = {
+  '2150': {
+    nameEn: 'Customer Wallet Liability',
+    nameAr: 'التزامات رصيد العملاء',
+    type: 'liability',
+  },
+  '4100': { nameEn: 'Unused Store Credit', nameAr: 'رصيد متجر غير مستخدم', type: 'revenue' },
+  '5950': { nameEn: 'Customer Goodwill', nameAr: 'مجاملة العملاء', type: 'expense' },
+};
+
+function walletAccountId(db: SyncSql, storeId: string, code: string, now: number): string {
+  const h = HEALABLE_ACCOUNTS[code];
+  if (h)
+    db.run(
+      `INSERT INTO accounts (id, store_id, code, name_en, name_ar, type, is_system, is_active, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 1, ?7, ?7) ON CONFLICT (store_id, code) DO NOTHING`,
+      [crypto.randomUUID(), storeId, code, h.nameEn, h.nameAr, h.type, now]
+    );
+  return systemAccountId(db, storeId, code);
+}
+
+/**
+ * The GL half of one wallet ledger row, called by `applyWalletEntry` in the same section that wrote it. `admin_adjust` /
+ * `credit` / `debit` land on 5950 Customer Goodwill, `expire` on 4100 Unused Store Credit, always against 2150; the other
+ * types are journaled by the posting that owns them (sale, refund, partial return) and are never booked twice here.
+ * Idempotent per wallet row (`source 'manual'`, `sourceId wallet:<id>`); a store with accounting off posts nothing.
+ */
+export function postWalletMovementJournal(
+  db: SyncSql,
+  a: { storeId: string; entryId: string; type: string; amount: number; now?: number }
+): { posted: boolean } {
+  const now = a.now ?? Date.now();
+  const kind =
+    a.type === 'admin_adjust' || a.type === 'credit' || a.type === 'debit'
+      ? 'goodwill'
+      : a.type === 'expire'
+        ? 'forfeit'
+        : null;
+  if (!kind || a.amount === 0) return { posted: false };
+  const cfg = db.all('SELECT accounting_enabled FROM store_config WHERE store_id = ?', [
+    a.storeId,
+  ])[0];
+  if (!cfg || !cfg.accounting_enabled) return { posted: false };
+  const liability = walletAccountId(db, a.storeId, '2150', now);
+  const abs = Math.abs(a.amount);
+  const ref = { refTable: 'wallet_transactions', refId: a.entryId };
+  if (kind === 'goodwill') {
+    const expense = walletAccountId(db, a.storeId, '5950', now);
+    const issued = a.amount > 0;
+    postEntry(db, {
+      storeId: a.storeId,
+      source: 'manual',
+      sourceId: `wallet:${a.entryId}`,
+      memo: issued ? 'Store credit issued (goodwill)' : 'Store credit reversed (goodwill)',
+      memoAr: issued ? 'رصيد متجر ممنوح (مجاملة)' : 'عكس رصيد متجر ممنوح (مجاملة)',
+      lines: [
+        { accountId: issued ? expense : liability, debit: abs, credit: 0, ...ref },
+        { accountId: issued ? liability : expense, debit: 0, credit: abs, ...ref },
+      ],
+      now,
+    });
+    return { posted: true };
+  }
+  const income = walletAccountId(db, a.storeId, '4100', now);
+  postEntry(db, {
+    storeId: a.storeId,
+    source: 'manual',
+    sourceId: `wallet:${a.entryId}`,
+    memo: 'Unused store credit written off',
+    memoAr: 'رصيد متجر غير مستخدم تم شطبه',
+    lines: [
+      { accountId: liability, debit: abs, credit: 0, ...ref },
+      { accountId: income, debit: 0, credit: abs, ...ref },
+    ],
+    now,
+  });
+  return { posted: true };
 }

@@ -7,6 +7,7 @@ import {
   hasTenantContext,
   type WalletTransactionType,
 } from '@ebda/database';
+import { storeMoney } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
@@ -149,6 +150,44 @@ export class WalletService {
   ): Promise<ApplyEntryResult> {
     assertValidInput(input);
     const { storeId, customerId, amount, idempotencyKey } = input;
+
+    // Store on its Durable Object (Ruling WALLET-GL-1 / CF-MONEY-1): ledger row, balance and GL half in one section. A
+    // caller-supplied client is already inside a Postgres transaction of its own and stays on it.
+    if (!client) {
+      const money = await storeMoney(storeId);
+      if (money) {
+        const r = await money.walletEntry({
+          customerId,
+          amount,
+          type: input.type,
+          idempotencyKey,
+          orderId: input.orderId ?? null,
+          returnId: input.returnId ?? null,
+          actorId: input.actorId ?? null,
+          note: input.note ?? null,
+        });
+        const e = r.entry as Record<string, any>;
+        return {
+          entry: {
+            id: e.id,
+            storeId: e.store_id,
+            walletId: e.wallet_id,
+            customerId: e.customer_id,
+            amount: e.amount,
+            balanceAfter: e.balance_after,
+            type: e.type,
+            orderId: e.order_id ?? null,
+            returnId: e.return_id ?? null,
+            idempotencyKey: e.idempotency_key,
+            actorId: input.actorId ?? e.actor_id ?? null,
+            note: e.note ?? null,
+            createdAt: new Date(e.created_at),
+          } as WalletEntry,
+          balance: r.balance,
+          replayed: r.replayed,
+        };
+      }
+    }
 
     return onClient(client, async c => {
       if (amount > 0) {

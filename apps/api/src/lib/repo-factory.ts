@@ -187,6 +187,20 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+  /** WalletService.applyEntry on the DO (Ruling WALLET-GL-1): ledger row + balance + GL in one section. */
+  walletEntry(
+    a: {
+      customerId: string;
+      amount: number;
+      type: string;
+      idempotencyKey: string;
+      orderId?: string | null;
+      returnId?: string | null;
+      actorId?: string | null;
+      note?: string | null;
+    },
+    key?: string
+  ): Promise<{ balance: number; replayed: boolean; entry: Record<string, unknown> }>;
   /** OrderService.create on the DO (Ruling CF-ORDERS-1): ONE section = stock, hold cap, coupon, loyalty redeem, wallet, rows. */
   createOrder(a: CreateOrderArgs, key?: string): Promise<PlacedOrderResult>;
   /** OrderService.quote (dryRun): totals and per-line prices; nothing reserved, nothing written (Ruling CF-FINAL-1). */
@@ -493,6 +507,7 @@ export function makeMoneyClient(
     loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+    walletEntry: (a, key) => call('walletEntry', a, key),
     createOrder: (a, key) => call('createOrder', a, key),
     quoteOrder: a => call('quoteOrder', a),
     confirmPayment: (a, key) => call('confirmPayment', a, key),
