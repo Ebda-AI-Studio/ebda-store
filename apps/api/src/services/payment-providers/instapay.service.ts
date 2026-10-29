@@ -323,8 +323,11 @@ export class InstapayService {
 
   /** The customer's view of an InstaPay order (public by order id, like payments/create). */
   static async getInstructions(storeId: string, orderId: string) {
-    return withStore(storeId, async () => {
-      const order = await prisma.order.findFirst({
+    const money = await storeMoney(storeId);
+    const scoped = <T>(fn: () => Promise<T>): Promise<T> => (money ? fn() : withStore(storeId, fn));
+    return scoped(async () => {
+      const db = money ? await storeDb(storeId) : prisma;
+      const order = await db.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
         select: {
           id: true,
@@ -343,11 +346,30 @@ export class InstapayService {
       const payment = order?.payments[0];
       if (!order || !payment)
         throw new AppError(404, 'NOT_FOUND', 'No InstaPay payment for this order');
-      const latest = await prisma.instapayReceipt.findFirst({
-        where: { storeId, kind: 'order', orderId, status: { not: 'draft' } },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, status: true, reviewNote: true, submittedAt: true, reviewedAt: true },
-      });
+      const latest = money
+        ? await money.receiptList({ orderId }).then(rows => {
+            const r = rows[0];
+            return r
+              ? {
+                  id: r.id,
+                  status: r.status,
+                  reviewNote: r.reviewNote,
+                  submittedAt: r.submittedAt === null ? null : new Date(r.submittedAt),
+                  reviewedAt: r.reviewedAt === null ? null : new Date(r.reviewedAt),
+                }
+              : null;
+          })
+        : await prisma.instapayReceipt.findFirst({
+            where: { storeId, kind: 'order', orderId, status: { not: 'draft' } },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              status: true,
+              reviewNote: true,
+              submittedAt: true,
+              reviewedAt: true,
+            },
+          });
       return {
         orderStatus: order.status,
         paymentStatus: order.paymentStatus,
@@ -384,7 +406,7 @@ export class InstapayService {
     const { storeId, orderId } = args;
     const now = args.now ?? new Date();
     // Store on its Durable Object (Ruling CF-ORDERS-1): the claim, the payment row and both audit rows are ONE section there.
-    // The shopper's proof is read from the DO payment metadata and the Postgres receipts (not moved yet); unknown = proof.
+    // The shopper's proof is read from the DO payment metadata and the DO receipts; unknown = proof.
     const money = await storeMoney(storeId);
     if (money) {
       const r = await money.confirmPayment({
@@ -396,14 +418,8 @@ export class InstapayService {
         // the same post-commit work as the Postgres path: the merchant's confirm approves the submitted receipts and the
         // screenshots are deleted (M-003), the customers cache is busted, the post-payment fan-out and the socket push fire
         try {
-          const approved = await InstapayReceiptService.approveSubmitted(
-            prisma as unknown as Prisma.TransactionClient,
-            storeId,
-            { orderId },
-            args.actorUserId,
-            now
-          );
-          await InstapayReceiptService.deleteImages(storeId, approved);
+          // the receipts were approved INSIDE the DO section (INSTAPAY-DO-1); only the screenshots are left to delete
+          await InstapayReceiptService.deleteImages(storeId, r.approvedReceiptIds ?? []);
         } catch (err) {
           logger.error({ err, orderId }, '[INSTAPAY] receipt approval after confirm failed');
         }
@@ -738,6 +754,8 @@ export class InstapayService {
     paymentMetadata: unknown
   ): Promise<boolean> {
     if (typeof metaOf(paymentMetadata).customerReference === 'string') return true;
+    const money = await storeMoney(storeId);
+    if (money) return (await money.receiptProof({ orderId })).submitted > 0;
     const n = await prisma.instapayReceipt.count({
       where: { storeId, kind: 'order', orderId, status: 'submitted' },
     });
@@ -746,7 +764,8 @@ export class InstapayService {
 
   /** The order + its pending InstaPay payment, for the receipt endpoints (public by order id). */
   private static async awaitingOrder(storeId: string, orderId: string) {
-    const order = await prisma.order.findFirst({
+    const db = (await storeMoney(storeId)) ? await storeDb(storeId) : prisma;
+    const order = await db.order.findFirst({
       where: { id: orderId, storeId, deletedAt: null },
       select: { id: true, status: true, createdAt: true },
     });
@@ -754,7 +773,7 @@ export class InstapayService {
     if (order.status !== AWAITING_PAYMENT_CONFIRMATION) {
       throw new AppError(409, 'INSTAPAY_NOT_AWAITING', 'This order is not waiting for a transfer');
     }
-    const payment = await prisma.payment.findFirst({
+    const payment = await db.payment.findFirst({
       where: { orderId, provider: 'instapay', status: 'pending' },
       orderBy: { createdAt: 'desc' },
     });
@@ -764,7 +783,9 @@ export class InstapayService {
 
   /** Shopper: upload the transfer screenshot (the AI read is queued). */
   static async uploadReceipt(storeId: string, orderId: string, file: Buffer) {
-    const { payment } = await withStore(storeId, () => this.awaitingOrder(storeId, orderId));
+    const { payment } = (await storeMoney(storeId))
+      ? await this.awaitingOrder(storeId, orderId)
+      : await withStore(storeId, () => this.awaitingOrder(storeId, orderId));
     return InstapayReceiptService.upload({
       storeId,
       kind: 'order',
@@ -795,6 +816,26 @@ export class InstapayService {
   }) {
     const { storeId, orderId } = args;
     const now = args.now ?? new Date();
+    // Store on its Durable Object (Ruling INSTAPAY-DO-1): the receipt, the hold freeze, the payment metadata and the payment
+    // event are ONE section there, in place of lockOrder + the savepoint below. No Postgres transaction is open around it.
+    if (await storeMoney(storeId)) {
+      const { order, payment } = await this.awaitingOrder(storeId, orderId);
+      const m = metaOf(payment.metadata);
+      const receipt = await InstapayReceiptService.submit({
+        storeId,
+        receiptId: args.receiptId,
+        scope: { kind: 'order', orderId },
+        fields: args.fields,
+        expectedAmountMinor: payment.amount,
+        expectedReceivers: [m.handle, m.phone].filter((v): v is string => typeof v === 'string'),
+        notBefore: new Date(order.createdAt.getTime() - 5 * 60_000),
+        now,
+      });
+      await InstapayService.notifyMerchant(storeId, orderId, 'proof_submitted').catch(
+        (err: unknown) => logger.error({ err, orderId }, '[INSTAPAY] proof notification failed')
+      );
+      return toReceiptView(receipt);
+    }
     return withStoreAfterCommit(storeId, async after => {
       const locked = await lockOrder(
         prisma as unknown as Prisma.TransactionClient,
@@ -878,6 +919,9 @@ export class InstapayService {
     const note = args.note.trim();
     if (note.length < 3)
       throw new AppError(400, 'REASON_REQUIRED', 'Write why the receipt is rejected');
+    // Store on its Durable Object (Ruling INSTAPAY-DO-1): the decision, the new deadline, the payment metadata and the event are one section
+    const onDo = await InstapayReceiptService.rejectOnDo({ ...args, note });
+    if (onDo) return onDo;
     return withStoreAfterCommit(storeId, async () => {
       const locked = await lockOrder(
         prisma as unknown as Prisma.TransactionClient,
@@ -1103,7 +1147,9 @@ export class InstapayService {
     orderId: string,
     kind: 'awaiting' | 'expired' | 'proof_submitted'
   ): Promise<void> {
-    const order = await prisma.order.findFirst({
+    const order = await (
+      await storeDb(storeId)
+    ).order.findFirst({
       where: { id: orderId, storeId },
       select: { orderNumber: true, total: true, currency: true },
     });

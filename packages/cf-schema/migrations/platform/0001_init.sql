@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS "entity_index" (
   "store_id" TEXT NOT NULL,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "entity_index_pkey" PRIMARY KEY ("kind", "id"),
-  CONSTRAINT "entity_index_kind_chk" CHECK ("kind" IN ('order', 'payment', 'shipment', 'customer', 'return', 'refund', 'webhook'))
+  CONSTRAINT "entity_index_kind_chk" CHECK ("kind" IN ('order', 'payment', 'shipment', 'customer', 'return', 'refund', 'webhook', 'instapay_ref'))
 );
 CREATE INDEX IF NOT EXISTS "entity_index_store_id_idx" ON "entity_index" ("store_id");
 

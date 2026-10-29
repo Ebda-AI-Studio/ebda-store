@@ -31,6 +31,7 @@ import {
   selectOpenExecutedClaims,
 } from '../../../shared/src/refunds/refund-settlement';
 import { cancelOrder, refundOrder } from './refund';
+import { approveSubmittedReceipts, ensureReceiptSchema } from './instapay-receipts';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 export const REFUND_CLAIM_EVENT = 'refund_initiated';
@@ -1317,10 +1318,18 @@ export function confirmInstapay(
     proofSubmitted: boolean;
     now?: number;
   }
-): { changed: boolean; orderId: string; status: string } {
+): { changed: boolean; orderId: string; status: string; approvedReceiptIds?: string[] } {
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
     const o = loadOrder(db, a.storeId, a.orderId);
+    // a receipt the shopper submitted on this DO is proof too (INSTAPAY-DO-1), whatever the caller passed
+    ensureReceiptSchema(db);
+    const hasReceipt =
+      (db.all(
+        "SELECT COUNT(*) AS c FROM instapay_order_receipts WHERE store_id = ? AND order_id = ? AND status = 'submitted'",
+        [a.storeId, a.orderId]
+      )[0].c as number) > 0;
+    const proofSubmitted = a.proofSubmitted || hasReceipt;
     if (o.status !== AWAITING_PAYMENT_CONFIRMATION) {
       const done = db.all(
         "SELECT 1 AS x FROM payments WHERE order_id = ? AND provider = 'instapay' AND status = 'completed'",
@@ -1341,7 +1350,7 @@ export function confirmInstapay(
     )[0];
     if (!pay) throw err('INSTAPAY_NOT_AWAITING', 'No pending InstaPay payment');
     const exp = o.payment_confirmation_expires_at;
-    if (exp !== null && exp <= now && !a.proofSubmitted)
+    if (exp !== null && exp <= now && !proofSubmitted)
       throw err(
         'INSTAPAY_CONFIRMATION_EXPIRED',
         'The confirmation window for this order has expired'
@@ -1388,7 +1397,14 @@ export function confirmInstapay(
       details: { reason: 'merchant_confirmed_instapay_transfer', amountMinor: pay.amount },
       now,
     });
-    return { changed: true, orderId: o.id, status: 'confirmed' };
+    // the merchant's confirm IS the approval of the shopper's submitted receipts, in this same section
+    const approvedReceiptIds = approveSubmittedReceipts(db, {
+      storeId: a.storeId,
+      orderId: o.id,
+      actorId: a.actorUserId,
+      now,
+    });
+    return { changed: true, orderId: o.id, status: 'confirmed', approvedReceiptIds };
   });
 }
 

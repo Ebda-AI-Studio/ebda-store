@@ -7,9 +7,9 @@
       "needs": "port of postPartialReturnJournal (allocatePartialReturn, loadPriorReversedQty, resolveReturnRefundLegs) onto do/ledger.ts, after the Return row lifecycle"
     },
     {
-      "code": "INSTAPAY_RECEIPTS_NOT_ON_DO",
-      "file": "apps/api/src/services/payment-providers/instapay-receipt.service.ts",
-      "needs": "a D1 entity-index kind for the cross-store reference_key uniqueness, then the receipt upload/submit as one moneyOp"
+      "code": "WALLET_IN_TRANSACTION_NOT_ON_DO",
+      "file": "apps/api/src/services/wallet.service.ts",
+      "needs": "the callers that hold an open Postgres transaction around a wallet movement (return completion with a store-credit refund, order create, erasure forfeit) become ONE DO section each, so the wallet write rolls back with them (Ruling WALLET-DO-TX-1; return completion is R1's moneyOp, branch feat/cf-r1-returns)"
     }
   ],
   "postgresOnly": [
@@ -25,9 +25,6 @@
     },
     {
       "flow": "order reads that join Postgres-only models"
-    },
-    {
-      "flow": "wallet-movement journal (WALLET-GL-1 / PR #325, not merged)"
     },
     {
       "flow": "partial-return journal (refused 501, listed above)"

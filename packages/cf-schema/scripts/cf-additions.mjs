@@ -148,7 +148,16 @@ export const extraModels = {
       fields: [
         f('kind', 'String', {
           kind: 'enum',
-          enumValues: ['order', 'payment', 'shipment', 'customer', 'return', 'refund', 'webhook'],
+          enumValues: [
+            'order',
+            'payment',
+            'shipment',
+            'customer',
+            'return',
+            'refund',
+            'webhook',
+            'instapay_ref',
+          ],
         }),
         f('id', 'String'),
         f('storeId', 'String'),

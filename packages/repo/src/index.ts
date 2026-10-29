@@ -41,3 +41,4 @@ export {
   resolveStoreId,
   drainEntityIndexOutbox,
 } from './platform/entity-index';
+export type { ReceiptRow as InstapayReceiptRow } from './do/instapay-receipts';
