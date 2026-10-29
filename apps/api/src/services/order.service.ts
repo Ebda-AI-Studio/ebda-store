@@ -3068,7 +3068,7 @@ export class OrderService {
         'This order has no captured payment, so it cannot be marked refunded'
       );
     const requestedAt = new Date();
-    const r = await money.refundBook({ orderId });
+    const r = await money.refundBook({ orderId, keepPaymentStatus: true });
     if (!r.replayed) {
       const hadCapturedPayment = hasCapturedPayment(before);
       await OrderService.applyRefundEffects(storeId, orderId, {

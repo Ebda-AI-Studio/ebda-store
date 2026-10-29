@@ -243,6 +243,7 @@ export interface MoneyClient {
       refundKey?: string;
       walletCredit?: number;
       external?: boolean;
+      keepPaymentStatus?: boolean;
     },
     key?: string
   ): Promise<CancelResult & { walletCredited: number; review?: string }>;

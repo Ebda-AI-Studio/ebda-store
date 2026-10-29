@@ -32,6 +32,7 @@ import {
   type InstapayReceiptView,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
+import { storeMoney } from '../../lib/repo-factory';
 import { sniffImage } from '../../lib/upload-sniff';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
@@ -196,6 +197,20 @@ export function toReceiptView(r: ReceiptRow): InstapayReceiptView {
 
 export class InstapayReceiptService {
   /**
+   * An ORDER receipt of a store on its Durable Object is refused loudly (Ruling CF-PAY-1): the receipts table, the
+   * cross-store `reference_key` uniqueness (needs a D1 entity-index kind) and the screenshot lifecycle have not moved, and a
+   * Postgres receipt for an order that lives only on the DO would never be read by the confirm/expiry money operations.
+   */
+  private static async refuseOrderReceiptOnDo(storeId: string, kind: string): Promise<void> {
+    if (kind === 'order' && (await storeMoney(storeId)))
+      throw new AppError(
+        501,
+        'INSTAPAY_RECEIPTS_NOT_ON_DO',
+        'InstaPay receipts for a Durable Object store are not ported yet'
+      );
+  }
+
+  /**
    * Store the screenshot (private bucket ONLY; 503 when it is not configured — never a
    * public fallback) and create the draft, then queue the AI read. A queue failure
    * marks the read failed at once so the payer falls back to manual entry.
@@ -209,6 +224,7 @@ export class InstapayReceiptService {
     now?: Date;
   }): Promise<InstapayReceiptView> {
     const { storeId, kind } = args;
+    await InstapayReceiptService.refuseOrderReceiptOnDo(storeId, kind);
     const now = args.now ?? new Date();
     if (args.file.length === 0 || args.file.length > INSTAPAY_RECEIPT_MAX_BYTES) {
       throw new AppError(400, 'FILE_TOO_LARGE', 'The screenshot must be smaller than 8 MB');
@@ -440,6 +456,7 @@ export class InstapayReceiptService {
     notBefore: Date | null;
     now?: Date;
   }): Promise<ReceiptRow> {
+    await InstapayReceiptService.refuseOrderReceiptOnDo(args.storeId, args.scope.kind);
     const now = args.now ?? new Date();
     const row = await this.get(args.storeId, args.receiptId, args.scope);
     if (row.status !== 'draft') {

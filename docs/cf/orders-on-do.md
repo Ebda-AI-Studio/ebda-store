@@ -65,8 +65,8 @@ Other transitions (`confirmed`, `processing`, `shipped`, `delivered`) move no st
 
 - Carts (`carts`, `cart_items`, `cart_bundles`) and the abandoned-cart table are still read and cleared on Postgres; the order is created on the DO from the cart's lines and bundles (CF-ORDERS-CART-1). Until carts move, the cart claim is not atomic with the order: two concurrent submits of one cart without a key can both read the full cart (the engine's own `cart` claim exists and is tested, `money-stock.test.ts`, but is not used from the Worker). A keyed retry is safe (the key is hashed with the cart id).
 - Fiscal sale documents (`issueSaleDocument`), delivery slots, personalisation notes and order-time affiliate attribution are not written by the engine (Ruling DO-MONEY-2).
-- InstaPay receipts have not moved: `proofSubmitted` reads Postgres and finds none for a DO store; receipt approval after a confirm is not run for a DO store.
-- The `status_fanout_*` columns and their stuck-sweep read Postgres: a DO order's status fanout is sent directly (with the inline fallback) but not re-sent by the sweep until the jobs move it.
+- InstaPay receipts have not moved (an ORDER receipt for a DO store is refused 501, CF-PAY-1): `proofSubmitted` reads the DO payment metadata only. Payments, webhooks, refunds, the ledger and gold repricing moved in D2b-3: `docs/cf/payments-on-do.md`.
+- The stuck status-fanout sweep reads the DO for DO stores (CF-PAY-1), but the DO order operations do not stamp `status_fanout_requested_at` yet, so a DO order's fanout is sent directly (with the inline fallback) and the sweep has nothing to find until the order status writes arm it.
 - The `order/refunded` fanout (affiliate commission, GL journal, notifications) still runs through Inngest; for a DO store only its money steps are redundant (idempotent markers), the rest is jobs work (`docs/cf/jobs-on-do.md`).
 
 ## Tests

@@ -555,6 +555,7 @@ export function refundOrder(
      * the full amount is stored on the marker and `review` is set so the surplus or the state is visible.
      */
     external?: boolean;
+    keepPaymentStatus?: boolean;
     now?: number;
   }
 ): RefundResult {
@@ -576,10 +577,12 @@ export function refundOrder(
         );
       const out = emptyResult(o, 'refund', false);
       if (o.status !== 'refunded') {
+        // `keepPaymentStatus`: a merchant status change leaves `payment_status` alone, like OrderService.updateStatus; a provider refund
+        // flips it (the gateway paths write status AND payment_status together)
         db.run(
-          `UPDATE orders SET status = 'refunded', payment_status = CASE WHEN payment_status IN ('paid', 'disputed') THEN 'refunded' ELSE payment_status END, updated_at = ?1
+          `UPDATE orders SET status = 'refunded', payment_status = CASE WHEN ?4 = 0 AND payment_status IN ('paid', 'disputed') THEN 'refunded' ELSE payment_status END, updated_at = ?1
            WHERE id = ?2 AND store_id = ?3`,
-          [now, o.id, a.storeId]
+          [now, o.id, a.storeId, a.keepPaymentStatus ? 1 : 0]
         );
         addEvent(db, a.storeId, o.id, o.status, 'refunded', {}, now);
         out.status = 'refunded';

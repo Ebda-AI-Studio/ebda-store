@@ -237,6 +237,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       refundKey: typeof a.refundKey === 'string' ? a.refundKey : undefined,
       walletCredit: typeof a.walletCredit === 'number' ? a.walletCredit : undefined,
       external: a.external === true,
+      keepPaymentStatus: a.keepPaymentStatus === true,
     }),
   journalSale: (db, storeId, a) =>
     postOrderSaleJournal(db, { storeId, orderId: id(a.orderId, 'orderId') }),
