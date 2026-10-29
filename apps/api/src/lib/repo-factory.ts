@@ -82,7 +82,12 @@ export type WritableModel =
   | 'storePage'
   | 'storePageRevision'
   | 'storeLocation'
-  | 'sizeChart';
+  | 'sizeChart'
+  | 'cart'
+  | 'cartItem'
+  | 'cartBundle'
+  | 'abandonedCart'
+  | 'abandonedCartConfig';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
@@ -195,7 +200,10 @@ export interface MoneyClient {
     a: { orderId: string; actorUserId?: string | null; proofSubmitted?: boolean },
     key?: string
   ): Promise<{ changed: boolean; orderId: string; status: string }>;
-  cancel(a: { orderId: string; restoreInventory?: boolean }, key?: string): Promise<CancelResult>;
+  cancel(
+    a: { orderId: string; restoreInventory?: boolean; note?: string },
+    key?: string
+  ): Promise<CancelResult>;
   expireHold(
     a: { orderId: string; proofSubmitted?: boolean },
     key?: string
@@ -261,6 +269,16 @@ export interface MoneyClient {
   goldDecidePending(a: Record<string, unknown>, key?: string): Promise<any>;
   goldUpdateSettings(a: Record<string, unknown>, key?: string): Promise<any>;
   goldRepriceProduct(a: { productId: string }, key?: string): Promise<{ repriced: number }>;
+  /** The credit note / refund receipt of a refund event, keyed per refund (Ruling CF-R2-1); `document` is null when nothing is left to credit. */
+  fiscalRefund(
+    a: { orderId: string; refundRef: string; amount: number | 'remaining'; reason?: string | null },
+    key?: string
+  ): Promise<{ document: { number: string; docType: string } | null }>;
+  /** A sale cancelled before any money was taken keeps its number, marked cancelled. */
+  fiscalCancelSale(
+    a: { orderId: string },
+    key?: string
+  ): Promise<{ document: { number: string } | null }>;
   goldSetProductPricing(a: Record<string, unknown>, key?: string): Promise<any>;
   goldBulkSwitchMode(a: Record<string, unknown>, key?: string): Promise<any>;
   goldCreateVariant(a: Record<string, unknown>, key?: string): Promise<{ id: string }>;
@@ -516,6 +534,8 @@ export function makeMoneyClient(
     goldCreateVariant: (a, key) => call('goldCreateVariant', a, key),
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
     orderStatus: (a, key) => call('orderStatus', a, key),
+    fiscalRefund: (a, key) => call('fiscalRefund', a, key),
+    fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
   };
 }
 

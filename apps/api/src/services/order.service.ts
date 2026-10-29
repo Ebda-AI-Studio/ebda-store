@@ -101,7 +101,13 @@ import {
   openUnpaidHoldCap,
   openUnpaidHoldIpCap,
 } from '../lib/stock-hold-cap';
-import { storeDb, storeMoney, type CreateOrderArgs, type MoneyClient } from '../lib/repo-factory';
+import {
+  storeDb,
+  storeMoney,
+  storeRepo,
+  type CreateOrderArgs,
+  type MoneyClient,
+} from '../lib/repo-factory';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -804,6 +810,24 @@ export class OrderService {
     const cartBundles = cart.bundles ?? [];
 
     if (cart.items.length === 0 && cartBundles.length === 0) {
+      // A keyed retry of an order the DO already placed: the first request consumed the cart, so the retry finds it empty. The
+      // order is read back by its key (scoped to this cart, like the engine's own replay) instead of failing EMPTY_CART.
+      const idemKey = requestContext?.idempotencyKey;
+      if (idemKey && (await storeMoney(storeId))) {
+        const prior = await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: {
+            storeId,
+            idempotencyKey: `${cart.id}:${checkoutIdempotencyHash(cart.id, idemKey)}`,
+          },
+          select: { id: true },
+        });
+        if (prior) {
+          const replay = await OrderService.loadCreatedOrder(storeId, prior.id);
+          if (replay) return replay;
+        }
+      }
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
     }
 
@@ -2206,7 +2230,10 @@ export class OrderService {
                 storeId,
                 OR: [
                   { cartId: cart.id },
-                  { customerId: cart.customerId, status: { not: 'recovered' } },
+                  // a guest cart (no customer) matches only its own row: `customerId: null` would match EVERY guest's
+                  ...(cart.customerId
+                    ? [{ customerId: cart.customerId, status: { not: 'recovered' } }]
+                    : []),
                 ],
                 status: { in: ['pending', 'step1_sent', 'step2_sent', 'step3_sent'] },
               },
@@ -2405,16 +2432,6 @@ export class OrderService {
       });
       walletAmount = w?.balance ?? 0; // the engine caps it to the order total
     }
-    // The cart STATE this order consumes, claimed atomically with the order (Ruling CF-FINAL-1, closes CF-ORDERS-CART-1): the
-    // row ids make a re-purchase after the cart was cleared a new state, and a double submit of one state the same one.
-    const cartFingerprint = createHash('sha256')
-      .update(
-        JSON.stringify([
-          c.cart.items.map(i => [i.id, i.quantity]).sort(),
-          c.cart.bundles.map(b => [b.id ?? b.bundleId, b.quantity]).sort(),
-        ])
-      )
-      .digest('hex');
     // Ruling B4-7 (CF-FINAL-1): the delivery date is validated against the live store row and the cart's longest lead time
     // (read from the DO's own products) and written as the first line of the order notes, exactly like the Postgres path.
     // A quote never refuses on it.
@@ -2443,7 +2460,9 @@ export class OrderService {
         orderNotes = data.notes ? `${deliveryNoteLine}\n${data.notes}` : deliveryNoteLine;
     }
     const orderArgs: CreateOrderArgs = {
-      cartClaim: { id: c.cart.id, fingerprint: cartFingerprint },
+      // the cart rows live on this DO: the engine claims them in the SAME section as the order (compared by content, deleted
+      // there), so a double submit of one cart is CART_CHANGED 409 and never a second order (Ruling CF-R2-1, closes CF-ORDERS-CART-1)
+      cart: { id: c.cart.id },
       lines: c.cart.items.map(i => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -2496,10 +2515,8 @@ export class OrderService {
       } as never;
     }
     const placed = await OrderService.translateDoRefusal(() => money.createOrder(orderArgs));
-    // the cart is consumed (it still lives in Postgres until carts move)
+    // the engine consumed the cart (its rows were deleted in the order's section)
     if (!placed.replayed) {
-      await prisma.cartItem.deleteMany({ where: { cartId: c.cart.id } });
-      await prisma.cartBundle.deleteMany({ where: { cartId: c.cart.id } });
       if (c.referralCode)
         await affiliateService
           .linkOrderToReferral(storeId, placed.orderId, c.referralCode)
@@ -2562,6 +2579,67 @@ export class OrderService {
   }
 
   /**
+   * `rollbackForPaymentFailure` for a store on its Durable Object (Ruling CF-R2-1): the cancel (stock, coupon, wallet, the
+   * order's status and note, and the unissued-money fiscal cancellation) is ONE `cancel` section; the cart the shopper finds
+   * waiting is then rebuilt on the DO from the order's lines. Same guards as the Postgres path: an order that is not `pending`,
+   * is cancelled, or already has a payment is left alone.
+   */
+  private static async rollbackOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    sessionId: string
+  ): Promise<void> {
+    const repo = await storeRepo(storeId);
+    const order = await repo.db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true, payments: true },
+    });
+    if (!order) return;
+    if (order.status === 'cancelled') return;
+    if (order.payments.length > 0) return;
+    if (order.status !== 'pending') return;
+
+    await money.cancel({
+      orderId,
+      restoreInventory: true,
+      note: '[auto-cancelled: payment step failed before completion]',
+    });
+
+    const cart =
+      (await repo.db.cart.findFirst({ where: { storeId, sessionId } })) ??
+      (await repo.writer.cart.create({
+        data: { storeId, sessionId, customerId: order.customerId },
+      }));
+    await repo.writer.cartItem.deleteMany({ where: { cartId: cart.id } });
+    await repo.writer.cartBundle.deleteMany({ where: { cartId: cart.id } });
+    const candidateBundleIds = [
+      ...new Set(order.items.map(i => i.bundleId).filter((id): id is string => !!id)),
+    ];
+    const liveBundleIds = new Set(
+      candidateBundleIds.length > 0
+        ? (
+            await repo.db.bundle.findMany({
+              where: { id: { in: candidateBundleIds }, storeId },
+              select: { id: true },
+            })
+          ).map(b => b.id)
+        : []
+    );
+    const restored = restoreCartShape(order.items, liveBundleIds);
+    for (const item of restored.items)
+      await repo.writer.cartItem.create({ data: { cartId: cart.id, ...item } });
+    for (const bundle of restored.bundles)
+      await repo.writer.cartBundle.create({ data: { cartId: cart.id, ...bundle } });
+
+    logger.info(
+      { orderId, storeId },
+      'Order rolled back after payment-create failure (inventory + cart restored)'
+    );
+    await bustProductCaches(storeId);
+  }
+
+  /**
    * Compensating action when /payments/create fails AFTER an order has been
    * committed (cart cleared, inventory decremented, coupon usage incremented).
    *
@@ -2579,6 +2657,8 @@ export class OrderService {
     orderId: string,
     sessionId: string
   ): Promise<void> {
+    const money = await storeMoney(storeId);
+    if (money) return OrderService.rollbackOnDo(money, storeId, orderId, sessionId);
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, storeId },
@@ -3306,6 +3386,33 @@ export class OrderService {
   }
 
   /**
+   * The fiscal step of the `order/refunded` fanout (ruling MONEYB-1) for a PARTIAL refund event on a store on its Durable
+   * Object: the credit note keyed on the refund (the amount is the caller's). A WHOLE-order cancel or refund issues its
+   * document inside the DO's reversal section (`settleFiscalOnReversal`), so it cannot be lost between the two.
+   */
+  private static async fiscalOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    partial?: { items: unknown[]; refundKey: string; refundAmount?: number; amountOnly?: boolean }
+  ): Promise<void> {
+    const isPartial = !!partial && (partial.items.length > 0 || partial.amountOnly === true);
+    if (!isPartial) return;
+    const amount = partial?.refundAmount;
+    if (typeof amount !== 'number' || amount <= 0) return;
+    const pay = await (
+      await storeDb(storeId)
+    ).payment.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+      select: { metadata: true },
+    });
+    const meta = pay?.metadata as Record<string, unknown> | null | undefined;
+    const reason = typeof meta?.refundReason === 'string' ? meta.refundReason : null;
+    await money.fiscalRefund({ orderId, refundRef: partial!.refundKey, amount, reason });
+  }
+
+  /**
    * Dispatcher for a refund/cancel's money reversals: inventory restore,
    * coupon usage decrement, affiliate-commission reversal, loyalty
    * earn/redeem reversal, and backorder-line cancellation. Provider-driven
@@ -3402,6 +3509,10 @@ export class OrderService {
     // inventory/coupons/loyalty (the stock was reserved) but must NOT claim
     // a refund happened.
     const notify = options.fireRefundNotification ?? true;
+    // A store on its Durable Object: the credit note / refund receipt / cancelled sale document is issued here, through the
+    // DO (the `order/refunded` fanout's `fiscal-document` step reads Postgres and is refused for a DO store, Ruling CF-JOBS-1).
+    const fiscalMoney = await storeMoney(storeId);
+    if (fiscalMoney) await OrderService.fiscalOnDo(fiscalMoney, storeId, orderId, options.partial);
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },
       select: { id: true },

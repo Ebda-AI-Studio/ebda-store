@@ -4,7 +4,7 @@ import {
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
 } from './loyalty';
-import { CART_CLAIMS_DDL, placeOrder, quoteOrder, type CheckoutInput } from './checkout';
+import { placeOrder, quoteOrder, type CheckoutInput } from './checkout';
 import { cancelOrder, refundOrder } from './refund';
 import {
   applyPaymentEventSync,
@@ -18,6 +18,7 @@ import {
   type ConfirmedTransaction,
   type PaymentWebhookInput,
 } from './payments';
+import { cancelSaleDocument, issueRefundDocument } from './fiscal';
 import { changeOrderStatus } from './order-status';
 import { postOrderSaleJournal, postRefundJournal } from './ledger';
 import {
@@ -77,7 +78,9 @@ export type MoneyOpName =
   | 'goldCreateVariant'
   | 'fanoutDisarm'
   | 'orderStatus'
-  | 'quoteOrder';
+  | 'quoteOrder'
+  | 'fiscalRefund'
+  | 'fiscalCancelSale';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -105,12 +108,13 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fanoutDisarm',
   'orderStatus',
   'quoteOrder',
+  'fiscalRefund',
+  'fiscalCancelSale',
 ];
 
 const TABLE = '_money_ops';
 export const ensureMoneyOpsSchema = (db: SyncSql): void => {
   ensureKeyedSchema(db, TABLE);
-  db.run(CART_CLAIMS_DDL, []);
 };
 
 const id = (v: unknown, what: string): string =>
@@ -178,12 +182,21 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       proofSubmitted: a.proofSubmitted === true,
     }),
   /** updateStatus -> cancelled: status plus the whole reversal (stock, coupon, loyalty, wallet, backorders). */
-  cancel: (db, storeId, a) =>
-    cancelOrder(db, {
+  cancel: (db, storeId, a) => {
+    const orderId = id(a.orderId, 'orderId');
+    const r = cancelOrder(db, {
       storeId,
-      orderId: id(a.orderId, 'orderId'),
+      orderId,
       restoreInventory: a.restoreInventory !== false,
-    }),
+    });
+    // rollbackForPaymentFailure's paper trail: appended to the order notes in the same section
+    if (!r.replayed && typeof a.note === 'string' && a.note.length > 0 && a.note.length <= 500)
+      db.run(
+        "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ?1 ELSE notes || char(10) || ?1 END WHERE id = ?2 AND store_id = ?3",
+        [a.note, orderId, storeId]
+      );
+    return r;
+  },
   /** An unconfirmed InstaPay hold whose window ran out is cancelled; 'skipped' when it is not (or no longer) expirable. */
   expireHold: (db, storeId, a) =>
     expireInstapay(db, {
@@ -327,6 +340,25 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       a.variant as NewVariant,
       (a.optionValueIds as string[] | undefined) ?? []
     ),
+  /** The credit note / refund receipt of a refund event (order-refunded fanout), keyed per refund: see `issueRefundDocument`. */
+  fiscalRefund: (db, storeId, a) => ({
+    document: issueRefundDocument(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      refundRef: id(a.refundRef, 'refundRef'),
+      amount: a.amount === 'remaining' ? 'remaining' : typeof a.amount === 'number' ? a.amount : 0,
+      reason: typeof a.reason === 'string' ? a.reason : null,
+      now: Date.now(),
+    }),
+  }),
+  /** A sale cancelled before any money was taken keeps its number, marked cancelled (MONEYB-1). */
+  fiscalCancelSale: (db, storeId, a) => ({
+    document: cancelSaleDocument(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      now: Date.now(),
+    }),
+  }),
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),

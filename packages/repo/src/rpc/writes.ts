@@ -26,7 +26,7 @@ export const WRITE_OPS = [
 ] as const;
 export type WriteOp = (typeof WRITE_OPS)[number];
 
-/** Non-money catalogue and content models whose writes the StoreDO accepts in D1. Everything else is D2. */
+/** Non-money catalogue, content and cart models whose writes the StoreDO accepts in D1 (and R2). Everything else is a money op. */
 export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'Product',
   'ProductVariant',
@@ -46,6 +46,12 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'StorePageRevision',
   'StoreLocation',
   'SizeChart',
+  // carts and abandoned carts (INFRA-CF-1 PR R2, Ruling CF-R2-1)
+  'Cart',
+  'CartItem',
+  'CartBundle',
+  'AbandonedCart',
+  'AbandonedCartConfig',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

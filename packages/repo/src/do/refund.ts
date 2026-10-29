@@ -1,3 +1,4 @@
+import { settleFiscalOnReversal } from './fiscal';
 import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
 import { recordMovement, restock } from './stock';
 import { MoneyError, type SyncSql } from './sync-sql';
@@ -394,6 +395,9 @@ function reverseWholeOrder(
       'UPDATE orders SET refund_reversed_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3',
       [now, o.id, storeId]
     );
+
+  // the fiscal document of the reversal (credit note, or the cancelled sale), in the same section
+  settleFiscalOnReversal(db, { storeId, orderId: o.id, now });
 
   const legacy = db.all(
     `SELECT id FROM inventory_history WHERE store_id = ? AND reference = ? AND type = 'adjustment' AND reason = ?`,

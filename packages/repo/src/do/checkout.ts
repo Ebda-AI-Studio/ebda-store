@@ -1,6 +1,7 @@
 import { normalizePhoneForStorage } from '../../../shared/src/region';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { decrementProduct, decrementVariant, forceDecrementVariant, recordMovement } from './stock';
+import { issueSaleDocument } from './fiscal';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
 import {
   cartItemsForTargeting,
@@ -62,14 +63,6 @@ export interface CheckoutInput {
    * instead of creating a second order. Also scopes `idempotencyKey` to this cart.
    */
   cart?: { id: string };
-  /**
-   * The cart STATE this checkout consumes when the cart rows live elsewhere (Postgres) - Ruling CF-FINAL-1, closing
-   * CF-ORDERS-CART-1. `fingerprint` is the cart's own version (id, its last-change time and the lines and boxes read). It is
-   * claimed in the SAME section as the order in `_cart_claims`: a second checkout of the same cart state (no key, a different
-   * key, a request that read the cart before the first one cleared it) finds the claim and fails with CART_CHANGED instead of
-   * creating a second order. Any change to the cart yields a new fingerprint, so a re-purchase is never blocked.
-   */
-  cartClaim?: { id: string; fingerprint: string };
   shippingAddress: Record<string, unknown>;
   billingAddress?: unknown;
   checkoutIp?: string;
@@ -123,7 +116,6 @@ export function quoteOrder(db: SyncSql, input: CheckoutInput): OrderQuoteResult 
       dryRun: true,
       idempotencyKey: undefined,
       cart: undefined,
-      cartClaim: undefined,
     });
   } catch (e) {
     if (e instanceof QuoteSignal) return e.quote;
@@ -150,10 +142,6 @@ export interface PlacedOrder {
 }
 
 const MAX_TOTAL = 2_000_000_000;
-/** A cart claim outlives any realistic double-submit window; a changed cart has a new fingerprint, so it never blocks a re-purchase. */
-export const CART_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
-export const CART_CLAIMS_DDL =
-  'CREATE TABLE IF NOT EXISTS _cart_claims (cart_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, claimed_at INTEGER NOT NULL)';
 const orderNumber = (now: number) =>
   `ORD-${Math.floor(now / 1000)
     .toString(36)
@@ -318,26 +306,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       }
     }
 
-    if (input.cartClaim) {
-      const { id, fingerprint } = input.cartClaim;
-      if (!id || !fingerprint || id.length > 128 || fingerprint.length > 256)
-        throw new MoneyError('BAD_ARGS', 'cartClaim', 400);
-      db.run('DELETE FROM _cart_claims WHERE claimed_at < ?', [now - CART_CLAIM_TTL_MS]);
-      const prior = db.all('SELECT fingerprint FROM _cart_claims WHERE cart_id = ?', [id])[0];
-      if (prior && prior.fingerprint === fingerprint)
-        throw new MoneyError(
-          'CART_CHANGED',
-          'The cart changed or was already checked out. Review it and try again.',
-          409
-        );
-      db.run(
-        'INSERT INTO _cart_claims (cart_id, fingerprint, claimed_at) VALUES (?, ?, ?) ON CONFLICT (cart_id) DO UPDATE SET fingerprint = excluded.fingerprint, claimed_at = excluded.claimed_at',
-        [id, fingerprint, now]
-      );
-    }
-
+    let cartCustomerId: string | null = null;
     if (input.cart) {
-      const owned = db.all('SELECT id FROM carts WHERE id = ? AND store_id = ?', [
+      const owned = db.all('SELECT id, customer_id FROM carts WHERE id = ? AND store_id = ?', [
         input.cart.id,
         input.storeId,
       ])[0];
@@ -385,6 +356,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       // counted above, deleted here: the section is single-writer, so nothing slips between the two
       db.run('DELETE FROM cart_items WHERE cart_id = ?', [input.cart.id]);
       db.run('DELETE FROM cart_bundles WHERE cart_id = ?', [input.cart.id]);
+      cartCustomerId = (owned!.customer_id as string | null) ?? null;
     }
 
     if (input.customerId) {
@@ -1016,6 +988,18 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     // entity index (audit DB-2): queued in the SAME section as the order; the Worker awaits it (awaitEntityIndexed) before
     // it hands the order reference to a provider or a shopper
     indexEntity(db, input.storeId, 'order', orderId, now);
+    // The sale's fiscal document (tax invoice or receipt) with its gapless serial, in THIS section: the order and its number
+    // commit or roll back together (Ruling MONEYB-1, CF-R2-1).
+    issueSaleDocument(db, { storeId: input.storeId, orderId, now });
+    // Abandoned-cart recovery (best effort on Postgres, a plain UPDATE here): the cart's own row, else the same customer's open
+    // one. A guest cart (no customer) matches only its own row.
+    if (input.cart)
+      db.run(
+        `UPDATE abandoned_carts SET status = 'recovered', recovered_at = ?1, recovered_order_id = ?2, updated_at = ?1
+         WHERE id = (SELECT id FROM abandoned_carts WHERE store_id = ?3 AND status IN ('pending', 'step1_sent', 'step2_sent', 'step3_sent')
+           AND (cart_id = ?4 OR (?5 IS NOT NULL AND customer_id = ?5)) ORDER BY (cart_id = ?4) DESC, created_at LIMIT 1)`,
+        [now, orderId, input.storeId, input.cart.id, cartCustomerId]
+      );
     return {
       orderId,
       orderNumber: num,

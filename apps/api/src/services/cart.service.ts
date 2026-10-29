@@ -31,6 +31,13 @@ import { canSeeWholesaleOnly } from '../lib/audience';
 import { ANONYMOUS_BUYER, type BuyerIdentity } from '../lib/buyer-identity';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
+import {
+  storeDb,
+  storeRepo,
+  storeWriter,
+  type StoreReads,
+  type StoreRepo,
+} from '../lib/repo-factory';
 import { activePersonalisation, cleanNote, stripNote, type Resolved } from '@ebda/shared';
 
 // Bilingual VARIANT_REQUIRED copy lives with the other line writers' guard;
@@ -96,7 +103,11 @@ async function tryResolveCartBundle(
   bundleId: string
 ): Promise<ResolvedBundle | null> {
   try {
-    return await resolveBundle(prisma, storeId, bundleId);
+    return await resolveBundle(
+      (await storeDb(storeId)) as unknown as typeof prisma,
+      storeId,
+      bundleId
+    );
   } catch (err) {
     if (err instanceof AppError && err.statusCode === 404) return null;
     throw err;
@@ -123,6 +134,41 @@ async function tryResolveCartBundle(
  * Backoff buys nothing against an opponent that has already finished.
  */
 const AMBIENT_TX_RETRY = { retries: 1, baseDelayMs: 5 } as const;
+
+const WRITE_OPS = new Set([
+  'create',
+  'createMany',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany',
+]);
+
+/**
+ * The transaction surface a line writer takes (`writeLine(tx)`), for a store on its Durable Object (Ruling CF-R2-1): reads go
+ * to the DO read client, writes to the DO write client. There is no interactive transaction there; the line writers already
+ * tolerate that, because on Postgres they run at Read Committed and recover a lost race by re-running (P2002: the re-read
+ * sees the winner's row and merges with `{ increment }`; P2025: the line is gone, take the create branch).
+ */
+function doTx(repo: StoreRepo, dry = false): Prisma.TransactionClient {
+  const surface = (model: string) =>
+    new Proxy(
+      {},
+      {
+        get: (_t, op: string) =>
+          dry && WRITE_OPS.has(op)
+            ? () => Promise.resolve(undefined) // the validation pass: every check runs, nothing is written
+            : (
+                (WRITE_OPS.has(op) ? repo.writer : repo.db) as never as Record<
+                  string,
+                  Record<string, unknown>
+                >
+              )[model][op],
+      }
+    );
+  return new Proxy({}, { get: (_t, model: string) => surface(model) }) as Prisma.TransactionClient;
+}
 
 /**
  * P2025 = the row a by-id `update`/`delete` targeted no longer exists. Every
@@ -242,7 +288,7 @@ export class CartService {
     const goldByLine = opts.skipPricing
       ? new Map<string, never>()
       : await publicGoldPricingForLines(
-          prisma as unknown as Prisma.TransactionClient,
+          (await storeDb(storeId)) as unknown as Prisma.TransactionClient,
           storeId,
           items
             .filter(i => !i.unavailable)
@@ -339,7 +385,9 @@ export class CartService {
     /** Who the prices are for (lib/buyer-identity.ts); default anonymous = retail + public tiers. */
     buyer: BuyerIdentity = ANONYMOUS_BUYER
   ) {
-    const cart = await prisma.cart.findFirst({
+    const cart = await (
+      await storeDb(storeId)
+    ).cart.findFirst({
       where: {
         storeId,
         OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
@@ -380,7 +428,8 @@ export class CartService {
     // cause a spurious EMPTY_CART on POST /orders. Returning the
     // most-recently-touched cart matches the user's mental model
     // ("my current cart") and prevents the test-order-cancel flakiness.
-    let cart = await prisma.cart.findFirst({
+    const repo = await storeRepo(storeId);
+    let cart = await repo.db.cart.findFirst({
       where: {
         storeId,
         OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
@@ -415,7 +464,7 @@ export class CartService {
         // with the winner on `(store_id, session_id)`. Commit-before-respond
         // does nothing for that. See tests/integration/cart-session-race.test.ts.
         cart = await withSavepoint(() =>
-          prisma.cart.create({
+          repo.writer.cart.create({
             data: {
               storeId,
               sessionId,
@@ -427,7 +476,7 @@ export class CartService {
       } catch (err) {
         // P2002 = Prisma unique constraint violation
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-          const existing = await prisma.cart.findFirst({
+          const existing = await repo.db.cart.findFirst({
             where: {
               storeId,
               OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
@@ -619,7 +668,16 @@ export class CartService {
       }
     };
 
-    if (hasTenantContext()) {
+    const repo = await storeRepo(storeId);
+    if (repo.backend === 'do') {
+      // Durable Object store (Ruling CF-R2-1): no interactive transaction; a lost same-line race is P2002 and the re-run's
+      // read sees the winner's row and merges, exactly as on the Postgres ambient path.
+      await retryOnWriteConflict(() => writeLine(doTx(repo)), {
+        label: 'cart.addItem(do)',
+        extraRetryCodes: ['P2002', 'P2025'],
+        ...AMBIENT_TX_RETRY,
+      });
+    } else if (hasTenantContext()) {
       // Already inside the request-scoped tenant transaction opened by
       // `tenantContext` middleware. Opening a nested $transaction here would
       // run on a DIFFERENT connection that cannot see the cart this request
@@ -676,7 +734,9 @@ export class CartService {
     }
 
     // Track activity for abandonment detection
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -694,13 +754,14 @@ export class CartService {
     sessionId: string,
     customerId?: string
   ): Promise<{ acknowledged: number }> {
-    const cart = await prisma.cart.findFirst({
+    const repo = await storeRepo(storeId);
+    const cart = await repo.db.cart.findFirst({
       where: { storeId, OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])] },
       orderBy: { updatedAt: 'desc' },
       select: { id: true },
     });
     if (!cart) return { acknowledged: 0 };
-    const lines = await prisma.cartItem.findMany({
+    const lines = await repo.db.cartItem.findMany({
       where: { cartId: cart.id, quotedUnitPrice: { not: null } },
       select: {
         id: true,
@@ -714,7 +775,7 @@ export class CartService {
     for (const l of lines) {
       const current = l.variant?.price ?? l.product.price;
       if (current === l.quotedUnitPrice) continue;
-      await prisma.cartItem.updateMany({
+      await repo.writer.cartItem.updateMany({
         where: { id: l.id, cartId: cart.id },
         data: { quotedUnitPrice: current, quotedAt: now },
       });
@@ -760,7 +821,8 @@ export class CartService {
     // caches. Throws AppError(404) for a bundle that isn't this store's;
     // that propagates to the route's catch-all `next(error)` unchanged,
     // same as every other cross-tenant 404 in this codebase.
-    const resolved = await resolveBundle(prisma, storeId, bundleId);
+    const repo = await storeRepo(storeId);
+    const resolved = await resolveBundle(repo.db as unknown as typeof prisma, storeId, bundleId);
 
     if (!resolved.isPurchasable) {
       return { ok: false, error: 'bundle_not_purchasable' };
@@ -802,30 +864,40 @@ export class CartService {
     // race as P2002, which would abort the request transaction outright —
     // `withSavepoint` confines that rollback so the retry can re-read the
     // winner's row and merge the quantity instead of 500ing the customer.
-    const result = hasTenantContext()
-      ? await retryOnWriteConflict(
-          () => withSavepoint(() => writeBundleLine(prisma as unknown as Prisma.TransactionClient)),
-          {
-            label: 'cart.addBundle(ambient-tx)',
+    const result =
+      repo.backend === 'do'
+        ? await retryOnWriteConflict(() => writeBundleLine(doTx(repo)), {
+            label: 'cart.addBundle(do)',
             extraRetryCodes: ['P2002', 'P2025'],
             ...AMBIENT_TX_RETRY,
-          }
-        )
-      : await retryOnWriteConflict(
-          () =>
-            prisma.$transaction(writeBundleLine, {
-              isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-              maxWait: 10000,
-              timeout: 30000,
-            }),
-          { label: 'cart.addBundle', extraRetryCodes: ['P2002', 'P2025'] }
-        );
+          })
+        : hasTenantContext()
+          ? await retryOnWriteConflict(
+              () =>
+                withSavepoint(() => writeBundleLine(prisma as unknown as Prisma.TransactionClient)),
+              {
+                label: 'cart.addBundle(ambient-tx)',
+                extraRetryCodes: ['P2002', 'P2025'],
+                ...AMBIENT_TX_RETRY,
+              }
+            )
+          : await retryOnWriteConflict(
+              () =>
+                prisma.$transaction(writeBundleLine, {
+                  isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+                  maxWait: 10000,
+                  timeout: 30000,
+                }),
+              { label: 'cart.addBundle', extraRetryCodes: ['P2002', 'P2025'] }
+            );
 
     if (!result.ok) {
       return result;
     }
 
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -844,18 +916,22 @@ export class CartService {
   ) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
-    const bundle = await prisma.cartBundle.findFirst({
+    const bundle = await (
+      await storeDb(storeId)
+    ).cartBundle.findFirst({
       where: { id: cartBundleId, cartId: cart.id },
     });
     if (!bundle) {
       throw new AppError(404, 'NOT_FOUND', 'Cart bundle not found');
     }
 
-    await withSavepoint(() => prisma.cartBundle.delete({ where: { id: cartBundleId } })).catch(
-      ignoreLineGone
-    );
+    await withSavepoint(async () =>
+      (await storeWriter(storeId)).cartBundle.delete({ where: { id: cartBundleId } })
+    ).catch(ignoreLineGone);
 
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -890,7 +966,8 @@ export class CartService {
     // `status: 'active'` and was resolvable here. A customer could add a
     // product the merchant had deleted to their cart and only discover it at
     // order creation — the same defect the audit reported one step later.
-    const products = await prisma.product.findMany({
+    const repo = await storeRepo(storeId);
+    const products = await repo.db.product.findMany({
       where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
       select: {
         id: true,
@@ -918,7 +995,7 @@ export class CartService {
     // inherits the product flag (lineAllowsBackorder).
     const variantIds = items.map(i => i.variantId).filter((v): v is string => !!v);
     const variants = variantIds.length
-      ? await prisma.productVariant.findMany({
+      ? await repo.db.productVariant.findMany({
           where: { id: { in: variantIds }, productId: { in: productIds }, isActive: true },
           // productId: the ownership check below (a variant must belong to ITS line's product).
           select: { id: true, productId: true, inventory: true, allowBackorder: true },
@@ -997,7 +1074,7 @@ export class CartService {
     // request transaction, the standalone one inside its own. Leaving this
     // inline is what let `addItems` keep the defect `addItem` and `addBundle`
     // were both fixed for.
-    const writeItems = async (tx: Prisma.TransactionClient) => {
+    const writeItems = async (tx: Prisma.TransactionClient, lines = aggregatedItems) => {
       const existingItems = await tx.cartItem.findMany({
         where: { cartId: cart.id, productId: { in: productIds } },
       });
@@ -1005,7 +1082,7 @@ export class CartService {
         existingItems.map(i => [lineKey(i.productId, i.variantId, i.note), i])
       );
 
-      for (const item of aggregatedItems) {
+      for (const item of lines) {
         const product = productById.get(item.productId);
         if (!product) continue;
         // A chosen-but-invalid variant is skipped, not silently dropped to
@@ -1065,7 +1142,19 @@ export class CartService {
       }
     };
 
-    if (hasTenantContext()) {
+    if (repo.backend === 'do') {
+      // Durable Object store (Ruling CF-R2-1): see addItem. The aggregated payload carries each line once, so a retry after a
+      // P2002 on the Nth line must not re-apply `{ increment }` to the lines before it (a transaction would have rolled them
+      // back), so every line is first CHECKED in a write-less pass (INSUFFICIENT_INVENTORY refuses the whole payload, as the
+      // Postgres transaction does) and then written ONE line at a time, each with its own re-read-and-merge retry.
+      await writeItems(doTx(repo, true));
+      for (const item of aggregatedItems)
+        await retryOnWriteConflict(() => writeItems(doTx(repo), [item]), {
+          label: 'cart.addItems(do)',
+          extraRetryCodes: ['P2002', 'P2025'],
+          ...AMBIENT_TX_RETRY,
+        });
+    } else if (hasTenantContext()) {
       // Already inside the request-scoped tenant transaction opened by
       // `tenantContext` middleware, exactly as in `addItem`. `getOrCreate`
       // above writes the new `carts` row through the tenant proxy, and that
@@ -1114,7 +1203,9 @@ export class CartService {
       );
     }
 
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -1139,7 +1230,8 @@ export class CartService {
       'inventory.backorder'
     );
 
-    const item = await prisma.cartItem.findFirst({
+    const repo = await storeRepo(storeId);
+    const item = await repo.db.cartItem.findFirst({
       where: { id: itemId, cartId: cart.id },
       // The variant is REQUIRED here, not a nicety: for a variant line the
       // parent product's `inventory` column is not stock (see
@@ -1156,7 +1248,7 @@ export class CartService {
     }
 
     if (quantity <= 0) {
-      await withSavepoint(() => prisma.cartItem.delete({ where: { id: itemId } })).catch(
+      await withSavepoint(() => repo.writer.cartItem.delete({ where: { id: itemId } })).catch(
         ignoreLineGone
       );
     } else {
@@ -1179,7 +1271,7 @@ export class CartService {
       }
 
       await withSavepoint(() =>
-        prisma.cartItem.update({
+        repo.writer.cartItem.update({
           where: { id: itemId },
           data: { quantity },
         })
@@ -1192,7 +1284,9 @@ export class CartService {
     }
 
     // Track activity for abandonment detection
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -1210,7 +1304,8 @@ export class CartService {
   ) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
-    const item = await prisma.cartItem.findFirst({
+    const repo = await storeRepo(storeId);
+    const item = await repo.db.cartItem.findFirst({
       where: { id: itemId, cartId: cart.id },
     });
 
@@ -1218,12 +1313,14 @@ export class CartService {
       throw new AppError(404, 'NOT_FOUND', 'Cart item not found');
     }
 
-    await withSavepoint(() => prisma.cartItem.delete({ where: { id: itemId } })).catch(
+    await withSavepoint(() => repo.writer.cartItem.delete({ where: { id: itemId } })).catch(
       ignoreLineGone
     );
 
     // Track activity for abandonment detection
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -1240,18 +1337,21 @@ export class CartService {
   ) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId, buyer);
 
-    await prisma.cartItem.deleteMany({
+    const w = await storeWriter(storeId);
+    await w.cartItem.deleteMany({
       where: { cartId: cart.id },
     });
     // Bundles live in their own table (see the file header) — clearing the
     // cart must clear both, or a "cleared" cart would still show its bundle
     // lines and a non-zero subtotal.
-    await prisma.cartBundle.deleteMany({
+    await w.cartBundle.deleteMany({
       where: { cartId: cart.id },
     });
 
     // Track activity for abandonment detection
-    await prisma.cart.update({
+    await (
+      await storeWriter(storeId)
+    ).cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
     });
@@ -1260,12 +1360,13 @@ export class CartService {
   }
 
   static async mergeGuestCart(storeId: string, guestSessionId: string, customerId: string) {
+    const repo = await storeRepo(storeId);
     const [guestCart, userCart] = await Promise.all([
-      prisma.cart.findFirst({
+      repo.db.cart.findFirst({
         where: { storeId, sessionId: guestSessionId, customerId: null },
         include: { items: true, bundles: true },
       }),
-      prisma.cart.findFirst({
+      repo.db.cart.findFirst({
         where: { storeId, customerId },
         include: { items: true, bundles: true },
       }),
@@ -1302,7 +1403,7 @@ export class CartService {
     // never executed against the real index. The unit tests mock Prisma,
     // where a unique index does not exist.
     if (!userCart) {
-      await prisma.cart.update({
+      await repo.writer.cart.update({
         where: { id: guestCart.id, storeId },
         data: { customerId },
       });
@@ -1325,12 +1426,12 @@ export class CartService {
       if (existingItem) {
         // Atomic increment — `userCart` was read before this loop, and the
         // customer's other tab can add to that same line while the merge runs.
-        await prisma.cartItem.update({
+        await repo.writer.cartItem.update({
           where: { id: existingItem.id },
           data: { quantity: { increment: guestItem.quantity } },
         });
       } else {
-        await prisma.cartItem.create({
+        await repo.writer.cartItem.create({
           data: {
             cartId: targetCart.id,
             productId: guestItem.productId,
@@ -1356,12 +1457,12 @@ export class CartService {
 
       if (existingBundle) {
         // Atomic increment — same reason as the item merge above.
-        await prisma.cartBundle.update({
+        await repo.writer.cartBundle.update({
           where: { id: existingBundle.id },
           data: { quantity: { increment: guestBundle.quantity } },
         });
       } else {
-        await prisma.cartBundle.create({
+        await repo.writer.cartBundle.create({
           data: {
             cartId: targetCart.id,
             bundleId: guestBundle.bundleId,
@@ -1372,7 +1473,7 @@ export class CartService {
     }
 
     // Delete guest cart (cascades to its own CartItem/CartBundle rows).
-    await prisma.cart.delete({ where: { id: guestCart.id, storeId } });
+    await repo.writer.cart.delete({ where: { id: guestCart.id, storeId } });
 
     return this.loadMergedCart(storeId, targetCart.id);
   }
@@ -1384,8 +1485,8 @@ export class CartService {
    * return two different shapes — a duplicated include is exactly how that
    * drifts.
    */
-  private static loadMergedCart(storeId: string, cartId: string) {
-    return prisma.cart.findUnique({
+  private static async loadMergedCart(storeId: string, cartId: string) {
+    return (await storeDb(storeId)).cart.findUnique({
       where: { id: cartId, storeId },
       include: {
         items: {
