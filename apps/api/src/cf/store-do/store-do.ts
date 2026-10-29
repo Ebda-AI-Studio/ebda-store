@@ -7,6 +7,7 @@
  * `transactionSync`: no `await` between the stock read and the write.
  */
 import { DurableObject } from 'cloudflare:workers';
+import { handleStoreAdmin } from '../../../../../packages/cf-migrate/src/store-admin.mjs';
 import * as schema from './schema';
 import { makeDrizzle, listProducts, addCartItem, createOrder, StoreError, type Db } from './repo';
 import { CORE_0001 } from './migrations';
@@ -51,6 +52,17 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     super(ctx, env);
     this.db = makeDrizzle(ctx.storage); // once per DO lifetime: no per-request client
     void ctx.blockConcurrencyWhile(async () => this.migrate());
+  }
+
+  /**
+   * The cutover admin surface (__import/__verify/__seal/__status/__unseal/...). Reached ONLY through
+   * cf/cutover.ts, which checks the CUTOVER_IMPORT_SECRET bearer before this DO sees the request.
+   */
+  async fetch(request: Request): Promise<Response> {
+    return handleStoreAdmin(request, {
+      sql: this.ctx.storage.sql as never,
+      transactionSync: fn => this.ctx.storage.transactionSync(fn),
+    });
   }
 
   private migrate(): void {

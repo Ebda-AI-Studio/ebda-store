@@ -11,6 +11,7 @@ const WF = join(ROOT, '.github/workflows');
 const REQ = [
   'API Worker boots on workerd',
   'App builds (affected)',
+  'Deploy workflow changes need the deploy-change label',
   'Detect affected workspaces',
   'Repo guards',
   'Scan for leaked secrets',

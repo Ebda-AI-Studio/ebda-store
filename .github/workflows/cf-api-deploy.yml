@@ -38,6 +38,7 @@ jobs:
         ports:
           - 5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1500m
           --health-cmd "pg_isready -U test -d ebda_smoke"
           --health-interval 10s
           --health-timeout 5s
@@ -60,6 +61,9 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
+          # Bindings the Worker cannot run without: an unset id deploys a Worker with no cache/DB binding (M-052).
+          test -n "$EBDA_HYPERDRIVE_ID" || { echo "::error::EBDA_HYPERDRIVE_ID is not set"; exit 1; }
+          test -n "$EBDA_KV_CACHE_ID" || { echo "::error::EBDA_KV_CACHE_ID is not set"; exit 1; }
       - run: npm ci
       - run: npm run -w packages/shared build
       - run: npm run -w packages/database build
@@ -67,10 +71,13 @@ jobs:
       - run: npx vitest run tests/unit/cf-database-role-guard.test.ts tests/unit/cron-tenant-scopes.test.ts tests/unit/merchant-signup-phone.test.ts
       - run: node scripts/ebda-cf-api-config.mjs
       - name: Require configured runtime secrets
+        # The required list lives in scripts/ci/api-required-secrets.json and is checked against the code by
+        # tests/unit/api-deploy-gates.test.ts (M-052: this gate used to require the retired RESEND_API_KEY and miss the
+        # alert token, so a deploy could ship an API that cannot alert).
         working-directory: apps/api
         run: |
           npx wrangler secret list --config .wrangler.deploy.jsonc > /tmp/ebda-secret-names.json
-          node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); for (const name of ["JWT_SECRET", "ENCRYPTION_KEY", "SUITE_BUYER_KEY_SECRET"]) { if (!names.has(name)) throw new Error(`Missing Worker secret: ${name}`); } for (const name of ["SEARCH_SEMANTIC_ENABLED"]) { if (names.has(name)) throw new Error(`${name} must be a wrangler.jsonc var, not a Worker secret (Ruling SEARCH-T10-1)`); }'
+          node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); const req = require(process.env.GITHUB_WORKSPACE + "/scripts/ci/api-required-secrets.json").required; const missing = req.filter(n => !names.has(n)); if (missing.length) throw new Error(`Missing Worker secret(s): ${missing.join(", ")}`); for (const name of ["SEARCH_SEMANTIC_ENABLED"]) { if (names.has(name)) throw new Error(`${name} must be a wrangler.jsonc var, not a Worker secret (Ruling SEARCH-T10-1)`); }'
       - name: Pre-deploy smoke - boot THIS Worker on workerd (refuse to deploy a Worker that cannot boot)
         # Ruling DEPLOY-SAFETY-1. Fresh Postgres migrated from scratch, the Worker built from the
         # deploy config and booted in local workerd; /health and a tenant-scoped public read must
@@ -94,9 +101,13 @@ jobs:
         id: previous
         run: node scripts/ci/deploy-guard.mjs previous --name ebda-api --cwd apps/api --config .wrangler.deploy.jsonc
       - name: Deploy reviewed API
+        id: deploy
         working-directory: apps/api
         run: npx wrangler deploy --config .wrangler.deploy.jsonc --var BUILD_COMMIT_SHA:$GITHUB_SHA
       - name: Verify the live API, roll back automatically if it is unhealthy
+        # M-007: `wrangler deploy` can upload the new version and still exit non-zero ("Some triggers failed to deploy"). The
+        # verify/rollback step MUST still run then, or a half-deployed Worker is neither verified nor rolled back.
+        if: always() && steps.deploy.conclusion != 'skipped' && steps.previous.conclusion == 'success'
         # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
         # previous version for a few seconds): /health must be ok on THIS commit AND a second route
         # (an unknown store through the database path) must be a clean 404. If not within 90s,
