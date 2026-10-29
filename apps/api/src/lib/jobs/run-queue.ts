@@ -157,7 +157,10 @@ async function runLegacyCron(msg: QueueMessageLike, body: LegacyCronMessage): Pr
   const { CRON_SCHEDULE } = await import('../../cf/cron.js');
   const job = CRON_SCHEDULE[body.cron]?.find(j => j.name === body.name);
   if (!job) {
-    logger.error({ id: msg.id, ...body }, '[jobs] parked legacy cron no longer exists, dropped');
+    logger.error(
+      { id: msg.id, name: body.name, cron: body.cron },
+      '[jobs] parked legacy cron no longer exists, dropped'
+    );
     msg.ack();
     return;
   }
@@ -165,7 +168,10 @@ async function runLegacyCron(msg: QueueMessageLike, body: LegacyCronMessage): Pr
     await job.run();
     msg.ack();
   } catch (err) {
-    logger.error({ err, ...body }, '[jobs] parked legacy cron failed, retrying');
+    logger.error(
+      { err, name: body.name, cron: body.cron },
+      '[jobs] parked legacy cron failed, retrying'
+    );
     if (msg.attempts > 4) msg.ack();
     else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
   }
