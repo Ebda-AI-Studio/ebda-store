@@ -144,4 +144,103 @@ describe('D1 platform schema', () => {
       ).toEqual({ c: 0 });
     });
   });
+
+  describe('billing_grants is append-only (FOUNDING-1, CF-LAST-2)', () => {
+    const grant = (id: string, o: Record<string, unknown> = {}) => {
+      const r = { status: 'pending', ...o };
+      db.prepare(
+        `INSERT INTO billing_grants (id, kind, beneficiary_id, idempotency_key, status, applied_at, period_end_before, period_end_after, revoked_at, revoke_reason)
+         VALUES (?, 'founding', 'b1', ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id,
+        `k-${id}`,
+        r.status as string,
+        (r.applied_at as number) ?? null,
+        (r.before as number) ?? null,
+        (r.after as number) ?? null,
+        (r.revoked_at as number) ?? null,
+        (r.reason as string) ?? null
+      );
+    };
+    const upd = (sql: string) => () => db.prepare(sql).run();
+
+    it('refuses every delete and every change of an identity, source or money column', () => {
+      grant('g1');
+      expectThrows(upd(`DELETE FROM billing_grants WHERE id = 'g1'`), /delete refused/);
+      for (const set of [
+        `kind = 'referral_referrer'`,
+        `beneficiary_id = 'b2'`,
+        `counterpart_id = 'c'`,
+        `value_minor = 5`,
+        `source_event_id = 'e'`,
+        `source_store_id = 's'`,
+        `idempotency_key = 'other'`,
+        `created_at = 1`,
+      ])
+        expectThrows(upd(`UPDATE billing_grants SET ${set} WHERE id = 'g1'`), /immutable column/);
+    });
+
+    it('pending -> applied needs the period bookkeeping; pending -> revoked needs reason and none', () => {
+      grant('g2');
+      expectThrows(
+        upd(`UPDATE billing_grants SET status = 'applied' WHERE id = 'g2'`),
+        /period bookkeeping/
+      );
+      expectThrows(
+        upd(`UPDATE billing_grants SET status = 'pending', applied_at = 1 WHERE id = 'g2'`),
+        /no period bookkeeping/
+      );
+      expectThrows(
+        upd(`UPDATE billing_grants SET status = 'revoked' WHERE id = 'g2'`),
+        /needs revoked_at/
+      );
+      expectThrows(
+        upd(
+          `UPDATE billing_grants SET status = 'revoked', revoked_at = 1, revoke_reason = 'x', applied_at = 1 WHERE id = 'g2'`
+        ),
+        /without period bookkeeping/
+      );
+      expectThrows(
+        upd(`UPDATE billing_grants SET revoked_at = 1 WHERE id = 'g2'`),
+        /belong to a revoked grant/
+      );
+      db.prepare(
+        `UPDATE billing_grants SET status = 'applied', applied_at = 1, period_end_before = 2, period_end_after = 3 WHERE id = 'g2'`
+      ).run();
+    });
+
+    it('an applied grant can only be revoked, with its bookkeeping untouched', () => {
+      grant('g3', { status: 'applied', applied_at: 1, before: 2, after: 3 });
+      expectThrows(
+        upd(`UPDATE billing_grants SET period_end_after = 9 WHERE id = 'g3'`),
+        /can only be revoked/
+      );
+      expectThrows(
+        upd(`UPDATE billing_grants SET applied_at = 9 WHERE id = 'g3'`),
+        /can only be revoked/
+      );
+      expectThrows(
+        upd(
+          `UPDATE billing_grants SET status = 'revoked', revoked_at = 5, revoke_reason = 'r', restored_at = 6 WHERE id = 'g3'`
+        ),
+        /can only be revoked/
+      );
+      db.prepare(
+        `UPDATE billing_grants SET status = 'revoked', revoked_at = 5, revoke_reason = 'r' WHERE id = 'g3'`
+      ).run();
+    });
+
+    it('a revoked grant is final except restored_at, set once', () => {
+      grant('g4', { status: 'revoked', revoked_at: 5, reason: 'r' });
+      for (const set of [
+        `status = 'applied', applied_at = 1, period_end_before = 2, period_end_after = 3, revoked_at = NULL, revoke_reason = NULL`,
+        `revoke_reason = 'other'`,
+        `revoked_at = 6`,
+        `applied_at = 1`,
+      ])
+        expectThrows(upd(`UPDATE billing_grants SET ${set} WHERE id = 'g4'`), /revoked|applied/);
+      db.prepare(`UPDATE billing_grants SET restored_at = 7 WHERE id = 'g4'`).run();
+      expectThrows(upd(`UPDATE billing_grants SET restored_at = 8 WHERE id = 'g4'`), /final/);
+    });
+  });
 });
