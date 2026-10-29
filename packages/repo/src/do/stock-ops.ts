@@ -128,7 +128,7 @@ const product = (db: SyncSql, storeId: string, productId: string): ProductRow | 
   db.all(
     'SELECT id, name, inventory FROM products WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
     [productId, storeId]
-  )[0] as ProductRow | undefined;
+  )[0] as unknown as ProductRow | undefined;
 const variantCount = (db: SyncSql, productId: string): number =>
   db.all('SELECT count(*) AS n FROM product_variants WHERE product_id = ?', [productId])[0]
     .n as number;

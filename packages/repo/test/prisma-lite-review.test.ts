@@ -506,7 +506,11 @@ describe('round 2 review (writes)', () => {
     await expect(
       lite.product.aggregate({ _sum: { price: true }, orderBy: { id: 'asc' } })
     ).rejects.toThrow(/unsupported/);
-    await expect(lite.product.groupBy({ by: ['status'], take: 0 })).rejects.toThrow(/unsupported/);
+    // groupBy take/skip/having/orderBy-aggregate are honoured since PR D2b (CF-MONEY-1); what it still cannot do is refused
+    await expect(lite.product.groupBy({ by: ['status'], cursor: { id: 'x' } })).rejects.toThrow(
+      /unsupported/
+    );
+    await expect(lite.product.groupBy({ by: ['status'], take: -1 })).rejects.toThrow(/take/);
   });
 
   it('MEDIUM 7: no transaction support means writes and $transaction THROW, never run unprotected', async () => {

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { FieldMeta, Meta, ModelMeta, RelationField, ScalarField, SqlRunner } from './types';
 import { decode, encode } from './codec';
+import { enumRankSql } from './enum-order';
 
 /** Cloudflare DO SQLite allows 100 bound parameters per statement. Asserted for EVERY statement (see `guarded`). */
 export const MAX_BOUND = 100;
@@ -340,7 +341,10 @@ export class Engine {
           const d = sortDir(typeof dir === 'string' ? dir : dobj.sort);
           const nulls =
             dobj.nulls !== undefined ? nullsPos(dobj.nulls) : d === 'ASC' ? 'LAST' : 'FIRST';
-          out.push(`${alias}.${q(f.column)} ${d} NULLS ${nulls}`);
+          const col = `${alias}.${q(f.column)}`;
+          out.push(
+            `${f.kind === 'enum' && f.enum ? enumRankSql(col, f.enum, this.meta.enums) : col} ${d} NULLS ${nulls}`
+          );
         } else if (!f.list && !f.external) {
           // to-one: order by the related row's column through a correlated subquery
           const t = this.model(f.type);
@@ -354,8 +358,9 @@ export class Engine {
           const [[col, d]] = entries;
           const cf = this.scalar(t, col);
           const dd = sortDir(d);
+          const sub = `(SELECT ${a}.${q(cf.column)} FROM ${q(t.table)} ${a} WHERE ${join})`;
           out.push(
-            `(SELECT ${a}.${q(cf.column)} FROM ${q(t.table)} ${a} WHERE ${join}) ${dd} NULLS ${dd === 'ASC' ? 'LAST' : 'FIRST'}`
+            `${cf.kind === 'enum' && cf.enum ? enumRankSql(sub, cf.enum, this.meta.enums) : sub} ${dd} NULLS ${dd === 'ASC' ? 'LAST' : 'FIRST'}`
           );
         } else if (
           f.list &&
@@ -420,6 +425,8 @@ export class Engine {
         const f = own(m.fields, k) ? m.fields[k] : undefined;
         if (!f || f.kind === 'relation')
           throw new Error('prisma-lite: cursor with orderBy on a relation is not supported');
+        if (f.kind === 'enum')
+          throw new Error('prisma-lite: cursor with orderBy on an enum is not supported');
         keys.push({ f, prop: k, desc: sortDir(typeof d === 'string' ? d : d?.sort) === 'DESC' });
       }
     for (const p of m.pk)

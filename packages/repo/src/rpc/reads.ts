@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { decodeRpc, encodeRpc } from './codec';
 
-/** The operations a StoreDO answers over RPC. READS ONLY in PR C; writes and money stay on their own paths (PR D). */
+/** The read operations a StoreDO answers over RPC (writes and stock have their own RPCs, PR D1 / D2a). */
 export const READ_OPS = [
   'findMany',
   'findFirst',
@@ -9,6 +9,10 @@ export const READ_OPS = [
   'findFirstOrThrow',
   'findUniqueOrThrow',
   'count',
+  // PR D2b (Ruling CF-MONEY-1): reporting and money reads. prisma-lite's engine answers both; the contract test compares them
+  // with Postgres (`tests/integration/repo-factory-aggregate-contract.test.ts`).
+  'aggregate',
+  'groupBy',
 ] as const;
 export type ReadOp = (typeof READ_OPS)[number];
 
