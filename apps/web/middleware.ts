@@ -1,6 +1,12 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } from '@ebda/shared';
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  newCspNonce,
+  parseStoreHost,
+  storeHost,
+  type ParsedStoreHost,
+  type PlatformApp,
+} from '@ebda/shared';
+import { buildStorefrontCsp } from './src/lib/csp';
 // Relative import (not the `@/*` tsconfig alias) so this file is importable
 // directly from the root Vitest suite, which has no per-workspace `@/*`
 // alias plugin (each app's `@/*` points at its OWN `src/`, so a single
@@ -515,7 +521,29 @@ export const MIDDLEWARE_ASSERTED_HEADERS = [
   LOCALE_SEARCH_HEADER,
 ] as const;
 
+/**
+ * Entry point: the per-request Content-Security-Policy nonce (Ruling CSP-WEB-1), then host routing.
+ *
+ * Mints a nonce, puts `Content-Security-Policy` + `x-nonce` on the REQUEST (that is how Next stamps the nonce on
+ * its own bootstrap and flight-data scripts, and how the root layout reads it for its inline script), runs the
+ * routing below on that request, and sets the same policy on whatever response comes back (page, rewrite,
+ * redirect or 404). Any client-sent `x-nonce` / CSP request header is overwritten here, never trusted.
+ */
 export function middleware(request: NextRequest) {
+  const nonce = newCspNonce();
+  const csp = buildStorefrontCsp(nonce);
+  const headers = new Headers(request.headers);
+  headers.set('x-nonce', nonce);
+  headers.set('Content-Security-Policy', csp);
+  const response = routeStorefront(new NextRequest(request, { headers }));
+  // The studio pages (ebda.app help/status hosts) already carry their own, stricter CSP: keep it.
+  if (!response.headers.has('Content-Security-Policy')) {
+    response.headers.set('Content-Security-Policy', csp);
+  }
+  return response;
+}
+
+function routeStorefront(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
 
   // /tenant-store/* is an INTERNAL rewrite target only (rewrites don't re-enter
