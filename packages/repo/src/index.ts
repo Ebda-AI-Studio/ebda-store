@@ -35,3 +35,9 @@ export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } fr
 export { answerStockOp, type StockAnswer } from './rpc/stock';
 export { runMoneyOp, ensureMoneyOpsSchema, MONEY_OP_NAMES, type MoneyOpName } from './do/money-ops';
 export { answerMoneyOp, type MoneyAnswer } from './rpc/money';
+
+export {
+  routePaymentWebhook,
+  resolveStoreId,
+  drainEntityIndexOutbox,
+} from './platform/entity-index';

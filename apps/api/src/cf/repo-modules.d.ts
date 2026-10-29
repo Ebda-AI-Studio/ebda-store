@@ -53,6 +53,27 @@ declare module '@ebda-src/repo' {
   ): unknown;
   export function ensureSearchIndex(db: SyncSql): void;
   export function ensurePaymentSchema(db: SyncSql): void;
+  export function routePaymentWebhook(
+    d1: unknown,
+    provider: string,
+    ref: string
+  ): Promise<{ storeId: string } | { retry: true; reason: 'unresolved_reference' }>;
+  export function resolveStoreId(d1: unknown, kind: string, id: string): Promise<string | null>;
+  export function drainEntityIndexOutbox(
+    db: SyncSql,
+    d1: unknown,
+    opts?: { now?: number; limit?: number }
+  ): Promise<unknown>;
+  export function trialBalance(
+    db: SyncSql,
+    storeId: string
+  ): {
+    rows: Array<{ code: string; debit: number; credit: number }>;
+    debit: number;
+    credit: number;
+    balanced: boolean;
+  };
+  export function postJournalEntry(db: SyncSql, a: Record<string, unknown>): unknown;
   export interface CheckoutInput {
     storeId: string;
     lines: Array<{ productId: string; variantId?: string; quantity: number }>;

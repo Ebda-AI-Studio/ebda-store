@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma, withSystemJob, type Prisma } from '@ebda/database';
+import { cfBindings } from '../cf/bindings';
+import { enabledStoreIds } from './store-backend';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
@@ -164,14 +166,41 @@ export async function resolveStoreFromWebhookRef(ref: {
   preferStoreId?: string | null;
 }): Promise<string | null> {
   if (!ref.transactionId && !ref.invoiceId) return null;
+  let found: string | null;
   if (ref.provider || ref.preferStoreId) {
     const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
       SELECT public.ebda_webhook_resolve_store_scoped(${ref.transactionId ?? null}, ${ref.invoiceId ?? null}, ${ref.provider ?? null}, ${ref.preferStoreId ?? null}) AS id`;
-    return rows[0]?.id ?? null;
+    found = rows[0]?.id ?? null;
+  } else {
+    const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+      SELECT public.ebda_webhook_resolve_store(${ref.transactionId ?? null}, ${ref.invoiceId ?? null}) AS id`;
+    found = rows[0]?.id ?? null;
   }
-  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
-    SELECT public.ebda_webhook_resolve_store(${ref.transactionId ?? null}, ${ref.invoiceId ?? null}) AS id`;
-  return rows[0]?.id ?? null;
+  // Not a Postgres payment: a store on its Durable Object has no `payments` row here. Its references live in the D1 entity
+  // index (Ruling CF-PAY-1), written in the same DO section that created the payment.
+  return found ?? (await resolveDoStoreFromWebhookRef(ref));
+}
+
+/**
+ * The Durable Object store that owns a provider reference, via the D1 entity index, or null. Only a store the fleet flag
+ * lists is ever returned (an index row for a store that has gone back to Postgres is stale; the definer above owns it), and
+ * a reference that points at a store NOT in the flag is treated as unresolved, never routed (tenant-resolver rule).
+ */
+export async function resolveDoStoreFromWebhookRef(ref: {
+  transactionId?: string | null;
+  invoiceId?: string | null;
+  provider?: string | null;
+}): Promise<string | null> {
+  if (enabledStoreIds().size === 0) return null;
+  const d1 = (cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB;
+  if (!d1) return null;
+  const { routePaymentWebhook } = await import('@ebda-src/repo');
+  for (const r of [ref.transactionId, ref.invoiceId]) {
+    if (!r) continue;
+    const routed = await routePaymentWebhook(d1 as never, ref.provider ?? '', r);
+    if ('storeId' in routed && enabledStoreIds().has(routed.storeId)) return routed.storeId;
+  }
+  return null;
 }
 
 /** An idempotency key -> the order it already settled, if any. */

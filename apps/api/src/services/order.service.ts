@@ -2767,6 +2767,19 @@ export class OrderService {
       const money = await storeMoney(storeId);
       if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
     }
+    // Refund by status on a Durable Object store (Ruling CF-PAY-1): the status flip and the whole reversal are ONE section there.
+    // Every other status of a DO order is still a Postgres write that cannot reach it, so it is refused loudly (never dropped).
+    {
+      const money = await storeMoney(storeId);
+      if (money) {
+        if (status === 'refunded') return OrderService.refundOnDo(money, storeId, orderId);
+        throw new AppError(
+          501,
+          'ORDER_STATUS_NOT_ON_DO',
+          `Moving a Durable Object store's order to ${status} moves with the order reads in the next slice`
+        );
+      }
+    }
     const order = await this.getById(storeId, orderId);
 
     // Validate status transition — shared with the payment-gateway/webhook
@@ -3029,6 +3042,60 @@ export class OrderService {
       if (err instanceof AppError && hit) throw new AppError(hit[0], hit[1], err.message);
       throw err;
     }
+  }
+
+  private static async refundOnDo(money: MoneyClient, storeId: string, orderId: string) {
+    const db = await storeDb(storeId);
+    const before = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      select: {
+        status: true,
+        paymentStatus: true,
+        customerId: true,
+        orderNumber: true,
+        payments: { select: { status: true } },
+      },
+    });
+    if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    assertValidTransition(before.status, 'refunded');
+    if (
+      (before.status === 'pending' || before.status === 'cancelled') &&
+      !hasCapturedPayment(before)
+    )
+      throw new AppError(
+        400,
+        'ORDER_NOT_PAID',
+        'This order has no captured payment, so it cannot be marked refunded'
+      );
+    const requestedAt = new Date();
+    const r = await money.refundBook({ orderId });
+    if (!r.replayed) {
+      const hadCapturedPayment = hasCapturedPayment(before);
+      await OrderService.applyRefundEffects(storeId, orderId, {
+        fireRefundNotification: shouldApplyRefundEffects('refunded', before),
+      });
+      await invalidateCustomersCache(storeId).catch(err =>
+        logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+      );
+      inngest
+        .send({
+          name: 'order/status-changed',
+          data: {
+            orderId,
+            storeId,
+            status: 'refunded',
+            hadCapturedPayment,
+            requestedAt: requestedAt.toISOString(),
+          },
+        })
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, 'Failed to enqueue order/status-changed for a DO refund')
+        );
+    }
+    return (await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    })) as never;
   }
 
   private static async cancelOnDo(

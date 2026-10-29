@@ -198,6 +198,112 @@ export interface MoneyClient {
     a: { orderId: string; proofSubmitted?: boolean },
     key?: string
   ): Promise<'expired' | 'skipped'>;
+  /** Payments, webhooks, refunds, the ledger and gold repricing (Rulings CF-PAY-1, CF-LEDGER-1). Results are the engine's. */
+  paymentCreate(
+    a: {
+      orderId: string;
+      provider: string;
+      amount: number;
+      method?: string | null;
+      currency?: string;
+      transactionId?: string | null;
+      invoiceId?: string | null;
+      paymentUrl?: string | null;
+    },
+    key?: string
+  ): Promise<{ paymentId: string }>;
+  paymentWebhook(
+    a: { input: DoWebhookInput; confirmed?: { kind: string; status: string } | null },
+    key?: string
+  ): Promise<DoWebhookResult>;
+  refundBegin(
+    a: {
+      paymentId: string;
+      amount?: number;
+      refundKey?: string;
+      reason?: string;
+      itemLevel?: boolean;
+    },
+    key?: string
+  ): Promise<DoRefundClaim>;
+  refundComplete(
+    a: { claimId: string; refundId: string; providerStatus?: string; reason?: string },
+    key?: string
+  ): Promise<{ orderStatus: string; booked: boolean; review: boolean }>;
+  refundRelease(
+    a: { claimId: string; reason: string; error?: string },
+    key?: string
+  ): Promise<{ released: boolean; review: boolean }>;
+  refundIndeterminate(a: { claimId: string; error: string }, key?: string): Promise<{ ok: true }>;
+  refundBook(
+    a: {
+      orderId: string;
+      amount?: number;
+      lines?: Array<{ orderItemId: string; quantity: number }>;
+      refundKey?: string;
+      walletCredit?: number;
+      external?: boolean;
+    },
+    key?: string
+  ): Promise<CancelResult & { walletCredited: number; review?: string }>;
+  journalSale(
+    a: { orderId: string },
+    key?: string
+  ): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  journalRefund(
+    a: { orderId: string; reason?: string },
+    key?: string
+  ): Promise<{ reversed: number }>;
+  goldApplyRates(a: Record<string, unknown>, key?: string): Promise<any>;
+  goldDecidePending(a: Record<string, unknown>, key?: string): Promise<any>;
+  goldUpdateSettings(a: Record<string, unknown>, key?: string): Promise<any>;
+  goldRepriceProduct(a: { productId: string }, key?: string): Promise<{ repriced: number }>;
+}
+
+export interface DoWebhookInput {
+  provider: string;
+  eventId: string;
+  providerRef: string;
+  kind: 'payment' | 'refund';
+  event?: string;
+  status?: string;
+  amount?: number | null;
+  currency?: string | null;
+  paidAt?: number | null;
+  paymentMethod?: string | null;
+  refund?: {
+    refundId: string;
+    status: 'completed' | 'failed' | 'pending' | 'processing';
+    amount?: number | null;
+    refundReference?: string | null;
+  };
+  rawPayload?: unknown;
+}
+export interface DoWebhookResult {
+  outcome: 'applied' | 'replayed' | 'ignored' | 'held';
+  paymentId: string;
+  orderId: string;
+  paymentStatus: string;
+  orderStatus: string;
+  alerts: Array<{
+    kind: string;
+    paymentId: string;
+    orderId: string;
+    body: string;
+    context?: Record<string, unknown>;
+  }>;
+  postCommit: Array<'order_paid' | 'payment_failed' | 'order_reversed'>;
+}
+export interface DoRefundClaim {
+  claimId: string;
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  isFullRefund: boolean;
+  flipsOrder: boolean;
+  priorStatus: string;
+  claimedStatus: 'refunded' | 'partially_refunded';
+  refundKey: string | null;
 }
 
 /** The checkout input of the DO engine (`packages/repo/src/do/checkout.ts` `CheckoutInput`) minus `storeId` and `now`. */
@@ -339,6 +445,19 @@ export function makeMoneyClient(
     confirmPayment: (a, key) => call('confirmPayment', a, key),
     cancel: (a, key) => call('cancel', a, key),
     expireHold: (a, key) => call('expireHold', a, key),
+    paymentCreate: (a, key) => call('paymentCreate', a, key),
+    paymentWebhook: (a, key) => call('paymentWebhook', a, key),
+    refundBegin: (a, key) => call('refundBegin', a, key),
+    refundComplete: (a, key) => call('refundComplete', a, key),
+    refundRelease: (a, key) => call('refundRelease', a, key),
+    refundIndeterminate: (a, key) => call('refundIndeterminate', a, key),
+    refundBook: (a, key) => call('refundBook', a, key),
+    journalSale: (a, key) => call('journalSale', a, key),
+    journalRefund: (a, key) => call('journalRefund', a, key),
+    goldApplyRates: (a, key) => call('goldApplyRates', a, key),
+    goldDecidePending: (a, key) => call('goldDecidePending', a, key),
+    goldUpdateSettings: (a, key) => call('goldUpdateSettings', a, key),
+    goldRepriceProduct: (a, key) => call('goldRepriceProduct', a, key),
   };
 }
 
