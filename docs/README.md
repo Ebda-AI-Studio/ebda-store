@@ -86,6 +86,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/fn-map.json](cf/fn-map.json) - fn map
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
+- [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
 - [cf/repo-factory.md](cf/repo-factory.md) - Repo factory: reads on the store's backend (INFRA-CF-1 PR C, Ruling CF-REPO-1)
 
 ## contracts - Service and API contracts
