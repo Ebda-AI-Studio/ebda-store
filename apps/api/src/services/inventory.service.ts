@@ -304,6 +304,7 @@ export class InventoryService {
         db.inventoryHistory.findUniqueOrThrow({ where: { id: r.historyId } }),
       ]);
       await notifyCatalogChanged({ storeId, productIds: [adjustment.productId] });
+      await invalidateStoreProductCaches(storeId);
       return this.afterAdjust(
         storeId,
         adjustment.productId,
@@ -380,6 +381,7 @@ export class InventoryService {
       }),
     ]);
 
+    await invalidateStoreProductCaches(storeId);
     return this.afterAdjust(
       storeId,
       adjustment.productId,
@@ -415,7 +417,6 @@ export class InventoryService {
     // must clear (see the class-wide fix on this defect: a bundle's
     // isPurchasable/componentSum depend on component product stock, and
     // this write path bypassed the cache entirely before).
-    await invalidateStoreProductCaches(storeId);
 
     const result = {
       product: {
@@ -648,6 +649,7 @@ export class InventoryService {
         db.inventoryHistory.findUniqueOrThrow({ where: { id: r.historyId } }),
       ]);
       await notifyCatalogChanged({ storeId, productIds: [productId] });
+      await invalidateStoreProductCaches(storeId);
       return this.afterAdjust(
         storeId,
         productId,
@@ -701,6 +703,7 @@ export class InventoryService {
       }),
     ]);
 
+    await invalidateStoreProductCaches(storeId);
     return this.afterAdjust(
       storeId,
       productId,
