@@ -25,6 +25,7 @@ import { featureService } from '../../apps/api/src/services/feature.service';
 import { handleOrderRefunded } from '../../apps/api/src/lib/inngest/functions/order-refunded';
 import {
   makeMoneyClient,
+  storeWriter,
   withRepo,
   type StoreReads,
   type StoreWrites,
@@ -152,7 +153,9 @@ const address = (i: number) => ({
 async function place(w: World, qty: number, extra: Record<string, unknown> = {}, i = 1) {
   const sessionId = cartSessionId('d2b2');
   const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
-  await prisma.cartItem.create({ data: { cartId: cart.id, productId: w.product, quantity: qty } });
+  await (
+    await storeWriter(STORE)
+  ).cartItem.create({ data: { cartId: cart.id, productId: w.product, quantity: qty } });
   const o = await OrderService.create(
     STORE,
     undefined,
@@ -200,8 +203,39 @@ async function state(w: World) {
     where: { productId: w.product },
     select: { type: true, quantity: true, previousStock: true, newStock: true },
   });
+  // PR R2 (Ruling CF-R2-1): the fiscal documents of those orders (number, serial, amounts, payload) and the cart rows left
+  // behind are part of every scenario's trace, so every order scenario also proves the gapless numbering and the cart claim.
+  const orderIds = (
+    await db.order.findMany({
+      where: { storeId: STORE, items: { some: { productId: w.product } } },
+      select: { id: true },
+    })
+  ).map((o: { id: string }) => o.id);
+  const fiscal = await db.fiscalDocument.findMany({
+    where: { storeId: STORE, orderId: { in: orderIds } },
+    select: {
+      docType: true,
+      serial: true,
+      number: true,
+      status: true,
+      currency: true,
+      netAmount: true,
+      vatAmount: true,
+      totalAmount: true,
+      vatRateBps: true,
+      sellerTrn: true,
+      refundRef: true,
+      originalNumber: true,
+      payload: true,
+    },
+  });
+  const counters = await db.fiscalDocument.count({ where: { storeId: STORE } });
+  const cartItems = await db.cartItem.count({ where: { cart: { storeId: STORE } } });
   const key = (r: unknown) => JSON.stringify(r);
   return {
+    fiscal: fiscal.sort((a: any, b: any) => key(a).localeCompare(key(b))),
+    documentsInStore: counters,
+    cartItems,
     products,
     coupons,
     orders: orders.sort((a: any, b: any) => key(a).localeCompare(key(b))),
@@ -242,6 +276,12 @@ beforeAll(async () => {
       data: { name: 'D2b2', slug: `d2b2-${sfx}`, ownerId: owner.id, status: 'active' },
     })
   ).id;
+  // the DO's copy of the store's settings: the sale document reads its seller (name, address, phone, email) from it
+  sqlite
+    .prepare(
+      `INSERT OR REPLACE INTO store_profile (store_id, name, slug, owner_id) VALUES (?, 'D2b2', ?, ?)`
+    )
+    .run(STORE, `d2b2-${sfx}`, owner.id);
   await prisma.paymentConfig.create({
     data: {
       storeId: STORE,
@@ -473,6 +513,126 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.state.orders[0].status).toBe('cancelled');
   });
 
+  it('fiscal: each order gets one receipt with the next gapless number; the document and its payload are the same on both backends', async () => {
+    const t = await parity(20, async w => {
+      await place(w, 2, { couponCode: w.coupon }, 1); // a discount line in the payload
+      await place(w, 1, {}, 2);
+      await place(w, 99, {}, 3).catch(() => undefined); // refused: burns no number
+      return place(w, 1, {}, 4);
+    });
+    expect(t.state.fiscal.map((d: any) => d.docType)).toEqual(['receipt', 'receipt', 'receipt']);
+    const serials = t.state.fiscal.map((d: any) => d.serial).sort((a: number, b: number) => a - b);
+    expect(serials.slice(1).every((x: number, i: number) => x === serials[i] + 1)).toBe(true); // no gap
+    expect(t.state.fiscal[0].payload.lines[0].kind).toBe('item');
+  });
+
+  it('fiscal: an unpaid order that is cancelled keeps its number, marked cancelled; the next order takes the next number', async () => {
+    const t = await parity(10, async w => {
+      const o = (await place(w, 1, {}, 1)) as { id: string };
+      await OrderService.updateStatus(STORE, o.id, 'cancelled');
+      if ((await (await import('../../apps/api/src/lib/repo-factory')).storeMoney(STORE)) === null)
+        await handleOrderRefunded(o.id, STORE, true, false, inlineStep);
+      return place(w, 1, {}, 2);
+    });
+    expect(t.state.fiscal.map((d: any) => d.status).sort()).toEqual(['cancelled', 'issued']);
+  });
+
+  it('fiscal: partial refunds get credit notes keyed on the refund, capped at what is left; a replay issues nothing', async () => {
+    const t = await parity(10, async w => {
+      const o = (await place(w, 1, {}, 1)) as { id: string };
+      const refund = async (refundKey: string, refundAmount: number) => {
+        const partial = { items: [], refundKey, refundAmount, amountOnly: true };
+        if (
+          (await (await import('../../apps/api/src/lib/repo-factory')).storeMoney(STORE)) === null
+        )
+          await handleOrderRefunded(o.id, STORE, false, false, inlineStep, partial);
+        else
+          await OrderService.applyRefundEffects(STORE, o.id, {
+            restoreInventory: false,
+            fireRefundNotification: false,
+            partial,
+          });
+      };
+      await refund('refund:a', 3_000);
+      await refund('refund:a', 3_000); // the same refund again
+      await refund('refund:b', 99_999_999); // more than is left: capped
+      await refund('refund:c', 100); // nothing left
+      return 'done';
+    });
+    const credits = t.state.fiscal.filter((d: any) => d.docType === 'refund_receipt');
+    expect(credits).toHaveLength(2);
+    expect(credits.reduce((n: number, d: any) => n + d.totalAmount, 0)).toBe(10_000);
+  });
+
+  it('fiscal: with a verified VAT profile the sale is a TAX INVOICE naming the buyer, VAT-exclusive and VAT-inclusive; its credit notes sum to it', async () => {
+    const withTax = async (included: boolean) => {
+      await prisma.store.update({
+        where: { id: STORE },
+        data: { taxEnabled: true, taxIncludedInPrice: included },
+      });
+      const profile = await prisma.storeTaxProfile.create({
+        data: {
+          storeId: STORE,
+          status: 'verified',
+          taxRegistrationNumber: '100200300',
+          legalName: 'D2b2 LLC',
+        },
+      });
+      const rate = await prisma.taxRate.create({
+        data: { storeId: STORE, name: 'VAT', rate: 14, isActive: true },
+      });
+      sqlite.exec(
+        `DELETE FROM store_config WHERE store_id = '${STORE}';
+         INSERT INTO store_config (store_id, tax_enabled, tax_included_in_price) VALUES ('${STORE}', 1, ${included ? 1 : 0});
+         INSERT INTO store_tax_profiles (id, store_id, status, tax_registration_number, legal_name) VALUES ('${profile.id}', '${STORE}', 'verified', '100200300', 'D2b2 LLC');
+         INSERT INTO tax_rates (id, store_id, name, rate, is_active) VALUES ('${rate.id}', '${STORE}', 'VAT', 1400, 1);`
+      );
+      return async () => {
+        await prisma.taxRate.delete({ where: { id: rate.id } });
+        await prisma.storeTaxProfile.delete({ where: { id: profile.id } });
+        await prisma.store.update({
+          where: { id: STORE },
+          data: { taxEnabled: false, taxIncludedInPrice: false },
+        });
+        sqlite.exec(
+          `DELETE FROM store_config WHERE store_id = '${STORE}'; DELETE FROM store_tax_profiles; DELETE FROM tax_rates;`
+        );
+      };
+    };
+    for (const included of [false, true]) {
+      const undo = await withTax(included);
+      try {
+        const t = await parity(10, async w => {
+          const o = (await place(w, 2, { couponCode: w.coupon }, 1)) as { id: string };
+          const partial = {
+            items: [],
+            refundKey: `refund:t-${included}`,
+            refundAmount: 4_000,
+            amountOnly: true,
+          };
+          if (
+            (await (await import('../../apps/api/src/lib/repo-factory')).storeMoney(STORE)) === null
+          )
+            await handleOrderRefunded(o.id, STORE, false, false, inlineStep, partial);
+          else
+            await OrderService.applyRefundEffects(STORE, o.id, {
+              restoreInventory: false,
+              fireRefundNotification: false,
+              partial,
+            });
+          return 'done';
+        });
+        const invoice = t.state.fiscal.find((d: any) => d.docType === 'tax_invoice');
+        expect(invoice).toMatchObject({ sellerTrn: '100200300', vatRateBps: 1400 });
+        expect(invoice.vatAmount).toBeGreaterThan(0);
+        expect(invoice.payload.buyer.name).toBe('Mona Adel');
+        expect(t.state.fiscal.some((d: any) => d.docType === 'credit_note')).toBe(true);
+      } finally {
+        await undo();
+      }
+    }
+  });
+
   it('a plain order: totals, items, stock and the sale ledger row are the same', async () => {
     const t = await parity(10, w => place(w, 3));
     expect(t.state.products[0].inventory).toBe(7);
@@ -599,7 +759,9 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     const t = await parity(1, async w => {
       const sessionId = cartSessionId('d2b4q');
       const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
-      await prisma.cartItem.create({
+      await (
+        await storeWriter(STORE)
+      ).cartItem.create({
         data: { cartId: cart.id, productId: w.product, quantity: 3 },
       });
       const q = await OrderService.quote(
@@ -641,7 +803,9 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       const out = await on(async () => {
         const sessionId = cartSessionId('d2b4c');
         const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
-        await prisma.cartItem.create({
+        await (
+          await storeWriter(STORE)
+        ).cartItem.create({
           data: { cartId: cart.id, productId: w.product, quantity: 2 },
         });
         const submit = (i: number) =>
@@ -690,7 +854,9 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
         const place1 = async (extra: Record<string, unknown>, note?: string) => {
           const sessionId = cartSessionId('d2b4p');
           const cart = await CartService.getOrCreate(STORE, sessionId, undefined);
-          await prisma.cartItem.create({
+          await (
+            await storeWriter(STORE)
+          ).cartItem.create({
             data: { cartId: cart.id, productId: w.product, quantity: 1, note: note ?? null },
           });
           return settle(() =>
