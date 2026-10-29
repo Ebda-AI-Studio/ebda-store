@@ -73,8 +73,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/gold-rate/gold-rate.service.ts': {
     category: 'writer',
     reason:
-      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price; it also reads each variant's own price to refuse a fixed variant that has none (B5-36)",
-    reads: { setProductPricing: 6 },
+      "Ruling B5-13/B5-19: setProductPricing reads a product's price to freeze it when a gold product goes back to fixed (audit row) and to return the new price; it also reads each variant's own price to refuse a fixed variant that has none (B5-36); the Durable Object branch (CF-LAST-1) reads the frozen price once more",
+    reads: { setProductPricing: 7 },
   },
   'services/cart.service.ts': {
     category: 'resolver-input',
@@ -310,7 +310,7 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/variant.service.ts': {
     category: 'writer',
     reason: 'variant price edits',
-    reads: { createVariant: 1, createVariantRow: 1, getProductVariants: 1 },
+    reads: { createVariant: 2, createVariantRow: 1, getProductVariants: 1 },
   },
   'routes/product.routes.ts': {
     category: 'writer',
