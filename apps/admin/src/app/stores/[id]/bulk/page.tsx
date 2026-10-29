@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { BulkExportPanel } from './_components/BulkExportPanel';
 import { BulkImportWizard } from './_components/BulkImportWizard';
 import { BulkTabs } from './_components/BulkTabs';
+import { CatalogImportPanel } from './_components/CatalogImportPanel';
 import type { BulkTab } from './_components/types';
 import { useBulkOperations } from './_hooks/useBulkOperations';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
@@ -85,6 +86,8 @@ export default function BulkOperationsPage() {
           onViewProducts={() => router.push(`/stores/${storeId}/products`)}
         />
       )}
+
+      {activeTab === 'catalog' && <CatalogImportPanel storeId={storeId} />}
 
       {activeTab === 'export' && (
         <BulkExportPanel
