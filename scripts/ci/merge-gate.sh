@@ -10,6 +10,7 @@
 #   - every check is COMPLETED with SUCCESS / SKIPPED / NEUTRAL (queued, in progress, failed, cancelled, timed out: no)
 #   - every REQUIRED check is an explicit SUCCESS. The required list is DERIVED from .github/workflows by
 #     scripts/ci/merge-gate-required.mjs (jobs that always run on a PR), so it cannot drift from the workflows.
+# Only the LATEST run per check name counts (the rollup keeps old failed runs of the same name on the same sha).
 # A failed/cancelled check or a moved head ends the run at once (exit 1). Pending checks are waited on, up to
 # --max-wait-min (default 180); running out of time exits 2 and merges nothing.
 #
@@ -44,8 +45,11 @@ evaluate() {
     def nm: (.name // .context);
     def st: if .__typename == "StatusContext" then (if .state == "PENDING" or .state == "EXPECTED" then "IN_PROGRESS" else "COMPLETED" end) else .status end;
     def cc: if .__typename == "StatusContext" then (if .state == "SUCCESS" then "SUCCESS" else .state end) else (.conclusion // "") end;
+    # statusCheckRollup keeps OLD runs of a check name on the same head sha: judge only the LATEST run per name
+    # (by startedAt, else createdAt/completedAt; ties keep rollup order, last wins).
+    def ts: (.startedAt // .createdAt // .completedAt // "");
     . as $p
-    | ($p.statusCheckRollup // []) as $c
+    | ([($p.statusCheckRollup // [])[]] | to_entries | map(.value + {__i: .key}) | group_by(nm) | map(sort_by([ts, .__i]) | last)) as $c
     | if ($p.headRefOid | startswith($want) | not) then "refuse:head moved to \($p.headRefOid[0:9]) (expected \($want))"
       elif [$c[] | select(st == "COMPLETED" and (cc | IN("SUCCESS","SKIPPED","NEUTRAL") | not)) | nm] | length > 0
         then "refuse:failing check(s): \([$c[] | select(st == "COMPLETED" and (cc | IN("SUCCESS","SKIPPED","NEUTRAL") | not)) | nm] | join(", "))"
