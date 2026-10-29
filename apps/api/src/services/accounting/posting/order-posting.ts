@@ -29,7 +29,10 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
  *
  * Posts TWO entries (atomic per-entry, separate idempotency keys):
  *   1. Cash/revenue entry  (sourceId = orderId)
- *      DR Cash[provider]          total
+ *      DR Cash[provider]          total - walletAmount
+ *      DR 2150 Customer Wallet    walletAmount (store credit redeemed at checkout; Ruling
+ *                                 WALLET-GL-1 — the wallet part is a tender like any other,
+ *                                 it settles the liability the credit created)
  *      CR Sales Revenue (net)     subtotal - discount [- tax, if tax-inclusive]
  *      CR Tax Payable             tax (if > 0)
  *      CR Shipping Income         shipping (if > 0)
@@ -47,7 +50,6 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
  *   - Order.paymentStatus is not 'paid' (logged as info)
  *   - Order is already cancelled/refunded (logged as warn — no sale to book)
  *   - Order.store.accountingEnabled is false (logged as info)
- *   - Order.walletAmount > 0 (logged as warn — Ruling W-3, see below)
  *   - Order.store has no seeded COA — postEntry throws via getSystemAccountIdByCode
  */
 export async function postOrderPaymentJournal(args: {
@@ -103,26 +105,13 @@ export async function postOrderPaymentJournal(args: {
     );
     return;
   }
-  // Customer-wallet spend (D1). The chart of accounts has no store-credit
-  // liability account yet (Ruling W-3), so the cash line below — `order.total`
-  // — would book the wallet portion as cash that never arrived. Wallet
-  // checkout is refused while accounting is on (WalletService.
-  // getCheckoutAvailability), so reaching here means accounting was switched
-  // on between checkout and payment. Refuse to post a wrong entry and say so;
-  // the order stays un-journaled, which the refund path already tolerates
-  // (postRefundJournal no-ops when no entry exists).
-  if (order.walletAmount > 0) {
-    logger.warn(
-      { orderId, storeId: order.storeId, walletAmount: order.walletAmount },
-      'postOrderPaymentJournal: wallet-paid order NOT journaled — store-credit liability is not modelled in the GL (Ruling W-3)'
-    );
-    return;
-  }
-
   const completedPayment = order.payments[0];
   const provider = completedPayment?.provider ?? 'cod';
   const cashCode = PROVIDER_TO_CASH_CODE[provider] ?? '1000';
 
+  // Store credit redeemed at checkout (Ruling WALLET-GL-1): never more than the total.
+  const walletPart = Math.min(Math.max(order.walletAmount ?? 0, 0), order.total);
+  const cashPart = order.total - walletPart;
   const cashAccountId = await getSystemAccountIdByCode(order.storeId, cashCode, client);
   const revenueAccountId = await getSystemAccountIdByCode(order.storeId, '4000', client);
   const taxPayableAccountId = await getSystemAccountIdByCode(order.storeId, '2100', client);
@@ -157,16 +146,25 @@ export async function postOrderPaymentJournal(args: {
     lineMemo?: string;
     refTable?: string;
     refId?: string;
-  }> = [
-    {
+  }> = [];
+  if (cashPart > 0)
+    cashLines.push({
       accountId: cashAccountId,
-      debit: order.total,
+      debit: cashPart,
       credit: 0,
       lineMemo: `Order ${order.orderNumber} payment`,
       refTable: 'orders',
       refId: order.id,
-    },
-  ];
+    });
+  if (walletPart > 0)
+    cashLines.push({
+      accountId: await getSystemAccountIdByCode(order.storeId, '2150', client),
+      debit: walletPart,
+      credit: 0,
+      lineMemo: `Order ${order.orderNumber} paid from customer wallet`,
+      refTable: 'orders',
+      refId: order.id,
+    });
   if (netRevenue > 0)
     cashLines.push({
       accountId: revenueAccountId,
