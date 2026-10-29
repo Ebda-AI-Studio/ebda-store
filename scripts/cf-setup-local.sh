@@ -137,8 +137,8 @@ EOF
   ] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOShardedTagCache", "DOQueueHandler"] }],
 ${ROUTES_JSON}
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "logpush": true
 }
 EOF
@@ -155,8 +155,8 @@ EOF
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
 ${ROUTES_JSON}
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "logpush": true
 }
 EOF
