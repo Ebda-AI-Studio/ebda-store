@@ -269,9 +269,16 @@
     "TRUST_PROXY_HOPS": "1",
     // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
-    // Which per-store schedules run as StoreSchedule alarms instead of a global cron (src/lib/jobs/alarm-flag.ts):
-    // comma list of function ids or "all"; "" = every schedule stays a cron.
-    "JOBS_CF_ALARMS": "",
+    // Which alarm-ready jobs fire as StoreSchedule alarms (src/lib/jobs/alarm-flag.ts): comma list or "all". Alarms are armed ONLY for
+    // stores served by their Durable Object (src/lib/jobs/store-schedule.ts, Ruling CF-JOBS-1); every Postgres store keeps the global
+    // cron. With JOBS_ON_DO unset no store is a DO store, so "all" arms nothing today.
+    "JOBS_CF_ALARMS": "all",
+    // "1" = background jobs follow each store's backend flag (STORE_DO_ENABLED_IDS): DO stores get alarms, their unported jobs are
+    // refused with an alert, sweeps skip them (src/lib/jobs/do-guard.ts). Flipped together with the flag at the cutover; "" = every store on Postgres.
+    "JOBS_ON_DO": "",
+    // "1" = cutover write freeze (docs/runbooks/cutover-cf.md 5.1): HTTP writes answer 503 AND crons, queue consumers, Workflows and
+    // DO alarms stand still (parked, never dropped; src/lib/jobs/freeze.ts). Anything else = off.
+    "WRITES_FROZEN": "",
     // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
     "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
     // Semantic search kill switch (docs/ENVIRONMENT.md "Semantic search"). Flipped ONLY here, by a PR

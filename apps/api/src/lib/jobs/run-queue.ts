@@ -7,6 +7,8 @@
  */
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch';
+import { decideRun, guardedRun, reportRefusal } from './do-guard';
+import { FREEZE_MAX_WAITS, FREEZE_PARK_SECONDS, writesFrozen } from './freeze';
 import { reportJobFailure, runOnFailure } from './failure';
 import {
   debounceClient,
@@ -18,7 +20,13 @@ import {
 } from './gate';
 import { getJob } from './registry';
 import { inlineStep, isNonRetriable } from './step-adapter';
-import { isJobQueueMessage, JOBS_DLQ_NAME, type JobQueueMessage } from './start';
+import {
+  isJobQueueMessage,
+  isLegacyCronMessage,
+  JOBS_DLQ_NAME,
+  type JobQueueMessage,
+  type LegacyCronMessage,
+} from './start';
 import { cfBindings } from '../../cf/bindings';
 
 const GATE_MAX_WAITS = 120;
@@ -52,6 +60,16 @@ export async function handleJobsBatch(batch: JobsBatchLike): Promise<void> {
 }
 
 async function handleOne(msg: QueueMessageLike): Promise<void> {
+  // Write freeze (Ruling CF-JOBS-2): the Worker parks the whole batch first (cf/queue-freeze.ts); this is the same rule
+  // for a message that reaches the handler anyway, so no path runs a job while frozen.
+  if (writesFrozen()) {
+    await parkFrozen(msg);
+    return;
+  }
+  if (isLegacyCronMessage(msg.body)) {
+    await runLegacyCron(msg, msg.body);
+    return;
+  }
   if (!isJobQueueMessage(msg.body)) {
     logger.error({ id: msg.id }, '[jobs] unreadable queue message dropped');
     msg.ack();
@@ -65,6 +83,14 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
     return;
   }
   const event = body.event;
+
+  // A DO store's job that still reads/writes its Postgres tables does not run (Ruling CF-JOBS-1): alert, ack, no failure path.
+  const decision = decideRun(def, event);
+  if (!decision.run) {
+    await reportRefusal(def, event, msg.id, decision);
+    msg.ack();
+    return;
+  }
 
   const deb = debounceFor(def, event);
   if (deb && body.debounceToken && !(await debounceClient.isLatest(deb, body.debounceToken))) {
@@ -83,12 +109,14 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
       }
       held.push({ gate, token });
     }
-    await def.handler({
-      event,
-      step: inlineStep({ dispatch: dispatchEventsToAll }),
-      runId: msg.id,
-      attempt: msg.attempts - 1,
-    });
+    await guardedRun(def, event, () =>
+      def.handler({
+        event,
+        step: inlineStep({ dispatch: dispatchEventsToAll }),
+        runId: msg.id,
+        attempt: msg.attempts - 1,
+      })
+    );
     msg.ack();
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
@@ -104,6 +132,42 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
     }
   } finally {
     await release(held);
+  }
+}
+
+/** Re-send the message later (no attempt spent); after 24 h of freeze it goes to the failure path, loudly. */
+async function parkFrozen(msg: QueueMessageLike): Promise<void> {
+  const body = msg.body as { frozenWaits?: number } | undefined;
+  const waits = (body?.frozenWaits ?? 0) + 1;
+  const q = cfBindings()?.JOBS_QUEUE;
+  if (waits > FREEZE_MAX_WAITS || !q) {
+    // No producer binding, or a day-long freeze: let the platform retry/DLQ path (which alerts) take over.
+    msg.retry({ delaySeconds: FREEZE_PARK_SECONDS });
+    return;
+  }
+  await q.send(
+    { ...(msg.body as object), frozenWaits: waits },
+    { contentType: 'json', delaySeconds: FREEZE_PARK_SECONDS }
+  );
+  msg.ack();
+}
+
+/** A rare legacy cron (cf/cron.ts CRON_SCHEDULE) that was parked during a freeze and now runs. */
+async function runLegacyCron(msg: QueueMessageLike, body: LegacyCronMessage): Promise<void> {
+  const { CRON_SCHEDULE } = await import('../../cf/cron.js');
+  const job = CRON_SCHEDULE[body.cron]?.find(j => j.name === body.name);
+  if (!job) {
+    logger.error({ id: msg.id, ...body }, '[jobs] parked legacy cron no longer exists, dropped');
+    msg.ack();
+    return;
+  }
+  try {
+    await job.run();
+    msg.ack();
+  } catch (err) {
+    logger.error({ err, ...body }, '[jobs] parked legacy cron failed, retrying');
+    if (msg.attempts > 4) msg.ack();
+    else msg.retry({ delaySeconds: jobRetryDelaySeconds(msg.attempts) });
   }
 }
 
@@ -146,6 +210,10 @@ async function parkForGate(msg: QueueMessageLike, body: JobQueueMessage, gate: G
 
 /** Retries exhausted at the platform level (a crash loop): same failure path, once. */
 async function handleDeadLetter(msg: QueueMessageLike): Promise<void> {
+  if (writesFrozen()) {
+    msg.retry({ delaySeconds: 3600 });
+    return;
+  }
   if (isJobQueueMessage(msg.body)) {
     const def = getJob(msg.body.fn);
     if (def) {

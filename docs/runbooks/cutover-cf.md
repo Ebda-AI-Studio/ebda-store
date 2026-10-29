@@ -1,6 +1,6 @@
 # Cutover runbook: Postgres (Neon) to Cloudflare (StoreDO + D1)
 
-INFRA-CF-1 phase 5. Rulings: CUTOVER-1 (one batch, shrunken shadow, Postgres read-only fallback for 7 days), CUTOVER-2 (tooling design), CUTOVER-3 (write freeze). Plan: `business/ebda/plans/2026-10-28-store-on-cloudflare-detailed.md` (phases 4, 5, 7.2).
+INFRA-CF-1 phase 5. Rulings: CUTOVER-1 (one batch, shrunken shadow, Postgres read-only fallback for 7 days), CUTOVER-2 (tooling design), CUTOVER-3 (write freeze), CF-JOBS-1 (jobs and DO stores), CF-JOBS-2 (the freeze reaches every writer). Plan: `business/ebda/plans/2026-10-28-store-on-cloudflare-detailed.md` (phases 4, 5, 7.2).
 
 Production today (Ruling CUTOVER-1, measured on the 2026-10-25 dump): 6 stores (5 `storedemo*` + `qa-walk-store-1010`), 19 orders, 6 users, 26 MB. No real merchants. The cutover is ONE batch for all stores, never store by store.
 
@@ -8,12 +8,12 @@ Production today (Ruling CUTOVER-1, measured on the 2026-10-25 dump): 6 stores (
 
 ## 1. Roles and who to page
 
-| Who                     | Role                                                       | How                                                                                            |
-| ----------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Ahmad                   | Owner, the only human operator, gives the go and the no-go | Telegram (bot `@EbdaAIStudiobot` alert chat); must be awake and reachable for the whole window |
-| Ebda controller session | Runs the sequence below, owns the decision log             | the session that holds this runbook                                                            |
-| Cutover agent           | Tooling in `scripts/cf/` and `packages/cf-migrate/`        | ask the controller; do not hand-edit data to "fix" a mismatch                                  |
-| Inngest dashboard       | Pausing background writers                                 | Ahmad (dashboard login)                                                                        |
+| Who                          | Role                                                               | How                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Ahmad                        | Owner, the only human operator, gives the go and the no-go         | Telegram (bot `@EbdaAIStudiobot` alert chat); must be awake and reachable for the whole window |
+| Ebda controller session      | Runs the sequence below, owns the decision log                     | the session that holds this runbook                                                            |
+| Cutover agent                | Tooling in `scripts/cf/` and `packages/cf-migrate/`                | ask the controller; do not hand-edit data to "fix" a mismatch                                  |
+| Job freeze (`WRITES_FROZEN`) | Stops every background writer: crons, queues, Workflows, DO alarms | the controller (Worker var + deploy); Ahmad has no dashboard step (Inngest is removed, G5-3)   |
 
 Page Ahmad immediately (P0, `docs/INCIDENT.md`) when: verify does not print `PASS`, a smoke step fails after the flip, `/health` disagrees with the flag, or a rollback itself does not restore service.
 
@@ -68,9 +68,9 @@ Everything between 5.1 and 7 happens inside the window. Target length from the r
 
 ### 5.1 Freeze writers
 
-1. Pause Inngest functions for the `ebda` app in the Inngest dashboard (Ahmad). The API freeze below also 503s Inngest's invoke POSTs, but pausing first avoids a retry storm and half-run steps.
-2. Set `WRITES_FROZEN=1` on `ebda-api` (var in `apps/api/wrangler.jsonc` or the dashboard, then `gh workflow run cf-api-deploy.yml` / `wrangler deploy`). Every non-GET request now answers 503 `READ_ONLY_WINDOW`.
-3. Prove the freeze: `curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/api/v1/public/<any write path>` returns 503, and a GET returns 200.
+1. Set `WRITES_FROZEN=1` on `ebda-api` (var in `apps/api/wrangler.jsonc` or the dashboard, then `gh workflow run cf-api-deploy.yml` / `wrangler deploy`). This ONE variable freezes every writer (Ruling CF-JOBS-2, replaces "pause Inngest"): HTTP answers 503 `READ_ONLY_WINDOW` to every non-GET; Cron Triggers stand still (a sweep tick is skipped, a rarer job is parked); every queue consumer (email, sms, jobs, CI, WhatsApp store events, DLQs) re-sends or retries its messages instead of running; Workflow instances sleep before every step; StoreSchedule alarms keep their due time and re-arm 5 minutes out. Nothing is dropped: all of it runs after the thaw. Deploy takes effect within the deploy; instances already between steps stop at their next step.
+2. Let in-flight work drain: wait 2 minutes (the longest step is bounded by its 15 minute timeout, but a step that was already running when the flag landed is at most one per instance), then check the window is quiet: Cloudflare dashboard, Workers & Pages, `ebda-jobs` Workflow instances show `running` only briefly, and `wrangler tail ebda-api --search "write freeze"` prints the park lines (`[cron] write freeze`, `[jobs] write freeze: run parked`, `[freeze] batch parked`).
+3. Prove the HTTP freeze: `curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/api/v1/public/<any write path>` returns 503, and a GET returns 200.
 4. Record the clock: `T0=$(date -u +%FT%TZ)`.
 
 ### 5.2 Final dump and scratch restore
@@ -136,7 +136,7 @@ It refuses without a passing verify report younger than 60 minutes that covers e
 
 ### 8.3 Unfreeze reads and writes
 
-Remove `WRITES_FROZEN` (or set `0`) and redeploy; resume Inngest only after the smoke below passes.
+Remove `WRITES_FROZEN` (or set `0`) and redeploy: the parked messages, Workflow instances and alarms run on their own within 5 minutes, in the order they were parked (a parked daily cron runs once, a skipped sweep tick is replaced by the next tick). Run the smoke below once the backlog drains; `JOBS_ON_DO=1` is set in the same deploy that flips the first store (Ruling CF-JOBS-1), never before.
 
 ### 8.4 Smoke (NEVER complete a purchase)
 
@@ -162,7 +162,7 @@ Exit 0 (`0 differ`) required. A diff is triaged: a volatile field is added to `-
 
 | Situation                                                                                                                                | Action                                                                                                                                                                                                                                                                                                                                                                                                                                       | Data cost                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| Failure before 8.2 (dry run, migrate, verify, window check)                                                                              | remove `WRITES_FROZEN`, resume Inngest, drop the scratch DB. Nothing was flipped; production Postgres was only read.                                                                                                                                                                                                                                                                                                                         | none                           |
+| Failure before 8.2 (dry run, migrate, verify, window check)                                                                              | remove `WRITES_FROZEN` (parked work resumes by itself), drop the scratch DB. Nothing was flipped; production Postgres was only read.                                                                                                                                                                                                                                                                                                         | none                           |
 | Failure after 8.2, no live write since the flip                                                                                          | `node scripts/cf/flip-backend.mjs --to pg --all "${D1[@]}" --health-url $API/health --yes`. It prints "loses nothing", flips the flag and waits for `/health` to agree.                                                                                                                                                                                                                                                                      | none                           |
 | Live writes exist (orders, payments, stock, settings...)                                                                                 | (a) REPLAY, preferred: add `--replay-pg-url <owner url of the Neon DIRECT endpoint> --allow-prod-write`. The script writes every added, changed and deleted row back into Postgres in ONE transaction, then compares Postgres to the live side table by table (counts + sha256 of every column + foreign-key check). Equal: COMMIT, then flip the flag. Anything else: ROLLBACK (Postgres is exactly as it was) and the rollback is refused. | none when it commits           |
 | The replay fails or does not verify, no replay URL, or live-side data that has no Postgres column (the CI-1 capture fields, `buyer_key`) | (b) REFUSED, by design. Do not use `--accept-data-loss`. Forward-fix: keep serving from Cloudflare, fix the defect there (revert the Worker with `docs/ROLLBACK.md` path A if the code is the problem, the data stays), and ask Ahmad before anything else.                                                                                                                                                                                  | none (nothing was rolled back) |

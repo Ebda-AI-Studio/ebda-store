@@ -136,8 +136,9 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 
 - Alarm-ready (handler sweeps only `event.data.storeId` for an alarm run): `abandoned-cart-purge-weekly`, `store-usage-snapshot`, `accounting-daily-close`, `accounting-period-reconciliation`, `accounting-profit-anomaly-cron`, `analytics-daily-rollup`, `stock-deadstock-scan-cron`, `stock-low-stock-alert-cron`, `stock-reorder-scan-cron`, `warehouse-reconcile-sweep-cron`, `wholesale-pending-nudge-cron`.
 - Stay crons on purpose: `audit-log-archive-weekly` (one cross-tenant table), `ai-autofill-sweep` (platform-wide leader lock + shared Gemini quota).
-- Arming: the hourly Cron Trigger `0 * * * *` runs `syncStoreSchedules` (every live store, bounded concurrency); it also removes entries for jobs switched back to cron. A new store is armed within the hour.
+- Arming (Ruling CF-JOBS-1): the hourly Cron Trigger `0 * * * *` runs `syncStoreSchedules` for the stores served by their Durable Object only (`JOBS_ON_DO=1` + the store flag); it also removes entries for jobs switched back to cron. A Postgres store is never armed: it keeps the global cron run, and the cron hides DO stores from its sweep. See `docs/cf/jobs-on-do.md`.
 - Exactly-once-ish: event id `alarm-<job>-<store>-<scheduledFor>` is the Workflow instance id (a re-fire is a no-op); the concurrency gate is `<job>|<store>`.
 - Failure: start errors retry 30 s .. 15 min, then the occurrence is skipped and the same direct alert fires. A fire later than 24 h is skipped, not replayed.
 - Cairo schedules are DST-safe: `next-run.ts` expands the zone's winter and summer UTC candidates and keeps the one whose local time matches.
-- Rollback: empty `JOBS_CF_ALARMS`; the next hourly sync clears the entries and the Cron Trigger resumes the job.
+- Rollback: empty `JOBS_CF_ALARMS`; the next hourly sync clears the entries and the Cron Trigger resumes the job. A store flipped back to Postgres: its remaining alarms start nothing and the cron covers it again.
+- Write freeze (Ruling CF-JOBS-2): a due alarm is held (same due time, re-armed 5 minutes out) while `WRITES_FROZEN=1`.

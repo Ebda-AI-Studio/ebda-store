@@ -224,3 +224,13 @@ export function repoScope(req: Request, _res: Response, next: NextFunction): voi
 export function withRepo<T>(repo: StoreRepo, fn: () => T, req: RequestLike = NO_REQUEST): T {
   return scopes.run({ req, repos: new Map([[repo.storeId, Promise.resolve(repo)]]) }, fn);
 }
+
+/**
+ * Run a background job in a repo scope that opts in to the Durable Object (`x-ebda-backend: do`), so `storeDb` /
+ * `storeWriter` follow the store's flag exactly like an HTTP request that opted in. Jobs have no request, and
+ * without this a flagged store would resolve to Postgres in a job (Ruling CF-JOBS-1). Only lib/jobs/do-guard.ts calls it,
+ * and only while `JOBS_ON_DO=1`.
+ */
+export function runInJobRepoScope<T>(fn: () => T): T {
+  return scopes.run({ req: { headers: { 'x-ebda-backend': 'do' } }, repos: new Map() }, fn);
+}

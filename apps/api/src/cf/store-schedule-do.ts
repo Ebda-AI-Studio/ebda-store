@@ -5,6 +5,8 @@ import { getJob } from '../lib/jobs/registry';
 import { startJob } from '../lib/jobs/start';
 import { reportJobFailure } from '../lib/jobs/failure';
 import logger from '../lib/logger';
+import { writesFrozen } from '../lib/jobs/freeze';
+import { doStoreIds } from '../lib/jobs/do-guard';
 
 export class StoreSchedule extends StoreScheduleBase<CfBindings> {
   constructor(ctx: ConstructorParameters<typeof StoreScheduleBase>[0], env: CfBindings) {
@@ -12,7 +14,13 @@ export class StoreSchedule extends StoreScheduleBase<CfBindings> {
     setCfBindings(env);
   }
 
+  protected override isFrozen(): boolean {
+    return writesFrozen(this.env);
+  }
+
   protected async dispatch(job: string, event: AlarmEvent): Promise<unknown> {
+    // The store went back to Postgres (flag flipped back): its global cron owns the job again, so this alarm starts nothing.
+    if (!doStoreIds().has(event.data.storeId)) return 'not-a-do-store';
     const def = getJob(job);
     if (!def) throw new Error(`unknown job ${job}`);
     return startJob(def, event);

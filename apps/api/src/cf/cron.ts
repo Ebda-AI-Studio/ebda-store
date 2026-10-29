@@ -20,6 +20,8 @@ import { cfBindings } from './bindings';
 import { runBackupSweep, flaggedStoreIds, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
+import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
+import type { LegacyCronMessage } from '../lib/jobs/start';
 
 const isJobCron = (cron: string): boolean => allJobCronStrings().includes(cron);
 
@@ -77,8 +79,10 @@ export async function runScheduled(
     }
     return startedResults;
   }
+  const frozen = writesFrozen();
   const legacy = await Promise.all(
     jobs.map(async job => {
+      if (frozen) return deferLegacyJob(cron, job.name, scheduledTime);
       try {
         await job.run();
         logger.info({ cron, job: job.name }, '[cron] job done');
@@ -90,4 +94,31 @@ export async function runScheduled(
     })
   );
   return [...legacy, ...startedResults];
+}
+
+/**
+ * Write freeze (Ruling CF-JOBS-2) for a legacy cron job. A sweep (fires again within 6 h) is skipped: the next tick after the
+ * window does the work. A rarer one (loyalty-daily, backup-sweep) is PARKED on the jobs queue as a `legacy-cron` message, which
+ * the consumer runs once the freeze is off. Never dropped: a failed park is reported as a failed job.
+ */
+async function deferLegacyJob(
+  cron: string,
+  name: string,
+  scheduledTime: number
+): Promise<{ name: string; ok: boolean }> {
+  if (isSweepCron(cron, scheduledTime)) {
+    logger.warn({ cron, job: name }, '[cron] write freeze: sweep tick skipped');
+    return { name, ok: true };
+  }
+  try {
+    const q = cfBindings()?.JOBS_QUEUE;
+    if (!q) throw new Error('JOBS_QUEUE binding missing');
+    const msg: LegacyCronMessage = { kind: 'legacy-cron', name, cron };
+    await q.send(msg, { contentType: 'json', delaySeconds: 300 });
+    logger.warn({ cron, job: name }, '[cron] write freeze: job parked on the jobs queue');
+    return { name, ok: true };
+  } catch (err) {
+    logger.error({ err, cron, job: name }, '[cron] write freeze: could not park job');
+    return { name, ok: false };
+  }
 }

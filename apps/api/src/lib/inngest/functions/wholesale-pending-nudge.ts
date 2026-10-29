@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { storeDirectory, withStore } from '@ebda/database';
+import { storeDirectory } from '@ebda/database';
+import { withStoreDb } from '../../jobs/store-db';
 import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -24,11 +25,12 @@ export function nudgeWindow(now: Date): { from: Date; to: Date } {
 /** Per-store work, exported for the test: returns the pending count that was nudged (0 = nothing to say). */
 export async function nudgeStore(storeId: string, now: Date = new Date()): Promise<number> {
   const { from, to } = nudgeWindow(now);
-  const { crossing, pending } = await withStore(storeId, async tx => ({
-    crossing: await tx.wholesaleApplication.count({
+  // PORTED (Ruling CF-JOBS-1): the counts follow the store's backend (its Durable Object or Postgres) through storeDb.
+  const { crossing, pending } = await withStoreDb(storeId, async db => ({
+    crossing: await db.wholesaleApplication.count({
       where: { storeId, status: 'pending', createdAt: { gt: from, lte: to } },
     }),
-    pending: await tx.wholesaleApplication.count({ where: { storeId, status: 'pending' } }),
+    pending: await db.wholesaleApplication.count({ where: { storeId, status: 'pending' } }),
   }));
   if (crossing === 0) return 0;
   await notifyMerchantOfApplications(storeId, 'nudge', { pendingCount: pending });
