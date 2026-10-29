@@ -30,3 +30,5 @@ export {
   type WriteOp,
 } from './rpc/writes';
 export { applyStoreSettings } from './rpc/settings';
+export { runStockOp, ensureStockOpsSchema, STOCK_OP_NAMES, type StockOpName } from './do/stock-ops';
+export { answerStockOp, type StockAnswer } from './rpc/stock';

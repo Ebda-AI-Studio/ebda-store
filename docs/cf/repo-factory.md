@@ -1,4 +1,4 @@
-# Repo factory: reads and non-money writes on the store's backend (INFRA-CF-1 PR C + D1 + D1c, Rulings CF-REPO-1, CF-WRITES-1..3, CF-ERASE-3)
+# Repo factory: reads and non-money writes on the store's backend (INFRA-CF-1 PR C + D1 + D1c + D2a, Rulings CF-REPO-1, CF-WRITES-1..3, CF-STOCK-1, CF-ERASE-3)
 
 Code: `apps/api/src/lib/repo-factory.ts` (factory + request scope), `packages/repo/src/rpc/*` (wire codec, read executor, write executor `writes.ts`, Worker-side client), `apps/api/src/cf/store-do/store-do.ts` (`query()`), `lib/store-backend.ts` (`backendFor`, the flag). Contract tests: `tests/integration/repo-factory-contract.test.ts` (reads) and `tests/integration/repo-factory-writes-contract.test.ts` (writes): Postgres vs the Durable Object schema, `tests/unit/repo-factory.test.ts`, `apps/api/workers-do/store-do-schema.test.ts` (real workerd).
 
@@ -90,6 +90,27 @@ await storeUpdateMany(tx, {
 }); // copies only if a row matched
 await syncStoreFields(storeId, ['settings']); // after a raw jsonb_set: re-read, copy the whole value
 ```
+
+## Stock and inventory on the DO (PR D2a, Ruling CF-STOCK-1)
+
+```ts
+const stock = await storeStock(storeId); // null on Postgres
+if (stock)
+  return doPath(await stock.adjustProduct({ productId, quantity: -2, type: 'manual_remove' }));
+// ...the unchanged Postgres code follows
+```
+
+One named operation per admin stock write, each ONE `transactionSync` section in the DO (single thread = the lock), reached through `StoreDO.stockOp` (separate from `mutate`, which still refuses stock columns). Optional idempotency key per call (marker row in `_stock_ops`, 24 h). Code: `packages/repo/src/do/stock-ops.ts`, `rpc/stock.ts`, client `makeStockClient` in `lib/repo-factory.ts`.
+
+| Operation                                   | Service call that uses it                  | Route                   |
+| ------------------------------------------- | ------------------------------------------ | ----------------------- |
+| `adjustProduct`                             | `InventoryService.adjustInventory`         | admin inventory adjust  |
+| `setProduct`                                | `InventoryService.setInventory`            | admin inventory count   |
+| `bulkAdjustProducts`                        | `InventoryService.bulkAdjustInventory`     | admin inventory bulk    |
+| `setVariantInventory`                       | `VariantService.bulkUpdateInventory`       | variants bulk-inventory |
+| `setWarehouseStock`, `adjustWarehouseStock` | `WarehouseService.setStock`, `adjustStock` | admin warehouse stock   |
+
+Contract tests: `packages/repo/test/do-stock-ops.test.ts` (engine), `tests/integration/repo-factory-stock-contract.test.ts` (real services on Postgres vs the DO schema, equal traces and tables), `apps/api/workers-do/stock.test.ts` (real workerd, 100 concurrent removals never oversell). Not moved yet, with reason: CSV import (stock and non-stock share one interactive transaction with D1 slug redirects and gold specs: needs the import orchestrator), opening stock and `inventoryHistory` inside product/variant create, warehouse CRUD, barcode sequences, reservations/hold cap (an open hold is an unpaid order: D2b).
 
 ## Left for D2 or later from the D1b list (with reason)
 

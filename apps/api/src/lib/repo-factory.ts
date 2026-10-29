@@ -97,9 +97,85 @@ export type StoreWrites = {
   ): Promise<{ [I in keyof T]: Awaited<T[I]> }>;
 };
 
+/**
+ * Stock and inventory operations of a store served by its Durable Object (PR D2a, Ruling CF-STOCK-1). One method per
+ * operation, each ONE atomic section in the DO; results and refusals carry the same codes the Postgres services use.
+ * `key` makes a retry return the first result (store it per logical action: an order id plus a line, an import row).
+ */
+export type HistoryType =
+  | 'manual_add'
+  | 'manual_remove'
+  | 'sale'
+  | 'return_stock'
+  | 'adjustment'
+  | 'damage'
+  | 'transfer_in'
+  | 'transfer_out'
+  | 'initial';
+interface StockLevel {
+  productId: string;
+  name: string;
+  previousStock: number;
+  newStock: number;
+}
+export interface StockClient {
+  adjustProduct(
+    a: {
+      productId: string;
+      quantity: number;
+      type: HistoryType;
+      reason?: string;
+      reference?: string;
+      userId?: string;
+    },
+    key?: string
+  ): Promise<StockLevel & { historyId: string }>;
+  setProduct(
+    a: { productId: string; quantity: number; reason?: string; userId?: string },
+    key?: string
+  ): Promise<StockLevel & { historyId: string }>;
+  bulkAdjustProducts(
+    a: {
+      adjustments: Array<{
+        productId: string;
+        quantity: number;
+        type: HistoryType;
+        reason?: string;
+        reference?: string;
+      }>;
+      userId?: string;
+    },
+    key?: string
+  ): Promise<{ successful: number; failed: number; errors: string[]; applied: StockLevel[] }>;
+  setVariantInventory(
+    a: { productId: string; updates: Array<{ variantId: string; inventory: number }> },
+    key?: string
+  ): Promise<{
+    updated: number;
+    failed: number;
+    results: Array<{ variantId: string; success: boolean }>;
+  }>;
+  setWarehouseStock(
+    a: { warehouseId: string; productId: string; variantId?: string | null; quantity: number },
+    key?: string
+  ): Promise<{ quantity: number }>;
+  adjustWarehouseStock(
+    a: {
+      warehouseId: string;
+      productId: string;
+      variantId?: string | null;
+      delta: number;
+      reason?: string;
+    },
+    key?: string
+  ): Promise<{ newQuantity: number }>;
+}
+
 export interface StoreRepo {
   storeId: string;
   backend: StoreBackend;
+  /** Stock operations. Present ONLY on 'do'; on 'pg' the service keeps its own Postgres path (see `storeStock`). */
+  stock?: StockClient;
   db: StoreReads;
   /** The write client (see StoreWrites). Resolved with the repo, so one flag read serves both. */
   writer: StoreWrites;
@@ -121,6 +197,14 @@ interface QueryStub {
   ): Promise<
     { ok: true; json: string } | { ok: false; code: string; message: string; json?: string }
   >;
+  stockOp(
+    storeId: string,
+    op: string,
+    argsJson: string,
+    key?: string
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
+  >;
   query(
     storeId: string,
     queries: Array<{ model: string; op: string; args?: Record<string, unknown> }>
@@ -129,16 +213,38 @@ interface QueryStub {
   >;
 }
 
-async function doClients(storeId: string): Promise<{ db: StoreReads; writer: StoreWrites }> {
+/** The typed stock client over a transport `call(op, args, key)`; shared by the Worker and the contract tests. */
+export function makeStockClient(
+  call: (op: string, args: unknown, key?: string) => Promise<any>
+): StockClient {
+  return {
+    adjustProduct: (a, key) => call('adjustProduct', a, key),
+    setProduct: (a, key) => call('setProduct', a, key),
+    bulkAdjustProducts: (a, key) => call('bulkAdjustProducts', a, key),
+    setVariantInventory: (a, key) => call('setVariantInventory', a, key),
+    setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
+    adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
+  };
+}
+
+async function doClients(
+  storeId: string
+): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient }> {
   const stub = storeDo(storeId) as unknown as QueryStub; // 503 here when the binding is absent
   // Dynamic: the Node build cannot resolve the @ebda-src alias (apps/api/src/cf/repo-modules.d.ts); only a Worker with a
   // bound StoreDO ever reaches this line.
-  const { createDoClient } = await import('@ebda-src/repo');
+  const { createDoClient, encodeRpc, decodeRpc } = await import('@ebda-src/repo');
+  const call = async (op: string, args: unknown, key?: string) => {
+    const r = await stub.stockOp(storeId, op, encodeRpc(args), key);
+    if (!r.ok) throw new AppError(r.status, r.code, r.message);
+    return decodeRpc<any>(r.json);
+  };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
     // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
     db: createDoClient(send as never) as unknown as StoreReads,
     writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
+    stock: makeStockClient(call),
   };
 }
 
@@ -190,6 +296,15 @@ export async function storeDb(storeId: string): Promise<StoreReads> {
 /** The write client for a store's non-money catalogue/content models: `const w = await storeWriter(id); await w.blogPost.create(...)`. */
 export async function storeWriter(storeId: string): Promise<StoreWrites> {
   return (await storeRepo(storeId)).writer;
+}
+
+/**
+ * The stock client of a store served by its Durable Object, or `null` on Postgres (the default for every store). A stock
+ * service uses it as `const stock = await storeStock(id); if (stock) return doPath(stock);` followed by its unchanged
+ * Postgres code, so with every flag at 'pg' the Postgres code (row locks, request transaction, RLS) runs exactly as before.
+ */
+export async function storeStock(storeId: string): Promise<StockClient | null> {
+  return (await storeRepo(storeId)).stock ?? null;
 }
 
 /**

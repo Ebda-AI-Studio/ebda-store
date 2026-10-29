@@ -108,6 +108,19 @@ declare module '@ebda-src/repo' {
     storeId: string,
     fields: Record<string, unknown>
   ): { profile: string[]; config: string[]; directoryOnly: string[] };
+  export type StockAnswer =
+    | { ok: true; json: string }
+    | { ok: false; code: string; status: number; message: string };
+  export function answerStockOp(
+    db: SyncSql,
+    storeId: string,
+    op: string,
+    argsJson: string,
+    key?: string
+  ): StockAnswer;
+  export function ensureStockOpsSchema(db: SyncSql): void;
+  export type StockOpName = string;
+  export const STOCK_OP_NAMES: readonly StockOpName[];
   export const DO_PROCS: Record<string, unknown>;
   export const PROC_MODEL: string;
   export const DO_WRITABLE_MODELS: ReadonlySet<string>;

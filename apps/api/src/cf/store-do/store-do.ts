@@ -27,8 +27,11 @@ import {
   createPrismaLite,
   doSqlRunner,
   doSyncSql,
+  answerStockOp,
   applyStoreSettings,
   decodeRpc,
+  ensureStockOpsSchema,
+  type StockAnswer,
   ensureIdempotencySchema,
   ensurePaymentSchema,
   ensureSearchIndex,
@@ -96,6 +99,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureSearchIndex(this.sync);
       ensurePaymentSchema(this.sync);
       ensureIdempotencySchema(doSqlRunner(ctx.storage));
+      ensureStockOpsSchema(this.sync);
     });
   }
 
@@ -172,6 +176,22 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         return { ok: false, code: 'STORE_MISMATCH', message: e.message };
       throw e;
     }
+  }
+
+  /**
+   * Stock and inventory operations (Ruling CF-STOCK-1): ONE named operation = ONE `transactionSync` section, the
+   * single-threaded replacement for the Postgres row locks. `argsJson` is the wire-encoded argument object; `key` makes a
+   * retry return the first run's result. A refusal is an ANSWER, never a throw.
+   */
+  stockOp(storeId: string, op: string, argsJson: string, key?: string): StockAnswer {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    return answerStockOp(this.sync, storeId, op, argsJson, key);
   }
 
   /**

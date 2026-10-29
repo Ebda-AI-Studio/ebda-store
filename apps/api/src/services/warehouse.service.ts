@@ -20,6 +20,7 @@ import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { storeStock } from '../lib/repo-factory';
 import { searchProductIdSet, searchVariantIdsBySku } from './product-search.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -510,6 +511,20 @@ export class WarehouseService {
       throw new AppError(400, 'INVALID_QUANTITY', 'Quantity cannot be negative');
     }
 
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): the checks, the upsert and the aggregate sum are ONE section.
+      await stock.setWarehouseStock({
+        warehouseId,
+        productId: input.productId,
+        variantId: input.variantId ?? null,
+        quantity: input.quantity,
+      });
+      await notifyCatalogChanged({ storeId, productIds: [input.productId] });
+      await invalidateStoreProductCaches(storeId);
+      return;
+    }
+
     // Verify warehouse belongs to store
     const warehouse = await prisma.warehouse.findFirst({
       where: { id: warehouseId, storeId },
@@ -559,6 +574,21 @@ export class WarehouseService {
     warehouseId: string,
     input: StockAdjustInput
   ): Promise<{ newQuantity: number }> {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): checks, upsert, aggregate sum and the audit row are ONE section.
+      const r = await stock.adjustWarehouseStock({
+        warehouseId,
+        productId: input.productId,
+        variantId: input.variantId ?? null,
+        delta: input.delta,
+        reason: input.reason,
+      });
+      await notifyCatalogChanged({ storeId, productIds: [input.productId] });
+      await invalidateStoreProductCaches(storeId);
+      return { newQuantity: r.newQuantity };
+    }
+
     // Verify warehouse belongs to store
     const warehouse = await prisma.warehouse.findFirst({
       where: { id: warehouseId, storeId },

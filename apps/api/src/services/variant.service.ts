@@ -7,7 +7,8 @@ import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { throwIfBundleFkViolation } from '../lib/bundle-fk-errors';
 import { withSavepoint } from '../lib/savepoint';
-import { storeWriter } from '../lib/repo-factory';
+import { storeStock, storeWriter } from '../lib/repo-factory';
+import { notifyCatalogChanged } from '../lib/wa/catalog-state';
 
 interface CreateOptionInput {
   name: string;
@@ -831,6 +832,15 @@ export class VariantService {
     productId: string,
     updates: Array<{ variantId: string; inventory: number }>
   ) {
+    const stock = await storeStock(storeId);
+    if (stock) {
+      // Durable Object path (Ruling CF-STOCK-1): one section, an unknown variant fails alone.
+      const r = await stock.setVariantInventory({ productId, updates });
+      await notifyCatalogChanged({ storeId, productIds: [productId] });
+      await invalidateStoreProductCaches(storeId);
+      return { updated: r.updated, failed: r.failed };
+    }
+
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId, deletedAt: null },
     });
