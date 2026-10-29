@@ -57,6 +57,7 @@ import { csv, iso, nowMs, randomCode, sha256Hex } from './util';
 import {
   pickStudioLang,
   renderStudioPage,
+  HSTS_VALUE,
   STUDIO_PAGE_HEADERS,
 } from '../../../packages/shared/src/studio-pages/index';
 
@@ -692,6 +693,7 @@ export function createApp() {
       c.header('Access-Control-Allow-Credentials', 'true');
     }
     c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Strict-Transport-Security', HSTS_VALUE);
     c.header('Referrer-Policy', 'no-referrer');
     if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
     return undefined;

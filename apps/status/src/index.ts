@@ -3,6 +3,7 @@ import { BRAND, BRAND_MARKETING_URL, SITE_NAV_JS } from '../../../packages/share
 import {
   pickStudioLang,
   renderStudioPage,
+  HSTS_VALUE,
   STUDIO_PAGE_HEADERS,
 } from '../../../packages/shared/src/studio-pages/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
@@ -20,6 +21,7 @@ const SECURITY_HEADERS = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
+  'strict-transport-security': HSTS_VALUE,
 };
 
 const text = (body: string, type = 'text/plain', maxAge = 3600): Response =>
