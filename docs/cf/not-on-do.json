@@ -2,11 +2,6 @@
   "note": "Ruling CF-FINAL-1. tests/unit/do-not-on-do-guard.test.ts keeps `refusals` EQUAL to what the code refuses (a new 501 or *_NOT_ON_DO fails the build until it is listed here or removed). `postgresOnly` lists flows a Durable Object store still runs against Postgres (no 501, so the scan cannot see them). A store may be flipped to `do` only when `node scripts/cf/not-on-do.mjs` exits 0.",
   "refusals": [
     {
-      "code": "PARTIAL_RETURN_JOURNAL_NOT_ON_DO",
-      "file": "apps/api/src/services/accounting/posting/partial-return-posting.ts",
-      "needs": "port of postPartialReturnJournal (allocatePartialReturn, loadPriorReversedQty, resolveReturnRefundLegs) onto do/ledger.ts, after the Return row lifecycle"
-    },
-    {
       "code": "INSTAPAY_RECEIPTS_NOT_ON_DO",
       "file": "apps/api/src/services/payment-providers/instapay-receipt.service.ts",
       "needs": "a D1 entity-index kind for the cross-store reference_key uniqueness, then the receipt upload/submit as one moneyOp"
@@ -21,16 +16,10 @@
       "flow": "fiscal documents and counters (issueSaleDocument)"
     },
     {
-      "flow": "Return row lifecycle (ReturnService)"
-    },
-    {
       "flow": "order reads that join Postgres-only models"
     },
     {
       "flow": "wallet-movement journal (WALLET-GL-1 / PR #325, not merged)"
-    },
-    {
-      "flow": "partial-return journal (refused 501, listed above)"
     },
     {
       "flow": "CSV import orchestrator (stock and non-stock fields, slug redirects, gold specs in one DO op)"

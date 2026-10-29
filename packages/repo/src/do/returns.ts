@@ -11,6 +11,13 @@ import {
   type TierLadderSnapshot,
 } from './return-adjustment';
 import { applyWalletEntry, refundOrder, reverseOrderEffects } from './refund';
+import {
+  addPaymentEvent,
+  REFUND_CLAIM_EVENT,
+  REFUND_EXECUTED_EVENT,
+  REFUND_RECONCILED_EVENT,
+  REFUND_RELEASED_EVENT,
+} from './payments';
 import { PROVIDER_TO_CASH_CODE, postEntry, systemAccountId, type JournalLine } from './ledger';
 
 /**
@@ -732,6 +739,76 @@ export function setReturnTracking(
   });
 }
 
+// ---------------------------------------------------------------- refund claims of a return (payment.factory twins)
+
+function refundEvents(db: SyncSql, storeId: string, orderId: string, refundKey: string, types: string[]) {
+  return db
+    .all(
+      `SELECT payment_id, event_type, provider, details FROM payment_events
+        WHERE store_id = ?1 AND order_id = ?2 AND event_type IN (${types.map(() => '?').join(', ')})
+          AND json_extract(details, '$.refundKey') = ?${types.length + 3}`,
+      [storeId, orderId, ...types, refundKey]
+    )
+    .map(r => {
+      let d: Record<string, unknown> = {};
+      try {
+        d = JSON.parse(String(r.details)) as Record<string, unknown>;
+      } catch {
+        d = {};
+      }
+      return { paymentId: r.payment_id as string, type: r.event_type as string, provider: (r.provider as string | null) ?? null, d };
+    });
+}
+/** findOutstandingRefundClaims: claims for `refundKey` not yet released (the claim row of an unreleased refund). */
+function outstandingClaims(db: SyncSql, storeId: string, orderId: string, refundKey: string): string[] {
+  const claimed = new Set<string>();
+  const released = new Set<string>();
+  for (const e of refundEvents(db, storeId, orderId, refundKey, [REFUND_CLAIM_EVENT, REFUND_RELEASED_EVENT])) {
+    const id = e.d.claimId;
+    if (typeof id !== 'string') continue;
+    (e.type === REFUND_CLAIM_EVENT ? claimed : released).add(id);
+  }
+  return [...claimed].filter(id => !released.has(id));
+}
+/** reconcileOutstandingRefundClaims: a non-gateway completion is the merchant settling an indeterminate gateway refund. */
+function reconcileClaims(
+  db: SyncSql,
+  a: { storeId: string; orderId: string; refundKey: string; refundMethod: string; userId: string; now: number }
+): string[] {
+  const claims = new Map<string, { paymentId: string; provider: string | null; amount: unknown }>();
+  const closed = new Set<string>();
+  for (const e of refundEvents(db, a.storeId, a.orderId, a.refundKey, [
+    REFUND_CLAIM_EVENT,
+    REFUND_EXECUTED_EVENT,
+    REFUND_RELEASED_EVENT,
+    REFUND_RECONCILED_EVENT,
+  ])) {
+    const id = e.d.claimId;
+    if (typeof id !== 'string') continue;
+    if (e.type === REFUND_CLAIM_EVENT) claims.set(id, { paymentId: e.paymentId, provider: e.provider, amount: e.d.amount });
+    else closed.add(id);
+  }
+  const open = [...claims].filter(([id]) => !closed.has(id));
+  for (const [claimId, c] of open)
+    addPaymentEvent(db, {
+      storeId: a.storeId,
+      paymentId: c.paymentId,
+      orderId: a.orderId,
+      eventType: REFUND_RECONCILED_EVENT,
+      provider: c.provider,
+      details: {
+        reason: 'reconciled_by_merchant',
+        claimId,
+        amount: typeof c.amount === 'number' ? c.amount : null,
+        refundKey: a.refundKey,
+        refundMethod: a.refundMethod,
+        reconciledBy: a.userId ?? null,
+      },
+      now: a.now,
+    });
+  return open.map(([id]) => id);
+}
+
 // ---------------------------------------------------------------- complete: the plan
 
 export interface PartialAllocation {
@@ -759,6 +836,8 @@ export interface ReturnPlan {
   walletShare: number;
   skipProvider: boolean;
   items: Array<{ orderItemId: string; quantity: number }>;
+  /** open (unreleased) refund claims for `return:<id>`: a gateway refund of this return may already have gone out */
+  outstandingClaims: string[];
 }
 
 function allocateThisReturn(
@@ -943,6 +1022,7 @@ function planReturn(
     walletShare,
     skipProvider,
     items: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
+    outstandingClaims: orderId ? outstandingClaims(db, storeId, orderId, `return:${returnId}`) : [],
   };
 }
 
@@ -1067,6 +1147,16 @@ export function finishReturn(
         WHERE id = ?4 AND store_id = ?5`,
       [method, now, finalAmount, a.returnId, a.storeId]
     );
+    // a NON-gateway completion settles any open claim of an earlier gateway attempt (PROVIDER_REFUND_INDETERMINATE recovery)
+    if (!plan.isGatewayRefund && plan.orderId)
+      reconcileClaims(db, {
+        storeId: a.storeId,
+        orderId: plan.orderId,
+        refundKey: `return:${a.returnId}`,
+        refundMethod: method,
+        userId: a.userId,
+        now,
+      });
     // B2B Task 8b: what each item's refund was reduced by (and any override, with who and why)
     for (const l of plan.tierLines)
       db.run(

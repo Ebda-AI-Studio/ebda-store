@@ -6,7 +6,6 @@ import { postEntry, type JournalLineInput } from '../journal.service';
 import { PROVIDER_TO_CASH_CODE } from './order-posting';
 import logger from '../../../lib/logger';
 import { storeMoney } from '../../../lib/repo-factory';
-import { AppError } from '../../../middleware/error-handler';
 import { allocatePartialReturn } from './partial-return-allocation';
 import { loadPriorReversedQty } from './prior-reversed-qty';
 import { isGatewayRefundMethod, RETURN_WALLET_SHARE_KEY_PREFIX } from '../../../lib/refund-methods';
@@ -96,13 +95,16 @@ export interface PartialReturnJournalArgs {
 export async function postPartialReturnJournal(
   args: PartialReturnJournalArgs
 ): Promise<{ posted: number; skipped?: string }> {
-  // Not ported (Ruling CF-LEDGER-1): refused loudly for a Durable Object store, never booked against a Postgres order that is not there.
-  if (args.storeId && (await storeMoney(args.storeId)))
-    throw new AppError(
-      501,
-      'PARTIAL_RETURN_JOURNAL_NOT_ON_DO',
-      'The pro-rata journal of a partial return is not ported to the store Durable Object'
-    );
+  // A store on its Durable Object books the adjustment in one section there (Ruling CF-RETURNS-1); idempotent per refundKey.
+  if (args.storeId) {
+    const money = await storeMoney(args.storeId);
+    if (money)
+      return money.journalPartialReturn({
+        orderId: args.orderId,
+        refundKey: args.refundKey,
+        items: args.items,
+      });
+  }
   if (!args.tx) {
     return withScopedToOrderStore(args, tx => postPartialReturnJournal({ ...args, tx }), {
       posted: 0,
@@ -508,6 +510,15 @@ export async function postAmountOnlyRefundJournal(args: {
   amount: number;
   tx?: Prisma.TransactionClient;
 }): Promise<{ posted: number; skipped?: string }> {
+  if (args.storeId) {
+    const money = await storeMoney(args.storeId);
+    if (money)
+      return money.journalAmountOnlyRefund({
+        orderId: args.orderId,
+        refundKey: args.refundKey,
+        amount: args.amount,
+      });
+  }
   if (!args.tx) {
     return withScopedToOrderStore(args, tx => postAmountOnlyRefundJournal({ ...args, tx }), {
       posted: 0,

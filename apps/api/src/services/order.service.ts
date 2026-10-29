@@ -3402,10 +3402,18 @@ export class OrderService {
     // inventory/coupons/loyalty (the stock was reserved) but must NOT claim
     // a refund happened.
     const notify = options.fireRefundNotification ?? true;
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId },
-      select: { id: true },
-    });
+    // A DO store's order is not in Postgres: its existence is read from the DO, and the arming stamps below (order and
+    // return) were written inside the DO section that completed the money step (Ruling CF-RETURNS-1).
+    const doMoney = await storeMoney(storeId);
+    const order = doMoney
+      ? await (await storeDb(storeId)).order.findFirst({
+          where: { id: orderId, storeId },
+          select: { id: true },
+        })
+      : await prisma.order.findFirst({
+          where: { id: orderId, storeId },
+          select: { id: true },
+        });
     if (!order) return;
 
     // Arm the stuck-reversal sweep for a WHOLE-order, stock-restoring event,
