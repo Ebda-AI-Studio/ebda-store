@@ -160,9 +160,11 @@ export default function CatalogImportReviewPage() {
         <ul className="mb-4 divide-y rounded-xl border bg-card text-sm">
           {failedFiles.map(f => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
-              <span dir="auto" className="min-w-0 truncate">
-                {f.originalName}
-                <span className="ms-2 text-xs text-muted-foreground">
+              <span className="min-w-0">
+                <bdi dir="auto" className="block truncate">
+                  {f.originalName}
+                </bdi>
+                <span className="block text-xs text-muted-foreground">
                   {f.status === 'skipped_quota' ? t('review.fileWaiting') : t('review.fileFailed')}
                   {f.errorCode && t.has(`errors.${f.errorCode}`)
                     ? ` · ${t(`errors.${f.errorCode}`)}`
@@ -237,7 +239,7 @@ export default function CatalogImportReviewPage() {
         </ul>
       )}
 
-      <div className="sticky bottom-0 mt-6 flex flex-wrap items-center gap-2 border-t bg-background py-3">
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mt-6 flex flex-wrap items-center gap-2 border-t bg-background py-3 md:bottom-0">
         {tab === 'pending' && (
           <Button
             variant="outline"

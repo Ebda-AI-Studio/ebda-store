@@ -125,7 +125,6 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
             className="mt-1"
           />
         </div>
-        {field('sku', t('sku'), 'ltr')}
         <div>
           <Label htmlFor={`${item.id}-cat`}>{t('category')}</Label>
           <select
@@ -154,22 +153,6 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
               {t('createCategory', { name: item.categoryName })}
             </label>
           )}
-        </div>
-        <div>
-          <Label htmlFor={`${item.id}-tags`}>{t('tags')}</Label>
-          <Input
-            id={`${item.id}-tags`}
-            defaultValue={item.tags.join('، ')}
-            disabled={disabled}
-            onBlur={e => {
-              const tags = e.target.value
-                .split(/[,،]/)
-                .map(s => s.trim())
-                .filter(Boolean);
-              if (tags.join('|') !== item.tags.join('|')) void save({ tags });
-            }}
-            className="mt-1"
-          />
         </div>
       </div>
 
@@ -206,9 +189,27 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
 
       <details className="mt-3">
         <summary className="min-h-11 cursor-pointer text-xs font-medium text-muted-foreground sm:min-h-0">
-          {t('descriptions')}
+          {t('moreDetails')}
         </summary>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {field('sku', t('sku'), 'ltr')}
+          <div>
+            <Label htmlFor={`${item.id}-tags`}>{t('tags')}</Label>
+            <Input
+              id={`${item.id}-tags`}
+              defaultValue={item.tags.join('، ')}
+              disabled={disabled}
+              onBlur={e => {
+                const tags = e.target.value
+                  .split(/[,،]/)
+                  .map(s => s.trim())
+                  .filter(Boolean);
+                if (tags.join('|') !== item.tags.join('|')) void save({ tags });
+              }}
+              className="mt-1"
+            />
+          </div>
+
           {field('descriptionAr', t('descriptionAr'), 'rtl')}
           {field('description', t('descriptionEn'), 'ltr')}
         </div>

@@ -3668,7 +3668,7 @@
         "tags": "Tags (comma separated)",
         "variants": "{count} options",
         "variantPrice": "Price of {name}",
-        "descriptions": "Descriptions",
+        "moreDetails": "More details (SKU, tags, descriptions)",
         "descriptionAr": "Description (Arabic)",
         "descriptionEn": "Description (English)",
         "checkTitle": "Check before accepting",

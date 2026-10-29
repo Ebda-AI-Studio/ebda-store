@@ -3668,7 +3668,7 @@
         "tags": "الوسوم (بفاصلة)",
         "variants": "{count} اختيار",
         "variantPrice": "سعر {name}",
-        "descriptions": "الوصف",
+        "moreDetails": "تفاصيل أكتر (كود المنتج، الوسوم، الوصف)",
         "descriptionAr": "الوصف بالعربي",
         "descriptionEn": "الوصف بالإنجليزي",
         "checkTitle": "راجع قبل القبول",
