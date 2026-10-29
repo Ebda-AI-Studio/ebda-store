@@ -618,5 +618,17 @@
   "EtaReceipt": {
     "target": "store-do",
     "reason": "storeId-scoped fiscal record, read and written in one store context (the submit job runs inside the store's scope)"
+  },
+  "CatalogImportJob": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CatalogImportFile": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
+  },
+  "CatalogImportItem": {
+    "target": "store-do",
+    "reason": "storeId-scoped, read only in one store context"
   }
 }

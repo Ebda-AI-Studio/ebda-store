@@ -604,6 +604,96 @@ export const carts = sqliteTable('carts', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const catalogImportFiles = sqliteTable('catalog_import_files', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  jobId: text('job_id').notNull(),
+  storeId: text('store_id').notNull(),
+  storageKey: text('storage_key').notNull(),
+  mime: text('mime').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  sha256: text('sha256').notNull(),
+  originalName: text('original_name').notNull(),
+  pageCount: integer('page_count').notNull().default(1),
+  status: text('status').notNull().default('stored'),
+  attempts: integer('attempts').notNull().default(0),
+  errorCode: text('error_code'),
+  quotaCounted: integer('quota_counted', { mode: 'boolean' }).notNull().default(false),
+  itemsFound: integer('items_found').notNull().default(0),
+  inputTokens: integer('input_tokens'),
+  outputTokens: integer('output_tokens'),
+  model: text('model'),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+  finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const catalogImportItems = sqliteTable('catalog_import_items', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  jobId: text('job_id').notNull(),
+  fileId: text('file_id').notNull(),
+  storeId: text('store_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  name: text('name'),
+  nameAr: text('name_ar'),
+  description: text('description'),
+  descriptionAr: text('description_ar'),
+  priceMinor: integer('price_minor'),
+  compareAtMinor: integer('compare_at_minor'),
+  priceRaw: text('price_raw'),
+  sku: text('sku'),
+  categoryName: text('category_name'),
+  categoryId: text('category_id'),
+  tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
+  variants: text('variants', { mode: 'json' }).$type<unknown>().notNull().default([]),
+  confidence: real('confidence').notNull().default(0),
+  flags: text('flags', { mode: 'json' }).$type<string[]>().notNull(),
+  acknowledged: text('acknowledged', { mode: 'json' }).$type<string[]>().notNull(),
+  sourceText: text('source_text'),
+  editedFields: text('edited_fields', { mode: 'json' }).$type<string[]>().notNull(),
+  productId: text('product_id'),
+  createErrorCode: text('create_error_code'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const catalogImportJobs = sqliteTable('catalog_import_jobs', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  storeId: text('store_id').notNull(),
+  createdBy: text('created_by'),
+  status: text('status').notNull().default('queued'),
+  errorCode: text('error_code'),
+  filesTotal: integer('files_total').notNull().default(0),
+  filesDone: integer('files_done').notNull().default(0),
+  filesFailed: integer('files_failed').notNull().default(0),
+  pagesTotal: integer('pages_total').notNull().default(0),
+  itemsTotal: integer('items_total').notNull().default(0),
+  draftsCreated: integer('drafts_created').notNull().default(0),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const categories = sqliteTable('categories', {
   id: text('id')
     .primaryKey()

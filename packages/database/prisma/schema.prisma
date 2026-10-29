@@ -455,6 +455,9 @@ model Store {
   affiliateEvents            AffiliateEvent[]
   pages                      StorePage[]
   bulkImportJobs             BulkImportJob[]
+  catalogImportJobs          CatalogImportJob[]
+  catalogImportFiles         CatalogImportFile[]
+  catalogImportItems         CatalogImportItem[]
   aiUsage                    AiUsage[]
   bulkAiJobs                 BulkAiJob[]
   faqs                       StoreFaq[]
@@ -943,6 +946,7 @@ model Category {
   metaDescriptionAeoAr String?   @map("meta_description_aeo_ar")
   // Size chart every product in this category inherits unless it has its own. null = none.
   sizeChartId          String?   @map("size_chart_id")
+  catalogImportItems CatalogImportItem[]
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
   deletedAt            DateTime? @map("deleted_at") // Soft delete support
@@ -1109,6 +1113,7 @@ model Product {
   embedFailure         ProductEmbedFailure?
   priceTiers           ProductPriceTier[]
   sizeChart            SizeChart?                 @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
+  catalogImportItems    CatalogImportItem[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -5985,4 +5990,109 @@ model EtaReceipt {
   @@index([storeId, orderId, refundKey])
   @@index([status, nextAttemptAt])
   @@map("eta_receipts")
+}
+
+// Catalogue import (photos / PDFs -> reviewed draft products). Ruling CATIMP-1: one row per uploaded
+// file stands in for the plan's separate `pages` table (an image is one page; a PDF is extracted whole).
+// Strict RLS (store_id GUC). Retention: expires_at = created + 30 days (docs/RETENTION.md).
+model CatalogImportJob {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  // Acting user id; no FK (identity lives outside this database). Scrubbed on user erasure.
+  createdBy     String?   @map("created_by")
+  status        String    @default("queued") // queued|processing|review|creating|done|failed|cancelled
+  errorCode     String?   @map("error_code")
+  filesTotal    Int       @default(0) @map("files_total")
+  filesDone     Int       @default(0) @map("files_done")
+  filesFailed   Int       @default(0) @map("files_failed")
+  pagesTotal    Int       @default(0) @map("pages_total")
+  itemsTotal    Int       @default(0) @map("items_total")
+  draftsCreated Int       @default(0) @map("drafts_created")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  expiresAt     DateTime  @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  store Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  files CatalogImportFile[]
+  items CatalogImportItem[]
+
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("catalog_import_jobs")
+}
+
+model CatalogImportFile {
+  id           String    @id @default(uuid())
+  jobId        String    @map("job_id")
+  storeId      String    @map("store_id")
+  // Private bucket key, always under stores/<storeId>/catalog-import/<jobId>/.
+  storageKey   String    @map("storage_key")
+  mime         String // sniffed from the bytes, never the client's
+  sizeBytes    Int       @map("size_bytes")
+  sha256       String
+  // Display only: control characters stripped, no path, capped. Never used as a storage key.
+  originalName String    @map("original_name")
+  pageCount    Int       @default(1) @map("page_count")
+  status       String    @default("stored") // stored|processing|done|failed|skipped_quota
+  attempts     Int       @default(0)
+  errorCode    String?   @map("error_code")
+  quotaCounted Boolean   @default(false) @map("quota_counted")
+  itemsFound   Int       @default(0) @map("items_found")
+  inputTokens  Int?      @map("input_tokens")
+  outputTokens Int?      @map("output_tokens")
+  model        String?
+  startedAt    DateTime? @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  job   CatalogImportJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  store Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items CatalogImportItem[]
+
+  @@index([jobId, status])
+  @@index([storeId, quotaCounted, startedAt])
+  @@map("catalog_import_files")
+}
+
+model CatalogImportItem {
+  id              String   @id @default(uuid())
+  jobId           String   @map("job_id")
+  fileId          String   @map("file_id")
+  storeId         String   @map("store_id")
+  status          String   @default("pending") // pending|accepted|rejected|created|failed
+  name            String?
+  nameAr          String?  @map("name_ar")
+  description     String?
+  descriptionAr   String?  @map("description_ar")
+  priceMinor      Int?     @map("price_minor")
+  compareAtMinor  Int?     @map("compare_at_minor")
+  priceRaw        String?  @map("price_raw")
+  sku             String?
+  categoryName    String?  @map("category_name")
+  categoryId      String?  @map("category_id")
+  tags            String[]
+  variants        Json     @default("[]")
+  confidence      Float    @default(0)
+  flags           String[]
+  acknowledged    String[]
+  sourceText      String?  @map("source_text")
+  editedFields    String[] @map("edited_fields")
+  productId       String?  @map("product_id")
+  createErrorCode String?  @map("create_error_code")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  job      CatalogImportJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  file     CatalogImportFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  product  Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([jobId, status])
+  @@index([storeId, sku])
+  @@index([productId])
+  @@index([categoryId])
+  @@map("catalog_import_items")
 }
