@@ -249,8 +249,8 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'محافظ رصيد المتجر: تُضاف المبالغ المستردة كرصيد متجر إلى محفظة العميل، ويمكن للتاجر تعديل الأرصدة، ويرى العميل رصيده في حسابه.',
     category: 'commerce',
     tier: 'addon',
-    // Un-hidden 2026-09-25 (D1). NOT in any plan baseline, so it resolves OFF
-    // for every store until a super-admin override turns it on.
+    // Un-hidden 2026-09-25 (D1). In the Growth + Business baselines since 2026-10-29 (Ruling W-8);
+    // a super-admin override still wins both ways.
   },
   customer_wallet_checkout: {
     key: 'customer_wallet_checkout',
