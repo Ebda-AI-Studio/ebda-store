@@ -196,7 +196,14 @@ describe('products', () => {
         where: { productId: p.id },
         orderBy: { position: 'asc' },
       });
-      return { upd, again, links };
+      // an unordered `include` has no defined order on either engine: compare it sorted
+      const byName = (r: any) => ({
+        ...r,
+        categories: [...r.categories].sort((x: any, y: any) =>
+          x.category.name.localeCompare(y.category.name)
+        ),
+      });
+      return { upd: byName(upd), again: byName(again), links };
     });
     expect(trace.links.map((l: any) => l.position).sort()).toEqual([0, 4]); // c1 keeps its saved position 4, c2 is new at 0
     expect(trace.upd.aiFieldSources).toMatchObject({ metaTitle: 'ai', excerpt: 'ai' }); // untouched keys survive the merge
