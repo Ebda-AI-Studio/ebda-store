@@ -28,7 +28,10 @@ vi.mock('../../contexts/LanguageContext', () => ({
   }),
 }));
 vi.mock('../../contexts/CartContext', () => ({ useCart: () => ({ itemCount: 0, items: [] }) }));
-vi.mock('../../contexts/StoreContext', () => ({ useStoreUrl: () => (p: string) => p }));
+vi.mock('../../contexts/StoreContext', () => ({
+  useStoreUrl: () => (p: string) => p,
+  useStore: () => ({ store: null }),
+}));
 
 afterEach(() => {
   cleanup();
