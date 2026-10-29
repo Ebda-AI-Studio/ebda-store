@@ -157,6 +157,8 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'bulk-ai-tags': { group: '4-ai', kind: 'workflow', trigger: 'event' },
   'bulk-ai-translate': { group: '4-ai', kind: 'workflow', trigger: 'event' },
   'bulk-import-products': { group: '4-ai', kind: 'queue', trigger: 'event' },
+  'catalog-import-run': { group: '4-ai', kind: 'workflow', trigger: 'event' },
+  'catalog-import-create-drafts': { group: '4-ai', kind: 'workflow', trigger: 'event' },
   'gsc-ingest-cron': { group: '4-ai', kind: 'workflow', trigger: 'cron' },
   'gsc-ingest-on-demand': { group: '4-ai', kind: 'queue', trigger: 'event' },
   'ebda-ads-conversion': { group: '5-integrations', kind: 'queue', trigger: 'event' },

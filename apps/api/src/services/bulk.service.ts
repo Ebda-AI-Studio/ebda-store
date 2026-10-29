@@ -173,7 +173,7 @@ export function buildVariantTitle(values: string[]): string {
  * Replace-semantics: any existing options/variants for the product are cleared
  * first (mirrors how categories/tags/images are replaced on re-import).
  */
-async function createVariantsForProductTx(
+export async function createVariantsForProductTx(
   tx: Prisma.TransactionClient,
   storeId: string,
   productId: string,

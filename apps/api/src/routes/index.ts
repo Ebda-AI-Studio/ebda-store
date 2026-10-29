@@ -48,6 +48,7 @@ import qrRoutes from './qr.routes';
 import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
+import catalogImportRoutes from './catalog-import.routes';
 import variantRoutes from './variant.routes';
 import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
@@ -360,6 +361,7 @@ router.use('/stores', tenantContext, qrRoutes);
 router.use('/stores', tenantContext, barcodeLabelRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
+router.use('/stores', tenantContext, catalogImportRoutes);
 router.use('/stores', tenantContext, variantRoutes);
 
 // Loyalty routes. Pulled out of the bare-'/stores'-only block above (fixed

@@ -44,6 +44,8 @@ type Feature =
   | 'geo'
   | 'recommendations'
   | 'tags'
+  // Catalogue import: photos / PDFs -> reviewed draft products (lib/catalogue/gemini-vision-extractor.ts).
+  | 'catalog-import'
   // Search words (dialect / Franco / EN) for products.search_terms — search program P1.
   | 'search-terms'
   | 'image-alt'
