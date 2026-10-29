@@ -1,24 +1,24 @@
 {
   "_doc": "Budget for the API Worker's startup, enforced by scripts/ci/worker-startup-budget.mjs (CI: Worker dry-run (api)). Cloudflare rejects a deploy whose global scope exceeds its startup CPU limit (error 10021, hit once after the B2B merge). Local workerd numbers are not Cloudflare's, so these are REGRESSION gates with headroom over the recorded baseline, not the platform limit. Raise one only with a Ruling that says why. The absolute startupCpuMs ceiling is enforced on main/nightly runs (quiet runner); pull requests compare against main's bundle measured in the same job (relative.ratio + relative.slackMs).",
   "startupCpuMs": 140,
-  "bundleBytes": 8300000,
-  "bundleGzipBytes": 2400000,
+  "bundleBytes": 7800000,
+  "bundleGzipBytes": 2200000,
   "baseline": {
-    "recorded": "2026-10-28",
+    "recorded": "2026-10-29",
     "before": {
-      "startupCpuMs": 91.6,
-      "bundleBytes": 14288016,
-      "bundleGzipBytes": 3005070
+      "startupCpuMs": 99.2,
+      "bundleBytes": 7632546,
+      "bundleGzipBytes": 2161134
     },
     "after": {
-      "startupCpuMs": 99.2,
-      "bundleBytes": 7518999,
-      "bundleGzipBytes": 2171018
+      "startupCpuMs": 88.3,
+      "bundleBytes": 7091868,
+      "bundleGzipBytes": 1993321
     }
   },
   "relative": {
     "ratio": 0.25,
     "slackMs": 15
   },
-  "_ruling": "Ruling BUNDLE-BUDGET-4 (docs/rulings/BUNDLE-BUDGET-4.md): minify + upload_source_maps in apps/api/wrangler.jsonc cut the bundle 14,288,016 -> 7,518,999 B; the size ceilings are the new size + 10%. Supersedes BUNDLE-BUDGET-3 and the +83019 B note of ID-17 (already included)."
+  "_ruling": "Ruling BUNDLE-BUDGET-5 (docs/rulings/BUNDLE-BUDGET-5.md): keep_names off, exceljs bare build, slimmed Prisma inline schema and slimmed mime-db cut worker.js 7,632,546 -> 7,091,868 B; the size ceilings are the new size + 10%. Supersedes BUNDLE-BUDGET-4's numbers."
 }

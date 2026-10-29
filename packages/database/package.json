@@ -9,8 +9,8 @@
     "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
-    "build": "prisma generate && tsc",
-    "generate": "prisma generate",
+    "build": "prisma generate && node ../../scripts/ci/slim-prisma-client.mjs && tsc",
+    "generate": "prisma generate && node ../../scripts/ci/slim-prisma-client.mjs",
     "gen:tenant-guard-schema": "node scripts/gen-tenant-guard-schema.mjs",
     "migrate": "prisma migrate dev",
     "push": "prisma db push",
