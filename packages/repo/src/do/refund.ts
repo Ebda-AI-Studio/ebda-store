@@ -531,6 +531,23 @@ export interface PartialLine {
 }
 
 /**
+ * The whole-order effects of a FULL return completed by a manual method (stock back, coupon, loyalty, wallet spend, backorders),
+ * with the order status UNTOUCHED, like the `order/refunded` fanout the Postgres path sends (Ruling CF-RETURNS-1). Idempotent.
+ */
+export function reverseOrderEffects(
+  db: SyncSql,
+  a: { storeId: string; orderId: string; now?: number }
+): RefundResult {
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    const o = loadOrder(db, a.storeId, a.orderId);
+    const out = emptyResult(o, 'refund', false);
+    reverseWholeOrder(db, a.storeId, o, now, out);
+    return out;
+  });
+}
+
+/**
  * Refund an order.
  *   neither `lines` nor `amount`: FULL refund. Status `refunded` (payment_status `refunded` if it was paid/disputed)
  *     and the full reversal; legal from confirmed, processing, shipped, delivered, cancelled.
