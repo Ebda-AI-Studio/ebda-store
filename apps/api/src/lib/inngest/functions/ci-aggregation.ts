@@ -41,7 +41,18 @@ export async function runDailyCiAggregation(
   const saved = cohort
     ? await saveInsights(generateInsights(cohort))
     : { created: 0, refreshed: 0 };
-  logger.info({ ...run, ...saved }, '[ci-agg] daily run done');
+  logger.info(
+    {
+      stores: run.stores,
+      failed: run.failed.length,
+      skippedLines: run.skippedLines,
+      cohortCells: run.cohortCells,
+      suppressedCells: run.suppressedCells,
+      insightsCreated: saved.created,
+      insightsRefreshed: saved.refreshed,
+    },
+    '[ci-agg] daily run done'
+  );
   return { skipped: false as const, ...run, ...saved };
 }
 

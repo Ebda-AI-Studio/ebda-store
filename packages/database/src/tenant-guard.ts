@@ -134,6 +134,8 @@ export const GLOBAL_MODELS: readonly string[] = [
   'ProviderVerification',
   'ProviderVerificationEvent',
   'SystemSetting',
+  // Ruling CI-9: platform-wide CI findings over k-anonymous cohort cells, no store_id and no identifier.
+  'CiInsight',
 ];
 
 interface ModelMeta {
