@@ -120,7 +120,7 @@ function loadOrder(db: SyncSql, storeId: string, orderId: string): OrderRow {
   if (!o) throw err('ORDER_NOT_FOUND', 'order not found', 404);
   return o as unknown as OrderRow;
 }
-function addPaymentEvent(
+export function addPaymentEvent(
   db: SyncSql,
   a: {
     storeId: string;
@@ -156,7 +156,7 @@ function addPaymentEvent(
     ]
   );
 }
-function addOrderEvent(
+export function addOrderEvent(
   db: SyncSql,
   storeId: string,
   orderId: string,

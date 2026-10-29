@@ -18,6 +18,7 @@ import {
   type ConfirmedTransaction,
   type PaymentWebhookInput,
 } from './payments';
+import { changeOrderStatus } from './order-status';
 import { postOrderSaleJournal, postRefundJournal } from './ledger';
 import {
   applyGoldRates,
@@ -63,7 +64,8 @@ export type MoneyOpName =
   | 'goldDecidePending'
   | 'goldUpdateSettings'
   | 'goldRepriceProduct'
-  | 'fanoutDisarm';
+  | 'fanoutDisarm'
+  | 'orderStatus';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -86,6 +88,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'goldUpdateSettings',
   'goldRepriceProduct',
   'fanoutDisarm',
+  'orderStatus',
 ];
 
 const TABLE = '_money_ops';
@@ -276,6 +279,13 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
         [id(a.orderId, 'orderId'), storeId, a.requestedAt as number]
       ).changes > 0,
   }),
+  /** The plain status transitions (confirmed, processing, shipped, delivered): see `changeOrderStatus`. */
+  orderStatus: (db, storeId, a) =>
+    changeOrderStatus(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      status: typeof a.status === 'string' ? a.status : '',
+    }),
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),

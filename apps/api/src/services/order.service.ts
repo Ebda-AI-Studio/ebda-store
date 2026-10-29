@@ -2767,16 +2767,16 @@ export class OrderService {
       const money = await storeMoney(storeId);
       if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
     }
-    // Refund by status on a Durable Object store (Ruling CF-PAY-1): the status flip and the whole reversal are ONE section there.
-    // Every other status of a DO order is still a Postgres write that cannot reach it, so it is refused loudly (never dropped).
+    // Refund by status (Ruling CF-PAY-1) and every other status (Ruling CF-FINAL-1) on a Durable Object store.
     {
       const money = await storeMoney(storeId);
       if (money) {
         if (status === 'refunded') return OrderService.refundOnDo(money, storeId, orderId);
-        throw new AppError(
-          501,
-          'ORDER_STATUS_NOT_ON_DO',
-          `Moving a Durable Object store's order to ${status} moves with the order reads in the next slice`
+        return OrderService.advanceOnDo(
+          money,
+          storeId,
+          orderId,
+          status as Exclude<typeof status, 'cancelled'>
         );
       }
     }
@@ -3096,6 +3096,105 @@ export class OrderService {
       where: { id: orderId, storeId },
       include: { items: true },
     })) as never;
+  }
+
+  /** confirmed / processing / shipped / delivered on a Durable Object store: one section there, then the Postgres path's tail. */
+  private static async advanceOnDo(
+    money: MoneyClient,
+    storeId: string,
+    orderId: string,
+    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered'
+  ) {
+    const db = await storeDb(storeId);
+    const before = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      select: {
+        status: true,
+        paymentStatus: true,
+        payments: { select: { status: true } },
+      },
+    });
+    if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    const hadCapturedPayment = hasCapturedPayment(before);
+    const r = await OrderService.translateDoStatus(() => money.orderStatus({ orderId, status }));
+    void deferAfterTenantCommit('order.updateStatus.invalidateCustomersCache', () =>
+      invalidateCustomersCache(storeId)
+    ).catch(err =>
+      logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+    );
+    if (r.codSettled) {
+      // Same post-payment fan-out as "Mark paid" (journal posting); its notification half is deduped by orderCreatedNotifiedAt.
+      void deferAfterTenantCommit('order.codCollectedOnDelivery', () =>
+        inngest.send({
+          name: 'order/created',
+          data: { orderId, storeId, paymentMethod: 'cod', locale: undefined },
+        })
+      );
+    }
+    if (status === 'delivered') {
+      inngest
+        .send({ name: 'order/delivered', data: { orderId, storeId } })
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, 'Failed to enqueue order/delivered event')
+        );
+    }
+    inngest
+      .send({
+        name: 'order/status-changed',
+        data: {
+          orderId,
+          storeId,
+          status,
+          hadCapturedPayment,
+          requestedAt: new Date(r.requestedAt).toISOString(),
+        },
+      })
+      .catch((err: unknown) => {
+        logger.error(
+          { err, orderId, status },
+          'Failed to enqueue order/status-changed - running fanout inline as fallback'
+        );
+        handleOrderStatusChanged(orderId, storeId, status, hadCapturedPayment, {
+          run: <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
+        }).catch((e: unknown) =>
+          logger.error(
+            { err: e, orderId, status },
+            'order/status-changed inline fallback also failed'
+          )
+        );
+      });
+    try {
+      if (r.customerId)
+        socketService.orderStatusNotification(r.customerId, {
+          orderNumber: r.orderNumber,
+          status,
+        });
+    } catch (notifyError) {
+      logger.error({ err: notifyError }, 'Failed to send order status notification');
+    }
+    const updated = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    });
+    // the customer lives in the directory database (a DO store has no join to it): attach it as the Postgres include does
+    const customer = r.customerId
+      ? await prisma.customer.findFirst({
+          where: { id: r.customerId, storeId },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      : null;
+    return { ...updated, customer } as never;
+  }
+
+  /** The engine's status refusals under the Postgres codes (the engine already speaks them; a missing order is the 404). */
+  private static async translateDoStatus<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (err) {
+      if (err instanceof AppError && err.code === 'ORDER_NOT_FOUND')
+        throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      throw err;
+    }
   }
 
   private static async cancelOnDo(

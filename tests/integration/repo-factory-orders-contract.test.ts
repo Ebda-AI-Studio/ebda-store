@@ -536,4 +536,71 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.state.coupons[0].usageCount).toBe(0);
     expect(t.state.orders[0].status).toBe('cancelled');
   });
+
+  // PR D2b-4 (Ruling CF-FINAL-1): the plain status transitions
+  const statusTrace = async (orderId: string) => {
+    const { storeDb } = await import('../../apps/api/src/lib/repo-factory');
+    const db = (await storeDb(STORE)) as any;
+    const o = await db.order.findFirst({
+      where: { id: orderId },
+      select: {
+        status: true,
+        paymentStatus: true,
+        deliveredAt: true,
+        statusFanoutRequestedStatus: true,
+        statusFanoutRequestedAt: true,
+        statusFanoutClaimedAt: true,
+        payments: { select: { status: true, provider: true } },
+      },
+    });
+    const events = await db.orderEvent.findMany({
+      where: { orderId },
+      select: { fromStatus: true, toStatus: true },
+    });
+    return {
+      status: o.status,
+      paymentStatus: o.paymentStatus,
+      delivered: o.deliveredAt !== null,
+      fanoutStatus: o.statusFanoutRequestedStatus,
+      armed: o.statusFanoutRequestedAt !== null && o.statusFanoutClaimedAt === null,
+      payments: o.payments,
+      events: events.map((e: any) => `${e.fromStatus}>${e.toStatus}`).sort(),
+    };
+  };
+  const codPayment = async (orderId: string, total: number) => {
+    const { storeMoney } = await import('../../apps/api/src/lib/repo-factory');
+    const money = await storeMoney(STORE);
+    if (money) await money.paymentCreate({ orderId, provider: 'cod', amount: total });
+    else
+      await prisma.payment.create({
+        data: { orderId, provider: 'cod', status: 'cod_pending', amount: total, currency: 'EGP' },
+      });
+  };
+
+  it('status chain: confirmed, processing, shipped, delivered; COD is settled on delivery (MONEYB-7)', async () => {
+    const t = await parity(10, async w => {
+      const o = (await place(w, 2)) as { id: string; total: number };
+      await codPayment(o.id, o.total);
+      const trace: unknown[] = [];
+      for (const st of ['confirmed', 'processing', 'shipped', 'delivered'] as const) {
+        await OrderService.updateStatus(STORE, o.id, st);
+        trace.push(await statusTrace(o.id));
+      }
+      return trace;
+    });
+    const last = t.out.ok[3];
+    expect(last).toMatchObject({ status: 'delivered', paymentStatus: 'paid', delivered: true });
+    expect(last.payments).toEqual([{ status: 'completed', provider: 'cod' }]);
+  });
+
+  it('status refusals: a backwards move and an unconfirmed InstaPay hold have the same code on both backends', async () => {
+    const t = await parity(10, async w => {
+      const o = (await place(w, 1)) as { id: string };
+      await OrderService.updateStatus(STORE, o.id, 'shipped');
+      const back = await settle(() => OrderService.updateStatus(STORE, o.id, 'confirmed'));
+      return { back, after: await statusTrace(o.id) };
+    });
+    expect(t.out.ok.back.err.code).toBe('INVALID_STATUS_TRANSITION');
+    expect(t.out.ok.after.status).toBe('shipped');
+  });
 });

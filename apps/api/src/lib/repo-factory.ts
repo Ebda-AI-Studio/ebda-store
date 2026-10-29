@@ -264,6 +264,24 @@ export interface MoneyClient {
     a: { orderId: string; requestedAt: number },
     key?: string
   ): Promise<{ disarmed: boolean }>;
+  /** confirmed / processing / shipped / delivered (Ruling CF-FINAL-1): state machine, fanout arming, COD settlement, event. */
+  orderStatus(
+    a: {
+      orderId: string;
+      status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered';
+    },
+    key?: string
+  ): Promise<OrderStatusResult>;
+}
+
+export interface OrderStatusResult {
+  orderId: string;
+  from: string;
+  status: string;
+  requestedAt: number;
+  codSettled: string | null;
+  orderNumber: string;
+  customerId: string | null;
 }
 
 export interface DoWebhookInput {
@@ -465,6 +483,7 @@ export function makeMoneyClient(
     goldUpdateSettings: (a, key) => call('goldUpdateSettings', a, key),
     goldRepriceProduct: (a, key) => call('goldRepriceProduct', a, key),
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
+    orderStatus: (a, key) => call('orderStatus', a, key),
   };
 }
 
