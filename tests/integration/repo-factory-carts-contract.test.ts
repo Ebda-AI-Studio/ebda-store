@@ -24,11 +24,14 @@ import { featureService } from '../../apps/api/src/services/feature.service';
 import {
   makeMoneyClient,
   storeDb,
+  storeMoney,
   withRepo,
   type StoreReads,
   type StoreWrites,
 } from '../../apps/api/src/lib/repo-factory';
 import { AppError } from '../../apps/api/src/middleware/error-handler';
+import { GoldRateService } from '../../apps/api/src/services/gold-rate/gold-rate.service';
+import { createProduct, ownerPool } from '../helpers/gold-sql';
 import { META, canon, insertSqlite, openSqlite } from '../../packages/repo/test/diff-harness';
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
 import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
@@ -296,6 +299,139 @@ const address = {
 };
 
 describe.skipIf(!hasDb)('cart (CartService) on Postgres vs the DO', () => {
+  // PR R4 (Ruling CF-R4-3): the price the cart shows (tiers, group price, MOQ flag, gold facts) is loaded from the store's own
+  // backend. The pure maths is shared; what is compared here is the LOADING: tiers, the buyer's group and the gold rows.
+  it('cart pricing: list price, tier, group price, MOQ flag and gold facts are the same for anonymous, group and plain buyers', async () => {
+    const ownerPg = ownerPool();
+    const t = await parity(async (w, s) => {
+      vi.spyOn(featureService, 'isFeatureEnabled').mockResolvedValue(true); // b2b.wholesale on
+      const onDoRun = !!(await storeMoney(STORE));
+      const mirror = (model: string, rows: unknown[]) => {
+        if (onDoRun) insertSqlite(sqlite, model, rows as never);
+      };
+      await prisma.product.update({ where: { id: w.plain }, data: { moq: 3 } });
+      if (onDoRun) sqlite.prepare('UPDATE products SET moq = 3 WHERE id = ?').run(w.plain);
+      const tier = await prisma.productPriceTier.create({
+        data: { storeId: STORE, productId: w.plain, minQty: 5, priceMinor: 8_000 },
+      });
+      mirror('ProductPriceTier', [tier]);
+      const group = await prisma.customerGroup.create({
+        data: {
+          storeId: STORE,
+          name: `Wholesale ${Math.random().toString(36).slice(2, 7)}`,
+          isWholesale: true,
+          pricingMode: 'percent_off',
+          discountBps: 1_000,
+          isActive: true,
+        },
+      });
+      mirror('CustomerGroup', [group]);
+      const user = await prisma.user.create({
+        data: {
+          email: `r4p-${Math.random().toString(36).slice(2)}@example.test`,
+          passwordHash: 'x'.repeat(60),
+          firstName: 'Whole',
+          lastName: 'Saler',
+          role: 'customer',
+          storeId: STORE,
+          status: 'active',
+        },
+      });
+      const customer = await prisma.customer.create({
+        data: {
+          storeId: STORE,
+          userId: user.id,
+          groupId: group.id,
+          firstName: 'Whole',
+          lastName: 'Saler',
+          email: user.email,
+        },
+      });
+      mirror('Customer', [customer]);
+      // a gold-rate product with a current rate: the cart carries its public pricing facts
+      const goldId = await createProduct(ownerPg, STORE, {
+        mode: 'gold_rate',
+        karat: 21,
+        weightMg: 3250,
+        makingType: 'per_gram',
+        makingValue: 15_000,
+        price: 1,
+        slug: `gold-${sfx}-${++n}`,
+      });
+      // the world is built on Postgres and then mirrored: the rate write itself must stay on Postgres here
+      await onPg(async () =>
+        GoldRateService.applyRates(
+          STORE,
+          { rates: [{ karat: 21, ratePerGram: 576_000 }], confirm: true },
+          { userId: (await prisma.store.findUniqueOrThrow({ where: { id: STORE } })).ownerId }
+        )
+      );
+      const gold = await prisma.product.findUniqueOrThrow({ where: { id: goldId } });
+      mirror('Product', [gold]);
+      mirror('GoldRate', await prisma.goldRate.findMany({ where: { storeId: STORE } }));
+      mirror(
+        'GoldRateCurrent',
+        await prisma.goldRateCurrent.findMany({ where: { storeId: STORE } })
+      );
+      w.names[goldId] = 'gold';
+      w.names[group.id] = 'group';
+      w.names[customer.id] = 'customer';
+      w.names[user.id] = 'user';
+      for (const [id, q] of [
+        [w.plain, 1],
+        [w.plain, 2],
+        [goldId, 1],
+        [w.sized, 1],
+      ] as const)
+        await CartService.addItem(STORE, s, id, q, undefined, id === w.sized ? w.small : undefined);
+      const price = (c: any) => ({
+        items: c.items
+          .map((i: any) => ({
+            product: w.names[i.productId],
+            qty: i.quantity,
+            unit: i.unitPrice,
+            total: i.lineTotal,
+            list: i.listPrice,
+            source: i.priceSource,
+            tier: i.priceTierMinQty,
+            ladderTop: i.priceLadderTopMinQty,
+            belowMoq: i.belowMoq,
+            moq: i.moqRequired,
+            gold: i.goldPricing && {
+              karat: i.goldPricing.karat,
+              rate: i.goldPricing.ratePerGram,
+              weight: i.goldPricing.weightMg,
+            },
+          }))
+          .sort((a: any, b: any) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+        subtotal: c.subtotal,
+      });
+      const retail = price(await CartService.view(STORE, s));
+      const asGroup = price(
+        await CartService.view(STORE, s, undefined, { kind: 'session', userId: user.id } as never)
+      );
+      // five of the plain line reach the tier break; the group price stacks per the resolver's rules
+      await CartService.addItem(STORE, s, w.plain, 3);
+      const tiered = price(await CartService.view(STORE, s));
+      const tieredGroup = price(
+        await CartService.view(STORE, s, undefined, { kind: 'session', userId: user.id } as never)
+      );
+      // the entitlement off: tiers and group prices are dropped, MOQ stays
+      vi.spyOn(featureService, 'isFeatureEnabled').mockResolvedValue(false);
+      const noPlan = price(
+        await CartService.view(STORE, s, undefined, { kind: 'session', userId: user.id } as never)
+      );
+      return { retail, asGroup, tiered, tieredGroup, noPlan };
+    });
+    await ownerPg.end();
+    const o = t.out.ok;
+    expect(JSON.stringify(o.retail)).toContain('"belowMoq"');
+    expect(o.tiered.items.find((i: any) => i.product === 'plain').source).not.toBe('base');
+    expect(o.tieredGroup.subtotal).toBeLessThan(o.tiered.subtotal);
+    expect(o.noPlan.items.find((i: any) => i.product === 'plain').source).toBe('base');
+    expect(o.retail.items.find((i: any) => i.product === 'gold').gold.karat).toBe(21);
+  });
+
   it('addItem: creates the cart, merges the same line by increment, and a different note or variant is its own line', async () => {
     const t = await parity(async (w, s) => {
       await CartService.addItem(STORE, s, w.plain, 1);

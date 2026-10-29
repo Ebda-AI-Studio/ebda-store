@@ -288,7 +288,7 @@ export class CartService {
     const goldByLine = opts.skipPricing
       ? new Map<string, never>()
       : await publicGoldPricingForLines(
-          prisma as unknown as Prisma.TransactionClient,
+          (await storeDb(storeId)) as unknown as Prisma.TransactionClient,
           storeId,
           items
             .filter(i => !i.unavailable)

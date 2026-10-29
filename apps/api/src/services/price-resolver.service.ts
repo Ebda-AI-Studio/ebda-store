@@ -30,6 +30,7 @@ import { resolveUnitPrice, type BuyerGroup, type PriceTierRow, type Resolved } f
 import { featureService } from './feature.service';
 import { getAutomationFlags } from './plan-entitlements';
 import type { BuyerIdentity } from '../lib/buyer-identity';
+import { storeDb } from '../lib/repo-factory';
 
 /**
  * The `b2b.wholesale` entitlement read straight from the database (no Redis / KV / in-memory cache): the per-store override
@@ -162,7 +163,10 @@ export class PriceResolver {
   private async loadTiers(productIds: string[]): Promise<Map<string, PriceTierRow[]>> {
     const missing = productIds.filter(id => !this.tierCache.has(id));
     if (missing.length > 0) {
-      const rows = await prisma.productPriceTier.findMany({
+      // the store's own backend (Ruling CF-R4-3): Postgres, or its Durable Object's rows
+      const rows = await (
+        await storeDb(this.storeId)
+      ).productPriceTier.findMany({
         where: { storeId: this.storeId, productId: { in: missing } },
         select: TIER_SELECT,
       });
@@ -213,7 +217,9 @@ export async function loadBuyerGroup(
       select: { id: true },
     });
     if (!user) return null;
-    customer = await prisma.customer.findFirst({
+    customer = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: { storeId, userId: user.id, groupId: { not: null } },
       select: { group: GROUP_SELECT },
     });
@@ -234,7 +240,9 @@ export async function loadBuyerGroup(
       });
       if (!shopper) return null;
     }
-    customer = await prisma.customer.findFirst({
+    customer = await (
+      await storeDb(storeId)
+    ).customer.findFirst({
       where: {
         storeId,
         groupId: { not: null },
