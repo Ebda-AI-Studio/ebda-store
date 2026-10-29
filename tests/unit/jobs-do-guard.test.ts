@@ -133,7 +133,7 @@ describe('job data classification', () => {
 
   it('every group-7 money job is a MONEY job (a new money job cannot silently page P1)', () => {
     for (const [id, e] of Object.entries(JOBS_MAP))
-      if (e.group === '7-money' && !NO_STORE_DATA_JOBS.has(id))
+      if (e.group === '7-money' && !NO_STORE_DATA_JOBS.has(id) && !PORTED_JOBS.has(id))
         expect(MONEY_JOBS.has(id), `${id} is group 7-money but not in MONEY_JOBS`).toBe(true);
   });
 
@@ -148,6 +148,22 @@ describe('job data classification', () => {
     expect(src).toMatch(/withStoreDb\(/);
     expect(src).not.toMatch(/withStore\(/);
     expect(src).not.toMatch(/\bprisma\b/);
+  });
+
+  it('the status-fanout sweep (ported in CF-PAY-1) reads through storeDb and writes a DO order only through the money op', () => {
+    const src = readFileSync(
+      new URL(
+        '../../apps/api/src/lib/inngest/functions/order-status-fanout-stuck-sweep.ts',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(src).toMatch(/storeDb\(/);
+    expect(src).toMatch(/fanoutDisarm\(/);
+    expect(src).not.toMatch(/\bprisma\b/);
+    // the one Postgres write left is the pg branch of the disarm, reached only when storeMoney() is null
+    expect(src.match(/withStore\(/g)).toHaveLength(1);
+    expect(src.indexOf('fanoutDisarm(')).toBeLessThan(src.indexOf('withStore('));
   });
 });
 
