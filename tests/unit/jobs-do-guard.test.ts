@@ -14,7 +14,14 @@ import { MONEY_JOBS, NO_STORE_DATA_JOBS, PORTED_JOBS, jobDataClass } from '@api/
 import { clearJobRegistry, registerJob } from '@api/lib/jobs/registry';
 import { runJobWorkflow } from '@api/lib/jobs/run-workflow';
 import { handleJobsBatch, type QueueMessageLike } from '@api/lib/jobs/run-queue';
-import { decideRun, doStoreIds, guardedRun, jobTargetStore } from '@api/lib/jobs/do-guard';
+import {
+  decideRun,
+  doStoreIds,
+  guardedRun,
+  jobTargetStore,
+  needsStoreLookup,
+  resolveRunStore,
+} from '@api/lib/jobs/do-guard';
 import type { WorkflowStepLike } from '@api/lib/jobs/step-adapter';
 
 const { sendAlert, runInStoreScope, repo, hidden } = vi.hoisted(() => ({
@@ -24,6 +31,8 @@ const { sendAlert, runInStoreScope, repo, hidden } = vi.hoisted(() => ({
   hidden: { calls: [] as string[] },
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
+const inbox = vi.hoisted(() => ({ get: vi.fn() }));
+vi.mock('@api/lib/definer', () => ({ webhookInbox: inbox }));
 vi.mock('@sentry/cloudflare', () => ({
   captureException: vi.fn(),
   flush: vi.fn(async () => true),
@@ -150,6 +159,76 @@ describe('with JOBS_ON_DO off (today) nothing changes', () => {
     const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
     expect(decideRun(def, { name: 'a', data: { storeId: DO_STORE } })).toEqual({ run: true });
     expect(await guardedRun(def, { name: 'a' }, async () => 42)).toBe(42);
+  });
+});
+
+describe('events that carry no storeId (PR E residual)', () => {
+  it('every typed event either carries a required storeId or is on the reviewed list (a new one fails here)', () => {
+    const src = readFileSync('apps/api/src/lib/inngest/client.ts', 'utf8');
+    const noStore: string[] = [];
+    for (const m of src.matchAll(/name: '([^']+)';\s*data:\s*(\{[\s\S]*?\n\s*\};|\{[^\n]*\};)/g)) {
+      if (!/\bstoreId: string/.test(m[2])) noStore.push(m[1]);
+    }
+    // payment/webhook.received is resolved from its inbox row (EVENT_STORE_RESOLVERS); the others touch no store data.
+    // Anything new needs a required storeId or a resolver.
+    expect(noStore.sort()).toEqual([
+      'contact/form.submitted', // storeId optional; without one the message is dropped (no store data read)
+      'ebda-ads/conversion.requested', // Ebda's own ad conversion: platform, no store
+      'legal/notice.send-requested',
+      'payment/webhook.received',
+    ]);
+  });
+  it('payment-webhook-process resolves its store from the inbox row: a DO store is refused (P0), a Postgres store runs', async () => {
+    flagOn();
+    const handler = vi.fn(async () => 1);
+    registerJob({ id: 'payment-webhook-process' }, handler);
+    inbox.get.mockResolvedValueOnce({ storeId: DO_STORE });
+    const m = qmsg('payment-webhook-process', { webhookEventId: 'wh1', provider: 'paymob' });
+    await handleJobsBatch({ queue: 'ebda-jobs', messages: [m] });
+    expect(handler).not.toHaveBeenCalled();
+    expect(m.ack).toHaveBeenCalled();
+    expect(sendAlert).toHaveBeenCalledWith(expect.objectContaining({ level: 'p0' }));
+
+    sendAlert.mockClear();
+    inbox.get.mockResolvedValueOnce({ storeId: 'some-postgres-store' });
+    await handleJobsBatch({
+      queue: 'ebda-jobs',
+      messages: [qmsg('payment-webhook-process', { webhookEventId: 'wh2', provider: 'paymob' })],
+    });
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(sendAlert).not.toHaveBeenCalled();
+  });
+  it('a row with no store, a missing id or a failed lookup runs as the platform-only path (no DO store reachable)', async () => {
+    flagOn();
+    const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
+    inbox.get.mockResolvedValueOnce({ storeId: null });
+    expect(
+      await resolveRunStore(def, { name: 'a', data: { webhookEventId: 'w' } })
+    ).toBeUndefined();
+    expect(await resolveRunStore(def, { name: 'a', data: {} })).toBeUndefined();
+    inbox.get.mockRejectedValueOnce(new Error('db down'));
+    expect(
+      await resolveRunStore(def, { name: 'a', data: { webhookEventId: 'w' } })
+    ).toBeUndefined();
+  });
+  it('with JOBS_ON_DO off the inbox is never read', async () => {
+    const def = { id: 'payment-webhook-process', options: { id: 'x' }, handler: async () => 1 };
+    inbox.get.mockClear();
+    expect(needsStoreLookup(def, { name: 'a', data: { webhookEventId: 'w' } })).toBe(false);
+    expect(
+      await resolveRunStore(def, { name: 'a', data: { webhookEventId: 'w' } })
+    ).toBeUndefined();
+    expect(inbox.get).not.toHaveBeenCalled();
+  });
+  it('the Workflow runner looks the store up in its own step and refuses a DO store', async () => {
+    flagOn();
+    const handler = vi.fn(async () => 1);
+    registerJob({ id: 'payment-webhook-process' }, handler);
+    inbox.get.mockResolvedValueOnce({ storeId: DO_STORE });
+    wfCalls.length = 0;
+    await runJobWorkflow(wfArgs('payment-webhook-process', { webhookEventId: 'w' }));
+    expect(handler).not.toHaveBeenCalled();
+    expect(wfCalls).toContain('do:resolve-run-store');
   });
 });
 

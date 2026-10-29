@@ -18,6 +18,7 @@ import logger from '../logger';
 import { sendAlert } from '../../services/alerts.service';
 import { enabledStoreIds } from '../store-backend';
 import { runInJobRepoScope } from '../repo-factory';
+import { webhookInbox } from '../definer';
 import { jobDataClass, MONEY_JOBS } from './job-data';
 import { alarmStoreId } from './store-scope';
 import type { JobDef, JobEvent } from './types';
@@ -41,12 +42,57 @@ export function jobTargetStore(event: JobEvent): string | undefined {
 
 export type RunDecision = { run: true } | { run: false; storeId: string; money: boolean };
 
-export function decideRun(def: JobDef, event: JobEvent): RunDecision {
+/**
+ * Events that carry NO `storeId` of their own name the store through a reference the job's data holds. The resolver reads
+ * it (a platform lookup, never the store's tables) so a DO store's event is refused/served like any other. Today only
+ * `payment/webhook.received` (`storeId` optional, "undefined for the platform-only path"): its inbox row holds the store
+ * the route resolved from the provider reference (WEBHOOK-SCOPE-1). A run for which NO store can be named stays on
+ * Postgres exactly as before: nothing of a DO store can be reached from it (a DO store's payment reference does not
+ * resolve there until the D1 entity index, plan task 3.5, lands - recorded in Ruling CF-MONEY-1).
+ */
+export const EVENT_STORE_RESOLVERS: Readonly<
+  Record<string, (event: JobEvent) => Promise<string | undefined>>
+> = {
+  'payment-webhook-process': async event => {
+    const id = event.data?.webhookEventId;
+    if (typeof id !== 'string' || !id) return undefined;
+    const row = await webhookInbox.get(id);
+    return row?.storeId ?? undefined;
+  },
+};
+
+/** True when the run's store must be looked up (JOBS_ON_DO on, the event carries none, the job has a resolver). */
+export function needsStoreLookup(def: JobDef, event: JobEvent): boolean {
+  return doStoreIds().size > 0 && !jobTargetStore(event) && def.id in EVENT_STORE_RESOLVERS;
+}
+
+/** The store a run is about, resolving it from a reference when the event does not carry it. Never throws. */
+export async function resolveRunStore(def: JobDef, event: JobEvent): Promise<string | undefined> {
+  const direct = jobTargetStore(event);
+  if (direct) return direct;
+  const resolver = EVENT_STORE_RESOLVERS[def.id];
+  if (!resolver || doStoreIds().size === 0) return undefined;
+  try {
+    return await resolver(event);
+  } catch (err) {
+    // A failed lookup must not turn into "run against Postgres" silently for a store that may be a DO store.
+    logger.error(
+      { err, job: def.id },
+      '[jobs] could not resolve the store of an event; running as platform-only'
+    );
+    return undefined;
+  }
+}
+
+export function decideRunForStore(def: JobDef, storeId: string | undefined): RunDecision {
   const dos = doStoreIds();
   if (dos.size === 0 || jobDataClass(def.id) !== 'unported') return { run: true };
-  const storeId = jobTargetStore(event);
   if (storeId && dos.has(storeId)) return { run: false, storeId, money: MONEY_JOBS.has(def.id) };
   return { run: true };
+}
+
+export function decideRun(def: JobDef, event: JobEvent): RunDecision {
+  return decideRunForStore(def, jobTargetStore(event));
 }
 
 /** Loud refusal: log + alert, never the job's own failure path (its `onFailure` would write to Postgres). */

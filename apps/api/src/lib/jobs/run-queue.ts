@@ -7,7 +7,7 @@
  */
 import logger from '../logger';
 import { dispatchEventsToAll } from './dispatch';
-import { decideRun, guardedRun, reportRefusal } from './do-guard';
+import { decideRunForStore, guardedRun, reportRefusal, resolveRunStore } from './do-guard';
 import { FREEZE_MAX_WAITS, FREEZE_PARK_SECONDS, writesFrozen } from './freeze';
 import { reportJobFailure, runOnFailure } from './failure';
 import {
@@ -85,7 +85,7 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   const event = body.event;
 
   // A DO store's job that still reads/writes its Postgres tables does not run (Ruling CF-JOBS-1): alert, ack, no failure path.
-  const decision = decideRun(def, event);
+  const decision = decideRunForStore(def, await resolveRunStore(def, event));
   if (!decision.run) {
     await reportRefusal(def, event, msg.id, decision);
     msg.ack();
