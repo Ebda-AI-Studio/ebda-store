@@ -89,7 +89,11 @@ describe('globals.css look rules', () => {
   });
   it('no global card-image or [data-section] rule (merchant presets win)', () => {
     expect(looksCss).not.toMatch(/group\\\/img/);
-    expect(looksCss).not.toMatch(/\[data-section\]/);
+    // TEMPLATES-MOCK-7/-8: the only allowed use is as the ANCESTOR scope of the card-chrome / product-grid
+    // trait rules (they restyle descendants on the home sections, never the section itself).
+    expect(looksCss).not.toMatch(
+      /\[data-section\](?! \[data-(?:card-chrome='(?:heart|swatches|tags)'|part='product-grid')\])/
+    );
   });
   it('the retired dahab skin no longer overrides --font-display on <body> (Ruling B5-1)', () => {
     expect(looksCss).not.toMatch(/data-pack='dahab'\]\s*\{\s*--font-display/);

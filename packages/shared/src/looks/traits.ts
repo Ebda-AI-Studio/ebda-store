@@ -23,10 +23,10 @@ export function traitDefault(key: string, lookId?: string | null): string | bool
       return 'inner';
     case 'headingWeight': {
       // The mock's bold display headings, except on a single-weight display face (Lalezar, Kufam...) where
-      // "bold" would be a synthesised smear: those stay regular.
+      // "strong" would be a synthesised smear: those stay regular.
       const look = getLook(lookId);
       if (!look) return undefined;
-      return shipsBold(look.tokens.fonts.display) ? 'bold' : 'regular';
+      return shipsBold(look.tokens.fonts.display) ? 'strong' : 'regular';
     }
     case 'priceColour': {
       // Accent prices only on a light-page look whose accent reads (>= 4.5:1) on the page and the surface. On a

@@ -56,7 +56,7 @@ export type HeroRatio = (typeof HERO_RATIOS)[number];
  * store, `always` on a store with no look (untouched).
  */
 /** The merchant's section-heading weight (TEMPLATES-MOCK-6). Unset = the look's own (bold where its display face ships a bold weight). */
-export const HEADING_WEIGHTS = ['regular', 'bold'] as const;
+export const HEADING_WEIGHTS = ['regular', 'strong'] as const;
 export type HeadingWeight = (typeof HEADING_WEIGHTS)[number];
 /** Product price colour on cards (TEMPLATES-MOCK-6): the look's accent (made readable) or the plain text colour. */
 export const PRICE_COLOURS = ['accent', 'text'] as const;

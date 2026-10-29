@@ -423,7 +423,7 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
           'Bold or regular section titles. Some display fonts have a single weight, so the look keeps those regular.',
         hintAr:
           'عناوين الأقسام بخط عريض أو عادي. بعض خطوط العناوين ليها سُمك واحد، فالشكل بيسيبها عادية.',
-        options: [opt('bold', 'Bold', 'عريض'), opt('regular', 'Regular', 'عادي')],
+        options: [opt('strong', 'Bold', 'عريض'), opt('regular', 'Regular', 'عادي')],
         trait: true,
         shownFor: { templates: ['qamar', 'souq', 'jasmine', 'lamma', 'dahab'] },
       },

@@ -97,7 +97,7 @@ describe('headingWeight + priceColour (P4)', () => {
   });
 
   it('look default: bold where the display face ships a bold weight, regular on single-weight faces', () => {
-    expect(traitDefault('headingWeight', 'qamar.atelier')).toBe('bold'); // Noto Naskh 400;700
+    expect(traitDefault('headingWeight', 'qamar.atelier')).toBe('strong'); // Noto Naskh 400;700
     expect(traitDefault('headingWeight', 'qamar.lookbook')).toBe('regular'); // Lalezar, one weight
     expect(traitDefault('headingWeight', 'dahab.giftbox')).toBe('regular'); // Kufam, one weight
     expect(traitDefault('priceColour', 'qamar.atelier')).toBe('accent'); // light page, readable accent
@@ -107,7 +107,7 @@ describe('headingWeight + priceColour (P4)', () => {
 
   it('body attributes: merchant beats look; a store with no look gets none', () => {
     expect(lookTraitAttrs({}, 'qamar.atelier')).toMatchObject({
-      'data-heading-weight': 'bold',
+      'data-heading-weight': 'strong',
       'data-price-colour': 'accent',
     });
     expect(
@@ -116,7 +116,7 @@ describe('headingWeight + priceColour (P4)', () => {
       'data-heading-weight': 'regular',
       'data-price-colour': 'text',
     });
-    expect(lookTraitAttrs({ headingWeight: 'bold' }, null)).toEqual({});
+    expect(lookTraitAttrs({ headingWeight: 'strong' }, null)).toEqual({});
   });
 
   it('the accent price colour is emitted only when the accent reads on page and card, else the text colour stays', () => {
