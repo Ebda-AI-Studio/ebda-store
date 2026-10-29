@@ -28,7 +28,7 @@
  * it is the `prisma` proxy (request transaction, tenant guard, RLS unchanged); on 'do' each call is ONE atomic `mutate`
  * RPC and `$transaction([...], { idempotencyKey })` ships the whole batch as one atomic, replay-safe unit.
  *
- * WHAT IS NOT HERE (PR D2): raw SQL, `$queryRaw`, interactive `$transaction`, aggregate/groupBy, row locks, money/stock
+ * WHAT IS NOT HERE (PR D2): raw SQL, `$queryRaw`, interactive `$transaction`, row locks, money/stock
  * models. The types `StoreReads`/`StoreWrites` offer only what prisma-lite answers on the DO, and the DO re-checks the
  * allow-list, so a service that compiles against them cannot reach a money path on either backend.
  */
@@ -52,7 +52,9 @@ type ReadOp =
   | 'findUnique'
   | 'findFirstOrThrow'
   | 'findUniqueOrThrow'
-  | 'count';
+  | 'count'
+  | 'aggregate'
+  | 'groupBy';
 
 /** The read-only slice of every model delegate of the Prisma client: what prisma-lite answers on the StoreDO. */
 export type StoreReads = {
@@ -171,11 +173,29 @@ export interface StockClient {
   ): Promise<{ newQuantity: number }>;
 }
 
+/** Money operations of the StoreDO (Ruling CF-MONEY-1); each takes an optional idempotency key. */
+export interface MoneyClient {
+  loyaltyEarn(
+    a: { customerId: string; orderId: string; featureEnabled: boolean },
+    key?: string
+  ): Promise<{ pointsEarned: number; newBalance: number; replayed: boolean }>;
+  loyaltyReverseEarned(
+    a: { orderId: string },
+    key?: string
+  ): Promise<{ pointsReversed: number; newBalance: number; replayed: boolean } | null>;
+  loyaltyReverseRedeemed(
+    a: { orderId: string },
+    key?: string
+  ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+}
+
 export interface StoreRepo {
   storeId: string;
   backend: StoreBackend;
   /** Stock operations. Present ONLY on 'do'; on 'pg' the service keeps its own Postgres path (see `storeStock`). */
   stock?: StockClient;
+  /** Money operations. Present ONLY on 'do' (see `storeMoney`). */
+  money?: MoneyClient;
   db: StoreReads;
   /** The write client (see StoreWrites). Resolved with the repo, so one flag read serves both. */
   writer: StoreWrites;
@@ -205,6 +225,14 @@ interface QueryStub {
   ): Promise<
     { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
   >;
+  moneyOp(
+    storeId: string,
+    op: string,
+    argsJson: string,
+    key?: string
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
+  >;
   query(
     storeId: string,
     queries: Array<{ model: string; op: string; args?: Record<string, unknown> }>
@@ -227,9 +255,20 @@ export function makeStockClient(
   };
 }
 
+/** The money client over a transport `call(op, args, key)`; shared by the Worker and the contract tests. */
+export function makeMoneyClient(
+  call: (op: string, args: unknown, key?: string) => Promise<any>
+): MoneyClient {
+  return {
+    loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
+    loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
+    loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+  };
+}
+
 async function doClients(
   storeId: string
-): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient }> {
+): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient; money: MoneyClient }> {
   const stub = storeDo(storeId) as unknown as QueryStub; // 503 here when the binding is absent
   // Dynamic: the Node build cannot resolve the @ebda-src alias (apps/api/src/cf/repo-modules.d.ts); only a Worker with a
   // bound StoreDO ever reaches this line.
@@ -239,12 +278,18 @@ async function doClients(
     if (!r.ok) throw new AppError(r.status, r.code, r.message);
     return decodeRpc<any>(r.json);
   };
+  const callMoney = async (op: string, args: unknown, key?: string) => {
+    const r = await stub.moneyOp(storeId, op, encodeRpc(args), key);
+    if (!r.ok) throw new AppError(r.status, r.code, r.message);
+    return decodeRpc<any>(r.json);
+  };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
     // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
     db: createDoClient(send as never) as unknown as StoreReads,
     writer: createDoClient(send as never, m => stub.mutate(storeId, m)) as unknown as StoreWrites,
     stock: makeStockClient(call),
+    money: makeMoneyClient(callMoney),
   };
 }
 
@@ -305,6 +350,15 @@ export async function storeWriter(storeId: string): Promise<StoreWrites> {
  */
 export async function storeStock(storeId: string): Promise<StockClient | null> {
   return (await storeRepo(storeId)).stock ?? null;
+}
+
+/**
+ * The money client of a store served by its Durable Object, or `null` on Postgres (the default for every store): a money
+ * service does `const money = await storeMoney(id); if (money) return doPath(money);` followed by its unchanged Postgres
+ * code, so with every flag at 'pg' the Postgres code (row locks, request transaction, RLS) runs exactly as before.
+ */
+export async function storeMoney(storeId: string): Promise<MoneyClient | null> {
+  return (await storeRepo(storeId)).money ?? null;
 }
 
 /**

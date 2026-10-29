@@ -4,7 +4,7 @@ import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
 import { fromMinor, minorToDecimalString } from '@ebda/shared';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeMoney, storeUpdate } from '../lib/repo-factory';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
@@ -155,6 +155,12 @@ async function lockLoyaltyRow(
     SELECT id FROM public.loyalty_points
     WHERE store_id = ${storeId} AND customer_id = ${customerId}
     FOR UPDATE`;
+}
+
+/** A reversal for an order the DO does not hold is a no-op, as it is on Postgres (no ledger row = nothing to reverse). */
+function orderNotFoundAsNull(err: unknown): null {
+  if (err instanceof AppError && err.code === 'ORDER_NOT_FOUND') return null;
+  throw err;
 }
 
 export class LoyaltyService {
@@ -387,6 +393,14 @@ export class LoyaltyService {
     orderId: string,
     orderTotalFils: number
   ): Promise<{ pointsEarned: number; newBalance: number }> {
+    // Store on its Durable Object (Ruling CF-MONEY-1): one named operation, one section, in place of the Postgres
+    // transaction below. The DO reads the order total from its own order row (orderTotalFils is what Postgres is given).
+    const money = await storeMoney(storeId);
+    if (money) {
+      const featureEnabled = await featureService.isFeatureEnabled(storeId, 'loyalty');
+      const r = await money.loyaltyEarn({ customerId, orderId, featureEnabled });
+      return { pointsEarned: r.pointsEarned, newBalance: r.newBalance };
+    }
     const [store, loyaltyEnabled] = await Promise.all([
       withStore(storeId, tx =>
         tx.store.findUnique({
@@ -551,6 +565,12 @@ export class LoyaltyService {
     storeId: string,
     orderId: string
   ): Promise<{ pointsReversed: number; newBalance: number } | null> {
+    const money = await storeMoney(storeId);
+    if (money) {
+      // an order the DO does not hold has no earn row either: Postgres answers null for it
+      const r = await money.loyaltyReverseEarned({ orderId }).catch(orderNotFoundAsNull);
+      return r ? { pointsReversed: r.pointsReversed, newBalance: r.newBalance } : null;
+    }
     // Find the original earn transaction. If loyalty was disabled at delivery
     // time, this returns null and we short-circuit.
     const earn = await prisma.loyaltyTransaction.findFirst({
@@ -846,6 +866,11 @@ export class LoyaltyService {
     storeId: string,
     orderId: string
   ): Promise<{ pointsRecredited: number; newBalance: number } | null> {
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.loyaltyReverseRedeemed({ orderId }).catch(orderNotFoundAsNull);
+      return r ? { pointsRecredited: r.pointsRecredited, newBalance: r.newBalance } : null;
+    }
     const redeem = await prisma.loyaltyTransaction.findFirst({
       where: { storeId, orderId, type: 'redeem_discount' },
     });

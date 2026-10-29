@@ -28,6 +28,9 @@ import {
   doSqlRunner,
   doSyncSql,
   answerStockOp,
+  answerMoneyOp,
+  ensureMoneyOpsSchema,
+  type MoneyAnswer,
   applyStoreSettings,
   decodeRpc,
   ensureStockOpsSchema,
@@ -100,6 +103,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensurePaymentSchema(this.sync);
       ensureIdempotencySchema(doSqlRunner(ctx.storage));
       ensureStockOpsSchema(this.sync);
+      ensureMoneyOpsSchema(this.sync);
     });
   }
 
@@ -192,6 +196,21 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
     }
     return answerStockOp(this.sync, storeId, op, argsJson, key);
+  }
+
+  /**
+   * Money operations (Ruling CF-MONEY-1): the same contract as `stockOp` (one named operation = one `transactionSync`
+   * section, optional idempotency key, a refusal is an ANSWER) for the money paths moved in PR D2b.
+   */
+  moneyOp(storeId: string, op: string, argsJson: string, key?: string): MoneyAnswer {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    return answerMoneyOp(this.sync, storeId, op, argsJson, key);
   }
 
   /**

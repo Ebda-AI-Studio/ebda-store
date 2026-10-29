@@ -119,6 +119,19 @@ declare module '@ebda-src/repo' {
     key?: string
   ): StockAnswer;
   export function ensureStockOpsSchema(db: SyncSql): void;
+  export type MoneyAnswer =
+    | { ok: true; json: string }
+    | { ok: false; code: string; status: number; message: string };
+  export function answerMoneyOp(
+    db: SyncSql,
+    storeId: string,
+    op: string,
+    argsJson: string,
+    key?: string
+  ): MoneyAnswer;
+  export function ensureMoneyOpsSchema(db: SyncSql): void;
+  export type MoneyOpName = string;
+  export const MONEY_OP_NAMES: readonly MoneyOpName[];
   export type StockOpName = string;
   export const STOCK_OP_NAMES: readonly StockOpName[];
   export const DO_PROCS: Record<string, unknown>;

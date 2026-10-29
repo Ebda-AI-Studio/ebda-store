@@ -7,7 +7,7 @@
  * re-mark every restored product/customer/order dirty, so the next search rebuilds the index from the rows.
  */
 const EXCLUDED =
-  /^(sqlite_|_cf_|_migrations$|_identity$|_idempotency$|_stock_ops$|search_dirty$|product_vector_state$|product_search_fts|customer_search_fts)/;
+  /^(sqlite_|_cf_|_migrations$|_identity$|_idempotency$|_stock_ops$|_money_ops$|search_dirty$|product_vector_state$|product_search_fts|customer_search_fts)/;
 
 export interface SqlRead {
   exec(q: string, ...b: unknown[]): { toArray(): Array<Record<string, unknown>> };
