@@ -286,6 +286,19 @@ export interface MoneyClient {
     guestOrderIds: string[];
     truncated: boolean;
   }>;
+  /** A merchant's manual order (Ruling CF-R4-2). */
+  createAdminOrder(
+    a: Record<string, unknown>,
+    key?: string
+  ): Promise<{
+    orderId: string;
+    orderNumber: string;
+    subtotal: number;
+    discount: number;
+    shipping: number;
+    tax: number;
+    total: number;
+  }>;
   goldSetProductPricing(a: Record<string, unknown>, key?: string): Promise<any>;
   goldBulkSwitchMode(a: Record<string, unknown>, key?: string): Promise<any>;
   goldCreateVariant(a: Record<string, unknown>, key?: string): Promise<{ id: string }>;
@@ -544,6 +557,7 @@ export function makeMoneyClient(
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
     searchOrders: a => call('searchOrders', a),
+    createAdminOrder: (a, key) => call('createAdminOrder', a, key),
   };
 }
 

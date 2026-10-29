@@ -817,7 +817,7 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       const num = placed[0].orderNumber;
       const terms = [
         num, // the whole number
-        num.slice(-6), // a part of it
+        num.slice(num.indexOf('-') + 1), // the random part of it (never a bare phone-like digit run)
         'ORD-', // matches every order
         'احمد', // folded: finds أحمد (registered) and Ahmed is Latin so not
         'أحمد',
@@ -841,7 +841,8 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       ];
       const out: Record<string, unknown> = {};
       for (const q of terms)
-        out[q === num ? '<num>' : q === num.slice(-6) ? '<part>' : q] = await search(q);
+        out[q === num ? '<num>' : q === num.slice(num.indexOf('-') + 1) ? '<part>' : q] =
+          await search(q);
       out['own orders'] = await search('hassan', { customerId: users[1] });
       out['other customer'] = await search('hassan', { customerId: users[0] });
       out['status filter'] = await search('example.test', { status: 'cancelled' });
@@ -867,6 +868,217 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       };
     });
     expect(t.out.ok).toEqual({ none: 0, byNumber: 1 });
+  });
+
+  // PR R4 (Ruling CF-R4-2): the merchant's manual order. Same scenario on Postgres (the unchanged code) and on the DO engine.
+  const adminAddr = (i: number, extra: Record<string, unknown> = {}) => ({
+    ...address(i),
+    email: 'phone.buyer@example.test',
+    area: 'Cairo',
+    ...extra,
+  });
+  const adminTrace = async (ids: string[]) => {
+    const { storeDb } = await import('../../apps/api/src/lib/repo-factory');
+    const db = (await storeDb(STORE)) as any;
+    const events = await db.orderEvent.findMany({
+      where: { orderId: { in: ids } },
+      select: { toStatus: true, metadata: true },
+    });
+    return events
+      .map((e: any) => ({ to: e.toStatus, meta: canon(e.metadata) }))
+      .sort((a: any, b: any) => {
+        // the coupon code is random per world, so it cannot be part of the order
+        const k = (e: any) => JSON.stringify({ ...e, meta: { ...e.meta, couponCode: undefined } });
+        return k(a).localeCompare(k(b));
+      });
+  };
+  const mkCoupon = async (w: World, data: Record<string, unknown>) => {
+    const code = `A${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+    const row = await prisma.coupon.create({
+      data: {
+        storeId: STORE,
+        code,
+        name: 'c',
+        type: 'fixed',
+        value: 1_500,
+        isActive: true,
+        ...data,
+      } as never,
+    });
+    insertSqlite(sqlite, 'Coupon', [row] as never);
+    w.names[row.id] = 'coupon2';
+    w.names[code] = 'code2';
+    return code;
+  };
+  const admin = (
+    w: World,
+    items: Array<{ productId: string; variantId?: string; quantity: number }>,
+    extra: Record<string, unknown> = {},
+    role = 'store_admin',
+    i = 1
+  ) =>
+    OrderService.createAdminOrder(
+      STORE,
+      ownerId,
+      { shippingAddress: adminAddr(i), items, ...extra } as never,
+      { role }
+    ) as Promise<{ id: string; total: number }>;
+
+  it('admin (manual) order: guest, totals, items, NO stock taken, the sale document and the cart rows are the same', async () => {
+    const t = await parity(10, async w => {
+      const o = await admin(w, [{ productId: w.product, quantity: 3 }], { notes: 'phone order' });
+      return { total: o.total, events: await adminTrace([o.id]) };
+    });
+    expect(t.state.products[0].inventory).toBe(10);
+    expect(t.state.history).toEqual([]);
+    expect(t.state.orders[0]).toMatchObject({
+      subtotal: 30_000,
+      status: 'pending',
+      notes: 'phone order',
+    });
+    expect(t.state.fiscal).toHaveLength(1);
+  });
+
+  it('admin order: a coupon is claimed once, discounts like checkout, a negotiated shipping fee replaces the computed one', async () => {
+    const t = await parity(10, async w => {
+      const o = await admin(w, [{ productId: w.product, quantity: 2 }], {
+        couponCode: w.coupon.toLowerCase(),
+        shippingOverride: 2_500,
+      });
+      return { total: o.total };
+    });
+    expect(t.state.coupons[0].usageCount).toBe(1);
+    expect(t.state.orders[0]).toMatchObject({
+      couponDiscount: 0,
+      discount: 1_000,
+      shipping: 2_500,
+    });
+  });
+
+  it('admin order: coupon rules are enforced (same code), an override needs a store admin and a reason and is recorded as an event', async () => {
+    const t = await parity(10, async w => {
+      const expired = await mkCoupon(w, { expiresAt: new Date(Date.now() - 86_400_000) });
+      const minimum = await mkCoupon(w, { minOrderAmount: 999_999 });
+      const used = await mkCoupon(w, { usageLimit: 1, usageCount: 1 });
+      const item = [{ productId: w.product, quantity: 1 }];
+      const out: Record<string, unknown> = {};
+      for (const [name, code] of [
+        ['expired', expired],
+        ['minimum', minimum],
+        ['used', used],
+      ] as const) {
+        out[`${name} enforced`] = await settle(() => admin(w, item, { couponCode: code }));
+        out[`${name} staff`] = await settle(() =>
+          admin(
+            w,
+            item,
+            { couponCode: code, overrideCouponRules: true, couponOverrideReason: 'phone deal' },
+            'staff'
+          )
+        );
+      }
+      out['no reason'] = await settle(() =>
+        admin(w, item, { couponCode: expired, overrideCouponRules: true })
+      );
+      const ids: string[] = [];
+      for (const [name, code] of [
+        ['expired', expired],
+        ['minimum', minimum],
+        ['used', used],
+      ] as const) {
+        const r = await settle(() =>
+          admin(w, item, {
+            couponCode: code,
+            overrideCouponRules: true,
+            couponOverrideReason: 'phone deal',
+          })
+        );
+        out[`${name} override`] = 'ok' in r ? { total: r.ok.total } : r;
+        if ('ok' in r) ids.push(r.ok.id);
+      }
+      out.events = await adminTrace(ids);
+      out.unknown = await settle(() => admin(w, item, { couponCode: 'NOPE-NOPE' }));
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o['expired enforced'].err.code).toBe('COUPON_EXPIRED');
+    expect(o['minimum enforced'].err.code).toBe('MIN_ORDER_NOT_MET');
+    expect(o['used enforced'].err.code).toBe('COUPON_LIMIT_REACHED');
+    expect(o['expired staff'].err.status).toBe(403);
+    expect(o['no reason'].err.status).toBe(400);
+    expect(o.events).toHaveLength(3);
+    expect(o.unknown.err.status).toBe(404);
+  });
+
+  it('admin order: minimum order quantity is refused 422, overridable by a store admin with a reason (event), staff refused', async () => {
+    const t = await parity(20, async w => {
+      await prisma.product.update({ where: { id: w.product }, data: { moq: 5 } });
+      sqlite.prepare('UPDATE products SET moq = 5 WHERE id = ?').run(w.product);
+      const item = [{ productId: w.product, quantity: 2 }];
+      const out: Record<string, unknown> = {};
+      out.refused = await settle(() => admin(w, item));
+      out.staff = await settle(() =>
+        admin(w, item, { overrideMoq: true, moqOverrideReason: 'phone deal' }, 'staff')
+      );
+      out.noReason = await settle(() => admin(w, item, { overrideMoq: true }));
+      const r = await settle(() =>
+        admin(w, item, { overrideMoq: true, moqOverrideReason: 'phone deal' })
+      );
+      out.override = 'ok' in r ? { total: r.ok.total } : r;
+      out.events = await adminTrace('ok' in r ? [r.ok.id] : []);
+      out.enough = await settle(() => admin(w, [{ productId: w.product, quantity: 5 }]));
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o.refused.err).toMatchObject({ status: 422, code: 'BELOW_MOQ' });
+    expect(o.staff.err.status).toBe(403);
+    expect(o.override.total).toBeGreaterThan(0);
+    expect(o.events).toHaveLength(1);
+  });
+
+  it('admin order: refusals (unknown product, variant required / unknown / disabled) carry the same status and code, and a variant line is priced from the variant', async () => {
+    const t = await parity(20, async w => {
+      const mkVariant = async (data: Record<string, unknown>) => {
+        const v = await prisma.productVariant.create({
+          data: {
+            productId: w.product,
+            title: 'L',
+            sku: `V${Math.random().toString(36).slice(2, 7)}`,
+            price: 12_000,
+            inventory: 5,
+            isActive: true,
+            ...data,
+          } as never,
+        });
+        if (await storeMoney(STORE)) insertSqlite(sqlite, 'ProductVariant', [v] as never); // the product is mirrored on the DO run only
+        w.names[v.id] = 'variant';
+        w.names[v.sku as string] = 'sku';
+        return v.id;
+      };
+      const ghost = await settle(() => admin(w, [{ productId: crypto.randomUUID(), quantity: 1 }]));
+      const ok = await mkVariant({});
+      const off = await mkVariant({ title: 'XL', isActive: false });
+      const out: Record<string, unknown> = {};
+      out.ghost = ghost;
+      out.required = await settle(() => admin(w, [{ productId: w.product, quantity: 1 }]));
+      out.unknown = await settle(() =>
+        admin(w, [{ productId: w.product, variantId: crypto.randomUUID(), quantity: 1 }])
+      );
+      out.disabled = await settle(() =>
+        admin(w, [{ productId: w.product, variantId: off, quantity: 1 }])
+      );
+      const r = await settle(() =>
+        admin(w, [{ productId: w.product, variantId: ok, quantity: 2 }])
+      );
+      out.variant = 'ok' in r ? { total: r.ok.total } : r;
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o.ghost.err).toMatchObject({ status: 404, code: 'PRODUCT_NOT_FOUND' });
+    expect(o.required.err).toMatchObject({ status: 400, code: 'VARIANT_REQUIRED' });
+    expect(o.unknown.err.code).toBe('VARIANT_NOT_FOUND');
+    expect(o.disabled.err).toMatchObject({ status: 409, code: 'VARIANT_INACTIVE' });
+    expect(o.variant.total).toBeGreaterThan(24_000 - 1);
   });
 
   it('a plain order: totals, items, stock and the sale ledger row are the same', async () => {

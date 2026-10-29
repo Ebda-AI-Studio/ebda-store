@@ -37,6 +37,7 @@ import {
   type ProductPricingInput,
   type VariantPricingInput,
 } from './gold-pricing';
+import { placeAdminOrder, type AdminOrderInput } from './admin-order';
 import { searchOrderIds } from './order-search';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -82,7 +83,8 @@ export type MoneyOpName =
   | 'quoteOrder'
   | 'fiscalRefund'
   | 'fiscalCancelSale'
-  | 'searchOrders';
+  | 'searchOrders'
+  | 'createAdminOrder';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -113,6 +115,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'fiscalRefund',
   'fiscalCancelSale',
   'searchOrders',
+  'createAdminOrder',
 ];
 
 const TABLE = '_money_ops';
@@ -370,6 +373,11 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       typeof a.search === 'string' ? a.search : '',
       typeof a.numberLimit === 'number' && a.numberLimit > 0 ? a.numberLimit : undefined
     ),
+  /** A merchant's manual order (Ruling CF-R4-2): priced from the DO's rows, no stock reserved, overrides recorded in the section. */
+  createAdminOrder: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a as Partial<AdminOrderInput>;
+    return placeAdminOrder(db, { ...(rest as AdminOrderInput), storeId });
+  },
   goldRepriceProduct: (db, storeId, a) => ({
     repriced: repriceGoldProduct(db, storeId, id(a.productId, 'productId')),
   }),

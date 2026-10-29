@@ -3771,6 +3771,127 @@ export class OrderService {
     });
   }
 
+  /**
+   * `createAdminOrder` for a store on its Durable Object (Ruling CF-R4-2). The permission rules for the two overrides (coupon
+   * rules, minimum order quantity) are decided HERE from the verified session, in the Postgres order's wording; the engine
+   * (`do/admin-order.ts`) then prices the lines from the DO's own rows and writes the order, its items, the override events
+   * and the fiscal sale document in one section, with no stock reserved (as on Postgres). The audit rows and the monthly cap
+   * note follow the commit.
+   */
+  private static async createAdminOrderOnDo(
+    money: MoneyClient,
+    storeId: string,
+    adminUserId: string,
+    data: Parameters<typeof OrderService.createAdminOrder>[2],
+    actor: { role?: string },
+    pricingOpts: { buyer?: BuyerIdentity }
+  ) {
+    const moqOverride = data.overrideMoq === true;
+    if (moqOverride) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+        throw new AppError(
+          403,
+          'MOQ_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override the minimum order quantity'
+        );
+      if (!data.moqOverrideReason?.trim())
+        throw new AppError(
+          400,
+          'MOQ_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override the minimum order quantity'
+        );
+    }
+    const overrideCoupon = !!data.couponCode && data.overrideCouponRules === true;
+    const overrideReason = data.couponOverrideReason?.trim() ?? '';
+    if (overrideCoupon) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+        throw new AppError(
+          403,
+          'COUPON_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override coupon rules'
+        );
+      if (!overrideReason)
+        throw new AppError(
+          400,
+          'COUPON_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override coupon rules'
+        );
+    }
+    // the engine already refuses under the Postgres codes (no `translateDoRefusal`: it would rename COUPON_EXPIRED to INVALID_COUPON)
+    const placed = await money.createAdminOrder({
+      lines: data.items.map(i => ({
+        productId: i.productId,
+        ...(i.variantId ? { variantId: i.variantId } : {}),
+        quantity: i.quantity,
+      })),
+      customerId: data.customerId,
+      buyer: pricingOpts.buyer ?? ANONYMOUS_BUYER,
+      wholesaleEntitled: await wholesaleEntitledUncached(storeId),
+      shippingAddress: data.shippingAddress,
+      billingAddress: data.billingAddress,
+      currency: data.currency ?? REGION.currency,
+      notes: data.notes,
+      couponCode: data.couponCode,
+      overrideCouponRules: overrideCoupon,
+      couponOverrideReason: overrideReason,
+      overrideMoq: moqOverride,
+      moqOverrideReason: data.moqOverrideReason?.trim(),
+      shippingOverride: data.shippingOverride,
+      actorId: adminUserId,
+      actorRole: actor.role ?? null,
+    });
+    const found = await (
+      await storeDb(storeId)
+    ).order.findFirst({ where: { id: placed.orderId, storeId }, include: { items: true } });
+    const order = (
+      await attachCustomers(storeId, [found!], {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+      })
+    )[0];
+    await auditLog({
+      action: 'order.admin_created',
+      userId: adminUserId,
+      resourceType: 'order',
+      resourceId: placed.orderId,
+      details: {
+        orderNumber: placed.orderNumber,
+        itemsCount: data.items.length,
+        total: placed.total,
+      },
+    });
+    if (overrideCoupon && data.couponCode)
+      await auditLog({
+        action: COUPON_OVERRIDE_AUDIT_ACTION,
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: placed.orderId,
+        details: {
+          orderNumber: placed.orderNumber,
+          couponCode: order.couponCode,
+          description: overrideReason,
+          discount: placed.discount,
+        },
+      });
+    if (moqOverride)
+      await auditLog({
+        action: 'order.moq_override',
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: placed.orderId,
+        details: {
+          orderNumber: placed.orderNumber,
+          description: data.moqOverrideReason?.trim() ?? '',
+        },
+      });
+    void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
+    return order;
+  }
+
   static async getCustomerOrders(
     storeId: string,
     customerId: string,
@@ -3901,6 +4022,19 @@ export class OrderService {
         );
       }
     }
+
+    // A store on its Durable Object prices and writes the order in ONE StoreDO section (Ruling CF-R4-2); the Postgres code
+    // below is untouched.
+    const money = await storeMoney(storeId);
+    if (money)
+      return OrderService.createAdminOrderOnDo(
+        money,
+        storeId,
+        adminUserId,
+        data,
+        actor,
+        pricingOpts
+      );
 
     // Hydrate product + variant prices from the DB. Admin form
     // submits only productId + quantity; we look up the canonical
