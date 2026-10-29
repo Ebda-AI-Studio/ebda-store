@@ -3406,7 +3406,9 @@ export class OrderService {
     // return) were written inside the DO section that completed the money step (Ruling CF-RETURNS-1).
     const doMoney = await storeMoney(storeId);
     const order = doMoney
-      ? await (await storeDb(storeId)).order.findFirst({
+      ? await (
+          await storeDb(storeId)
+        ).order.findFirst({
           where: { id: orderId, storeId },
           select: { id: true },
         })
