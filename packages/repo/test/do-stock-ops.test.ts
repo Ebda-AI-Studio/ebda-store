@@ -210,6 +210,35 @@ describe('warehouses', () => {
   });
 });
 
+describe('reconcile deficit (WAREHOUSE-NEG-1)', () => {
+  const quantities = (r: ReturnType<typeof rig>, variant: string | null = null) =>
+    r.q(
+      `SELECT warehouse_id AS w, quantity AS q FROM warehouse_stock WHERE product_id = ? AND ${variant ? 'variant_id = ?' : 'variant_id IS NULL'} ORDER BY warehouse_id`,
+      ...(variant ? ['pv', variant] : ['p1'])
+    );
+  function withThree() {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO warehouses (id, store_id, name, code, is_default, priority) VALUES ('w1', 's1', 'Main', 'MAIN', 1, 0), ('w2', 's1', 'Second', 'SEC', 0, 5), ('w3', 's1', 'Third', 'THI', 0, 9)`
+    );
+    return r;
+  }
+  it('a count below the shadow spreads the deficit default-first and never goes negative', () => {
+    const r = withThree();
+    r.op('setWarehouseStock', { warehouseId: 'w1', productId: 'p1', quantity: 2 });
+    r.op('setWarehouseStock', { warehouseId: 'w2', productId: 'p1', quantity: 4 });
+    r.op('setWarehouseStock', { warehouseId: 'w3', productId: 'p1', quantity: 10 });
+    r.op('setProduct', { productId: 'p1', quantity: 5 });
+    // deficit 11: default 2 -> 0, then priority desc: w3 9 of its 10 -> 1, w2 untouched
+    expect(quantities(r)).toEqual([
+      { w: 'w1', q: 0 },
+      { w: 'w2', q: 4 },
+      { w: 'w3', q: 1 },
+    ]);
+    expect(inv(r, 'p1')).toBe(5);
+  });
+});
+
 describe('idempotency and atomicity', () => {
   it('a replayed key returns the first result without a second write; another payload is refused', () => {
     const r = rig();

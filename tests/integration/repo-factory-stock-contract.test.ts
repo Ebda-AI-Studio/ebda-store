@@ -389,4 +389,16 @@ describe('warehouse stock (WarehouseService)', () => {
       return InventoryService.setInventory(STORE, fx.plain, 3, 'count', userId);
     });
   });
+
+  it('WAREHOUSE-NEG-1: a count below the shadow sum spreads the deficit, no warehouse row goes negative', async () => {
+    const fx = await fixtures();
+    const t = await parity(fx, async () => {
+      await WarehouseService.setStock(STORE, fx.w1, { productId: fx.plain, quantity: 2 });
+      await WarehouseService.setStock(STORE, fx.w2, { productId: fx.plain, quantity: 10 });
+      return InventoryService.setInventory(STORE, fx.plain, 3, 'count', userId);
+    });
+    const rows = t.state.warehouseStock as Array<{ q: number }>;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.map(r => r.q).sort()).toEqual([0, 3]);
+  });
 });

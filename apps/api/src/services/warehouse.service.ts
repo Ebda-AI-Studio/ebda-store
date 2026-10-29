@@ -19,6 +19,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { planDeficit } from '../lib/warehouse-deficit';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { storeStock } from '../lib/repo-factory';
 import { searchProductIdSet, searchVariantIdsBySku } from './product-search.service';
@@ -892,20 +893,11 @@ export class WarehouseService {
    * `INSERT … ON CONFLICT … RETURNING` helper Task 1 built — applying the
    * diff as a relative delta to the default warehouse's row.
    *
-   * Clamp-vs-negative decision (documented + tested, see
-   * task-2-report.md): the default warehouse's row is allowed to go
-   * NEGATIVE. This is deliberate — the invariant this helper exists to
-   * restore is `SUM(WarehouseStock for this SKU) === authoritative
-   * aggregate`, always, exactly. Clamping the default's absorption at 0
-   * would silently re-introduce drift whenever the default warehouse cannot
-   * absorb the full diff on its own (e.g. default holds 2 units, diff is
-   * -9): clamping leaves SUM off by the unabsorbed residual, which is
-   * exactly the bug this task fixes, just smaller. Allow-negative keeps the
-   * invariant exact in every case. A negative per-warehouse row is a
-   * reconciliation signal (this warehouse's shadow has never legitimately
-   * gone negative from `adjustStock`, which still floors at 0) — a
-   * follow-up could surface/alert on it, but that's out of this task's
-   * scope (helper + backfill only, no wiring).
+   * Clamp-vs-negative decision (Ruling WAREHOUSE-NEG-1, supersedes the earlier allow-negative-on-default policy): a
+   * SURPLUS goes to the default warehouse's row; a DEFICIT is spread over the SKU's rows (default first, then
+   * priority desc, created_at asc), each giving at most its own quantity, so NO row ever goes negative and
+   * SUM(rows) still equals the aggregate. If the rows cannot cover the deficit (the aggregate itself is below what the
+   * rows hold) every row is floored at 0 and the shortfall is logged as `reconcile_shortfall` (alert), never negative.
    *
    * Deadlock-safety (fix wave 1, 2026-07): `setStock`/`adjustStock` lock
    * WarehouseStock (via `upsertWarehouseStock`'s own row lock/upsert) FIRST,
@@ -999,19 +991,65 @@ export class WarehouseService {
             return { reconciled: false, diff: 0 };
           }
 
-          // Apply the diff as a relative delta to the default warehouse's row
-          // — works identically whether or not that row existed before
-          // (initialQty covers the INSERT branch). No GREATEST(0, …) clamp:
-          // see docstring.
-          await WarehouseService.upsertWarehouseStock(tx, {
-            warehouseId: defaultWarehouse.id,
-            productId,
-            variantId,
-            storeId,
-            setExpr: Prisma.sql`"warehouse_stock"."quantity" + ${diff}`,
-            initialQty: diff,
-          });
+          if (diff > 0) {
+            // Surplus: the default warehouse's row takes it (INSERT branch covers a row that did not exist yet).
+            await WarehouseService.upsertWarehouseStock(tx, {
+              warehouseId: defaultWarehouse.id,
+              productId,
+              variantId,
+              storeId,
+              setExpr: Prisma.sql`"warehouse_stock"."quantity" + ${diff}`,
+              initialQty: diff,
+            });
+            return { reconciled: true, diff };
+          }
 
+          // Deficit (WAREHOUSE-NEG-1): spread it over the SKU's warehouse rows, default first, so NO row goes negative.
+          // Order is shared with the Durable Object (packages/repo/src/do/stock-ops.ts reconcileToAggregate).
+          const rows = variantId
+            ? await tx.$queryRaw<Array<{ warehouse_id: string; quantity: number }>>`
+                SELECT ws."warehouse_id", ws."quantity" FROM "warehouse_stock" ws
+                JOIN "warehouses" w ON w."id" = ws."warehouse_id"
+                WHERE ws."store_id" = ${storeId} AND ws."product_id" = ${productId} AND ws."variant_id" = ${variantId}
+                ORDER BY (ws."warehouse_id" = ${defaultWarehouse.id}) DESC, w."priority" DESC, w."created_at" ASC, ws."warehouse_id" ASC
+                FOR UPDATE OF ws
+              `
+            : await tx.$queryRaw<Array<{ warehouse_id: string; quantity: number }>>`
+                SELECT ws."warehouse_id", ws."quantity" FROM "warehouse_stock" ws
+                JOIN "warehouses" w ON w."id" = ws."warehouse_id"
+                WHERE ws."store_id" = ${storeId} AND ws."product_id" = ${productId} AND ws."variant_id" IS NULL
+                ORDER BY (ws."warehouse_id" = ${defaultWarehouse.id}) DESC, w."priority" DESC, w."created_at" ASC, ws."warehouse_id" ASC
+                FOR UPDATE OF ws
+              `;
+          const { takes, shortfall } = planDeficit(
+            rows.map(r => ({ id: r.warehouse_id, quantity: r.quantity })),
+            -diff
+          );
+          for (const t of takes) {
+            await WarehouseService.upsertWarehouseStock(tx, {
+              warehouseId: t.id,
+              productId,
+              variantId,
+              storeId,
+              setExpr: Prisma.sql`"warehouse_stock"."quantity" - ${t.amount}`,
+              initialQty: 0,
+            });
+          }
+          if (shortfall > 0) {
+            // Impossible to honour SUM == aggregate without a negative row (the aggregate itself is below what the
+            // rows hold, or a row was already negative): leave every row at >= 0 and ALERT, never go negative.
+            logger.error(
+              {
+                storeId,
+                productId,
+                variantId,
+                aggregate: authoritative,
+                shadowSum: currentSum,
+                shortfall,
+              },
+              '[Warehouse] reconcile_shortfall: deficit exceeds the warehouse stock; rows floored at 0, shadow still above the aggregate (WAREHOUSE-NEG-1)'
+            );
+          }
           return { reconciled: true, diff };
         }),
       {

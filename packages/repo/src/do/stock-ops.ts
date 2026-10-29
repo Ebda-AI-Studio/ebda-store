@@ -1,4 +1,5 @@
 import { MoneyError, type SyncSql } from './sync-sql';
+import { planDeficit } from './warehouse-deficit';
 
 /**
  * Stock and inventory on the StoreDO (INFRA-CF-1 PR D2a, Ruling CF-STOCK-1; plan section 4 rows 1, 2, 6).
@@ -144,8 +145,8 @@ function upsertWarehouseStock(
     value: number;
   }
 ): number {
-  // 'add' floors at 0 (WarehouseService.adjustStock: GREATEST(0, qty + delta)); 'shift' is the reconcile's unfloored
-  // `qty + diff` (Postgres can drive the default warehouse row negative there; replicated for parity, see CF-STOCK-1)
+  // 'add' floors at 0 (WarehouseService.adjustStock: GREATEST(0, qty + delta)); 'shift' is the reconcile's signed
+  // `qty + value` (WAREHOUSE-NEG-1: callers only pass a negative value that the row can cover, so no row goes negative)
   const set =
     a.mode === 'set'
       ? 'excluded.quantity'
@@ -234,14 +235,47 @@ function reconcileToAggregate(
   )[0].s as number;
   const diff = (authoritative as number) - sum;
   if (diff === 0) return;
-  upsertWarehouseStock(db, {
-    storeId,
-    warehouseId: wh,
-    productId,
-    variantId,
-    mode: 'shift',
-    value: diff,
-  });
+  if (diff > 0) {
+    upsertWarehouseStock(db, {
+      storeId,
+      warehouseId: wh,
+      productId,
+      variantId,
+      mode: 'shift',
+      value: diff,
+    });
+    return;
+  }
+  // Deficit (Ruling WAREHOUSE-NEG-1): spread over the SKU's rows, default first, so no row goes negative.
+  const rows = db.all(
+    `SELECT ws.warehouse_id AS id, ws.quantity AS quantity FROM warehouse_stock ws JOIN warehouses w ON w.id = ws.warehouse_id
+     WHERE ws.store_id = ? AND ws.product_id = ? AND ${variantId ? 'ws.variant_id = ?' : 'ws.variant_id IS NULL'}
+     ORDER BY (ws.warehouse_id = ?) DESC, w.priority DESC, w.created_at ASC, ws.warehouse_id ASC`,
+    variantId ? [storeId, productId, variantId, wh] : [storeId, productId, wh]
+  ) as Array<{ id: string; quantity: number }>;
+  const { takes, shortfall } = planDeficit(rows, -diff);
+  for (const t of takes)
+    upsertWarehouseStock(db, {
+      storeId,
+      warehouseId: t.id,
+      productId,
+      variantId,
+      mode: 'shift',
+      value: -t.amount,
+    });
+  if (shortfall > 0)
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        msg: '[Warehouse] reconcile_shortfall: deficit exceeds the warehouse stock; rows floored at 0 (WAREHOUSE-NEG-1)',
+        storeId,
+        productId,
+        variantId,
+        aggregate: authoritative,
+        shadowSum: sum,
+        shortfall,
+      })
+    );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
