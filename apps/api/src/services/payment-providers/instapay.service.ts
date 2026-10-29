@@ -52,6 +52,7 @@ import {
   type InstapayRefundRecord,
 } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
+import { storeMoney } from '../../lib/repo-factory';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
 import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
@@ -382,6 +383,27 @@ export class InstapayService {
   }): Promise<ConfirmOutcome> {
     const { storeId, orderId } = args;
     const now = args.now ?? new Date();
+    // Store on its Durable Object (Ruling CF-ORDERS-1): the claim, the payment row and both audit rows are ONE section there.
+    // The receipts table has not moved, so `proofSubmitted` reads Postgres and finds none for a DO store (residual).
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.confirmPayment({
+        orderId,
+        actorUserId: args.actorUserId,
+        proofSubmitted: await InstapayService.proofSubmitted(storeId, orderId, null),
+      });
+      if (r.changed) {
+        await invalidateCustomersCache(storeId);
+        await inngest
+          .send({ name: 'order/created', data: { orderId, storeId, paymentMethod: 'instapay' } })
+          .catch((err: unknown) =>
+            logger.error({ err, orderId }, '[INSTAPAY] failed to enqueue order/created')
+          );
+      }
+      return r.changed
+        ? { changed: true, orderId: r.orderId, status: 'confirmed' }
+        : { changed: false, orderId: r.orderId, status: r.status };
+    }
     return withStoreAfterCommit(storeId, async after => {
       const locked = await lockOrder(
         prisma as unknown as Prisma.TransactionClient,
@@ -540,6 +562,22 @@ export class InstapayService {
     orderId: string,
     now: Date = new Date()
   ): Promise<'expired' | 'skipped'> {
+    // Store on its Durable Object (Ruling CF-ORDERS-1): the window check, the cancel with its whole reversal and the
+    // payment expiry are ONE section there, safe against a concurrent confirm.
+    const money = await storeMoney(storeId);
+    if (money) {
+      const r = await money.expireHold({
+        orderId,
+        proofSubmitted: await InstapayService.proofSubmitted(storeId, orderId, null),
+      });
+      if (r === 'expired') {
+        await OrderService.applyRefundEffects(storeId, orderId, { fireRefundNotification: false });
+        await InstapayService.notifyMerchantExpired(storeId, orderId).catch((err: unknown) =>
+          logger.error({ err, orderId }, '[INSTAPAY] expiry notification failed')
+        );
+      }
+      return r;
+    }
     return withStoreAfterCommit(storeId, async after => {
       const locked = await lockOrder(
         prisma as unknown as Prisma.TransactionClient,

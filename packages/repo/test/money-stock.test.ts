@@ -69,7 +69,7 @@ describe('checkout core: stock', () => {
     expect(stock('products', 'sku')).toBe(7);
     expect(
       count(
-        `SELECT count(*) n FROM inventory_history WHERE reference = '${o.orderId}' AND previous_stock = 10 AND new_stock = 7 AND quantity = 3`
+        `SELECT count(*) n FROM inventory_history WHERE reference = '${o.orderId}' AND previous_stock = 10 AND new_stock = 7 AND quantity = -3`
       )
     ).toBe(1);
     expect(count(`SELECT sum(total) n FROM order_items WHERE order_id = '${o.orderId}'`)).toBe(

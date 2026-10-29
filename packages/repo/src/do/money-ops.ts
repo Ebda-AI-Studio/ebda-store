@@ -4,6 +4,9 @@ import {
   reverseEarnedPointsFromOrder,
   reverseRedeemedPointsFromOrder,
 } from './loyalty';
+import { placeOrder, type CheckoutInput } from './checkout';
+import { cancelOrder } from './refund';
+import { confirmInstapay, expireInstapay } from './payments';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -19,11 +22,22 @@ import { MoneyError, type SyncSql } from './sync-sql';
  * floors or clamps a figure (a reversal cannot take a customer below zero points) the operation clamps the same way and
  * still records the row; it never refuses the fact.
  */
-export type MoneyOpName = 'loyaltyEarn' | 'loyaltyReverseEarned' | 'loyaltyReverseRedeemed';
+export type MoneyOpName =
+  | 'loyaltyEarn'
+  | 'loyaltyReverseEarned'
+  | 'loyaltyReverseRedeemed'
+  | 'createOrder'
+  | 'confirmPayment'
+  | 'cancel'
+  | 'expireHold';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
   'loyaltyReverseRedeemed',
+  'createOrder',
+  'confirmPayment',
+  'cancel',
+  'expireHold',
 ];
 
 const TABLE = '_money_ops';
@@ -50,6 +64,31 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     reverseEarnedPointsFromOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
   loyaltyReverseRedeemed: (db, storeId, a) =>
     reverseRedeemedPointsFromOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  /**
+   * OrderService.create (Ruling CF-ORDERS-1): stock reserve, hold cap, coupon limit, loyalty redeem, wallet debit and the
+   * order rows are ONE section. The caller never supplies `storeId` (bound by the DO) nor `now` (the DO clock).
+   */
+  createOrder: (db, storeId, a) => {
+    const { storeId: _s, now: _n, ...rest } = a as Partial<CheckoutInput>;
+    return placeOrder(db, { ...(rest as CheckoutInput), storeId });
+  },
+  /** The merchant confirms an InstaPay transfer (OrderService/instapay-confirmation): exactly once. */
+  confirmPayment: (db, storeId, a) =>
+    confirmInstapay(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
+      proofSubmitted: a.proofSubmitted === true,
+    }),
+  /** updateStatus -> cancelled: status plus the whole reversal (stock, coupon, loyalty, wallet, backorders). */
+  cancel: (db, storeId, a) => cancelOrder(db, { storeId, orderId: id(a.orderId, 'orderId') }),
+  /** An unconfirmed InstaPay hold whose window ran out is cancelled; 'skipped' when it is not (or no longer) expirable. */
+  expireHold: (db, storeId, a) =>
+    expireInstapay(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      proofSubmitted: a.proofSubmitted === true,
+    }),
 };
 
 /** Run one money operation for `storeId`. THROWS `MoneyError` for a refusal; everything it wrote is rolled back with it. */

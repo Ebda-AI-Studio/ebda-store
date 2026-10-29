@@ -415,10 +415,11 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
             storeId: input.storeId,
             productId,
             type: 'sale',
-            quantity: qty,
+            quantity: -qty,
             previousStock: r.previousStock,
             newStock: r.newStock,
             reference: orderId,
+            reason: 'Sold via order',
           });
         // a variant inherits the product's backorder flag (lineAllowsBackorder), and the store feature must be on
         if (input.backorderEnabled === true && (v?.allow_backorder || p.allow_backorder)) {
@@ -427,7 +428,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
             storeId: input.storeId,
             productId,
             type: 'sale',
-            quantity: f.previousStock - f.newStock,
+            quantity: f.newStock - f.previousStock,
             previousStock: f.previousStock,
             newStock: f.newStock,
             reference: orderId,
@@ -472,7 +473,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           storeId: input.storeId,
           productId,
           type: 'sale',
-          quantity: qty,
+          quantity: -qty,
           previousStock: r.previousStock,
           newStock: r.newStock,
           reference: orderId,
@@ -484,10 +485,11 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         storeId: input.storeId,
         productId,
         type: 'sale',
-        quantity: qty,
+        quantity: -qty,
         previousStock: r.previousStock,
         newStock: r.newStock,
         reference: orderId,
+        reason: 'Sold via order',
       });
     };
     const costOf = (productId: string, variantId: string | null): number | null => {
@@ -827,7 +829,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         promo.promotionDiscount,
         promo.appliedPromotionId,
         bundles.bundleDiscount,
-        loyaltyPoints,
+        loyaltyPoints > 0 ? loyaltyPoints : null,
         loyaltyDiscount,
         walletAmount,
         input.customerNotes ?? null,

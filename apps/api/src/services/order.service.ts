@@ -94,7 +94,14 @@ import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
-import { assertStockHoldCapNotExceeded, HOLD_CAPPED_PAYMENT_METHODS } from '../lib/stock-hold-cap';
+import {
+  assertStockHoldCapNotExceeded,
+  HOLD_CAPPED_PAYMENT_METHODS,
+  openUnpaidGatewayHoldCap,
+  openUnpaidHoldCap,
+  openUnpaidHoldIpCap,
+} from '../lib/stock-hold-cap';
+import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -798,6 +805,26 @@ export class OrderService {
 
     if (cart.items.length === 0 && cartBundles.length === 0) {
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
+    }
+
+    // Store on its Durable Object (Ruling CF-ORDERS-1): pricing, stock reservation, hold cap, coupon limit, loyalty redeem,
+    // wallet debit and the order rows are ONE section there, in place of the interactive transaction below.
+    const money = await storeMoney(storeId);
+    if (money) {
+      if (requestContext?.dryRun)
+        throw new AppError(
+          501,
+          'QUOTE_NOT_ON_DO',
+          'A quote for a Durable Object store is not ported'
+        );
+      return OrderService.createOnDo(money, {
+        storeId,
+        customerId,
+        data,
+        cart: { id: cart.id, items: cart.items, bundles: cartBundles },
+        referralCode,
+        requestContext,
+      });
     }
 
     // CartService's product select is storefront-safe (T-H2) and omits
@@ -2318,6 +2345,121 @@ export class OrderService {
   }
 
   /**
+   * `create` for a store on its Durable Object (Ruling CF-ORDERS-1). The engine prices the lines from the DO's own rows (the
+   * cart is only read for WHAT is being ordered), reserves stock, checks the hold cap and the coupon limit, redeems loyalty
+   * points, debits the wallet and writes the order in one `moneyOp`. The cart and the post-commit effects stay here.
+   * Residuals (documented in docs/cf/orders-on-do.md): the cart claim is not atomic with the order (carts have not moved),
+   * and delivery slots, personalisation notes, affiliate attribution at order time and the fiscal sale document are not
+   * written by the engine (Ruling DO-MONEY-2).
+   */
+  private static async createOnDo(
+    money: MoneyClient,
+    c: {
+      storeId: string;
+      customerId: string | undefined;
+      data: CreateOrderData;
+      cart: {
+        id: string;
+        items: Array<{ productId: string; quantity: number; variantId?: string | null }>;
+        bundles: Array<{ bundleId: string; quantity: number }>;
+      };
+      referralCode?: string;
+      requestContext?: {
+        checkoutIp?: string | null;
+        idempotencyKey?: string | null;
+        buyer?: BuyerIdentity;
+      };
+    }
+  ) {
+    const { storeId, customerId, data } = c;
+    const [loyaltyOn, backorderOn, wholesale, walletOk] = await Promise.all([
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+      featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
+      wholesaleEntitledUncached(storeId),
+      customerId && data.useWallet === true
+        ? WalletService.getCheckoutAvailability(storeId).then(a => a.available)
+        : Promise.resolve(false),
+    ]);
+    let walletAmount = 0;
+    if (customerId && walletOk) {
+      const w = await (
+        await storeDb(storeId)
+      ).customerWallet.findFirst({
+        where: { storeId, customerId },
+        select: { balance: true },
+      });
+      walletAmount = w?.balance ?? 0; // the engine caps it to the order total
+    }
+    const placed = await OrderService.translateDoRefusal(() =>
+      money.createOrder({
+        lines: c.cart.items.map(i => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          ...(i.variantId ? { variantId: i.variantId } : {}),
+        })),
+        bundles: c.cart.bundles.map(b => ({ bundleId: b.bundleId, quantity: b.quantity })),
+        buyer: c.requestContext?.buyer,
+        customerId,
+        couponCode: data.couponCode,
+        walletAmount,
+        pointsToRedeem: customerId ? data.pointsToRedeem : undefined,
+        paymentMethod: data.paymentMethod,
+        idempotencyKey: c.requestContext?.idempotencyKey
+          ? (checkoutIdempotencyHash(c.cart.id, c.requestContext.idempotencyKey) ?? undefined)
+          : undefined,
+        shippingAddress: data.shippingAddress,
+        billingAddress: data.billingAddress,
+        checkoutIp: c.requestContext?.checkoutIp ?? undefined,
+        holdCaps: {
+          manual: openUnpaidHoldCap(),
+          gateway: openUnpaidGatewayHoldCap(),
+          ip: openUnpaidHoldIpCap(),
+        },
+        wholesaleEntitled: wholesale,
+        loyaltyFeatureEnabled: loyaltyOn,
+        backorderEnabled: backorderOn,
+        goldRequireQuote: false,
+        expectedTotal: data.expectedTotal,
+        customerNotes: data.notes,
+      })
+    );
+    // the cart is consumed (it still lives in Postgres until carts move)
+    if (!placed.replayed) {
+      await prisma.cartItem.deleteMany({ where: { cartId: c.cart.id } });
+      await prisma.cartBundle.deleteMany({ where: { cartId: c.cart.id } });
+      if (c.referralCode)
+        await affiliateService
+          .linkOrderToReferral(storeId, placed.orderId, c.referralCode)
+          .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
+      if (data.paymentMethod === 'cod' || placed.paymentStatus === 'paid')
+        inngest
+          .send({
+            name: 'order/created',
+            data: {
+              orderId: placed.orderId,
+              storeId,
+              paymentMethod: placed.paymentStatus === 'paid' ? 'wallet' : data.paymentMethod,
+              locale: data.locale ?? undefined,
+            },
+          })
+          .catch((err: unknown) =>
+            logger.error({ err, orderId: placed.orderId }, 'Failed to enqueue order/created')
+          );
+      await bustProductCaches(storeId);
+      void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
+    }
+    const order = await (
+      await storeDb(storeId)
+    ).order.findFirst({
+      where: { id: placed.orderId, storeId },
+      include: { items: true },
+    });
+    return { ...order, customer: null } as unknown as NonNullable<
+      Awaited<ReturnType<typeof OrderService.loadCreatedOrder>>
+    >;
+  }
+
+  /**
    * Compensating action when /payments/create fails AFTER an order has been
    * committed (cart cleared, inventory decremented, coupon usage incremented).
    *
@@ -2554,6 +2696,12 @@ export class OrderService {
      */
     opts: { restoreInventory?: boolean } = {}
   ) {
+    // Cancel on a store's Durable Object (Ruling CF-ORDERS-1): the status flip AND the whole reversal (stock, coupon, loyalty,
+    // wallet, backorders) are one section there. The state machine is checked on the DO's own status first.
+    if (status === 'cancelled') {
+      const money = await storeMoney(storeId);
+      if (money) return OrderService.cancelOnDo(money, storeId, orderId);
+    }
     const order = await this.getById(storeId, orderId);
 
     // Validate status transition — shared with the payment-gateway/webhook
@@ -2794,6 +2942,49 @@ export class OrderService {
     }
 
     return updatedOrder;
+  }
+
+  /** The DO engine's refusals under the codes (and statuses) the Postgres path throws, so a client sees one contract. */
+  private static async translateDoRefusal<T>(run: () => Promise<T>): Promise<T> {
+    const MAP: Record<string, [number, string]> = {
+      OUT_OF_STOCK: [400, 'INSUFFICIENT_INVENTORY'],
+      COUPON_EXHAUSTED: [400, 'INVALID_COUPON'],
+      COUPON_USER_LIMIT: [400, 'COUPON_LIMIT_REACHED'],
+      COUPON_INVALID: [400, 'INVALID_COUPON'],
+      COUPON_EXPIRED: [400, 'INVALID_COUPON'],
+      INSUFFICIENT_WALLET: [409, 'INSUFFICIENT_WALLET_BALANCE'],
+      TOO_MANY_OPEN_ORDERS: [429, 'TOO_MANY_OPEN_HOLDS'],
+    };
+    try {
+      return await run();
+    } catch (err) {
+      const hit = err instanceof AppError ? MAP[err.code] : undefined;
+      if (err instanceof AppError && hit) throw new AppError(hit[0], hit[1], err.message);
+      throw err;
+    }
+  }
+
+  private static async cancelOnDo(money: MoneyClient, storeId: string, orderId: string) {
+    const db = await storeDb(storeId);
+    const before = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      select: { status: true },
+    });
+    if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    assertValidTransition(before.status, 'cancelled');
+    const r = await money.cancel({ orderId }, `cancel:${orderId}`);
+    if (!r.replayed) {
+      await OrderService.applyRefundEffects(storeId, orderId, { fireRefundNotification: false });
+      void deferAfterTenantCommit('order.updateStatus.invalidateCustomersCache', () =>
+        invalidateCustomersCache(storeId)
+      ).catch(err =>
+        logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+      );
+    }
+    return (await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { items: true },
+    })) as never;
   }
 
   /**

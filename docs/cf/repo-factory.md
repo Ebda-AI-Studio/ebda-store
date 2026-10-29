@@ -129,6 +129,8 @@ The twin of the stock operations: `StoreDO.moneyOp` -> `answerMoneyOp` -> `runMo
 
 Contract tests: `tests/integration/repo-factory-money-contract.test.ts` (real service on Postgres vs the DO schema, equal traces and tables), `packages/repo/test/do-money-ops.test.ts`, `apps/api/workers-do/money.test.ts` (real workerd). Also in D2b: `aggregate` and `groupBy` are read ops (`having`, `orderBy` an aggregate, `take`/`skip`; everything else refused loudly), enum columns sort in the Postgres enum order (`prisma-lite/enum-order.ts`, checked against `pg_enum`), `reconcileWarehouseStockToAggregate` never makes a row negative on either backend (WAREHOUSE-NEG-1), and event jobs without a `storeId` resolve their store through `EVENT_STORE_RESOLVERS` (`docs/cf/jobs-on-do.md`).
 
+Orders (PR D2b-2, Rulings CF-ORDERS-1, CF-ORDERS-CART-1): `createOrder`, `confirmPayment`, `cancel`, `expireHold` are money operations too; the map of the Postgres transactions, the differences found and the residuals are in `docs/cf/orders-on-do.md`.
+
 ## Left for D2 or later from the D1b list (with reason)
 
 | Item                                                                                           | Reason                                                                                                                                                                                                     |

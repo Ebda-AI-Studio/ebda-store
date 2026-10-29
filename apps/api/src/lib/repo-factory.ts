@@ -187,6 +187,74 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ pointsRecredited: number; newBalance: number; replayed: boolean } | null>;
+  /** OrderService.create on the DO (Ruling CF-ORDERS-1): ONE section = stock, hold cap, coupon, loyalty redeem, wallet, rows. */
+  createOrder(a: CreateOrderArgs, key?: string): Promise<PlacedOrderResult>;
+  confirmPayment(
+    a: { orderId: string; actorUserId?: string | null; proofSubmitted?: boolean },
+    key?: string
+  ): Promise<{ changed: boolean; orderId: string; status: string }>;
+  cancel(a: { orderId: string }, key?: string): Promise<CancelResult>;
+  expireHold(
+    a: { orderId: string; proofSubmitted?: boolean },
+    key?: string
+  ): Promise<'expired' | 'skipped'>;
+}
+
+/** The checkout input of the DO engine (`packages/repo/src/do/checkout.ts` `CheckoutInput`) minus `storeId` and `now`. */
+export interface CreateOrderArgs {
+  lines: Array<{
+    productId: string;
+    variantId?: string;
+    quantity: number;
+    quotedUnitPrice?: number | null;
+  }>;
+  bundles?: Array<{ bundleId: string; quantity: number }>;
+  buyer?: unknown;
+  customerId?: string;
+  couponCode?: string;
+  walletAmount?: number;
+  pointsToRedeem?: number;
+  paymentMethod?: string;
+  currency?: string;
+  idempotencyKey?: string;
+  cart?: { id: string };
+  shippingAddress: Record<string, unknown>;
+  billingAddress?: unknown;
+  checkoutIp?: string;
+  holdCaps?: { manual?: number; gateway?: number; ip?: number };
+  wholesaleEntitled?: boolean;
+  loyaltyFeatureEnabled?: boolean;
+  backorderEnabled?: boolean;
+  goldRequireQuote?: boolean;
+  expectedTotal?: number;
+  customerNotes?: string;
+}
+export interface PlacedOrderResult {
+  orderId: string;
+  orderNumber: string;
+  subtotal: number;
+  discount: number;
+  couponDiscount: number;
+  promotionDiscount: number;
+  bundleDiscount: number;
+  loyaltyDiscount: number;
+  shipping: number;
+  codFee: number;
+  tax: number;
+  walletAmount: number;
+  total: number;
+  paymentStatus: 'unpaid' | 'paid';
+  replayed: boolean;
+}
+export interface CancelResult {
+  orderId: string;
+  kind: 'cancel' | 'refund' | 'partial_refund';
+  replayed: boolean;
+  status: string;
+  couponUnclaimed: boolean;
+  walletReversed: number;
+  loyalty: { earnedReversed: number; redeemedRecredited: number };
+  backorderLinesCancelled: number;
 }
 
 export interface StoreRepo {
@@ -263,6 +331,10 @@ export function makeMoneyClient(
     loyaltyEarn: (a, key) => call('loyaltyEarn', a, key),
     loyaltyReverseEarned: (a, key) => call('loyaltyReverseEarned', a, key),
     loyaltyReverseRedeemed: (a, key) => call('loyaltyReverseRedeemed', a, key),
+    createOrder: (a, key) => call('createOrder', a, key),
+    confirmPayment: (a, key) => call('confirmPayment', a, key),
+    cancel: (a, key) => call('cancel', a, key),
+    expireHold: (a, key) => call('expireHold', a, key),
   };
 }
 

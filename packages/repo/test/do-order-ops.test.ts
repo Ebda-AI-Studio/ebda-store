@@ -1,0 +1,222 @@
+// PR D2b-2 (Ruling CF-ORDERS-1): createOrder / confirmPayment / cancel / expireHold as named money operations on the real DO
+// schema (node:sqlite). The engines are covered by money-stock / do-refund / do-payments; this proves the DOOR: registry,
+// argument trust boundary, idempotency marker, one-section rollback, and the invariants the operations promise.
+import { describe, expect, it } from 'vitest';
+import { openSqlite } from './diff-harness';
+import { nodeSyncSql } from './node-sync-sql';
+import { ensureMoneyOpsSchema, MONEY_OP_NAMES, runMoneyOp } from '../src/do/money-ops';
+import { ensurePaymentSchema, createPayment } from '../src/do/payments';
+import { MoneyError } from '../src/do/sync-sql';
+
+const S = 's1';
+function rig(stock = 10) {
+  const raw = openSqlite();
+  const db = nodeSyncSql(raw);
+  ensureMoneyOpsSchema(db);
+  ensurePaymentSchema(db);
+  raw.exec(
+    `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('sku', 's1', 'Widget', 'widget', 1500, ${stock}, 'active')`
+  );
+  const n = (sql: string) => (raw.prepare(sql).get() as { n: number }).n;
+  const op = (name: string, args: Record<string, unknown>, key?: string) =>
+    runMoneyOp(db, S, name, args, key) as any;
+  const code = (name: string, args: Record<string, unknown>, key?: string): string => {
+    try {
+      op(name, args, key);
+    } catch (e) {
+      return (e as MoneyError).code;
+    }
+    return 'no error';
+  };
+  const order = (over: Record<string, unknown> = {}) => ({
+    lines: [{ productId: 'sku', quantity: 1 }],
+    shippingAddress: { name: 'A' },
+    ...over,
+  });
+  return { raw, db, n, op, code, order };
+}
+
+describe('order money operations: the door', () => {
+  it('the four operations are registered; storeId and now are never taken from the caller', () => {
+    expect(MONEY_OP_NAMES).toEqual(
+      expect.arrayContaining(['createOrder', 'confirmPayment', 'cancel', 'expireHold'])
+    );
+    const r = rig();
+    const placed = r.op('createOrder', r.order({ storeId: 'other', now: 1 }));
+    expect(
+      r.n(`SELECT count(*) n FROM orders WHERE store_id = 's1' AND id = '${placed.orderId}'`)
+    ).toBe(1);
+    expect(r.n(`SELECT count(*) n FROM orders WHERE store_id = 'other'`)).toBe(0);
+    expect(r.n(`SELECT created_at n FROM orders`)).toBeGreaterThan(1_700_000_000_000);
+  });
+
+  it('createOrder reserves stock, writes the ledger and the order in one section; a keyed replay writes nothing', () => {
+    const r = rig();
+    const a = r.op(
+      'createOrder',
+      r.order({ lines: [{ productId: 'sku', quantity: 3 }] }),
+      'order:abcdefgh'
+    );
+    expect(a).toMatchObject({ subtotal: 4500, paymentStatus: 'unpaid', replayed: false });
+    const b = r.op(
+      'createOrder',
+      r.order({ lines: [{ productId: 'sku', quantity: 3 }] }),
+      'order:abcdefgh'
+    );
+    expect(b).toEqual(a);
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(7);
+    expect(r.n(`SELECT count(*) n FROM orders`)).toBe(1);
+    expect(r.n(`SELECT count(*) n FROM inventory_history`)).toBe(1);
+    expect(
+      r.code(
+        'createOrder',
+        r.order({ lines: [{ productId: 'sku', quantity: 1 }] }),
+        'order:abcdefgh'
+      )
+    ).toBe('IDEMPOTENCY_KEY_REUSED');
+  });
+
+  it('a refused order leaves nothing behind (no stock, no marker, no coupon use)', () => {
+    const r = rig(2);
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit, scope_product_ids, scope_category_ids) VALUES ('c', 's1', 'ONE', 'x', 'fixed', 100, 1, '[]', '[]')`
+    );
+    expect(
+      r.code(
+        'createOrder',
+        r.order({ couponCode: 'ONE', lines: [{ productId: 'sku', quantity: 5 }] }),
+        'order:refused1'
+      )
+    ).toBe('OUT_OF_STOCK');
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(2);
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBe(0);
+    expect(r.n(`SELECT count(*) n FROM _money_ops`)).toBe(0);
+  });
+
+  it('the last items: N orders for stock S succeed exactly S times and stock never goes negative', () => {
+    const r = rig(5);
+    let ok = 0;
+    for (let i = 0; i < 20; i++) {
+      try {
+        r.op('createOrder', r.order());
+        ok++;
+      } catch (e) {
+        expect((e as MoneyError).code).toBe('OUT_OF_STOCK');
+      }
+    }
+    expect(ok).toBe(5);
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(0);
+  });
+
+  it('cancel restores stock and the coupon use exactly once; a replay and a second cancel change nothing', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit, scope_product_ids, scope_category_ids) VALUES ('c', 's1', 'TWO', 'x', 'fixed', 100, 2, '[]', '[]')`
+    );
+    const o = r.op(
+      'createOrder',
+      r.order({ couponCode: 'TWO', lines: [{ productId: 'sku', quantity: 2 }] })
+    );
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(8);
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBe(1);
+    expect(r.op('cancel', { orderId: o.orderId })).toMatchObject({
+      status: 'cancelled',
+      replayed: false,
+    });
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(10);
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBe(0);
+    expect(r.op('cancel', { orderId: o.orderId })).toMatchObject({ replayed: true });
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(10);
+    expect(r.code('cancel', { orderId: 'missing' })).not.toBe('no error');
+    expect(r.code('cancel', {})).toBe('BAD_ARGS');
+  });
+
+  it('a delivered order cannot be cancelled (the state machine holds)', () => {
+    const r = rig();
+    const o = r.op('createOrder', r.order());
+    r.raw.exec(`UPDATE orders SET status = 'delivered', payment_status = 'paid'`);
+    expect(r.code('cancel', { orderId: o.orderId })).toBe('INVALID_TRANSITION');
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(9);
+  });
+
+  it('confirmPayment once, expireHold skips a confirmed order, and an expired hold gives its stock back', () => {
+    const r = rig();
+    const hold = (expiresAt: number) => {
+      const o = r.op('createOrder', r.order({ paymentMethod: 'instapay' }));
+      r.raw.exec(
+        `UPDATE orders SET status = 'awaiting_payment_confirmation', payment_confirmation_expires_at = ${expiresAt} WHERE id = '${o.orderId}'`
+      );
+      createPayment(r.db, {
+        storeId: S,
+        orderId: o.orderId,
+        provider: 'instapay',
+        amount: o.total,
+      });
+      return o.orderId as string;
+    };
+    const live = hold(Date.now() + 3_600_000);
+    expect(r.op('expireHold', { orderId: live })).toBe('skipped'); // window still open
+    expect(r.op('confirmPayment', { orderId: live, actorUserId: 'u1' })).toMatchObject({
+      changed: true,
+      status: 'confirmed',
+    });
+    expect(r.op('confirmPayment', { orderId: live })).toMatchObject({ changed: false });
+    expect(r.op('expireHold', { orderId: live })).toBe('skipped'); // confirmed meanwhile
+
+    const old = hold(Date.now() - 1000);
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(8);
+    expect(r.op('expireHold', { orderId: old, proofSubmitted: true })).toBe('skipped'); // proof sent: waits for the merchant
+    expect(r.op('expireHold', { orderId: old })).toBe('expired');
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(9);
+    expect(r.code('confirmPayment', { orderId: old })).toBe('INSTAPAY_ORDER_CANCELLED');
+  });
+
+  it('wallet never goes negative and a coupon never passes its limit, across many orders', () => {
+    const r = rig(100);
+    r.raw.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+    );
+    r.raw.exec(
+      `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 4000)`
+    );
+    r.raw.exec(
+      `INSERT INTO coupons (id, store_id, code, name, type, value, usage_limit, scope_product_ids, scope_category_ids) VALUES ('c', 's1', 'THREE', 'x', 'fixed', 100, 3, '[]', '[]')`
+    );
+    for (let i = 0; i < 10; i++)
+      try {
+        r.op(
+          'createOrder',
+          r.order({
+            customerId: 'cust',
+            walletAmount: 1400,
+            couponCode: 'THREE',
+            paymentMethod: 'card',
+          })
+        );
+      } catch {
+        /* refused: fine */
+      }
+    expect(r.n(`SELECT balance n FROM customer_wallets`)).toBeGreaterThanOrEqual(0);
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBeLessThanOrEqual(3);
+    // the wallet (4000) pays two 1400 orders; the third is refused as a whole and burns no coupon use
+    expect(r.n(`SELECT usage_count n FROM coupons`)).toBe(2);
+    expect(r.n(`SELECT balance n FROM customer_wallets`)).toBe(1200);
+    expect(r.n(`SELECT 4000 - balance n FROM customer_wallets`)).toBe(
+      r.n(`SELECT -sum(amount) n FROM wallet_transactions`)
+    );
+  });
+
+  it('the hold cap holds: a third open COD order from one phone is refused and costs no stock', () => {
+    const r = rig();
+    const o = () =>
+      r.order({
+        paymentMethod: 'cod',
+        shippingAddress: { phone: '01012345678' },
+        holdCaps: { manual: 2 },
+      });
+    r.op('createOrder', o());
+    r.op('createOrder', o());
+    expect(r.code('createOrder', o())).toBe('TOO_MANY_OPEN_ORDERS');
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(8);
+  });
+});
