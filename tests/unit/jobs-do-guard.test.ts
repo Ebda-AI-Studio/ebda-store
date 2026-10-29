@@ -150,6 +150,23 @@ describe('job data classification', () => {
     expect(src).not.toMatch(/\bprisma\b/);
   });
 
+  it('the abandoned-cart jobs (ported in CF-R4-5) reach their rows through the store repo, never `prisma.abandonedCart`', () => {
+    const read = (f: string) =>
+      readFileSync(new URL(`../../apps/api/src/${f}`, import.meta.url), 'utf8');
+    for (const f of [
+      'services/cart-recovery-email.service.ts',
+      'lib/inngest/functions/cart-recovery-email.ts',
+    ]) {
+      const src = read(f);
+      expect(src).toMatch(/storeRepo\(/);
+      expect(src).not.toMatch(/prisma\.(abandonedCart|newsletterSubscriber|cartItem|cartBundle)/);
+    }
+    const retention = read('lib/inngest/functions/data-retention.ts');
+    expect(retention).not.toMatch(/prisma\.abandonedCart/);
+    expect(PORTED_JOBS.has('cart-recovery-email')).toBe(true);
+    expect(PORTED_JOBS.has('abandoned-cart-purge-weekly')).toBe(true);
+  });
+
   it('the status-fanout sweep (ported in CF-PAY-1) reads through storeDb and writes a DO order only through the money op', () => {
     const src = readFileSync(
       new URL(

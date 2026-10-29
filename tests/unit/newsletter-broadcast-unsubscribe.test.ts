@@ -37,6 +37,7 @@ vi.mock('@ebda/database', () => ({
   },
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
   runInStoreScope: (_s: string, fn: () => unknown) => fn(),
+  withStore: async (_s: string, fn: (tx: unknown) => unknown) => fn(holder.prisma),
   onClosedTenantTxAccess: () => undefined,
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));

@@ -104,8 +104,9 @@ const ALLOW: Record<string, AllowEntry> = {
   },
   'services/abandoned-cart.service.ts': {
     category: 'resolver-input',
-    reason: 'recovery totals via priceCart for the cart owner',
-    reads: { detectNewAbandonments: 5 },
+    reason:
+      'recovery totals via priceCart for the cart owner (the candidate include selects the variant price the resolver is fed)',
+    reads: { detectNewAbandonments: 4, '<module>': 1 },
   },
   'services/price-resolver.service.ts': {
     category: 'resolver-input',

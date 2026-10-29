@@ -66,12 +66,13 @@ vi.mock('@ebda/database', () => ({
     }
   },
   acrossStores: vi.fn(),
-  acrossStoresFlat: async (fn: () => Promise<unknown[]>) => {
+  // the real helper hands the store id to the callback
+  acrossStoresFlat: async (fn: (storeId: string) => Promise<unknown[]>) => {
     const result: unknown[] = [];
     for (const id of m.stores) {
       m.scope = id;
       try {
-        result.push(...(await fn()));
+        result.push(...(await fn(id)));
       } finally {
         m.scope = '';
       }
