@@ -177,11 +177,34 @@ describe('refunds', () => {
       /INVALID_STATE|REFUND_ALREADY_ISSUED|PAYMENT_FULLY_REFUNDED/
     );
     r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-1' });
-    const first = r.op('refundBook', { orderId: p.o.orderId });
-    expect(first).toMatchObject({ kind: 'refund', replayed: false, status: 'refunded' });
-    const stock = r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory;
-    expect(stock).toBe(20);
+    // the reversal ran INSIDE refundComplete (Opus I4): stock is back and the keyed refundBook is a replay
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
     expect(r.op('refundBook', { orderId: p.o.orderId }).replayed).toBe(true);
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
+  });
+
+  it('FAILURE INJECTION (Opus I4): a failing whole-order reversal rolls refundComplete back whole, and the retry converges', () => {
+    const r = rig();
+    const p = r.paid(3);
+    p.hook('evt-p');
+    const claim = r.op('refundBegin', { paymentId: p.paymentId, refundKey: 'rk-inject-1' });
+    r.raw.exec(
+      `CREATE TRIGGER inject_reversal BEFORE UPDATE OF refund_reversed_at ON orders WHEN NEW.refund_reversed_at IS NOT NULL BEGIN SELECT RAISE(ABORT, 'injected'); END`
+    );
+    expect(() => r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-9' })).toThrow();
+    // nothing half-applied: no executed marker, the order was not flipped, stock still held
+    expect(
+      r.q("SELECT count(*) n FROM payment_events WHERE event_type = 'refund_executed'")[0].n
+    ).toBe(0);
+    expect(r.q('SELECT status FROM orders')[0].status).not.toBe('refunded');
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(17);
+    r.raw.exec('DROP TRIGGER inject_reversal');
+    r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-9' });
+    expect(r.q('SELECT status FROM orders')[0].status).toBe('refunded');
+    expect(r.q('SELECT refund_reversed_at FROM orders')[0].refund_reversed_at).not.toBeNull();
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
+    // a second retry changes nothing
+    r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-9' });
     expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
   });
 
@@ -275,6 +298,32 @@ describe('refunds', () => {
     expect(r.q('SELECT refunded_amount FROM payments')[0].refunded_amount).toBe(gateway);
     expect(r.q('SELECT status FROM orders')[0].status).toBe('refunded'); // the full refund reversed the order
     expect(r.q('SELECT balance FROM customer_wallets')[0].balance).toBe(2000); // the wallet share is back
+  });
+
+  it('EXTERNAL FACT (Opus I3): a capture on a CANCELLED order is recorded in full, the order is flagged and alerted, nothing rolls back', () => {
+    const r = rig();
+    const p = r.paid(2);
+    r.op('cancel', { orderId: p.o.orderId });
+    expect(r.q('SELECT status FROM orders')[0].status).toBe('cancelled');
+    const out = p.hook('evt-late');
+    expect(out.outcome).toBe('applied');
+    expect(out.postCommit ?? []).not.toContain('order_paid');
+    expect(out.alerts.map((a: { kind: string }) => a.kind)).toContain(
+      'captured_on_unconfirmable_order'
+    );
+    expect(r.q('SELECT status FROM payments')[0].status).toBe('completed');
+    expect(r.q("SELECT count(*) n FROM payment_event_log WHERE event_id = 'evt-late'")[0].n).toBe(
+      1
+    );
+    const o = r.q('SELECT status, payment_status FROM orders')[0];
+    expect(o).toEqual({ status: 'cancelled', payment_status: 'paid' });
+    expect(
+      r.q(
+        "SELECT metadata FROM order_events WHERE metadata LIKE '%captured_on_unconfirmable_order%'"
+      )
+    ).toHaveLength(1);
+    // the gateway retrying the same delivery is a replay, not a second record
+    expect(p.hook('evt-late').outcome).toBe('replayed');
   });
 
   it('wallet store credit goes back once under return-credit:<key>', () => {

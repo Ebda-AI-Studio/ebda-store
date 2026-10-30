@@ -1,3 +1,4 @@
+import { canonicalJson, fingerprint } from './keyed-op';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { planDeficit } from './warehouse-deficit';
 
@@ -79,12 +80,6 @@ const optStr = (v: unknown, what: string, max = 500): string | null =>
       : fail('BAD_ARGS', what);
 const hType = (v: unknown): HistoryType =>
   typeof v === 'string' && HISTORY_TYPES.has(v) ? (v as HistoryType) : fail('BAD_ARGS', 'type');
-
-function fingerprint(s: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
-  return `${s.length}:${h.toString(16)}`;
-}
 
 function history(
   db: SyncSql,
@@ -552,7 +547,7 @@ export function runStockOp(
     throw new MoneyError('BAD_ARGS', 'args', 400);
   if (key !== undefined && !KEY_RE.test(key))
     throw new MoneyError('BAD_IDEMPOTENCY_KEY', 'key', 400);
-  const fp = fingerprint(`${op}:${JSON.stringify(args)}`);
+  const fp = fingerprint(`${op}:${canonicalJson(args)}`);
   return db.transactionSync(() => {
     if (key) {
       const prior = db.all('SELECT op, fp, result, at FROM _stock_ops WHERE k = ?', [key])[0];

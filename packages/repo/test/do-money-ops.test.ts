@@ -77,3 +77,16 @@ describe('money operations', () => {
     expect(r.q('SELECT points FROM loyalty_points')[0].points).toBe(0);
   });
 });
+
+describe('keyed-op fingerprint (Opus M1)', () => {
+  it('is key-order insensitive and distinguishes different arguments', async () => {
+    const { canonicalJson, fingerprint } = await import('../src/do/keyed-op');
+    expect(fingerprint(canonicalJson({ a: 1, b: { c: 2, d: [1, 2] } }))).toBe(
+      fingerprint(canonicalJson({ b: { d: [1, 2], c: 2 }, a: 1 }))
+    );
+    expect(fingerprint(canonicalJson({ a: 1 }))).not.toBe(fingerprint(canonicalJson({ a: 2 })));
+    expect(fingerprint(canonicalJson({ a: [1, 2] }))).not.toBe(
+      fingerprint(canonicalJson({ a: [2, 1] }))
+    );
+  });
+});

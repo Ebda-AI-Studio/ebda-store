@@ -17,10 +17,29 @@ export function ensureKeyedSchema(db: SyncSql, table: string): void {
   );
 }
 
+/** JSON with object keys sorted, so the same arguments built in another key order fingerprint the same (Opus M1). */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (v && typeof v === 'object')
+    return `{${Object.keys(v as Record<string, unknown>)
+      .filter(k => (v as Record<string, unknown>)[k] !== undefined)
+      .sort()
+      .map(k => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`;
+  return JSON.stringify(v) ?? 'null';
+}
+
+/** Two independent 32-bit FNV-1a lanes (64 bits) over the canonical string, plus its length. */
 export function fingerprint(s: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
-  return `${s.length}:${h.toString(16)}`;
+  let a = 0x811c9dc5;
+  let b = 0x9e3779b1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ (c + i), 0x85ebca6b) >>> 0;
+    b ^= b >>> 13;
+  }
+  return `${s.length}:${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
 }
 
 /** Run `body` as one section, honouring `key`. THROWS `MoneyError` for a refusal; everything `body` wrote rolls back with it. */
@@ -36,7 +55,7 @@ export function runKeyed(
   if (!/^_[a-z_]+$/.test(table)) throw new Error('bad marker table');
   if (key !== undefined && !KEY_RE.test(key))
     throw new MoneyError('BAD_IDEMPOTENCY_KEY', 'key', 400);
-  const fp = fingerprint(`${op}:${JSON.stringify(args)}`);
+  const fp = fingerprint(`${op}:${canonicalJson(args)}`);
   return db.transactionSync(() => {
     if (key) {
       const prior = db.all(`SELECT op, fp, result, at FROM ${table} WHERE k = ?`, [key])[0];

@@ -2925,7 +2925,8 @@ export class PaymentService {
     }
     if (claim.flipsOrder) {
       try {
-        // the whole-order reversal (stock, coupon, loyalty, wallet, backorders) in one DO section, then the fan-out
+        // `refundComplete` already reversed the whole order in its own section (Ruling CF-OPUS-4); this keyed call is an
+        // idempotent no-op that only finishes a claim completed before that change, then the fan-out
         await money.refundBook({ orderId: payment.orderId, external: true });
         await OrderService.applyRefundEffects(storeId, payment.orderId);
       } catch (effectsError) {

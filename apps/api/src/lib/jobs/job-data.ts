@@ -33,7 +33,7 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'search-log-purge-daily',
   'soft-deleted-user-anonymize-monthly',
   // Ruling CF-JOBS-4: jobs that touch only platform (D1) rows or third parties, never a store-do table
-  // third-party erasure (OneSignal, PostHog) + the CI bucket in R2, keyed by ids the event carries
+  // third-party erasure (OneSignal, PostHog) + the CI bucket in R2, keyed by ids the event carries; the DO erasure scope is finalized by its last step (Ruling CF-OPUS-1)
   'account-erased-propagation',
   'ci-erasure-second-pass',
   // the store's public contact address + its owner (stores / users: platform rows) and the mail provider
