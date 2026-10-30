@@ -49,21 +49,15 @@
       "default": "./src/tracking/browser.ts"
     },
     "./qr": {
-      "types": "./dist/qr/index.d.ts",
-      "import": "./dist/qr/index.js",
-      "require": "./dist/qr/index.js",
+      "types": "./src/qr/index.ts",
       "default": "./src/qr/index.ts"
     },
     "./qr/schema": {
-      "types": "./dist/qr/schema.d.ts",
-      "import": "./dist/qr/schema.js",
-      "require": "./dist/qr/schema.js",
+      "types": "./src/qr/schema.ts",
       "default": "./src/qr/schema.ts"
     },
     "./qr/links": {
-      "types": "./dist/qr/links.d.ts",
-      "import": "./dist/qr/links.js",
-      "require": "./dist/qr/links.js",
+      "types": "./src/qr/links.ts",
       "default": "./src/qr/links.ts"
     }
   },
