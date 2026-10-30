@@ -14,7 +14,7 @@ import { queryBudgetSpent, takeQueryEmbed } from '../lib/search/embed-budget';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
 import { storeMoney } from '../lib/repo-factory';
-import { productVectorIndex } from '../lib/search/do-index';
+import { cfBindings } from '../cf/bindings';
 
 /** Most ids a lexical search binds into the follow-up Prisma query (list, typeahead, admin). */
 export const PRODUCT_SEARCH_ID_CAP = 1000;
@@ -386,7 +386,7 @@ async function vectorLegDo(
   limit: number,
   money: NonNullable<Awaited<ReturnType<typeof storeMoney>>>
 ): Promise<{ ids: string[]; degraded: boolean }> {
-  const index = productVectorIndex();
+  const index = cfBindings()?.PRODUCT_VECTORS ?? null; // the same binding the DO indexer uses (lib/search/do-index.ts)
   if (!index) {
     logger.warn(
       { storeId },

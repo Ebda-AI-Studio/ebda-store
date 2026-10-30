@@ -1,5 +1,5 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
-import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
+import { prisma, hasTenantContext, runInTenantContext, withStore } from '@ebda/database';
 import type { Expense } from '@prisma/client';
 import {
   isCashOrBankAccount,
@@ -337,10 +337,9 @@ export async function approveExpense(
       select: { createdBy: true },
     });
     if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { expenseTwoStepApproval: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { expenseTwoStepApproval: true } })
+    );
     const selfApproval =
       (store?.expenseTwoStepApproval ?? false) && userId != null && userId === row.createdBy;
     return expenseStepOnDo(onDo, storeId, id, 'approve', { userId, pending: selfApproval });

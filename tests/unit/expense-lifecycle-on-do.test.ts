@@ -21,9 +21,11 @@ vi.mock('@ebda/database', async () => {
   return mock.databaseMock({
     prisma: {
       expense: h.pgExpense,
-      store: { findUnique: async () => ({ expenseTwoStepApproval: h.twoStep }) },
     },
-    extra: {},
+    extra: {
+      withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+        fn({ store: { findUnique: async () => ({ expenseTwoStepApproval: h.twoStep }) } }),
+    },
   });
 });
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
