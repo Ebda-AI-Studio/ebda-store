@@ -382,7 +382,9 @@ export interface MoneyClient {
     actorId: string;
     capWindowMs: number;
   }): Promise<{
-    orders: Array<{ id: string; buyerKey: string | null; createdAt: number }>;
+    orderIds: string[];
+    buyerKeys: string[];
+    since: number | null;
     receiptIds: string[];
     provenBuyerKey: string | null;
     replayed: boolean;
@@ -392,6 +394,8 @@ export interface MoneyClient {
     walletForfeited: number;
     walletNotesScrubbed: boolean;
   }>;
+  /** The erasure finished: delete its saved scope (Ruling CF-R6A-3). */
+  finalizeErasure(a: { userId: string }): Promise<{ deleted: number }>;
   /** Product lexical search on the DO's own index (Ruling CF-R6A-1). A read. */
   searchProducts(a: {
     raw: string;
@@ -799,6 +803,7 @@ export function makeMoneyClient(
     searchOrders: a => call('searchOrders', a),
     searchProducts: a => call('searchProducts', a),
     eraseShopper: a => call('eraseShopper', a),
+    finalizeErasure: a => call('finalizeErasure', a),
     searchCustomers: a => call('searchCustomers', a),
     createAdminOrder: (a, key) => call('createAdminOrder', a, key),
     recoveryCoupon: (a, key) => call('recoveryCoupon', a, key),

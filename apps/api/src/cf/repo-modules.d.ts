@@ -90,6 +90,7 @@ declare module '@ebda-src/repo' {
   ): unknown;
   export function ensureSearchIndex(db: SyncSql): void;
   export function ensurePaymentSchema(db: SyncSql): void;
+  export function purgeErasureLedger(db: SyncSql, now?: number): number;
   export function scrubReceiptsForOrders(
     db: SyncSql,
     a: { orderIds: string[]; now?: number }

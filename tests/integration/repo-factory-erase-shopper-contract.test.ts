@@ -489,13 +489,41 @@ describe.skipIf(!hasDb)('shopper erasure: Postgres vs the store DO', () => {
     expect(send).not.toHaveBeenCalled();
     fail.mockRestore();
 
+    // data that arrives BETWEEN the attempts is erased too: a new order of the shopper with a receipt filed on it
+    const lateOrder = crypto.randomUUID();
+    insertSqlite(sqlite, 'Order', [
+      {
+        id: lateOrder,
+        storeId: ids.store,
+        customerId: d.U,
+        orderNumber: `EB-${tag}-late`,
+        status: 'pending',
+        subtotal: 1,
+        total: 1,
+        shippingAddress: { phone: '+201099999999' },
+        billingAddress: {},
+        buyerKey: crypto.createHash('sha256').update(`${tag}late`).digest('hex'),
+        updatedAt: new Date(),
+      },
+    ] as never);
+    sqlite
+      .prepare(
+        "INSERT INTO instapay_order_receipts (id, store_id, order_id, storage_key, mime_type, size_bytes, sha256, status, created_at) VALUES ('rcpt-late', ?, ?, 'k/2', 'image/png', 1, 'sha2', 'submitted', 1)"
+      )
+      .run(ids.store, lateOrder);
+
     await withRepo(doRepo, () => AuthService.eraseAccount(d.U));
     const evt = send.mock.calls.map(c => c[0] as any).find(e => e.name === 'account/erased');
-    expect(evt.data.ciScope.orderIds.sort()).toEqual([...orderIds].sort());
-    expect(evt.data.ciScope.buyerKeys).toHaveLength(2);
+    expect(evt.data.ciScope.orderIds.sort()).toEqual([...orderIds, lateOrder].sort());
+    expect(evt.data.ciScope.buyerKeys).toHaveLength(3);
     expect(evt.data.ciProven.buyerKeys).toHaveLength(1);
     expect(evt.data.buyerKey).toBe(evt.data.ciProven.buyerKeys[0]);
-    expect(deleteImages).toHaveBeenCalledWith(ids.store, ['rcpt-1']);
+    expect(deleteImages).toHaveBeenCalledWith(ids.store, ['rcpt-1', 'rcpt-late']);
+    // the late order is unlinked too, and the finished erasure left no saved scope behind
+    expect(
+      sqlite.prepare('SELECT count(*) AS n FROM orders WHERE customer_id = ?').get(d.U)
+    ).toEqual({ n: 0 });
+    expect(sqlite.prepare('SELECT count(*) AS n FROM erasure_ledger').get()).toEqual({ n: 0 });
     // and the receipt was scrubbed and marked by the first (committed) DO section
     expect(
       sqlite

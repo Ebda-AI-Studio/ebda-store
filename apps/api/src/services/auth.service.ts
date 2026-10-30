@@ -2110,19 +2110,16 @@ export class AuthService {
         select: { id: true, buyerKey: true, createdAt: true },
       });
       // a DO store's orders are the DO's (the Postgres rows are only the pre-cutover copy)
-      const ciOrders = doErase
-        ? doErase.orders.map(o => ({
-            id: o.id,
-            buyerKey: o.buyerKey,
-            createdAt: new Date(o.createdAt),
-          }))
-        : ownOrders;
       ciScope = {
         storeId: eraseStoreId,
-        orderIds: ciOrders.map(o => o.id),
-        buyerKeys: [...new Set(ciOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
+        orderIds: doErase ? doErase.orderIds : ownOrders.map(o => o.id),
+        buyerKeys: doErase
+          ? doErase.buyerKeys
+          : [...new Set(ownOrders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])))],
         // The prefix pass starts at the sink's partition day of the first order minus a margin (lib/ci/layout.ts).
-        sinceDay: ciSinceDay(ciOrders.map(o => o.createdAt)),
+        sinceDay: doErase
+          ? ciSinceDay(doErase.since == null ? [] : [new Date(doErase.since)])
+          : ciSinceDay(ownOrders.map(o => o.createdAt)),
       };
       ciProven = eraseProvenBuyerKey
         ? { storeId: consentStoreId, buyerKeys: [eraseProvenBuyerKey] }
@@ -2528,8 +2525,8 @@ export class AuthService {
     // may still roll back. `deferAfterTenantCommit` fires it after COMMIT and
     // DROPS it if the transaction failed. Outside a request (self-service,
     // retention cron) it runs inline, unchanged.
-    void deferAfterTenantCommit('auth.eraseAccount.propagate', () =>
-      inngest.send({
+    void deferAfterTenantCommit('auth.eraseAccount.propagate', async () => {
+      await inngest.send({
         name: 'account/erased',
         // `storeId` + `buyerKey` (the hashed phone, never the phone) let Ebda WhatsApp erase the
         // contact and its messages (contract `customer.erased`); computed BEFORE the scrub below.
@@ -2541,8 +2538,12 @@ export class AuthService {
           ciProven,
           ciScope,
         },
-      })
-    ).catch(err =>
+      });
+      // The Postgres half has committed and the downstream erase is queued: the DO's saved erasure scope (ids and hashes
+      // kept only so a failed attempt can be finished) is no longer needed. If the enqueue above threw we never get here and
+      // the row stays for a retry; the nightly alarm purges it after the TTL (Ruling CF-R6A-3).
+      if (doMoney) await doMoney.finalizeErasure({ userId });
+    }).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );
 

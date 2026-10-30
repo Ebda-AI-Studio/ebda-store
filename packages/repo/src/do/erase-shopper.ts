@@ -38,6 +38,36 @@ export const WALLET_FORFEIT_NOTE = 'Forfeited on account erasure';
 export const ERASURE_LEDGER_TTL_MS = 30 * 86_400_000;
 export const ERASURE_LEDGER_DDL = `CREATE TABLE IF NOT EXISTS erasure_ledger (
   user_id TEXT PRIMARY KEY, store_id TEXT NOT NULL, scope TEXT NOT NULL, created_at INTEGER NOT NULL)`;
+interface LedgerScope {
+  orderIds: string[];
+  buyerKeys: string[];
+  since: number | null;
+  receiptIds: string[];
+  provenBuyerKey: string | null;
+}
+
+/** Drop ledger rows older than the TTL. Run at every erasure AND by the nightly alarm, so a stuck row never outlives it. */
+export function purgeErasureLedger(db: SyncSql, now = Date.now()): number {
+  db.run(ERASURE_LEDGER_DDL, []);
+  return db.run('DELETE FROM erasure_ledger WHERE created_at < ?', [now - ERASURE_LEDGER_TTL_MS])
+    .changes;
+}
+
+/** The erasure is complete (the Postgres half committed and the downstream erase was queued): the saved scope goes. Idempotent. */
+export function finalizeErasure(
+  db: SyncSql,
+  a: { storeId: string; userId: string }
+): { deleted: number } {
+  if (!a.storeId || !a.userId) NOT_FOUND();
+  db.run(ERASURE_LEDGER_DDL, []);
+  return {
+    deleted: db.run('DELETE FROM erasure_ledger WHERE user_id = ? AND store_id = ?', [
+      a.userId,
+      a.storeId,
+    ]).changes,
+  };
+}
+
 export const ANONYMIZED_ADDRESS = '{"anonymized":true}';
 
 export interface EraseShopperInput {
@@ -58,8 +88,10 @@ export interface EraseShopperInput {
 }
 
 export interface EraseShopperResult {
-  /** The shopper's own orders (for the Customer Intelligence erase scope). */
-  orders: Array<{ id: string; buyerKey: string | null; createdAt: number }>;
+  /** The shopper's own orders (for the Customer Intelligence erase scope): ids, their buyer-key hashes, the earliest order time. */
+  orderIds: string[];
+  buyerKeys: string[];
+  since: number | null;
   /** The proven current-number buyer key the erasure used (the saved one on a replay). */
   provenBuyerKey: string | null;
   /** true when the scope came from the erasure ledger of an earlier, partly completed attempt. */
@@ -84,7 +116,9 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
   const now = a.now ?? Date.now();
   const { storeId, userId } = a;
   const out: EraseShopperResult = {
-    orders: [],
+    orderIds: [],
+    buyerKeys: [],
+    since: null,
     provenBuyerKey: null,
     replayed: false,
     receiptIds: [],
@@ -95,59 +129,58 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
     walletNotesScrubbed: false,
   };
   return db.transactionSync(() => {
-    // 0. the erasure scope, saved BEFORE any destructive step (a replay uses the saved one)
+    // 0. the erasure scope, saved BEFORE any destructive step. A replay MERGES the saved scope with a fresh read (an order
+    //    placed, a receipt filed between the attempts is still erased); the merged scope is saved again. Only ids and
+    //    hashes are kept, and only what a resume needs: order ids, their buyer-key hashes, the earliest order day, receipt ids.
     db.run(ERASURE_LEDGER_DDL, []);
-    db.run('DELETE FROM erasure_ledger WHERE created_at < ?', [now - ERASURE_LEDGER_TTL_MS]);
-    const saved = db.all('SELECT scope FROM erasure_ledger WHERE user_id = ? AND store_id = ?', [
+    purgeErasureLedger(db, now);
+    const row = db.all('SELECT scope FROM erasure_ledger WHERE user_id = ? AND store_id = ?', [
       userId,
       storeId,
     ])[0];
-    if (saved) {
-      const sc = JSON.parse(saved.scope as string) as Pick<
-        EraseShopperResult,
-        'orders' | 'receiptIds' | 'provenBuyerKey'
-      >;
-      out.orders = sc.orders;
-      out.receiptIds = sc.receiptIds;
-      out.provenBuyerKey = sc.provenBuyerKey;
-      out.replayed = true;
-    } else {
-      out.orders = db
-        .all(
-          'SELECT id, buyer_key, created_at FROM orders WHERE store_id = ? AND customer_id = ?',
-          [storeId, userId]
-        )
-        .map(r => ({
-          id: r.id as string,
-          buyerKey: (r.buyer_key as string | null) ?? null,
-          createdAt: r.created_at as number,
-        }));
-      out.provenBuyerKey = a.provenBuyerKey;
-      out.receiptIds = out.orders.length
-        ? db
-            .all(
-              `SELECT id FROM instapay_order_receipts WHERE store_id = ? AND image_deleted_at IS NULL
-                  AND order_id IN (SELECT value FROM json_each(?))`,
-              [storeId, JSON.stringify(out.orders.map(o => o.id))]
-            )
-            .map(r => r.id as string)
-        : [];
-      db.run(
-        'INSERT INTO erasure_ledger (user_id, store_id, scope, created_at) VALUES (?, ?, ?, ?)',
-        [
-          userId,
-          storeId,
-          JSON.stringify({
-            orders: out.orders,
-            receiptIds: out.receiptIds,
-            provenBuyerKey: out.provenBuyerKey,
-          }),
-          now,
-        ]
-      );
-    }
-    const orderIds = out.orders.map(o => o.id);
-    const provenKey = out.provenBuyerKey;
+    const saved: LedgerScope | null = row ? (JSON.parse(row.scope as string) as LedgerScope) : null;
+    const fresh = db.all(
+      'SELECT id, buyer_key, created_at FROM orders WHERE store_id = ? AND customer_id = ?',
+      [storeId, userId]
+    );
+    const orderIdSet = new Set([...(saved?.orderIds ?? []), ...fresh.map(r => r.id as string)]);
+    const buyerKeySet = new Set([
+      ...(saved?.buyerKeys ?? []),
+      ...fresh.flatMap(r => (r.buyer_key ? [r.buyer_key as string] : [])),
+    ]);
+    const sinceCandidates = [
+      ...(saved?.since != null ? [saved.since] : []),
+      ...fresh.map(r => r.created_at as number),
+    ];
+    const freshReceipts = orderIdSet.size
+      ? db
+          .all(
+            `SELECT id FROM instapay_order_receipts WHERE store_id = ? AND image_deleted_at IS NULL
+                AND order_id IN (SELECT value FROM json_each(?))`,
+            [storeId, JSON.stringify([...orderIdSet])]
+          )
+          .map(r => r.id as string)
+      : [];
+    const scope: LedgerScope = {
+      orderIds: [...orderIdSet].sort(),
+      buyerKeys: [...buyerKeySet].sort(),
+      since: sinceCandidates.length ? Math.min(...sinceCandidates) : null,
+      receiptIds: [...new Set([...(saved?.receiptIds ?? []), ...freshReceipts])].sort(),
+      provenBuyerKey: saved?.provenBuyerKey ?? a.provenBuyerKey ?? null,
+    };
+    db.run(
+      `INSERT INTO erasure_ledger (user_id, store_id, scope, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (user_id) DO UPDATE SET scope = excluded.scope`,
+      [userId, storeId, JSON.stringify(scope), now]
+    );
+    out.replayed = !!saved;
+    out.orderIds = scope.orderIds;
+    out.buyerKeys = scope.buyerKeys;
+    out.since = scope.since;
+    out.receiptIds = scope.receiptIds;
+    out.provenBuyerKey = scope.provenBuyerKey;
+    const orderIds = scope.orderIds;
+    const provenKey = scope.provenBuyerKey;
 
     // 2. webhook delivery log (Ruling WH-7): the shopper's contact data leaves the stored payloads
     const email = a.email?.trim().toLowerCase() || null;
@@ -165,12 +198,7 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
 
     // 3b. Customer Intelligence capture rows (append-only; the trigger lets buyer_key go to NULL only while the erasure flag is
     //     up, raised and lowered inside this section). The shopper's own order keys, and the proven current number's key.
-    const buyerKeys = [
-      ...new Set([
-        ...out.orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
-        ...(provenKey ? [provenKey] : []),
-      ]),
-    ];
+    const buyerKeys = [...new Set([...scope.buyerKeys, ...(provenKey ? [provenKey] : [])])];
     if (buyerKeys.length > 0) {
       const flag = (v: 0 | 1) =>
         db.run(

@@ -41,7 +41,12 @@ import {
 import { placeAdminOrder, type AdminOrderInput } from './admin-order';
 import { searchOrderIds } from './order-search';
 import { searchProductIdSet } from './search';
-import { ERASURE_LEDGER_DDL, eraseShopper, type EraseShopperInput } from './erase-shopper';
+import {
+  ERASURE_LEDGER_DDL,
+  eraseShopper,
+  finalizeErasure,
+  type EraseShopperInput,
+} from './erase-shopper';
 import { matchingCustomers } from './search-customers';
 import {
   claimReturn,
@@ -120,6 +125,7 @@ export type MoneyOpName =
   | 'searchOrders'
   | 'searchProducts'
   | 'eraseShopper'
+  | 'finalizeErasure'
   | 'searchCustomers'
   | 'createAdminOrder'
   | 'recoveryCoupon'
@@ -177,6 +183,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'searchOrders',
   'searchProducts',
   'eraseShopper',
+  'finalizeErasure',
   'searchCustomers',
   'createAdminOrder',
   'recoveryCoupon',
@@ -566,6 +573,9 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
     const { storeId: _s, now: _n, ...rest } = a as Partial<EraseShopperInput>;
     return eraseShopper(db, { ...(rest as EraseShopperInput), storeId });
   },
+  /** The erasure finished: the saved scope (ids and hashes) is deleted (Ruling CF-R6A-3). */
+  finalizeErasure: (db, storeId, a) =>
+    finalizeErasure(db, { storeId, userId: id(a.userId, 'userId') }),
   /** Product lexical search (admin palette, lists, storefront; Ruling CF-R6A-1): the ids, best name match first. A read. */
   searchProducts: (db, storeId, a) => {
     const o = (a.opts ?? {}) as Record<string, unknown>;

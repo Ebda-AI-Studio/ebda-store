@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { env, runInDurableObject } from 'cloudflare:test';
+import { env, runInDurableObject, runDurableObjectAlarm } from 'cloudflare:test';
 import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 
@@ -116,30 +116,78 @@ describe('shopper erasure on the store DO', () => {
     ]);
   });
 
-  it('a replay returns the SAVED scope (orders already unlinked), so the caller can finish what a failed first attempt left', async () => {
+  it('a replay merges the SAVED scope with a fresh read: what was unlinked is remembered, what arrived since is erased too', async () => {
     const store = 'es-replay';
     const stub = await seeded(store);
-    const first = decodeRpc<{
-      orders: unknown[];
+    type R = {
+      orderIds: string[];
+      buyerKeys: string[];
+      receiptIds: string[];
       replayed: boolean;
       provenBuyerKey: string | null;
-    }>(
-      (
-        (await op(stub, store, 'eraseShopper', { ...args, provenBuyerKey: 'b'.repeat(64) })) as {
-          json: string;
-        }
-      ).json
+    };
+    const run = async (extra: object = {}) =>
+      decodeRpc<R>(
+        ((await op(stub, store, 'eraseShopper', { ...args, ...extra })) as { json: string }).json
+      );
+    await rows(
+      stub,
+      "INSERT INTO instapay_order_receipts (id, store_id, order_id, storage_key, mime_type, size_bytes, sha256, created_at) VALUES ('rc1', ?, 'o1', 'k/1', 'image/png', 1, 's1', 1)",
+      store
     );
-    expect(first).toMatchObject({ replayed: false, provenBuyerKey: 'b'.repeat(64) });
-    expect(first.orders).toHaveLength(1);
+    const first = await run({ provenBuyerKey: 'b'.repeat(64) });
+    expect(first).toMatchObject({
+      replayed: false,
+      orderIds: ['o1'],
+      receiptIds: ['rc1'],
+      provenBuyerKey: 'b'.repeat(64),
+    });
     expect(await rows(stub, 'SELECT customer_id FROM orders')).toEqual([{ customer_id: null }]);
-    // the retry has no linked order and no proof left; the ledger supplies both
-    const again = decodeRpc<typeof first & { receiptIds: string[] }>(
-      ((await op(stub, store, 'eraseShopper', args)) as { json: string }).json
+    // between the attempts: a new order of the same shopper and a receipt filed on it
+    await rows(
+      stub,
+      "INSERT INTO orders (id, store_id, customer_id, order_number, subtotal, total, shipping_address, billing_address, buyer_key, created_at, updated_at) VALUES ('o2', ?, 'u1', 'EB-2', 1, 1, '{}', '{}', ?, 5, 5)",
+      store,
+      'c'.repeat(64)
     );
+    await rows(
+      stub,
+      "INSERT INTO instapay_order_receipts (id, store_id, order_id, storage_key, mime_type, size_bytes, sha256, created_at) VALUES ('rc2', ?, 'o2', 'k/2', 'image/png', 1, 's2', 1)",
+      store
+    );
+    const again = await run();
     expect(again).toMatchObject({ replayed: true, provenBuyerKey: 'b'.repeat(64) });
-    expect(again.orders).toEqual(first.orders);
+    expect(again.orderIds).toEqual(['o1', 'o2']);
+    expect(again.receiptIds).toEqual(['rc1', 'rc2']);
+    expect(again.buyerKeys).toContain('c'.repeat(64));
+    expect(await rows(stub, 'SELECT id FROM orders WHERE customer_id IS NOT NULL')).toEqual([]);
+    expect(
+      await rows(stub, 'SELECT id FROM instapay_order_receipts WHERE personal_scrubbed_at IS NULL')
+    ).toEqual([]);
+  });
+
+  it('finalizeErasure deletes the ledger row; the nightly alarm purges one past its TTL', async () => {
+    const store = 'es-final';
+    const stub = await seeded(store);
+    await op(stub, store, 'eraseShopper', args);
     expect(await rows(stub, 'SELECT user_id FROM erasure_ledger')).toEqual([{ user_id: 'u1' }]);
+    const f = await op(stub, store, 'finalizeErasure', { userId: 'u1' });
+    expect(decodeRpc<{ deleted: number }>((f as { json: string }).json)).toEqual({ deleted: 1 });
+    expect(await rows(stub, 'SELECT user_id FROM erasure_ledger')).toEqual([]);
+    expect(
+      decodeRpc<{ deleted: number }>(
+        ((await op(stub, store, 'finalizeErasure', { userId: 'u1' })) as { json: string }).json
+      )
+    ).toEqual({ deleted: 0 });
+    // a row whose finalize never came (the Postgres half kept failing) is purged by the alarm, not by the next erasure
+    await rows(
+      stub,
+      "INSERT INTO erasure_ledger (user_id, store_id, scope, created_at) VALUES ('stale', ?, '{}', 1)",
+      store
+    );
+    await stub.ensureBackupAlarm();
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(await rows(stub, 'SELECT user_id FROM erasure_ledger')).toEqual([]);
   });
 
   it('an admin role is refused and nothing changes', async () => {

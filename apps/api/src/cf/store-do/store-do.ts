@@ -40,6 +40,7 @@ import {
   ensurePaymentSchema,
   scrubReceiptsForOrders,
   ensureSearchIndex,
+  purgeErasureLedger,
   MoneyError,
   runReads,
   runWrites,
@@ -338,6 +339,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
 
   async alarm(): Promise<void> {
     try {
+      // The saved scope of a half-finished shopper erasure never outlives its TTL (Ruling CF-R6A-3).
+      try {
+        purgeErasureLedger(this.sync);
+      } catch (err) {
+        console.error('erasure ledger purge failed', err);
+      }
       const storeId = this.boundStoreId();
       if (storeId) await this.backupNow(storeId);
     } finally {
