@@ -184,16 +184,19 @@ export const orderCreated: JobDef = inngest.createFunction(
       isCod: (paymentMethod || '').toLowerCase() === 'cod',
     };
 
-    // `Store` is a platform row for either backend
     const store = await step.run('load-store', () =>
-      withStore(storeId, tx =>
-        tx.store
-          .findUnique({
-            where: { id: storeId },
-            select: { name: true, settings: true },
-          })
-          .catch(() => null)
-      )
+      // Postgres: exactly as before; a DO store has no tenant transaction to open for a platform row
+      (money
+        ? withStore(storeId, tx =>
+            tx.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+          )
+        : runInTenantContext(storeId, () =>
+            prisma.store.findUnique({
+              where: { id: storeId },
+              select: { name: true, settings: true },
+            })
+          )
+      ).catch(() => null)
     );
 
     const results = await Promise.allSettled([

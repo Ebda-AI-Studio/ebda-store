@@ -127,11 +127,18 @@ export async function handleOrderStatusChanged(
   const customerPhone = shippingAddrFull?.phone ?? undefined;
 
   const store = await step.run('load-store', () =>
-    withStore(storeId, tx =>
-      tx.store
-        .findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
-        .catch(() => null)
-    )
+    // Postgres: exactly as before; a DO store has no tenant transaction to open for a platform row
+    (money
+      ? withStore(storeId, tx =>
+          tx.store.findUnique({ where: { id: storeId }, select: { name: true, settings: true } })
+        )
+      : runInTenantContext(storeId, () =>
+          prisma.store.findUnique({
+            where: { id: storeId },
+            select: { name: true, settings: true },
+          })
+        )
+    ).catch(() => null)
   );
   const storeName = store?.name ?? storeId;
 
