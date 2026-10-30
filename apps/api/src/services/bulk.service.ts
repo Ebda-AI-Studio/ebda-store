@@ -1673,8 +1673,8 @@ export class BulkService {
     if (result.created + result.updated > 0) await requestStoreReindex(storeId, 'bulk-import');
 
     // BARCODE-1: rows imported without a barcode get one (inventory.barcode stores only).
-    // (barcode sequences are Postgres-only for now: a DO store's generator is a separate item, not run against the wrong database)
-    if (result.created + result.updated > 0 && !money) await fillMissingAfterImport(storeId);
+    // (a DO store allocates in one DO section, Ruling BARCODE-DO-1)
+    if (result.created + result.updated > 0) await fillMissingAfterImport(storeId);
 
     return result;
   }

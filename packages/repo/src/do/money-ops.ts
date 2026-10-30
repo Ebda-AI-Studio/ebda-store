@@ -69,6 +69,7 @@ import {
   type ImportRowPlan,
   type ImportVariantRow,
 } from './catalog-import';
+import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -135,7 +136,9 @@ export type MoneyOpName =
   | 'receiptImageDeleted'
   | 'receiptSweep'
   | 'importBatch'
-  | 'importVariants';
+  | 'importVariants'
+  | 'barcodeFill'
+  | 'barcodeEnsure';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -188,6 +191,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'receiptSweep',
   'importBatch',
   'importVariants',
+  'barcodeFill',
+  'barcodeEnsure',
 ];
 
 const TABLE = '_money_ops';
@@ -443,6 +448,14 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       storeId,
       productId: id(a.productId, 'productId'),
       variants: (a.variants as ImportVariantRow[]) ?? [],
+    }),
+  /** Missing in-store barcodes for existing items (Ruling BARCODE-DO-1): one section replaces the advisory lock. */
+  barcodeFill: (db, storeId, a) =>
+    generateMissingBarcodes(db, storeId, typeof a.limit === 'number' ? a.limit : 500),
+  barcodeEnsure: (db, storeId, a) =>
+    ensureBarcode(db, storeId, {
+      productId: typeof a.productId === 'string' ? a.productId : undefined,
+      variantId: typeof a.variantId === 'string' ? a.variantId : undefined,
     }),
   journalSale: (db, storeId, a) =>
     postOrderSaleJournal(db, { storeId, orderId: id(a.orderId, 'orderId') }),

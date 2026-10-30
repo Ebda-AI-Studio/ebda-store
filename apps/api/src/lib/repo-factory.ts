@@ -276,6 +276,11 @@ export interface MoneyClient {
     productId: string;
     variants: unknown[];
   }): Promise<{ variantsCreated: number }>;
+  /** In-store barcodes (Ruling BARCODE-DO-1). */
+  barcodeFill(a: {
+    limit?: number;
+  }): Promise<{ products: number; variants: number; remaining: number }>;
+  barcodeEnsure(a: { productId?: string; variantId?: string }): Promise<{ code: string | null }>;
   cancel(
     a: { orderId: string; restoreInventory?: boolean; note?: string },
     key?: string
@@ -749,6 +754,8 @@ export function makeMoneyClient(
     searchOrders: a => call('searchOrders', a),
     createAdminOrder: (a, key) => call('createAdminOrder', a, key),
     recoveryCoupon: (a, key) => call('recoveryCoupon', a, key),
+    barcodeFill: a => call('barcodeFill', a),
+    barcodeEnsure: a => call('barcodeEnsure', a),
     returnCreate: (a, key) => call('returnCreate', a, key),
     returnStatus: (a, key) => call('returnStatus', a, key),
     returnTracking: (a, key) => call('returnTracking', a, key),
