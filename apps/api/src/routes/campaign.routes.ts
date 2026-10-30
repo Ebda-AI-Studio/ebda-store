@@ -16,6 +16,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { storeScopeContext } from '../middleware/tenant-context';
 import { AppError } from '../middleware/error-handler';
+import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
@@ -95,7 +96,9 @@ const CAMPAIGN_DETAIL_SELECT = {
 } as const;
 
 async function findCampaignOr404(storeId: string, campaignId: string) {
-  const campaign = await prisma.campaign.findFirst({
+  const campaign = await (
+    await storeDb(storeId)
+  ).campaign.findFirst({
     where: { id: campaignId, storeId },
     select: CAMPAIGN_DETAIL_SELECT,
   });
@@ -121,7 +124,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
     const { cursor, limit } = listQuery.parse(req.query);
-    const rows = await prisma.campaign.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).campaign.findMany({
       where: { storeId },
       select: CAMPAIGN_LIST_SELECT,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -168,7 +173,9 @@ router.post('/', writeLimiter, async (req: Request, res: Response, next: NextFun
   try {
     const { storeId } = req.params;
     const input = campaignDraftSchema.parse(req.body);
-    const campaign = await prisma.campaign.create({
+    const campaign = await (
+      await storeWriter(storeId)
+    ).campaign.create({
       data: { storeId, ...draftData(input) },
       select: CAMPAIGN_DETAIL_SELECT,
     });
@@ -197,7 +204,9 @@ router.get('/:campaignId', async (req: Request, res: Response, next: NextFunctio
     const { storeId } = req.params;
     const { campaignId } = idParam.parse(req.params);
     const campaign = await findCampaignOr404(storeId, campaignId);
-    const groups = await prisma.campaignRecipient.groupBy({
+    const groups = await (
+      await storeDb(storeId)
+    ).campaignRecipient.groupBy({
       by: ['status'],
       where: { campaignId, storeId },
       _count: { _all: true },
@@ -209,7 +218,9 @@ router.get('/:campaignId', async (req: Request, res: Response, next: NextFunctio
     // a bounced/unsubscribed row can carry it too, so no status count stands in
     // for it. Lets the admin hide a Delete that can only 409 (issue 2082).
     const hasSendHistory =
-      (await prisma.campaignRecipient.findFirst({
+      (await (
+        await storeDb(storeId)
+      ).campaignRecipient.findFirst({
         where: { campaignId, storeId, sentAt: { not: null } },
         select: { id: true },
       })) !== null;
@@ -226,7 +237,9 @@ router.get('/:campaignId/recipients', async (req: Request, res: Response, next: 
     const { campaignId } = idParam.parse(req.params);
     const { cursor, limit, status } = recipientsQuery.parse(req.query);
     await findCampaignOr404(storeId, campaignId);
-    const rows = await prisma.campaignRecipient.findMany({
+    const rows = await (
+      await storeDb(storeId)
+    ).campaignRecipient.findMany({
       where: { campaignId, storeId, ...(status ? { status } : {}) },
       select: {
         id: true,
@@ -262,7 +275,9 @@ router.put(
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
       const input = campaignDraftSchema.parse(req.body);
-      const updated = await prisma.campaign.updateMany({
+      const updated = await (
+        await storeWriter(storeId)
+      ).campaign.updateMany({
         where: { id: campaignId, storeId, status: 'draft' },
         data: draftData(input),
       });
@@ -296,7 +311,9 @@ router.delete(
     try {
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
-      const deleted = await prisma.campaign.deleteMany({
+      const deleted = await (
+        await storeWriter(storeId)
+      ).campaign.deleteMany({
         where: {
           id: campaignId,
           storeId,
@@ -395,7 +412,9 @@ router.post(
         );
       }
 
-      const flipped = await prisma.campaign.updateMany({
+      const flipped = await (
+        await storeWriter(storeId)
+      ).campaign.updateMany({
         where: { id: campaignId, storeId, status: 'draft' },
         data: { status: 'scheduled', scheduledAt, recipientCount: audienceSize },
       });
@@ -417,6 +436,15 @@ router.post(
           { campaignId, storeId, err: err instanceof Error ? err.message : 'unknown' },
           '[CAMPAIGN] enqueue failed'
         );
+        // A store on its Durable Object is not in this request's Postgres transaction, so the 5xx below cannot undo the
+        // flip: put the campaign back to `draft` here, only if it is still THIS request's `scheduled` row (Ruling CF-R6A-2).
+        if ((await storeRepo(storeId)).backend === 'do')
+          await (
+            await storeWriter(storeId)
+          ).campaign.updateMany({
+            where: { id: campaignId, storeId, status: 'scheduled', scheduledAt },
+            data: { status: 'draft', scheduledAt: null, recipientCount: campaign.recipientCount },
+          });
         res.status(503).json({
           success: false,
           error: {
@@ -456,7 +484,9 @@ router.post(
     try {
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
-      const cancelled = await prisma.campaign.updateMany({
+      const cancelled = await (
+        await storeWriter(storeId)
+      ).campaign.updateMany({
         where: { id: campaignId, storeId, status: { in: ['scheduled', 'sending'] } },
         data: { status: 'cancelled' },
       });

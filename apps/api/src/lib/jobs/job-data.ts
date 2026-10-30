@@ -29,6 +29,8 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   // the abandoned-cart rows and the newsletter consent follow the store's backend (Ruling CF-R4-5)
   'abandoned-cart-purge-weekly',
   'cart-recovery-email',
+  // campaigns, recipients and the consent list follow the store's backend (Ruling CF-R6A-2)
+  'campaign-send',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

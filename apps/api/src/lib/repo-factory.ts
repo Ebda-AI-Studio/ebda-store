@@ -89,6 +89,8 @@ export type WritableModel =
   | 'abandonedCart'
   | 'abandonedCartConfig'
   | 'newsletterSubscriber'
+  | 'campaign'
+  | 'campaignRecipient'
   | 'notificationConfig'
   | 'notificationEventConfig';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */

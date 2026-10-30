@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
 import { storeRepo } from '../lib/repo-factory';
+import { inCampaignStore } from '../services/campaign.service';
 import { publicLimiter } from '../middleware/security';
 import {
   verifyUnsubscribeToken,
@@ -131,16 +132,15 @@ router.get(
         res.status(400).json({ success: false, error: { code: 'INVALID_TOKEN' } });
         return;
       }
-      const found = await runInTenantContext(ids.storeId, async () => {
-        const recipient = await prisma.campaignRecipient.findFirst({
+      const found = await inCampaignStore(ids.storeId, async db => {
+        const recipient = await db.campaignRecipient.findFirst({
           where: { id: ids.recipientId, storeId: ids.storeId },
           select: { email: true, status: true },
         });
         if (!recipient) return null;
-        const store = await prisma.store.findUnique({
-          where: { id: ids.storeId },
-          select: { name: true, nameAr: true },
-        });
+        const store = await withStore(ids.storeId, tx =>
+          tx.store.findUnique({ where: { id: ids.storeId }, select: { name: true, nameAr: true } })
+        );
         return { recipient, store };
       });
       if (!found) {
@@ -178,8 +178,8 @@ router.post(
         res.status(400).json({ success: false, error: { code: 'INVALID_TOKEN' } });
         return;
       }
-      const done = await runInTenantContext(ids.storeId, async () => {
-        const recipient = await prisma.campaignRecipient.findFirst({
+      const done = await inCampaignStore(ids.storeId, async (db, w) => {
+        const recipient = await db.campaignRecipient.findFirst({
           where: { id: ids.recipientId, storeId: ids.storeId },
           select: { id: true, email: true, subscriberId: true },
         });
@@ -187,9 +187,7 @@ router.post(
         const now = new Date();
         // Withdraw consent on the subscriber row — by id when linked, and by
         // (store, email) so a re-created row for the same address is covered.
-        await (
-          await storeRepo(ids.storeId)
-        ).writer.newsletterSubscriber.updateMany({
+        await w.newsletterSubscriber.updateMany({
           where: {
             storeId: ids.storeId,
             OR: [
@@ -201,7 +199,7 @@ router.post(
           data: { isActive: false, unsubscribedAt: now },
         });
         // Record it against the campaign that carried the link.
-        await prisma.campaignRecipient.updateMany({
+        await w.campaignRecipient.updateMany({
           where: { id: recipient.id, storeId: ids.storeId, status: { not: 'unsubscribed' } },
           data: { status: 'unsubscribed', unsubscribedAt: now },
         });

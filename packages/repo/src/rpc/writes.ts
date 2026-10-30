@@ -54,6 +54,9 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AbandonedCartConfig',
   // the newsletter list and its consent (INFRA-CF-1 PR R4, Ruling CF-R4-4)
   'NewsletterSubscriber',
+  // email campaigns and their recipients (INFRA-CF-1 PR R6a, Ruling CF-R6A-2)
+  'Campaign',
+  'CampaignRecipient',
   // the channel credentials and per-event switches the push / SMS / WhatsApp dispatchers read (Ruling CF-NOTIFY-1)
   'NotificationConfig',
   'NotificationEventConfig',

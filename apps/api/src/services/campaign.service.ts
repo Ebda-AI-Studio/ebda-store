@@ -1,5 +1,5 @@
-import { prisma, withStore } from '@ebda/database';
-import { storeDb, storeRepo } from '../lib/repo-factory';
+import { prisma, withStore, runInTenantContext } from '@ebda/database';
+import { storeDb, storeRepo, type StoreReads, type StoreWrites } from '../lib/repo-factory';
 import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@ebda/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
@@ -13,6 +13,20 @@ import { storeBrandTheme } from '../lib/store-brand-theme';
  * `lib/inngest/functions/campaign-send.ts`, which only runs after a merchant
  * presses send (or the test-send route, which only ever mails the merchant).
  */
+
+/**
+ * One store's campaign reads and writes for a job step or a public endpoint (Ruling CF-R6A-2). A store on Postgres keeps
+ * its request-style tenant scope (`runInTenantContext`, unchanged); a store on its Durable Object has no Postgres scope to
+ * open, its `campaigns` / `campaign_recipients` / newsletter rows come over RPC.
+ */
+export async function inCampaignStore<T>(
+  storeId: string,
+  fn: (db: StoreReads, w: StoreWrites) => Promise<T>
+): Promise<T> {
+  const repo = await storeRepo(storeId);
+  const run = () => fn(repo.db, repo.writer);
+  return repo.backend === 'do' ? run() : runInTenantContext(storeId, run);
+}
 
 // ─── Limits (docs/ENVIRONMENT.md) ────────────────────────────────────────────
 
@@ -81,9 +95,11 @@ export async function sentInLast24h(storeId: string, now: Date = new Date()): Pr
   const since = new Date(now.getTime() - SEND_CAP_WINDOW_MS);
   // Cart-recovery emails go out through the same Resend key and sender reputation, so they spend
   // the same rolling 24h budget (Ruling CART-EMAIL-6).
+  // A DO store counts its own rows (the same two counts); a Postgres store reads through the ambient scope as before.
+  const db = await storeDb(storeId);
   const [campaign, cart] = await Promise.all([
-    prisma.campaignRecipient.count({ where: { storeId, sentAt: { gte: since } } }),
-    prisma.abandonedCart.count({ where: { storeId, emailSentAt: { gte: since } } }),
+    db.campaignRecipient.count({ where: { storeId, sentAt: { gte: since } } }),
+    db.abandonedCart.count({ where: { storeId, emailSentAt: { gte: since } } }),
   ]);
   return campaign + cart;
 }
