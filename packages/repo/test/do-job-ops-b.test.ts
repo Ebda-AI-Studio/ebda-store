@@ -258,3 +258,56 @@ describe('the R2 reference registry against the DO schema (Ruling CF-JOBS-4B)', 
       });
   });
 });
+
+describe('vectorPlan / vectorCommit / vectorStale (Ruling CF-JOBS-4B)', () => {
+  async function vrig() {
+    const { VECTOR_STATEMENTS } = await import('../src/do/search-vectors');
+    const r = rig();
+    for (const st of VECTOR_STATEMENTS) r.raw.exec(st);
+    r.raw.exec(`UPDATE products SET name = 'Lamp', description = 'A brass lamp' WHERE id = 'sku'`);
+    return r;
+  }
+
+  it('plans the stale product, commits it against the current text, then has nothing left', async () => {
+    const { op } = await vrig();
+    expect(op('vectorStale', {})).toEqual({ stale: true });
+    const plan = op('vectorPlan', { limit: 10 });
+    expect(plan.work).toHaveLength(1);
+    expect(plan.work[0]).toMatchObject({ productId: 'sku', needDoc: true });
+    const done = op('vectorCommit', { ready: plan.work, failures: [], forget: [], texts: 1 });
+    expect(done).toMatchObject({ embedded: 1, cleanup: [] });
+    expect(op('vectorStale', {})).toEqual({ stale: false });
+    expect(op('vectorPlan', { limit: 10 }).work).toHaveLength(0);
+    // a double delivery of the same commit changes nothing
+    expect(
+      op('vectorCommit', { ready: plan.work, failures: [], forget: [], texts: 0 }).embedded
+    ).toBe(1);
+    expect(op('vectorPlan', { limit: 10 }).work).toHaveLength(0);
+  });
+
+  it('an edit between plan and commit leaves the product stale', async () => {
+    const { raw, op } = await vrig();
+    const plan = op('vectorPlan', { limit: 10 });
+    raw.exec(`UPDATE products SET description = 'A different lamp' WHERE id = 'sku'`);
+    expect(
+      op('vectorCommit', { ready: plan.work, failures: [], forget: [], texts: 1 }).embedded
+    ).toBe(0);
+    expect(op('vectorStale', {})).toEqual({ stale: true });
+  });
+
+  it('a rejected text is quarantined until the text changes; the daily budget trims the plan', async () => {
+    const { raw, op } = await vrig();
+    const plan = op('vectorPlan', { limit: 10 });
+    op('vectorCommit', {
+      ready: [],
+      failures: [{ work: plan.work[0], kind: 'input' }],
+      forget: [],
+      texts: 0,
+    });
+    expect(op('vectorPlan', { limit: 10 }).work).toHaveLength(0);
+    raw.exec(`UPDATE products SET description = 'Changed text' WHERE id = 'sku'`);
+    expect(op('vectorPlan', { limit: 10 }).work).toHaveLength(1);
+    const capped = op('vectorPlan', { limit: 10, dailyCap: 0 });
+    expect(capped).toMatchObject({ work: [], capped: true });
+  });
+});

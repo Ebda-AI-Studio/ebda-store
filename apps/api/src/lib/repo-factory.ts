@@ -481,6 +481,21 @@ export interface MoneyClient {
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** True while any indexable product still needs a vector. */
+  vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
+  /** Settle an embedded batch: usage, orphans, quarantines, per-product state against the current row. */
+  vectorCommit(a: {
+    ready: import('@ebda-src/repo').VectorWork[];
+    failures: Array<{ work: import('@ebda-src/repo').VectorWork; kind: string }>;
+    forget: string[];
+    texts: number;
+  }): Promise<{ embedded: number; cleanup: string[]; quarantined: number }>;
+  /** The next product vectors to build, fitted to today's embedding budget, plus orphaned vectors (Ruling CF-JOBS-4B). */
+  vectorPlan(a: { limit: number; dailyCap?: number }): Promise<{
+    work: import('@ebda-src/repo').VectorWork[];
+    orphans: string[];
+    capped: boolean;
+  }>;
   /** Create a webhook endpoint under the per-store cap, count and insert in ONE section (Ruling CF-JOBS-4B). */
   webhookEndpointCreate(a: {
     maxEndpoints: number;
@@ -885,6 +900,9 @@ export function makeMoneyClient(
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    vectorStale: a => call('vectorStale', a),
+    vectorCommit: a => call('vectorCommit', a),
+    vectorPlan: a => call('vectorPlan', a),
     webhookEndpointCreate: a => call('webhookEndpointCreate', a),
     r2References: a => call('r2References', a),
     expenseDraft: (a, key) => call('expenseDraft', a, key),

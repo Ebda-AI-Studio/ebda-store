@@ -16,6 +16,29 @@ declare module '@ebda-src/prisma-meta' {
   export default meta;
 }
 declare module '@ebda-src/repo' {
+  /** One product's pending vectors (do/search-vectors.ts `VectorWork`). */
+  export interface VectorWork {
+    productId: string;
+    doc: string | null;
+    words: string | null;
+    docHash: string | null;
+    wordsHash: string | null;
+    needDoc: boolean;
+    needWords: boolean;
+    key: string;
+  }
+  /** The slice of a Vectorize index the product indexer uses. */
+  export interface VectorizeLike {
+    upsert(
+      vectors: Array<{
+        id: string;
+        values: number[];
+        namespace: string;
+        metadata: Record<string, string | number | boolean>;
+      }>
+    ): Promise<unknown>;
+    deleteByIds(ids: string[]): Promise<unknown>;
+  }
   export interface InstapayReceiptRow {
     id: string;
     storeId: string;

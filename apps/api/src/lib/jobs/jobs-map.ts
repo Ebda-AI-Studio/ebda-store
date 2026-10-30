@@ -194,7 +194,12 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'eta-receipt-redrive': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'eta-receipt-submit': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'order-capi-conversion': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
-  'search-index-backstop': { group: '5-integrations', kind: 'workflow', trigger: 'cron' },
+  'search-index-backstop': {
+    group: '5-integrations',
+    kind: 'workflow',
+    trigger: 'cron',
+    alarm: true,
+  },
   'search-product-index': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron', alarm: true },
   'wa-store-events': { group: '5-integrations', kind: 'queue', trigger: 'event' },

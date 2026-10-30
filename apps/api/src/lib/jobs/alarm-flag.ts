@@ -48,6 +48,8 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   'queue-depth-watch',
   // Ruling CF-JOBS-4B (webhooks): endpoints and the delivery log follow the store's backend; the log purge runs on a DO store's alarm
   'webhook-delivery-purge-daily',
+  // Ruling CF-JOBS-4B (search): a DO store is indexed from its DO into Vectorize, probed on its own alarm
+  'search-index-backstop',
 ]);
 
 function tokens(): string[] {

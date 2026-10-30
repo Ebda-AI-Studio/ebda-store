@@ -1,6 +1,16 @@
 // Store-side statements for the non-money background jobs (INFRA-CF-1, Ruling CF-JOBS-4). Same rules as job-ops.ts: each is
 // scoped by the `store_id` the DO holds, never by the caller.
 import { MoneyError, type SyncSql } from './sync-sql';
+import {
+  DEFAULT_DAILY_CAP,
+  commitVectorWork,
+  embedUsageToday,
+  hasStaleVectors,
+  planVectorWork,
+  quarantineVectorFailure,
+  reserveEmbedTexts,
+  type VectorWork,
+} from './search-vectors';
 
 /** The order columns a job may stamp once. A closed list: the caller names the stamp, never a column. */
 const ORDER_STAMPS: Readonly<Record<string, string>> = {
@@ -343,4 +353,76 @@ export function webhookEndpointCreateOp(
     ]
   );
   return { id };
+}
+
+/**
+ * The next batch of product vectors to build, trimmed to what today's embedding budget still allows (the same greedy fit
+ * `syncProductVectors` applies), and the vectors of products that are no longer indexable. Read-only.
+ */
+export function vectorPlanOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { work: VectorWork[]; orphans: string[]; capped: boolean } {
+  const limit = intArg(a.limit, 'limit', 1, 100);
+  const cap =
+    a.dailyCap === undefined ? DEFAULT_DAILY_CAP : intArg(a.dailyCap, 'dailyCap', 0, 1_000_000);
+  const now = Date.now();
+  const plan = planVectorWork(db, storeId, limit, now);
+  let room = cap - embedUsageToday(db, storeId, now);
+  const work: VectorWork[] = [];
+  let capped = false;
+  for (const w of plan.work) {
+    const n = (w.needDoc && w.doc ? 1 : 0) + (w.needWords && w.words ? 1 : 0);
+    if (n > room) {
+      capped = true;
+      break;
+    }
+    room -= n;
+    work.push(w);
+  }
+  return { work, orphans: plan.orphans, capped };
+}
+
+/**
+ * Settle one batch after the Worker embedded it and upserted the vectors: count the texts sent against today's budget, forget
+ * the orphans' state, quarantine the texts the model rejected, and commit each built product against its CURRENT row (an edit
+ * in between leaves it stale, a product that stopped being indexable has its fresh vectors returned in `cleanup`).
+ */
+export function vectorCommitOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { embedded: number; cleanup: string[]; quarantined: number } {
+  const ready = a.ready as VectorWork[] | undefined;
+  const failures = a.failures as Array<{ work: VectorWork; kind: string }> | undefined;
+  const forget = a.forget as string[] | undefined;
+  if (!Array.isArray(ready) || !Array.isArray(failures) || !Array.isArray(forget))
+    throw new MoneyError('BAD_ARGS', 'ready/failures/forget', 400);
+  if (ready.length + failures.length + forget.length > 200)
+    throw new MoneyError('BAD_ARGS', 'batch', 400);
+  const texts = intArg(a.texts, 'texts', 0, 100_000);
+  const now = Date.now();
+  if (texts > 0) {
+    try {
+      reserveEmbedTexts(db, storeId, texts, Number.MAX_SAFE_INTEGER, now);
+    } catch {
+      /* spend is counted after the fact; the plan already fitted the batch to the budget */
+    }
+  }
+  db.transactionSync(() => {
+    for (const id of forget)
+      db.run('DELETE FROM product_vector_state WHERE product_id = ? AND store_id = ?', [
+        id,
+        storeId,
+      ]);
+    for (const f of failures) quarantineVectorFailure(db, storeId, f.work, f.kind, now);
+  });
+  const done = commitVectorWork(db, storeId, ready, now);
+  return { embedded: done.embedded, cleanup: done.cleanup, quarantined: failures.length };
+}
+
+/** True while any indexable product still needs a vector (the backstop probe). */
+export function vectorStaleOp(db: SyncSql, storeId: string): { stale: boolean } {
+  return { stale: hasStaleVectors(db, storeId) };
 }

@@ -136,6 +136,9 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'webhook-delivery-purge-daily',
   // Ruling CF-JOBS-4B (r2-orphan-sweep): a DO store's references are read from its DO; any unreadable store ends the run before a delete
   'r2-orphan-sweep',
+  // Ruling CF-JOBS-4B (search): a DO store is indexed from its DO into Vectorize, probed on its own alarm
+  'search-product-index',
+  'search-index-backstop',
 ]);
 
 /**

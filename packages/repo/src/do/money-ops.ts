@@ -85,6 +85,9 @@ import {
   orderStampOp,
   r2ReferencesOp,
   usageCountsOp,
+  vectorCommitOp,
+  vectorPlanOp,
+  vectorStaleOp,
   webhookEndpointCreateOp,
 } from './job-ops-b';
 import {
@@ -180,7 +183,10 @@ export type MoneyOpName =
   | 'usageCounts'
   | 'expenseDraft'
   | 'r2References'
-  | 'webhookEndpointCreate';
+  | 'webhookEndpointCreate'
+  | 'vectorPlan'
+  | 'vectorCommit'
+  | 'vectorStale';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -252,6 +258,9 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'expenseDraft',
   'r2References',
   'webhookEndpointCreate',
+  'vectorPlan',
+  'vectorCommit',
+  'vectorStale',
 ];
 
 const TABLE = '_money_ops';
@@ -572,6 +581,9 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  vectorStale: (db, storeId, a) => vectorStaleOp(db, storeId, a),
+  vectorCommit: (db, storeId, a) => vectorCommitOp(db, storeId, a),
+  vectorPlan: (db, storeId, a) => vectorPlanOp(db, storeId, a),
   webhookEndpointCreate: (db, storeId, a) => webhookEndpointCreateOp(db, storeId, a),
   r2References: (db, storeId, a) => r2ReferencesOp(db, storeId, a),
   expenseDraft: (db, storeId, a) => expenseDraftOp(db, storeId, a),

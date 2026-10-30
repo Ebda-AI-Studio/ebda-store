@@ -151,6 +151,12 @@ export interface CfBindings {
   STORE_REALTIME?: DurableObjectNamespaceLike;
   /** One SQLite Durable Object per store (Phase 0 spike, flag-gated: lib/store-backend.ts). */
   STORE_DO?: DurableObjectNamespaceLike;
+  /**
+   * Vectorize index of the product vectors of stores on their Durable Object (1024 dims, cosine, namespace = store id). NOT
+   * declared in wrangler.jsonc until the index exists (`wrangler vectorize create ebda-product-vectors --dimensions=1024
+   * --metric=cosine`): a binding to a missing index fails the deploy. Without it the DO product indexer skips, loudly in the log.
+   */
+  PRODUCT_VECTORS?: import('@ebda-src/repo').VectorizeLike;
   /** R2 bucket for StoreDO backups (prefix store-do-backups/). */
   STORE_BACKUPS?: unknown;
   /** Store -> Ebda WhatsApp events (contract 2026-10-24): lib/wa/events.ts. */

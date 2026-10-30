@@ -46,6 +46,10 @@ import {
 import { EmbeddingError, getEmbeddingProvider } from '../../search/embedding-provider';
 import { alertOutageOnce, takeEmbedCalls } from '../../search/embed-budget';
 import logger from '../../logger';
+import { doStoreIds } from '../../jobs/do-guard';
+import { alarmStoreId } from '../../jobs/store-scope';
+import { storeMoney } from '../../repo-factory';
+import { indexRoundsDo, productVectorIndex } from '../../search/do-index';
 
 export const REINDEX_EVENT = 'search/store.reindex-requested';
 /**
@@ -107,7 +111,10 @@ export async function handleSearchProductIndex({
   // the LAST event, so a text edit followed by a price edit would arrive as `changedFields: ['price']`
   // and be lost. The hash is the source of truth.
   const counts = { permanent: 0, temporary: 0 };
-  const result = await indexRounds(storeId, step, attempt, counts);
+  // A store on its Durable Object (Ruling CF-JOBS-4B): its products and index state are in the DO, its vectors in Vectorize
+  const result = doStoreIds().has(storeId)
+    ? await indexRoundsDo(storeId, step, attempt, INDEX_RETRIES, counts)
+    : await indexRounds(storeId, step, attempt, counts);
   // Review N-I1 (c): ONE P1 per run that quarantined anything, with the counts — never per product.
   if (counts.permanent + counts.temporary > 0)
     await step.run('alert-quarantine', () => alertQuarantined(storeId, counts));
@@ -272,10 +279,25 @@ export const searchProductIndex: JobDef = inngest.createFunction(
 /** The backstop body, exported for tests. */
 export async function handleSearchIndexBackstop({
   step,
+  event,
 }: {
   step: IndexStep;
+  event?: { data?: unknown };
 }): Promise<Record<string, unknown>> {
   if (!getEmbeddingProvider()) return { skipped: 'no-provider' };
+  // The alarm of a store on its Durable Object probes that store's own index state (Ruling CF-JOBS-4B)
+  const only = alarmStoreId(event);
+  if (only && doStoreIds().has(only)) {
+    if (!productVectorIndex()) return { skipped: 'no-vector-index' };
+    const stale = (await step.run('find-stale-do-store', async () =>
+      Boolean((await (await storeMoney(only))?.vectorStale({}))?.stale)
+    )) as boolean;
+    if (stale)
+      await step.sendEvent('fan-out-0', [
+        { name: REINDEX_EVENT, data: { storeId: only, reason: 'backstop' } },
+      ]);
+    return { stores: stale ? 1 : 0, failed: 0 };
+  }
   const found = (await step.run('find-stale-stores', async () => {
     let failed = 0;
     const rows = await acrossStores(storeId => hasStaleProducts(storeId), {
@@ -311,5 +333,6 @@ export const searchIndexBackstop: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: '17 */6 * * *' }],
   },
-  async ({ step }) => handleSearchIndexBackstop({ step: step as unknown as IndexStep })
+  async ({ step, event }) =>
+    handleSearchIndexBackstop({ step: step as unknown as IndexStep, event })
 );
