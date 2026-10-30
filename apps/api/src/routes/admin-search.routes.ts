@@ -129,8 +129,15 @@ router.get(
         userIds.length
           ? onDo
             ? (db as never as { customer: typeof prisma.customer }).customer.findMany({
-                where: { storeId, id: { in: userIds.slice(0, USER_CAP) } },
-                select: { id: true, firstName: true, lastName: true, phone: true },
+                // `userIds` holds the CRM row ids AND their linked platform user ids (Ruling CF-FIX-1)
+                where: {
+                  storeId,
+                  OR: [
+                    { id: { in: userIds.slice(0, USER_CAP * 2) } },
+                    { userId: { in: userIds.slice(0, USER_CAP * 2) } },
+                  ],
+                },
+                select: { id: true, userId: true, firstName: true, lastName: true, phone: true },
                 orderBy: { id: 'asc' },
                 take: PER_KIND,
               })
@@ -158,6 +165,7 @@ router.get(
       const byId = new Map(products.map(p => [p.id, p]));
       data.products = productIds.flatMap(id => (byId.has(id) ? [byId.get(id)!] : []));
       // DO: the order's registered customer is attached by id after the read (the Postgres twin includes the relation).
+      // `orders.customer_id` is a platform user id (migrated, signed-in) or a CRM row id (merchant-opened): index both (CF-FIX-1).
       const doCustomers = new Map<string, { firstName: string | null; lastName: string | null }>();
       if (onDo) {
         const ids = [
@@ -173,10 +181,12 @@ router.get(
           for (const c of await (
             db as never as { customer: typeof prisma.customer }
           ).customer.findMany({
-            where: { storeId, id: { in: ids } },
-            select: { id: true, firstName: true, lastName: true },
-          }))
+            where: { storeId, OR: [{ id: { in: ids } }, { userId: { in: ids } }] },
+            select: { id: true, userId: true, firstName: true, lastName: true },
+          })) {
             doCustomers.set(c.id, c);
+            if (c.userId && !doCustomers.has(c.userId)) doCustomers.set(c.userId, c);
+          }
       }
       data.orders = orders.map(o => {
         const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
@@ -190,7 +200,8 @@ router.get(
         return { id: o.id, orderNumber: o.orderNumber, customerName: name, total: o.total };
       });
       const registered = users.map(u => ({
-        key: u.id,
+        // a DO CRM row stands for the platform user it links to: the key is the id Postgres lists (CF-FIX-1)
+        key: (u as { userId?: string | null }).userId ?? u.id,
         name: [u.firstName, u.lastName].filter(Boolean).join(' '),
         phone: u.phone ?? '',
         isGuest: false,

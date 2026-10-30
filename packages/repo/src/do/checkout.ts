@@ -39,7 +39,7 @@ export interface HoldCaps {
  * TRUST BOUNDARY: this core trusts `buyer`/`customerId`, `wholesaleEntitled`, `loyaltyFeatureEnabled`,
  * `backorderEnabled` and `goldRequireQuote` (the store Worker resolves them from the verified session and the platform
  * database; the shopper never supplies them). Amounts are NEVER trusted: prices, discounts, shipping, tax, COD fee and
- * totals are all computed here from the rows. The core still checks that the customer exists in THIS store.
+ * totals are all computed here from the rows. `customerId` is the shopper's users.id (Ruling CF-FIX-2): no CRM row is required.
  */
 export interface CheckoutInput {
   storeId: string;
@@ -224,9 +224,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
   };
   const buyer: Buyer =
     input.buyer ??
-    (input.customerId
-      ? { kind: 'merchant-selected', customerId: input.customerId }
-      : { kind: 'anonymous' });
+    (input.customerId ? { kind: 'session', userId: input.customerId } : { kind: 'anonymous' });
 
   const bundleTotals = new Map<string, number>();
   for (const b of input.bundles ?? [])
@@ -359,13 +357,13 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       cartCustomerId = (owned!.customer_id as string | null) ?? null;
     }
 
-    if (input.customerId) {
-      const c = db.all('SELECT id FROM customers WHERE id = ? AND store_id = ?', [
-        input.customerId,
-        input.storeId,
-      ])[0];
-      if (!c) throw new MoneyError('CUSTOMER_NOT_FOUND', 'unknown customer for this store', 404);
-    }
+    // `customerId` is the shopper's platform users.id (Ruling CF-FIX-2): the identity lives on the platform, the Worker
+    // authenticated it, and the DO has no users table. It is NOT a CRM `customers.id`, so there is nothing to look up here.
+    if (
+      input.customerId !== undefined &&
+      (typeof input.customerId !== 'string' || !input.customerId)
+    )
+      throw new MoneyError('BAD_ARGS', 'customerId', 400);
 
     for (const l of input.lines) {
       if (!Number.isInteger(l.quantity) || l.quantity < 1 || l.quantity > 1000)

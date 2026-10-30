@@ -287,9 +287,9 @@ async function world(
     insertSqlite(sqlite, 'OrderItem', [i1, i2] as never);
     sqlite
       .prepare(
-        `INSERT INTO customers (id, store_id, first_name, last_name) VALUES (?, ?, 'R', 'T')`
+        `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES (?, ?, 'R', 'T', ?)`
       )
-      .run(user.id, STORE);
+      .run(`crm-${user.id}`, STORE, user.id); // the CRM id DIFFERS from the platform user id (Ruling CF-FIX-2)
     sqlite.prepare('DELETE FROM store_config WHERE store_id = ?').run(STORE);
     sqlite
       .prepare('INSERT INTO store_config (store_id, return_window_days) VALUES (?, ?)')

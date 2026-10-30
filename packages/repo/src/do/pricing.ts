@@ -37,8 +37,8 @@ export type { Resolved, PriceTierRow, BuyerGroup };
 export type Buyer =
   | { kind: 'anonymous' }
   | { kind: 'session'; userId: string }
-  /** a merchant staff session picked a Customer (CRM row) BY ID (Ruling B2B-2d). */
-  | { kind: 'merchant-selected'; customerId: string };
+  /** a merchant staff session picked a Customer (CRM row) BY ID (Ruling B2B-2d), or a registered shopper by users.id (CF-FIX-2). */
+  | { kind: 'merchant-selected'; customerId?: string; shopperUserId?: string };
 
 export const ANONYMOUS: Buyer = { kind: 'anonymous' };
 
@@ -123,8 +123,15 @@ export function loadBuyerGroup(db: SyncSql, storeId: string, buyer: Buyer): Buye
     customerSql = 'c.user_id = ?';
     param = id(buyer.userId, 'userId');
   } else if (buyer.kind === 'merchant-selected') {
-    customerSql = 'c.id = ?';
-    param = id(buyer.customerId, 'customerId');
+    // a CRM row picked by id, or a registered shopper (users.id) the merchant picked: that shopper's group is read through
+    // customers.user_id exactly as for their own session (Ruling CF-FIX-2)
+    if (buyer.customerId) {
+      customerSql = 'c.id = ?';
+      param = id(buyer.customerId, 'customerId');
+    } else {
+      customerSql = 'c.user_id = ?';
+      param = id(buyer.shopperUserId, 'shopperUserId');
+    }
   } else if (buyer.kind === 'anonymous') {
     return null;
   } else {

@@ -174,7 +174,7 @@ describe('order money operations: the door', () => {
   it('wallet never goes negative and a coupon never passes its limit, across many orders', () => {
     const r = rig(100);
     r.raw.exec(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', 's1', 'A', 'B', 'cust')`
     );
     r.raw.exec(
       `INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', 's1', 'cust', 4000)`

@@ -652,9 +652,9 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       });
       sqlite
         .prepare(
-          `INSERT OR IGNORE INTO customers (id, store_id, email, first_name, last_name) VALUES (?, ?, ?, 'Reader', 'One')`
+          `INSERT OR IGNORE INTO customers (id, store_id, email, first_name, last_name, user_id) VALUES (?, ?, ?, 'Reader', 'One', ?)`
         )
-        .run(user.id, STORE, user.email);
+        .run(`crm-${user.id}`, STORE, user.email, user.id); // the CRM id DIFFERS from the platform user id (Ruling CF-FIX-2)
       const mine = async (extra: Record<string, unknown>, i: number) => {
         const sessionId = cartSessionId('d2b2r');
         await (
@@ -753,9 +753,9 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
         if (await storeMoney(STORE))
           sqlite
             .prepare(
-              `INSERT OR IGNORE INTO customers (id, store_id, email, first_name, last_name, phone) VALUES (?, ?, ?, ?, ?, ?)`
+              `INSERT OR IGNORE INTO customers (id, store_id, email, first_name, last_name, phone, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
             )
-            .run(user.id, STORE, user.email, r.first, r.last, r.phone);
+            .run(`crm-${user.id}`, STORE, user.email, r.first, r.last, r.phone, user.id);
         const sessionId = cartSessionId('r4s');
         await (
           await storeWriter(STORE)

@@ -17,6 +17,7 @@
 // __tables  every application table of the DO (verify checks each is mapped, a CF-only rule or a runtime table).
 // __unseal  {confirm:'wipe-and-unseal'}: wipes the DO so a retried cutover can re-import.
 import { PK_SEP, TableDigest, canonRow, canonValue, sha256Hex } from './canon.mjs';
+import { DO_DERIVED_TABLE } from './coverage.mjs';
 
 export const MAX_PAGE_ROWS = 2000;
 export const MAX_BODY_BYTES = 8 * 1024 * 1024;
@@ -242,7 +243,10 @@ function appTables(sql) {
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE 'cf\\_%' ESCAPE '\\' ORDER BY name`
     )
     .toArray()
-    .map(r => r.name);
+    .map(r => r.name)
+    // The FTS search indexes and their shadow tables (`*_data` holds a BLOB) are derived state: the seal baseline and the diff
+    // cannot canonicalise a BLOB, and a DELETE on a shadow table corrupts the index. The base-table triggers re-mark them dirty.
+    .filter(name => !DO_DERIVED_TABLE.test(name));
   return names.map(name => {
     const info = sql.exec(`SELECT name, pk FROM pragma_table_info(?) ORDER BY cid`, name).toArray();
     return {

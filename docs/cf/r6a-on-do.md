@@ -21,5 +21,5 @@ Legal-record rules are the Postgres function's, not the registry's. The registry
 ## Residuals
 
 - A rollback does not replay receipts filed on the DO after the flip.
-- The DO order search and palette treat `customers.id` as the id `orders.customer_id` carries (Ruling CF-R6A-1, found, not changed).
+- `orders.customer_id` is a `users.id` (migrated, signed-in) or a `customers.id` (merchant-opened); the DO order search and palette match both through `customers.user_id` (Ruling CF-FIX-1, closes the CF-R6A-1 residual).
 - `returns`, `shipments`, `audit_logs`, `customer_rfm_snapshots`, and the wallet row (balance 0) are left like Postgres leaves them; the PDPL job scrubs them.

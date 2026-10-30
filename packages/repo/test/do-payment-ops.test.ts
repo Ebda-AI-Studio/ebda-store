@@ -237,7 +237,7 @@ describe('refunds', () => {
   it('wallet store credit goes back once under return-credit:<key>', () => {
     const r = rig();
     r.raw.exec(
-      `INSERT INTO customers (id, store_id, email, first_name, last_name) VALUES ('c1', 's1', 'a@b.c', 'A', 'B'); INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1','s1','c1',0)`
+      `INSERT INTO customers (id, store_id, email, first_name, last_name, user_id) VALUES ('crm-c1', 's1', 'a@b.c', 'A', 'B', 'c1'); INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1','s1','c1',0)`
     );
     const p = r.paid(2);
     p.hook('evt-p');

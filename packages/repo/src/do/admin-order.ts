@@ -92,17 +92,17 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
   const buyer: Buyer =
     input.buyer ??
     (input.customerId
-      ? { kind: 'merchant-selected', customerId: input.customerId }
+      ? { kind: 'merchant-selected', shopperUserId: input.customerId }
       : { kind: 'anonymous' });
 
   return db.transactionSync(() => {
-    if (input.customerId) {
-      const c = db.all('SELECT id FROM customers WHERE id = ? AND store_id = ?', [
-        input.customerId,
-        storeId,
-      ])[0];
-      if (!c) throw new MoneyError('NOT_FOUND', 'Customer not found for this store', 404);
-    }
+    // `customerId` is the registered shopper's users.id (Ruling CF-FIX-2); the Worker validated it against the store's
+    // identity before the call, and the DO has no users table.
+    if (
+      input.customerId !== undefined &&
+      (typeof input.customerId !== 'string' || !input.customerId)
+    )
+      throw new MoneyError('BAD_ARGS', 'customerId', 400);
 
     // ---- lines: the same refusals, in the same order, as the Postgres hydration --------------------------------------
     const lines = input.lines.map(it => {

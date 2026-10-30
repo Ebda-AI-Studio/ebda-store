@@ -28,7 +28,7 @@ async function seed(store: string) {
       store
     );
     s.storage.sql.exec(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('c1', ?, 'A', 'B')`,
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-c1', ?, 'A', 'B', 'c1')`,
       store
     );
   });

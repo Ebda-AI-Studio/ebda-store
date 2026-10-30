@@ -99,7 +99,7 @@ const settle = async <T>(f: () => Promise<T>) =>
   );
 
 let n = 0;
-/** A store customer on Postgres (a customer `User`) and on the DO (a `customers` row with the same id). */
+/** A store customer on Postgres (a customer `User`) and on the DO (a `customers` row with its OWN id, linked by user_id: Ruling CF-FIX-2). */
 async function customer(mirror: boolean) {
   const k = `${sfx}w${++n}`;
   const u = await prisma.user.create({
@@ -116,8 +116,10 @@ async function customer(mirror: boolean) {
   });
   if (mirror)
     sqlite
-      .prepare('INSERT INTO customers (id, store_id, first_name, last_name) VALUES (?, ?, ?, ?)')
-      .run(u.id, STORE, 'W', 'C');
+      .prepare(
+        'INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(`crm-${u.id}`, STORE, 'W', 'C', u.id);
   return { id: u.id, names: { [u.id]: 'customer' } };
 }
 

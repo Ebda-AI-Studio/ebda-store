@@ -275,11 +275,12 @@ describe('DO promotions: customer context (group + first order)', () => {
   it('first order: by customer id (cancelled and deleted orders do not count), by session user, by guest phone/email', () => {
     const f = fixture();
     f.customer('c1', 'u1', null);
-    f.order('o1', { customer: 'c1', status: 'cancelled' });
-    expect(resolveCustomerContext(f.db, 's1', { customerId: 'c1' }, anon).isFirstOrder).toBe(true);
-    f.order('o2', { customer: 'c1' });
-    expect(resolveCustomerContext(f.db, 's1', { customerId: 'c1' }, anon).isFirstOrder).toBe(false);
-    // session buyer without a customerId resolves its customers row (not the users.id as a customer id)
+    // orders carry the shopper's users.id (u1), NOT the CRM row id (c1) (Ruling CF-FIX-2)
+    f.order('o1', { customer: 'u1', status: 'cancelled' });
+    expect(resolveCustomerContext(f.db, 's1', { customerId: 'u1' }, anon).isFirstOrder).toBe(true);
+    f.order('o2', { customer: 'u1' });
+    expect(resolveCustomerContext(f.db, 's1', { customerId: 'u1' }, anon).isFirstOrder).toBe(false);
+    // a session buyer without a customerId counts its orders by its users.id
     expect(
       resolveCustomerContext(f.db, 's1', {}, { kind: 'session', userId: 'u1' }).isFirstOrder
     ).toBe(false);

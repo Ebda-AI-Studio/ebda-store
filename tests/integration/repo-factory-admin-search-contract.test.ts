@@ -62,7 +62,9 @@ const asApp = <T>(fn: () => Promise<T>) =>
   });
 
 const tag = `ac${Date.now()}${crypto.randomBytes(2).toString('hex')}`;
-const ids = { owner: '', store: '', reg: `${tag}-reg` };
+// `mig`: a MIGRATED registered customer (Ruling CF-FIX-1): the order carries the platform users.id, the DO CRM row has its OWN id
+// and links to the user through customers.user_id.
+const ids = { owner: '', store: '', reg: `${tag}-reg`, mig: `${tag}-mig`, migRow: `${tag}-migrow` };
 let sqlite = openSqlite();
 let doRepo: any;
 
@@ -135,6 +137,9 @@ describe.skipIf(!hasDb)('admin palette search: Postgres vs the store DO', () => 
     await prisma.$executeRaw`
       INSERT INTO public.users (id, store_id, email, password_hash, first_name, last_name, phone, role, updated_at)
       VALUES (${ids.reg}, ${S}, ${`reg.${tag}@x.test`}, 'x', 'أحمد', 'علي', '+201012345678', 'customer', now())`;
+    await prisma.$executeRaw`
+      INSERT INTO public.users (id, store_id, email, password_hash, first_name, last_name, phone, role, updated_at)
+      VALUES (${ids.mig}, ${S}, ${`mig.${tag}@x.test`}, 'x', 'خالد', 'منصور', '+201234567890', 'customer', now())`;
     const guest = JSON.stringify({
       firstName: 'منى',
       lastName: 'سالم',
@@ -144,6 +149,7 @@ describe.skipIf(!hasDb)('admin palette search: Postgres vs the store DO', () => 
     await prisma.$executeRaw`
       INSERT INTO public.orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address, customer_id, updated_at) VALUES
         (${`${tag}-o1`}, ${S}, ${`EB-${tag}-1`}, 1000, 1500, '{}', '{}', ${ids.reg}, now()),
+        (${`${tag}-o2`}, ${S}, ${`EB-${tag}-2`}, 1000, 1700, '{}', '{}', ${ids.mig}, now()),
         (${`${tag}-g1`}, ${S}, ${`EB-${tag}-g1`}, 1000, 2500, ${guest}::jsonb, '{}', NULL, now())`;
     // the DO side: the same products, the registered customer as a `customers` row with the SAME id, the same orders
     insertSqlite(
@@ -159,6 +165,19 @@ describe.skipIf(!hasDb)('admin palette search: Postgres vs the store DO', () => 
         firstName: 'أحمد',
         lastName: 'علي',
         phone: '+201012345678',
+        totalOrders: 1,
+        totalSpent: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: ids.migRow,
+        userId: ids.mig,
+        storeId: S,
+        email: `mig.${tag}@x.test`,
+        firstName: 'خالد',
+        lastName: 'منصور',
+        phone: '+201234567890',
         totalOrders: 1,
         totalSpent: 0,
         createdAt: new Date(),
@@ -201,6 +220,8 @@ describe.skipIf(!hasDb)('admin palette search: Postgres vs the store DO', () => 
     ['a phone, local form', '0101 234 5678'],
     ['a phone, +20', '+201012345678'],
     ['a phone, Arabic-Indic digits', '٠١٠١٢٣٤٥٦٧٨'],
+    ['a migrated customer (order.customer_id is a users.id), by name', 'خالد'],
+    ['a migrated customer, by phone', '01234567890'],
     ['a guest by name', 'منى'],
     ['a guest by phone', '01123456789'],
     ['a guest by e-mail', `mona.${tag}@x.test`],
@@ -226,6 +247,13 @@ describe.skipIf(!hasDb)('admin palette search: Postgres vs the store DO', () => 
         { key: ids.reg, name: 'أحمد علي', phone: '+201012345678', isGuest: false },
       ]);
       expect(c.orders.map((x: { id: string }) => x.id)).toEqual([`${tag}-o1`]);
+      const m = (await ask(backend, 'خالد')).body.data;
+      expect(m.customers).toEqual([
+        { key: ids.mig, name: 'خالد منصور', phone: '+201234567890', isGuest: false },
+      ]);
+      expect(m.orders).toEqual([
+        expect.objectContaining({ id: `${tag}-o2`, customerName: 'خالد منصور' }),
+      ]);
       const g = (await ask(backend, 'منى')).body.data;
       expect(g.customers.map((x: { key: string }) => x.key)).toEqual([`mona.${tag}@x.test`]);
     }
