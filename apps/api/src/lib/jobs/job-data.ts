@@ -80,6 +80,8 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'order-anonymize-5y-monthly',
   // Ruling CF-JOBS-4B (queue-depth-watch): BulkAiJob follows the store's backend; a DO store is watched on its alarm
   'queue-depth-watch',
+  // Ruling CF-JOBS-4B (store-usage-snapshot): the store side comes from the DO op usageCounts
+  'store-usage-snapshot',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([
