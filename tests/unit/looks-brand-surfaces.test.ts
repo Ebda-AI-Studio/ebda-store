@@ -15,7 +15,12 @@ const { state, sent } = vi.hoisted(() => ({
 }));
 vi.mock('@ebda/database', () => {
   const count = async () => 0;
-  const tx = { store: { findUnique: async () => state.store } };
+  const tx = {
+    store: {
+      findUnique: async () =>
+        state.store ?? (state.order as { store?: never } | null)?.store ?? null,
+    },
+  };
   return {
     prisma: {
       fiscalDocument: { findMany: async () => [] },
@@ -27,6 +32,12 @@ vi.mock('@ebda/database', () => {
     withStore: async (_id: string, fn: (t: typeof tx) => unknown) => fn(tx),
   };
 });
+vi.mock('@api/lib/repo-factory', async () =>
+  (await import('./helpers/invoice-repo-mock')).repoFactoryMock()
+);
+vi.mock('@api/lib/jobs/store-db', async () =>
+  (await import('./helpers/invoice-repo-mock')).storeDbMock()
+);
 vi.mock('@api/services/store-mailer.service', () => ({
   StoreMailer: {
     sendBrandedEmail: async (_s: string, a: { html: string }) => {
