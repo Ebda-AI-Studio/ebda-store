@@ -132,7 +132,6 @@ function rowOf(r: Record<string, unknown>): ReceiptRow {
     createdAt: r.created_at as number,
   };
 }
-const COLS = '*';
 
 function loadOrder(db: SyncSql, storeId: string, orderId: string) {
   const o = db.all(
