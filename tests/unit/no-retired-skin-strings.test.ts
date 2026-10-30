@@ -33,7 +33,9 @@ const files = execFileSync(
 )
   .split('\n')
   .filter(f => /\.(ts|tsx|js|jsx|mjs|cjs|yml|yaml)$/.test(f))
-  .filter(f => !f.includes('/migrations/') && !f.endsWith('/node_modules'));
+  .filter(f => !f.includes('/migrations/') && !f.endsWith('/node_modules'))
+  // a minified third-party library build (exceljs, Ruling BUNDLE-BUDGET-6), not first-party source
+  .filter(f => f !== 'apps/api/src/cf/stubs/exceljs-workers.cjs');
 
 // The one place that may carry the names (the tolerant reader and its own test).
 const READER = [

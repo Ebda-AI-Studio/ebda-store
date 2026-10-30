@@ -1,4 +1,5 @@
-import { prisma, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { storeRepo, storeWriter } from '../lib/repo-factory';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { smsService } from './sms.service';
@@ -79,12 +80,16 @@ class NotificationConfigService {
     // (and Redis-cached) config map: storefront push/SMS silently disabled. This
     // is a trusted internal read already scoped by `where: { storeId }`, so it
     // enters the store's scope itself (withStore) to be context-independent.
-    const rows = await withStore(storeId, tx =>
-      tx.notificationConfig.findMany({
-        where: { storeId },
-        select: { channel: true, provider: true, credentials: true, enabled: true },
-      })
-    );
+    // A store on its Durable Object reads its own row set (Ruling CF-NOTIFY-1); there is no RLS inside a DO.
+    const args = {
+      where: { storeId },
+      select: { channel: true, provider: true, credentials: true, enabled: true },
+    } as const;
+    const repo = await storeRepo(storeId);
+    const rows =
+      repo.backend === 'do'
+        ? await (repo.db as any).notificationConfig.findMany(args)
+        : await withStore(storeId, tx => tx.notificationConfig.findMany(args));
 
     const map: Record<string, DecryptedConfig> = {};
 
@@ -162,8 +167,9 @@ class NotificationConfigService {
           // and a cache entry that fails to decrypt reads as "no credentials"
           // and erases the secret outright. Same defect fixed the same way in
           // shipping-carrier.service.ts.
-          const current = await prisma.notificationConfig.findUnique({
-            where: { storeId_channel: { storeId, channel } },
+          const repo = await storeRepo(storeId);
+          const current = await (repo.db as any).notificationConfig.findFirst({
+            where: { storeId, channel },
             select: { credentials: true },
           });
           stored = {};
@@ -251,7 +257,9 @@ class NotificationConfigService {
     );
     const encryptedCredentials = encryption.encrypt(JSON.stringify(mergedCredentials));
 
-    await prisma.notificationConfig.upsert({
+    await (
+      await storeWriter(storeId)
+    ).notificationConfig.upsert({
       where: { storeId_channel: { storeId, channel } },
       create: {
         storeId,
@@ -280,7 +288,9 @@ class NotificationConfigService {
    * Removes a notification channel config and invalidates cache.
    */
   async deleteConfig(storeId: string, channel: string): Promise<void> {
-    await prisma.notificationConfig.deleteMany({
+    await (
+      await storeWriter(storeId)
+    ).notificationConfig.deleteMany({
       where: { storeId, channel },
     });
 
@@ -347,7 +357,9 @@ class NotificationConfigService {
    * If no row exists for an event, defaults all channels to true.
    */
   async getEventConfigs(storeId: string): Promise<Record<string, EventConfigData>> {
-    const rows = await prisma.notificationEventConfig.findMany({
+    const rows = await (
+      await storeRepo(storeId)
+    ).db.notificationEventConfig.findMany({
       where: { storeId },
       select: { event: true, whatsapp: true, sms: true, push: true },
     });
@@ -373,7 +385,9 @@ class NotificationConfigService {
     event: string,
     config: EventConfigData
   ): Promise<EventConfigData> {
-    const row = await prisma.notificationEventConfig.upsert({
+    const row = await (
+      await storeWriter(storeId)
+    ).notificationEventConfig.upsert({
       where: { storeId_event: { storeId, event } },
       create: {
         storeId,

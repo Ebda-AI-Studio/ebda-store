@@ -113,8 +113,9 @@ export async function withClaimReleases<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 function refuseRelease(refs: ClaimRef[], why: string): void {
+  const stores = Array.from(new Set(refs.map(r => r.storeId)));
   logger.error(
-    { stores: [...new Set(refs.map(r => r.storeId))], count: refs.length, why },
+    { stores, count: refs.length, why },
     '[P1][instapay-ref] claim release refused: the commit point is unknown; the claims stay held'
   );
   if (process.env.NODE_ENV !== 'production')

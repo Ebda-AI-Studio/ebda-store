@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma, Prisma, ReturnStatus, ReturnType } from '@ebda/database';
+import { prisma, Prisma, ReturnStatus, ReturnType, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -304,7 +304,9 @@ export class ReturnService {
       lastName: true,
     });
     // the Store row is authoritative in D1/Postgres, not on the DO
-    const store = await prisma.store.findFirst({ where: { id: storeId }, select: { name: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findFirst({ where: { id: storeId }, select: { name: true } })
+    );
     return { ...row, store: { name: store?.name ?? '' } } as unknown as UpdatedReturn;
   }
 
@@ -335,7 +337,9 @@ export class ReturnService {
       select: { email: true, firstName: true, lastName: true },
     });
     const order = orderRow ? { ...orderRow, customer } : null;
-    const store = await prisma.store.findFirst({ where: { id: storeId }, select: { name: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findFirst({ where: { id: storeId }, select: { name: true } })
+    );
     const orderLocale = (order?.locale ?? undefined) as 'en' | 'ar' | undefined;
     const customerName =
       `${order?.customer?.firstName || ''} ${order?.customer?.lastName || ''}`.trim() || 'Customer';

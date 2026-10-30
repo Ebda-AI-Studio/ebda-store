@@ -54,6 +54,9 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AbandonedCartConfig',
   // the newsletter list and its consent (INFRA-CF-1 PR R4, Ruling CF-R4-4)
   'NewsletterSubscriber',
+  // the channel credentials and per-event switches the push / SMS / WhatsApp dispatchers read (Ruling CF-NOTIFY-1)
+  'NotificationConfig',
+  'NotificationEventConfig',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

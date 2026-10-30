@@ -88,7 +88,9 @@ export type WritableModel =
   | 'cartBundle'
   | 'abandonedCart'
   | 'abandonedCartConfig'
-  | 'newsletterSubscriber';
+  | 'newsletterSubscriber'
+  | 'notificationConfig'
+  | 'notificationEventConfig';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<
