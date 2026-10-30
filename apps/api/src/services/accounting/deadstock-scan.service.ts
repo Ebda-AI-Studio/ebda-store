@@ -33,6 +33,8 @@ import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { AppError } from '../../middleware/error-handler';
 import { withSavepointOn } from '../../lib/savepoint';
+import { storeRepo } from '../../lib/repo-factory';
+import { withStoreRw } from '../../lib/jobs/store-db';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -119,6 +121,19 @@ async function lastSaleByProduct(
 
   for (const row of rows) {
     if (row.last_sale) map.set(row.product_id, new Date(row.last_sale));
+  }
+  return map;
+}
+
+/** The same map from the DO op `lastPaidSales` (at most 90 ids per call: the DO binds 100 parameters). */
+async function lastSaleByProductDo(
+  productIds: string[],
+  money: { lastPaidSales(a: { productIds: string[] }): Promise<{ sales: Record<string, number> }> }
+): Promise<Map<string, Date>> {
+  const map = new Map<string, Date>();
+  for (let i = 0; i < productIds.length; i += 90) {
+    const { sales } = await money.lastPaidSales({ productIds: productIds.slice(i, i + 90) });
+    for (const [id, ms] of Object.entries(sales)) map.set(id, new Date(ms));
   }
   return map;
 }
@@ -211,21 +226,36 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // transaction so it can never blow the 30s interactive-tx timeout — same fix
   // as reorder-scan.service.ts (the prior single-tx-around-everything design
   // timed out at ~112s on stores with many candidates + the 2.5s throttle).
+  // A store on its Durable Object (Ruling CF-JOBS-4B): the expiry is a model write, the last-sale read is the DO op
+  // `lastPaidSales`; the catalogue read goes through the DO read client. Postgres keeps the transaction and its raw SQL.
+  const repo = await storeRepo(storeId);
+  const doMoney = repo.backend === 'do' ? (repo.money ?? null) : null;
+  if (repo.backend === 'do' && !doMoney)
+    throw new Error(`deadstock-scan: no money client for DO store ${storeId}`);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { expiredCount, candidates, scanned } = await withStore(storeId, async (tx: any) => {
+  const phase1 = async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Expire old open flags (>30 days)
     // -------------------------------------------------------------------------
     const expireThreshold = new Date(Date.now() - EXPIRE_AFTER_DAYS * 24 * 60 * 60 * 1000);
 
-    const expiredResult = await tx.$executeRaw`
+    const expired = doMoney
+      ? (
+          await repo.writer.deadStockFlag.updateMany({
+            where: { storeId, status: 'open', scannedAt: { lt: expireThreshold } },
+            data: { status: 'expired' },
+          })
+        ).count
+      : Number(
+          await tx.$executeRaw`
       UPDATE public.deadstock_flags
       SET status = 'expired'
       WHERE store_id = ${storeId}
         AND status = 'open'
         AND scanned_at < ${expireThreshold}
-    `;
-    const expired = Number(expiredResult);
+    `
+        );
 
     // -------------------------------------------------------------------------
     // Step 2: List active products with trackInventory=true and stock on hand.
@@ -266,11 +296,10 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     // Last-sale dates come from ONE grouped query (not N per-product queries),
     // so this stays a constant number of round-trips inside the short tx.
     // -------------------------------------------------------------------------
-    const lastSales = await lastSaleByProduct(
-      products.map((p: { id: string }) => p.id),
-      storeId,
-      tx
-    );
+    const productIds = products.map((p: { id: string }) => p.id);
+    const lastSales = doMoney
+      ? await lastSaleByProductDo(productIds, doMoney)
+      : await lastSaleByProduct(productIds, storeId, tx);
 
     const collected: DeadstockCandidate[] = [];
 
@@ -307,7 +336,11 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     }
 
     return { expiredCount: expired, candidates: collected, scanned: products.length };
-  });
+  };
+  const { expiredCount, candidates, scanned } = doMoney
+    ? await phase1(repo.db)
+    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await withStore(storeId, (tx: any) => phase1(tx));
 
   if (candidates.length === 0) {
     logger.info({ storeId, scanned, flagged: 0, expiredCount }, 'deadstock-scan: no candidates');
@@ -382,7 +415,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
     const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rowsUpserted += await withStore(storeId, async (tx: any) => {
+    rowsUpserted += await withStoreRw(storeId, async (tx: any) => {
       let upserted = 0;
 
       for (const candidate of slice) {
@@ -393,7 +426,11 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         };
 
         try {
-          await withSavepointOn(tx, async () => {
+          // Postgres: one savepoint per candidate. On the DO each write is its own atomic call, so a failed one rolls back alone.
+          const savepoint = doMoney
+            ? (_tx: unknown, fn: () => Promise<void>) => fn()
+            : withSavepointOn;
+          await savepoint(tx, async () => {
             const existing = await tx.deadStockFlag.findFirst({
               where: {
                 storeId,

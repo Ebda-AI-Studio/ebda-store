@@ -82,6 +82,11 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'queue-depth-watch',
   // Ruling CF-JOBS-4B (store-usage-snapshot): the store side comes from the DO op usageCounts
   'store-usage-snapshot',
+  // Ruling CF-JOBS-4B (stock): the scans read the catalogue through the store's backend and write dead-stock flags through the DO writer
+  'stock-deadstock-scan-cron',
+  'stock-deadstock-scan-on-demand',
+  'stock-low-stock-alert-cron',
+  'stock-low-stock-alert-on-demand',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([

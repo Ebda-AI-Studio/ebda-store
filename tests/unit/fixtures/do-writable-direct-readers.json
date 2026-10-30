@@ -106,6 +106,9 @@
     "storePage": 1,
     "review": 1
   },
+  "apps/api/src/routes/smart-layer.routes.ts": {
+    "deadStockFlag": 3
+  },
   "apps/api/src/routes/stock-adjustments.routes.ts": {
     "productVariant": 2,
     "product": 2
@@ -135,7 +138,8 @@
     "category": 1
   },
   "apps/api/src/services/accounting/deadstock-scan.service.ts": {
-    "product": 1
+    "product": 1,
+    "deadStockFlag": 2
   },
   "apps/api/src/services/accounting/purchase-order.service.ts": {
     "productVariant": 4,
@@ -201,9 +205,6 @@
   "apps/api/src/services/inventory.service.ts": {
     "product": 6,
     "productVariant": 1
-  },
-  "apps/api/src/services/inventory/low-stock-scan.service.ts": {
-    "product": 1
   },
   "apps/api/src/services/notification-config.service.ts": {
     "notificationConfig": 1

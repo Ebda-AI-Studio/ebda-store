@@ -24,7 +24,8 @@
  * This is consistent with the owner being the admin managing the store.
  */
 
-import { withStore } from '@ebda/database';
+import { withStore, type AppPrismaClient } from '@ebda/database';
+import { storeRepo } from '../../lib/repo-factory';
 import { redis } from '../redis.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
@@ -141,8 +142,10 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
   // ("Transaction already closed ... 39532 ms passed"). Keep this block to the
   // two reads and get out fast — all sentinel I/O happens AFTER, off the tx.
   // -------------------------------------------------------------------------
-  const data = await withStore(storeId, async tx => {
-    const store = await tx.store.findUnique({
+  // The `Store` row (name, settings, owner) is a platform row; the catalogue is the store's own rows, on Postgres (same
+  // transaction as before) or on its Durable Object (Ruling CF-JOBS-4B).
+  const loadStore = (tx: Pick<AppPrismaClient, 'store'>) =>
+    tx.store.findUnique({
       where: { id: storeId },
       select: {
         id: true,
@@ -153,13 +156,11 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
         },
       },
     });
-
-    if (!store) return null;
-
-    // Load active, trackInventory products. We load all of them (not just the
-    // low ones) so we can also clear sentinels for products now back above
-    // threshold or exhausted.
-    const products = await tx.product.findMany({
+  // Load active, trackInventory products. We load all of them (not just the
+  // low ones) so we can also clear sentinels for products now back above
+  // threshold or exhausted.
+  const loadProducts = (db: Pick<AppPrismaClient, 'product'>) =>
+    db.product.findMany({
       where: {
         storeId,
         trackInventory: true,
@@ -180,9 +181,18 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
         variants: { select: { inventory: true, isActive: true } },
       },
     });
-
-    return { store, products };
-  });
+  const repo = await storeRepo(storeId);
+  const data =
+    repo.backend === 'do'
+      ? await (async () => {
+          const store = await withStore(storeId, tx => loadStore(tx));
+          return store ? { store, products: await loadProducts(repo.db as never) } : null;
+        })()
+      : await withStore(storeId, async tx => {
+          const store = await loadStore(tx);
+          if (!store) return null;
+          return { store, products: await loadProducts(tx) };
+        });
 
   if (!data) {
     logger.warn({ storeId }, 'low-stock-scan: store not found, aborting');

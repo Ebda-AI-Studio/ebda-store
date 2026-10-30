@@ -52,10 +52,6 @@
     "r2-orphan-sweep",
     "search-index-backstop",
     "search-product-index",
-    "stock-deadstock-scan-cron",
-    "stock-deadstock-scan-on-demand",
-    "stock-low-stock-alert-cron",
-    "stock-low-stock-alert-on-demand",
     "webhook-deliver",
     "webhook-delivery-purge-daily",
     "webhook-fanout"
