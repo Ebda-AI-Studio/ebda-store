@@ -82,6 +82,7 @@ function num(v: number | null | undefined, digits = 2): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InsightsDashboardPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.dashboard');
@@ -148,7 +149,10 @@ export default function InsightsDashboardPage() {
       header: t('colVelocity'),
       alignEnd: true,
       cell: sku => (
-        <span className="font-mono text-xs text-muted-foreground">{num(sku.velocity, 2)}/day</span>
+        <span className="font-mono text-xs text-muted-foreground">
+          {num(sku.velocity, 2)}
+          {t('perDay')}
+        </span>
       ),
     },
   ];
@@ -178,7 +182,7 @@ export default function InsightsDashboardPage() {
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('aov')}</p>
             <p className="text-2xl font-semibold font-mono">{major(aovThis)}</p>
             <p className="text-xs text-muted-foreground">
-              EGP
+              {tc('egp')}
               {aovChange !== 0 && (
                 <span
                   className={`ms-2 font-medium ${
@@ -196,7 +200,7 @@ export default function InsightsDashboardPage() {
           <div className="rounded-xl border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('mrr30d')}</p>
             <p className="text-2xl font-semibold font-mono text-green-700">{major(data.mrr30d)}</p>
-            <p className="text-xs text-muted-foreground">EGP</p>
+            <p className="text-xs text-muted-foreground">{tc('egp')}</p>
           </div>
 
           {/* Repeat purchase rate */}
@@ -223,8 +227,8 @@ export default function InsightsDashboardPage() {
                   {data.topSegment.segment.replace(/_/g, ' ')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {data.topSegment.count} customers ·{' '}
-                  {major(data.topSegment.revenueContributionFils)} EGP
+                  {t('topSegmentCustomers', { count: data.topSegment.count })} ·{' '}
+                  {major(data.topSegment.revenueContributionFils)} {tc('egp')}
                 </p>
               </>
             ) : (

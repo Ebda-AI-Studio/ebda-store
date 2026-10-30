@@ -50,6 +50,7 @@ const SEGMENT_ICONS: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InsightsSegmentsPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.segments');
@@ -124,7 +125,7 @@ export default function InsightsSegmentsPage() {
               <p className="text-2xl font-semibold font-mono text-green-700">
                 {minorToMajor(totalRevenue)}
               </p>
-              <p className="text-xs text-muted-foreground">EGP</p>
+              <p className="text-xs text-muted-foreground">{tc('egp')}</p>
             </div>
           </div>
         )}
@@ -181,7 +182,7 @@ export default function InsightsSegmentsPage() {
                     <div>
                       <p className="text-xs opacity-70">{t('revenue')}</p>
                       <p className="font-mono font-semibold">
-                        {minorToMajor(seg.totalMonetaryFils)} EGP
+                        {minorToMajor(seg.totalMonetaryFils)} {tc('egp')}
                       </p>
                       <p className="text-xs opacity-60">
                         {t('shareOfTotal', { pct: revSharePct })}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet } from '../../lib/api';
+import { useT } from '@/i18n/useT';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -160,6 +161,7 @@ interface ReturnLifecycleTimelineProps {
 }
 
 export function ReturnLifecycleTimeline({ storeId, returnId }: ReturnLifecycleTimelineProps) {
+  const t = useT('components');
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<ReturnTimelineRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -195,7 +197,7 @@ export function ReturnLifecycleTimeline({ storeId, returnId }: ReturnLifecycleTi
         aria-expanded={expanded}
       >
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Return Timeline / مسار الإرجاع
+          {t('title')}
         </h3>
         <svg
           className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -217,9 +219,7 @@ export function ReturnLifecycleTimeline({ storeId, returnId }: ReturnLifecycleTi
           )}
 
           {!loading && rows.length === 0 && (
-            <p className="py-3 text-center text-sm text-muted-foreground">
-              No timeline events yet / لا توجد أحداث حتى الآن
-            </p>
+            <p className="py-3 text-center text-sm text-muted-foreground">{t('noEvents')}</p>
           )}
 
           {!loading && rows.length > 0 && (
@@ -251,7 +251,7 @@ export function ReturnLifecycleTimeline({ storeId, returnId }: ReturnLifecycleTi
                       {/* Actor */}
                       {row.actorName && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          by {row.actorName}
+                          {t('by')} {row.actorName}
                           {row.actorRole && (
                             <span className="ms-1 opacity-60">
                               ({row.actorRole.replace('_', ' ')})
@@ -263,12 +263,12 @@ export function ReturnLifecycleTimeline({ storeId, returnId }: ReturnLifecycleTi
                       {/* Detail lines */}
                       {!!row.details.reason && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          Reason: {row.details.reason}
+                          {t('reasonLabel')} {row.details.reason}
                         </p>
                       )}
                       {!!row.details.refundMethod && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          Refund via: {row.details.refundMethod}
+                          {t('refundViaLabel')} {row.details.refundMethod}
                         </p>
                       )}
                       {!!row.details.trackingNumber && (

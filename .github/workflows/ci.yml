@@ -253,6 +253,12 @@ jobs:
       - name: Clear-on-empty payload gate
         run: npm run check:clear-on-empty
 
+      # Hardcoded user-visible copy in apps/admin JSX must go through useT / next-intl
+      # (Ruling ADM-I18N-GATE-1). AST-based and cheap; runs only when admin is in the affected set.
+      - name: Admin i18n literal gate
+        if: contains(needs.changes.outputs.lint, 'apps/admin')
+        run: npm run check:admin-i18n
+
   typecheck:
     name: Type Check
     needs: [changes]
@@ -672,7 +678,8 @@ jobs:
     needs: [changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.has_workers == 'true'
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 15
+    # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner

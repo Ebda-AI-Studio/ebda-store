@@ -226,7 +226,7 @@ export default function SignupPage() {
             whiteSpace: 'nowrap',
           }}
         >
-          <label htmlFor="signup-company-site">Company website</label>
+          <label htmlFor="signup-company-site">{t('companyWebsite')}</label>
           <input
             id="signup-company-site"
             name="company_site"

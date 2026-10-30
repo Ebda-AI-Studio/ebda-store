@@ -295,7 +295,7 @@ export default function FloatingWidgetPage() {
                 type="text"
                 value={config.toggleLabel ?? ''}
                 onChange={e => patch({ toggleLabel: e.target.value })}
-                placeholder="Open menu"
+                placeholder={t('menuLabelEnSample')}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
             </label>
@@ -307,7 +307,7 @@ export default function FloatingWidgetPage() {
                 type="text"
                 value={config.toggleLabelAr ?? ''}
                 onChange={e => patch({ toggleLabelAr: e.target.value })}
-                placeholder="القائمة"
+                placeholder={t('menuLabelArSample')}
                 dir="rtl"
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
@@ -437,7 +437,7 @@ export default function FloatingWidgetPage() {
                               onChange={e =>
                                 updateButton(b.id, { whatsappMessage: e.target.value })
                               }
-                              placeholder="Hi! I'd like to ask about…"
+                              placeholder={t('prefillExample')}
                               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                             />
                           </label>
@@ -455,7 +455,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.socialLinks?.instagram
                                 ? t('usingStoreInstagram', { value: store.socialLinks.instagram })
-                                : 'demo-shop'
+                                : t('handleSampleDemoShop')
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -491,7 +491,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.socialLinks?.tiktok
                                 ? t('usingStoreTiktok', { value: store.socialLinks.tiktok })
-                                : 'mystore'
+                                : t('handleSample')
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -509,7 +509,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.socialLinks?.snapchat
                                 ? t('usingStoreSnapchat', { value: store.socialLinks.snapchat })
-                                : 'mystore'
+                                : t('handleSample')
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -563,7 +563,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.socialLinks?.twitter
                                 ? t('usingStoreX', { value: store.socialLinks.twitter })
-                                : 'mystore'
+                                : t('handleSample')
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -581,7 +581,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.socialLinks?.telegram
                                 ? t('usingStoreTelegram', { value: store.socialLinks.telegram })
-                                : 'mystore'
+                                : t('handleSample')
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -609,7 +609,7 @@ export default function FloatingWidgetPage() {
                               type="text"
                               value={b.emailSubject ?? ''}
                               onChange={e => updateButton(b.id, { emailSubject: e.target.value })}
-                              placeholder="Question about your store"
+                              placeholder={t('emailSubjectExample')}
                               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                             />
                           </label>

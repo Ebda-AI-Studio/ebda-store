@@ -204,7 +204,7 @@ export default function InsightsCohortsPage() {
                               <td key={o} className="text-end px-3 py-2">
                                 <span
                                   className={`inline-block rounded px-1.5 py-0.5 font-medium ${retentionColor(rate)}`}
-                                  title={`${cell.customersActive} / ${total} customers active`}
+                                  title={t('cellTitle', { active: cell.customersActive, total })}
                                 >
                                   {(rate * 100).toFixed(0)}%
                                 </span>
@@ -217,10 +217,7 @@ export default function InsightsCohortsPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Cells show % of cohort customers who placed an order in that period. Green = high
-                retention, red = low.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{t('legendNote')}</p>
             </section>
 
             {/* LTV data table (simple) */}

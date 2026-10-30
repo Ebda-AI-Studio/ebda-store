@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
 import { formatPrice } from '@/lib/format';
+import { useT } from '@/i18n/useT';
 
 interface AffiliateEvent {
   id: string;
@@ -139,6 +140,8 @@ function EventIcon({ type }: { type: IconType }) {
 }
 
 export default function AffiliateEventsPage() {
+  const t = useT('affiliates');
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const affiliateId = params?.affiliateId as string;
@@ -174,8 +177,8 @@ export default function AffiliateEventsPage() {
     <AdminLayout
       mode="store_admin"
       storeId={storeId}
-      title={affiliate ? `${affiliate.name} — Events` : 'Affiliate Events'}
-      subtitle="Affiliates / المسوقون"
+      title={affiliate ? t('eventsTitle', { name: affiliate.name }) : t('eventsTitleFallback')}
+      subtitle={t('subtitle')}
     >
       <div className="mx-auto max-w-3xl px-4 pb-12 pt-4 sm:px-6">
         {/* Back link */}
@@ -197,7 +200,7 @@ export default function AffiliateEventsPage() {
               d="M15 19l-7-7 7-7"
             />
           </svg>
-          Back to Affiliates / العودة للمسوقين
+          {t('backToAffiliates')}
         </Link>
 
         {affiliate && (
@@ -218,7 +221,7 @@ export default function AffiliateEventsPage() {
                   href={`/stores/${storeId}/affiliates/${affiliateId}/audit-trail`}
                   className="text-xs text-primary hover:underline"
                 >
-                  Audit Trail →
+                  {t('auditTrail2')}
                 </Link>
               </div>
             </div>
@@ -239,14 +242,14 @@ export default function AffiliateEventsPage() {
               onClick={fetchEvents}
               className="mt-3 rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive/10"
             >
-              Retry / إعادة المحاولة
+              {tc('retry')}
             </button>
           </div>
         )}
 
         {!loading && !error && events.length === 0 && (
           <div className="rounded-2xl border border-border bg-card p-12 text-center">
-            <p className="text-muted-foreground">No events yet / لا توجد أحداث حتى الآن</p>
+            <p className="text-muted-foreground">{t('noEventsYet')}</p>
           </div>
         )}
 
@@ -254,7 +257,7 @@ export default function AffiliateEventsPage() {
           <div className="rounded-2xl border border-border bg-card">
             <div className="border-b border-border px-5 py-3">
               <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Event History / سجل الأحداث
+                {t('eventHistory')}
               </h2>
             </div>
             <ol className="px-5 py-4 space-y-0">
@@ -283,7 +286,7 @@ export default function AffiliateEventsPage() {
                     <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                       {event.details.orderNumber && (
                         <p>
-                          Order:{' '}
+                          {t('orderLabel')}{' '}
                           <Link
                             href={`/stores/${storeId}/orders/${event.details.orderId}`}
                             className="text-primary hover:underline"
@@ -297,7 +300,7 @@ export default function AffiliateEventsPage() {
                       )}
                       {event.details.commissionAmount !== undefined && (
                         <p>
-                          Commission:{' '}
+                          {t('commissionLabel')}{' '}
                           <span className="font-medium text-success-ink">
                             +{formatPrice(event.details.commissionAmount)}
                           </span>
@@ -305,12 +308,14 @@ export default function AffiliateEventsPage() {
                       )}
                       {event.details.amount !== undefined && (
                         <p>
-                          Amount:{' '}
+                          {t('amountLabel')}{' '}
                           <span className="font-medium text-foreground">
                             {formatPrice(event.details.amount)}
                           </span>
                           {event.details.method && (
-                            <span className="ms-1">via {event.details.method}</span>
+                            <span className="ms-1">
+                              {t('via')} {event.details.method}
+                            </span>
                           )}
                         </p>
                       )}

@@ -1108,7 +1108,7 @@ export function AreaRateEditor({ storeId }: Props) {
                           <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
                           <input
                             type="text"
-                            placeholder="Area name"
+                            placeholder={t('areaNameEnSample')}
                             value={addForm.area}
                             onChange={e =>
                               setAddAreaForm(prev => ({
@@ -1123,7 +1123,7 @@ export function AreaRateEditor({ storeId }: Props) {
                           <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
                           <input
                             type="text"
-                            placeholder="اسم المنطقة"
+                            placeholder={t('areaNameArSample')}
                             dir="rtl"
                             value={addForm.areaAr}
                             onChange={e =>
@@ -1323,7 +1323,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
                               <input
                                 type="text"
-                                placeholder="Area name"
+                                placeholder={t('areaNameEnSample')}
                                 value={govAddForm.area}
                                 onChange={e =>
                                   setAddAreaForm(prev => ({
@@ -1338,7 +1338,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
                               <input
                                 type="text"
-                                placeholder="اسم المنطقة"
+                                placeholder={t('areaNameArSample')}
                                 dir="rtl"
                                 value={govAddForm.areaAr}
                                 onChange={e =>
@@ -1439,7 +1439,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 <label className="text-xs font-medium text-foreground">{t('countryEn')} *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Saudi Arabia"
+                  placeholder={t('countryEnSample')}
                   value={addLocForm.country}
                   onChange={e => setAddLocForm(prev => ({ ...prev, country: e.target.value }))}
                   className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1450,7 +1450,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 <label className="text-xs font-medium text-foreground">{t('countryAr')}</label>
                 <input
                   type="text"
-                  placeholder="مثال: المملكة العربية السعودية"
+                  placeholder={t('countryArSample')}
                   dir="rtl"
                   value={addLocForm.countryAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, countryAr: e.target.value }))}
@@ -1464,7 +1464,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Riyadh"
+                  placeholder={t('cityEnSample')}
                   value={addLocForm.governorate}
                   onChange={e => setAddLocForm(prev => ({ ...prev, governorate: e.target.value }))}
                   className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1475,7 +1475,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 <label className="text-xs font-medium text-foreground">{t('governorateAr')}</label>
                 <input
                   type="text"
-                  placeholder="مثال: الرياض"
+                  placeholder={t('cityArSample')}
                   dir="rtl"
                   value={addLocForm.governorateAr}
                   onChange={e =>
@@ -1489,7 +1489,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 <label className="text-xs font-medium text-foreground">{t('areaEn')} *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Al Olaya"
+                  placeholder={t('districtEnSample')}
                   value={addLocForm.area}
                   onChange={e => setAddLocForm(prev => ({ ...prev, area: e.target.value }))}
                   className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1500,7 +1500,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 <label className="text-xs font-medium text-foreground">{t('areaAr')}</label>
                 <input
                   type="text"
-                  placeholder="مثال: العليا"
+                  placeholder={t('districtArSample')}
                   dir="rtl"
                   value={addLocForm.areaAr}
                   onChange={e => setAddLocForm(prev => ({ ...prev, areaAr: e.target.value }))}

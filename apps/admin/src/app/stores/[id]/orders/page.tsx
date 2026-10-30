@@ -450,7 +450,7 @@ export default function StoreOrdersPage() {
               the phone, then issue a payment link from the
               order detail page (Ahmad 2026-05-16). */}
           <Link href={`/stores/${storeId}/orders/new`}>
-            <Button type="button">+ New order</Button>
+            <Button type="button">{t('newOrder')}</Button>
           </Link>
           <Link href={`/stores/${storeId}`}>
             <Button type="button" variant="outline">

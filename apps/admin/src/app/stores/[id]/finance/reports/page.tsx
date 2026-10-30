@@ -260,13 +260,13 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
                     {tb('accountName')}
                   </th>
                   <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('debit')} (EGP)
+                    {tb('debit')} {tc('egpParen')}
                   </th>
                   <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('credit')} (EGP)
+                    {tb('credit')} {tc('egpParen')}
                   </th>
                   <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('balance')} (EGP)
+                    {tb('balance')} {tc('egpParen')}
                   </th>
                 </tr>
               </thead>
@@ -436,7 +436,9 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
+                      <td className="px-3 py-2 text-end font-mono">
+                        {major(a.balance)} {tc('egp')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -446,7 +448,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalRevenue')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-green-700">
-                      {major(data.revenue.total)} EGP
+                      {major(data.revenue.total)} {tc('egp')}
                     </td>
                   </tr>
                 </tfoot>
@@ -466,7 +468,9 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
+                      <td className="px-3 py-2 text-end font-mono">
+                        {major(a.balance)} {tc('egp')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -476,7 +480,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalExpenses')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-red-600">
-                      {major(data.expenses.total)} EGP
+                      {major(data.expenses.total)} {tc('egp')}
                     </td>
                   </tr>
                 </tfoot>
@@ -493,7 +497,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
               }`}
             >
               {data.netIncome < 0 ? '−' : ''}
-              {major(Math.abs(data.netIncome))} EGP
+              {major(Math.abs(data.netIncome))} {tc('egp')}
             </span>
           </div>
         </div>
@@ -590,7 +594,9 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
+                  <td className="px-3 py-2 text-end font-mono">
+                    {major(a.balance)} {tc('egp')}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -600,7 +606,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                   {totalLabel}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {major(section.total)} EGP
+                  {major(section.total)} {tc('egp')}
                 </td>
               </tr>
             </tfoot>
@@ -814,13 +820,13 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {major(data.summary.totalTaxableSales)} EGP
+                {major(data.summary.totalTaxableSales)} {tc('egp')}
               </p>
             </div>
             <div className="rounded-xl border border-border p-4 bg-amber-50 border-amber-200">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
               <p className="text-2xl font-semibold font-mono text-amber-800">
-                {major(data.summary.totalTaxCollected)} EGP
+                {major(data.summary.totalTaxCollected)} {tc('egp')}
               </p>
             </div>
           </div>
@@ -840,10 +846,10 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                         {tt('entries')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('taxableBase')} (EGP)
+                        {tt('taxableBase')} {tc('egpParen')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('taxCollected')} (EGP)
+                        {tt('taxCollected')} {tc('egpParen')}
                       </th>
                     </tr>
                   </thead>
@@ -890,16 +896,16 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           {tt('customer')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('taxableBase')} (EGP)
+                          {tt('taxableBase')} {tc('egpParen')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
                           {tt('taxRate')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('taxCollected')} (EGP)
+                          {tt('taxCollected')} {tc('egpParen')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('orderTotal')} (EGP)
+                          {tt('orderTotal')} {tc('egpParen')}
                         </th>
                       </tr>
                     </thead>

@@ -115,7 +115,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
           type="text"
           value={entryId}
           onChange={e => setEntryId(e.target.value)}
-          placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+          placeholder={t('uuidExample')}
           className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <p className="mt-1 text-xs text-muted-foreground">{t('entryIdHelp')}</p>
@@ -142,6 +142,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function StatementDetailPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const statementId = params?.statementId as string;
@@ -388,8 +389,8 @@ export default function StatementDetailPage() {
                   {t('difference.bankBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.bankBalanceFils < 0 ? '−' : ''}EGP{' '}
-                  {major(Math.abs(difference.bankBalanceFils))}
+                  {difference.bankBalanceFils < 0 ? '−' : ''}
+                  {tc('egp')} {major(Math.abs(difference.bankBalanceFils))}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -397,8 +398,8 @@ export default function StatementDetailPage() {
                   {t('difference.ledgerBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.ledgerBalanceFils < 0 ? '−' : ''}EGP{' '}
-                  {major(Math.abs(difference.ledgerBalanceFils))}
+                  {difference.ledgerBalanceFils < 0 ? '−' : ''}
+                  {tc('egp')} {major(Math.abs(difference.ledgerBalanceFils))}
                 </p>
               </div>
               <div
@@ -423,7 +424,7 @@ export default function StatementDetailPage() {
                   }`}
                 >
                   {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
-                  EGP {major(Math.abs(difference.differenceFils))}
+                  {tc('egp')} {major(Math.abs(difference.differenceFils))}
                 </p>
               </div>
             </div>
@@ -436,7 +437,7 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedBankSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-warning-ink font-mono">
-                    EGP {major(difference.unmatchedBankFils)}
+                    {tc('egp')} {major(difference.unmatchedBankFils)}
                   </p>
                   <p className="mt-0.5 text-xs text-warning-ink">
                     {summary?.unmatched ?? 0} {t('difference.bankLines')}
@@ -447,8 +448,8 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedLedgerSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
-                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}EGP{' '}
-                    {major(Math.abs(difference.unmatchedLedgerFils))}
+                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}
+                    {tc('egp')} {major(Math.abs(difference.unmatchedLedgerFils))}
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}

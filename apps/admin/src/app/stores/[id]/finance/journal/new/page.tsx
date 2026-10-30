@@ -40,6 +40,7 @@ const EMPTY_LINE: LineDraft = { accountId: '', debit: '', credit: '', lineMemo: 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function NewJournalEntryPage() {
+  const tc = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const router = useRouter();
@@ -181,10 +182,10 @@ export default function NewJournalEntryPage() {
                   {tNew('account')}
                 </th>
                 <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {t('debit')} (EGP)
+                  {t('debit')} {tc('egpParen')}
                 </th>
                 <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {t('credit')} (EGP)
+                  {t('credit')} {tc('egpParen')}
                 </th>
                 <th className="text-start px-3 py-2 font-medium text-muted-foreground">
                   {t('memo')}

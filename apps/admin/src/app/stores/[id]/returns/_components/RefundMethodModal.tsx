@@ -311,6 +311,7 @@ export function RefundMethodModal({
                     return (
                       <li key={l.returnItemId} className="text-sm">
                         <p className="font-medium text-foreground">
+                          {/* i18n-gate-allow: multiplication sign glyph, not copy */}
                           <bdi>{l.productName}</bdi> x {l.quantity}
                         </p>
                         <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 text-xs">

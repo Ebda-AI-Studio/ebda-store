@@ -139,7 +139,7 @@ export function ProductsTable({
           onChange={() => onToggleSelect(product.id)}
           onClick={e => e.stopPropagation()}
           className="rounded border-border accent-primary cursor-pointer"
-          aria-label={`Select ${product.name}`}
+          aria-label={t('selectProduct', { name: product.name })}
         />
       ),
     },
@@ -178,7 +178,7 @@ export function ProductsTable({
       cell: product => (
         <span className="text-sm font-medium">
           {product.hasVariants && (
-            <span className="text-xs text-muted-foreground me-1">{isRtl ? 'من' : 'From'}</span>
+            <span className="text-xs text-muted-foreground me-1">{t('priceFrom')}</span>
           )}
           {formatPrice(product.price)}
         </span>

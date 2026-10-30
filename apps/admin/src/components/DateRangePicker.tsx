@@ -137,7 +137,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
       {period === 'custom' && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            {isRtl ? 'من' : 'From'}
+            {t('dateFrom')}
             <input
               type="date"
               value={customStart}
@@ -147,7 +147,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            {isRtl ? 'إلى' : 'To'}
+            {t('dateTo')}
             <input
               type="date"
               value={customEnd}
