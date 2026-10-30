@@ -87,6 +87,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
+- [cf/opus-review-closure.md](cf/opus-review-closure.md) - Opus review of #356 closed item by item with the proving test and its result, the leftovers closed, and the merge point for feat/cf-r6b (INFRA-CF-1)
 - [cf/r6a-on-do.md](cf/r6a-on-do.md) - The last three Postgres-only flows on the store Durable Object: palette search, campaigns, shopper erasure; InstaPay receipts at cutover (INFRA-CF-1 PR R6a)
 - [cf/payments-on-do.md](cf/payments-on-do.md) - Payments, webhooks, refunds, ledger and gold repricing on the store Durable Object (INFRA-CF-1 PR D2b-3)
 - [cf/returns-on-do.md](cf/returns-on-do.md) - The Return lifecycle and the partial-return journal on the store Durable Object (INFRA-CF-1 R1)
