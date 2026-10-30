@@ -128,6 +128,8 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'agent-write-denied-watch',
   'ai-autofill-sweep',
   'answer-engine-citation-scan-cron',
+  // Ruling CF-JOBS-4B (expense OCR): the draft is one DO op; accounts are read from the store's own chart
+  'accounting-expense-ocr-process',
 ]);
 
 /**

@@ -8,7 +8,9 @@ import {
   ALLOWED_CURRENCIES,
   REGION,
 } from '@ebda/shared';
+import { createHash } from 'node:crypto';
 import { nextSequence } from '../sequence.service';
+import { storeRepo } from '../../lib/repo-factory';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
@@ -44,6 +46,11 @@ export interface CreateExpenseInput {
   notes?: string;
   notesAr?: string;
   createdBy?: string;
+  /**
+   * OCR metadata of a receipt draft. A store on its Durable Object stores it in the same atomic section as the draft; a Postgres
+   * store ignores it here (the OCR service attaches it with its own non-fatal update, as before).
+   */
+  ocr?: { json: unknown; confidence: number | null; modelVersion: string; processedAtMs: number };
 }
 
 export type ExpenseWithRelations = Expense & {
@@ -57,6 +64,9 @@ export type ExpenseWithRelations = Expense & {
  * Status is always 'draft' on creation.
  */
 export async function createExpense(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
+  // A store on its Durable Object (Ruling CF-JOBS-4B): the draft is one DO section (guards, number, row).
+  const repo = await storeRepo(input.storeId);
+  if (repo.backend === 'do') return createExpenseOnDo(input, repo);
   // Issue 2291: with no ambient tenant transaction (the expense-OCR Inngest
   // job) the guard below opened its own transient transaction, but every
   // statement after it — the paid-from lookup and the INSERT, both on STRICT
@@ -68,6 +78,93 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
     return runInTenantContext(input.storeId, () => createExpenseInScope(input));
   }
   return createExpenseInScope(input);
+}
+
+/**
+ * The base-currency amounts of a draft: EGP is stored as given; a foreign amount is converted with the rate, or with the
+ * placeholder 1 when the caller has none (the merchant corrects it before posting). Pure; shared by both backends.
+ */
+function expenseAmounts(input: CreateExpenseInput) {
+  const currency = (input.currency ?? REGION.currency).toUpperCase();
+  if (!ALLOWED_CURRENCIES.includes(currency as (typeof ALLOWED_CURRENCIES)[number])) {
+    throw new AppError(422, 'INVALID_CURRENCY', `Currency '${currency}' is not supported.`);
+  }
+  if (!requiresFxRate(currency)) {
+    return {
+      currency,
+      amountBase: input.amount,
+      taxAmountBase: input.taxAmount ?? 0,
+      fxRate: 1,
+      original: input.amount + (input.taxAmount ?? 0),
+    };
+  }
+  const rate = input.fxRate ?? 1;
+  if (rate <= 0 || !isFinite(rate)) {
+    throw new AppError(422, 'INVALID_FX_RATE', 'fxRate must be a finite positive number.');
+  }
+  const rawAmount = input.originalAmount ?? input.amount;
+  const rawTax = input.taxAmount ?? 0;
+  return {
+    currency,
+    amountBase: convertToBase(rawAmount, rate, currency),
+    taxAmountBase: convertToBase(rawTax, rate, currency),
+    fxRate: rate,
+    original: rawAmount + rawTax,
+  };
+}
+
+async function createExpenseOnDo(
+  input: CreateExpenseInput,
+  repo: Awaited<ReturnType<typeof storeRepo>>
+): Promise<ExpenseWithRelations> {
+  if (!repo.money) throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'No money client');
+  const a = expenseAmounts(input);
+  let made;
+  try {
+    made = await repo.money.expenseDraft(
+      {
+        supplierId: input.supplierId ?? null,
+        expenseAccountId: input.expenseAccountId,
+        paidFromAccountId: input.paidFromAccountId,
+        amount: a.amountBase,
+        taxAmount: a.taxAmountBase,
+        total: a.amountBase + a.taxAmountBase,
+        currency: a.currency,
+        fxRate: a.fxRate,
+        originalAmount: a.original,
+        expenseDate: new Date(input.expenseDate).getTime(),
+        receiptImageUrl: input.receiptImageUrl ?? null,
+        notes: input.notes ?? null,
+        notesAr: input.notesAr ?? null,
+        createdBy: input.createdBy ?? null,
+        ...(input.ocr ? { ocr: input.ocr } : {}),
+      },
+      // a retried job (same receipt) gets the first draft back instead of a second one
+      input.receiptImageUrl
+        ? `expense-draft:${createHash('sha256').update(input.receiptImageUrl).digest('hex').slice(0, 40)}`
+        : undefined
+    );
+  } catch (err) {
+    const e = err as { code?: string; status?: number; message?: string };
+    if (e.code && e.status && e.status < 500)
+      throw new AppError(e.status, e.code, e.message ?? e.code);
+    throw err;
+  }
+  const row = await repo.db.expense.findFirst({
+    where: { id: made.expenseId, storeId: input.storeId },
+    include: {
+      supplier: { select: { id: true, name: true, nameAr: true } },
+      expenseAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+      paidFromAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+    },
+  });
+  if (!row)
+    throw new AppError(
+      500,
+      'EXPENSE_NOT_FOUND',
+      'The draft expense was not found after it was created.'
+    );
+  return row as unknown as ExpenseWithRelations;
 }
 
 async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseWithRelations> {

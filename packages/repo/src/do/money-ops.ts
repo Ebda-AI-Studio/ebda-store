@@ -78,7 +78,13 @@ import {
   type ImportVariantRow,
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
-import { lastPaidSalesOp, orderAnonymizeOp, orderStampOp, usageCountsOp } from './job-ops-b';
+import {
+  expenseDraftOp,
+  lastPaidSalesOp,
+  orderAnonymizeOp,
+  orderStampOp,
+  usageCountsOp,
+} from './job-ops-b';
 import {
   abandonStampOp,
   accountTotalsOp,
@@ -169,7 +175,8 @@ export type MoneyOpName =
   | 'orderStamp'
   | 'orderAnonymize'
   | 'lastPaidSales'
-  | 'usageCounts';
+  | 'usageCounts'
+  | 'expenseDraft';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -238,6 +245,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'orderAnonymize',
   'lastPaidSales',
   'usageCounts',
+  'expenseDraft',
 ];
 
 const TABLE = '_money_ops';
@@ -558,6 +566,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Non-money jobs (Ruling CF-JOBS-4): see `job-ops-b.ts`. */
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
+  expenseDraft: (db, storeId, a) => expenseDraftOp(db, storeId, a),
   lastPaidSales: (db, storeId, a) => lastPaidSalesOp(db, storeId, a),
   orderAnonymize: (db, storeId, a) => orderAnonymizeOp(db, storeId, a),
   periodGlCredits: (db, storeId, a) => periodGlCreditsOp(db, storeId, a),

@@ -479,6 +479,11 @@ export interface MoneyClient {
   orderStamp(a: { orderId: string; stamp: 'reviewRequestSentAt' }): Promise<{ stamped: boolean }>;
   /** Catalogue and period commerce counts for the monthly usage snapshot. */
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
+  /** A draft expense (receipt OCR): accounts guarded, number claimed, OCR metadata in the same section (Ruling CF-JOBS-4B). */
+  expenseDraft(
+    a: Record<string, unknown>,
+    key?: string
+  ): Promise<{ expenseId: string; expenseNumber: string }>;
   /** Last paid-sale time (ms) per product, one grouped read (dead-stock scan). */
   lastPaidSales(a: { productIds: string[] }): Promise<{ sales: Record<string, number> }>;
   /** Retention at 5 years: scrub up to `limit` old orders' personal snapshots (Ruling CF-JOBS-4B). */
@@ -861,6 +866,7 @@ export function makeMoneyClient(
     orderAnonymize: a => call('orderAnonymize', a),
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
+    expenseDraft: (a, key) => call('expenseDraft', a, key),
     periodGlCredits: a => call('periodGlCredits', a),
     accountTotals: a => call('accountTotals', a),
     ciOrderStamp: a => call('ciOrderStamp', a),

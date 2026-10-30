@@ -16,7 +16,6 @@
     "warehouse-reconcile-sweep-cron"
   ],
   "jobsAccepted": [
-    "accounting-expense-ocr-process",
     "r2-orphan-sweep",
     "search-index-backstop",
     "search-product-index",

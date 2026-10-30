@@ -139,3 +139,112 @@ export function usageCountsOp(
     ),
   };
 }
+
+const FX_SCALE = 100_000_000;
+const CASH_BANK_PREFIX = '10';
+
+/**
+ * A DRAFT expense (the receipt-OCR job): the accounts and the supplier must be this store's, the paid-from account a cash or
+ * bank asset (code `10..`, the same guard `createExpense` applies), the number `EXP-<year>-<6 digits>` is claimed from the
+ * store's own sequence, and the row (with the OCR metadata, when the job read one) lands in the same section. The Worker computes
+ * the amounts (`total = amount + taxAmount`, the base-currency conversion) exactly as the Postgres twin does; nothing is posted
+ * to the ledger here (a draft has no journal).
+ */
+export function expenseDraftOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { expenseId: string; expenseNumber: string } {
+  const text = (v: unknown, what: string, max = 4000): string | null => {
+    if (v === undefined || v === null) return null;
+    if (typeof v !== 'string' || v.length > max) throw new MoneyError('BAD_ARGS', what, 400);
+    return v;
+  };
+  const id = (v: unknown, what: string): string => {
+    if (typeof v !== 'string' || v.length === 0 || v.length > 128)
+      throw new MoneyError('BAD_ARGS', what, 400);
+    return v;
+  };
+  const amount = intArg(a.amount, 'amount', 0, 2_000_000_000);
+  const taxAmount = intArg(a.taxAmount, 'taxAmount', 0, 2_000_000_000);
+  const total = intArg(a.total, 'total', 0, 2_000_000_000);
+  if (total !== amount + taxAmount) throw new MoneyError('BAD_ARGS', 'total', 400);
+  const originalAmount = intArg(a.originalAmount, 'originalAmount', 0, 2_000_000_000);
+  const expenseDate = intArg(a.expenseDate, 'expenseDate', 0, Number.MAX_SAFE_INTEGER);
+  const fxRate = a.fxRate;
+  if (typeof fxRate !== 'number' || !Number.isFinite(fxRate) || fxRate <= 0)
+    throw new MoneyError('INVALID_FX_RATE', 'fxRate must be a finite positive number.', 422);
+  const currency = text(a.currency, 'currency', 8);
+  if (!currency) throw new MoneyError('BAD_ARGS', 'currency', 400);
+  const expenseAccountId = id(a.expenseAccountId, 'expenseAccountId');
+  const paidFromAccountId = id(a.paidFromAccountId, 'paidFromAccountId');
+  const supplierId = a.supplierId == null ? null : id(a.supplierId, 'supplierId');
+
+  const paidFrom = db.all('SELECT code, type FROM accounts WHERE id = ? AND store_id = ?', [
+    paidFromAccountId,
+    storeId,
+  ])[0];
+  if (!paidFrom)
+    throw new MoneyError('INVALID_PAID_FROM', 'Paid-from account not found for this store.', 400);
+  if (paidFrom.type !== 'asset' || !String(paidFrom.code).startsWith(CASH_BANK_PREFIX))
+    throw new MoneyError(
+      'INVALID_PAID_FROM',
+      'Paid-from account must be a cash or bank account (codes 1000–1099).',
+      400
+    );
+  if (
+    !db.all('SELECT 1 FROM accounts WHERE id = ? AND store_id = ?', [expenseAccountId, storeId])[0]
+  )
+    throw new MoneyError('ACCOUNT_NOT_FOUND', 'Expense account not found for this store.', 400);
+  if (
+    supplierId &&
+    !db.all('SELECT 1 FROM suppliers WHERE id = ? AND store_id = ?', [supplierId, storeId])[0]
+  )
+    throw new MoneyError('SUPPLIER_NOT_FOUND', 'Supplier not found for this store.', 400);
+
+  const now = Date.now();
+  db.run(
+    `INSERT INTO sequences (store_id, kind, next, updated_at) VALUES (?1, 'expense', 2, ?2)
+     ON CONFLICT (store_id, kind) DO UPDATE SET next = sequences.next + 1, updated_at = ?2`,
+    [storeId, now]
+  );
+  const n = Number(
+    db.all("SELECT next - 1 AS n FROM sequences WHERE store_id = ? AND kind = 'expense'", [
+      storeId,
+    ])[0].n
+  );
+  const expenseNumber = `EXP-${new Date(now).getUTCFullYear()}-${String(n).padStart(6, '0')}`;
+  const expenseId = crypto.randomUUID();
+  const ocr = a.ocr as Record<string, unknown> | undefined;
+  db.run(
+    `INSERT INTO expenses (id, store_id, expense_number, supplier_id, expense_account_id, paid_from_account_id, amount, tax_amount,
+       total, currency, fx_rate, original_amount, expense_date, status, receipt_image_url, notes, notes_ar, created_by,
+       ocr_json, category_ai_confidence, ocr_model_version, ocr_processed_at, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'draft', ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?22)`,
+    [
+      expenseId,
+      storeId,
+      expenseNumber,
+      supplierId,
+      expenseAccountId,
+      paidFromAccountId,
+      amount,
+      taxAmount,
+      total,
+      currency,
+      Math.round(fxRate * FX_SCALE),
+      originalAmount,
+      expenseDate,
+      text(a.receiptImageUrl, 'receiptImageUrl', 2048),
+      text(a.notes, 'notes'),
+      text(a.notesAr, 'notesAr'),
+      text(a.createdBy, 'createdBy', 128),
+      ocr ? JSON.stringify(ocr.json ?? null) : null,
+      ocr && typeof ocr.confidence === 'number' ? ocr.confidence : null,
+      ocr ? text(ocr.modelVersion, 'modelVersion', 128) : null,
+      ocr && typeof ocr.processedAtMs === 'number' ? ocr.processedAtMs : null,
+      now,
+    ]
+  );
+  return { expenseId, expenseNumber };
+}

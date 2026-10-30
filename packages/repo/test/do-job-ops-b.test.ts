@@ -129,3 +129,60 @@ describe('lastPaidSales and usageCounts (Ruling CF-JOBS-4B)', () => {
     });
   });
 });
+
+describe('expenseDraft (Ruling CF-JOBS-4B)', () => {
+  function exp() {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO accounts (id, store_id, code, name_en, type) VALUES
+         ('a-cash', 's1', '1000', 'Cash', 'asset'), ('a-inv', 's1', '1200', 'Inventory', 'asset'),
+         ('a-exp', 's1', '5990', 'Misc', 'expense'), ('a-other', 's2', '5990', 'Misc', 'expense')`
+    );
+    const args = (over: Record<string, unknown> = {}) => ({
+      expenseAccountId: 'a-exp',
+      paidFromAccountId: 'a-cash',
+      amount: 1000,
+      taxAmount: 140,
+      total: 1140,
+      currency: 'EGP',
+      fxRate: 1,
+      originalAmount: 1140,
+      expenseDate: Date.UTC(2026, 9, 29),
+      receiptImageUrl: 'https://r2.example/r.jpg',
+      notes: 'n',
+      ocr: { json: { vendor: 'X' }, confidence: 0.9, modelVersion: 'm', processedAtMs: 5 },
+      ...over,
+    });
+    return { ...r, args };
+  }
+
+  it('creates a numbered draft with its OCR metadata, and numbers the next one', () => {
+    const { raw, op, args } = exp();
+    const first = op('expenseDraft', args());
+    expect(first.expenseNumber).toMatch(/^EXP-\d{4}-000001$/);
+    expect(op('expenseDraft', args()).expenseNumber).toMatch(/-000002$/);
+    expect(
+      raw
+        .prepare(
+          'SELECT status, total, fx_rate, ocr_json, category_ai_confidence FROM expenses WHERE id = ?'
+        )
+        .get(first.expenseId)
+    ).toMatchObject({
+      status: 'draft',
+      total: 1140,
+      fx_rate: 100000000,
+      ocr_json: '{"vendor":"X"}',
+      category_ai_confidence: 0.9,
+    });
+  });
+
+  it("refuses a paid-from account that is not cash or bank, another store's account, and a total that does not add up", () => {
+    const { op, args } = exp();
+    expect(() => op('expenseDraft', args({ paidFromAccountId: 'a-inv' }))).toThrow(/cash or bank/);
+    expect(() => op('expenseDraft', args({ expenseAccountId: 'a-other' }))).toThrow(
+      /Expense account/
+    );
+    expect(() => op('expenseDraft', args({ total: 1 }))).toThrow();
+    expect(() => op('expenseDraft', args(), 's2')).toThrow();
+  });
+});

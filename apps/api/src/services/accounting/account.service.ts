@@ -2,6 +2,7 @@ import { prisma, withStore, DbClient } from '@ebda/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
+import { storeRepo } from '../../lib/repo-factory';
 
 /**
  * Seed the Egypt-retail Chart of Accounts for a store. Idempotent — existing
@@ -162,6 +163,19 @@ export async function getSystemAccountIdByCode(
       where: { storeId_code: { storeId, code } },
       select: { id: true },
     });
+  // A store on its Durable Object reads its own chart of accounts. No self-heal there: the cutover import carries the accounts
+  // across, so a missing system account is a real fault (the ledger twin answers ACCOUNT_NOT_FOUND the same way).
+  if (!tx) {
+    const repo = await storeRepo(storeId);
+    if (repo.backend === 'do') {
+      const hit = await repo.db.account.findFirst({
+        where: { storeId, code },
+        select: { id: true },
+      });
+      if (hit) return hit.id;
+      throw new Error(`System account ${code} not found for store ${storeId} — seed COA first`);
+    }
+  }
   const acct = tx ? await findIt(tx) : await withStore(storeId, findIt);
   if (acct) return acct.id;
 
