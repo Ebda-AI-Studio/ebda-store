@@ -1,12 +1,18 @@
 /**
- * Per-store storage backend flag (Ruling INFRA-CF-1, Phase 0 spike).
+ * Per-store storage backend flag (Ruling INFRA-CF-1, hardened by Ruling CF-BACKEND-1).
  *
- * `backendFor` returns 'do' ONLY when (a) the store id is listed in STORE_DO_ENABLED_IDS (wrangler var,
- * default EMPTY = nobody) AND (b) the request opts in with `x-ebda-backend: do`. Anything else is 'pg',
- * the unchanged production path. (b) keeps the public demo storefront on Postgres while the spike is
- * measured; it is deleted with the flag at Phase 5. Never flag `qa-walk-store-1010`.
+ * The backend of a store comes ONLY from server-side state: the D1 `stores.storage_backend` column (the one switch
+ * `scripts/cf/flip-backend.mjs` writes). NOTHING in the request chooses it: a client header such as the Phase 0
+ * `x-ebda-backend: do` is ignored (and stripped at the Worker edge), because letting a visitor move a store's money,
+ * stock and writes onto the Durable Object while its real backend is Postgres is split-brain money state.
+ *
+ *   - D1 bound: the column decides. A store without a directory row is not flagged ('pg'); an unreadable or malformed
+ *     flag is a 503 (fail closed - a flagged store is never defaulted to pg on a read error).
+ *   - D1 unbound (Node, unit tests, local dev): the `STORE_DO_ENABLED_IDS` env list decides - but only outside
+ *     production. In production an unbound D1 with a listed store is a 503, never a silent fallback.
+ *
+ * Never flag `qa-walk-store-1010`.
  */
-import type { Request } from 'express';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 
@@ -23,9 +29,35 @@ export function enabledStoreIds(
   );
 }
 
-export function backendFor(storeId: string, req: Pick<Request, 'headers'>): StoreBackend {
-  if (!enabledStoreIds().has(storeId)) return 'pg';
-  return req.headers['x-ebda-backend'] === 'do' ? 'do' : 'pg';
+interface FlagD1 {
+  prepare(sql: string): {
+    bind(...v: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> };
+  };
+}
+
+const unavailable = () =>
+  new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend flag is unavailable');
+
+/** The backend that serves `storeId`, from server-side state only (see the file header). Takes no request. */
+export async function backendFor(storeId: string): Promise<StoreBackend> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: FlagD1 } | undefined)?.PLATFORM_DB;
+  if (!d1) {
+    if (!enabledStoreIds().has(storeId)) return 'pg';
+    if (process.env.NODE_ENV === 'production') throw unavailable();
+    return 'do';
+  }
+  let row: { storage_backend?: unknown } | null;
+  try {
+    row = await d1
+      .prepare('SELECT storage_backend FROM stores WHERE id = ?')
+      .bind(storeId)
+      .first<{ storage_backend?: unknown }>();
+  } catch {
+    throw unavailable();
+  }
+  if (!row) return 'pg';
+  if (row.storage_backend === 'do' || row.storage_backend === 'pg') return row.storage_backend;
+  throw unavailable();
 }
 
 type DoResult<T> = { ok: true; data: T } | { ok: false; code: string; status: number };

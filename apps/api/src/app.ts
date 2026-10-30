@@ -133,6 +133,11 @@ export const lifecycle = { isShuttingDown: false };
 installClosedTenantTxAlerting();
 setDbHopObserver(recordHop);
 
+// The backend of a store is server-side state only (Ruling CF-BACKEND-1): a client `x-ebda-backend` never reaches a handler.
+app.use((req, _res, next) => {
+  delete req.headers['x-ebda-backend'];
+  next();
+});
 // Request ID for tracing
 app.use(requestId);
 // Cutover read-only window (WRITES_FROZEN=1, docs/runbooks/cutover-cf.md): 503 to every write, reads stay open.

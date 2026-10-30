@@ -1,8 +1,8 @@
 /**
  * StoreDO: ONE SQLite Durable Object per store (Ruling INFRA-CF-1, Phase 0 spike).
  *
- * Reachable ONLY for a store listed in STORE_DO_ENABLED_IDS (default empty = nobody) AND a request
- * carrying `x-ebda-backend: do` (lib/store-backend.ts). Production storefront traffic never touches it.
+ * Reachable ONLY for a store whose server-side flag says 'do' (D1 stores.storage_backend, lib/store-backend.ts; Ruling
+ * CF-BACKEND-1). No request header selects it.
  * Data layer: Drizzle on DO SQLite (Ruling INFRA-CF-2). Every money/stock section is one synchronous
  * `transactionSync`: no `await` between the stock read and the write.
  */

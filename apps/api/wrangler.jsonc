@@ -55,8 +55,8 @@
       { "name": "AUTH_STATE", "class_name": "AuthState" },
       // One per store: admin realtime over hibernating WebSockets.
       { "name": "STORE_REALTIME", "class_name": "StoreRealtime" },
-      // One per store: the SQLite store (Ruling INFRA-CF-1, Phase 0 spike). Reachable only for a store in
-      // STORE_DO_ENABLED_IDS that also sends `x-ebda-backend: do` (lib/store-backend.ts).
+      // One per store: the SQLite store (Ruling INFRA-CF-1, Phase 0 spike). Reachable only for a store whose D1
+      // stores.storage_backend is 'do' (lib/store-backend.ts, Ruling CF-BACKEND-1); no request header selects it.
       { "name": "STORE_DO", "class_name": "StoreDO" },
       // Concurrency leases and debounce for background jobs (G5, src/cf/job-gate.ts): one per function + key.
       { "name": "JOB_GATE", "class_name": "JobGate" },
@@ -267,7 +267,7 @@
     "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
-    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010), and only for requests sending x-ebda-backend: do.
+    // Phase 0 spike flag (lib/store-backend.ts): comma list of store ids the SQLite store may serve. Empty = nobody. Phase 0: ONE demo store, storedemo-souq (is_demo; never qa-walk-store-1010). With the D1 PLATFORM_DB bound this list is NOT consulted by backendFor (the D1 column is); it only feeds the legacy consumers (backup sweep, webhook resolver, jobs guard).
     "STORE_DO_ENABLED_IDS": "09b5dbd1-1774-49b5-b781-e06d0ee7b0fe",
     // Which alarm-ready jobs fire as StoreSchedule alarms (src/lib/jobs/alarm-flag.ts): comma list or "all". Alarms are armed ONLY for
     // stores served by their Durable Object (src/lib/jobs/store-schedule.ts, Ruling CF-JOBS-1); every Postgres store keeps the global

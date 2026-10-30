@@ -23,7 +23,6 @@ import {
   rejectImpersonated,
 } from '../middleware/auth';
 import { buyerFromRequest } from '../lib/buyer-identity';
-import { backendFor, storeDo, unwrapDo } from '../lib/store-backend';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
@@ -282,14 +281,6 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const headerTerm = searchQueryFromHeader(req);
     const search = headerTerm ?? req.query.search;
     const storeId = await getStoreIdFromRequest(req);
-    if (backendFor(storeId, req) === 'do') {
-      // Phase 0 spike (Ruling INFRA-CF-1): flagged demo store + opt-in header only. Postgres path below is untouched.
-      const lim = Math.min(Math.max(Number(limit) || 24, 1), 100);
-      const products = unwrapDo(await storeDo(storeId).listProducts(storeId, lim));
-      res.setHeader('x-store-backend', 'do');
-      res.json({ success: true, data: { products } });
-      return;
-    }
     // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
     // to turn an absent param into `featured: false`, which listPublic applied
     // as `WHERE featured = false` on every non-"Featured" listing.
@@ -878,14 +869,6 @@ router.post(
 
       const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
-      if (backendFor(storeId, req) === 'do') {
-        const { cartId } = unwrapDo(
-          await storeDo(storeId).addCartItem(storeId, sessionId, productId, quantity, variantId)
-        );
-        res.setHeader('x-store-backend', 'do');
-        res.json({ success: true, data: { cart: { id: cartId } } });
-        return;
-      }
       const cart = await CartService.addItem(
         storeId,
         sessionId,
@@ -1331,16 +1314,6 @@ router.post(
 
       const storeId = await getStoreIdFromRequest(req);
       const orderData = createOrderSchema.parse(req.body);
-      if (backendFor(storeId, req) === 'do') {
-        // Spike order path: stock + order rows in ONE DO transaction. The demo copy only; no payment, no email.
-        const order = unwrapDo(await storeDo(storeId).createOrder(storeId, sessionId));
-        // The order just decremented stock in the Durable Object: every cache layer (KV, the Worker edge cache
-        // through the same generations, the storefront tag) must see it, exactly as the Postgres path does.
-        await invalidateStoreProductCachesAfterOrder(storeId);
-        res.setHeader('x-store-backend', 'do');
-        res.status(201).json({ success: true, data: { order } });
-        return;
-      }
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
       // and storefront origins (api.ebda.app host), so a merchant

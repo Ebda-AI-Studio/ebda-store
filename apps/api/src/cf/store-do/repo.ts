@@ -1,7 +1,7 @@
 // Phase 0 demo operations of the StoreDO (INFRA-CF-1): list products, add to cart, order. They run on the REAL
 // generated cf-schema tables (no thin spike copy any more) and the order goes through the real money core
-// (`placeOrder`, packages/repo/src/do/checkout.ts), not a stand-in. Reachable only for a flagged demo store plus
-// `x-ebda-backend: do` (lib/store-backend.ts). Every statement is bound to `storeId` (no RLS inside a DO).
+// (`placeOrder`, packages/repo/src/do/checkout.ts), not a stand-in. Reachable only for a store whose server-side
+// flag says 'do' (lib/store-backend.ts). Every statement is bound to `storeId` (no RLS inside a DO).
 import { MoneyError, placeOrder, type SyncSql } from '@ebda-src/repo';
 
 export class StoreError extends Error {

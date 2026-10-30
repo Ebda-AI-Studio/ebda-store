@@ -122,6 +122,14 @@ async function checkRole(): Promise<void> {
   });
 }
 
+/** Drop a client-supplied `x-ebda-backend` (the retired Phase 0 opt-in) before anything reads the request. */
+export function stripBackendHeader(request: Request): Request {
+  if (!request.headers.has('x-ebda-backend')) return request;
+  const headers = new Headers(request.headers);
+  headers.delete('x-ebda-backend');
+  return new Request(request, { headers });
+}
+
 /** Overwrite X-Forwarded-For with the address Cloudflare saw, so `trust proxy` cannot be spoofed. */
 function withTrustedClientIp(request: Request): Request {
   const ip = request.headers.get('cf-connecting-ip');
@@ -316,7 +324,9 @@ async function floodGuard(
   );
 }
 
-async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
+async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
+  // The backend of a store is server-side state only (Ruling CF-BACKEND-1): the retired Phase 0 opt-in header never gets in.
+  const request = stripBackendHeader(incoming);
   const path = new URL(request.url).pathname;
   if (path === '/__dev/stats') {
     const res = devStats(env, isolateDb);
