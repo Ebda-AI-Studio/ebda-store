@@ -558,3 +558,22 @@ describe('4. TOTP replay', () => {
     ).toBe(401);
   });
 });
+
+describe('HSTS (Ruling HSTS-ALL-1)', () => {
+  const HSTS = 'max-age=31536000; includeSubDomains; preload';
+  it.each(['/health', '/login', '/nope', '/.well-known/jwks.json'])(
+    '%s carries the same HSTS policy as the other hosts',
+    async path => {
+      const r = await call(
+        path,
+        path === '/login' ? { json: { email: 'a@b.co', password: 'x' } } : {}
+      );
+      expect(r.headers.get('strict-transport-security')).toBe(HSTS);
+    }
+  );
+  it('a studio 404 page carries it too', async () => {
+    const r = await call('/nope', { headers: { accept: 'text/html' } });
+    expect(r.status).toBe(404);
+    expect(r.headers.get('strict-transport-security')).toBe(HSTS);
+  });
+});
