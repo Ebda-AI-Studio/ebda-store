@@ -18,26 +18,26 @@ Named `moneyOp`s, each ONE `transactionSync` section, reached with `const money 
 
 ## Options the Postgres path honours, and what the DO does with each
 
-| Postgres option / behaviour                               | On the DO                                                                        |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Kashier confirm-before-apply (PROVIDERS-17)               | done by the Worker, the gateway's answer is applied; none = 503, nothing written |
-| store-scoped webhook key (WEBHOOK-SCOPE-1)                | route unchanged; the DO's dedupe is `payment_event_log (provider, event_id)`     |
-| `refundKey` (a retry must not pay twice)                  | `REFUND_ALREADY_ISSUED` 409 while a claim is open                                |
-| `itemLevel` refund (no order flip)                        | honoured by `refundBegin`                                                        |
-| cumulative cap, claim before the provider call            | honoured (CAS on `refunded_amount`)                                              |
-| refund by status keeps `payment_status`                   | `keepPaymentStatus` (found by the contract test)                                 |
-| external refund exceeding the order / on a reversed order | recorded in full, `review` flag + alert (`external: true`), never thrown         |
-| `restoreInventory:false`                                  | cancel (CF-ORDERS-1)                                                             |
-| any other status of a DO order                            | 501 `ORDER_STATUS_NOT_ON_DO`                                                     |
-| partial-return pro-rata journal                           | `journalPartialReturn` (CF-RETURNS-1)                                            |
-| gold `setProductPricing`, `asRepricer`, `bulkSwitchMode`  | `goldSetProductPricing` / `goldCreateVariant` / `goldBulkSwitchMode` (CF-LAST-1) |
-| InstaPay ORDER receipt upload / submit / reject / approve | DO table `instapay_order_receipts`, one section each (INSTAPAY-DO-1)             |
-| wallet movement outside a Postgres transaction            | `walletEntry` (ledger row, balance and the 2150 journal half in one section)     |
-| wallet movement INSIDE a Postgres transaction             | 501 `WALLET_IN_TRANSACTION_NOT_ON_DO` (WALLET-DO-TX-1)                           |
+| Postgres option / behaviour                               | On the DO                                                                                |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Kashier confirm-before-apply (PROVIDERS-17)               | done by the Worker, the gateway's answer is applied; none = 503, nothing written         |
+| store-scoped webhook key (WEBHOOK-SCOPE-1)                | route unchanged; the DO's dedupe is `payment_event_log (provider, event_id)`             |
+| `refundKey` (a retry must not pay twice)                  | `REFUND_ALREADY_ISSUED` 409 while a claim is open                                        |
+| `itemLevel` refund (no order flip)                        | honoured by `refundBegin`                                                                |
+| cumulative cap, claim before the provider call            | honoured (CAS on `refunded_amount`)                                                      |
+| refund by status keeps `payment_status`                   | `keepPaymentStatus` (found by the contract test)                                         |
+| external refund exceeding the order / on a reversed order | recorded in full, `review` flag + alert (`external: true`), never thrown                 |
+| `restoreInventory:false`                                  | cancel (CF-ORDERS-1)                                                                     |
+| any other status of a DO order                            | 501 `ORDER_STATUS_NOT_ON_DO`                                                             |
+| partial-return pro-rata journal                           | `journalPartialReturn` (CF-RETURNS-1)                                                    |
+| gold `setProductPricing`, `asRepricer`, `bulkSwitchMode`  | `goldSetProductPricing` / `goldCreateVariant` / `goldBulkSwitchMode` (CF-LAST-1)         |
+| InstaPay ORDER receipt upload / submit / reject / approve | DO table `instapay_order_receipts`, one section each (INSTAPAY-DO-1)                     |
+| wallet movement outside a Postgres transaction            | `walletEntry` (ledger row, balance and the 2150 journal half in one section)             |
+| wallet movement INSIDE a Postgres transaction             | `walletEntry`, keyed on the entity (WALLET-DO-TX-2); return completion is `returnFinish` |
 
 ## Not moved (the flip gate stays closed)
 
-Carts, fiscal documents and the order reads (moved in R2, Ruling CF-R2-1), delivery slots, personalisation notes and quotes (moved in D2b-4), expense / PO / stock-adjustment journals, the callers that hold a Postgres transaction around a wallet movement (return completion, erasure forfeit, order create: WALLET-DO-TX-1), and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
+Carts, fiscal documents and the order reads (moved in R2, Ruling CF-R2-1), delivery slots, personalisation notes and quotes (moved in D2b-4), expense / PO / stock-adjustment journals and `payment-reconcile-sweep`, `payment-webhook-stuck-sweep`, `refund-reversal-stuck-sweep` (still `unported`, refused for a DO store with a P0).
 
 ## Tests
 

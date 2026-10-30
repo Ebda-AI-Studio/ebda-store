@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import {
   currentStoreId,
-  currentTenantGucs,
   prisma,
   Prisma,
   withMoneyTx,
@@ -153,19 +152,14 @@ export class WalletService {
     const { storeId, customerId, amount, idempotencyKey } = input;
 
     // Store on its Durable Object (Ruling WALLET-GL-1 / CF-MONEY-1): ledger row, balance and GL half in one section.
-    // NEVER inside an open Postgres transaction (Ruling WALLET-DO-TX-1): a DO write cannot roll back with it, so a later
-    // failure of that transaction would leave the credit applied and its retry would credit again. A caller that holds a
-    // client or an ambient tenant transaction (return completion, erasure, order create) on a DO store is refused loudly
-    // until its whole operation is one DO section.
+    // Inside a Postgres transaction too (Ruling WALLET-DO-TX-2): every caller keys the movement on the entity it belongs to
+    // (`admin-adjust:<request key>`, `order-payment:<order>`, `erasure-forfeit:<wallet>:<position>`), so a request that
+    // rolls back after the DO write and is retried REPLAYS the same entry instead of crediting again. The one caller whose
+    // retry used to mint a fresh key, the return completion with a store-credit refund, no longer reaches this method for a
+    // DO store: `returnFinish` writes the credit in the same DO section as the completion (Ruling CF-RETURNS-1).
     {
       const money = await storeMoney(storeId);
       if (money) {
-        if (client || currentTenantGucs() !== undefined)
-          throw new AppError(
-            501,
-            'WALLET_IN_TRANSACTION_NOT_ON_DO',
-            'A wallet movement inside a database transaction is not available for a Durable Object store yet'
-          );
         const r = await money.walletEntry({
           customerId,
           amount,

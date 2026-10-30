@@ -297,9 +297,9 @@ describe.skipIf(!hasDb)(
       expect(t.state.ledger.entries).toBe(0);
     });
 
-    it('Ruling WALLET-DO-TX-1: a DO wallet credit inside a Postgres transaction is refused, so a rollback leaves no credit and the retry cannot double it', async () => {
+    it('Ruling WALLET-DO-TX-2: a DO wallet credit inside a Postgres transaction that fails is replayed by the retry, never doubled', async () => {
       const c = await customer(true);
-      // the return-completion shape: a tenant transaction, a wallet credit, then the transaction fails
+      // the shape that used to be refused: a tenant transaction, a wallet credit, then the transaction fails
       const failing = () =>
         onDo(() =>
           runInTenantContext(STORE, async () => {
@@ -313,30 +313,36 @@ describe.skipIf(!hasDb)(
             throw new Error('postgres transaction fails after the wallet write');
           })
         );
-      for (let attempt = 0; attempt < 2; attempt++)
-        await expect(failing()).rejects.toMatchObject({ code: 'WALLET_IN_TRANSACTION_NOT_ON_DO' });
+      for (let attempt = 0; attempt < 3; attempt++)
+        await expect(failing()).rejects.toThrow(
+          'postgres transaction fails after the wallet write'
+        );
       const after = await onDo(() => walletState(c.id));
-      expect(after.balance).toBeUndefined(); // no wallet row, no credit, after two attempts
-      expect(after.rows).toEqual([]);
-      // a caller-supplied client is the same thing
-      await expect(
-        onDo(() =>
-          WalletService.applyEntry(
-            {
-              storeId: STORE,
-              customerId: c.id,
-              amount: 1,
-              type: 'credit',
-              idempotencyKey: 'x-client',
-            },
-            prisma as never
-          )
+      expect(after.balance).toBe(4_000); // credited once after three attempts
+      expect(after.rows).toHaveLength(1);
+      // a caller-supplied client takes the same DO path and replays the same key
+      const viaClient = await onDo(() =>
+        WalletService.applyEntry(
+          {
+            storeId: STORE,
+            customerId: c.id,
+            amount: 4_000,
+            type: 'refund_credit',
+            idempotencyKey: 'return-credit:tx-1',
+          },
+          prisma as never
         )
-      ).rejects.toMatchObject({ code: 'WALLET_IN_TRANSACTION_NOT_ON_DO' });
-      // outside a transaction the same credit applies once, and its retry replays
-      expect((await onDo(() => adj(c.id, 4_000, 'ok'))).replayed).toBe(false);
-      expect((await onDo(() => adj(c.id, 4_000, 'ok'))).replayed).toBe(true);
+      );
+      expect(viaClient.replayed).toBe(true);
       expect((await onDo(() => walletState(c.id))).balance).toBe(4_000);
+      // the merchant's manual adjustment (the route runs inside the request's tenant transaction) applies once and replays
+      expect(
+        (await onDo(() => runInTenantContext(STORE, () => adj(c.id, 500, 'in-tx')))).replayed
+      ).toBe(false);
+      expect(
+        (await onDo(() => runInTenantContext(STORE, () => adj(c.id, 500, 'in-tx')))).replayed
+      ).toBe(true);
+      expect((await onDo(() => walletState(c.id))).balance).toBe(4_500);
     });
   }
 );
