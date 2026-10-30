@@ -63,7 +63,7 @@ const ssrfSelectors = [
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', 'src/cf/stubs/exceljs-workers.cjs'], // a generated minified library build (BUNDLE-BUDGET-6)
   },
   ...tseslint.configs.recommended,
   {
