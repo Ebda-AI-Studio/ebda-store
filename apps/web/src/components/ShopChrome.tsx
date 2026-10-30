@@ -60,6 +60,9 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   // Prop wins (homepage server-fetches layout for SSR correctness); context
   // layout is the lazy-fetched fallback for other routes.
   const layout = layoutProp ?? ctxLayout ?? undefined;
+  // Ruling TEMPLATES-POLISH-1: a look store pins its header like the mock-ups do; an explicit merchant
+  // choice (`sticky: false`) still wins, and a store without a look keeps the old default (scrolls away).
+  const headerSticky = layout?.header?.sticky ?? Boolean(store?.look);
   const branding = useStoreBranding();
   const contact = useStoreContact();
   const storeUrl = useStoreUrl();
@@ -357,7 +360,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             data-zone="header"
             className={
               [
-                layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
+                headerSticky ? 'sticky top-0 z-40' : undefined,
                 sectionVisibilityClass(layout?.header),
               ]
                 .filter(Boolean)
@@ -427,10 +430,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         <div
           data-zone="header"
           className={
-            [
-              layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
-              sectionVisibilityClass(layout?.header),
-            ]
+            [headerSticky ? 'sticky top-0 z-40' : undefined, sectionVisibilityClass(layout?.header)]
               .filter(Boolean)
               .join(' ') || undefined
           }

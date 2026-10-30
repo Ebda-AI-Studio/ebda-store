@@ -31,6 +31,8 @@ export type NavLabels = {
   // Hub names (sidebar — 9 items)
   dashboard: string;
   catalog: string;
+  /** The visual storefront editor (its own entry since T9). */
+  editor: string;
   sales: string;
   stock: string;
   finance: string;
@@ -171,6 +173,13 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       hubKey: 'catalog',
       // Package / layers icon
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+    },
+    {
+      name: labels.editor,
+      href: `/stores/${storeId}/builder`,
+      hubKey: 'editor',
+      // Pencil-square icon (Heroicons v2 `pencil-square`): edit the storefront.
+      icon: 'M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10',
     },
     {
       name: labels.sales,

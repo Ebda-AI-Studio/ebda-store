@@ -39,7 +39,9 @@ export function StoreLockup({
     fontFamily: 'var(--font-display)',
     fontSize: lockup.size,
     fontWeight: lockup.weight,
-    lineHeight: 1.1,
+    // The display faces (Lalezar, Reem Kufi...) draw Arabic marks well above and below a 1.1 line box and
+    // `line-clamp` clips at it: a 1.4 line keeps them whole (Qamar lookbook's name was cut at the page top).
+    lineHeight: 1.4,
     color: COLOR[lockup.color],
     letterSpacing: 'normal',
   };

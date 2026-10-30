@@ -5874,6 +5874,7 @@
     "adminLayout": {
       "navDashboard": "لوحة التحكم",
       "navCatalog": "الكتالوج",
+      "navEditor": "المحرر",
       "navSales": "المبيعات",
       "navStock": "الجرد",
       "navFinance": "المحاسبة",

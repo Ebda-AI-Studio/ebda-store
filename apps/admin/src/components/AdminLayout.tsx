@@ -104,6 +104,7 @@ export function AdminLayout({
     // Hub names (sidebar — 9 items)
     dashboard: t('navDashboard'),
     catalog: t('navCatalog'),
+    editor: t('navEditor'),
     sales: t('navSales'),
     stock: t('navStock'),
     finance: t('navFinance'),
@@ -131,7 +132,6 @@ export function AdminLayout({
   const hubLabels: HubLabels = {
     // Catalog tabs
     products: t('hubTabs.products'),
-    editor: t('hubTabs.editor'),
     content: t('hubTabs.content'),
     blog: t('hubTabs.blog'),
     floatingWidget: t('hubTabs.floatingWidget'),
