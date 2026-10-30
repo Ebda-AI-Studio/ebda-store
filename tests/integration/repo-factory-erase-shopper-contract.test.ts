@@ -289,7 +289,10 @@ const TABLES: Array<[string, string, string]> = [
 async function stateOf(side: Side, w: { U: string; email: string }) {
   const out: Record<string, unknown> = {};
   for (const [t, cols, order] of TABLES) {
-    const scope = t === 'customer_addresses' ? '1 = 1' : `store_id = '${ids.store}'`;
+    const scope =
+      t === 'customer_addresses'
+        ? `customer_id IN (SELECT id FROM customers WHERE store_id = '${ids.store}')`
+        : `store_id = '${ids.store}'`;
     const sql = `SELECT ${cols} FROM ${t} WHERE ${scope} ORDER BY ${order}`;
     const rows: any[] =
       side === 'd'
@@ -449,6 +452,58 @@ describe.skipIf(!hasDb)('shopper erasure: Postgres vs the store DO', () => {
     expect(norm(await stateOf('d', d), d)).toEqual(sp);
     // the other data subject's record is intact
     expect(sp.customers.map((c: any) => c.first_name)).toContain('Other');
+  });
+
+  it('the erasure scope is saved first: a Postgres failure after the DO step, then a retry, still erases everything in scope', async () => {
+    process.env.SUITE_BUYER_KEY_SECRET = 'x'.repeat(40);
+    const { inngest } = await import('../../apps/api/src/lib/inngest/client');
+    const { WhatsAppConsentService } = await import('../../apps/api/src/lib/wa/consent');
+    const { InstapayReceiptService } =
+      await import('../../apps/api/src/services/payment-providers/instapay-receipt.service');
+    const send = inngest.send as unknown as ReturnType<typeof vi.fn>;
+    const d = await world('d');
+    const orderIds = (
+      sqlite.prepare('SELECT id FROM orders WHERE customer_id = ?').all(d.U) as { id: string }[]
+    ).map(r => r.id);
+    expect(orderIds).toHaveLength(2);
+    sqlite
+      .prepare(
+        "INSERT INTO instapay_order_receipts (id, store_id, order_id, storage_key, mime_type, size_bytes, sha256, status, created_at) VALUES (?, ?, ?, 'k/1', 'image/png', 1, 'sha', 'submitted', 1)"
+      )
+      .run('rcpt-1', ids.store, orderIds[0]);
+    const deleteImages = vi.spyOn(InstapayReceiptService, 'deleteImages').mockResolvedValue();
+    const fail = vi
+      .spyOn(WhatsAppConsentService, 'eraseForAccount')
+      .mockRejectedValueOnce(new Error('postgres down after the DO step'));
+    send.mockClear();
+    await expect(withRepo(doRepo, () => AuthService.eraseAccount(d.U))).rejects.toThrow(
+      'postgres down'
+    );
+    // the DO half committed: the orders are already unlinked, so a scope derived now would be empty
+    expect(
+      sqlite.prepare('SELECT count(*) AS n FROM orders WHERE customer_id = ?').get(d.U)
+    ).toEqual({ n: 0 });
+    expect(
+      sqlite.prepare('SELECT count(*) AS n FROM erasure_ledger WHERE user_id = ?').get(d.U)
+    ).toEqual({ n: 1 });
+    expect(send).not.toHaveBeenCalled();
+    fail.mockRestore();
+
+    await withRepo(doRepo, () => AuthService.eraseAccount(d.U));
+    const evt = send.mock.calls.map(c => c[0] as any).find(e => e.name === 'account/erased');
+    expect(evt.data.ciScope.orderIds.sort()).toEqual([...orderIds].sort());
+    expect(evt.data.ciScope.buyerKeys).toHaveLength(2);
+    expect(evt.data.ciProven.buyerKeys).toHaveLength(1);
+    expect(evt.data.buyerKey).toBe(evt.data.ciProven.buyerKeys[0]);
+    expect(deleteImages).toHaveBeenCalledWith(ids.store, ['rcpt-1']);
+    // and the receipt was scrubbed and marked by the first (committed) DO section
+    expect(
+      sqlite
+        .prepare('SELECT personal_scrubbed_at IS NOT NULL AS s FROM instapay_order_receipts')
+        .get()
+    ).toEqual({ s: 1 });
+    deleteImages.mockRestore();
+    delete process.env.SUITE_BUYER_KEY_SECRET;
   });
 
   it('an admin account is refused and nothing changes (the last super_admin is never erasable here)', async () => {

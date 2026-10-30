@@ -65,6 +65,11 @@ const PARITY: Record<string, Verdict> = {
     pg: 'scrub the payer personal fields, mark so the screenshot is deleted',
     do: 'same (scrubReceiptsForOrders), screenshot ids returned for the R2 delete',
   },
+  erasure_ledger: {
+    how: 'handled',
+    pg: 'n/a (DO-only): the saved scope of the erasure',
+    do: 'written first, read on a replay',
+  },
   commerce_outcomes: {
     how: 'handled',
     pg: 'n/a (DO-only table): buyer key to NULL',

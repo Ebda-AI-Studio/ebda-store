@@ -7,6 +7,12 @@ import { MoneyError, type SyncSql } from './sync-sql';
  * `AuthService.eraseAccount`, ONE section. The `users` row, its tokens and passkeys are platform data and stay in Postgres /
  * the identity service; everything the store holds about the shopper is here.
  *
+ * THE SCOPE IS PERSISTED FIRST: the shopper's order ids, their buyer keys, the proven number's key and the receipts to delete are
+ * read from rows this very section is about to unlink, so the first thing it does is write them to `erasure_ledger` (keyed by
+ * the user id). The caller commits the Postgres half AFTER this section; if that fails, the retry finds the orders already
+ * unlinked and would derive an empty scope, so a replay uses the SAVED scope instead and returns it (the Customer Intelligence
+ * erase and the screenshot deletes are driven by it).
+ *
  * It follows the Postgres function table by table. WHERE Postgres anonymises, so does this (the legal-record rules), and where
  * it deletes, this deletes; `tests/integration/repo-factory-erase-shopper-contract.test.ts` compares the rows of both backends
  * and `tests/unit/erase-shopper-parity.test.ts` pins every table the erasure registry deletes or scrubs to one of: handled
@@ -28,6 +34,10 @@ import { MoneyError, type SyncSql } from './sync-sql';
  *  everything else the shopper owns (addresses, carts, wishlists, push, B2B applications) deleted
  */
 export const WALLET_FORFEIT_NOTE = 'Forfeited on account erasure';
+/** How long a ledger row is kept: past this a half-finished erasure can no longer be resumed from it. */
+export const ERASURE_LEDGER_TTL_MS = 30 * 86_400_000;
+export const ERASURE_LEDGER_DDL = `CREATE TABLE IF NOT EXISTS erasure_ledger (
+  user_id TEXT PRIMARY KEY, store_id TEXT NOT NULL, scope TEXT NOT NULL, created_at INTEGER NOT NULL)`;
 export const ANONYMIZED_ADDRESS = '{"anonymized":true}';
 
 export interface EraseShopperInput {
@@ -50,6 +60,10 @@ export interface EraseShopperInput {
 export interface EraseShopperResult {
   /** The shopper's own orders (for the Customer Intelligence erase scope). */
   orders: Array<{ id: string; buyerKey: string | null; createdAt: number }>;
+  /** The proven current-number buyer key the erasure used (the saved one on a replay). */
+  provenBuyerKey: string | null;
+  /** true when the scope came from the erasure ledger of an earlier, partly completed attempt. */
+  replayed: boolean;
   /** Receipt screenshots to delete from the private bucket after this commits. */
   receiptIds: string[];
   crmChecked: boolean;
@@ -71,6 +85,8 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
   const { storeId, userId } = a;
   const out: EraseShopperResult = {
     orders: [],
+    provenBuyerKey: null,
+    replayed: false,
     receiptIds: [],
     crmChecked: false,
     crmRowsScrubbed: 0,
@@ -79,18 +95,59 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
     walletNotesScrubbed: false,
   };
   return db.transactionSync(() => {
-    // 1. orders (read before they lose the link)
-    out.orders = db
-      .all('SELECT id, buyer_key, created_at FROM orders WHERE store_id = ? AND customer_id = ?', [
-        storeId,
-        userId,
-      ])
-      .map(r => ({
-        id: r.id as string,
-        buyerKey: (r.buyer_key as string | null) ?? null,
-        createdAt: r.created_at as number,
-      }));
+    // 0. the erasure scope, saved BEFORE any destructive step (a replay uses the saved one)
+    db.run(ERASURE_LEDGER_DDL, []);
+    db.run('DELETE FROM erasure_ledger WHERE created_at < ?', [now - ERASURE_LEDGER_TTL_MS]);
+    const saved = db.all('SELECT scope FROM erasure_ledger WHERE user_id = ? AND store_id = ?', [
+      userId,
+      storeId,
+    ])[0];
+    if (saved) {
+      const sc = JSON.parse(saved.scope as string) as Pick<
+        EraseShopperResult,
+        'orders' | 'receiptIds' | 'provenBuyerKey'
+      >;
+      out.orders = sc.orders;
+      out.receiptIds = sc.receiptIds;
+      out.provenBuyerKey = sc.provenBuyerKey;
+      out.replayed = true;
+    } else {
+      out.orders = db
+        .all(
+          'SELECT id, buyer_key, created_at FROM orders WHERE store_id = ? AND customer_id = ?',
+          [storeId, userId]
+        )
+        .map(r => ({
+          id: r.id as string,
+          buyerKey: (r.buyer_key as string | null) ?? null,
+          createdAt: r.created_at as number,
+        }));
+      out.provenBuyerKey = a.provenBuyerKey;
+      out.receiptIds = out.orders.length
+        ? db
+            .all(
+              `SELECT id FROM instapay_order_receipts WHERE store_id = ? AND image_deleted_at IS NULL
+                  AND order_id IN (SELECT value FROM json_each(?))`,
+              [storeId, JSON.stringify(out.orders.map(o => o.id))]
+            )
+            .map(r => r.id as string)
+        : [];
+      db.run(
+        'INSERT INTO erasure_ledger (user_id, store_id, scope, created_at) VALUES (?, ?, ?, ?)',
+        [
+          userId,
+          storeId,
+          JSON.stringify({
+            orders: out.orders,
+            receiptIds: out.receiptIds,
+            provenBuyerKey: out.provenBuyerKey,
+          }),
+          now,
+        ]
+      );
+    }
     const orderIds = out.orders.map(o => o.id);
+    const provenKey = out.provenBuyerKey;
 
     // 2. webhook delivery log (Ruling WH-7): the shopper's contact data leaves the stored payloads
     const email = a.email?.trim().toLowerCase() || null;
@@ -103,24 +160,15 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
         [storeId, JSON.stringify(orderIds), email]
       );
 
-    // 3. InstaPay receipts of those orders
-    if (orderIds.length > 0) {
-      out.receiptIds = db
-        .all(
-          `SELECT id FROM instapay_order_receipts WHERE store_id = ? AND image_deleted_at IS NULL
-              AND order_id IN (SELECT value FROM json_each(?))`,
-          [storeId, JSON.stringify(orderIds)]
-        )
-        .map(r => r.id as string);
-      scrubReceiptsForOrders(db, { orderIds, now });
-    }
+    // 3. InstaPay receipts of those orders (the screenshot ids are in the saved scope)
+    if (orderIds.length > 0) scrubReceiptsForOrders(db, { orderIds, now });
 
     // 3b. Customer Intelligence capture rows (append-only; the trigger lets buyer_key go to NULL only while the erasure flag is
     //     up, raised and lowered inside this section). The shopper's own order keys, and the proven current number's key.
     const buyerKeys = [
       ...new Set([
         ...out.orders.flatMap(o => (o.buyerKey ? [o.buyerKey] : [])),
-        ...(a.provenBuyerKey ? [a.provenBuyerKey] : []),
+        ...(provenKey ? [provenKey] : []),
       ]),
     ];
     if (buyerKeys.length > 0) {
@@ -278,7 +326,7 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
       .filter(r => r.user_id === userId || r.user_id === null);
     for (const r of wa) {
       const keepOptOut =
-        r.buyer_key !== a.provenBuyerKey && r.granted === 0 && r.revoked_source === 'whatsapp';
+        r.buyer_key !== provenKey && r.granted === 0 && r.revoked_source === 'whatsapp';
       if (keepOptOut)
         db.run(
           'UPDATE store_whatsapp_consents SET user_id = NULL WHERE store_id = ? AND buyer_key = ?',

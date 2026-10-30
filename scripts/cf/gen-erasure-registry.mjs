@@ -63,6 +63,12 @@ const RUNTIME_PII_TABLES = {
     },
   },
 };
+RUNTIME_PII_TABLES.erasure_ledger = {
+  // Ruling CF-R6A-3: the saved scope of a shopper erasure (order ids, buyer keys, receipt ids), keyed by the user id; a
+  // customer erasure of the same subject deletes it, and a 30-day TTL bounds a half-finished one
+  match: { userId: 'user_id' },
+  action: 'delete',
+};
 const PII_JSON_LIKE = /address|_raw|json/i;
 
 export async function generate() {
@@ -144,7 +150,13 @@ export async function generate() {
   }
   for (const [t, e] of Object.entries(RUNTIME_PII_TABLES)) {
     if (out[t]) throw new Error(`${t} is now in the schema: drop it from RUNTIME_PII_TABLES`);
-    out[t] = { kind: 'customer-pii', match: {}, via: e.via, action: e.action, scrub: e.scrub };
+    out[t] = {
+      kind: 'customer-pii',
+      match: e.match ?? {},
+      via: e.via,
+      action: e.action,
+      scrub: e.scrub,
+    };
   }
   const sorted = Object.fromEntries(Object.entries(out).sort(([a], [b]) => (a < b ? -1 : 1)));
   const body = JSON.stringify(sorted, null, 2)

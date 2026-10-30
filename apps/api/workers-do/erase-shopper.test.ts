@@ -116,6 +116,32 @@ describe('shopper erasure on the store DO', () => {
     ]);
   });
 
+  it('a replay returns the SAVED scope (orders already unlinked), so the caller can finish what a failed first attempt left', async () => {
+    const store = 'es-replay';
+    const stub = await seeded(store);
+    const first = decodeRpc<{
+      orders: unknown[];
+      replayed: boolean;
+      provenBuyerKey: string | null;
+    }>(
+      (
+        (await op(stub, store, 'eraseShopper', { ...args, provenBuyerKey: 'b'.repeat(64) })) as {
+          json: string;
+        }
+      ).json
+    );
+    expect(first).toMatchObject({ replayed: false, provenBuyerKey: 'b'.repeat(64) });
+    expect(first.orders).toHaveLength(1);
+    expect(await rows(stub, 'SELECT customer_id FROM orders')).toEqual([{ customer_id: null }]);
+    // the retry has no linked order and no proof left; the ledger supplies both
+    const again = decodeRpc<typeof first & { receiptIds: string[] }>(
+      ((await op(stub, store, 'eraseShopper', args)) as { json: string }).json
+    );
+    expect(again).toMatchObject({ replayed: true, provenBuyerKey: 'b'.repeat(64) });
+    expect(again.orders).toEqual(first.orders);
+    expect(await rows(stub, 'SELECT user_id FROM erasure_ledger')).toEqual([{ user_id: 'u1' }]);
+  });
+
   it('an admin role is refused and nothing changes', async () => {
     const store = 'es-admin';
     const stub = await seeded(store);

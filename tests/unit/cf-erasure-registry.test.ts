@@ -18,6 +18,7 @@ import {
 } from '../../apps/api/src/cf/erasure/store-do-sql';
 
 import { INSTAPAY_RECEIPT_DDL } from '../../packages/repo/src/do/instapay-receipts';
+import { ERASURE_LEDGER_DDL } from '../../packages/repo/src/do/erase-shopper';
 
 const ROOT = path.resolve(__dirname, '../..');
 const dir = path.join(ROOT, 'packages/cf-schema/migrations/store');
@@ -30,6 +31,7 @@ function openDo(): DatabaseSync {
     db.exec(fs.readFileSync(path.join(dir, f), 'utf8'));
   // tables the StoreDO creates at start that hold personal data (they are classified in the generator, not in the migrations)
   for (const s of INSTAPAY_RECEIPT_DDL) db.exec(s);
+  db.exec(ERASURE_LEDGER_DDL);
   return db;
 }
 // like the Durable Object's `sql.exec`: the statement runs when called, `toArray()` only reads the cursor

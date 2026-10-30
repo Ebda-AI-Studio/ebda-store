@@ -384,6 +384,8 @@ export interface MoneyClient {
   }): Promise<{
     orders: Array<{ id: string; buyerKey: string | null; createdAt: number }>;
     receiptIds: string[];
+    provenBuyerKey: string | null;
+    replayed: boolean;
     crmChecked: boolean;
     crmRowsScrubbed: number;
     crmAmbiguous: boolean;

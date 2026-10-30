@@ -194,6 +194,13 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
   do_flags: {
     kind: 'no-pii',
   },
+  erasure_ledger: {
+    kind: 'customer-pii',
+    match: {
+      userId: 'user_id',
+    },
+    action: 'delete',
+  },
   eta_connections: {
     kind: 'store-owned',
   },

@@ -62,6 +62,10 @@ export const DO_RUNTIME_TABLES = {
     erasure: 'ttl',
     why: 'InstaPay order receipts of a DO store (Ruling INSTAPAY-DO-1): payer fields scrubbed 180 days after a decision and on the shopper erasure, screenshots deleted by the retention sweep; imported from the platform table at cutover (PG_SOURCED_DO_TABLES, Ruling CF-R6A-4)',
   },
+  erasure_ledger: {
+    erasure: 'ttl',
+    why: 'the saved scope of a shopper erasure (Ruling CF-R6A-3), purged after 30 days and by the subject erasure; never imported, an erasure in flight at the flip is retried',
+  },
   search_dirty: { erasure: 'derived', why: 'queue of rows to re-index' },
   product_vector_state: { erasure: 'derived', why: 'embedding bookkeeping, rebuilt from products' },
   vector_usage: { erasure: 'no-pii', why: 'Workers AI spend counter per day' },

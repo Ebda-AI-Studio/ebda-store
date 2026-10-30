@@ -2086,7 +2086,7 @@ export class AuthService {
       if (!consentStoreId)
         throw new Error('[auth.eraseAccount] no store id for the consent erasure');
       eraseProvenBuyerKey = doMoney
-        ? doProvenBuyerKey
+        ? (doErase?.provenBuyerKey ?? undefined)
         : buyerKey && user.phone && (await phoneOnOwnOrder(consentStoreId, userId, user.phone, tx))
           ? buyerKey
           : undefined;

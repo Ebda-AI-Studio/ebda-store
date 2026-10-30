@@ -41,7 +41,7 @@ import {
 import { placeAdminOrder, type AdminOrderInput } from './admin-order';
 import { searchOrderIds } from './order-search';
 import { searchProductIdSet } from './search';
-import { eraseShopper, type EraseShopperInput } from './erase-shopper';
+import { ERASURE_LEDGER_DDL, eraseShopper, type EraseShopperInput } from './erase-shopper';
 import { matchingCustomers } from './search-customers';
 import {
   claimReturn,
@@ -208,6 +208,8 @@ const TABLE = '_money_ops';
 export const ensureMoneyOpsSchema = (db: SyncSql): void => {
   ensureKeyedSchema(db, TABLE);
   for (const s of INSTAPAY_RECEIPT_DDL) db.run(s, []);
+  // the saved scope of a shopper erasure (Ruling CF-R6A-3); the registry classifies it, so it must exist before any customer subject
+  db.run(ERASURE_LEDGER_DDL, []);
 };
 
 const id = (v: unknown, what: string): string =>
