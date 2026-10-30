@@ -177,11 +177,34 @@ describe('refunds', () => {
       /INVALID_STATE|REFUND_ALREADY_ISSUED|PAYMENT_FULLY_REFUNDED/
     );
     r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-1' });
-    const first = r.op('refundBook', { orderId: p.o.orderId });
-    expect(first).toMatchObject({ kind: 'refund', replayed: false, status: 'refunded' });
-    const stock = r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory;
-    expect(stock).toBe(20);
+    // the reversal ran INSIDE refundComplete (Opus I4): stock is back and the keyed refundBook is a replay
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
     expect(r.op('refundBook', { orderId: p.o.orderId }).replayed).toBe(true);
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
+  });
+
+  it('FAILURE INJECTION (Opus I4): a failing whole-order reversal rolls refundComplete back whole, and the retry converges', () => {
+    const r = rig();
+    const p = r.paid(3);
+    p.hook('evt-p');
+    const claim = r.op('refundBegin', { paymentId: p.paymentId, refundKey: 'rk-inject-1' });
+    r.raw.exec(
+      `CREATE TRIGGER inject_reversal BEFORE UPDATE OF refund_reversed_at ON orders WHEN NEW.refund_reversed_at IS NOT NULL BEGIN SELECT RAISE(ABORT, 'injected'); END`
+    );
+    expect(() => r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-9' })).toThrow();
+    // nothing half-applied: no executed marker, the order was not flipped, stock still held
+    expect(
+      r.q("SELECT count(*) n FROM payment_events WHERE event_type = 'refund_executed'")[0].n
+    ).toBe(0);
+    expect(r.q('SELECT status FROM orders')[0].status).not.toBe('refunded');
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(17);
+    r.raw.exec('DROP TRIGGER inject_reversal');
+    r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-9' });
+    expect(r.q('SELECT status FROM orders')[0].status).toBe('refunded');
+    expect(r.q('SELECT refund_reversed_at FROM orders')[0].refund_reversed_at).not.toBeNull();
+    expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
+    // a second retry changes nothing
+    r.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-9' });
     expect(r.q("SELECT inventory FROM products WHERE id = 'sku'")[0].inventory).toBe(20);
   });
 

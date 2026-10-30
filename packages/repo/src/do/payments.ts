@@ -510,6 +510,10 @@ export function completeRefund(
         { via: 'provider_refund', refundId: a.refundId },
         now
       );
+      // The whole-order reversal (stock, coupon, loyalty, wallet, backorders) is part of THIS section (Opus I4, Ruling
+      // CF-OPUS-4): the provider's refund is an external fact, so a failure here rolls back the executed marker too and the
+      // caller's retry of `refundComplete` re-runs both, instead of leaving a refunded payment with an unreversed order.
+      refundOrder(db, { storeId: a.storeId, orderId: o.id, external: true, now });
     }
     addPaymentEvent(db, {
       storeId: a.storeId,
