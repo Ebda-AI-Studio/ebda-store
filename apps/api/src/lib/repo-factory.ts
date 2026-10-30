@@ -95,7 +95,8 @@ export type WritableModel =
   | 'notificationEventConfig'
   | 'review'
   | 'etaConnection'
-  | 'etaReceipt';
+  | 'etaReceipt'
+  | 'bulkAiJob';
 /** `inventory` is never written through this client (stock moves only in the locked money/stock sections, PR D2). */
 export type StoreWrites = {
   [K in WritableModel]: Pick<

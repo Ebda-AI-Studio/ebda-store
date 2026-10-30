@@ -49,7 +49,6 @@
     "ci-outcomes",
     "contact-form-send",
     "domain-claim-sweep",
-    "queue-depth-watch",
     "r2-orphan-sweep",
     "search-index-backstop",
     "search-product-index",

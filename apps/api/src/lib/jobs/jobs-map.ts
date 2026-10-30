@@ -38,7 +38,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   heartbeat: { group: '1-observability', kind: 'queue', trigger: 'cron' },
-  'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron' },
+  'queue-depth-watch': { group: '1-observability', kind: 'queue', trigger: 'cron', alarm: true },
   'abandoned-cart-purge-weekly': {
     group: '2-housekeeping',
     kind: 'queue',

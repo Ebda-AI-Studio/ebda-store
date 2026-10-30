@@ -42,6 +42,8 @@ export const ALARM_READY: ReadonlySet<string> = new Set([
   // Ruling CF-JOBS-4B (data retention): receipts and orders are swept on the DO store's own alarm
   'instapay-receipt-retention-daily',
   'order-anonymize-5y-monthly',
+  // Ruling CF-JOBS-4B (queue-depth-watch): BulkAiJob follows the store's backend; a DO store is watched on its alarm
+  'queue-depth-watch',
 ]);
 
 function tokens(): string[] {

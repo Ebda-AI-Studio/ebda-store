@@ -65,6 +65,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   // ETA e-receipts: the connection and the receipt rows (Ruling CF-JOBS-4B)
   'EtaConnection',
   'EtaReceipt',
+  // bulk AI job rows: the stuck-job watcher resumes or fails them (Ruling CF-JOBS-4B)
+  'BulkAiJob',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

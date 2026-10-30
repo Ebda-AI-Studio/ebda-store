@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, withStore, acrossStores } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { sweepStoresDb, withStoreRw } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -81,7 +82,7 @@ const queueDepthWatchFn = inngest.createFunction(
     // HOURLY (Ruling INNGEST-BUDGET-1): a 30/60-min stuck threshold watch; an hourly tick sees it at most 1h late.
     triggers: [{ cron: '7 * * * *' }],
   },
-  async () => {
+  async ({ event }) => {
     const now = Date.now();
     const queuedThreshold = new Date(now - 30 * 60 * 1000); // 30 min ago
     const runningThreshold = new Date(now - 60 * 60 * 1000); // 60 min ago
@@ -90,21 +91,22 @@ const queueDepthWatchFn = inngest.createFunction(
     // Inngest workers, so plain prisma reads return 0 rows. Each store is read
     // in its own scope and the per-store partials are merged to the same
     // global 20-row ceilings.
-    const perStore = await acrossStores(storeId =>
-      Promise.all([
-        prisma.bulkAiJob.findMany({
+    // Store by store through the store's backend: the cron run visits the Postgres stores, a DO store's alarm run reads that
+    // store's own Durable Object (Ruling CF-JOBS-4B). The store's display name is a platform row, attached after the read.
+    const queued = await sweepStoresDb(event, {
+      fetch: (storeId, db) =>
+        db.bulkAiJob.findMany({
           where: { storeId, status: 'queued', createdAt: { lt: queuedThreshold } },
-          select: {
-            id: true,
-            storeId: true,
-            kind: true,
-            createdAt: true,
-            store: { select: { name: true, slug: true } },
-          },
+          select: { id: true, storeId: true, kind: true, createdAt: true },
           orderBy: { createdAt: 'asc' },
           take: 20,
         }),
-        prisma.bulkAiJob.findMany({
+      orderKey: j => j.createdAt,
+      take: 20,
+    });
+    const running = await sweepStoresDb(event, {
+      fetch: (storeId, db) =>
+        db.bulkAiJob.findMany({
           where: { storeId, status: 'running', startedAt: { lt: runningThreshold } },
           select: {
             id: true,
@@ -116,21 +118,26 @@ const queueDepthWatchFn = inngest.createFunction(
             force: true,
             direction: true,
             autoResumeCount: true,
-            store: { select: { name: true, slug: true } },
           },
           orderBy: { startedAt: 'asc' },
           take: 20,
         }),
-      ])
-    );
-    const stuckQueued = perStore
-      .flatMap(r => r.value[0])
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-      .slice(0, 20);
-    const stuckRunning = perStore
-      .flatMap(r => r.value[1])
-      .sort((a, b) => (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0))
-      .slice(0, 20);
+      orderKey: j => j.startedAt?.getTime() ?? 0,
+      take: 20,
+    });
+    const labels = new Map<string, { name: string; slug?: string }>();
+    for (const id of new Set([...queued, ...running].map(j => j.storeId))) {
+      const st = await withStore(id, tx =>
+        tx.store.findUnique({ where: { id }, select: { name: true, slug: true } })
+      );
+      labels.set(id, { name: st?.name ?? id, slug: st?.slug ?? undefined });
+    }
+    const withStoreLabel = <J extends { storeId: string }>(j: J) => ({
+      ...j,
+      store: labels.get(j.storeId) ?? { name: j.storeId, slug: undefined },
+    });
+    const stuckQueued = queued.map(withStoreLabel);
+    const stuckRunning = running.map(withStoreLabel);
 
     const stuckCount = stuckQueued.length + stuckRunning.length;
 
@@ -180,7 +187,7 @@ const queueDepthWatchFn = inngest.createFunction(
         // scan (and the next one) doesn't re-flag it while it's just
         // waiting to be picked up again.
         try {
-          await withStore(job.storeId, tx =>
+          await withStoreRw(job.storeId, tx =>
             tx.bulkAiJob.update({
               where: { id: job.id, storeId: job.storeId },
               data: { status: 'queued', autoResumeCount: { increment: 1 } },
@@ -243,7 +250,7 @@ const queueDepthWatchFn = inngest.createFunction(
             ? 'AI quota exhausted for today'
             : 're-enqueue attempt failed';
       try {
-        await withStore(job.storeId, tx =>
+        await withStoreRw(job.storeId, tx =>
           tx.bulkAiJob.update({
             where: { id: job.id, storeId: job.storeId },
             data: {
