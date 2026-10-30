@@ -1,4 +1,7 @@
 {
+  "apps/api/src/lib/ci/source.ts": {
+    "shipment": 1
+  },
   "apps/api/src/lib/inngest/functions/bulk-ai-aeo.ts": {
     "category": 4,
     "product": 4
@@ -41,18 +44,14 @@
     "product": 2,
     "category": 2
   },
-  "apps/api/src/lib/inngest/functions/wa-store-events.ts": {
-    "abandonedCart": 1,
-    "product": 2
-  },
   "apps/api/src/lib/savepoint.ts": {
     "cart": 1
   },
   "apps/api/src/lib/wa/consent.ts": {
     "cart": 1
   },
-  "apps/api/src/routes/admin-search.routes.ts": {
-    "product": 1
+  "apps/api/src/mcp/tools/admin-read.tools.ts": {
+    "shipment": 2
   },
   "apps/api/src/routes/admin.routes.ts": {
     "product": 3
@@ -92,6 +91,9 @@
     "product": 3,
     "storeLocation": 1,
     "storePage": 1
+  },
+  "apps/api/src/routes/shipping-carrier.routes.ts": {
+    "shipment": 6
   },
   "apps/api/src/routes/stock-adjustments.routes.ts": {
     "productVariant": 2,
@@ -148,8 +150,8 @@
     "product": 1
   },
   "apps/api/src/services/auth.service.ts": {
-    "abandonedCart": 1,
-    "campaignRecipient": 1
+    "campaignRecipient": 1,
+    "abandonedCart": 1
   },
   "apps/api/src/services/barcode-scan.service.ts": {
     "product": 3,
@@ -165,7 +167,6 @@
     "product": 2
   },
   "apps/api/src/services/campaign.service.ts": {
-    "abandonedCart": 1,
     "newsletterSubscriber": 1
   },
   "apps/api/src/services/cart.service.ts": {
@@ -173,6 +174,9 @@
     "productVariant": 1,
     "cartItem": 2,
     "cartBundle": 1
+  },
+  "apps/api/src/services/cod-reconciliation.service.ts": {
+    "shipment": 2
   },
   "apps/api/src/services/customer-reorder.service.ts": {
     "product": 1
@@ -240,6 +244,12 @@
   },
   "apps/api/src/services/setup-guide.service.ts": {
     "product": 1
+  },
+  "apps/api/src/services/shipment-pickup.service.ts": {
+    "shipment": 1
+  },
+  "apps/api/src/services/shipping-carrier.service.ts": {
+    "shipment": 11
   },
   "apps/api/src/services/store-category-suggest.service.ts": {
     "category": 1,

@@ -17,6 +17,8 @@ import {
   runInStoreScope,
   withMoneyTx,
 } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { runInStoreCtx } from '../lib/jobs/store-db';
 import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { config as appConfig } from '../config';
 import {
@@ -135,7 +137,10 @@ class ShippingCarrierService {
     const cacheKey = `${CARRIER_CONFIG_CACHE_PREFIX}${storeId}`;
     let rows = await redis.get<any[]>(cacheKey, true);
     if (rows === null) {
-      rows = await prisma.shippingCarrierConfig.findMany({
+      // the store's backend (Ruling CF-JOBS-4): its Durable Object for a DO store, `prisma` for Postgres
+      rows = await (
+        await storeDb(storeId)
+      ).shippingCarrierConfig.findMany({
         where: { storeId },
         orderBy: { createdAt: 'asc' },
       });
@@ -451,7 +456,8 @@ class ShippingCarrierService {
       '[ShippingCarrierService] createShipmentForOrder'
     );
 
-    const existing = await prisma.shipment.findFirst({ where: { orderId, storeId } });
+    const rdb = await storeDb(storeId);
+    const existing = await rdb.shipment.findFirst({ where: { orderId, storeId } });
     const rebookable =
       existing &&
       (existing.status === CREATION_FAILED ||
@@ -463,14 +469,24 @@ class ShippingCarrierService {
       return existing;
     }
 
-    const order = await prisma.order.findFirst({
+    // `customer` is an identity row (not in the store's Durable Object): its email is read apart, from the platform.
+    const orderRow = await rdb.order.findFirst({
       where: { id: orderId, storeId },
       include: {
         items: { include: { product: { select: { name: true, sku: true } } } },
-        customer: { select: { email: true, firstName: true, lastName: true } },
         payments: { select: { provider: true, status: true, amount: true, createdAt: true } },
       },
     });
+    const customerRow =
+      orderRow?.customerId != null
+        ? await withStore(storeId, tx =>
+            tx.user.findFirst({
+              where: { id: orderRow.customerId! },
+              select: { email: true, firstName: true, lastName: true },
+            })
+          ).catch(() => null)
+        : null;
+    const order = orderRow ? { ...orderRow, customer: customerRow } : null;
     if (!order) {
       throw new AppError(404, 'NOT_FOUND', `Order ${orderId} not found in store ${storeId}`);
     }
@@ -582,7 +598,7 @@ class ShippingCarrierService {
       weight: settings.defaultWeight,
     });
     if (!claimedId) {
-      const current = await prisma.shipment.findFirst({ where: { orderId, storeId } });
+      const current = await rdb.shipment.findFirst({ where: { orderId, storeId } });
       if (current) return current;
       throw new AppError(409, 'SHIPMENT_IN_PROGRESS', 'A shipment is already being created');
     }
@@ -673,7 +689,7 @@ class ShippingCarrierService {
     );
 
     try {
-      await runInTenantContext(storeId, () =>
+      await runInStoreCtx(storeId, () =>
         setOrderStatusGuarded(prisma, storeId, orderId, 'shipped')
       );
     } catch (txError) {
@@ -691,8 +707,8 @@ class ShippingCarrierService {
         },
         '[ShippingCarrierService] shipment booked but the order could not be marked shipped'
       );
-      await runInTenantContext(storeId, () =>
-        prisma.shipment.update({
+      await runInStoreCtx(storeId, async () =>
+        (await storeWriter(storeId)).shipment.update({
           where: { id: claimedId, storeId },
           data: { error: 'Booked, but the order status could not be set to shipped' },
         })
@@ -734,17 +750,18 @@ class ShippingCarrierService {
       weight: input.weight ? String(input.weight) : null,
     };
     try {
-      return await runInTenantContext(storeId, async () => {
+      return await runInStoreCtx(storeId, async () => {
+        const w = await storeWriter(storeId);
         if (!input.existingId) {
           // ci: not-an-outcome (the booking claim; `shipment.created` is emitted once the carrier accepted it)
-          const row = await prisma.shipment.create({
+          const row = await w.shipment.create({
             data: { storeId, orderId: input.orderId, ...fields, createAttempts: 1 },
           });
           return row.id;
         }
         const staleBefore = new Date(Date.now() - CLAIM_STALE_MS);
         // ci: not-an-outcome (re-claiming a failed or stale booking row)
-        const r = await prisma.shipment.updateMany({
+        const r = await w.shipment.updateMany({
           where: {
             id: input.existingId,
             storeId,
@@ -1542,7 +1559,10 @@ async function setOrderStatusGuarded(
   to: OrderStatus,
   opts: { restoreInventory?: boolean } = {}
 ): Promise<void> {
-  const current = await client.order.findFirst({
+  // the order lives in the store's backend (a Durable Object for a DO store); `client` stays for the Postgres callers' signature
+  const current = await (
+    await storeDb(storeId)
+  ).order.findFirst({
     where: { id: orderId, storeId },
     select: { status: true },
   });

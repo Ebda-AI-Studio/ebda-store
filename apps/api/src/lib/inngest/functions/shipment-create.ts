@@ -1,6 +1,6 @@
 import { NonRetriableError } from '../../jobs/errors';
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { runInStoreCtx, storeNameOf, withStoreDb } from '../../jobs/store-db';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
@@ -31,18 +31,24 @@ type Data = { storeId: string; orderId: string; carrier?: string };
 async function notifyMerchant(data: Data, reason: string) {
   const { storeId, orderId } = data;
   try {
-    const info = await runInTenantContext(storeId, async () => {
-      const [order, store, shipment] = await Promise.all([
-        prisma.order.findFirst({ where: { id: orderId, storeId }, select: { orderNumber: true } }),
-        prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }),
-        prisma.shipment.findFirst({ where: { orderId, storeId }, select: { carrier: true } }),
-      ]);
-      return {
-        orderNumber: order?.orderNumber ?? orderId,
-        storeName: store?.name ?? storeId,
-        carrier: shipment?.carrier,
-      };
-    });
+    const [rows, storeName] = await Promise.all([
+      withStoreDb(storeId, async db => ({
+        order: await db.order.findFirst({
+          where: { id: orderId, storeId },
+          select: { orderNumber: true },
+        }),
+        shipment: await db.shipment.findFirst({
+          where: { orderId, storeId },
+          select: { carrier: true },
+        }),
+      })),
+      storeNameOf(storeId),
+    ]);
+    const info = {
+      orderNumber: rows.order?.orderNumber ?? orderId,
+      storeName,
+      carrier: rows.shipment?.carrier,
+    };
     await OneSignalService.notifyAdminsOfShipmentFailure({
       storeId,
       storeName: info.storeName,
@@ -62,7 +68,7 @@ async function notifyMerchant(data: Data, reason: string) {
  */
 export async function bookShipment(data: Data) {
   // store_features + shipments + shipping_carrier_configs are FORCE RLS: scope the work.
-  return runInTenantContext(data.storeId, async () => {
+  return runInStoreCtx(data.storeId, async () => {
     const enabled = await featureService.isFeatureEnabled(data.storeId, 'shipping_carriers');
     if (!enabled) return { skipped: 'feature_off' as const };
     try {

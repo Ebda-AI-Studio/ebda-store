@@ -46,6 +46,7 @@ const h = vi.hoisted(() => ({
     })),
     reconcileWarehouseSku: vi.fn(async () => ({ reconciled: true, diff: 0 })),
   },
+  createShipment: vi.fn(async () => ({ id: 'sh1', status: 'created' })),
   send: vi.fn(async () => undefined),
   sendAlert: vi.fn(async () => 'sent'),
   sendStoreEvents: vi.fn(async () => undefined),
@@ -111,6 +112,12 @@ vi.mock('@api/lib/wa/plan-state', () => ({
   PLAN_CHANGED_EVENT: 'store/plan-changed',
   planChangedInput: async () => ({ input: { type: 'plan.changed' }, seed: 'plan:x' }),
 }));
+vi.mock('@api/services/shipping-carrier.service', () => ({
+  shippingCarrierService: { createShipmentForOrder: h.createShipment },
+}));
+vi.mock('@api/services/onesignal.service', () => ({
+  OneSignalService: { notifyAdminsOfShipmentFailure: vi.fn() },
+}));
 vi.mock('@api/services/redis.service', () => ({ redis: { exists: vi.fn(), set: vi.fn() } }));
 
 import { MONEY_JOBS, PORTED_JOBS, PORTED_MONEY_JOBS } from '@api/lib/jobs/job-data';
@@ -124,6 +131,7 @@ import { accountingPostRefundJournal } from '@api/lib/inngest/functions/accounti
 import { accountingPostExpenseJournal } from '@api/lib/inngest/functions/accounting-post-expense-journal';
 import { accountingPostPoReceiveJournal } from '@api/lib/inngest/functions/accounting-post-po-receive-journal';
 import { accountingPostStockAdjustmentJournal } from '@api/lib/inngest/functions/accounting-post-stock-adjustment-journal';
+import { bookShipment } from '@api/lib/inngest/functions/shipment-create';
 import { accountingDailyClose } from '@api/lib/inngest/functions/accounting-daily-close';
 import { sweepAllWarehouseStores } from '@api/lib/inngest/functions/warehouse-reconcile-sweep';
 import { emitStoreEventsFor, waPlanSync } from '@api/lib/inngest/functions/wa-store-events';
@@ -347,6 +355,14 @@ describe('wa-store-events: the erasure step runs for a DO store', () => {
       })
     ).toBe(0);
     expect(h.sendStoreEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('shipment-create on a DO store', () => {
+  it('books through the carrier service with no Postgres transaction', async () => {
+    const r = await bookShipment({ storeId: DO_STORE, orderId: 'o1' });
+    expect(r).toEqual({ shipmentId: 'sh1', status: 'created' });
+    expect(h.createShipment).toHaveBeenCalledWith(DO_STORE, 'o1', undefined);
   });
 });
 

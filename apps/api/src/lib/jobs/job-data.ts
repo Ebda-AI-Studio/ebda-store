@@ -57,10 +57,10 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'accounting-post-expense-journal',
   'accounting-post-po-receive-journal',
   'accounting-post-stock-adjustment-journal',
+  'shipment-create',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([
-  'shipment-create',
   'order-refunded-fanout',
   'order-created-fanout',
   'order-status-changed-fanout',
@@ -71,6 +71,7 @@ export const MONEY_JOBS: ReadonlySet<string> = new Set([
  * lists only the money jobs still refused, so together they are every job that moves money or stock.
  */
 export const PORTED_MONEY_JOBS: ReadonlySet<string> = new Set([
+  'shipment-create',
   'accounting-post-expense-journal',
   'accounting-post-po-receive-journal',
   'accounting-post-stock-adjustment-journal',
