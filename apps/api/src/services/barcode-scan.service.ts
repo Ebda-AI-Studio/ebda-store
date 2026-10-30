@@ -558,7 +558,16 @@ export async function reconcileCountSession(
         );
       }
     }
-    logger.info({ storeId, sessionId, ...r }, 'barcode-scan: reconcile (do)');
+    logger.info(
+      {
+        storeId,
+        sessionId,
+        adjustmentId: r.adjustmentId,
+        linesReconciled: r.linesReconciled,
+        zeroVarianceLines: r.zeroVarianceLines,
+      },
+      'barcode-scan: reconcile (do)'
+    );
     return r;
   }
   const session = await prisma.countSession.findFirst({
