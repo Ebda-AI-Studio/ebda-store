@@ -80,6 +80,7 @@ import {
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
 import {
   expenseDraftOp,
+  expenseTransitionOp,
   lastPaidSalesOp,
   orderAnonymizeOp,
   orderStampOp,
@@ -216,7 +217,8 @@ export type MoneyOpName =
   | 'vectorPlan'
   | 'vectorCommit'
   | 'vectorStale'
-  | 'vectorVisible';
+  | 'vectorVisible'
+  | 'expenseTransition';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -307,6 +309,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'vectorCommit',
   'vectorStale',
   'vectorVisible',
+  'expenseTransition',
 ];
 
 const TABLE = '_money_ops';
@@ -629,6 +632,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
+  expenseTransition: (db, storeId, a) => expenseTransitionOp(db, storeId, a),
   vectorCommit: (db, storeId, a) => vectorCommitOp(db, storeId, a),
   vectorPlan: (db, storeId, a) => vectorPlanOp(db, storeId, a),
   webhookEndpointCreate: (db, storeId, a) => webhookEndpointCreateOp(db, storeId, a),

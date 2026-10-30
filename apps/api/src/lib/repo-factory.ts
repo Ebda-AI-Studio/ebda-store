@@ -498,6 +498,13 @@ export interface MoneyClient {
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
   /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
   vectorVisible(a: { ids: string[] }): Promise<{ ids: string[] }>;
+  /** An expense's status step: approve (draft/pending), post (approved) or reject, one conditional UPDATE (Ruling CF-EXP-1). */
+  expenseTransition(a: {
+    expenseId: string;
+    action: 'approve' | 'post' | 'reject';
+    userId?: string | null;
+    pending?: boolean;
+  }): Promise<{ found: boolean; changed: boolean; status: string | null }>;
   /** Settle an embedded batch: usage, orphans, quarantines, per-product state against the current row. */
   vectorCommit(a: {
     ready: import('@ebda-src/repo').VectorWork[];
@@ -955,6 +962,7 @@ export function makeMoneyClient(
     usageCounts: a => call('usageCounts', a),
     vectorStale: a => call('vectorStale', a),
     vectorVisible: a => call('vectorVisible', a),
+    expenseTransition: a => call('expenseTransition', a),
     vectorCommit: a => call('vectorCommit', a),
     vectorPlan: a => call('vectorPlan', a),
     webhookEndpointCreate: a => call('webhookEndpointCreate', a),

@@ -278,6 +278,45 @@ async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseW
   });
 }
 
+const EXPENSE_INCLUDE = {
+  supplier: { select: { id: true, name: true, nameAr: true } },
+  expenseAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+  paidFromAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
+} as const;
+
+/** A store on its Durable Object (Ruling CF-EXP-1): the repo, or null for a Postgres store (whose code below is unchanged). */
+async function doRepoOf(storeId: string) {
+  const repo = await storeRepo(storeId);
+  if (repo.backend !== 'do') return null;
+  if (!repo.money) throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'No money client');
+  return { db: repo.db, money: repo.money };
+}
+
+/** The status step on the DO, then the row re-read with its relations. Errors read like the Postgres twin's. */
+async function expenseStepOnDo(
+  r: NonNullable<Awaited<ReturnType<typeof doRepoOf>>>,
+  storeId: string,
+  id: string,
+  action: 'approve' | 'post' | 'reject',
+  extra: { userId?: string | null; pending?: boolean } = {}
+): Promise<ExpenseWithRelations> {
+  const out = await r.money.expenseTransition({ expenseId: id, action, ...extra });
+  if (!out.found) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  if (!out.changed) {
+    if (action === 'post')
+      throw new Error(`Expense ${id} must be approved before posting (status=${out.status})`);
+    throw new Error(
+      `Expense ${id} cannot be ${action === 'approve' ? 'approved' : 'rejected'} (status=${out.status})`
+    );
+  }
+  const row = await r.db.expense.findFirst({
+    where: { id, storeId },
+    include: EXPENSE_INCLUDE,
+  });
+  if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
+  return row as unknown as ExpenseWithRelations;
+}
+
 /**
  * Approve a draft (or pending) expense.
  *
@@ -291,6 +330,21 @@ export async function approveExpense(
   id: string,
   userId?: string
 ): Promise<ExpenseWithRelations> {
+  const onDo = await doRepoOf(storeId);
+  if (onDo) {
+    const row = await onDo.db.expense.findFirst({
+      where: { id, storeId },
+      select: { createdBy: true },
+    });
+    if (!row) throw new Error(`Expense ${id} not found in store ${storeId}`);
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { expenseTwoStepApproval: true },
+    });
+    const selfApproval =
+      (store?.expenseTwoStepApproval ?? false) && userId != null && userId === row.createdBy;
+    return expenseStepOnDo(onDo, storeId, id, 'approve', { userId, pending: selfApproval });
+  }
   const expense = await prisma.expense.findFirst({
     where: { id, storeId },
     include: { store: { select: { expenseTwoStepApproval: true } } },
@@ -325,6 +379,12 @@ export async function approveExpense(
  * then fires `accounting/expense-posted` so the GL journal posts async.
  */
 export async function postExpense(storeId: string, id: string): Promise<ExpenseWithRelations> {
+  const onDo = await doRepoOf(storeId);
+  if (onDo) {
+    const posted = await expenseStepOnDo(onDo, storeId, id, 'post');
+    await fireExpensePosted(storeId, id);
+    return posted;
+  }
   const expense = await prisma.expense.findFirst({ where: { id, storeId } });
 
   if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
@@ -342,7 +402,13 @@ export async function postExpense(storeId: string, id: string): Promise<ExpenseW
     },
   });
 
-  // Fire async journal posting — non-blocking; journal service is idempotent
+  await fireExpensePosted(storeId, id);
+
+  return updated;
+}
+
+/** Fire async journal posting: non-blocking, and the journal job is idempotent per source row. */
+async function fireExpensePosted(storeId: string, id: string): Promise<void> {
   try {
     await inngest.send({
       name: 'accounting/expense-posted',
@@ -351,14 +417,14 @@ export async function postExpense(storeId: string, id: string): Promise<ExpenseW
   } catch (err) {
     logger.error({ err, expenseId: id, storeId }, 'postExpense: failed to fire inngest event');
   }
-
-  return updated;
 }
 
 /**
  * Reject a draft or pending expense.
  */
 export async function rejectExpense(storeId: string, id: string): Promise<ExpenseWithRelations> {
+  const onDo = await doRepoOf(storeId);
+  if (onDo) return expenseStepOnDo(onDo, storeId, id, 'reject');
   const expense = await prisma.expense.findFirst({ where: { id, storeId } });
 
   if (!expense) throw new Error(`Expense ${id} not found in store ${storeId}`);
@@ -414,14 +480,14 @@ export async function listExpenses(
     if (opts.to) where.expenseDate.lte = opts.to;
   }
 
-  const include = {
-    supplier: { select: { id: true, name: true, nameAr: true } },
-    expenseAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
-    paidFromAccount: { select: { id: true, nameEn: true, nameAr: true, code: true } },
-  } as const;
+  const include = EXPENSE_INCLUDE;
+
+  // A store on its Durable Object reads its own expenses (Ruling CF-EXP-1); the Postgres reads below are unchanged.
+  const onDo = await doRepoOf(storeId);
+  const rows = onDo ? onDo.db.expense : prisma.expense;
 
   const [items, total] = await Promise.all([
-    prisma.expense.findMany({
+    rows.findMany({
       where,
       // `expenseDate` is a calendar day (UTC midnight), so same-day rows tie byte-for-byte; `id`
       // makes the order total so page N+1 never repeats or skips a row of page N (issue 2429).
@@ -430,7 +496,7 @@ export async function listExpenses(
       take: perPage,
       include,
     }),
-    prisma.expense.count({ where }),
+    rows.count({ where }),
   ]);
 
   return { items: items as unknown as ExpenseWithRelations[], total, page, perPage };
@@ -443,7 +509,8 @@ export async function getExpense(
   storeId: string,
   id: string
 ): Promise<ExpenseWithRelations | null> {
-  return prisma.expense.findFirst({
+  const onDo = await doRepoOf(storeId);
+  return (onDo ? onDo.db.expense : prisma.expense).findFirst({
     where: { id, storeId },
     include: {
       supplier: { select: { id: true, name: true, nameAr: true } },

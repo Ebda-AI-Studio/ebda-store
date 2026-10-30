@@ -260,6 +260,55 @@ export function expenseDraftOp(
   return { expenseId, expenseNumber };
 }
 
+/**
+ * An expense's status step (approve / post / reject), the DO twin of `approveExpense` / `postExpense` / `rejectExpense`: ONE
+ * conditional UPDATE in one section, so two concurrent clicks cannot both move it. `approve` takes draft/pending to approved (or to
+ * pending when the Worker says the two-step rule applies: it read `expenseTwoStepApproval` and compared the approver with the
+ * creator, which this op does not repeat), `post` takes approved to posted, `reject` takes draft/pending to rejected. A row in
+ * another status, or no such row, changes nothing and says which, so the Worker raises the same error the Postgres twin does.
+ * Posting does NOT book the journal: the Worker sends `accounting/expense-posted` after this returns (the journal job is idempotent).
+ */
+export function expenseTransitionOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { found: boolean; changed: boolean; status: string | null } {
+  if (typeof a.expenseId !== 'string' || a.expenseId.length === 0 || a.expenseId.length > 128)
+    throw new MoneyError('BAD_ARGS', 'expenseId', 400);
+  const now = Date.now();
+  const userId = typeof a.userId === 'string' && a.userId.length <= 128 ? a.userId : null;
+  let sql: string;
+  let params: unknown[];
+  switch (a.action) {
+    case 'approve': {
+      const pending = a.pending === true;
+      sql = pending
+        ? "UPDATE expenses SET status = 'pending', approved_by = NULL, approved_at = NULL, updated_at = ?1 WHERE id = ?2 AND store_id = ?3 AND status IN ('draft', 'pending')"
+        : "UPDATE expenses SET status = 'approved', approved_by = ?4, approved_at = ?1, updated_at = ?1 WHERE id = ?2 AND store_id = ?3 AND status IN ('draft', 'pending')";
+      params = pending ? [now, a.expenseId, storeId] : [now, a.expenseId, storeId, userId];
+      break;
+    }
+    case 'post':
+      sql =
+        "UPDATE expenses SET status = 'posted', posted_at = ?1, updated_at = ?1 WHERE id = ?2 AND store_id = ?3 AND status = 'approved'";
+      params = [now, a.expenseId, storeId];
+      break;
+    case 'reject':
+      sql =
+        "UPDATE expenses SET status = 'rejected', updated_at = ?1 WHERE id = ?2 AND store_id = ?3 AND status IN ('draft', 'pending')";
+      params = [now, a.expenseId, storeId];
+      break;
+    default:
+      throw new MoneyError('BAD_ARGS', 'action', 400);
+  }
+  const changed = db.run(sql, params).changes > 0;
+  const row = db.all('SELECT status FROM expenses WHERE id = ? AND store_id = ?', [
+    a.expenseId,
+    storeId,
+  ])[0];
+  return { found: Boolean(row), changed, status: row ? String(row.status) : null };
+}
+
 const IDENT = /^[a-z][a-z0-9_]{0,63}$/;
 
 /**

@@ -187,6 +187,79 @@ describe('expenseDraft (Ruling CF-JOBS-4B)', () => {
   });
 });
 
+describe('expenseTransition (Ruling CF-EXP-1)', () => {
+  function drafted() {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO accounts (id, store_id, code, name_en, type) VALUES
+         ('a-cash', 's1', '1000', 'Cash', 'asset'), ('a-exp', 's1', '5990', 'Misc', 'expense')`
+    );
+    const made = r.op('expenseDraft', {
+      expenseAccountId: 'a-exp',
+      paidFromAccountId: 'a-cash',
+      amount: 1000,
+      taxAmount: 0,
+      total: 1000,
+      currency: 'EGP',
+      fxRate: 1,
+      originalAmount: 1000,
+      expenseDate: Date.UTC(2026, 9, 29),
+    });
+    const status = () =>
+      r.raw.prepare('SELECT status, approved_by, posted_at FROM expenses').get() as any;
+    return { ...r, id: made.expenseId as string, status };
+  }
+
+  it('draft -> approved -> posted, in order; posting an unapproved expense or approving a posted one changes nothing', () => {
+    const { op, id, status } = drafted();
+    expect(op('expenseTransition', { expenseId: id, action: 'post' })).toEqual({
+      found: true,
+      changed: false,
+      status: 'draft',
+    });
+    expect(op('expenseTransition', { expenseId: id, action: 'approve', userId: 'u1' })).toEqual({
+      found: true,
+      changed: true,
+      status: 'approved',
+    });
+    expect(status().approved_by).toBe('u1');
+    expect(op('expenseTransition', { expenseId: id, action: 'post' }).status).toBe('posted');
+    expect(status().posted_at).toBeGreaterThan(0);
+    // a second click (or a retried request) moves nothing
+    expect(op('expenseTransition', { expenseId: id, action: 'post' }).changed).toBe(false);
+    expect(op('expenseTransition', { expenseId: id, action: 'approve' }).changed).toBe(false);
+    expect(op('expenseTransition', { expenseId: id, action: 'reject' }).changed).toBe(false);
+  });
+
+  it('the two-step rule parks it in pending, the second approver approves it; reject works from draft or pending only', () => {
+    const { op, id, status } = drafted();
+    expect(
+      op('expenseTransition', { expenseId: id, action: 'approve', userId: 'u1', pending: true })
+        .status
+    ).toBe('pending');
+    expect(status().approved_by).toBeNull();
+    expect(op('expenseTransition', { expenseId: id, action: 'approve', userId: 'u2' }).status).toBe(
+      'approved'
+    );
+    expect(op('expenseTransition', { expenseId: id, action: 'reject' }).changed).toBe(false);
+    const other = drafted();
+    expect(other.op('expenseTransition', { expenseId: other.id, action: 'reject' }).status).toBe(
+      'rejected'
+    );
+  });
+
+  it('is store-scoped and refuses a bad action; an unknown id says not found', () => {
+    const { op, id } = drafted();
+    expect(op('expenseTransition', { expenseId: id, action: 'approve' }, 's2')).toEqual({
+      found: false,
+      changed: false,
+      status: null,
+    });
+    expect(op('expenseTransition', { expenseId: 'nope', action: 'post' }).found).toBe(false);
+    expect(() => op('expenseTransition', { expenseId: id, action: 'delete' })).toThrow();
+  });
+});
+
 describe('webhookEndpointCreate and r2References (Ruling CF-JOBS-4B)', () => {
   const ep = (i: number) => ({
     maxEndpoints: 2,
