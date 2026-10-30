@@ -9,7 +9,7 @@
   "pages": {
     "/": {
       "jsGzipKb": 207.5,
-      "htmlGzipKb": 51.5,
+      "htmlGzipKb": 52.5,
       "maxScripts": 13
     },
     "/features": {
@@ -36,6 +36,12 @@
     },
     "/en/legal/whatsapp-terms": {
       "htmlGzipKb": 26
+    },
+    "/terms": {
+      "htmlGzipKb": 21.5
+    },
+    "/merchant-agreement": {
+      "htmlGzipKb": 21.5
     }
   },
   "lcpMs": 2500,
