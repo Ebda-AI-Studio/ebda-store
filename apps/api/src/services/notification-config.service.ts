@@ -356,7 +356,9 @@ class NotificationConfigService {
           message: 'Push is not configured on the platform (VAPID keys are missing).',
         };
       }
-      const devices = await prisma.pushSubscription.count({ where: { storeId } });
+      const devices = await (
+        await storeRepo(storeId)
+      ).db.pushSubscription.count({ where: { storeId } });
       if (devices === 0) {
         return {
           success: false,

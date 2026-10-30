@@ -10,6 +10,10 @@
     "moduleResolution": "Bundler",
     "types": ["node"]
   },
-  "include": ["./**/*.ts", "../unit/search-eval-scoring.test.ts"],
+  "include": [
+    "./**/*.ts",
+    "../unit/search-eval-scoring.test.ts",
+    "../../apps/api/src/cf/repo-modules.d.ts"
+  ],
   "exclude": ["./embed-proxy/.wrangler"]
 }
