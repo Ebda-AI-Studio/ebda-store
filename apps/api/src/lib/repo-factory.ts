@@ -315,6 +315,19 @@ export interface StockClient {
     a: { sessionId: string; reconciledBy?: string | null },
     key?: string
   ): Promise<{ adjustmentId: string | null; linesReconciled: number; zeroVarianceLines: number }>;
+  importCodRemittances(a: {
+    carrier: string;
+    source?: string;
+    rows: Array<{
+      trackingNumber: string;
+      lineRef: string;
+      batchId?: string | null;
+      grossAmount: number;
+      feeAmount: number;
+      netAmount: number;
+      remittedAt: Date;
+    }>;
+  }): Promise<{ inserted: number; duplicates: number; unmatched: number }>;
   bulkSetInventory(a: {
     productIds: string[];
     mode: 'set' | 'adjust';
@@ -1034,6 +1047,7 @@ export function makeStockClient(
     closeCountSession: a => call('closeCountSession', a),
     reconcileCountSession: (a, key) => call('reconcileCountSession', a, key),
     bulkSetInventory: a => call('bulkSetInventory', a),
+    importCodRemittances: a => call('importCodRemittances', a),
     reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
     reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
   };

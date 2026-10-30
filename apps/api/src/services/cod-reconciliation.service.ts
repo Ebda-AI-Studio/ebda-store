@@ -7,7 +7,7 @@
  * store scope (the admin routes' tenant context).
  */
 import { prisma } from '@ebda/database';
-import { storeDb, storeRepo } from '../lib/repo-factory';
+import { storeDb, storeStock } from '../lib/repo-factory';
 import { AppError } from '../middleware/error-handler';
 import {
   parseSettlementCsv,
@@ -91,6 +91,26 @@ export class CodReconciliationService {
       return { inserted: 0, duplicates: 0, unmatched: 0, rejected: parsed.rejected };
     }
 
+    // A store on its Durable Object keeps its remittance lines there, beside the shipments they reference (Ruling CF-R7-2):
+    // matching and insert are one section, so a line never points at a shipment that is not in the store.
+    const stock = await storeStock(storeId);
+    if (stock) {
+      const r = await stock.importCodRemittances({
+        carrier,
+        source: opts.source ?? 'csv',
+        rows: parsed.rows.map(x => ({
+          trackingNumber: x.trackingNumber,
+          lineRef: x.lineRef,
+          batchId: x.batchId ?? null,
+          grossAmount: x.grossAmount,
+          feeAmount: x.feeAmount,
+          netAmount: x.netAmount,
+          remittedAt: x.remittedAt,
+        })),
+      });
+      return { ...r, rejected: parsed.rejected };
+    }
+
     const trackings = [...new Set(parsed.rows.map(r => r.trackingNumber))];
     const shipments = await (
       await storeDb(storeId)
@@ -132,27 +152,12 @@ export class CodReconciliationService {
     const page = Math.max(1, opts.page ?? 1);
     const limit = Math.min(100, Math.max(1, opts.limit ?? 25));
 
-    // A DO store's remittance lines are written to Postgres (CodRemittance is not a DO-written model), so the "has a remittance"
-    // filter cannot be a relation filter on the DO's own (empty) table: resolve the shipment ids from Postgres (Ruling CF-R6B-1).
-    const onDo = (await storeRepo(storeId)).backend === 'do';
-    const remittedShipmentIds = onDo
-      ? (
-          await prisma.codRemittance.findMany({
-            where: { storeId, shipmentId: { not: null } },
-            select: { shipmentId: true },
-            distinct: ['shipmentId'],
-          })
-        ).flatMap(r => (r.shipmentId ? [r.shipmentId] : []))
-      : [];
     const [shipmentsRead, linesRead] = await Promise.all([
       (await storeDb(storeId)).shipment.findMany({
         where: {
           storeId,
           status: { notIn: ['creation_failed', 'creating'] },
-          OR: [
-            { codAmount: { gt: 0 } },
-            onDo ? { id: { in: remittedShipmentIds } } : { codRemittances: { some: {} } },
-          ],
+          OR: [{ codAmount: { gt: 0 } }, { codRemittances: { some: {} } }],
           ...(opts.carrier ? { carrier: opts.carrier } : {}),
         },
         select: {
@@ -169,7 +174,7 @@ export class CodReconciliationService {
         orderBy: { createdAt: 'desc' },
         take: COD_REPORT_MAX_SHIPMENTS + 1,
       }),
-      prisma.codRemittance.findMany({
+      (await storeDb(storeId)).codRemittance.findMany({
         where: { storeId, ...(opts.carrier ? { carrier: opts.carrier } : {}) },
         orderBy: { remittedAt: 'asc' },
         take: COD_REPORT_MAX_LINES + 1,

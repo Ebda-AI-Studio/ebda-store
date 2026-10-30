@@ -143,7 +143,7 @@ beforeAll(async () => {
     insertSqlite(sqlite, 'Shipment', [sh as Record<string, unknown>]);
     ids[`ship${n}`] = sh.id;
   }
-  await prisma.codRemittance.create({
+  const remit = await prisma.codRemittance.create({
     data: {
       storeId: STORE,
       shipmentId: ids.ship2,
@@ -157,6 +157,8 @@ beforeAll(async () => {
       source: 'csv',
     } as never,
   });
+  // the DO keeps the remittance lines with the store (Ruling CF-R7-2)
+  insertSqlite(sqlite, 'CodRemittance', [remit as Record<string, unknown>]);
 });
 afterAll(async () => {
   if (!hasDb) return;

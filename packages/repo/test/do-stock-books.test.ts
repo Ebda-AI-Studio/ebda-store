@@ -352,3 +352,78 @@ describe('bulk inventory', () => {
     expect(r.q('SELECT count(*) AS n FROM inventory_history')[0].n).toBe(0);
   });
 });
+
+describe('COD settlement import (Ruling CF-R7-2)', () => {
+  function withShipments() {
+    const r = rig();
+    r.raw.exec(`
+      INSERT INTO orders (id, store_id, order_number, subtotal, total, shipping_address, billing_address) VALUES ('o1','s1','1',1,1,'{}','{}'), ('o2','s1','2',1,1,'{}','{}'), ('o3','other','3',1,1,'{}','{}');
+      INSERT INTO shipments (id, store_id, order_id, carrier, tracking_number, status, cod_amount, pickup_address, delivery_address) VALUES
+        ('sh1','s1','o1','bosta','T1','delivered',5000,'{}','{}'), ('sh2','s1','o2','bosta','T2','delivered',3000,'{}','{}');
+    `);
+    return r;
+  }
+  const row = (t: string, ref: string, gross: number, fee = 0) => ({
+    trackingNumber: t,
+    lineRef: ref,
+    grossAmount: gross,
+    feeAmount: fee,
+    netAmount: gross - fee,
+    remittedAt: new Date('2026-10-01T00:00:00Z'),
+  });
+
+  it('a line for a DO shipment references it; an unknown tracking stays unmatched (partial match)', () => {
+    const r = withShipments();
+    const out = r.op('importCodRemittances', {
+      carrier: 'bosta',
+      rows: [row('T1', 'L1', 5000, 100), row('T2', 'L2', 1000), row('T9', 'L9', 700)],
+    });
+    expect(out).toEqual({ inserted: 3, duplicates: 0, unmatched: 1 });
+    expect(
+      r.q('SELECT line_ref, shipment_id, net_amount FROM cod_remittances ORDER BY line_ref')
+    ).toEqual([
+      { line_ref: 'L1', shipment_id: 'sh1', net_amount: 4900 },
+      { line_ref: 'L2', shipment_id: 'sh2', net_amount: 1000 },
+      { line_ref: 'L9', shipment_id: null, net_amount: 700 },
+    ]);
+  });
+
+  it('importing the same file twice books every amount once', () => {
+    const r = withShipments();
+    const rows = [row('T1', 'L1', 5000), row('T2', 'L2', 3000)];
+    expect(r.op('importCodRemittances', { carrier: 'bosta', rows })).toMatchObject({
+      inserted: 2,
+      duplicates: 0,
+    });
+    expect(r.op('importCodRemittances', { carrier: 'bosta', rows })).toEqual({
+      inserted: 0,
+      duplicates: 2,
+      unmatched: 0,
+    });
+    expect(r.q('SELECT sum(net_amount) AS s, count(*) AS n FROM cod_remittances')[0]).toEqual({
+      s: 8000,
+      n: 2,
+    });
+  });
+
+  it('a late shipment is not matched retroactively by the import; a refused row writes nothing', () => {
+    const r = withShipments();
+    expect(
+      r.code('importCodRemittances', {
+        carrier: 'bosta',
+        rows: [row('T1', 'L1', 5000), { ...row('T2', 'L2', 3000), netAmount: 1 }],
+      })
+    ).toBe('BAD_ARGS/400');
+    expect(r.q('SELECT count(*) AS n FROM cod_remittances')[0].n).toBe(0);
+  });
+
+  it("is scoped to the store: another store's shipment with the same tracking is never matched", () => {
+    const r = withShipments();
+    r.raw.exec(
+      `INSERT INTO shipments (id, store_id, order_id, carrier, tracking_number, status, cod_amount, pickup_address, delivery_address) VALUES ('shx','other','o3','bosta','T5','delivered',1,'{}','{}')`
+    );
+    const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T5', 'L5', 1)] });
+    expect(out.unmatched).toBe(1);
+    expect(r.q('SELECT shipment_id FROM cod_remittances')[0].shipment_id).toBeNull();
+  });
+});

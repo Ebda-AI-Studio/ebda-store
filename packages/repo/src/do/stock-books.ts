@@ -984,6 +984,74 @@ export function bulkSetInventory(db: SyncSql, storeId: string, a: Args) {
   return { updated: rows.length };
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// COD settlement import (Ruling CF-R7-2)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * CodReconciliationService.importSettlement for a store on its DO. The remittance LINES live with the store (the DO's
+ * `cod_remittances`, whose `shipment_id` references the DO's own `shipments`), so a line can reference a DO store's shipment;
+ * on Postgres that FK pointed at Postgres `shipments`, which a DO store never writes. One section: the shipments are matched
+ * (carrier + tracking number, the newest shipment wins a tie) and the lines inserted together, so a line never carries a
+ * shipment id that is not in this store. Idempotent per `(store, carrier, lineRef)`: a line already imported is a duplicate and
+ * changes nothing, so the same statement imported twice (or two uploads racing) books every amount once.
+ */
+export function importCodRemittances(db: SyncSql, storeId: string, a: Args) {
+  const carrier = str(a.carrier, 'carrier');
+  const source = optStr(a.source, 'source', 32) ?? 'csv';
+  const rows = list(a.rows, 'rows', 5000).map(r => {
+    const gross = int(r.grossAmount, 'grossAmount', 0);
+    const fee = int(r.feeAmount, 'feeAmount', 0);
+    const net = int(r.netAmount, 'netAmount', 0);
+    // the table's own CHECK would refuse it with an opaque constraint error: answer it as a bad row instead
+    if (net !== gross - fee) fail('BAD_ARGS', 'netAmount must equal grossAmount - feeAmount');
+    return {
+      trackingNumber: str(r.trackingNumber, 'trackingNumber'),
+      lineRef: str(r.lineRef, 'lineRef'),
+      batchId: optStr(r.batchId, 'batchId', 128),
+      gross,
+      fee,
+      net,
+      remittedAt: optMs(r.remittedAt, 'remittedAt') ?? fail('BAD_ARGS', 'remittedAt'),
+    };
+  });
+  const trackings = [...new Set(rows.map(r => r.trackingNumber))];
+  const byTracking = new Map<string, string>();
+  if (trackings.length)
+    for (const s of db.all(
+      `SELECT id, tracking_number FROM shipments WHERE store_id = ? AND carrier = ? AND tracking_number IN (${inList(trackings.length)}) ORDER BY created_at ASC, rowid ASC`,
+      [storeId, carrier, ...trackings]
+    ))
+      byTracking.set(s.tracking_number as string, s.id as string); // ascending: the newest overwrites
+  let inserted = 0;
+  const now = Date.now();
+  for (const r of rows)
+    inserted += db.run(
+      `INSERT INTO cod_remittances (id, store_id, shipment_id, carrier, tracking_number, line_ref, batch_id, gross_amount, fee_amount, net_amount, remitted_at, source, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (store_id, carrier, line_ref) DO NOTHING`,
+      [
+        crypto.randomUUID(),
+        storeId,
+        byTracking.get(r.trackingNumber) ?? null,
+        carrier,
+        r.trackingNumber,
+        r.lineRef,
+        r.batchId,
+        r.gross,
+        r.fee,
+        r.net,
+        r.remittedAt,
+        source,
+        now,
+      ]
+    ).changes;
+  return {
+    inserted,
+    duplicates: rows.length - inserted,
+    unmatched: rows.filter(r => !byTracking.has(r.trackingNumber)).length,
+  };
+}
+
 export const BOOKS_OPS = {
   createStockAdjustment,
   postStockAdjustment,
@@ -998,5 +1066,6 @@ export const BOOKS_OPS = {
   closeCountSession,
   reconcileCountSession,
   bulkSetInventory,
+  importCodRemittances,
 } as const;
 export type BooksOpName = keyof typeof BOOKS_OPS;
