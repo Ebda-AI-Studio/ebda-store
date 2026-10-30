@@ -34,6 +34,7 @@ import {
 import { AppError } from '../../middleware/error-handler';
 import { storeDb, storeMoney, type DoReceipt, type MoneyClient } from '../../lib/repo-factory';
 import { claimInstapayReference, releaseInstapayReference } from '../../lib/instapay-ref-claim';
+import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { enabledStoreIds } from '../../lib/store-backend';
 import { sniffImage } from '../../lib/upload-sniff';
 import logger from '../../lib/logger';
@@ -41,7 +42,6 @@ import { inngest } from '../../lib/inngest/client';
 import { isP2002 } from '../../lib/prisma-errors';
 import { withSavepoint } from '../../lib/savepoint';
 import { StorageService } from '../storage.service';
-import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 import { readInstapayReceipt } from '../../lib/ai/instapay-receipt-reader';
 import { instapayHandle } from '../billing/manual-config';
 
@@ -239,6 +239,28 @@ export function toReceiptView(r: ReceiptRow): InstapayReceiptView {
     reviewedAt: r.reviewedAt?.toISOString() ?? null,
     createdAt: r.createdAt.toISOString(),
   };
+}
+
+const duplicateReference = () =>
+  new AppError(
+    409,
+    'DUPLICATE_REFERENCE',
+    'This transfer reference was already used. Each transfer can pay only once.'
+  );
+
+/**
+ * Free the D1 claims of Postgres receipts whose `referenceKey` was just nulled (rejected, voided). Deferred until the
+ * request transaction COMMITS (dropped on rollback): the claim must outlive a rollback that keeps the reference in Postgres.
+ */
+function freeClaimsAfterCommit(
+  storeId: string,
+  rows: Array<{ id: string; referenceKey: string | null }>
+) {
+  const held = rows.filter((r): r is { id: string; referenceKey: string } => !!r.referenceKey);
+  if (held.length === 0) return Promise.resolve(null);
+  return deferAfterTenantCommit('instapay-ref-release', async () => {
+    for (const r of held) await releaseInstapayReference(r.referenceKey, storeId, r.id);
+  });
 }
 
 export class InstapayReceiptService {
@@ -626,6 +648,10 @@ export class InstapayReceiptService {
       sameImageSeenBefore: seen > 0,
       now,
     });
+    // One uniqueness space with the Durable Object stores (Ruling INSTAPAY-DO-1): the reference is also claimed in D1
+    // `entity_index`, bound to this receipt, before the Postgres write. Without a D1 binding the UNIQUE index decides alone.
+    const claim = await claimInstapayReference(referenceKey, args.storeId, row.id);
+    if (claim === 'taken') throw duplicateReference();
     try {
       return await withSavepoint(() =>
         prisma.instapayReceipt.update({
@@ -652,13 +678,9 @@ export class InstapayReceiptService {
         })
       );
     } catch (err) {
-      if (isP2002(err)) {
-        throw new AppError(
-          409,
-          'DUPLICATE_REFERENCE',
-          'This transfer reference was already used. Each transfer can pay only once.'
-        );
-      }
+      // The savepoint rolled back, so this receipt is not submitted: free only the claim THIS call made.
+      if (claim === 'claimed') await releaseInstapayReference(referenceKey, args.storeId, row.id);
+      if (isP2002(err)) throw duplicateReference();
       throw err;
     }
   }
@@ -787,6 +809,13 @@ export class InstapayReceiptService {
     actorId: string | null,
     now: Date = new Date()
   ): Promise<number> {
+    const freed =
+      decision.status === 'rejected'
+        ? await prisma.instapayReceipt.findMany({
+            where: { id: receiptId, storeId, status: 'submitted', referenceKey: { not: null } },
+            select: { id: true, referenceKey: true },
+          })
+        : [];
     const { count } = await prisma.instapayReceipt.updateMany({
       where: { id: receiptId, storeId, status: 'submitted' },
       data:
@@ -801,6 +830,7 @@ export class InstapayReceiptService {
               reviewedAt: now,
             },
     });
+    if (count > 0) await freeClaimsAfterCommit(storeId, freed);
     return count;
   }
 
@@ -982,7 +1012,11 @@ export class InstapayReceiptService {
 
   /** Free a (approved) receipt's reference after its payment was VOIDED (recorded in error). */
   static async voidByClaim(storeId: string, claimId: string, note: string, actorId: string) {
-    return prisma.instapayReceipt.updateMany({
+    const freed = await prisma.instapayReceipt.findMany({
+      where: { storeId, claimId, referenceKey: { not: null } },
+      select: { id: true, referenceKey: true },
+    });
+    const res = await prisma.instapayReceipt.updateMany({
       where: { storeId, claimId },
       data: {
         status: 'voided',
@@ -992,6 +1026,8 @@ export class InstapayReceiptService {
         reviewedAt: new Date(),
       },
     });
+    await freeClaimsAfterCommit(storeId, freed);
+    return res;
   }
 }
 

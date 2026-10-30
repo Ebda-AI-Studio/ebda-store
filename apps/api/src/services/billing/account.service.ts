@@ -54,6 +54,8 @@ import {
   type LedgerVat,
 } from './charge-amount';
 import { storeUpdate, storeUpdateMany } from '../../lib/repo-factory';
+import { releaseInstapayReference } from '../../lib/instapay-ref-claim';
+import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -651,6 +653,12 @@ export async function submitSubscriptionReceipt(args: {
         where: { id: receipt.id, storeId: args.storeId },
         data: { status: 'draft', referenceKey: null, submittedAt: null },
       });
+      // The receipt is a draft again: free its D1 reference claim (Ruling INSTAPAY-DO-1) once this transaction commits.
+      const heldKey = receipt.referenceKey;
+      if (heldKey)
+        await deferAfterTenantCommit('instapay-ref-release', () =>
+          releaseInstapayReference(heldKey, args.storeId, receipt.id)
+        );
       throw new AppError(
         409,
         'DUPLICATE_REFERENCE',

@@ -5,7 +5,12 @@
  * traces (return values or error, then the receipts / order / payment rows) must be equal.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setCfBindings } from '../../apps/api/src/cf/bindings';
+import { claimInstapayReference } from '../../apps/api/src/lib/instapay-ref-claim';
 import { prisma } from '@ebda/database';
 import {
   answerMoneyOp,
@@ -342,3 +347,96 @@ describe.skipIf(!hasDb)('InstaPay order receipts on Postgres vs the DO', () => {
     expect(t.out.err.code).toBe('TOO_MANY_RECEIPTS');
   });
 });
+
+/**
+ * INSTAPAY-DO-1, the Postgres half: a Postgres store's receipts claim their reference in D1 `entity_index` too, so a Postgres
+ * store and a DO store share ONE uniqueness space. The D1 double runs the real statements on SQLite over the real migration.
+ */
+describe.skipIf(!hasDb)(
+  'InstaPay reference claims: Postgres stores share the D1 uniqueness space',
+  () => {
+    const mig = fs.readFileSync(
+      path.join(__dirname, '../../packages/cf-schema/migrations/platform/0001_init.sql'),
+      'utf8'
+    );
+    const ddl = /CREATE TABLE IF NOT EXISTS "entity_index"[\s\S]*?\n\);/.exec(mig)![0];
+    let d1db: DatabaseSync;
+    const claims = () =>
+      d1db
+        .prepare("SELECT id, store_id, claim_ref FROM entity_index WHERE kind = 'instapay_ref'")
+        .all() as any[];
+    beforeEach(() => {
+      d1db = new DatabaseSync(':memory:');
+      d1db.exec(ddl);
+      // the backend flag table (lib/store-backend.ts reads it once D1 is bound): this store is on Postgres
+      d1db.exec(
+        "CREATE TABLE stores (id TEXT PRIMARY KEY, storage_backend TEXT NOT NULL DEFAULT 'pg')"
+      );
+      d1db.prepare('INSERT INTO stores (id, storage_backend) VALUES (?, ?)').run(STORE, 'pg');
+      setCfBindings({
+        PLATFORM_DB: {
+          prepare: (sql: string) => ({
+            bind: (...v: unknown[]) => ({
+              run: async () => ({
+                meta: { changes: Number(d1db.prepare(sql).run(...(v as never[])).changes) },
+              }),
+              first: async () => (d1db.prepare(sql).get(...(v as never[])) as never) ?? null,
+            }),
+          }),
+        },
+      } as never);
+    });
+    afterEach(() => setCfBindings(undefined as never));
+
+    it('a Postgres submit holds the reference in D1; a DO store of another tenant is refused it', async () => {
+      const w = await world(false);
+      const ref = freshReference();
+      const id = await uploaded(w);
+      await submit(w, id, ref);
+      expect(claims()).toHaveLength(1);
+      expect(claims()[0].claim_ref).toBe(id);
+      expect(await claimInstapayReference(claims()[0].id, 'some-do-store', 'do-receipt')).toBe(
+        'taken'
+      );
+    });
+
+    it('a Postgres submit of a reference a DO store already holds is a 409 DUPLICATE_REFERENCE and writes nothing', async () => {
+      const w = await world(false);
+      const ref = freshReference();
+      const id = await uploaded(w);
+      const key = ref.replace(/\D/g, '');
+      await claimInstapayReference(key, 'some-do-store', 'do-receipt');
+      await expect(submit(w, id, ref)).rejects.toMatchObject({ code: 'DUPLICATE_REFERENCE' });
+      expect(claims()).toHaveLength(1);
+      expect(claims()[0].store_id).toBe('some-do-store');
+      const r = await prisma.instapayReceipt.findUnique({ where: { id } });
+      expect(r?.status).toBe('draft');
+    });
+
+    it('20 submits of one reference from 20 Postgres orders: one wins', async () => {
+      const ref = freshReference();
+      const ws = await Promise.all(Array.from({ length: 20 }, () => world(false)));
+      const ids = await Promise.all(ws.map(w => uploaded(w)));
+      const out = await Promise.allSettled(ws.map((w, i) => submit(w, ids[i], ref)));
+      expect(out.filter(o => o.status === 'fulfilled')).toHaveLength(1);
+      expect(claims()).toHaveLength(1);
+    });
+
+    it('rejecting the receipt frees the claim so the same transfer may be filed again', async () => {
+      const w = await world(false);
+      const ref = freshReference();
+      const id = await uploaded(w);
+      await submit(w, id, ref);
+      expect(claims()).toHaveLength(1);
+      await InstapayService.rejectReceipt({
+        storeId: STORE,
+        orderId: w.order,
+        receiptId: id,
+        note: 'wrong receiver',
+        actorUserId: ownerId,
+      });
+      await new Promise(r => setTimeout(r, 50));
+      expect(claims()).toHaveLength(0);
+    });
+  }
+);

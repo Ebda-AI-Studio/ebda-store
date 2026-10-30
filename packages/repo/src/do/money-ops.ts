@@ -193,7 +193,6 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
 const TABLE = '_money_ops';
 export const ensureMoneyOpsSchema = (db: SyncSql): void => {
   ensureKeyedSchema(db, TABLE);
-  db.run(CART_CLAIMS_DDL, []);
   for (const s of INSTAPAY_RECEIPT_DDL) db.run(s, []);
 };
 

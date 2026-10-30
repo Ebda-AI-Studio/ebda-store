@@ -41,8 +41,6 @@ const RUNTIME_TABLES = {
   payment_event_log:
     'provider, event_id, payment_id, outcome, applied_at: webhook dedupe keys only',
   vector_usage: 'store_id, day, texts: a per-day embedding counter',
-  _cart_claims:
-    'cart_id, fingerprint, claimed_at: the atomic cart-claim marker of CF-FINAL-1 (found unclassified by the receipts erasure test, R3)',
 };
 /**
  * Runtime tables (as above) that DO hold a buyer's personal data: classified here with the same shape a schema table gets.

@@ -4,9 +4,6 @@
 import type { TableClass } from './registry';
 
 export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
-  _cart_claims: {
-    kind: 'no-pii',
-  },
   abandoned_cart_configs: {
     kind: 'no-pii',
   },

@@ -60,10 +60,10 @@ describe('generated registry', () => {
   it('classifies every table of the live schema: nothing is left for a customer subject to refuse on', () => {
     const db = openDo();
     expect(unclassifiedTables(tablesOf(db))).toEqual([]);
-    // + the tables the DO creates itself at start that are not in the migrations: payment_event_log, vector_usage and _cart_claims
+    // + the tables the DO creates itself at start that are not in the migrations: payment_event_log and vector_usage
     // (reviewed no-pii in the generator); instapay_order_receipts (personal data) is already in the db above via its DDL
     expect(Object.keys(STORE_DO_REGISTRY).sort()).toEqual(
-      [...tablesOf(db), 'payment_event_log', 'vector_usage', '_cart_claims'].sort()
+      [...tablesOf(db), 'payment_event_log', 'vector_usage'].sort()
     );
   });
 
