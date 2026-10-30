@@ -286,7 +286,7 @@ export interface MoneyClient {
   }): Promise<{ products: number; variants: number; remaining: number }>;
   barcodeEnsure(a: { productId?: string; variantId?: string }): Promise<{ code: string | null }>;
   cancel(
-    a: { orderId: string; restoreInventory?: boolean; note?: string },
+    a: { orderId: string; restoreInventory?: boolean; note?: string; unpaidOnly?: boolean },
     key?: string
   ): Promise<CancelResult>;
   expireHold(
@@ -448,6 +448,22 @@ export interface MoneyClient {
     a: { orderId: string; requestedAt: number },
     key?: string
   ): Promise<{ disarmed: boolean }>;
+  /** A payment-timeline audit row (`recordPaymentEvent`) written on the DO (Ruling CF-JOBS-3). */
+  paymentEventRecord(a: {
+    paymentId: string;
+    orderId: string;
+    eventType: string;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    provider?: string | null;
+    details?: Record<string, unknown>;
+  }): Promise<{ recorded: true }>;
+  /** The payment-abandonment stamp: once, only while the order is unpaid and unstamped. */
+  abandonStamp(a: { orderId: string }): Promise<{ stamped: boolean }>;
+  /** Posted debit / credit totals of the store (accounting daily close). */
+  trialBalance(): Promise<{ debit: number; credit: number }>;
+  /** Revenue-side GL credits posted since `sinceMs` (accounting period reconciliation). */
+  periodGlCredits(a: { sinceMs: number }): Promise<{ total: number }>;
   /** confirmed / processing / shipped / delivered (Ruling CF-FINAL-1): state machine, fanout arming, COD settlement, event. */
   orderStatus(
     a: {
@@ -797,6 +813,10 @@ export function makeMoneyClient(
     goldBulkSwitchMode: (a, key) => call('goldBulkSwitchMode', a, key),
     goldCreateVariant: (a, key) => call('goldCreateVariant', a, key),
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
+    paymentEventRecord: a => call('paymentEventRecord', a),
+    abandonStamp: a => call('abandonStamp', a),
+    trialBalance: () => call('trialBalance', {}),
+    periodGlCredits: a => call('periodGlCredits', a),
     orderStatus: (a, key) => call('orderStatus', a, key),
     fiscalRefund: (a, key) => call('fiscalRefund', a, key),
     fiscalCancelSale: (a, key) => call('fiscalCancelSale', a, key),
