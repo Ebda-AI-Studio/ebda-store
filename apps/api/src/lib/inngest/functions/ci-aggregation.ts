@@ -134,8 +134,8 @@ export const ciHintCalibrationWeekly: JobDef = inngest.createFunction(
     concurrency: { limit: 1 },
     triggers: [{ cron: `TZ=${REGION.timezone} 30 4 * * 1` }], // Mondays, Cairo (digits are mapped to names by jobs/cron-expr.ts)
   },
-  async () => {
-    const r = await runCalibration();
+  async ({ event }) => {
+    const r = await runCalibration(undefined, event);
     return { alerted: r.alerted, bands: r.results.length };
   }
 );

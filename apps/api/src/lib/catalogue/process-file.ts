@@ -6,7 +6,7 @@
  * Logging: ids and counts only. Never file bytes, prompt, model reply, product text or file names.
  */
 import { createHash } from 'node:crypto';
-import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../repo-factory';
 import { catalogueRawPageSchema, stageCatalogueItems, normalizeArabicSearch } from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import { isAiQuotaCapError } from '../ai-quota';
@@ -35,19 +35,26 @@ export async function processFile(
   categoryNames: string[],
   extractor: CatalogueExtractor = getCatalogueExtractor()
 ): Promise<ProcessFileResult> {
-  const job = await prisma.catalogImportJob.findFirst({
+  const job = await (
+    await storeDb(storeId)
+  ).catalogImportJob.findFirst({
     where: { id: jobId, storeId },
     select: { status: true },
   });
   if (!job || job.status === 'cancelled') return { outcome: 'cancelled', calledModel: false };
 
-  const file = await prisma.catalogImportFile.findFirst({
+  const file = await (
+    await storeDb(storeId)
+  ).catalogImportFile.findFirst({
     where: { id: fileId, jobId, storeId, status: { in: ['stored', 'processing'] } },
   });
   if (!file) return { outcome: 'skipped', calledModel: false };
 
-  const mark = (data: Record<string, unknown>) =>
-    prisma.catalogImportFile.updateMany({ where: { id: fileId, storeId }, data });
+  const mark = async (data: Record<string, unknown>) =>
+    (await storeWriter(storeId)).catalogImportFile.updateMany({
+      where: { id: fileId, storeId },
+      data,
+    });
 
   // Attempts are capped per file; a step retry re-enters a `processing` file without a new attempt.
   if (file.status === 'stored' && file.attempts >= catalogueLimits().maxAttempts) {
@@ -101,7 +108,9 @@ export async function processFile(
       bytes = n.bytes;
       pageCount = n.pages;
       await mark({ pageCount });
-      const others = await prisma.catalogImportFile.aggregate({
+      const others = await (
+        await storeDb(storeId)
+      ).catalogImportFile.aggregate({
         where: { jobId, storeId, id: { not: fileId } },
         _sum: { pageCount: true },
       });
@@ -172,7 +181,9 @@ export async function processFile(
     return { outcome: 'failed', calledModel: true };
   }
 
-  const categories = await prisma.category.findMany({
+  const categories = await (
+    await storeDb(storeId)
+  ).category.findMany({
     where: { storeId, deletedAt: null },
     select: { id: true, name: true, nameAr: true },
     take: 500,
@@ -184,7 +195,9 @@ export async function processFile(
   const names = staged.flatMap(s => [s.name, s.nameAr]).filter((n): n is string => !!n);
   const existing =
     skus.length || names.length
-      ? await prisma.product.findMany({
+      ? await (
+          await storeDb(storeId)
+        ).product.findMany({
           where: {
             storeId,
             deletedAt: null,
@@ -210,9 +223,11 @@ export async function processFile(
     if (folded.some(n => existingNames.has(n))) s.flags.push('duplicate_exact');
   }
 
-  await prisma.catalogImportItem.deleteMany({ where: { fileId, storeId } });
+  await (await storeWriter(storeId)).catalogImportItem.deleteMany({ where: { fileId, storeId } });
   if (staged.length) {
-    await prisma.catalogImportItem.createMany({
+    await (
+      await storeWriter(storeId)
+    ).catalogImportItem.createMany({
       data: staged.map(s => ({
         jobId,
         fileId,
@@ -243,15 +258,17 @@ export async function processFile(
 /** Recompute the job's progress counters from the rows (no drift). */
 export async function refreshJobCounters(storeId: string, jobId: string) {
   const [files, itemsTotal] = await Promise.all([
-    prisma.catalogImportFile.groupBy({
+    (await storeDb(storeId)).catalogImportFile.groupBy({
       by: ['status'],
       where: { jobId, storeId },
       _count: { _all: true },
     }),
-    prisma.catalogImportItem.count({ where: { jobId, storeId } }),
+    (await storeDb(storeId)).catalogImportItem.count({ where: { jobId, storeId } }),
   ]);
   const n = (s: string) => files.find(f => f.status === s)?._count._all ?? 0;
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: { id: jobId, storeId },
     data: { filesDone: n('done'), filesFailed: n('failed') + n('skipped_quota'), itemsTotal },
   });

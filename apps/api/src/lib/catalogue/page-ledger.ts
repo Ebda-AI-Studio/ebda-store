@@ -6,7 +6,7 @@
  * `plans.limits.catalogImportPagesPerMonth` (null = unlimited, 0 = not included); the per-job,
  * per-day and per-file numbers are env defaults. This is IN ADDITION to `assertAiQuota`.
  */
-import { prisma } from '@ebda/database';
+import { storeDb } from '../repo-factory';
 import { regionMonthStart, regionYearMonth } from '@ebda/shared';
 import { getEntitlements } from '../../services/plan-entitlements';
 
@@ -51,7 +51,9 @@ export async function pageAllowance(storeId: string): Promise<PageAllowance> {
   dayStart.setUTCHours(0, 0, 0, 0);
   const sum = async (since: Date) =>
     (
-      await prisma.catalogImportFile.aggregate({
+      await (
+        await storeDb(storeId)
+      ).catalogImportFile.aggregate({
         where: { storeId, chargedPages: { gt: 0 }, startedAt: { gte: since } },
         _sum: { chargedPages: true },
       })

@@ -29,6 +29,15 @@ export function matches(row: Row, where: Where = {}): boolean {
   return Object.entries(where).every(([k, f]) => {
     if (k === 'OR') return (f as Where[]).some(w => matches(row, w));
     if (k === 'AND') return (f as Where[]).every(w => matches(row, w));
+    // a compound unique selector (`storeId_feature: { storeId, feature }`) is the same equality on its parts
+    if (
+      !(k in row) &&
+      k.includes('_') &&
+      f !== null &&
+      typeof f === 'object' &&
+      !(f instanceof Date)
+    )
+      return matches(row, f as Where);
     if (f === undefined) return true;
     return cmp(row[k], f);
   });
@@ -92,6 +101,19 @@ export class FakeStoreDo {
       count: async a => {
         read('count');
         return t().filter(r => matches(r, a?.where)).length;
+      },
+      groupBy: async a => {
+        read('groupBy');
+        const by = (a?.by as string[]) ?? [];
+        const groups = new Map<string, Row[]>();
+        for (const r of t().filter(x => matches(x, a?.where))) {
+          const k = JSON.stringify(by.map(b => r[b]));
+          groups.set(k, [...(groups.get(k) ?? []), r]);
+        }
+        return [...groups.values()].map(rs => ({
+          ...Object.fromEntries(by.map(b => [b, rs[0][b]])),
+          _count: { _all: rs.length },
+        }));
       },
       aggregate: async a => {
         read('aggregate');

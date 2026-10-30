@@ -9,23 +9,6 @@
     }
   },
   "baseline": {
-    "apps/api/src/lib/catalogue/process-file.ts": {
-      "kind": "job-unported",
-      "reason": "Catalogue import (PR #329) reads and writes products and categories with prisma in the staging and draft-creation jobs; these jobs are unported (refused for a DO store, listed in docs/cf/not-on-do.json jobsAccepted) until the import is routed through storeDb (Ruling INTEG-1).",
-      "models": {
-        "category": 1,
-        "product": 1
-      },
-      "jobs": ["catalog-import-run", "catalog-import-create-drafts"]
-    },
-    "apps/api/src/lib/inngest/functions/catalog-import-run.ts": {
-      "kind": "job-unported",
-      "reason": "Catalogue import (PR #329) reads and writes products and categories with prisma in the staging and draft-creation jobs; these jobs are unported (refused for a DO store, listed in docs/cf/not-on-do.json jobsAccepted) until the import is routed through storeDb (Ruling INTEG-1).",
-      "models": {
-        "category": 1
-      },
-      "jobs": ["catalog-import-run"]
-    },
     "apps/api/src/routes/admin.routes.ts": {
       "kind": "platform",
       "reason": "super_admin GET/list of products: the list includes the `store` relation (a D1 platform model prisma-lite cannot join) and the by-id read is located through the Postgres definer getEntityStoreId; platform-level, not a store's own data path.",
@@ -104,29 +87,6 @@
         "productOption": 1,
         "productVariant": 1,
         "product": 1
-      }
-    },
-    "apps/api/src/services/catalog-import.service.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Catalogue import (PR #329) request path: category and product reads and writes use prisma (the store scope is entered with runInStoreScope, but the data calls are not yet routed through storeDb). Named in docs/cf/not-on-do.json postgresOnly (Ruling INTEG-1).",
-      "models": {
-        "category": 4,
-        "product": 1
-      }
-    },
-    "apps/api/src/services/ci-calibration.service.ts": {
-      "kind": "job-unported",
-      "reason": "The weekly hint calibration (PR #336) resolves open hint logs against shipments with prisma across all stores; the job is unported (refused for a DO store, listed in docs/cf/not-on-do.json jobsAccepted) until it is routed through storeDb (Ruling INTEG-1).",
-      "models": {
-        "shipment": 1
-      },
-      "jobs": ["ci-hint-calibration-weekly"]
-    },
-    "apps/api/src/services/ci-hints.service.ts": {
-      "kind": "pg-only-flow",
-      "reason": "Customer Intelligence hints (PR #336) read shipments with prisma to build the courier ranking and the fee hint. Named in docs/cf/not-on-do.json postgresOnly (Ruling INTEG-1).",
-      "models": {
-        "shipment": 2
       }
     },
     "apps/api/src/services/gold-rate/gold-rate.service.ts": {

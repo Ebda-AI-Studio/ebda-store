@@ -3,7 +3,7 @@
  * only the magic bytes decide what a file is, what it is stored as and what the extractor is sent.
  * JPEG, PNG, WebP, HEIC/HEIF and PDF are accepted; GIF, SVG, TIFF, BMP and everything else are refused.
  */
-import { PDFDocument } from '@cantoo/pdf-lib';
+import type { PDFDocument as PDFDocumentType } from '@cantoo/pdf-lib';
 import { Unzlib } from 'fflate';
 import { sniffImage } from '../upload-sniff';
 
@@ -127,12 +127,30 @@ export function scanPdf(buf: Buffer): void {
  * pages counted == pages charged; scripts, open-actions and embedded files do not survive the copy.
  * Runs in the job step, never in the request handler.
  */
+/**
+ * pdf-lib ships as its own Worker module (Ruling BUNDLE-BUDGET-7: apps/api/src/cf/modules/pdf-lib.mjs, built by
+ * scripts/ci/gen-pdf-lib-module.mjs, uploaded by the `rules` entry of wrangler.jsonc), so its 450+ KB is not part of the main
+ * script and is evaluated on the first PDF only. Only `normalizePdf` (the job step) loads it, never a request handler.
+ */
+async function loadPdfLib(): Promise<{ PDFDocument: typeof PDFDocumentType }> {
+  // A variable specifier is left alone by the bundler: on the Worker it resolves to the uploaded module (named relative to
+  // src/, wrangler `find_additional_modules`), in Node (dev, tests) to the file next to the sources.
+  const nav = (globalThis as { navigator?: { userAgent?: string } }).navigator;
+  const onWorker = nav?.userAgent === 'Cloudflare-Workers';
+  const spec = onWorker ? './cf/modules/pdf-lib.mjs' : '../../cf/modules/pdf-lib.mjs';
+  const m = (await import(/* @vite-ignore */ spec)) as {
+    default: { PDFDocument: typeof PDFDocumentType };
+  };
+  return m.default;
+}
+
 export async function normalizePdf(
   buf: Buffer,
   maxPages: number,
   maxBytes: number
 ): Promise<{ bytes: Buffer; pages: number }> {
   scanPdf(buf);
+  const { PDFDocument } = await loadPdfLib();
   let src;
   try {
     src = await PDFDocument.load(buf, { throwOnInvalidObject: true, updateMetadata: false });

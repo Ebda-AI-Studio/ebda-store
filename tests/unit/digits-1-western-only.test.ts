@@ -30,7 +30,11 @@ const ALL = [...walk(path.join(ROOT, 'apps')), ...walk(path.join(ROOT, 'packages
   f.split(path.sep).join('/')
 );
 const isTest = (f: string) => /\.test\.|\/__tests__\/|\/test\/|\.spec\./.test(f);
-const SOURCE = ALL.filter(f => /\.(ts|tsx|mjs|js)$/.test(f) && !isTest(f));
+// the vendored pdf-lib build (Ruling BUNDLE-BUDGET-7) is third-party minified code, not first-party source
+const SOURCE = ALL.filter(
+  f =>
+    /\.(ts|tsx|mjs|js)$/.test(f) && !isTest(f) && !f.endsWith('apps/api/src/cf/modules/pdf-lib.mjs')
+);
 // foundation/vectors = vendored cross-product test vectors that deliberately contain Arabic-Indic input
 const COPY = ALL.filter(
   f => /\.(json|mdx|md|html|hbs)$/.test(f) && !isTest(f) && !/\/foundation\/vectors\//.test(f)

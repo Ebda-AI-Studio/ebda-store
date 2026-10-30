@@ -7,7 +7,7 @@
  * scoped to the store; a store id that does not resolve throws instead of defaulting.
  */
 import { prisma } from '@ebda/database';
-import { storeUpdateMany } from '../lib/repo-factory';
+import { storeDb, storeUpdateMany, storeWriter } from '../lib/repo-factory';
 import { featureService } from './feature.service';
 import { loadHintData } from '../lib/ci/hints/data';
 import { codRiskHint, type BuyerHistory, type CodRiskHint } from '../lib/ci/hints/cod-risk';
@@ -36,9 +36,10 @@ async function buyerHistory(
 ): Promise<BuyerHistory | null> {
   if (!buyerKey) return null;
   const where = { storeId, order: { buyerKey, id: { not: orderId } } };
+  const db = await storeDb(storeId);
   const [returned, delivered] = await Promise.all([
-    prisma.shipment.count({ where: { ...where, returnedAt: { not: null } } }),
-    prisma.shipment.count({ where: { ...where, returnedAt: null, deliveredAt: { not: null } } }),
+    db.shipment.count({ where: { ...where, returnedAt: { not: null } } }),
+    db.shipment.count({ where: { ...where, returnedAt: null, deliveredAt: { not: null } } }),
   ]);
   return { shipped: returned + delivered, returned };
 }
@@ -51,7 +52,9 @@ export type OrderHintResult =
 /** COD risk note for one order. Logs the hint (once per order) so calibration can compare it to what happened. */
 export async function orderCodRisk(storeId: string, orderId: string): Promise<OrderHintResult> {
   if (!(await enabled(storeId, 'cod_risk'))) return { enabled: false };
-  const o = await prisma.order.findFirst({
+  const o = await (
+    await storeDb(storeId)
+  ).order.findFirst({
     where: { id: orderId, storeId },
     select: { areaKey: true, buyerKey: true, payments: { select: { provider: true } } },
   });
@@ -60,7 +63,9 @@ export async function orderCodRisk(storeId: string, orderId: string): Promise<Or
 
   const data = await loadHintData(storeId);
   const hint = codRiskHint(data, o.areaKey, await buyerHistory(storeId, orderId, o.buyerKey));
-  await prisma.ciHintLog.createMany({
+  await (
+    await storeWriter(storeId)
+  ).ciHintLog.createMany({
     data: [
       {
         storeId,
@@ -79,7 +84,9 @@ export async function orderCodRisk(storeId: string, orderId: string): Promise<Or
 
 export async function courierSuggestion(storeId: string, orderId: string, carriers: string[]) {
   if (!(await enabled(storeId, 'courier'))) return { enabled: false as const };
-  const o = await prisma.order.findFirst({
+  const o = await (
+    await storeDb(storeId)
+  ).order.findFirst({
     where: { id: orderId, storeId },
     select: { areaKey: true },
   });
@@ -119,7 +126,9 @@ export async function ciOverview(storeId: string): Promise<CiOverview> {
     (gates.find(g => g.feature === 'fee')?.enabled ?? true) &&
     !paused.some(p => p.feature === 'fee');
   const since = new Date(Date.now() - 30 * 86_400_000);
-  const rows = await prisma.ciHintLog.groupBy({
+  const rows = await (
+    await storeDb(storeId)
+  ).ciHintLog.groupBy({
     by: ['feature', 'band'],
     where: { storeId, createdAt: { gte: since } },
     _count: { _all: true },

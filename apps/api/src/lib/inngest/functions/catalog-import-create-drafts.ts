@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInStoreScope } from '@ebda/database';
+import { runInStoreScope } from '@ebda/database';
+import { storeDb, storeWriter } from '../../repo-factory';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { createDraftForItem, finishCreateDrafts } from '../../../services/catalog-import.service';
@@ -21,8 +22,8 @@ export const catalogImportCreateDrafts: JobDef = inngest.createFunction(
       const d = event.data?.event?.data as { jobId?: string; storeId?: string } | undefined;
       if (!d?.jobId || !d.storeId) return;
       // Back to review so the job is never stuck "creating"; created drafts stay.
-      await runInStoreScope(d.storeId, () =>
-        prisma.catalogImportJob.updateMany({
+      await runInStoreScope(d.storeId, async () =>
+        (await storeWriter(d.storeId!)).catalogImportJob.updateMany({
           where: { id: d.jobId!, storeId: d.storeId!, status: 'creating' },
           data: { status: 'review', errorCode: 'DRAFTS_FAILED' },
         })
@@ -42,7 +43,9 @@ export const catalogImportCreateDrafts: JobDef = inngest.createFunction(
     const ids = await step.run('list', () =>
       runInStoreScope(storeId, async () =>
         (
-          await prisma.catalogImportItem.findMany({
+          await (
+            await storeDb(storeId)
+          ).catalogImportItem.findMany({
             where: {
               jobId,
               storeId,

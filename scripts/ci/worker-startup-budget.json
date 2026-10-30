@@ -1,8 +1,8 @@
 {
   "_doc": "Budget for the API Worker's startup, enforced by scripts/ci/worker-startup-budget.mjs (CI: Worker dry-run (api)). Cloudflare rejects a deploy whose global scope exceeds its startup CPU limit (error 10021, hit once after the B2B merge). Local workerd numbers are not Cloudflare's, so these are REGRESSION gates with headroom over the recorded baseline, not the platform limit. Raise one only with a Ruling that says why. The absolute startupCpuMs ceiling is enforced on main/nightly runs (quiet runner); pull requests compare against main's bundle measured in the same job (relative.ratio + relative.slackMs).",
   "startupCpuMs": 140,
-  "bundleBytes": 8400000,
-  "bundleGzipBytes": 2350000,
+  "bundleBytes": 7800000,
+  "bundleGzipBytes": 2200000,
   "baseline": {
     "recorded": "2026-10-29",
     "before": {
@@ -20,5 +20,5 @@
     "ratio": 0.25,
     "slackMs": 15
   },
-  "_ruling": "Ruling BUNDLE-BUDGET-7 (docs/rulings/BUNDLE-BUDGET-7.md): the integration of all open PRs measures 8,149,392 B raw / 2,280,474 B gzip; the size ceilings are raised to 8,400,000 / 2,350,000 (new size + ~3%). Supersedes BUNDLE-BUDGET-5/6's ceilings."
+  "_ruling": "Ruling BUNDLE-BUDGET-7 (docs/rulings/BUNDLE-BUDGET-7.md): the integration of all open PRs measured 8,150,690 B raw; pdf-lib moved to its own Worker module (apps/api/src/cf/modules/pdf-lib.mjs) and worker.js measures 7,682,914 B. The ceilings stay at BUNDLE-BUDGET-5/6's 7,800,000 / 2,200,000; no raise."
 }

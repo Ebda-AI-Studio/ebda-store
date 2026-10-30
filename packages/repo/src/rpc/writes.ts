@@ -85,6 +85,12 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AnswerEngineCheck',
   // the carrier booking job claims and updates the shipment row (INFRA-CF-1, Ruling CF-JOBS-4)
   'Shipment',
+  // catalogue import (#329) job / file / item rows and the Customer Intelligence hint log and per-store gate (#336) (Ruling INTEG-1)
+  'CatalogImportJob',
+  'CatalogImportFile',
+  'CatalogImportItem',
+  'CiHintLog',
+  'CiStoreGate',
 ]);
 
 /** Stock columns: never written through the generic path (a stock change is a locked money/stock section, D2). */

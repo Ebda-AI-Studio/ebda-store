@@ -4,6 +4,7 @@
  * the next hint): it is read straight from the database on every hint, with no cache layer.
  */
 import { prisma } from '@ebda/database';
+import { storeDb } from '../../repo-factory';
 
 export const CI_HINT_FEATURES = ['cod_risk', 'courier', 'fee'] as const;
 export type CiHintFeature = (typeof CI_HINT_FEATURES)[number];
@@ -77,7 +78,9 @@ export interface StoreGateRow {
 }
 
 export async function storeGateClosed(storeId: string, feature: CiHintFeature): Promise<boolean> {
-  const row = await prisma.ciStoreGate.findFirst({
+  const row = await (
+    await storeDb(storeId)
+  ).ciStoreGate.findFirst({
     where: { storeId, feature },
     select: { id: true },
   });
@@ -85,7 +88,7 @@ export async function storeGateClosed(storeId: string, feature: CiHintFeature): 
 }
 
 export async function storeGates(storeId: string): Promise<StoreGateRow[]> {
-  return prisma.ciStoreGate.findMany({
+  return (await storeDb(storeId)).ciStoreGate.findMany({
     where: { storeId },
     orderBy: { feature: 'asc' },
     select: {

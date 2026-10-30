@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { prisma, runInStoreScope, withMoneyTx, Prisma } from '@ebda/database';
+import { storeDb, storeMoney, storeWriter } from '../lib/repo-factory';
 import {
   BLOCKING_FLAGS,
   CATALOGUE_LIMITS,
@@ -74,7 +75,9 @@ export async function createJob(
       'Catalogue import is not included in your plan.'
     );
   }
-  const active = await prisma.catalogImportJob.count({
+  const active = await (
+    await storeDb(storeId)
+  ).catalogImportJob.count({
     where: { storeId, status: { in: ACTIVE } },
   });
   if (active >= lim.maxActiveJobs) {
@@ -131,7 +134,9 @@ export async function createJob(
         pageCount: c.pages,
       });
     }
-    await prisma.catalogImportJob.create({
+    await (
+      await storeWriter(storeId)
+    ).catalogImportJob.create({
       data: {
         id: jobId,
         storeId,
@@ -181,7 +186,9 @@ export async function failJob(
 ) {
   try {
     await runInStoreScope(storeId, async () => {
-      await prisma.catalogImportJob.updateMany({
+      await (
+        await storeWriter(storeId)
+      ).catalogImportJob.updateMany({
         where: { id: jobId, storeId, status: { notIn: ['done', 'cancelled'] } },
         data: { status: 'failed', errorCode, completedAt: new Date() },
       });
@@ -193,7 +200,9 @@ export async function failJob(
 }
 
 async function deleteJobObjects(storeId: string, jobId: string) {
-  const files = await prisma.catalogImportFile.findMany({
+  const files = await (
+    await storeDb(storeId)
+  ).catalogImportFile.findMany({
     where: { jobId, storeId },
     select: { storageKey: true },
   });
@@ -209,11 +218,15 @@ async function deleteJobObjects(storeId: string, jobId: string) {
 /** A job stuck `queued` / `processing` is failed on read: the second net behind the fail-fast enqueue. */
 export async function sweepStaleJobs(storeId: string) {
   const now = Date.now();
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: { storeId, status: 'queued', updatedAt: { lt: new Date(now - STALE_QUEUED_MS) } },
     data: { status: 'failed', errorCode: 'NOT_STARTED', completedAt: new Date() },
   });
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: {
       storeId,
       status: { in: ['processing', 'creating'] },
@@ -225,14 +238,18 @@ export async function sweepStaleJobs(storeId: string) {
 
 /** Retention (30 days): expired jobs and their private originals are purged when the store is active. */
 export async function purgeExpiredJobs(storeId: string) {
-  const expired = await prisma.catalogImportJob.findMany({
+  const expired = await (
+    await storeDb(storeId)
+  ).catalogImportJob.findMany({
     where: { storeId, expiresAt: { lt: new Date() } },
     select: { id: true },
     take: 5,
   });
   for (const j of expired) {
     await deleteJobObjects(storeId, j.id);
-    await prisma.catalogImportJob.deleteMany({ where: { id: j.id, storeId } });
+    await (
+      await storeWriter(storeId)
+    ).catalogImportJob.deleteMany({ where: { id: j.id, storeId } });
   }
 }
 
@@ -255,7 +272,7 @@ export async function listJobs(storeId: string) {
   await sweepStaleJobs(storeId);
   await purgeExpiredJobs(storeId);
   const [jobs, allowance] = await Promise.all([
-    prisma.catalogImportJob.findMany({
+    (await storeDb(storeId)).catalogImportJob.findMany({
       where: { storeId },
       orderBy: { createdAt: 'desc' },
       take: 20,
@@ -268,7 +285,9 @@ export async function listJobs(storeId: string) {
 
 export async function getJob(storeId: string, jobId: string) {
   await sweepStaleJobs(storeId);
-  const job = await prisma.catalogImportJob.findFirst({
+  const job = await (
+    await storeDb(storeId)
+  ).catalogImportJob.findFirst({
     where: { id: jobId, storeId },
     select: {
       ...JOB_SELECT,
@@ -287,7 +306,9 @@ export async function getJob(storeId: string, jobId: string) {
     },
   });
   if (!job) throw new AppError(404, 'NOT_FOUND', 'Import not found.');
-  const grouped = await prisma.catalogImportItem.groupBy({
+  const grouped = await (
+    await storeDb(storeId)
+  ).catalogImportItem.groupBy({
     by: ['status'],
     where: { jobId, storeId },
     _count: { _all: true },
@@ -298,7 +319,9 @@ export async function getJob(storeId: string, jobId: string) {
 }
 
 async function requireJob(storeId: string, jobId: string) {
-  const job = await prisma.catalogImportJob.findFirst({
+  const job = await (
+    await storeDb(storeId)
+  ).catalogImportJob.findFirst({
     where: { id: jobId, storeId },
     select: { id: true, status: true },
   });
@@ -311,7 +334,9 @@ export async function cancelJob(storeId: string, jobId: string) {
   if (TERMINAL.includes(job.status) || job.status === 'review') {
     throw new AppError(409, 'NOT_CANCELLABLE', 'This import has already finished.');
   }
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: { id: jobId, storeId },
     data: { status: 'cancelled', completedAt: new Date() },
   });
@@ -320,7 +345,7 @@ export async function cancelJob(storeId: string, jobId: string) {
 export async function deleteJob(storeId: string, jobId: string) {
   await requireJob(storeId, jobId);
   await deleteJobObjects(storeId, jobId);
-  await prisma.catalogImportJob.deleteMany({ where: { id: jobId, storeId } });
+  await (await storeWriter(storeId)).catalogImportJob.deleteMany({ where: { id: jobId, storeId } });
 }
 
 /**
@@ -331,7 +356,9 @@ export async function deleteJob(storeId: string, jobId: string) {
  */
 export async function retryFile(storeId: string, jobId: string, fileId: string) {
   const lim = catalogueLimits();
-  const file = await prisma.catalogImportFile.findFirst({
+  const file = await (
+    await storeDb(storeId)
+  ).catalogImportFile.findFirst({
     where: { id: fileId, jobId, storeId },
     select: { id: true, status: true, attempts: true, job: { select: { status: true } } },
   });
@@ -345,20 +372,26 @@ export async function retryFile(storeId: string, jobId: string, fileId: string) 
   if (file.attempts >= lim.maxAttempts) {
     throw new AppError(409, 'TOO_MANY_RETRIES', 'This file was tried too many times.');
   }
-  const otherActive = await prisma.catalogImportJob.count({
+  const otherActive = await (
+    await storeDb(storeId)
+  ).catalogImportJob.count({
     where: { storeId, status: { in: ACTIVE }, id: { not: jobId } },
   });
   if (otherActive >= lim.maxActiveJobs) {
     throw new AppError(429, 'CATALOG_IMPORT_BUSY', 'Finish the imports in progress first.');
   }
   // Atomic claim: two concurrent retries cannot both start the file.
-  const claimed = await prisma.catalogImportFile.updateMany({
+  const claimed = await (
+    await storeWriter(storeId)
+  ).catalogImportFile.updateMany({
     where: { id: fileId, storeId, status: { in: ['failed', 'skipped_quota'] } },
     data: { status: 'stored', errorCode: null },
   });
   if (claimed.count !== 1)
     throw new AppError(409, 'NOT_RETRYABLE', 'This file is already retrying.');
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: { id: jobId, storeId },
     data: { status: 'queued', errorCode: null, completedAt: null },
   });
@@ -367,7 +400,9 @@ export async function retryFile(storeId: string, jobId: string, fileId: string) 
 
 /** Source bytes for the review screen. Tenant-checked; the content type is re-sniffed from the bytes. */
 export async function getSourceFile(storeId: string, jobId: string, fileId: string) {
-  const file = await prisma.catalogImportFile.findFirst({
+  const file = await (
+    await storeDb(storeId)
+  ).catalogImportFile.findFirst({
     where: { id: fileId, jobId, storeId },
     select: { storageKey: true },
   });
@@ -415,7 +450,9 @@ export async function listItems(
 ) {
   await requireJob(storeId, jobId);
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
-  const rows = await prisma.catalogImportItem.findMany({
+  const rows = await (
+    await storeDb(storeId)
+  ).catalogImportItem.findMany({
     where: {
       jobId,
       storeId,
@@ -462,7 +499,9 @@ const TEXT_FIELDS = {
 } as const;
 
 export async function patchItem(storeId: string, jobId: string, itemId: string, patch: ItemPatch) {
-  const item = await prisma.catalogImportItem.findFirst({
+  const item = await (
+    await storeDb(storeId)
+  ).catalogImportItem.findFirst({
     where: { id: itemId, jobId, storeId },
     select: ITEM_SELECT,
   });
@@ -504,7 +543,9 @@ export async function patchItem(storeId: string, jobId: string, itemId: string, 
   }
   if (patch.categoryId !== undefined) {
     if (patch.categoryId) {
-      const cat = await prisma.category.findFirst({
+      const cat = await (
+        await storeDb(storeId)
+      ).category.findFirst({
         where: { id: patch.categoryId, storeId, deletedAt: null },
         select: { id: true },
       });
@@ -560,8 +601,10 @@ export async function patchItem(storeId: string, jobId: string, itemId: string, 
   data.flags = [...flags];
   data.acknowledged = [...ack];
 
-  await prisma.catalogImportItem.updateMany({ where: { id: itemId, jobId, storeId }, data });
-  return prisma.catalogImportItem.findFirstOrThrow({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportItem.updateMany({ where: { id: itemId, jobId, storeId }, data });
+  return (await storeDb(storeId)).catalogImportItem.findFirstOrThrow({
     where: { id: itemId, jobId, storeId },
     select: ITEM_SELECT,
   });
@@ -570,7 +613,9 @@ export async function patchItem(storeId: string, jobId: string, itemId: string, 
 /** Accepts only high-confidence items with NO flags at all; flagged items are never touched. */
 export async function bulkAcceptHighConfidence(storeId: string, jobId: string) {
   await requireJob(storeId, jobId);
-  const r = await prisma.catalogImportItem.updateMany({
+  const r = await (
+    await storeWriter(storeId)
+  ).catalogImportItem.updateMany({
     where: {
       jobId,
       storeId,
@@ -592,7 +637,9 @@ export async function startCreateDrafts(storeId: string, jobId: string, itemIds?
   if (job.status !== 'review' && job.status !== 'done') {
     throw new AppError(409, 'NOT_READY', 'The import is not ready for drafts yet.');
   }
-  const queued = await prisma.catalogImportItem.count({
+  const queued = await (
+    await storeDb(storeId)
+  ).catalogImportItem.count({
     where: {
       jobId,
       storeId,
@@ -602,7 +649,9 @@ export async function startCreateDrafts(storeId: string, jobId: string, itemIds?
     },
   });
   if (queued === 0) throw new AppError(400, 'NOTHING_TO_CREATE', 'Accept at least one item first.');
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: { id: jobId, storeId },
     data: { status: 'creating' },
   });
@@ -623,13 +672,17 @@ export async function createDraftForItem(
   storeId: string,
   itemId: string
 ): Promise<'created' | 'skipped' | 'failed'> {
-  const item = await prisma.catalogImportItem.findFirst({
+  const item = await (
+    await storeDb(storeId)
+  ).catalogImportItem.findFirst({
     where: { id: itemId, storeId, status: 'accepted', productId: null },
   });
   if (!item) return 'skipped';
 
   const fail = async (code: string) => {
-    await prisma.catalogImportItem.updateMany({
+    await (
+      await storeWriter(storeId)
+    ).catalogImportItem.updateMany({
       where: { id: itemId, storeId, productId: null },
       data: { status: 'failed', createErrorCode: code },
     });
@@ -641,14 +694,18 @@ export async function createDraftForItem(
   // Category: an existing one, or one the merchant explicitly asked to create.
   let categoryId = item.categoryId;
   if (categoryId) {
-    const ok = await prisma.category.findFirst({
+    const ok = await (
+      await storeDb(storeId)
+    ).category.findFirst({
       where: { id: categoryId, storeId, deletedAt: null },
       select: { id: true },
     });
     if (!ok) categoryId = null;
   }
   if (!categoryId && item.categoryName && item.acknowledged.includes('create_category')) {
-    const all = await prisma.category.findMany({
+    const all = await (
+      await storeDb(storeId)
+    ).category.findMany({
       where: { storeId, deletedAt: null },
       select: { id: true, name: true, nameAr: true },
     });
@@ -664,12 +721,16 @@ export async function createDraftForItem(
       let slug = base;
       for (
         let n = 1;
-        await prisma.category.findFirst({ where: { storeId, slug, deletedAt: null } });
+        await (
+          await storeDb(storeId)
+        ).category.findFirst({ where: { storeId, slug, deletedAt: null } });
         n++
       )
         slug = `${base}-${n}`;
       const isAr = /[؀-ۿ]/.test(item.categoryName);
-      const created = await prisma.category.create({
+      const created = await (
+        await storeWriter(storeId)
+      ).category.create({
         data: { storeId, name: item.categoryName, nameAr: isAr ? item.categoryName : null, slug },
         select: { id: true },
       });
@@ -728,18 +789,43 @@ export async function createDraftForItem(
       };
     });
     try {
-      await withMoneyTx(prisma, tx => createVariantsForProductTx(tx, storeId, productId, rows));
+      const money = await storeMoney(storeId);
+      if (money) {
+        // Durable Object store: the variants are one atomic DO section (the CSV import's batch op, replace-semantics on the
+        // product just created); `status: 'draft'` is the row's own value, so the product is otherwise untouched (Ruling INTEG-1).
+        await money.importBatch({
+          rows: [
+            {
+              rowIndex: 0,
+              existingId: productId,
+              existingSlug: null,
+              slug: '',
+              fields: { status: 'draft' },
+              imported: {},
+              categoryIds: null,
+              tagIds: null,
+              imageUrls: null,
+              variants: rows,
+            },
+          ],
+          aiFields: [],
+        });
+      } else {
+        await withMoneyTx(prisma, tx => createVariantsForProductTx(tx, storeId, productId, rows));
+      }
     } catch (err) {
       // Compensate: a draft with half its variants would be worse than no draft.
       logger.error({ err, itemId }, '[catalog-import] variants failed; removing the draft');
-      await prisma.product
+      await (await storeWriter(storeId)).product
         .deleteMany({ where: { id: productId, storeId, status: 'draft' } })
         .catch(() => undefined);
       return fail('VARIANTS_FAILED');
     }
   }
 
-  const done = await prisma.catalogImportItem.updateMany({
+  const done = await (
+    await storeWriter(storeId)
+  ).catalogImportItem.updateMany({
     where: { id: itemId, storeId, productId: null },
     data: { status: 'created', productId, createErrorCode: null },
   });
@@ -748,12 +834,16 @@ export async function createDraftForItem(
 
 export async function finishCreateDrafts(storeId: string, jobId: string) {
   const [created, pending] = await Promise.all([
-    prisma.catalogImportItem.count({ where: { jobId, storeId, status: 'created' } }),
-    prisma.catalogImportItem.count({
+    (await storeDb(storeId)).catalogImportItem.count({
+      where: { jobId, storeId, status: 'created' },
+    }),
+    (await storeDb(storeId)).catalogImportItem.count({
       where: { jobId, storeId, status: 'accepted', productId: null },
     }),
   ]);
-  await prisma.catalogImportJob.updateMany({
+  await (
+    await storeWriter(storeId)
+  ).catalogImportJob.updateMany({
     where: { id: jobId, storeId, status: 'creating' },
     data: { draftsCreated: created, status: pending === 0 ? 'done' : 'review' },
   });
@@ -766,7 +856,9 @@ export async function finishCreateDrafts(storeId: string, jobId: string) {
 
 export async function publishItems(storeId: string, jobId: string, itemIds: string[]) {
   await requireJob(storeId, jobId);
-  const items = await prisma.catalogImportItem.findMany({
+  const items = await (
+    await storeDb(storeId)
+  ).catalogImportItem.findMany({
     where: { jobId, storeId, id: { in: itemIds } },
     select: {
       id: true,
@@ -785,7 +877,9 @@ export async function publishItems(storeId: string, jobId: string, itemIds: stri
       refused.push({ itemId: id, code: 'NOT_DRAFT' });
       continue;
     }
-    const p = await prisma.product.findFirst({
+    const p = await (
+      await storeDb(storeId)
+    ).product.findFirst({
       where: { id: it.productId, storeId, deletedAt: null },
       select: {
         status: true,

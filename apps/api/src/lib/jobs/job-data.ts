@@ -42,6 +42,8 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'domain-claim-sweep',
   // Customer Intelligence daily aggregation: reads the platform's R2 envelopes, writes the platform `CiInsight` (D1) rows, lists stores from the directory; opens no store-do table (Ruling INTEG-1)
   'ci-aggregation-daily',
+  // expired uploads in the private bucket only (R2 listing + delete); opens no store table (Ruling INTEG-1)
+  'catalog-import-uploads-sweep',
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
@@ -152,6 +154,11 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'order-created-fanout',
   'order-status-changed-fanout',
   'order-refunded-fanout',
+  // Ruling INTEG-1: the catalogue import and the weekly CI hint calibration reach their store only through `storeDb` /
+  // `storeWriter` / `storeMoney.importBatch` (tests/unit/integ-1-on-do.test.ts)
+  'catalog-import-run',
+  'catalog-import-create-drafts',
+  'ci-hint-calibration-weekly',
 ]);
 
 /**
@@ -166,6 +173,8 @@ export const ALL_STORES_JOBS: ReadonlySet<string> = new Set([
   'agent-write-denied-watch',
   'ai-autofill-sweep',
   'answer-engine-citation-scan-cron',
+  // lists every store and resolves each one's open hint logs; the platform check ranks all stores' rows together (Ruling INTEG-1)
+  'ci-hint-calibration-weekly',
 ]);
 
 export const MONEY_JOBS: ReadonlySet<string> = new Set([]);

@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { prisma, runInStoreScope } from '@ebda/database';
+import { runInStoreScope } from '@ebda/database';
+import { storeDb, storeWriter } from '../../repo-factory';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { processFile, refreshJobCounters } from '../../catalogue/process-file';
@@ -37,21 +38,29 @@ export const catalogImportRun: JobDef = inngest.createFunction(
 
     const plan = await step.run('start', () =>
       runInStoreScope(storeId, async () => {
-        const job = await prisma.catalogImportJob.findFirst({
+        const job = await (
+          await storeDb(storeId)
+        ).catalogImportJob.findFirst({
           where: { id: jobId, storeId },
           select: { status: true, startedAt: true },
         });
         if (!job || job.status === 'cancelled') return { skip: true as const };
-        await prisma.catalogImportJob.updateMany({
+        await (
+          await storeWriter(storeId)
+        ).catalogImportJob.updateMany({
           where: { id: jobId, storeId },
           data: { status: 'processing', startedAt: job.startedAt ?? new Date(), completedAt: null },
         });
-        const files = await prisma.catalogImportFile.findMany({
+        const files = await (
+          await storeDb(storeId)
+        ).catalogImportFile.findMany({
           where: { jobId, storeId, status: { in: ['stored', 'processing'] } },
           orderBy: { createdAt: 'asc' },
           select: { id: true },
         });
-        const cats = await prisma.category.findMany({
+        const cats = await (
+          await storeDb(storeId)
+        ).category.findMany({
           where: { storeId, deletedAt: null },
           select: { name: true, nameAr: true },
           take: 100,
@@ -74,8 +83,8 @@ export const catalogImportRun: JobDef = inngest.createFunction(
       if (stopped) {
         // The AI cap is hit: park the rest as retryable, do not call the model.
         await step.run(`park-${fileId}`, () =>
-          runInStoreScope(storeId, () =>
-            prisma.catalogImportFile.updateMany({
+          runInStoreScope(storeId, async () =>
+            (await storeWriter(storeId)).catalogImportFile.updateMany({
               where: { id: fileId, storeId, status: { in: ['stored', 'processing'] } },
               data: { status: 'skipped_quota', errorCode: 'AI_QUOTA_EXCEEDED' },
             })
@@ -99,12 +108,16 @@ export const catalogImportRun: JobDef = inngest.createFunction(
     return step.run('finalize', () =>
       runInStoreScope(storeId, async () => {
         const c = await refreshJobCounters(storeId, jobId);
-        const first = await prisma.catalogImportFile.findFirst({
+        const first = await (
+          await storeDb(storeId)
+        ).catalogImportFile.findFirst({
           where: { jobId, storeId, status: { in: ['failed', 'skipped_quota'] } },
           select: { errorCode: true },
         });
         const ok = c.done > 0;
-        await prisma.catalogImportJob.updateMany({
+        await (
+          await storeWriter(storeId)
+        ).catalogImportJob.updateMany({
           where: { id: jobId, storeId, status: 'processing' },
           data: ok
             ? { status: 'review', completedAt: new Date() }

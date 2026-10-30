@@ -1,4 +1,5 @@
-import { acrossStores, prisma } from '@ebda/database';
+import { acrossAllStoresDb } from '../lib/jobs/store-db';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import logger from '../lib/logger';
 import {
   evaluateCalibration,
@@ -18,14 +19,16 @@ export async function resolveAndSummarise(
   storeId: string,
   now = new Date()
 ): Promise<CalibrationRow[]> {
-  const open = await prisma.ciHintLog.findMany({
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  const open = await db.ciHintLog.findMany({
     where: { storeId, outcome: null, createdAt: { gte: new Date(now.getTime() - 120 * DAY) } },
     select: { id: true, orderId: true },
     take: 2000,
   });
   const byOrder = new Map(open.map(o => [o.orderId, o.id]));
   for (const orders of chunk([...byOrder.keys()], 100)) {
-    const ships = await prisma.shipment.findMany({
+    const ships = await db.shipment.findMany({
       where: {
         storeId,
         orderId: { in: orders },
@@ -36,21 +39,21 @@ export async function resolveAndSummarise(
     const returned = ships.filter(s => s.returnedAt).map(s => byOrder.get(s.orderId)!);
     const delivered = ships.filter(s => !s.returnedAt).map(s => byOrder.get(s.orderId)!);
     if (returned.length)
-      await prisma.ciHintLog.updateMany({
+      await w.ciHintLog.updateMany({
         where: { storeId, id: { in: returned } },
         data: { outcome: 'returned', outcomeAt: now },
       });
     if (delivered.length)
-      await prisma.ciHintLog.updateMany({
+      await w.ciHintLog.updateMany({
         where: { storeId, id: { in: delivered } },
         data: { outcome: 'delivered', outcomeAt: now },
       });
   }
   // Retention (docs/RETENTION.md): hint logs live 400 days.
-  await prisma.ciHintLog.deleteMany({
+  await w.ciHintLog.deleteMany({
     where: { storeId, createdAt: { lt: new Date(now.getTime() - 400 * DAY) } },
   });
-  const done = await prisma.ciHintLog.findMany({
+  const done = await db.ciHintLog.findMany({
     where: {
       storeId,
       outcome: { not: null },
@@ -91,7 +94,9 @@ export async function applyStoreGates(
   rows: CalibrationRow[]
 ): Promise<{ closed: string[]; reopened: string[] }> {
   const verdicts = evaluateStoreGates(rows.filter(r => r.storeId === storeId));
-  const existing = await prisma.ciStoreGate.findMany({
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  const existing = await db.ciStoreGate.findMany({
     where: { storeId },
     select: { feature: true },
     take: 50,
@@ -105,7 +110,7 @@ export async function applyStoreGates(
       actualRate: v.actual!,
       resolved: v.resolved,
     };
-    await prisma.ciStoreGate.upsert({
+    await w.ciStoreGate.upsert({
       where: { storeId_feature: { storeId, feature: v.feature } },
       create: { storeId, feature: v.feature, ...data },
       update: data,
@@ -115,7 +120,7 @@ export async function applyStoreGates(
   const stillOff = new Set(verdicts.filter(v => v.off).map(v => v.feature));
   const reopened = [...paused].filter(f => !stillOff.has(f));
   if (reopened.length) {
-    await prisma.ciStoreGate.deleteMany({ where: { storeId, feature: { in: reopened } } });
+    await w.ciStoreGate.deleteMany({ where: { storeId, feature: { in: reopened } } });
   }
   if (closed.length || reopened.length) {
     logger.info({ storeId, closed, reopened }, '[ci-calibration] store gate changed');
@@ -124,26 +129,27 @@ export async function applyStoreGates(
 }
 
 export interface CalibrationDeps {
-  collect(): Promise<CalibrationRow[]>;
+  /** `event` is the job event: the alarm run of one DO store covers that store only (Ruling INTEG-1). */
+  collect(event?: { data?: unknown }): Promise<CalibrationRow[]>;
   alert(feature: string, reason: string): Promise<unknown>;
 }
 
 const defaultDeps: CalibrationDeps = {
-  async collect() {
-    const per = await acrossStores(
-      async id => {
+  async collect(event) {
+    // every store, Postgres and Durable Object alike, from the one weekly cron run (the platform check needs all rows)
+    const per = await acrossAllStoresDb(event, async id => {
+      try {
         const rows = await resolveAndSummarise(id);
         // One store's gating failing must not lose its rows for the platform check.
         await applyStoreGates(id, rows).catch(err =>
           logger.error({ err, storeId: id }, '[ci-calibration] store gate failed')
         );
         return rows;
-      },
-      {
-        onStoreError: (storeId, err) =>
-          logger.error({ err, storeId }, '[ci-calibration] store failed'),
+      } catch (err) {
+        logger.error({ err, storeId: id }, '[ci-calibration] store failed');
+        return [] as CalibrationRow[];
       }
-    );
+    });
     return per.flatMap(p => p.value);
   },
   alert: (feature, reason) =>
@@ -158,9 +164,10 @@ const defaultDeps: CalibrationDeps = {
 
 /** Weekly: evaluate every band; ALERT for any feature with a band off by more than 10 points. The platform gate is never closed here (Ruling CI-11). */
 export async function runCalibration(
-  deps: CalibrationDeps = defaultDeps
+  deps: CalibrationDeps = defaultDeps,
+  event?: { data?: unknown }
 ): Promise<{ results: CalibrationResult[]; alerted: string[] }> {
-  const results = evaluateCalibration(await deps.collect());
+  const results = evaluateCalibration(await deps.collect(event));
   const alerted: string[] = [];
   for (const feature of CI_HINT_FEATURES) {
     const off = results.filter(r => r.feature === feature && r.off);
