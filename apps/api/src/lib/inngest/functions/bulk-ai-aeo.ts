@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -270,8 +271,13 @@ const bulkAiFaqAeoFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), total: count, force },
         })
@@ -319,17 +325,17 @@ const bulkAiFaqAeoFn = inngest.createFunction(
             where: { id: storeId },
             select: { name: true, nameAr: true, description: true },
           }),
-          prisma.category.findMany({
+          sdb.category.findMany({
             where: { storeId, isActive: true },
             select: { name: true },
             take: 10,
           }),
-          prisma.product.findMany({
+          sdb.product.findMany({
             where: { storeId, status: 'active', deletedAt: null },
             select: { name: true },
             take: 20,
           }),
-          prisma.paymentConfig.findMany({
+          sdb.paymentConfig.findMany({
             where: { storeId, isEnabled: true },
             select: { provider: true, supportedMethods: true },
           }),
@@ -339,7 +345,7 @@ const bulkAiFaqAeoFn = inngest.createFunction(
           return { notFound: true, filled, skipped, failed, errors };
         }
 
-        const existingFaqs = await prisma.storeFaq.findMany({
+        const existingFaqs = await sdb.storeFaq.findMany({
           where: { storeId },
           select: { question: true, manuallyEdited: true, orderIndex: true },
         });
@@ -373,10 +379,10 @@ const bulkAiFaqAeoFn = inngest.createFunction(
           methodSet.size > 0 ? Array.from(methodSet).join(', ') : 'cash on delivery';
 
         if (force) {
-          await prisma.storeFaq.deleteMany({
+          await sw.storeFaq.deleteMany({
             where: { storeId, manuallyEdited: false },
           });
-          const reloadedFaqs = await prisma.storeFaq.findMany({
+          const reloadedFaqs = await sdb.storeFaq.findMany({
             where: { storeId },
             select: { question: true, manuallyEdited: true, orderIndex: true },
           });
@@ -469,7 +475,7 @@ No other text, no markdown code fences — pure JSON only.`;
           }
           try {
             orderCursor++;
-            await prisma.storeFaq.create({
+            await sw.storeFaq.create({
               data: {
                 storeId,
                 question: f.question.trim(),
@@ -500,7 +506,7 @@ No other text, no markdown code fences — pure JSON only.`;
 
       if (result.notFound) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -522,12 +528,12 @@ No other text, no markdown code fences — pure JSON only.`;
       // (#1333).
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const faqFinalRow = await prisma.bulkAiJob.findUnique({
+        const faqFinalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: faqFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
@@ -600,8 +606,13 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), total: count, force },
         })
@@ -649,12 +660,12 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
             where: { id: storeId },
             select: { name: true, nameAr: true, description: true },
           }),
-          prisma.category.findMany({
+          sdb.category.findMany({
             where: { storeId, isActive: true },
             select: { name: true },
             take: 8,
           }),
-          prisma.product.findMany({
+          sdb.product.findMany({
             where: { storeId, status: 'active', deletedAt: null },
             select: { name: true },
             take: 15,
@@ -665,7 +676,7 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
           return { notFound: true, filled, skipped, failed, errors };
         }
 
-        const existingHowtos = await prisma.storeHowto.findMany({
+        const existingHowtos = await sdb.storeHowto.findMany({
           where: { storeId },
           select: { title: true, manuallyEdited: true, orderIndex: true },
         });
@@ -675,10 +686,10 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
         let maxOrder = existingHowtos.reduce((m, h) => Math.max(m, h.orderIndex), -1);
 
         if (force) {
-          await prisma.storeHowto.deleteMany({
+          await sw.storeHowto.deleteMany({
             where: { storeId, manuallyEdited: false },
           });
-          const reloadedHowtos = await prisma.storeHowto.findMany({
+          const reloadedHowtos = await sdb.storeHowto.findMany({
             where: { storeId },
             select: { title: true, manuallyEdited: true, orderIndex: true },
           });
@@ -790,7 +801,7 @@ No markdown, no code fences — pure JSON only.`;
           }
           try {
             orderCursor++;
-            await prisma.storeHowto.create({
+            await sw.storeHowto.create({
               data: {
                 storeId,
                 title: h.title.trim(),
@@ -823,7 +834,7 @@ No markdown, no code fences — pure JSON only.`;
 
       if (result.notFound) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -838,12 +849,12 @@ No markdown, no code fences — pure JSON only.`;
       // record's own `public:store:*` cache keys, not `public:products:*`.
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const howtoFinalRow = await prisma.bulkAiJob.findUnique({
+        const howtoFinalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: howtoFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
@@ -940,8 +951,13 @@ const bulkAiMetaAeoFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
@@ -954,11 +970,11 @@ const bulkAiMetaAeoFn = inngest.createFunction(
         });
         if (!store) return [];
 
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        const cats = await prisma.category.findMany({
+        const cats = await sdb.category.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
@@ -969,7 +985,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
           ...cats.map(c => ({ kind: 'category' as const, id: c.id })),
         ];
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: work.length },
         });
@@ -979,7 +995,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
 
       if (items.length === 0) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -1008,7 +1024,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
         const batchItems = batches[i];
 
         const result: MetaBatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -1114,7 +1130,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
             }
 
             if (item.kind === 'product') {
-              const p = await prisma.product.findUnique({
+              const p = await sdb.product.findUnique({
                 where: { id: item.id, storeId },
                 select: {
                   id: true,
@@ -1185,7 +1201,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
             }
 
             // item.kind === 'category'
-            const c = await prisma.category.findUnique({
+            const c = await sdb.category.findUnique({
               where: { id: item.id, storeId },
               select: {
                 id: true,
@@ -1282,7 +1298,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
@@ -1325,12 +1341,12 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const metaFinalRow = await prisma.bulkAiJob.findUnique({
+        const metaFinalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: metaFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',

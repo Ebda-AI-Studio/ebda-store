@@ -1,4 +1,6 @@
 import type { JobDef } from '../../jobs/types';
+import { storeWriter } from '../../repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { revertProductBalance } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
@@ -63,8 +65,13 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
@@ -73,11 +80,11 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
       // We list ALL products; revertProductBalance skips those without a
       // backup — this gives an upper bound for the progress bar.
       const productIds = await step.run('load-items', async () => {
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: products.length },
         });
@@ -96,7 +103,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
         const batchIds = batches[i];
 
         const result: RevertBatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -112,7 +119,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
             };
           }
 
-          const items = await prisma.product.findMany({
+          const items = await sdb.product.findMany({
             where: { id: { in: batchIds }, storeId },
             select: { id: true, name: true },
           });
@@ -180,7 +187,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { processed, filled: reverted, skipped, failed, errors: errors as object },
           })
@@ -215,7 +222,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
 
       await step.run('finalize', async () => {
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: 'completed',

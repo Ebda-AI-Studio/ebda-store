@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
@@ -127,8 +128,13 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), total: 1, force },
         })
@@ -161,13 +167,13 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
                 llmsTxt: true,
               },
             }),
-            prisma.category.findMany({
+            sdb.category.findMany({
               where: { storeId, isActive: true },
               select: { name: true, nameAr: true, slug: true },
               orderBy: { position: 'asc' },
               take: 20,
             }),
-            prisma.product.findMany({
+            sdb.product.findMany({
               where: { storeId, status: 'active', deletedAt: null },
               select: { name: true, nameAr: true, slug: true, price: true },
               take: 10,
@@ -296,7 +302,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
 
       if (result.notFound) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -312,12 +318,12 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
       // busts the wrong namespace entirely (#1333).
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const llmsFinalRow = await prisma.bulkAiJob.findUnique({
+        const llmsFinalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: llmsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
@@ -387,8 +393,13 @@ const bulkAiCitationCopyFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
@@ -400,11 +411,11 @@ const bulkAiCitationCopyFn = inngest.createFunction(
           select: { id: true },
         });
         if (!store) return { storeFound: false, productIds: [] as string[] };
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: products.length },
         });
@@ -413,7 +424,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
 
       if (!storeFound) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -442,7 +453,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
         const batchIds = batches[i];
 
         const result: CitationBatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -464,7 +475,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
             generationConfig: { responseMimeType: 'application/json' },
           });
 
-          const items = await prisma.product.findMany({
+          const items = await sdb.product.findMany({
             where: { id: { in: batchIds }, storeId },
             select: {
               id: true,
@@ -585,7 +596,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
@@ -624,12 +635,12 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
       // pre-sweep store data until that key's TTL expired.
       await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const citationFinalRow = await prisma.bulkAiJob.findUnique({
+        const citationFinalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: citationFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
@@ -681,8 +692,13 @@ const bulkAiBrandFactsFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), total: 1, force },
         })
@@ -716,7 +732,7 @@ const bulkAiBrandFactsFn = inngest.createFunction(
                 aboutJson: true,
               },
             }),
-            prisma.category.findMany({
+            sdb.category.findMany({
               where: { storeId, isActive: true },
               select: { name: true },
               orderBy: { position: 'asc' },
@@ -830,7 +846,7 @@ Populate using only the information provided above. For keyCategories, use the c
 
       if (result.notFound) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -846,12 +862,12 @@ Populate using only the information provided above. For keyCategories, use the c
       // (#1333). Bust ONCE at the end, never per item.
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const factsFinalRow = await prisma.bulkAiJob.findUnique({
+        const factsFinalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: factsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',

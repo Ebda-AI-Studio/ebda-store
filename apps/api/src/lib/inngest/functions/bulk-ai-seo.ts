@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
+import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
@@ -100,8 +101,13 @@ const bulkAiSeoFn = inngest.createFunction(
     }
 
     return runInStoreScope(storeId, async () => {
+      // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
+
+      const sdb = lazyStoreDb(storeId);
+
+      const sw = lazyStoreWriter(storeId);
       await step.run('mark-running', () =>
-        prisma.bulkAiJob.update({
+        sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
@@ -114,11 +120,11 @@ const bulkAiSeoFn = inngest.createFunction(
         });
         if (!store) return [];
 
-        const cats = await prisma.category.findMany({
+        const cats = await sdb.category.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        const products = await prisma.product.findMany({
+        const products = await sdb.product.findMany({
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
@@ -129,7 +135,7 @@ const bulkAiSeoFn = inngest.createFunction(
           ...products.map(p => ({ kind: 'product' as const, id: p.id })),
         ];
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: { total: work.length },
         });
@@ -146,7 +152,7 @@ const bulkAiSeoFn = inngest.createFunction(
 
       if (items.length === 0) {
         await step.run('mark-failed', async () => {
-          await prisma.bulkAiJob.update({
+          await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
           });
@@ -169,7 +175,7 @@ const bulkAiSeoFn = inngest.createFunction(
         const batchItems = batches[i];
 
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+          const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
             select: { status: true },
           });
@@ -263,7 +269,7 @@ const bulkAiSeoFn = inngest.createFunction(
             }
 
             if (item.kind === 'category') {
-              const c = await prisma.category.findUnique({
+              const c = await sdb.category.findUnique({
                 where: { id: item.id, storeId },
                 select: {
                   id: true,
@@ -332,7 +338,7 @@ const bulkAiSeoFn = inngest.createFunction(
             }
 
             // item.kind === 'product'
-            const p = await prisma.product.findUnique({
+            const p = await sdb.product.findUnique({
               where: { id: item.id, storeId },
               select: {
                 id: true,
@@ -423,7 +429,7 @@ const bulkAiSeoFn = inngest.createFunction(
         }
 
         await step.run(`progress-${i}`, () =>
-          prisma.bulkAiJob.update({
+          sw.bulkAiJob.update({
             where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
@@ -466,12 +472,12 @@ const bulkAiSeoFn = inngest.createFunction(
       // pre-sweep store data until that key's TTL expired.
       await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
       await step.run('finalize', async () => {
-        const finalRow = await prisma.bulkAiJob.findUnique({
+        const finalRow = await sdb.bulkAiJob.findUnique({
           where: { id: jobId, storeId },
           select: { status: true },
         });
 
-        await prisma.bulkAiJob.update({
+        await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
           data: {
             status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',

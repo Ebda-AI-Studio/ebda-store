@@ -6,7 +6,7 @@
  * `writeLimiter` per-IP rate limiter on top of the AI service's own
  * per-store daily token budget.
  */
-import { storeWriter } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
@@ -516,8 +516,8 @@ async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promis
   try {
     // Savepointed: best-effort inside the request's tenant transaction — a
     // swallowed failure must not abort it (issue 2215's class).
-    await withSavepoint(() =>
-      prisma.bulkAiJob.update({
+    await withSavepoint(async () =>
+      (await storeWriter(currentStoreId())).bulkAiJob.update({
         where: { id: jobId, storeId: currentStoreId() },
         data: { status: 'failed', errorMessage: message, completedAt: new Date() },
       })
@@ -536,7 +536,9 @@ router.post(
       const { storeId } = req.params;
       const { direction } = bulkTranslateSchema.parse(req.body);
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'translate', direction },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -574,7 +576,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -611,7 +615,9 @@ router.post(
 router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const jobs = await prisma.bulkAiJob.findMany({
+    const jobs = await (
+      await storeDb(currentStoreId())
+    ).bulkAiJob.findMany({
       where: { storeId },
       orderBy: { createdAt: 'desc' },
       take: 20,
@@ -640,7 +646,9 @@ router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId, jobId } = req.params;
-    const job = await prisma.bulkAiJob.findFirst({
+    const job = await (
+      await storeDb(currentStoreId())
+    ).bulkAiJob.findFirst({
       where: { id: jobId, storeId },
       select: {
         id: true,
@@ -779,7 +787,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -832,7 +842,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'category_assign' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -873,7 +885,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'image_alt' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -913,7 +927,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -958,7 +974,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1130,7 +1148,9 @@ router.post(
       const count = Math.min(parseInt(String(req.body?.count ?? '8'), 10) || 8, 20);
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1174,7 +1194,9 @@ router.post(
       const count = Math.min(parseInt(String(req.body?.count ?? '3'), 10) || 3, 10);
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1217,7 +1239,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1268,7 +1292,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1322,7 +1348,7 @@ router.post(
 
       // Create all three jobs in parallel
       const [faqJob, howtoJob, metaJob] = await Promise.all([
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1331,7 +1357,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1340,7 +1366,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1417,7 +1443,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1460,7 +1488,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1503,7 +1533,9 @@ router.post(
       const { storeId } = req.params;
       const force = req.body?.force === true;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: {
           storeId,
           userId: req.user!.userId,
@@ -1549,7 +1581,7 @@ router.post(
       const geoSweepForce = req.body?.force === true;
 
       const [llmsJob, citationJob, factsJob] = await Promise.all([
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1561,7 +1593,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1573,7 +1605,7 @@ router.post(
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
-        prisma.bulkAiJob.create({
+        (await storeWriter(currentStoreId())).bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
@@ -1648,7 +1680,9 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, jobId } = req.params;
-      const updated = await prisma.bulkAiJob.updateMany({
+      const updated = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.updateMany({
         where: { id: jobId, storeId, status: { in: ['queued', 'running'] } },
         data: { status: 'cancelled', completedAt: new Date() },
       });
@@ -1730,7 +1764,9 @@ router.get('/results/recommendations', async (req: Request, res: Response, next:
       throw new AppError(400, 'PRODUCT_ID_REQUIRED', 'productId query param is required');
     }
 
-    const rows = await prisma.aiRecommendation.findMany({
+    const rows = await (
+      await storeDb(currentStoreId())
+    ).aiRecommendation.findMany({
       where: { storeId, sourceProductId: productId },
       orderBy: { score: 'desc' },
       take: 25,
@@ -1792,14 +1828,14 @@ router.get(
 
       const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
         prisma.product.count({ where: { storeId, deletedAt: null } }),
-        prisma.aiRecommendation
+        (await storeDb(currentStoreId())).aiRecommendation
           .findMany({
             where: { storeId },
             distinct: ['sourceProductId'],
             select: { sourceProductId: true },
           })
           .then(rows => rows.length),
-        prisma.aiRecommendation.count({ where: { storeId } }),
+        (await storeDb(currentStoreId())).aiRecommendation.count({ where: { storeId } }),
       ]);
 
       res.json({
@@ -1985,7 +2021,9 @@ router.get('/results/faqs', async (req: Request, res: Response, next: NextFuncti
   try {
     const storeId = (req.params as { storeId: string }).storeId;
 
-    const faqs = await prisma.storeFaq.findMany({
+    const faqs = await (
+      await storeDb(currentStoreId())
+    ).storeFaq.findMany({
       where: { storeId, isActive: true },
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2031,7 +2069,9 @@ router.get('/results/howtos', async (req: Request, res: Response, next: NextFunc
   try {
     const storeId = (req.params as { storeId: string }).storeId;
 
-    const howtos = await prisma.storeHowto.findMany({
+    const howtos = await (
+      await storeDb(currentStoreId())
+    ).storeHowto.findMany({
       where: { storeId, isActive: true },
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       select: {
@@ -2226,7 +2266,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'description_balance' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
@@ -2263,7 +2305,9 @@ router.post(
     try {
       const { storeId } = req.params;
 
-      const job = await prisma.bulkAiJob.create({
+      const job = await (
+        await storeWriter(currentStoreId())
+      ).bulkAiJob.create({
         data: { storeId, userId: req.user!.userId, kind: 'description_revert' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
