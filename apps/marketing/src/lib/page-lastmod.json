@@ -1,70 +1,70 @@
 {
   "home": {
-    "hash": "8c4513d7fffb396d",
+    "hash": "c35cda9347aa45e1",
     "date": "2026-10-28"
   },
   "features": {
-    "hash": "88d68dac868c77b7",
+    "hash": "0a26564f1f4d1336",
     "date": "2026-10-28"
   },
   "whatsapp": {
-    "hash": "667d065472652fdb",
+    "hash": "c59b9c4df2cd9234",
     "date": "2026-10-28"
   },
   "compare/zid": {
-    "hash": "3686aff84073d9f6",
+    "hash": "015e21ceb36420e4",
     "date": "2026-10-28"
   },
   "compare/shopify": {
-    "hash": "f1d2656682406d88",
+    "hash": "f39ca0c7ff1d8549",
     "date": "2026-10-28"
   },
   "compare/wuilt": {
-    "hash": "4f42491988b49cd3",
+    "hash": "2b04f2a59627c268",
     "date": "2026-10-28"
   },
   "compare/youcan": {
-    "hash": "c44f9fe73a93c53a",
+    "hash": "28008ad9f9f13223",
     "date": "2026-10-28"
   },
   "compare/easyorders": {
-    "hash": "5036b70ba9156711",
+    "hash": "24acc19a4d107d36",
     "date": "2026-10-28"
   },
   "compare/expandcart": {
-    "hash": "570496b90fc836ff",
+    "hash": "2b40218d12450f83",
     "date": "2026-10-28"
   },
   "for/fashion": {
-    "hash": "c4b865aa634971ef",
+    "hash": "58263c65ffd3210a",
     "date": "2026-10-28"
   },
   "for/electronics": {
-    "hash": "8c29fd6635ea002e",
+    "hash": "1b8b8d39d33ced2e",
     "date": "2026-10-28"
   },
   "for/beauty": {
-    "hash": "30f9fcce8f7d30c3",
+    "hash": "63116925dab3f367",
     "date": "2026-10-28"
   },
   "for/food": {
-    "hash": "8cee2218aa695a8e",
+    "hash": "284a1d20f8514c75",
     "date": "2026-10-28"
   },
   "for/jewellery": {
-    "hash": "c09c43473dced819",
+    "hash": "78f7565fa82b9a40",
     "date": "2026-10-28"
   },
   "about": {
-    "hash": "45bd3045239b5a42",
+    "hash": "50b563f25f239379",
     "date": "2026-10-28"
   },
   "contact": {
-    "hash": "ee0fc74c297de6c1",
+    "hash": "4242d489b6302cb9",
     "date": "2026-10-28"
   },
   "credits": {
-    "hash": "336ecaf48db09af3",
+    "hash": "15502ee5a950eb19",
     "date": "2026-10-28"
   }
 }

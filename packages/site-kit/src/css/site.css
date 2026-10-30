@@ -323,7 +323,10 @@ ol {
 @media (min-width: 900px) {
   .layout.has-side {
     display: grid;
-    grid-template-columns: 240px minmax(0, 1fr);
+    /* The reading column is capped (prose is 78ch); an uncapped 1fr left the article hugging one side of
+       the 1180px wrap, with a dead gutter on the other at wide desktops. Cap the column and centre the pair. */
+    grid-template-columns: 240px minmax(0, 52rem);
+    justify-content: center;
     gap: 40px;
     align-items: start;
   }

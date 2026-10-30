@@ -11,6 +11,7 @@ const WF = join(ROOT, '.github/workflows');
 const REQ = [
   'API Worker boots on workerd',
   'App builds (affected)',
+  'Deploy workflow changes need the deploy-change label',
   'Detect affected workspaces',
   'Repo guards',
   'Scan for leaked secrets',
@@ -18,7 +19,13 @@ const REQ = [
 ];
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12';
 
-type Check = { name: string; status?: string; conclusion?: string | null };
+type Check = {
+  name: string;
+  status?: string;
+  conclusion?: string | null;
+  startedAt?: string;
+  completedAt?: string;
+};
 const run = (
   checks: Check[],
   over: { head?: string; mergeable?: string; want?: string; polls?: string } = {}
@@ -119,6 +126,80 @@ describe('merge-gate.sh', () => {
     expect(r.status).toBe(2);
     expect(r.merged).toBeNull();
     expect(r.out).toContain('without an explicit SUCCESS: blast-radius');
+  });
+  it('an OLD failed run of a check followed by a NEWER passing run of the same name -> merges (latest run wins)', () => {
+    const r = run([
+      {
+        name: 'Deploy workflow changes need the deploy-change label',
+        conclusion: 'FAILURE',
+        startedAt: '2026-10-29T10:00:00Z',
+        completedAt: '2026-10-29T10:01:00Z',
+      },
+      ...green.filter(c => c.name !== 'Deploy workflow changes need the deploy-change label'),
+      {
+        name: 'Deploy workflow changes need the deploy-change label',
+        conclusion: 'SUCCESS',
+        startedAt: '2026-10-29T10:30:00Z',
+        completedAt: '2026-10-29T10:31:00Z',
+      },
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.merged).toBe(SHA);
+  });
+  it('the latest run wins whatever order the rollup lists them in', () => {
+    const r = run(
+      [
+        ...green,
+        {
+          name: 'Repo guards',
+          conclusion: 'FAILURE',
+          startedAt: '2026-10-29T10:00:00Z',
+          completedAt: '2026-10-29T10:01:00Z',
+        },
+      ].map(c =>
+        c.name === 'Repo guards' && !c.startedAt ? { ...c, startedAt: '2026-10-29T11:00:00Z' } : c
+      )
+    );
+    expect(r.status).toBe(0);
+  });
+  it('a NEWER failed run after an older passing run of the same name -> still refuses', () => {
+    const r = run([
+      ...green.filter(c => c.name !== 'Repo guards'),
+      {
+        name: 'Repo guards',
+        conclusion: 'SUCCESS',
+        startedAt: '2026-10-29T10:00:00Z',
+        completedAt: '2026-10-29T10:01:00Z',
+      },
+      {
+        name: 'Repo guards',
+        conclusion: 'FAILURE',
+        startedAt: '2026-10-29T10:30:00Z',
+        completedAt: '2026-10-29T10:31:00Z',
+      },
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.merged).toBeNull();
+    expect(r.out).toContain('failing check(s): Repo guards');
+  });
+  it('a newer in-progress rerun after an old failure -> waits, never merges', () => {
+    const r = run([
+      ...green.filter(c => c.name !== 'Repo guards'),
+      {
+        name: 'Repo guards',
+        conclusion: 'FAILURE',
+        startedAt: '2026-10-29T10:00:00Z',
+        completedAt: '2026-10-29T10:01:00Z',
+      },
+      {
+        name: 'Repo guards',
+        status: 'IN_PROGRESS',
+        conclusion: null,
+        startedAt: '2026-10-29T10:30:00Z',
+      },
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.merged).toBeNull();
   });
   it('head moved since review -> refuses at once', () => {
     const r = run(green, { head: 'ffffff1234567890ffffff1234567890ffffff12' });

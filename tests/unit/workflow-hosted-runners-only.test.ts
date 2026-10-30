@@ -59,7 +59,11 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
   // so deleting the variable is the single switch back to hosted runners.
   const ALLOWED = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}`;
   it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-latest fallback', () => {
-    const bad = runsOnValues().filter(r => r.value !== ALLOWED);
+    // Ruling OFFMACHINE-1: the off-machine database backup must NOT depend on the Umbra fleet (the Mac and the CI guest are
+    // exactly what it protects against), so db-backup.yml alone pins the literal GitHub-hosted runner.
+    const bad = runsOnValues().filter(
+      r => r.value !== ALLOWED && !(r.file === 'db-backup.yml' && r.value === 'ubuntu-latest')
+    );
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
       'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-latest)'

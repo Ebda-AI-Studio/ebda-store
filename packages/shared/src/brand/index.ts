@@ -87,7 +87,7 @@ export const BRAND = {
    * E.164 with the leading +; use `whatsappUrl()` / `whatsappDisplay()` to render it.
    */
   contact: {
-    whatsapp: '+201207761882',
+    whatsapp: '+201514191411',
   },
   legalUrls: {
     terms: 'https://ebda.app/terms',
@@ -126,7 +126,7 @@ export function whatsappUrl(text?: string): string {
   return text ? `${url}?text=${encodeURIComponent(text)}` : url;
 }
 
-/** The WhatsApp number for display, e.g. `+20 120 776 1882` (render left-to-right, selectable). */
+/** The WhatsApp number for display, e.g. `+20 151 419 1411` (render left-to-right, selectable). */
 export function whatsappDisplay(): string {
   return BRAND.contact.whatsapp.replace(/^\+20(\d{3})(\d{3})(\d{4})$/, '+20 $1 $2 $3');
 }

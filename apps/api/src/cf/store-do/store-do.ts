@@ -23,6 +23,7 @@
  * and lock paths are not here (PR D2).
  */
 import { DurableObject } from 'cloudflare:workers';
+import { handleStoreAdmin } from '../../../../../packages/cf-migrate/src/store-admin.mjs';
 import {
   createPrismaLite,
   doSqlRunner,
@@ -110,6 +111,17 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureIdempotencySchema(doSqlRunner(ctx.storage));
       ensureStockOpsSchema(this.sync);
       ensureMoneyOpsSchema(this.sync);
+    });
+  }
+
+  /**
+   * The cutover admin surface (__import/__verify/__seal/__status/__unseal/...). Reached ONLY through
+   * cf/cutover.ts, which checks the CUTOVER_IMPORT_SECRET bearer before this DO sees the request.
+   */
+  async fetch(request: Request): Promise<Response> {
+    return handleStoreAdmin(request, {
+      sql: this.ctx.storage.sql as never,
+      transactionSync: fn => this.ctx.storage.transactionSync(fn),
     });
   }
 

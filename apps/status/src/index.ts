@@ -1,3 +1,4 @@
+import { composeAlert, sendTelegram, type SendFetch } from './alert';
 import { BRAND, BRAND_MARKETING_URL, SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
 import {
   pickStudioLang,
@@ -54,6 +55,17 @@ export async function runProbes(
 ) {
   const results = await probeAll(COMPONENTS, opts.fetcher, opts.timeoutMs);
   return store(env).record(results, opts.now ?? Date.now(), thresholdsFrom(env));
+}
+
+/** Telegram on an incident opening or resolving (no-op without TELEGRAM_* secrets). Exported for tests. */
+export async function alertOnOutcome(
+  env: Cloudflare.Env,
+  outcome: { opened: number[]; resolved: number[] },
+  send?: SendFetch
+): Promise<boolean> {
+  if (!outcome.opened.length && !outcome.resolved.length) return false;
+  const text = composeAlert(await store(env).snapshot(Date.now()), outcome);
+  return text ? sendTelegram(env, text, send) : false;
 }
 
 async function sha256(s: string): Promise<Uint8Array> {
@@ -245,6 +257,10 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runProbes(env));
+    ctx.waitUntil(
+      runProbes(env)
+        .then(outcome => alertOnOutcome(env, outcome))
+        .catch(err => console.error('[status] probe round failed', err))
+    );
   },
 } satisfies ExportedHandler<Cloudflare.Env>;
