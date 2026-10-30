@@ -31,7 +31,7 @@ function stub(storeId: string): ScheduleStub | undefined {
  * a Postgres store keeps today's path, the global cron. No-op without the binding or for a Postgres store.
  */
 export async function armStoreSchedule(storeId: string): Promise<void> {
-  if (!doStoreIds().has(storeId)) return;
+  if (!(await doStoreIds()).has(storeId)) return;
   await stub(storeId)?.arm(storeId, alarmEntries());
 }
 
@@ -44,7 +44,7 @@ export async function syncStoreSchedules(
   concurrency = 10
 ): Promise<{ stores: number; failed: number }> {
   if (!cfBindings()?.STORE_SCHEDULE) return { stores: 0, failed: 0 };
-  const dos = doStoreIds();
+  const dos = await doStoreIds();
   if (dos.size === 0) return { stores: 0, failed: 0 };
   const stores = (await storeDirectory()).filter(s => dos.has(s.id));
   const entries = alarmEntries();

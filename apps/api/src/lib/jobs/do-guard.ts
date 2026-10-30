@@ -16,7 +16,7 @@
 import { withHiddenStores } from '@ebda/database';
 import logger from '../logger';
 import { sendAlert } from '../../services/alerts.service';
-import { enabledStoreIds } from '../store-backend';
+import { doStoreIdSet } from '../store-backend';
 import { runInJobRepoScope } from '../repo-factory';
 import { jobDataClass, MONEY_JOBS, PORTED_MONEY_JOBS } from './job-data';
 import { jobRunsOnAlarm } from './alarm-flag';
@@ -28,8 +28,8 @@ export function jobsOnDo(): boolean {
 }
 
 /** Stores whose data lives on their Durable Object, as far as jobs are concerned. Empty = today. */
-export function doStoreIds(): ReadonlySet<string> {
-  return jobsOnDo() ? enabledStoreIds() : new Set<string>();
+export async function doStoreIds(): Promise<ReadonlySet<string>> {
+  return jobsOnDo() ? doStoreIdSet() : new Set<string>();
 }
 
 /** The store a run is about: the alarm's store, else a string `event.data.storeId`. */
@@ -55,8 +55,8 @@ export const EVENT_STORE_RESOLVERS: Record<
 > = {};
 
 /** True when the run's store must be looked up (JOBS_ON_DO on, the event carries none, the job has a resolver). */
-export function needsStoreLookup(def: JobDef, event: JobEvent): boolean {
-  return doStoreIds().size > 0 && !jobTargetStore(event) && def.id in EVENT_STORE_RESOLVERS;
+export async function needsStoreLookup(def: JobDef, event: JobEvent): Promise<boolean> {
+  return (await doStoreIds()).size > 0 && !jobTargetStore(event) && def.id in EVENT_STORE_RESOLVERS;
 }
 
 /** The store a run is about, resolving it from a reference when the event does not carry it. Never throws. */
@@ -64,7 +64,7 @@ export async function resolveRunStore(def: JobDef, event: JobEvent): Promise<str
   const direct = jobTargetStore(event);
   if (direct) return direct;
   const resolver = EVENT_STORE_RESOLVERS[def.id];
-  if (!resolver || doStoreIds().size === 0) return undefined;
+  if (!resolver || (await doStoreIds()).size === 0) return undefined;
   try {
     return await resolver(event);
   } catch (err) {
@@ -77,14 +77,17 @@ export async function resolveRunStore(def: JobDef, event: JobEvent): Promise<str
   }
 }
 
-export function decideRunForStore(def: JobDef, storeId: string | undefined): RunDecision {
-  const dos = doStoreIds();
+export async function decideRunForStore(
+  def: JobDef,
+  storeId: string | undefined
+): Promise<RunDecision> {
+  const dos = await doStoreIds();
   if (dos.size === 0 || jobDataClass(def.id) !== 'unported') return { run: true };
   if (storeId && dos.has(storeId)) return { run: false, storeId, money: MONEY_JOBS.has(def.id) };
   return { run: true };
 }
 
-export function decideRun(def: JobDef, event: JobEvent): RunDecision {
+export function decideRun(def: JobDef, event: JobEvent): Promise<RunDecision> {
   return decideRunForStore(def, jobTargetStore(event));
 }
 
@@ -116,7 +119,7 @@ export async function guardedRun<T>(
   event: JobEvent,
   fn: () => Promise<T>
 ): Promise<T> {
-  const dos = doStoreIds();
+  const dos = await doStoreIds();
   const cls = jobDataClass(def.id);
   if (dos.size === 0 || cls === 'none') return fn();
   const only = alarmStoreId(event);

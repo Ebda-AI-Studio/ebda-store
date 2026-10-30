@@ -45,7 +45,6 @@ vi.mock('@api/cf/ops/backup-sweep', () => ({
     legacy.ran.push('backup-sweep');
     return { ok: true };
   },
-  flaggedStoreIds: () => [],
 }));
 vi.mock('@api/lib/jobs/store-schedule', () => ({
   syncStoreSchedules: async () => void legacy.ran.push('store-schedule-sync'),

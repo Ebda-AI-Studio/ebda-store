@@ -17,7 +17,8 @@ import { AuthService } from '../services/auth.service';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
-import { runBackupSweep, flaggedStoreIds, type SweepEnv } from './ops/backup-sweep';
+import { doStoreIdList } from '../lib/store-backend';
+import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
 import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
@@ -52,7 +53,7 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
       run: async () => {
         const env = (cfBindings() ?? {}) as unknown as SweepEnv;
         const report = await runBackupSweep(env, {
-          listStoreIds: () => flaggedStoreIds(process.env.STORE_DO_ENABLED_IDS),
+          listStoreIds: () => doStoreIdList(),
           alert: (title, body) => sendAlert({ level: 'p1', source: 'backup-sweep', title, body }),
         });
         if (!report.ok) throw new Error('backup sweep reported failures (alert sent)');

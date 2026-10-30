@@ -209,10 +209,10 @@ describe('job data classification', () => {
 describe('with JOBS_ON_DO off (today) nothing changes', () => {
   it('no store is a DO store, every decision is "run", guardedRun is a pass-through', async () => {
     vi.stubEnv('STORE_DO_ENABLED_IDS', DO_STORE); // the Phase 0 spike flag alone must not touch jobs
-    expect(doStoreIds().size).toBe(0);
+    expect((await doStoreIds()).size).toBe(0);
     registerJob({ id: 'fixture-money-job' }, async () => 1);
     const def = { id: 'fixture-money-job', options: { id: 'x' }, handler: async () => 1 };
-    expect(decideRun(def, { name: 'a', data: { storeId: DO_STORE } })).toEqual({ run: true });
+    expect(await decideRun(def, { name: 'a', data: { storeId: DO_STORE } })).toEqual({ run: true });
     expect(await guardedRun(def, { name: 'a' }, async () => 42)).toBe(42);
   });
 });
@@ -269,7 +269,7 @@ describe('events that carry no storeId (PR E residual)', () => {
   it('with JOBS_ON_DO off the inbox is never read', async () => {
     const def = { id: 'fixture-money-job', options: { id: 'x' }, handler: async () => 1 };
     inbox.get.mockClear();
-    expect(needsStoreLookup(def, { name: 'a', data: { webhookEventId: 'w' } })).toBe(false);
+    expect(await needsStoreLookup(def, { name: 'a', data: { webhookEventId: 'w' } })).toBe(false);
     expect(
       await resolveRunStore(def, { name: 'a', data: { webhookEventId: 'w' } })
     ).toBeUndefined();
@@ -352,14 +352,14 @@ describe('refusal of unported jobs for a DO store', () => {
     expect(none).toHaveBeenCalledTimes(1);
   });
 
-  it('a ported job is NOT refused for a DO store', () => {
+  it('a ported job is NOT refused for a DO store', async () => {
     flagOn();
     const def = {
       id: 'wholesale-pending-nudge-cron',
       options: { id: 'x' },
       handler: async () => 1,
     };
-    expect(decideRun(def, { name: 'a', data: { alarm: true, storeId: DO_STORE } })).toEqual({
+    expect(await decideRun(def, { name: 'a', data: { alarm: true, storeId: DO_STORE } })).toEqual({
       run: true,
     });
   });

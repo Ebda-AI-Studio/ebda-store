@@ -21,7 +21,7 @@ import {
 import { config } from '../config';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
-import { enabledStoreIds } from '../lib/store-backend';
+import { doStoreIdList } from '../lib/store-backend';
 import { storeMoney } from '../lib/repo-factory';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { inngest } from '../lib/inngest/client';
@@ -247,7 +247,7 @@ async function gateDelivery(args: {
     // Once any store lives on its Durable Object an unresolvable reference may be ITS payment whose index row has not landed
     // (CF-PAY-1): never the constant 401 (the gateway would not retry and the order would stay unpaid), but 503 + retry and a
     // P0. The answer is the same for a forged delivery, so it reveals nothing; the alert is throttled by its fixed title.
-    if (enabledStoreIds().size > 0) {
+    if ((await doStoreIdList()).length > 0) {
       await burnDummyWork(rawBody);
       respondUnresolvedForDoFleet(res, provider, idempotencyKey);
       return undefined;

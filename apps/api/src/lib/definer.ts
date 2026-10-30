@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma, withSystemJob, type Prisma } from '@ebda/database';
 import { cfBindings } from '../cf/bindings';
-import { enabledStoreIds } from './store-backend';
+import { backendFor, doStoreIdList } from './store-backend';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
@@ -195,14 +195,14 @@ export async function resolveDoStoreFromWebhookRef(ref: {
 }): Promise<string | null> {
   // Same contract as the Postgres resolver (`ebda_webhook_resolve_store_scoped`): a reference is unique per PROVIDER, so an
   // empty provider resolves nothing, and only the provider-scoped `webhook` key is read - never the unscoped `payment` kind.
-  if (!ref.provider || enabledStoreIds().size === 0) return null;
+  if (!ref.provider || (await doStoreIdList()).length === 0) return null;
   const d1 = (cfBindings() as { PLATFORM_DB?: unknown } | undefined)?.PLATFORM_DB;
   if (!d1) return null;
   const { resolveStoreId } = await import('@ebda-src/repo');
   for (const r of [ref.transactionId, ref.invoiceId]) {
     if (!r) continue;
     const id = await resolveStoreId(d1, 'webhook', `${ref.provider}:${r}`);
-    if (!id || !enabledStoreIds().has(id)) continue;
+    if (!id || (await backendFor(id)) !== 'do') continue;
     // a URL that names store A never accepts store B's reference: same answer as an unknown one
     if (ref.preferStoreId && id !== ref.preferStoreId) return null;
     return id;

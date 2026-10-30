@@ -18,6 +18,7 @@ import { AppError } from '../middleware/error-handler';
 
 export type StoreBackend = 'do' | 'pg';
 
+/** Parse an env list. The ONLY production read of `STORE_DO_ENABLED_IDS` lives here (guard: tests/unit/backend-flag-single-source.test.ts). */
 export function enabledStoreIds(
   raw: string | undefined = process.env.STORE_DO_ENABLED_IDS
 ): Set<string> {
@@ -33,6 +34,10 @@ interface FlagD1 {
   prepare(sql: string): {
     bind(...v: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> };
   };
+}
+
+interface ListD1 {
+  prepare(sql: string): { all<T = Record<string, unknown>>(): Promise<{ results?: T[] }> };
 }
 
 const unavailable = () =>
@@ -58,6 +63,33 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
   if (!row) return 'pg';
   if (row.storage_backend === 'do' || row.storage_backend === 'pg') return row.storage_backend;
   throw unavailable();
+}
+
+/**
+ * Every store served by its Durable Object, from the same source as `backendFor` (Ruling CF-BACKEND-2): the D1 column when
+ * D1 is bound, the env list only where D1 is unbound (Node / tests / local dev; production with a listed store and no D1 is
+ * a 503). Sweeps, the jobs guard and the webhook resolver use this - never the env list - so a store flipped only in D1 is
+ * seen everywhere.
+ */
+export async function doStoreIdList(): Promise<string[]> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: ListD1 } | undefined)?.PLATFORM_DB;
+  if (!d1) {
+    const ids = [...enabledStoreIds()];
+    if (ids.length > 0 && process.env.NODE_ENV === 'production') throw unavailable();
+    return ids;
+  }
+  try {
+    const rows = (
+      await d1.prepare("SELECT id FROM stores WHERE storage_backend = 'do'").all<{ id?: unknown }>()
+    ).results;
+    return (rows ?? []).map(r => r.id).filter((id): id is string => typeof id === 'string' && !!id);
+  } catch {
+    throw unavailable();
+  }
+}
+
+export async function doStoreIdSet(): Promise<Set<string>> {
+  return new Set(await doStoreIdList());
 }
 
 type DoResult<T> = { ok: true; data: T } | { ok: false; code: string; status: number };

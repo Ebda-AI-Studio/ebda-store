@@ -20,7 +20,7 @@ export class StoreSchedule extends StoreScheduleBase<CfBindings> {
 
   protected async dispatch(job: string, event: AlarmEvent): Promise<unknown> {
     // The store went back to Postgres (flag flipped back): its global cron owns the job again, so this alarm starts nothing.
-    if (!doStoreIds().has(event.data.storeId)) return 'not-a-do-store';
+    if (!(await doStoreIds()).has(event.data.storeId)) return 'not-a-do-store';
     const def = getJob(job);
     if (!def) throw new Error(`unknown job ${job}`);
     return startJob(def, event);

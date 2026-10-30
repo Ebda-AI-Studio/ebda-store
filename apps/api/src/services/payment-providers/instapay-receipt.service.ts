@@ -45,7 +45,7 @@ import {
   releaseInstapayReference,
   scheduleClaimRelease,
 } from '../../lib/instapay-ref-claim';
-import { enabledStoreIds } from '../../lib/store-backend';
+import { doStoreIdList } from '../../lib/store-backend';
 import { sniffImage } from '../../lib/upload-sniff';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';
@@ -988,7 +988,7 @@ export class InstapayReceiptService {
     );
     // stores on their Durable Object: `acrossStores` skips them, their receipts are swept in the DO (Ruling INSTAPAY-DO-1)
     // With jobs on the DO, a DO store's own alarm sweeps it (Ruling CF-JOBS-4B); without, the cron still covers it from here.
-    const doStores = only ? (onlyIsDo ? [only] : []) : jobsOnDo() ? [] : [...enabledStoreIds()];
+    const doStores = only ? (onlyIsDo ? [only] : []) : jobsOnDo() ? [] : await doStoreIdList();
     for (const storeId of doStores) {
       try {
         const money = await storeMoney(storeId);

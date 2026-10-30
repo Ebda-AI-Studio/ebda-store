@@ -135,14 +135,14 @@ export async function runJobWorkflow(a: RunWorkflowArgs): Promise<void> {
 
   // A DO store's job that still reads/writes its Postgres tables does not run (Ruling CF-JOBS-1).
   // The lookup needs a database connection, which code outside a step does not have on a Workflow: it is its own step.
-  const runStore = needsStoreLookup(def, event)
+  const runStore = (await needsStoreLookup(def, event))
     ? await step.do(
         'resolve-run-store',
         NO_RETRY,
         async () => (await resolveRunStore(def, event)) ?? null
       )
     : (jobTargetStore(event) ?? null);
-  const decision = decideRunForStore(def, runStore ?? undefined);
+  const decision = await decideRunForStore(def, runStore ?? undefined);
   if (!decision.run) {
     await step.do('do-guard-refusal', NO_RETRY, async () => {
       await reportRefusal(def, event, a.instanceId, decision);

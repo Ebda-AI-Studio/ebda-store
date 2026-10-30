@@ -85,7 +85,7 @@ async function handleOne(msg: QueueMessageLike): Promise<void> {
   const event = body.event;
 
   // A DO store's job that still reads/writes its Postgres tables does not run (Ruling CF-JOBS-1): alert, ack, no failure path.
-  const decision = decideRunForStore(def, await resolveRunStore(def, event));
+  const decision = await decideRunForStore(def, await resolveRunStore(def, event));
   if (!decision.run) {
     await reportRefusal(def, event, msg.id, decision);
     msg.ack();
