@@ -38,6 +38,15 @@ declare module '@ebda-src/repo' {
       }>
     ): Promise<unknown>;
     deleteByIds(ids: string[]): Promise<unknown>;
+    query(
+      values: number[],
+      opts: {
+        topK: number;
+        namespace: string;
+        filter?: Record<string, unknown>;
+        returnMetadata?: 'none' | 'indexed' | 'all';
+      }
+    ): Promise<{ matches: Array<{ id: string; score: number }> }>;
   }
   export interface InstapayReceiptRow {
     id: string;

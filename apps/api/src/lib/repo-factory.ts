@@ -496,6 +496,8 @@ export interface MoneyClient {
   usageCounts(a: { startMs: number; endMs: number }): Promise<Record<string, number>>;
   /** True while any indexable product still needs a vector. */
   vectorStale(a: Record<string, never>): Promise<{ stale: boolean }>;
+  /** The storefront-visible subset of the product ids a Vectorize query returned (Ruling CF-VEC-1). A read. */
+  vectorVisible(a: { ids: string[] }): Promise<{ ids: string[] }>;
   /** Settle an embedded batch: usage, orphans, quarantines, per-product state against the current row. */
   vectorCommit(a: {
     ready: import('@ebda-src/repo').VectorWork[];
@@ -952,6 +954,7 @@ export function makeMoneyClient(
     lastPaidSales: a => call('lastPaidSales', a),
     usageCounts: a => call('usageCounts', a),
     vectorStale: a => call('vectorStale', a),
+    vectorVisible: a => call('vectorVisible', a),
     vectorCommit: a => call('vectorCommit', a),
     vectorPlan: a => call('vectorPlan', a),
     webhookEndpointCreate: a => call('webhookEndpointCreate', a),

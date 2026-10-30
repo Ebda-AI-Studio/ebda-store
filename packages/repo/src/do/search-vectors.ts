@@ -551,6 +551,25 @@ export const hasStaleVectors = (db: SyncSql, storeId: string, now = Date.now()):
 // ---- query ---------------------------------------------------------------------------------------------------------
 
 /**
+ * Of the product ids a Vectorize query returned, the ones the storefront may show: active, not deleted, public audience, and
+ * vectored by THIS model. The Worker queries Vectorize (it holds the binding) and asks the DO this, so a stale or foreign vector
+ * can never surface a hidden product (`vectorVisible` op).
+ */
+export function visibleVectorProductIds(db: SyncSql, storeId: string, ids: string[]): string[] {
+  if (!storeId) throw new MoneyError('STORE_REQUIRED', 'storeId is required', 500);
+  if (ids.length === 0) return [];
+  if (ids.length > 200) throw new MoneyError('BAD_ARGS', 'ids', 400);
+  return db
+    .all(
+      `SELECT p.id FROM products p JOIN product_vector_state s ON s.product_id = p.id AND s.model = ?
+        WHERE p.store_id = ? AND p.${INDEXABLE_SQL.replace(' AND ', ' AND p.')} AND p.audience = 'public'
+          AND p.id IN (${ids.map(() => '?').join(',')})`,
+      [EMBED_MODEL, storeId, ...ids]
+    )
+    .map(r => r.id as string);
+}
+
+/**
  * The vector leg: product ids nearest to the query vector (cosine distance = 1 - Vectorize score), within
  * `maxDistance`, nearest first. Store-scoped twice (the namespace, then the DO's own rows decide visibility:
  * storefront = active, not deleted, public audience, vectors of THIS model only), so a stale or foreign vector can
@@ -582,16 +601,7 @@ export async function semanticProductIds(
   }
   if (best.size === 0) return [];
   const ids = [...best.keys()];
-  const visible = new Set(
-    db
-      .all(
-        `SELECT p.id FROM products p JOIN product_vector_state s ON s.product_id = p.id AND s.model = ?
-          WHERE p.store_id = ? AND p.${INDEXABLE_SQL.replace(' AND ', ' AND p.')} AND p.audience = 'public'
-            AND p.id IN (${ids.map(() => '?').join(',')})`,
-        [EMBED_MODEL, storeId, ...ids]
-      )
-      .map(r => r.id as string)
-  );
+  const visible = new Set(visibleVectorProductIds(db, storeId, ids));
   return ids
     .filter(id => visible.has(id))
     .sort((a, b) => best.get(a)! - best.get(b)! || (a < b ? -1 : 1))

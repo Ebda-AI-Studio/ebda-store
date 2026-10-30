@@ -88,6 +88,7 @@ import {
   vectorCommitOp,
   vectorPlanOp,
   vectorStaleOp,
+  vectorVisibleOp,
   webhookEndpointCreateOp,
 } from './job-ops-b';
 import {
@@ -214,7 +215,8 @@ export type MoneyOpName =
   | 'webhookEndpointCreate'
   | 'vectorPlan'
   | 'vectorCommit'
-  | 'vectorStale';
+  | 'vectorStale'
+  | 'vectorVisible';
 export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'loyaltyEarn',
   'loyaltyReverseEarned',
@@ -304,6 +306,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'vectorPlan',
   'vectorCommit',
   'vectorStale',
+  'vectorVisible',
 ];
 
 const TABLE = '_money_ops';
@@ -625,6 +628,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   orderStamp: (db, storeId, a) => orderStampOp(db, storeId, a),
   usageCounts: (db, storeId, a) => usageCountsOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
+  vectorVisible: (db, storeId, a) => vectorVisibleOp(db, storeId, a),
   vectorCommit: (db, storeId, a) => vectorCommitOp(db, storeId, a),
   vectorPlan: (db, storeId, a) => vectorPlanOp(db, storeId, a),
   webhookEndpointCreate: (db, storeId, a) => webhookEndpointCreateOp(db, storeId, a),

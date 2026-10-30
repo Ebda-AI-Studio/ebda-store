@@ -10,6 +10,7 @@ import {
   quarantineVectorFailure,
   reserveEmbedTexts,
   type VectorWork,
+  visibleVectorProductIds,
 } from './search-vectors';
 
 /** The order columns a job may stamp once. A closed list: the caller names the stamp, never a column. */
@@ -423,6 +424,17 @@ export function vectorCommitOp(
 }
 
 /** True while any indexable product still needs a vector (the backstop probe). */
+/** The storefront-visible subset of the product ids a Vectorize query returned (a read; Ruling CF-VEC-1). */
+export function vectorVisibleOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { ids: string[] } {
+  if (!Array.isArray(a.ids) || a.ids.some(x => typeof x !== 'string' || x.length > 128))
+    throw new MoneyError('BAD_ARGS', 'ids', 400);
+  return { ids: visibleVectorProductIds(db, storeId, a.ids as string[]) };
+}
+
 export function vectorStaleOp(db: SyncSql, storeId: string): { stale: boolean } {
   return { stale: hasStaleVectors(db, storeId) };
 }

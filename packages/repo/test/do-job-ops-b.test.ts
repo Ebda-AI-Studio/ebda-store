@@ -285,6 +285,18 @@ describe('vectorPlan / vectorCommit / vectorStale (Ruling CF-JOBS-4B)', () => {
     expect(op('vectorPlan', { limit: 10 }).work).toHaveLength(0);
   });
 
+  it('vectorVisible: only an active, public, vectored product is visible to the storefront (Ruling CF-VEC-1)', async () => {
+    const { raw, op } = await vrig();
+    const plan = op('vectorPlan', { limit: 10 });
+    op('vectorCommit', { ready: plan.work, failures: [], forget: [], texts: 1 });
+    expect(op('vectorVisible', { ids: ['sku', 'foreign-id'] })).toEqual({ ids: ['sku'] });
+    raw.exec(`UPDATE products SET status = 'draft' WHERE id = 'sku'`);
+    expect(op('vectorVisible', { ids: ['sku'] })).toEqual({ ids: [] });
+    raw.exec(`UPDATE products SET status = 'active', audience = 'wholesale_only' WHERE id = 'sku'`);
+    expect(op('vectorVisible', { ids: ['sku'] })).toEqual({ ids: [] });
+    expect(() => op('vectorVisible', { ids: 'sku' })).toThrow();
+  });
+
   it('an edit between plan and commit leaves the product stale', async () => {
     const { raw, op } = await vrig();
     const plan = op('vectorPlan', { limit: 10 });
