@@ -150,7 +150,7 @@ It refuses without a passing verify report younger than 60 minutes that covers e
 
 ### 8.3 Unfreeze reads and writes, and switch the jobs over
 
-ONE deploy: set `JOBS_ON_DO=1` and remove `WRITES_FROZEN` (or set `0`). `JOBS_ON_DO=1` makes the flagged stores DO stores for jobs (Ruling CF-JOBS-1): their alarms are armed, their money and stock jobs are ALL ported and run (Ruling CF-JOBS-4; the flip gate `node scripts/cf/not-on-do.mjs` refuses to open while one is not), and the sweeps run on each store's alarm; no job is refused (the gate refuses to open otherwise). It is never set earlier, and never without the flip (a flag with no flipped store arms nothing; a flipped store without it runs Postgres jobs against sealed rows). The parked messages, Workflow instances and alarms run on their own within 5 minutes, in the order they were parked (a parked daily cron runs once, a skipped sweep tick is replaced by the next tick). Run the smoke below once the backlog drains.
+ONE deploy: set `JOBS_ON_DO=1`, set `STORE_DO_ENABLED_IDS` to EXACTLY the flipped store ids (Opus C3, interim until `feat/cf-r6b` derives it from D1: the jobs guard, alarm arming, the DO webhook resolver and the InstaPay retention sweep still read this list; compare it with `wrangler d1 execute ebda-platform --remote --command "SELECT id FROM stores WHERE storage_backend='do'"` and stop on any difference) and remove `WRITES_FROZEN` (or set `0`). `JOBS_ON_DO=1` makes the flagged stores DO stores for jobs (Ruling CF-JOBS-1): their alarms are armed, their money and stock jobs are ALL ported and run (Ruling CF-JOBS-4; the flip gate `node scripts/cf/not-on-do.mjs` refuses to open while one is not), and the sweeps run on each store's alarm; no job is refused (the gate refuses to open otherwise). It is never set earlier, and never without the flip (a flag with no flipped store arms nothing; a flipped store without it runs Postgres jobs against sealed rows). The parked messages, Workflow instances and alarms run on their own within 5 minutes, in the order they were parked (a parked daily cron runs once, a skipped sweep tick is replaced by the next tick). Run the smoke below once the backlog drains.
 
 ### 8.4 Smoke (NEVER complete a purchase)
 
@@ -160,6 +160,8 @@ ONE deploy: set `JOBS_ON_DO=1` and remove `WRITES_FROZEN` (or set `0`). `JOBS_ON
 4. Guest cart: add a product to a cart as a guest and view the cart. Stop at the cart. Do not enter checkout payment; do not place an order.
 5. Cross-store isolation: a store A request with store B's id gets 404/403 (the isolation test in CI covers it; one manual curl is enough).
 6. Sentry: no new issue in the 10 minutes after the flip.
+7. Logged-in shopper (Opus M2; C1/C4 would pass a guest-only smoke unseen): sign in as the demo SHOPPER (a `users.id` with and one without a CRM `customers` row), add to cart, open checkout and read the priced quote (the wallet line, if the shopper has a balance, shows). Do not pay. The same shopper's order list opens. A 404 `CUSTOMER_NOT_FOUND` here is a rollback trigger (section 9).
+8. Jobs and webhook, STAGING ONLY, before the 2-hour keep decision: with a sandbox gateway key, pay one test order, POST the gateway's signed test webhook, and confirm the order turns paid, the sale journal entry exists and the confirmation job ran (`wrangler tail ebda-api --search "jobs-do-guard"` shows no refusal). Production is never paid in the smoke.
 
 ### 8.5 Shadow compare (Ruling CUTOVER-1, shrunken)
 

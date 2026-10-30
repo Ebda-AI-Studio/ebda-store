@@ -171,6 +171,29 @@ describe('order money operations: the door', () => {
     expect(r.code('confirmPayment', { orderId: old })).toBe('INSTAPAY_ORDER_CANCELLED');
   });
 
+  it('OPUS C4: a logged-in shopper (users.id) checks out and a merchant order is placed for them, with a differing CRM id AND with no CRM row at all', () => {
+    const r = rig(100);
+    // u-a has a CRM row whose id differs from the user id; u-b has no CRM row on this store at all
+    r.raw.exec(
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-a', 's1', 'A', 'B', 'u-a')`
+    );
+    for (const u of ['u-a', 'u-b']) {
+      expect(r.code('createOrder', r.order({ customerId: u, paymentMethod: 'cod' }))).toBe(
+        'no error'
+      );
+      expect(
+        r.code('createAdminOrder', {
+          lines: [{ productId: 'sku', quantity: 1 }],
+          shippingAddress: { firstName: 'A', lastName: 'B', phone: '01012345678' },
+          customerId: u,
+          actorId: 'admin',
+          actorRole: 'store_admin',
+        })
+      ).toBe('no error');
+      expect(r.n(`SELECT count(*) n FROM orders WHERE customer_id = '${u}'`)).toBe(2);
+    }
+  });
+
   it('wallet never goes negative and a coupon never passes its limit, across many orders', () => {
     const r = rig(100);
     r.raw.exec(
