@@ -1,4 +1,5 @@
-import { prisma, Prisma } from '@ebda/database';
+import { currentStoreId, prisma, Prisma } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
@@ -377,7 +378,9 @@ export class AnalyticsService {
     startDate: Date,
     endDate: Date
   ): Promise<number | null> {
-    const agg = await prisma.funnelSnapshot.aggregate({
+    const agg = await (
+      await storeDb(currentStoreId())
+    ).funnelSnapshot.aggregate({
       where: { storeId, periodDate: { gte: startDate, lte: endDate } },
       _sum: { productViews: true, ordersCompleted: true },
     });

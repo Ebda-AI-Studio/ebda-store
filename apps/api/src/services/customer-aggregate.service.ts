@@ -1,4 +1,5 @@
-import { prisma, Prisma, type RfmSegment } from '@ebda/database';
+import { currentStoreId, prisma, Prisma, type RfmSegment } from '@ebda/database';
+import { storeDb } from '../lib/repo-factory';
 import { getCached, customersCacheKey } from '../lib/public-cache';
 import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
@@ -879,7 +880,9 @@ export async function segmentsForCustomers(
   const out = new Map<string, RfmSegment>();
   if (rows.length === 0) return out;
   const keyOf = new Map(rows.map(r => [r.id, rfmKeyFor(r.id, r.isGuest)]));
-  const snapshots = await prisma.customerRfmSnapshot.findMany({
+  const snapshots = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.findMany({
     where: { storeId, customerId: { in: Array.from(new Set(keyOf.values())) } },
     select: { customerId: true, segment: true },
   });
@@ -901,7 +904,9 @@ export async function filterCustomersBySegment<T extends { id: string; isGuest: 
   rows: ReadonlyArray<T>,
   segment: RfmSegment
 ): Promise<T[]> {
-  const members = await prisma.customerRfmSnapshot.findMany({
+  const members = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.findMany({
     where: { storeId, segment },
     select: { customerId: true },
   });
@@ -916,7 +921,9 @@ export async function filterCustomersBySegment<T extends { id: string; isGuest: 
  * a read of every snapshot (issue 2243).
  */
 export async function presentRfmSegments(storeId: string): Promise<RfmSegment[]> {
-  const groups = await prisma.customerRfmSnapshot.groupBy({
+  const groups = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.groupBy({
     by: ['segment'],
     where: { storeId },
   });

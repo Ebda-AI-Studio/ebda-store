@@ -15,7 +15,8 @@
  * keeps Gemini call counts low.
  */
 
-import { prisma, runInStoreScope, withStore } from '@ebda/database';
+import { currentStoreId, prisma, runInStoreScope, withStore } from '@ebda/database';
+import { storeDb } from '../../lib/repo-factory';
 import { callGemini } from './gemini-ai.service';
 import logger from '../../lib/logger';
 
@@ -90,7 +91,9 @@ async function narrate(storeId: string, scope: NarrationScope): Promise<Narratio
 
 async function narrateCohort(storeId: string, storeName: string): Promise<Narration | null> {
   // Top 6 cohorts by month-3 retention (periodOffset = 3)
-  const cohorts = await prisma.customerCohortSnapshot.findMany({
+  const cohorts = await (
+    await storeDb(currentStoreId())
+  ).customerCohortSnapshot.findMany({
     where: { storeId, periodOffset: 3 },
     orderBy: { cohortMonth: 'desc' },
     take: 6,
@@ -110,7 +113,9 @@ async function narrateCohort(storeId: string, storeName: string): Promise<Narrat
 }
 
 async function narrateFunnel(storeId: string, storeName: string): Promise<Narration | null> {
-  const funnels = await prisma.funnelSnapshot.findMany({
+  const funnels = await (
+    await storeDb(currentStoreId())
+  ).funnelSnapshot.findMany({
     where: { storeId },
     orderBy: { periodDate: 'desc' },
     take: 14,
@@ -132,7 +137,9 @@ async function narrateFunnel(storeId: string, storeName: string): Promise<Narrat
 }
 
 async function narrateSegment(storeId: string, storeName: string): Promise<Narration | null> {
-  const segments = await prisma.customerRfmSnapshot.groupBy({
+  const segments = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.groupBy({
     by: ['segment'],
     where: { storeId },
     _count: { id: true },
@@ -142,7 +149,9 @@ async function narrateSegment(storeId: string, storeName: string): Promise<Narra
   if (segments.length === 0) return null;
 
   // Customers who moved between segments (movers reveal churn/recovery signals)
-  const movers = await prisma.customerRfmSnapshot.findMany({
+  const movers = await (
+    await storeDb(currentStoreId())
+  ).customerRfmSnapshot.findMany({
     where: { storeId, previousSegment: { not: null } },
     select: { segment: true, previousSegment: true },
     take: 100,
