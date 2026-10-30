@@ -24,17 +24,25 @@ export function check(files, labels) {
   return { ok: labels.includes(LABEL), changed };
 }
 
+/**
+ * The PR's OWN changed files. On pull_request CI, HEAD is a merge commit of the PR head into the CURRENT base, so diffing the
+ * event's (possibly stale) base sha pulls main's later commits into the list. For a merge commit diff its parents
+ * (HEAD^1...HEAD^2 = merge-base..PR head); otherwise (push/local) fall back to base...HEAD.
+ */
+export function changedFiles(cwd, base) {
+  const git = args =>
+    execFileSync('git', args, { cwd, encoding: 'utf8' }).split('\n').filter(Boolean);
+  const parents = git(['rev-list', '--parents', '-n', '1', 'HEAD'])[0]?.split(' ').slice(1) ?? [];
+  const range = parents.length === 2 ? 'HEAD^1...HEAD^2' : `${base}...HEAD`;
+  return git(['diff', '--name-only', range]);
+}
+
 function main(argv) {
   const val = k => (argv.includes(`--${k}`) ? argv[argv.indexOf(`--${k}`) + 1] : undefined);
   const base = val('base');
   const labels = JSON.parse(val('labels') || '[]');
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const files = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], {
-    cwd: root,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .filter(Boolean);
+  const files = changedFiles(root, base);
   const r = check(files, labels);
   if (!r.ok) {
     console.error(
