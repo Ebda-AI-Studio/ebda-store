@@ -121,12 +121,8 @@ export function applyWalletEntry(
     }
 
     if (a.amount > 0) {
-      const cust = db.all('SELECT id FROM customers WHERE id = ? AND store_id = ?', [
-        a.customerId,
-        a.storeId,
-      ])[0];
-      if (!cust)
-        throw new MoneyError('CUSTOMER_NOT_FOUND', 'customer not found in this store', 404);
+      // `customerId` is the shopper's users.id (Ruling CF-FIX-2): a wallet belongs to the account, never to a CRM row, and
+      // a credit must not be refused because the merchant has no CRM row for the shopper (the Postgres twin checks `users`).
       db.run(
         `INSERT INTO customer_wallets (id, store_id, customer_id, balance, created_at, updated_at)
          VALUES (?, ?, ?, 0, ?, ?) ON CONFLICT (store_id, customer_id) DO NOTHING`,

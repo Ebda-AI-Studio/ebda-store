@@ -83,7 +83,7 @@ describe('StoreDO.moneyOp orders', () => {
     const stub = await seed(
       'ord-wallet',
       100,
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', '$S', 'A', 'B');;INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', '$S', 'cust', 5000)`
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', '$S', 'A', 'B', 'cust');;INSERT INTO customer_wallets (id, store_id, customer_id, balance) VALUES ('w1', '$S', 'cust', 5000)`
     );
     const answers = await Promise.all(
       Array.from({ length: 30 }, () =>

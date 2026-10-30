@@ -21,7 +21,9 @@ function fixture(over: { days?: number | null; walletAmount?: number } = {}) {
   x(
     `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p2', 's1', 'Cap', 'cap', 5000, 5, 'active')`
   );
-  x(`INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`);
+  x(
+    `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', 's1', 'A', 'B', 'cust')`
+  );
   x(
     `INSERT INTO orders (id, store_id, customer_id, order_number, status, payment_status, subtotal, discount, tax, shipping, total, wallet_amount, shipping_address, billing_address, delivered_at, updated_at, created_at)
      VALUES ('o1', 's1', 'cust', 'ORD-1', 'delivered', 'paid', 25000, 2500, 3150, 0, 25650, ?, '{}', '{}', ?, ?, ?)`,
@@ -257,7 +259,10 @@ describe('complete: claim, finish, release', () => {
     const a = f.create([line('i1', 'p1', 1)]);
     f.toReceived(a);
     f.op('returnClaim', { returnId: a, refundMethod: 'store_credit', walletFeature: true });
-    f.x(`DELETE FROM customers WHERE id = 'cust'`); // the credit cannot be applied
+    // the credit cannot be applied (a CRM row is NOT what it needs: the wallet is the account's, keyed by users.id)
+    f.x(
+      `CREATE TRIGGER wallet_boom BEFORE INSERT ON customer_wallets BEGIN SELECT RAISE(ABORT, 'wallet unavailable'); END`
+    );
     expect(
       refusal(() =>
         f.op('returnFinish', {
@@ -266,14 +271,12 @@ describe('complete: claim, finish, release', () => {
           walletFeature: true,
           userId: 'u1',
         })
-      ).code
-    ).toBe('CUSTOMER_NOT_FOUND');
+      ).message
+    ).toMatch(/wallet unavailable/);
     expect(f.ret(a)).toMatchObject({ status: 'received' }); // not completed without its credit
     expect(f.one(`SELECT inventory FROM products WHERE id = 'p1'`).inventory).toBe(5); // no restock either
     expect(f.one('SELECT count(*) n FROM wallet_transactions').n).toBe(0);
-    f.x(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', 's1', 'A', 'B')`
-    );
+    f.x('DROP TRIGGER wallet_boom');
     const key = 'finish-key-0001';
     const args = { returnId: a, refundMethod: 'store_credit', walletFeature: true, userId: 'u1' };
     const one = f.op('returnFinish', args, key);

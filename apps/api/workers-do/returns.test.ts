@@ -46,7 +46,7 @@ async function seed(store: string) {
       store
     );
     x(
-      `INSERT INTO customers (id, store_id, first_name, last_name) VALUES ('cust', ?, 'A', 'B')`,
+      `INSERT INTO customers (id, store_id, first_name, last_name, user_id) VALUES ('crm-cust', ?, 'A', 'B', 'cust')`,
       store
     );
     x(
@@ -246,11 +246,28 @@ describe('StoreDO.moneyOp returns', () => {
     const id = await received(stub, 'ret-atomic', [tee(1)]);
     const args = { returnId: id, refundMethod: 'store_credit', walletFeature: true };
     val(await op(stub, 'ret-atomic', 'returnClaim', args));
-    await runInDurableObject(stub, (_i, s) => s.storage.sql.exec(`DELETE FROM customers`));
+    await runInDurableObject(stub, (_i, s) =>
+      s.storage.sql.exec(
+        `CREATE TRIGGER wallet_boom BEFORE INSERT ON customer_wallets BEGIN SELECT RAISE(ABORT, 'wallet unavailable'); END`
+      )
+    );
     const refused = await op(stub, 'ret-atomic', 'returnFinish', { ...args, userId: 'u' });
-    expect(refused).toMatchObject({ ok: false, code: 'CUSTOMER_NOT_FOUND' });
+    expect(refused).toMatchObject({ ok: false });
     expect(await num(stub, `SELECT count(*) AS n FROM returns WHERE status = 'received'`)).toBe(1);
     expect(await num(stub, `SELECT inventory AS n FROM products WHERE id = 'p1'`)).toBe(3);
     expect(await num(stub, `SELECT count(*) AS n FROM wallet_transactions`)).toBe(0);
+  });
+
+  it('the return credit lands on the account (users.id) even when the merchant has NO CRM row for the shopper (Ruling CF-FIX-2)', async () => {
+    const stub = await seed('ret-nocrm');
+    const id = await received(stub, 'ret-nocrm', [tee(1)]);
+    await runInDurableObject(stub, (_i, s) => s.storage.sql.exec(`DELETE FROM customers`));
+    const args = { returnId: id, refundMethod: 'store_credit', walletFeature: true };
+    val(await op(stub, 'ret-nocrm', 'returnClaim', args));
+    val(await op(stub, 'ret-nocrm', 'returnFinish', { ...args, userId: 'u' }));
+    expect(await num(stub, `SELECT count(*) AS n FROM returns WHERE status = 'completed'`)).toBe(1);
+    expect(
+      await num(stub, `SELECT balance AS n FROM customer_wallets WHERE customer_id = 'cust'`)
+    ).toBeGreaterThan(0);
   });
 });

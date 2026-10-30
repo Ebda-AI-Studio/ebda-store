@@ -85,6 +85,26 @@ export interface CustomerMatches {
   guestsTruncated: boolean;
 }
 
+/**
+ * The ids an order's `customer_id` can hold for these CRM rows (Ruling CF-FIX-1). Postgres has `orders.customer_id -> users.id`:
+ * a migrated order, and any order a signed-in shopper placed, carries the PLATFORM user id, while an order a merchant opened
+ * for a CRM row (`createAdminOrder`) carries `customers.id`. The CRM row links to its user through `customers.user_id`, which
+ * equals `customers.id` only by chance. So a matched row stands for BOTH ids; `userIds` returns the row ids first, then the
+ * linked user ids not already listed (one bound parameter: json_each).
+ */
+function withLinkedUserIds(db: SyncSql, storeId: string, rowIds: string[]): string[] {
+  if (rowIds.length === 0) return rowIds;
+  const seen = new Set(rowIds);
+  const linked = db
+    .all(
+      'SELECT user_id FROM customers WHERE store_id = ? AND user_id IS NOT NULL AND id IN (SELECT value FROM json_each(?)) ORDER BY id',
+      [storeId, JSON.stringify(rowIds)]
+    )
+    .map(r => r.user_id as string)
+    .filter(u => !seen.has(u) && seen.add(u));
+  return [...rowIds, ...linked];
+}
+
 /** Registered customers and guest orders matching what an admin typed. Store-scoped; empty for an empty query. */
 export function matchingCustomers(
   db: SyncSql,
@@ -129,8 +149,9 @@ export function matchingCustomers(
   const guests = pick('guest_order', guestCap);
   const usersTruncated = users.length > userCap;
   const guestsTruncated = guests.length > guestCap;
+  const kept = users.slice(0, userCap);
   return {
-    userIds: users.slice(0, userCap),
+    userIds: withLinkedUserIds(db, storeId, kept),
     guestOrderIds: guests.slice(0, guestCap),
     truncated: usersTruncated || guestsTruncated,
     usersTruncated,

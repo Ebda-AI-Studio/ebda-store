@@ -12,6 +12,7 @@ import {
   searchProductIdSet,
   verifyProductIndex,
 } from '../src/do/search';
+import { searchOrderIds } from '../src/do/order-search';
 import { matchingCustomers, searchOrderNumbers } from '../src/do/search-customers';
 import { buildCustomerPatterns, digitsOnly, normalizeArabicSearch } from '../../shared/src/search';
 
@@ -148,6 +149,40 @@ describe('customer lookup', () => {
         );
       }
     }
+  });
+});
+
+describe('registered customers and orders.customer_id (Ruling CF-FIX-1)', () => {
+  it('a migrated order carries the platform users.id: the CRM row (own id, user_id link) finds it; a merchant-opened order carries customers.id', () => {
+    const f = fx();
+    f.customer('crm-1', 'خالد', 'منصور', { phone: '01234567890' });
+    f.raw.prepare("UPDATE customers SET user_id = 'user-9' WHERE id = 'crm-1'").run();
+    f.customer('crm-2', 'خالد', 'سعيد'); // no linked user: its own id is what its orders carry
+    f.order('migrated', { customer: 'user-9' }); // customer_id is a users.id, NOT a customers.id
+    f.order('opened', { customer: 'crm-2' });
+    f.order('other', { customer: 'user-77' });
+    const ids = (q: string) => searchOrderIds(f.db, 's1', q).userIds.sort();
+    expect(ids('منصور')).toEqual(['crm-1', 'user-9']);
+    expect(ids('01234567890')).toEqual(['crm-1', 'user-9']);
+    expect(ids('سعيد')).toEqual(['crm-2']);
+    expect(ids('خالد')).toEqual(['crm-1', 'crm-2', 'user-9']);
+    // the order list filters `customer_id IN userIds`: it must return the migrated order and the merchant-opened one
+    const hit = (q: string) =>
+      (
+        f.raw
+          .prepare(
+            'SELECT id FROM orders WHERE customer_id IN (SELECT value FROM json_each(?)) ORDER BY id'
+          )
+          .all(JSON.stringify(ids(q))) as Array<{ id: string }>
+      ).map(r => r.id);
+    expect(hit('منصور')).toEqual(['migrated']);
+    expect(hit('خالد')).toEqual(['migrated', 'opened']);
+  });
+  it('another store’s link is never returned', () => {
+    const f = fx();
+    f.customer('crm-s2', 'خالد', 'منصور', { store: 's2' });
+    f.raw.prepare("UPDATE customers SET user_id = 'u-s2' WHERE id = 'crm-s2'").run();
+    expect(searchOrderIds(f.db, 's1', 'منصور').userIds).toEqual([]);
   });
 });
 
