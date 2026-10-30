@@ -154,7 +154,7 @@ export default function MinimalHeader({
               isCentre
                 ? 'max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
                 : isProminent
-                  ? 'top-3 max-w-[calc(100%-7rem)] md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]'
+                  ? `top-3 ${logoPlacement ? 'max-w-[calc(100%-13rem)]' : 'max-w-[calc(100%-7rem)]'} md:top-auto md:col-start-1 md:row-start-1 md:max-w-[16rem]`
                   : logoPlacement
                     ? // the cart and language (96 px) sit on one side, so the centred logo may not reach them
                       'max-w-[calc(100%-13rem)] md:max-w-none'
@@ -377,7 +377,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`lg:hidden ${logoPlacement && !isProminent ? 'max-lg:absolute max-lg:start-0 max-lg:top-1/2 max-lg:-translate-y-1/2 ' : ''}inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR : ''}`}
+              className={`lg:hidden ${logoPlacement ? (isProminent ? 'max-lg:absolute max-lg:start-0 max-lg:top-3 ' : 'max-lg:absolute max-lg:start-0 max-lg:top-1/2 max-lg:-translate-y-1/2 ') : ''}inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${tabBarShown ? HEADER_MENU_WITH_TAB_BAR : ''}`}
               aria-label={t('Menu', 'القائمة')}
               aria-expanded={isMenuOpen}
             >
