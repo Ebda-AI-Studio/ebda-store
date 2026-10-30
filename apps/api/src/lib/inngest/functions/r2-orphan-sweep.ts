@@ -8,7 +8,7 @@ import {
   storeDirectory,
   withoutHiddenStores,
 } from '@ebda/database';
-import { storeRepo } from '../../repo-factory';
+import { collectDoStoreReferencedKeys } from '../../r2-do-references';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -17,10 +17,6 @@ import { urlToR2Key } from '../../../services/r2-cleanup.service';
 import {
   assertStrictTablesVisible,
   collectReferencedR2Keys,
-  columnsByTable,
-  urlsInColumnValue,
-  urlsInString,
-  PLATFORM_R2_TABLES,
   isDerivedR2Key,
   isExpiredDerivedKey,
 } from '../../r2-references';
@@ -134,50 +130,9 @@ export async function collectDoReferencedKeys(): Promise<string[]> {
     storeDirectory(undefined, { includeDeleted: true })
   );
   const keys = new Set<string>();
-  const tables = [...columnsByTable()].filter(([t]) => !PLATFORM_R2_TABLES.includes(t));
   for (const { id } of stores) {
-    const repo = await storeRepo(id);
-    if (repo.backend !== 'do') continue;
-    const money = repo.money;
-    if (!money) throw new Error(`r2-orphan-sweep: no DO client for store ${id}`);
-    for (const [table, cols] of tables) {
-      let after: string | undefined;
-      do {
-        const page = await money.r2References({
-          table,
-          columns: cols.map(c => c.column),
-          after,
-          limit: 1000,
-        });
-        if (page.missing)
-          throw new Error(
-            `r2-orphan-sweep: store ${id} has no ${table} with the registered columns`
-          );
-        for (const row of page.rows)
-          for (const c of cols) {
-            const v = row[c.column];
-            if (v == null) continue;
-            let value: unknown = v;
-            if (c.kind === 'json') {
-              try {
-                value = JSON.parse(v);
-              } catch {
-                // unparseable JSON text: scan it as text (over-inclusive, which only keeps a file alive)
-                for (const url of urlsInString(v)) {
-                  const key = urlToR2Key(url);
-                  if (key) keys.add(key);
-                }
-                continue;
-              }
-            }
-            for (const url of urlsInColumnValue(c.kind, value)) {
-              const key = urlToR2Key(url);
-              if (key) keys.add(key);
-            }
-          }
-        after = page.last ?? undefined;
-      } while (after);
-    }
+    const storeKeys = await collectDoStoreReferencedKeys(id, urlToR2Key);
+    if (storeKeys) for (const k of storeKeys) keys.add(k);
   }
   return [...keys];
 }
